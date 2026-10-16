@@ -29,8 +29,8 @@ Responses are JSON unless noted.
 ## Public Endpoints (no auth)
 
 ### `GET /status`
-Health check. Its shape is load-bearing — `scripts/check-deploy-lag.mjs` reads
-`commit` and `branch` and refuses to report "no lag" for a status it cannot
+Health check. Its shape is load-bearing — deploy-lag checks read
+`commit` and `branch` and must not report "no lag" for a status they cannot
 parse.
 
 **Response:**
@@ -810,8 +810,8 @@ Returns `404` if the agreement does not exist or does not belong to the caller's
 
 ---
 
-> Portal ↔ core machine-to-machine endpoints (e.g. `POST /api/admin/tenant-status`,
-> `POST /api/admin/silo`) are SaaS-only and not used by a standalone self-hosted deploy.
+> Machine-to-machine endpoints under `/api/platform/*` (e.g. `PATCH /api/platform/tenants/:slug`,
+> `POST /api/platform/tenants/:slug/data-export`) are mounted only in multi-tenant (`APP_MODE=saas`) deployments and are not used by a standalone self-hosted deploy.
 
 ---
 

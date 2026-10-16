@@ -39,7 +39,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const [templatesRes, servicesRes, membersRes, usageRes] = await Promise.all([
       api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
       api.services.index.$get().catch(() => null),
-      api.admin.members.$get().catch(() => null),
+      api.inspections.inspectors.$get().catch(() => null),
       api.usage.summary.$get().catch(() => null),
     ]);
 
@@ -68,16 +68,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       services = (sj.data ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price }));
     }
 
-    // B-21 team step — non-admins get 403 → null → []; team step hidden for them.
-    const schedulingRoles = new Set(["owner", "manager", "inspector"]);
+    // B-21 team step — the assignee list the schedule routes use, so it is open to office staff too. Someone
+    // who may not reassign gets 403 → null → []; the team step is hidden for them. Already limited to field roles.
     let teamMembers: WizardTeamMember[] = [];
     if (membersRes?.ok) {
-      const mb = (await membersRes.json()) as {
-        data?: Array<{ id: string; email: string; role: string; name?: string | null }>;
-      };
-      teamMembers = (mb.data ?? [])
-        .filter((m) => schedulingRoles.has(m.role))
-        .map((m) => ({ id: m.id, name: m.name ?? m.email }));
+      const mb = (await membersRes.json()) as { data?: Array<{ id: string; email: string; name?: string | null }> };
+      teamMembers = (mb.data ?? []).map((m) => ({ id: m.id, name: m.name ?? m.email }));
     }
 
     let quotaCaps: QuotaTriple | null = null;

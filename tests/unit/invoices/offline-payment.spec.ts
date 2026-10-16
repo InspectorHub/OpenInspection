@@ -234,7 +234,7 @@ describe('POST /api/invoices/{id}/payments — recording', () => {
 });
 
 describe('POST /api/invoices/{id}/payments — the capability gate', () => {
-    it('403s an inspector without the financial capability', async () => {
+    it('403s an inspector without the companyFinance capability', async () => {
         // Asserted over HTTP against the REAL mounted route: a route that
         // declares a capability but never mounts the guard still answers 200,
         // and only the status code can tell the two apart.
@@ -337,7 +337,7 @@ describe('POST /api/invoices/{id}/payments/{paymentId}/corrections', () => {
         expect(res.status).toBe(404);
     });
 
-    it('403s an inspector without the financial capability', async () => {
+    it('403s an inspector without the companyFinance capability', async () => {
         const origId = await recordAndGetId(20000);
         const res = await postCorrection(origId, { correctedAmountCents: 2000, reason: 'typo' }, 'inspector');
         expect(res.status).toBe(403);

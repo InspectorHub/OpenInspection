@@ -40,7 +40,7 @@ const ByInspectorSchema = z.object({
     ledCount:               z.number().describe('Inspections this person led in the period.'),
     assistedCount:          z.number().describe('Inspections this person assisted on in the period.'),
     payCents:               z.number().describe('What this inspector earns: the sum of their recorded pay split rows, in cents.'),
-    attributedRevenueCents: z.number().nullable().describe('What the business billed for the lines they worked, in cents; null for a caller without the financial capability.'),
+    attributedRevenueCents: z.number().nullable().describe('What the business billed for the lines they worked, in cents; null for a caller without the companyFinance capability.'),
     medianTurnaroundDays:   z.number().nullable().describe('Median days from field completion to report publish, lead only; null when there is no basis.'),
     turnaroundBasis:        z.enum(['field_complete_to_report_published', 'no_data']).describe('Which clock the turnaround figure used, or no_data when none was available.'),
 });
@@ -55,22 +55,22 @@ const MetricsResponseSchema = z.object({
     /** Echoed back so a caller can tell what window the numbers actually cover. */
     from:             z.string().describe('First day the figures cover (inclusive), YYYY-MM-DD.'),
     to:               z.string().describe('Last day the figures cover (inclusive), YYYY-MM-DD.'),
-    // `self` means the caller lacks the financial capability: byInspector holds
+    // `self` means the caller lacks the companyFinance capability: byInspector holds
     // only their own row and every company figure is null. Null rather than
     // zero — zero would be a claim about the business.
     scope:            z.enum(['all', 'self']).describe('Whether the payload covers the company or only the caller.'),
-    totalRevenue:     z.number().nullable().describe('Effective revenue over the window in cents; null without the financial capability.'),
+    totalRevenue:     z.number().nullable().describe('Effective revenue over the window in cents; null without the companyFinance capability.'),
     totalInspections: z.number().describe('Inspections in the window.'),
-    avgOrderValue:    z.number().nullable().describe('Mean effective price per inspection in cents; null without the financial capability.'),
-    monthly:          z.array(MonthlyDataSchema).describe('Monthly revenue and volume series; empty without the financial capability.'),
-    topAgents:        z.array(TopAgentSchema).describe('Referrers by volume — contact-keyed rows first, then free-text sources; empty without the financial capability.'),
+    avgOrderValue:    z.number().nullable().describe('Mean effective price per inspection in cents; null without the companyFinance capability.'),
+    monthly:          z.array(MonthlyDataSchema).describe('Monthly revenue and volume series; empty without the companyFinance capability.'),
+    topAgents:        z.array(TopAgentSchema).describe('Referrers by volume — contact-keyed rows first, then free-text sources; empty without the companyFinance capability.'),
     byInspector:      z.array(ByInspectorSchema).describe('Per-inspector counts, pay, attributed revenue and median turnaround.'),
-    serviceBreakdown: z.array(ServiceDistributionSchema).describe('Service mix by volume and revenue; empty without the financial capability.'),
+    serviceBreakdown: z.array(ServiceDistributionSchema).describe('Service mix by volume and revenue; empty without the companyFinance capability.'),
     paymentSummary: z.object({
         paid:    z.number().describe('Effective revenue on inspections marked paid, in cents.'),
         unpaid:  z.number().describe('Effective revenue on inspections still unpaid, in cents.'),
         overdue: z.number().describe('Effective revenue past due, in cents.'),
-    }).nullable().describe('Paid/unpaid split; null without the financial capability.'),
+    }).nullable().describe('Paid/unpaid split; null without the companyFinance capability.'),
 });
 
 export const MetricsApiResponseSchema = createApiResponseSchema(MetricsResponseSchema);

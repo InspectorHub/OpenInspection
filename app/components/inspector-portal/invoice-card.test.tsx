@@ -21,7 +21,7 @@
  *   submit should never sit disabled with no explanation.
  *
  * `undefined` is deliberately NOT folded in with `0`: it means the viewer lacks
- * the `financial` capability and the amount is redacted, which is a permission
+ * the `companyFinance` capability and the amount is redacted, which is a permission
  * question this change has no business answering.
  */
 import { describe, it, expect } from "vitest";
@@ -79,5 +79,42 @@ describe("InvoiceCard request-payment affordance", () => {
     it("leaves the redacted-money case exactly as it was", () => {
         renderCard(undefined);
         expect(screen.getByRole("button", { name: /request payment/i })).toBeTruthy();
+    });
+});
+
+describe("InvoiceCard payment-required switch", () => {
+    function renderWithGate(canEditGate: boolean | undefined) {
+        const Stub = createRoutesStub([
+            {
+                path: "/",
+                Component: () => (
+                    <InvoiceCard
+                        pill={{ tone: "monitor", label: "Unpaid" }}
+                        amountCents={45000}
+                        currency="USD"
+                        paid={false}
+                        sent={false}
+                        payUrl={null}
+                        hasServiceLines={false}
+                        paymentRequired={false}
+                        basePriceCents={45000}
+                        canManagePrice={false}
+                        {...(canEditGate === undefined ? {} : { canEditGate })}
+                        onRequestPayment={() => {}}
+                    />
+                ),
+            },
+        ]);
+        return render(<Stub initialEntries={["/"]} />);
+    }
+
+    it("is not rendered for a viewer whose order edits the API refuses (staff)", () => {
+        const { container } = renderWithGate(false);
+        expect(container.querySelector('[data-testid="hub-gate-payment"]')).toBeNull();
+    });
+
+    it("POSITIVE CONTROL - rendered by default, and when allowed", () => {
+        expect(renderWithGate(undefined).container.querySelector('[data-testid="hub-gate-payment"]')).not.toBeNull();
+        expect(renderWithGate(true).container.querySelector('[data-testid="hub-gate-payment"]')).not.toBeNull();
     });
 });

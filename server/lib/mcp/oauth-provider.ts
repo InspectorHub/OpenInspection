@@ -1,10 +1,12 @@
 import { OAuthError, OAuthProvider, getOAuthApi, type OAuthProviderOptions, type TokenExchangeCallbackResult } from '@cloudflare/workers-oauth-provider';
 import { claimsNative, currentNativeRole, isNativeProps, nativeGrantCredentialState, nativeTokenExchange } from '../auth/native-token';
-import { InspectorMcp } from '../../durable-objects/inspector-mcp';
-import type { McpProps } from '../../durable-objects/inspector-mcp';
+import type { McpProps } from './build-server';
+import { resourceUrlFor } from './resource-url';
+import { logger } from '../logger';
 import { mcpEnabled, nativeClientEnabled, oauthProviderEnabled } from './flag';
 import { assertCompanySlugMatches, slugFromMcpPath, stripMcpSlugPrefix } from './identity-bridge';
 import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
+import type { AppEnv } from '../../types/hono';
 
 /**
  * Loose fetch signature used for both the app handler and the returned handler.
@@ -16,10 +18,17 @@ type FetchFn = (req: Request, env: any, ctx: ExecutionContext) => Response | Pro
 
 /**
  * Minimal env subset read by this module. The full wrangler bindings live in
- * worker-configuration.d.ts; regenerate with `wrangler types` once OAUTH_KV /
- * INSPECTOR_MCP are confirmed provisioned to update the global Env type.
+ * worker-configuration.d.ts; regenerate with `wrangler types` once OAUTH_KV is
+ * confirmed provisioned to update the global Env type.
  */
-type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string; DB?: D1Database; TENANT_CACHE?: KVNamespace } & ProfileEnv;
+type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string; APP_BASE_URL?: string; DB?: D1Database; TENANT_CACHE?: KVNamespace } & ProfileEnv;
+
+const JSON_HEADERS = { 'content-type': 'application/json' };
+
+/** Paths this wrapper owns: the authorization server, its discovery documents, and the MCP endpoint. */
+function isOAuthSurface(pathname: string): boolean {
+    return pathname.startsWith('/oauth/') || pathname.startsWith('/.well-known/oauth-') || pathname === '/mcp' || pathname.startsWith('/mcp/');
+}
 
 /**
  * Wraps `appFetch` with an OAuthProvider when MCP or native clients are enabled.
@@ -41,17 +50,29 @@ type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string; DB?: D
 export function buildOAuthHandler(
     appFetch: FetchFn,
     env: McpFlagEnv,
+    req?: Request,
 ): { fetch: FetchFn } {
     if (!oauthProviderEnabled(env)) return { fetch: appFetch };
+
+    // Every token is bound to ONE canonical resource: the bare /mcp endpoint on
+    // the deployment's own origin; /mcp/{slug} is a path under it. When no
+    // trustworthy origin can be derived the OAuth surface is unavailable, but the
+    // rest of the site must keep working: this wrapper is built on every request,
+    // not only on /mcp.
+    const resource = resourceUrlFor(env, req);
+    if (!resource) {
+        return {
+            fetch: (r, e, ctx) => {
+                if (!isOAuthSurface(new URL(r.url).pathname)) return appFetch(r, e, ctx);
+                logger.error('OAuth surface unavailable: APP_BASE_URL is not an https (or loopback http) origin and none could be derived from the request');
+                return new Response(JSON.stringify({ error: 'temporarily_unavailable' }), { status: 503, headers: JSON_HEADERS });
+            },
+        };
+    }
 
     // A literal path prefix — every /mcp* request goes through token auth.
     // Slug validation (spec §6) is applied in the wrapper below.
     const apiRoute = getDeploymentProfile(env).mcpApiRoute; // always '/mcp'
-
-    // McpAgent.serve() internal path is always '/mcp'; 'INSPECTOR_MCP' overrides
-    // McpAgent's default MCP_OBJECT binding name (see wrangler.jsonc DO bindings).
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const baseServeHandler = InspectorMcp.serve('/mcp', { binding: 'INSPECTOR_MCP' }) as any;
 
     // One handler for both modes: the slug guard fires exactly when the PATH
     // carries a slug segment, not when the mode says it should. The standalone
@@ -59,49 +80,44 @@ export function buildOAuthHandler(
     // request is delegated untouched — the two modes cannot drift (OI #308).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const apiHandler: any = {
-        fetch(
+        async fetch(
             req: Request,
             e: unknown,
             ctx: ExecutionContext & { props?: McpProps },
-        ): Response | Promise<Response> {
+        ): Promise<Response> {
             // A native grant is a full session, not an MCP grant. It has no module
             // scopes, so it would reach the MCP server with nothing to call by
             // accident; refuse it outright instead of relying on that. Anything that
             // CLAIMS to be native is refused, well-formed or not.
             if (claimsNative(ctx.props)) {
-                return new Response(JSON.stringify({ error: 'forbidden' }), {
-                    status: 403,
-                    headers: { 'content-type': 'application/json' },
-                });
+                return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403, headers: JSON_HEADERS });
             }
             // The provider is also mounted for native clients alone. With MCP off
             // there is no MCP surface: answer as if /mcp were not mounted, even to
             // a token minted while it was on or obtained through the open
             // registration endpoint.
             if (!mcpEnabled(env)) {
-                return new Response(JSON.stringify({ error: 'not_found' }), {
-                    status: 404,
-                    headers: { 'content-type': 'application/json' },
-                });
+                return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: JSON_HEADERS });
             }
             const url = new URL(req.url);
             const urlSlug = slugFromMcpPath(url.pathname);
-            if (urlSlug === null) return baseServeHandler.fetch(req, e, ctx);
             const props = ctx.props;
-            if (!props || !assertCompanySlugMatches(urlSlug, props)) {
-                return new Response(JSON.stringify({ error: 'tenant_mismatch' }), {
-                    status: 403,
-                    headers: { 'content-type': 'application/json' },
-                });
+            if (urlSlug !== null && (!props || !assertCompanySlugMatches(urlSlug, props))) {
+                return new Response(JSON.stringify({ error: 'tenant_mismatch' }), { status: 403, headers: JSON_HEADERS });
             }
-            // McpAgent.serve('/mcp') matches the literal mount path via
-            // URLPattern; the saas endpoint is /mcp/{slug}, which would never
-            // match and 404s ("Not found"). Reduce it to the mount path so the
-            // agent sees what it registered. Tenant identity travels in
-            // ctx.props (verified above), and the DO instance is keyed by
-            // session id — not the URL — so this rewrite preserves isolation.
+            // A validated token always carries props. Refuse rather than let the
+            // server factory fail on a missing scope list and surface as a 500.
+            if (!props) {
+                return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: JSON_HEADERS });
+            }
+            // The handler's route is an exact match on /mcp, while the saas endpoint
+            // is /mcp/{slug}: reduce it to the mount path. Tenant identity travels in
+            // ctx.props (verified above), never in the URL.
             url.pathname = stripMcpSlugPrefix(url.pathname);
-            return baseServeHandler.fetch(new Request(url, req), e, ctx);
+            // Dynamic: keeps the MCP server graph (SDK, tool catalogue) out of every
+            // cold start, including requests on deployments where MCP is switched off.
+            const { createInspectorMcpHandler } = await import('./handler');
+            return createInspectorMcpHandler(env as unknown as AppEnv, props, req)(new Request(url, req), e, ctx);
         },
     };
 
@@ -114,32 +130,22 @@ export function buildOAuthHandler(
         authorizeEndpoint: '/oauth/authorize',
         tokenEndpoint: '/oauth/token',
         clientRegistrationEndpoint: '/oauth/register',
-        // S256 only, and NOT the library default.
-        //
-        // Left unset, `allowPlainPKCE` defaults to true, and three things follow
-        // that are all worse than they look:
-        //
-        //  - the metadata document advertises `["plain", "S256"]`, so a client
-        //    is told plain is acceptable here
-        //  - an authorize request that OMITS `code_challenge_method` is read as
-        //    `plain` rather than refused, so the weaker method is what you get
-        //    by saying nothing
-        //  - the token endpoint's plain branch compares the verifier to the
-        //    stored challenge verbatim, which is not a check: the challenge
-        //    travelled in the same redirect URL as the code, so whoever
-        //    intercepted one has the other
-        //
-        // PKCE exists to make a stolen authorization code unusable. `plain`
-        // returns it to being usable, which makes advertising it worse than not
-        // offering PKCE at all — a client that negotiates down believes it is
-        // protected. Setting this to false both narrows the advertisement to
-        // `["S256"]` and makes the parse REFUSE plain instead of accepting it.
-        allowPlainPKCE: false,
-        // Native grants: 1h access token, refresh token with no fixed expiry and
-        // a sliding 90-day idle limit (see nativeTokenExchange). MCP grants
-        // return undefined and keep the library defaults. A denial revokes the
-        // grant, then throws OAuthError so the client gets 400 invalid_grant;
-        // any other thrown error would surface as a 500.
+        // The one canonical resource every token is bound to. Grants made against
+        // the older per-workspace path are bound to that path and sign in again
+        // (see docs/develop/conventions/mcp-migration-decisions.md). PKCE is S256
+        // only in 1.x: plain was removed from the library, not merely switched off.
+        resourceMetadata: { resource },
+        // Deployment-wide: the provider accepts private-use-scheme redirect URIs
+        // for every client. isRedirectAllowedForScope() is the per-scope check
+        // (native clients, plus a short list of editors for MCP) and both the
+        // authorize loader and action apply it.
+        allowPrivateUseRedirectUris: true,
+        // Native grants: 1h access token, a finite refresh lifetime at code
+        // exchange, and a 90-day idle window re-armed on every refresh (see
+        // nativeTokenExchange). MCP grants return undefined and keep the library
+        // defaults. A denial revokes the grant, then throws OAuthError so the
+        // client gets 400 invalid_grant; any other thrown error would surface as
+        // a 500.
         tokenExchangeCallback: async (opts): Promise<TokenExchangeCallbackResult | void> => {
             // Every refusal revokes the grant first, so a grant cannot outlive the
             // switch, the membership or the credential that allowed it, then
@@ -178,13 +184,7 @@ export function buildOAuthHandler(
                     headers: { 'Retry-After': '30' },
                 });
             }
-            // The provider tests for the PRESENCE of `refreshTokenTTL` on a code exchange, so the
-            // native result carries it as an explicit undefined (no fixed expiry). The library types
-            // it as `number`, which `exactOptionalPropertyTypes` will not widen; Object.assign copies
-            // the key, undefined value included, without an assertion.
-            const result: TokenExchangeCallbackResult = {};
-            Object.assign(result, decision.result);
-            return result;
+            return { ...decision.result };
         },
     };
     const provider = new OAuthProvider<any>(options); // eslint-disable-line @typescript-eslint/no-explicit-any

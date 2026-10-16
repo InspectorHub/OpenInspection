@@ -4,8 +4,8 @@
 // inside the handler, not a capability on the route: an inspector may see a
 // single-row view of THEMSELVES (own pay, own counts, own turnaround) and none
 // of the company's money. That is the same third state the pay-split routes
-// implement — `financial: false` AND `subject = self` — and no boolean
-// permission expresses it. A caller without `financial` gets the company
+// implement — `companyFinance: false` AND `subject = self` — and no boolean
+// permission expresses it. A caller without `companyFinance` gets the company
 // aggregates as NULL rather than as zero: zero is a claim about the business,
 // null says "not yours to see".
 import { createRoute } from '@hono/zod-openapi';
@@ -30,7 +30,7 @@ const metricsRoutes = createApiRouter()
     responses: { 200: { content: { 'application/json': { schema: MetricsApiResponseSchema.describe('Revenue, volume, agent, inspector and service aggregates for the window.') } }, description: 'Metrics' } },
     operationId: "listMetrics",
     summary: "List metrics for current tenant",
-    description: "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the financial capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
+    description: "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the company-finance capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
 }, { scopes: ['read'], tier: 'extended' })), async (c) => {
     const tenantId = c.get('tenantId');
     const { from, to } = resolveMetricsWindow(c.req.valid('query'));
@@ -158,10 +158,10 @@ const metricsRoutes = createApiRouter()
     const everyInspector = await perInspectorMetrics(db, tenantId, { from, to });
 
     // The scoping rule, and the reason it is here rather than in a redactor: a
-    // caller without `financial` is not being shown a censored version of the
+    // caller without `companyFinance` is not being shown a censored version of the
     // company's numbers, they are being shown THEIR OWN row. A colleague's pay
     // is absent from the payload, not hidden inside it.
-    const byInspector = caps.financial
+    const byInspector = caps.companyFinance
         ? everyInspector
         : everyInspector
             .filter(r => r.inspectorId === self)
@@ -173,25 +173,25 @@ const metricsRoutes = createApiRouter()
         data: {
             from,
             to,
-            scope: caps.financial ? ('all' as const) : ('self' as const),
-            totalRevenue: caps.financial ? totalRevenue : null,
+            scope: caps.companyFinance ? ('all' as const) : ('self' as const),
+            totalRevenue: caps.companyFinance ? totalRevenue : null,
             totalInspections,
-            avgOrderValue: caps.financial ? avgOrderValue : null,
-            monthly: caps.financial
+            avgOrderValue: caps.companyFinance ? avgOrderValue : null,
+            monthly: caps.companyFinance
                 ? monthly.map(r => ({ month: r.month, revenue: Number(r.revenue || 0), count: Number(r.count) }))
                 : [],
             // "Which agent sends the most work" is commercially sensitive in a
             // multi-inspector firm — same gate as attributed revenue.
-            topAgents: caps.financial ? [...topAgents, ...referralSources] : [],
+            topAgents: caps.companyFinance ? [...topAgents, ...referralSources] : [],
             byInspector,
-            serviceBreakdown: caps.financial
+            serviceBreakdown: caps.companyFinance
                 ? serviceBreakdown.map(r => ({
                     serviceName: r.serviceName,
                     count:       Number(r.count),
                     revenue:     Number(r.revenue || 0),
                 }))
                 : [],
-            paymentSummary: caps.financial ? { paid: paidAmt, unpaid: unpaidAmt, overdue: 0 } : null,
+            paymentSummary: caps.companyFinance ? { paid: paidAmt, unpaid: unpaidAmt, overdue: 0 } : null,
         },
     });
 });

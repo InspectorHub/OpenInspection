@@ -21,6 +21,8 @@ import { runErasure } from '../lib/compliance/erasure-orchestrator';
 import type { Role } from '../lib/auth/roles';
 import type { UserRole } from '../types/auth';
 import { assertMayTouchOwner } from '../lib/auth/owner-guard';
+import { assertMayGrant } from '../lib/auth/grant-ceiling';
+import { getCapabilities, type CapabilitySet } from '../lib/auth/capabilities';
 
 import type { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { safeTimestamp } from '../lib/date';
@@ -93,8 +95,15 @@ export class AdminService {
      * Creates a team invitation. The invited role is copied onto the new user at
      * accept time, so inviting as owner is minting an owner: only an owner may.
      */
-    async createInvite(tenantId: string, email: string, role: string, requesterRole: UserRole) {
+    async createInvite(tenantId: string, email: string, role: string, requesterRole: UserRole, requesterCapabilities?: CapabilitySet) {
         assertMayTouchOwner(requesterRole, 'inspector', role);
+        // The same ceiling as the Team page's invite: a manager hands out at most
+        // what they hold, and the role template counts. This route never carries
+        // switches, so the role alone is what is checked.
+        assertMayGrant(
+            { role: requesterRole, capabilities: requesterCapabilities ?? getCapabilities('agent', null) },
+            { from: null, to: { role: role as Role, overrides: null } },
+        );
         const db = this.getDrizzle();
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         const inviteId = crypto.randomUUID();

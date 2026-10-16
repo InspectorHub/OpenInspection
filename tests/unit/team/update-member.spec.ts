@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
+import { getCapabilities } from '../../../server/lib/auth/capabilities';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { Role } from '../../../server/lib/auth/roles';
@@ -27,6 +28,7 @@ const OWNER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1';
 const OWNER_2 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2';
 const MANAGER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1';
 const INSPECTOR = 'cccccccc-cccc-cccc-cccc-ccccccccccc1';
+const MANAGER_CAPS = getCapabilities('manager', null);
 
 function userRow(id: string, role: Role, email: string) {
   return { id, tenantId: TENANT, email, name: email, role, passwordHash: 'x', createdAt: new Date() };
@@ -90,14 +92,14 @@ describe('TeamService.updateMember', () => {
 
     await svc.updateMember({
       tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner',
-      permissionOverrides: { financial: true },
+      permissionOverrides: { companyFinance: true },
     });
 
     // Overrides are read from the row per request, so they already apply.
     // Logging someone out for a checkbox would be gratuitous.
     expect(puts).toHaveLength(0);
     const row = await db.select({ o: schema.users.permissionOverrides }).from(schema.users).where(eq(schema.users.id, INSPECTOR)).get();
-    expect(row?.o).toEqual({ financial: true });
+    expect(row?.o).toEqual({ companyFinance: true });
   });
 
   it('stores only what differs from the role template', async () => {
@@ -120,14 +122,14 @@ describe('TeamService.updateMember', () => {
     await seed(db);
     const svc = new TeamService({} as D1Database);
 
-    // `financial` is false for an inspector but true for a manager. Promoting
-    // to manager AND asking for financial must store nothing: it is the new
+    // `companyFinance` is false for an inspector but true for a manager. Promoting
+    // to manager AND asking for it must store nothing: it is the new
     // template's default. Diffing against the OLD role would persist a
-    // redundant `{financial: true}` that outlives the reason for it.
+    // redundant `{companyFinance: true}` that outlives the reason for it.
     await svc.updateMember({
       tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner',
       role: 'manager',
-      permissionOverrides: { financial: true },
+      permissionOverrides: { companyFinance: true },
     });
 
     expect(await roleOf(INSPECTOR)).toBe('manager');
@@ -162,7 +164,7 @@ describe('TeamService.updateMember', () => {
       const svc = new TeamService({} as D1Database);
 
       await expect(
-        svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, requesterRole: 'manager', role: 'manager' }),
+        svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, requesterRole: 'manager', requesterCapabilities: MANAGER_CAPS, role: 'manager' }),
       ).rejects.toMatchObject({ status: 403 });
       expect(await roleOf(OWNER)).toBe('owner');
     });
@@ -172,7 +174,7 @@ describe('TeamService.updateMember', () => {
       const svc = new TeamService({} as D1Database);
 
       await expect(
-        svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, requesterRole: 'manager', permissionOverrides: { financial: false } }),
+        svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, requesterRole: 'manager', requesterCapabilities: MANAGER_CAPS, permissionOverrides: { companyFinance: false } }),
       ).rejects.toMatchObject({ status: 403 });
     });
 
@@ -181,7 +183,7 @@ describe('TeamService.updateMember', () => {
       const svc = new TeamService({} as D1Database);
 
       await expect(
-        svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager', role: 'owner' }),
+        svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager', requesterCapabilities: MANAGER_CAPS, role: 'owner' }),
       ).rejects.toMatchObject({ status: 403 });
       expect(await roleOf(INSPECTOR)).toBe('inspector');
     });
@@ -190,7 +192,7 @@ describe('TeamService.updateMember', () => {
       await seed(db);
       const svc = new TeamService({} as D1Database);
 
-      await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager', role: 'manager' });
+      await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager', requesterCapabilities: MANAGER_CAPS, role: 'manager' });
       expect(await roleOf(INSPECTOR)).toBe('manager');
     });
 

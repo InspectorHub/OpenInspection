@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * A caller without the `financial` capability gets a contact detail with the
+ * A caller without the money capabilities gets a contact detail with the
  * money fields ABSENT. The page must say "not available to you" (a dash), never
  * "$0.00", which would read as a true statement about the contact's revenue.
  */

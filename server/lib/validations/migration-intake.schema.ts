@@ -116,7 +116,7 @@ export const RemapRequestSchema = z.object({
             mapping: z.object({
                 email: z.string().min(1).describe('Column holding the email address to invite'),
                 name: z.string().min(1).optional().describe('Column holding the person\'s name'),
-                role: valueSource(z.enum(['owner', 'manager', 'inspector']))
+                role: valueSource(z.enum(['owner', 'manager', 'inspector', 'staff']))
                     .describe('Where each invitation\'s role comes from'),
             }).strict(),
         }).strict(),

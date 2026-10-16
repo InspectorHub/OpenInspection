@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, isNull } from 'drizzle-orm';
 import type { AppEnv } from '../../types/hono';
-import type { McpProps } from '../../durable-objects/inspector-mcp';
+import type { McpProps } from './build-server';
 import { buildKeyring, signJwt } from '../jwt-keyring';
 import { users } from '../db/schema';
 

@@ -547,7 +547,7 @@ is a Safety category?" is exactly the question this split exists to refuse.
 - **R2**: blobs. **One bucket binding, `PHOTOS`** — field photos, logos, pre-rendered report and certificate PDFs, and e-sign evidence packs all live in it. There is no `REPORTS` bucket; this document named one for a long time and `wrangler.jsonc` has never bound it. Accessed via signed URL or a Worker pass-through endpoint. (A SaaS deployment adds one more, `EXPORTS_BUCKET`, shared with the control plane for offboarding exports.)
 - **KV**: two namespaces. `TENANT_CACHE` holds short-lived signed tokens (agent share, password reset), the tenant config and branding caches, cron cursors and rate-limit counters — see [`../concepts/kv-cache.md`](../concepts/kv-cache.md). `OAUTH_KV` is owned by `@cloudflare/workers-oauth-provider` and holds MCP OAuth grants; its binding name is fixed by that library.
 - **Queues**: `CRON_QUEUE` (one background job per invocation — see [Background work](#background-work)) and `WORD_EXPORT_QUEUE` (async `.docx` export). Both are declared in `wrangler.jsonc`, producer and consumer, because neither is a SaaS-only feature.
-- **Durable Objects**: `INSPECTION_PRESENCE` and `TENANT_PRESENCE` (live presence), `INSPECTION_DOC` (the collaborative results document), `INSPECTOR_MCP` (the remote MCP server).
+- **Durable Objects**: `INSPECTION_PRESENCE` and `TENANT_PRESENCE` (live presence), `INSPECTION_DOC` (the collaborative results document). `INSPECTOR_MCP` is a retired binding kept only until a deletion migration ships; the remote MCP endpoint itself is a stateless handler (see [MCP + OAuth notes](conventions/mcp-oauth-notes.md)).
 
 ## Background work
 

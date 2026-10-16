@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { STAFF_ORDER_STATUSES } from "../../../server/lib/inspection/order-fields";
 import { INSPECTION_STATUS, isReportPublished, statusTone } from "~/lib/status";
 import { reportStateLabel } from "~/lib/dashboard-filters";
 import { REPORT_STATE_TONE, type Inspection } from "~/lib/dashboard-schema";
@@ -20,7 +21,29 @@ interface DashboardInspectionRowProps {
   /** Viewer's effective zone (useDisplayTimeZone in the owning route). Required:
    *  an omitted zone renders scheduled times in whatever zone the browser is in. */
   timeZone: string;
+  /**
+   * Whether the viewer may write the inspection's status (the dropdown and Restore).
+   * Defaults to true so a caller that does not say keeps today's behaviour.
+   */
+  canChangeStatus?: boolean;
+  /**
+   * Office staff set the booking's status (requested, scheduled, confirmed) and never
+   * the visit's: the dropdown lists only those, and is withheld from a completed job,
+   * which the API will not let them move.
+   */
+  orderStatusesOnly?: boolean;
+  /** Whether the viewer may write report content (`editReports`); false hides the editor link. */
+  canOpenEditor?: boolean;
 }
+
+const STATUS_LABEL = {
+  requested: m.dashboard_row_status_requested,
+  scheduled: m.dashboard_row_status_scheduled,
+  confirmed: m.dashboard_row_status_confirmed,
+  completed: m.dashboard_row_status_completed,
+} as const;
+/** The statuses a row can be set to: the order statuses the server lets staff write, then the visit's own. */
+const ROW_STATUSES = [...STAFF_ORDER_STATUSES, INSPECTION_STATUS.COMPLETED] as const;
 
 /* ---- Render inspection row ---- */
 // reportView=true on the Published tab: render a report-state badge and, for
@@ -34,6 +57,9 @@ export function DashboardInspectionRow({
   toggleSelect,
   transitionStatus,
   timeZone,
+  canChangeStatus = true,
+  orderStatusesOnly = false,
+  canOpenEditor = true,
 }: DashboardInspectionRowProps) {
   const locale = useDisplayLocale();
   const currency = useDisplayCurrency();
@@ -120,15 +146,17 @@ export function DashboardInspectionRow({
       </Link>
       {/* Hover actions: open editor + status transition (visible on hover) */}
       <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity shrink-0 flex items-center gap-1.5">
-        <Link
-          to={`/inspections/${insp.id}/edit`}
-          aria-label={m.dashboard_row_open_editor()}
-          title={m.dashboard_row_open_editor()}
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center justify-center h-6 w-6 rounded text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
-        >
-          <Icon name="edit" size={14} />
-        </Link>
+        {canOpenEditor && (
+          <Link
+            to={`/inspections/${insp.id}/edit`}
+            aria-label={m.dashboard_row_open_editor()}
+            title={m.dashboard_row_open_editor()}
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center justify-center h-6 w-6 rounded text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
+          >
+            <Icon name="edit" size={14} />
+          </Link>
+        )}
         {/* #111: deep-link into the public report (Published tab, delivered/published only) */}
         {showReportLink && (
           <Link
@@ -157,17 +185,16 @@ export function DashboardInspectionRow({
             entry. That endpoint is the one door now and this write refuses, so
             the cancelled cluster below shows the status and offers the button
             instead of four options the server would reject. */}
-        {!cancelled && (
+        {!cancelled && canChangeStatus && !(orderStatusesOnly && insp.status === INSPECTION_STATUS.COMPLETED) && (
           <select
             value={insp.status}
             onChange={(e) => transitionStatus(insp.id, e.target.value)}
             onClick={(e) => e.stopPropagation()}
             className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-2 border-0 outline-none cursor-pointer"
           >
-            <option value="requested">{m.dashboard_row_status_requested()}</option>
-            <option value="scheduled">{m.dashboard_row_status_scheduled()}</option>
-            <option value="confirmed">{m.dashboard_row_status_confirmed()}</option>
-            <option value="completed">{m.dashboard_row_status_completed()}</option>
+            {(orderStatusesOnly ? STAFF_ORDER_STATUSES : ROW_STATUSES).map((status) => (
+              <option key={status} value={status}>{STATUS_LABEL[status]()}</option>
+            ))}
           </select>
         )}
       </div>
@@ -188,11 +215,13 @@ export function DashboardInspectionRow({
           >
             <option value="cancelled">{m.dashboard_row_status_cancelled()}</option>
           </select>
-          <RestoreInspectionAction
-            inspectionId={insp.id}
-            variant="ghost"
-            className="h-6 px-1.5 text-[10px]"
-          />
+          {canChangeStatus && (
+            <RestoreInspectionAction
+              inspectionId={insp.id}
+              variant="ghost"
+              className="h-6 px-1.5 text-[10px]"
+            />
+          )}
         </div>
       )}
     </div>

@@ -30,11 +30,12 @@ export function InvoiceCard({
     paymentRequired,
     basePriceCents,
     canManagePrice,
+    canEditGate = true,
     onRequestPayment,
 }: {
     /** `detail` carries the one-line money sentence a pill has no room for. */
     pill: { tone: PillTone; label: string; detail?: string };
-    /** IA-95 — undefined when the caller lacks the `financial` capability. */
+    /** IA-95 — undefined when the caller lacks the `companyFinance` capability. */
     amountCents: number | undefined;
     /** The invoice's own ISO 4217 snapshot; every figure on this card uses it. */
     currency: string | undefined;
@@ -46,6 +47,8 @@ export function InvoiceCard({
     /** IA-95 — undefined when money is redacted. */
     basePriceCents: number | undefined;
     canManagePrice: boolean;
+    /** False for a viewer the API refuses order edits (an office user): the payment-required switch is not rendered. */
+    canEditGate?: boolean;
     onRequestPayment: () => void;
 }) {
     const [priceOpen, setPriceOpen] = useState(false);
@@ -67,7 +70,7 @@ export function InvoiceCard({
     return (
         <Card className="p-5">
             <BlockHeading title={m.inspections_hub_block_invoice()} pill={pill} />
-            {/* IA-95 — an inspector without the financial capability sees the
+            {/* IA-95 — an inspector without the companyFinance capability sees the
                 invoice exists and its status, but not the figure. Saying so beats
                 rendering $0.00, which reads as "nothing owed". */}
             <p className="text-[15px] font-medium text-ih-fg-1 mb-1">
@@ -132,6 +135,7 @@ export function InvoiceCard({
                     checked={paymentRequired}
                     label={m.inspections_hub_gate_payment()}
                     testId="hub-gate-payment"
+                    canEdit={canEditGate}
                 />
             )}
 

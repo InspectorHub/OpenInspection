@@ -25,7 +25,6 @@ const FULL_TWILIO_OWN = {
 };
 const FULL_MANAGED_ENV: IntegrationEnv = {
     TWILIO_ACCOUNT_SID: 'ACdep', TWILIO_API_KEY_SID: 'SKdep', TWILIO_API_KEY_SECRET: 'sec',
-    TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MGdep',
 };
 
 const cfg = (c: CompanyIntegrationConfig = {}): CompanyIntegrationConfig => c;
@@ -58,9 +57,9 @@ describe('catalog', () => {
         expect(offeredSources('video', SELF, {})).toEqual(['own']);
     });
 
-    it('hosted sms offers own only while the shared-number flag is off, provided too when it is on', () => {
+    it('hosted sms offers own only, whatever the environment holds', () => {
         expect(offeredSources('sms', HOSTED, {})).toEqual(['own']);
-        expect(offeredSources('sms', HOSTED, { SMS_MANAGED_SHARED_ENABLED: 'true' })).toEqual(['provided', 'own']);
+        expect(offeredSources('sms', HOSTED, { TWILIO_API_KEY_SID: 'SK1' })).toEqual(['own']);
     });
 });
 
@@ -119,26 +118,27 @@ describe('email', () => {
 });
 
 describe('sms', () => {
-    it('hosted provided is held back while the flag is off, even with a complete shared pool', () => {
+    it('hosted provided is never offered, even with a complete shared pool', () => {
         for (const c of [cfg(), cfg({ sources: { sms: 'provided' } })]) {
             expect(resolveIntegrationSource('sms', HOSTED, c, FULL_MANAGED_ENV))
                 .toMatchObject({ source: 'unavailable', reason: 'provider_confirmation_pending' });
         }
-        // control: flag on + complete pool resolves; flag on + incomplete pool does not
-        const on = { ...FULL_MANAGED_ENV, SMS_MANAGED_SHARED_ENABLED: 'true' };
-        expect(resolveIntegrationSource('sms', HOSTED, cfg({ sources: { sms: 'provided' } }), on))
-            .toMatchObject({ source: 'provided', credentialsPresent: true });
-        expect(resolveIntegrationSource('sms', HOSTED, cfg({ sources: { sms: 'provided' } }), { SMS_MANAGED_SHARED_ENABLED: 'true' }))
-            .toMatchObject({ source: 'unavailable', reason: 'provided_not_configured' });
+        // control: a company on its own account with complete details resolves under the same environment
+        expect(resolveIntegrationSource('sms', HOSTED, cfg({ sources: { sms: 'own' }, ownSecrets: FULL_TWILIO_OWN }), FULL_MANAGED_ENV))
+            .toMatchObject({ source: 'own', credentialsPresent: true });
     });
 
-    it('the flag only turns on for an explicit true or 1', () => {
-        for (const v of ['', 'false', '0', 'yes', undefined]) {
-            expect(offeredSources('sms', HOSTED, { SMS_MANAGED_SHARED_ENABLED: v })).toEqual(['own']);
-        }
-        for (const v of ['true', '1']) {
-            expect(offeredSources('sms', HOSTED, { SMS_MANAGED_SHARED_ENABLED: v })).toEqual(['provided', 'own']);
-        }
+    it('hosted managed_dedicated is the company own sender: connected when the registration is usable, attention with a reason when not', () => {
+        const base = { legacy: { smsMode: 'managed_dedicated' as const } };
+        expect(resolveIntegrationSource('sms', HOSTED, cfg({ ...base, dedicatedNumberReady: true }), {}))
+            .toMatchObject({ source: 'own', reason: 'dedicated_number', credentialsPresent: true });
+        expect(resolveIntegrationSource('sms', HOSTED, cfg(base), {}))
+            .toMatchObject({ source: 'unavailable', reason: 'dedicated_not_ready' });
+        // control: the same company without a dedicated number is still told to add its own account
+        expect(resolveIntegrationSource('sms', HOSTED, cfg({ legacy: { smsMode: 'platform' } }), {}))
+            .toMatchObject({ source: 'unavailable', reason: 'provider_confirmation_pending' });
+        // self-hosted never reads the registration path
+        expect(resolveIntegrationSource('sms', SELF, cfg({ ...base, dedicatedNumberReady: true }), {}).reason).not.toBe('dedicated_number');
     });
 
     it('hosted own works with the company Twilio keys and never borrows the deployment keys', () => {
@@ -157,10 +157,10 @@ describe('sms', () => {
         expect(resolveIntegrationSource('sms', HOSTED, ok, {})).toMatchObject({ source: 'own' });
     });
 
-    it('hosted, nothing stored, legacy own: own; legacy platform or managed: provided (held back)', () => {
+    it('hosted, nothing stored, legacy own: own; legacy platform or shared: unavailable (no shared sender)', () => {
         const own = cfg({ legacy: { smsMode: 'own' }, ownSecrets: FULL_TWILIO_OWN });
         expect(resolveIntegrationSource('sms', HOSTED, own, {})).toMatchObject({ source: 'own', reason: 'legacy_setting' });
-        for (const m of ['platform', 'managed_shared', 'managed_dedicated'] as const) {
+        for (const m of ['platform', 'managed_shared'] as const) {
             expect(resolveIntegrationSource('sms', HOSTED, cfg({ legacy: { smsMode: m } }), {}))
                 .toMatchObject({ source: 'unavailable', reason: 'provider_confirmation_pending' });
         }

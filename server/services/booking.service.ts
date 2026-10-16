@@ -1,8 +1,9 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, inArray, isNull } from 'drizzle-orm';
 import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, serviceInspectors, users } from '../lib/db/schema';
 import { logger } from '../lib/logger';
+import { FIELD_ROLES } from '../lib/auth/roles';
 import type { HonoConfig } from '../types/hono';
 import type { PublicBookingSchema } from '../lib/validations/booking.schema';
 import type { z } from '@hono/zod-openapi';
@@ -68,8 +69,20 @@ export class BookingService {
         const db = this.getDrizzle();
         
         const [recurring, overrides, jobs] = await Promise.all([
-            db.select().from(availability).where(and(eq(availability.tenantId, tenantId), eq(availability.inspectorId, inspectorId))).all(),
-            db.select().from(availabilityOverrides).where(and(
+            // Public, anonymous read: name the columns. Selecting whole rows put the
+            // internal tenant id, row ids, creation times and (for synced overrides)
+            // the external calendar event id into the response.
+            db.select({
+                dayOfWeek: availability.dayOfWeek,
+                startTime: availability.startTime,
+                endTime: availability.endTime,
+            }).from(availability).where(and(eq(availability.tenantId, tenantId), eq(availability.inspectorId, inspectorId))).all(),
+            db.select({
+                date: availabilityOverrides.date,
+                isAvailable: availabilityOverrides.isAvailable,
+                startTime: availabilityOverrides.startTime,
+                endTime: availabilityOverrides.endTime,
+            }).from(availabilityOverrides).where(and(
                 eq(availabilityOverrides.tenantId, tenantId),
                 eq(availabilityOverrides.inspectorId, inspectorId),
                 gte(availabilityOverrides.date, startDate),
@@ -141,7 +154,8 @@ export class BookingService {
 
     /**
      * IA-26 — staff eligible to run the given services. Base set = every
-     * non-deleted tenant user except global agents (availability is the real
+     * non-deleted tenant user with a field role (owner, manager, inspector; not
+     * agents or staff) (availability is the real
      * bookability signal: office staff who never configure hours simply never
      * yield slots). service_inspectors rows RESTRICT per service; zero rows
      * for a service = everyone qualifies. Multi-service bookings intersect.
@@ -149,7 +163,7 @@ export class BookingService {
     async getQualifiedInspectorIds(tenantId: string, serviceIds: string[]): Promise<string[]> {
         const db = this.getDrizzle();
         const staff = await db.select({ id: users.id }).from(users)
-            .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt), ne(users.role, 'agent')))
+            .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt), inArray(users.role, [...FIELD_ROLES])))
             .all();
         let ids = staff.map(s => s.id);
         if (serviceIds.length === 0 || ids.length === 0) return ids;

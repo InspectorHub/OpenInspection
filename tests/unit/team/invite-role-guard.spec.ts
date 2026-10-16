@@ -98,6 +98,13 @@ describe.each([
         expect(res.status).toBe(201);
     });
 
+    it.each(['staff'] as const)('a manager may invite a %s', async (invited) => {
+        const built = buildApp('manager');
+        const res = await post(built.app, path, invited);
+        expect(res.status).toBe(201);
+        expect(pick(built)).toHaveBeenCalledTimes(1);
+    });
+
     it.each(['owner', 'manager'] as const)('refuses the agent role for a %s requester', async (requester) => {
         const built = buildApp(requester);
         const res = await post(built.app, path, 'agent');

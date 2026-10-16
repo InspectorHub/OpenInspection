@@ -18,9 +18,9 @@
  * Matching is on the NORMALIZED phone, because stored phones are field-entered
  * and may not be.
  */
-import { and, eq, isNotNull } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { contacts, tenantConfigs, users } from '../db/schema';
+import { contacts, users } from '../db/schema';
 import { normalizeE164 } from './phone';
 import type { ConsentRecipientType } from './consent-basis';
 
@@ -57,20 +57,14 @@ export interface PhoneMatchedSubject extends ConsentSubject {
 type AnyDrizzle = DrizzleD1Database<any>;
 
 /**
- * Everyone whose stored number is `phone`, in both id spaces.
+ * Everyone in ONE company whose stored number is `phone`, in both id spaces.
  *
- * `scopeTenantId` null is the PLATFORM shared-number shape: every tenant except
- * those sending from their own number, which the shared number does not reach
- * and whose recipients therefore never texted it.
- *
- * A global agent account carries `tenant_id IS NULL` (it reaches a company
- * through that company's `contacts` row, which is where its consent belongs)
- * and a consent event has to name a tenant, so a user with no tenant is not a
- * subject here.
+ * Always scoped to a company: consent is kept per company + recipient, so a
+ * number is never resolved across companies.
  */
 export async function subjectsForPhone(
     db: AnyDrizzle,
-    scopeTenantId: string | null,
+    tenantId: string,
     phone: string | null | undefined,
 ): Promise<PhoneMatchedSubject[]> {
     const target = normalizeE164(phone);
@@ -79,15 +73,15 @@ export async function subjectsForPhone(
     const [contactRows, userRows] = await Promise.all([
         db.select({ id: contacts.id, tenantId: contacts.tenantId, phone: contacts.phone, type: contacts.type })
             .from(contacts)
-            .where(scopeTenantId ? eq(contacts.tenantId, scopeTenantId) : undefined)
+            .where(eq(contacts.tenantId, tenantId))
             .all(),
         db.select({ id: users.id, tenantId: users.tenantId, phone: users.phone })
             .from(users)
-            .where(scopeTenantId ? eq(users.tenantId, scopeTenantId) : isNotNull(users.tenantId))
+            .where(eq(users.tenantId, tenantId))
             .all(),
     ]);
 
-    const matched: PhoneMatchedSubject[] = [
+    return [
         ...contactRows
             .filter((r) => normalizeE164(r.phone) === target)
             .map((r): PhoneMatchedSubject => ({
@@ -99,12 +93,6 @@ export async function subjectsForPhone(
                 ? [{ kind: 'user', id: r.id, tenantId: r.tenantId, recipientType: 'staff' }]
                 : [])),
     ];
-    if (scopeTenantId) return matched;
-
-    const cfgs = await db.select({ tenantId: tenantConfigs.tenantId, smsMode: tenantConfigs.smsMode })
-        .from(tenantConfigs).all();
-    const ownNumber = new Set(cfgs.filter((r) => r.smsMode === 'own').map((r) => r.tenantId));
-    return matched.filter((r) => !ownNumber.has(r.tenantId));
 }
 
 /**

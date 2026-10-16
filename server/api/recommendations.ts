@@ -1,6 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
+import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
 import {
@@ -45,21 +46,21 @@ const getRecommendationRoute = createRoute(withMcpMetadata({
 const createRecommendationRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/',
     tags: ["recommendations"],
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateCreate')] as const,
     request: { body: { content: { 'application/json': { schema: CreateRecommendationSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: RecommendationResponseSchema } }, description: 'Created' },
     },
     operationId: "createRecommendation",
     summary: "Create recommendation for current tenant",
-    description: "Adds a recommendation to the company library: a name, a severity, a repair-scope summary and optionally a category and suggested contractor type. Stored alongside the canned-comment library. Owner, manager or inspector. Writes an audit entry (recommendation.created). Returns the created recommendation."
-}, { scopes: ['write'], tier: 'primary' }));
+    description: "Adds a recommendation to the company library: a name, a severity, a repair-scope summary and optionally a category and suggested contractor type. Stored alongside the canned-comment library. Owner, manager or inspector with the template create capability. Writes an audit entry (recommendation.created). Returns the created recommendation."
+}, { scopes: ['write'], tier: 'primary', capability: 'templateCreate' }));
 
 /* ── PUT /api/recommendations/:id ─────────────────────────────────────────── */
 const replaceRecommendationRoute = createRoute(withMcpMetadata({
     method: 'put', path: '/{id}',
     tags: ["recommendations"],
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateEdit')] as const,
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Recommendation id.') }),
         body: { content: { 'application/json': { schema: UpdateRecommendationSchema } } },
@@ -69,22 +70,22 @@ const replaceRecommendationRoute = createRoute(withMcpMetadata({
     },
     operationId: "replaceRecommendation",
     summary: "Replace recommendation for current tenant",
-    description: "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector."
-}, { scopes: ['write'], tier: 'extended' }));
+    description: "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector with the template edit capability."
+}, { scopes: ['write'], tier: 'extended', capability: 'templateEdit' }));
 
 /* ── DELETE /api/recommendations/:id ──────────────────────────────────────── */
 const deleteRecommendationRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["recommendations"],
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('templateDelete')] as const,
     request: { params: z.object({ id: z.string().trim().min(1).describe('Recommendation id.') }) },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('True when the request succeeded.'), data: z.object({ deleted: z.literal(true).describe('True when the recommendation was deleted.') }).describe('Response payload.') }) } }, description: 'Deleted' },
     },
     operationId: "deleteRecommendation",
     summary: "Delete recommendation for current tenant",
-    description: "Permanently deletes a recommendation from the company library. Owner, manager or inspector. Writes an audit entry (recommendation.deleted)."
-}, { scopes: ['write'], tier: 'primary' }));
+    description: "Permanently deletes a recommendation from the company library. Owner, manager or inspector with the template delete capability. Writes an audit entry (recommendation.deleted)."
+}, { scopes: ['write'], tier: 'primary', capability: 'templateDelete' }));
 
 /* ── POST /api/recommendations/seed-defaults ──────────────────────────────── */
 const seedDefaultsRecommendationRoute = createRoute(withMcpMetadata({

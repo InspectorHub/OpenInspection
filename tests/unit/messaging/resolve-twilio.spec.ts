@@ -35,15 +35,8 @@ describe('resolveTwilio — managed branch', () => {
         });
     });
 
-    it('managed_shared + complete managed bag → returns managed TwilioCreds', () => {
-        const out = resolveTwilio('managed_shared', {}, PLATFORM, COMPLETE_MANAGED);
-        expect(out).toEqual({
-            sid: 'ACmain',
-            token: 'api-secret',
-            from: '',
-            authSid: 'SKkey',
-            messagingServiceSid: 'MGtenant',
-        });
+    it('managed_shared (retired shared sender) → null, even with a complete bag and platform creds', () => {
+        expect(resolveTwilio('managed_shared', OWN, PLATFORM, COMPLETE_MANAGED)).toBeNull();
     });
 
     it('managed_dedicated + no managed bag → falls through to platform creds', () => {
@@ -139,7 +132,11 @@ describe('resolveTwilioSource — effective-source label (Settings UI, no secret
  * Asserting this one against a literal would have passed before and after.
  */
 describe('resolveTwilioSource — managed tiers (F58)', () => {
-    for (const mode of ['managed_shared', 'managed_dedicated'] as const) {
+    it('managed_shared (retired) → none, never managed, whatever creds exist', () => {
+        expect(resolveTwilioSource('managed_shared', SOURCE_OWN, SOURCE_PLATFORM, COMPLETE_MANAGED)).toBe('none');
+    });
+
+    for (const mode of ['managed_dedicated'] as const) {
         it(`${mode} + a complete managed pool → managed, and agrees with the sender`, () => {
             expect(resolveTwilioSource(mode, {}, {}, COMPLETE_MANAGED)).toBe('managed');
             // The sender resolves the same input to the managed pool.

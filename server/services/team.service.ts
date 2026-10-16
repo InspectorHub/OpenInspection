@@ -4,28 +4,24 @@ import { eq, and, isNull, ne } from 'drizzle-orm';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { UserRole } from '../types/auth';
 import { assertMayTouchOwner } from '../lib/auth/owner-guard';
+import { assertMayGrant, type GrantActor } from '../lib/auth/grant-ceiling';
+import { diffOverrides, planMemberUpdate, type MemberUpdatePlan, type RequestedOverrides } from './team/plan-member-update';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
-import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
+import { coerceOverrides, getCapabilities, type CapabilitySet, type PermissionOverrides } from '../lib/auth/capabilities';
 import { revokeAllUserGrants } from '../lib/mcp/grants';
 import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import { resetMemberTwoFactor } from './team/reset-two-factor';
-
-/**
- * Loose shape accepted from the validated invite body. Zod under
- * `exactOptionalPropertyTypes` infers `boolean | undefined` per key, which is
- * not assignable to the strict `PermissionOverrides`; `diffOverrides` reads each
- * value through a `typeof === 'boolean'` guard so the looseness is safe.
- */
-type RequestedOverrides = Partial<Record<Capability, boolean | undefined>>;
+import { planReassignment, runAtomically, type RemovalChoice } from './team/open-assignments';
 
 export class TeamService {
     /**
      * @param outbox Optional core->portal user-sync sink (SaaS-only; wired in
      *   di.ts when the portal binding is present, undefined in standalone). Used
      *   to emit `user.deleted` when a member is removed so the portal identity's
-     *   membership for this workspace is dropped. Guarded by `if (this.outbox)`,
+     *   membership for this workspace is dropped, and `user.role_changed` when a
+     *   member's role moves. Guarded by `if (this.outbox)`,
      *   so standalone never touches portal code.
      * @param kv Optional session-invalidation KV (same binding as
      *   AuthService's `TENANT_CACHE`). Used by `removeMember` to write a
@@ -101,7 +97,8 @@ export class TeamService {
         ]);
 
         const maxUsers = tenantRecord[0]?.maxUsers ?? 3;
-        return { activeUsers, pendingInvites, maxUsers };
+        const readThrough = <T extends { permissionOverrides: unknown }>(rows: T[]) => rows.map(r => ({ ...r, permissionOverrides: coerceOverrides(r.permissionOverrides) })); // rows stored before `financial` was split are read through
+        return { activeUsers: readThrough(activeUsers), pendingInvites: readThrough(pendingInvites), maxUsers };
     }
 
     async createInvite(params: {
@@ -109,8 +106,18 @@ export class TeamService {
         email: string;
         role: UserRole;
         permissionOverrides?: RequestedOverrides | null;
+        /** Who is inviting. Required: an invite without a known inviter is not creatable. */
+        actor: GrantActor;
     }) {
         const db = this.getDB();
+
+        // Store only what DIFFERS from the role template, so an all-default
+        // invite stores null (single source of truth = the role).
+        const permissionOverrides = TeamService.diffOverrides(params.role, params.permissionOverrides);
+
+        // Checked before anything is read, so a refused caller learns nothing
+        // about who is already on the team.
+        assertMayGrant(params.actor, { from: null, to: { role: params.role, overrides: permissionOverrides } });
 
         // Seat-quota enforcement now lives in features/seat-quota/middleware
         // (mounted on POST /api/team/invite). The service only needs to
@@ -121,10 +128,6 @@ export class TeamService {
             .where(and(eq(users.tenantId, params.tenantId), eq(users.email, params.email), isNull(users.deletedAt))).limit(1);
 
         if (existing.length > 0) throw Errors.Conflict('User is already a member');
-
-        // Only persist toggles that DIFFER from the role template, so an
-        // all-default invite stores null (single source of truth = the role).
-        const permissionOverrides = TeamService.diffOverrides(params.role, params.permissionOverrides);
 
         // Create Invite (7-day expiry)
         const inviteToken = crypto.randomUUID();
@@ -191,22 +194,9 @@ export class TeamService {
         return row ?? null;
     }
 
-    /**
-     * Reduce a requested override map to only the capabilities whose value
-     * differs from the role's template default. Returns null when nothing
-     * differs (the role template already covers the request) so the stored
-     * column stays null. owner/agent capabilities are pinned by getCapabilities,
-     * so a diff against the effective template never persists a moot toggle.
-     */
+    /** See `diffOverrides` in ./team/plan-member-update. */
     static diffOverrides(role: UserRole, requested?: RequestedOverrides | null): PermissionOverrides | null {
-        if (!requested) return null;
-        const template = getCapabilities(role, null);
-        const diff: PermissionOverrides = {};
-        for (const cap of TOGGLEABLE) {
-            const value = requested[cap];
-            if (typeof value === 'boolean' && value !== template[cap]) diff[cap] = value;
-        }
-        return Object.keys(diff).length ? diff : null;
+        return diffOverrides(role, requested);
     }
 
     /**
@@ -237,13 +227,34 @@ export class TeamService {
         userId: string;
         requesterId: string;
         requesterRole: UserRole;
+        /**
+         * The requester's RESOLVED capabilities (role plus their own overrides).
+         * Required for every requester but an owner, who holds everything: a
+         * non-owner call without it is refused rather than guessed at.
+         */
+        requesterCapabilities?: CapabilitySet;
         role?: UserRole;
+        /** Omitted means "leave the overrides as they are"; null or an empty map clears them. */
         permissionOverrides?: RequestedOverrides | null;
-    }) {
+        /**
+         * Runs after every refusal rule has passed and before anything is written,
+         * and only when the edit changes something. Lets a caller add a check that
+         * must come AFTER the grant ceiling (a seat-quota check, say), so a person
+         * who may not make the change is never told about the company's seat count.
+         */
+        beforeWrite?: (plan: MemberUpdatePlan) => Promise<void>;
+    }): Promise<{ id: string; role: UserRole; permissionOverrides: PermissionOverrides | null } & Pick<MemberUpdatePlan, 'changed' | 'roleChanged' | 'capabilitiesChanged'>> {
         const { tenantId, userId, requesterId } = params;
         const db = this.getDB();
 
-        const user = await db.select({ id: users.id, email: users.email, role: users.role }).from(users)
+        const actor: GrantActor | null = params.requesterRole === 'owner'
+            ? { role: 'owner', capabilities: getCapabilities('owner', null) }
+            : params.requesterCapabilities
+                ? { role: params.requesterRole, capabilities: params.requesterCapabilities }
+                : null;
+        if (!actor) throw Errors.Forbidden('Only an owner or a manager can change team access');
+
+        const user = await db.select({ id: users.id, email: users.email, role: users.role, permissionOverrides: users.permissionOverrides }).from(users)
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId), isNull(users.deletedAt)))
             .get();
         if (!user) throw Errors.NotFound('Member not found');
@@ -280,18 +291,25 @@ export class TeamService {
             }
         }
 
-        // Store only what differs from the (possibly new) role template, so an
-        // all-default member stores null and the role stays the single source.
-        const permissionOverrides = TeamService.diffOverrides(
+        // The ceiling, the self-edit rule and the change itself (see the planner).
+        const plan = planMemberUpdate({
+            actor,
+            isSelf: userId === requesterId,
+            current: { role: user.role as UserRole, permissionOverrides: user.permissionOverrides },
             nextRole,
-            params.permissionOverrides ?? null,
-        );
+            requested: params.permissionOverrides,
+        });
+        const { permissionOverrides, roleChanged, capabilitiesChanged, changed } = plan;
+        const result = { id: userId, role: nextRole, permissionOverrides, changed, roleChanged, capabilitiesChanged };
+        if (!changed) return result;
+
+        if (params.beforeWrite) await params.beforeWrite(plan);
 
         await db.update(users)
             .set({ role: nextRole, permissionOverrides })
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
 
-        if (params.role && params.role !== user.role) {
+        if (roleChanged) {
             await this.writeSessionInvalidation(userId);
             if (this.oauth) {
                 try {
@@ -303,12 +321,31 @@ export class TeamService {
                     });
                 }
             }
+
+            // Mirror the new role to the other side of the seam, after the
+            // security-critical invalidation above. SaaS-only: no-op when the
+            // outbox is undefined. Sent only when the role moved.
+            // The role is already saved and the session already ended, so a failed
+            // append must not turn this into an error the caller would retry.
+            if (this.outbox) {
+                try {
+                    await this.outbox.append({
+                        type: 'user.role_changed',
+                        payload: { tenantId, email: user.email, role: nextRole },
+                    });
+                } catch (err) {
+                    logger.error('Failed to append user.role_changed to the sync outbox after a role change; the other side may keep the OLD role', {
+                        userId,
+                        tenantId,
+                    }, err instanceof Error ? err : new Error(String(err)));
+                }
+            }
         }
 
-        return { id: userId, role: nextRole, permissionOverrides };
+        return result;
     }
 
-    async removeMember(tenantId: string, userId: string, requesterId: string, requesterRole: UserRole) {
+    async removeMember(tenantId: string, userId: string, requesterId: string, requesterRole: UserRole, choice: RemovalChoice = {}) {
         if (userId === requesterId) {
             throw Errors.BadRequest('Cannot remove yourself');
         }
@@ -322,24 +359,22 @@ export class TeamService {
         // A workspace with no owner cannot be administered by anyone. Same
         // rule as updateMember's role change (a backstop: only an owner gets here).
         if (user.role === 'owner') {
-            const otherOwners = await db.select({ id: users.id }).from(users)
-                .where(and(
-                    eq(users.tenantId, tenantId),
-                    eq(users.role, 'owner'),
-                    ne(users.id, userId),
-                    isNull(users.deletedAt),
-                )).limit(1);
+            const otherOwners = await db.select({ id: users.id }).from(users).where(and(
+                eq(users.tenantId, tenantId), eq(users.role, 'owner'), ne(users.id, userId), isNull(users.deletedAt),
+            )).limit(1);
             if (otherOwners.length === 0) throw Errors.BadRequest('Cannot remove the last owner');
         }
 
-        // Soft-delete rather than hard-delete: `inspections.inspector_id`
-        // FK-references `users.id`, so a member with inspections can't be
-        // hard-deleted under D1 FK enforcement, and hard-deleting would orphan
-        // report attribution. `deletedAt` gives deactivate/reactivate
-        // semantics (see AuthService.joinTeam reactivation) while keeping the
-        // row — and any inspections it is attributed to — intact.
-        await db.update(users).set({ deletedAt: new Date() })
+        // Throws the typed 409 BEFORE any write when open inspections need a choice.
+        const plan = await planReassignment(db, tenantId, userId, choice);
+
+        // Soft-delete, not hard-delete: finished inspections keep their
+        // inspector for the record, and `deletedAt` allows reactivation (see
+        // AuthService.joinTeam). The reassignment and the soft-delete share ONE
+        // batch, so there is no state with half the inspections moved.
+        const softDelete = db.update(users).set({ deletedAt: new Date() })
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+        await runAtomically(db, [...plan.statements, softDelete]);
 
         // Invalidate the removed member's live sessions immediately, and do
         // it BEFORE the (unguarded) outbox append below. jwtAuthMiddleware
@@ -381,7 +416,11 @@ export class TeamService {
             });
         }
 
-        return user;
+        const moved = choice.reassignTo ? plan.openInspections : 0;
+        // "Unassigned" counts inspections left WITHOUT a lead: a helper seat that
+        // is merely dropped is not an inspection nobody is on.
+        const unassigned = choice.unassign ? plan.openAsLead : 0;
+        return { ...user, reassigned: moved, unassigned, keptForRecord: plan.keptForRecord };
     }
 
     /**

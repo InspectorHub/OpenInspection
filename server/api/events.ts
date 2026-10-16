@@ -39,7 +39,7 @@ const EventStatusBody = z.object({
 const eventsRoutes = createApiRouter()
     .get('/event-types', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const data = await c.var.services.event.listEventTypes(c.get('tenantId'));
-        return c.json({ success: true, data: await moneyView(c, data) });
+        return c.json({ success: true, data: await moneyView(c, data, 'inspectionFees') });
     })
     .post('/event-types', requireRole('owner', 'manager'), async (c) => {
         // Checked on the RAW body: the schema's default of 0 would otherwise make
@@ -47,13 +47,13 @@ const eventsRoutes = createApiRouter()
         const parsed = TypeBody.safeParse(await guardMoneyWrite(c, await c.req.json(), null));
         if (!parsed.success) throw Errors.BadRequest('Invalid event type', parsed.error.flatten().fieldErrors);
         const row = await c.var.services.event.createEventType(c.get('tenantId'), parsed.data);
-        return c.json({ success: true, data: await moneyView(c, row) }, 201);
+        return c.json({ success: true, data: await moneyView(c, row, 'inspectionFees') }, 201);
     })
     // ---- Inspection events ----
     .get('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const inspectionId = c.req.param('inspectionId') as string;
         const data = await c.var.services.event.listInspectionEvents(c.get('tenantId'), inspectionId);
-        return c.json({ success: true, data: await moneyView(c, data) });
+        return c.json({ success: true, data: await moneyView(c, data, 'inspectionFees') });
     })
     .post('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const inspectionId = c.req.param('inspectionId') as string;
@@ -63,7 +63,7 @@ const eventsRoutes = createApiRouter()
             ...parsed.data,
             scheduledAt: new Date(parsed.data.scheduledAt),
         });
-        return c.json({ success: true, data: await moneyView(c, row) }, 201);
+        return c.json({ success: true, data: await moneyView(c, row, 'inspectionFees') }, 201);
     })
     .put('/events/:id', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const id = c.req.param('id') as string;
@@ -79,6 +79,11 @@ const eventsRoutes = createApiRouter()
         // it. `visitActions` (app/components/inspector-portal/VisitsCard.tsx)
         // declines to OFFER the verb; this is where it is ENFORCED, so a
         // hand-rolled request cannot walk around the UI.
+        // Staff are the office: they schedule visits but never change a visit's
+        // status (completing or cancelling one moves the job), whatever the value.
+        if (c.get('userRole') === 'staff') {
+            throw Errors.Forbidden('Staff cannot change the status of a visit');
+        }
         if (parsed.data.status === 'results_received' && !isAdminRole(c.get('userRole'))) {
             throw Errors.Forbidden('Requires one of [owner, manager]');
         }

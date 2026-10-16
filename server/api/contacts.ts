@@ -238,7 +238,13 @@ const contactRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const detail = await c.var.services.contact.getContactDetail(id, tenantId);
         if (!detail) return c.json({ success: false, error: { message: 'Contact not found', code: 'NOT_FOUND' } }, 404);
-        return c.json({ success: true as const, data: await moneyView(c, detail) }, 200);
+        return c.json({ success: true as const, data: {
+            ...detail,
+            // The price on each inspection row is that inspection's money; the cumulative
+            // revenue is the company's books. Each is projected for its own capability.
+            inspections: await moneyView(c, detail.inspections, 'inspectionFees'),
+            stats: await moneyView(c, detail.stats, 'companyFinance'),
+        } }, 200);
     })
     .openapi(createContactRoute, async (c) => {
         const tenantId = c.get('tenantId');

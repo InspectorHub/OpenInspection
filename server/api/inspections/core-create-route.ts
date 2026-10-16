@@ -14,7 +14,7 @@ export const createInspectionRoute = createRoute(withMcpMetadata({
     path: '/',
     tags: ["inspections"],
     summary: "Create inspection for current tenant",
-    description: "Initialize a new inspection for a property. (POST /, inspections domain).",
+    description: "Initialize a new inspection for a property. Available to owner, manager, inspector and staff roles; a named inspector must be a member who can inspect (400 otherwise), and a job booked by staff without one starts unassigned.",
     request: {
         body: {
             content: {

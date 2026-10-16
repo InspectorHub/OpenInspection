@@ -100,6 +100,21 @@ describe("ReviewPanel — what it says when it has nothing to say", () => {
         renderPanel(EMPTY);
         expect(screen.getByText("You")).toBeTruthy();
     });
+
+    it("does not name office staff as the inspector: with none chosen it says the job is not assigned yet", () => {
+        render(
+            <ReviewPanel
+                summary={EMPTY}
+                scheduledIso="2026-07-25T09:00:00.000Z"
+                timeZone="UTC"
+                currentStep="confirm"
+                viewerCanInspect={false}
+                onJump={vi.fn()}
+            />,
+        );
+        expect(screen.getByText("Not assigned yet")).toBeTruthy();
+        expect(screen.queryByText("You")).toBeNull();
+    });
 });
 
 describe("ReviewPanel — hidden prices", () => {

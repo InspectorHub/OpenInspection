@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * Without the `financial` capability the service catalogue arrives with no
+ * Without the `inspectionFees` capability the service catalogue arrives with no
  * prices. The step must not offer a price field (the create request would be
  * refused if it carried an override) and must not show a $0.00 total.
  */

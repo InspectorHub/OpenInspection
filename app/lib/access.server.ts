@@ -1,7 +1,8 @@
 import type { LoadContext } from "~/lib/load-context";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { assertAdminOrForbidden, assertOwnerOrForbidden } from "~/lib/access";
+import { assertAdminOrForbidden, assertOwnerOrForbidden, isStaffRole } from "~/lib/access";
+import type { Capability } from "../../server/lib/auth/capabilities";
 
 /**
  * The current user's role, or `undefined` when it cannot be resolved.
@@ -15,16 +16,57 @@ export async function resolveRole(
   context: LoadContext,
   token: string,
 ): Promise<string | undefined> {
+  return (await resolveSessionUser(context, token))?.role;
+}
+
+/**
+ * The signed-in user's role and RESOLVED capabilities from the session-context
+ * API, or `undefined` when they cannot be read. The one place that call is made,
+ * so `resolveRole` and the capability guard below fail closed in the same way.
+ */
+async function resolveSessionUser(
+  context: LoadContext,
+  token: string,
+): Promise<{ role?: string; capabilities?: Partial<Record<Capability, boolean>> } | undefined> {
   try {
     const api = createApi(context, { token });
     const res = await api.sessionContext.context.$get();
     if (!res.ok) return undefined;
-    const body = (await res.json()) as { data?: { user?: { role?: string } } };
-    return body.data?.user?.role;
+    const body = (await res.json()) as {
+      data?: { user?: { role?: string; capabilities?: Partial<Record<Capability, boolean>> } };
+    };
+    return body.data?.user;
   } catch {
     // Fail closed: an unresolved role is treated as no role at all.
     return undefined;
   }
+}
+
+/**
+ * Loader-side guard for a page whose data the API serves only to a viewer holding
+ * `capability`. `forbidden` is true when the capability is not a definite yes
+ * (including when the session cannot be read), so the route renders its
+ * no-permission notice instead of an empty page. UI guard only: the API still
+ * enforces the capability itself.
+ */
+export async function requireCapabilityLoader(
+  context: LoadContext,
+  request: Request,
+  capability: Capability,
+): Promise<{ forbidden: boolean; token: string }> {
+  const token = await requireToken(context, request);
+  const user = await resolveSessionUser(context, token);
+  return { forbidden: user?.capabilities?.[capability] !== true, token };
+}
+
+/** The same guard for a page that has nothing for an office (`staff`) user. */
+export async function requireNotStaffLoader(
+  context: LoadContext,
+  request: Request,
+): Promise<{ forbidden: boolean; token: string }> {
+  const token = await requireToken(context, request);
+  const role = await resolveRole(context, token);
+  return { forbidden: role === undefined || isStaffRole(role), token };
 }
 
 /**

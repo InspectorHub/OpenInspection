@@ -1,7 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { app } from '../../../server/index';
 import { isMoneyField } from '../../../server/lib/auth/money-redaction';
-import { MONEY_SURFACE, UNSCANNED_MONEY_SURFACE } from './money-surface-registry';
+import { MONEY_SURFACE, UNSCANNED_MONEY_SURFACE, type Disposition } from './money-surface-registry';
 
 interface Schema {
     type?: string;
@@ -79,6 +80,59 @@ describe('every endpoint that can return money declares how it protects it', { t
         });
         expect(stale).toEqual([]);
         expect(Object.keys(UNSCANNED_MONEY_SURFACE).filter((k) => k in MONEY_SURFACE)).toEqual([]);
+    });
+    it('every redact and gate names only the two legitimate buckets', () => {
+        const legit = new Set(['inspectionFees', 'companyFinance']);
+        const checked = [...Object.entries(MONEY_SURFACE), ...Object.entries(UNSCANNED_MONEY_SURFACE)]
+            .filter((e): e is [string, Extract<Disposition, { bucket: readonly string[] }>] => e[1].kind !== 'exempt');
+        console.log(`money buckets: checked=${checked.length}`);
+        expect(checked.length).toBeGreaterThan(30);
+        for (const [k, d] of checked) {
+            expect(d.bucket.length, k).toBeGreaterThan(0);
+            for (const b of d.bucket) expect(legit.has(b), `${k} -> ${b}`).toBe(true);
+        }
+    });
+    it('the capability a gate declares is the bucket the registry names', () => {
+        const doc = app.getOpenAPIDocument({ openapi: '3.0.0', info: { version: 't', title: 't' } });
+        const mismatched: string[] = [];
+        let compared = 0;
+        let undeclared = 0;
+        for (const [k, d] of [...Object.entries(MONEY_SURFACE), ...Object.entries(UNSCANNED_MONEY_SURFACE)]) {
+            if (d.kind !== 'gate') continue;
+            const [method, path] = k.split(' ') as [string, string];
+            const op = ((doc.paths ?? {})[path] as Record<string, { 'x-capability'?: string }> | undefined)?.[method.toLowerCase()];
+            const declared = op?.['x-capability'];
+            if (declared === undefined) {
+                undeclared += 1;
+                // Guarded inside the handler instead (by field, or by a caller-scoped view): the named file must say so.
+                const src = d.file ? readFileSync(`server/api/${d.file}`, 'utf8') : '';
+                const bucket = d.bucket[0];
+                if (!d.file || !(/guardMoneyWrite\(/.test(src) || new RegExp(`caps[.]${bucket}\\b`).test(src))) {
+                    mismatched.push(`${k} has no x-capability and no in-handler guard for ${bucket} in ${d.file ?? '(no file)'}`);
+                }
+                continue;
+            }
+            compared += 1;
+            if (!d.bucket.includes(declared as never) || d.bucket.length !== 1) mismatched.push(`${k}: registry ${d.bucket.join('+')} but route declares ${declared}`);
+        }
+        console.log(`gate buckets: compared=${compared} guarded-by-field=${undeclared}`);
+        expect(compared).toBeGreaterThan(10);
+        expect(mismatched).toEqual([]);
+    });
+    it('the route file of a redact wears the bucket the registry names', () => {
+        const missing: string[] = [];
+        let checked = 0;
+        for (const [k, d] of [...Object.entries(MONEY_SURFACE), ...Object.entries(UNSCANNED_MONEY_SURFACE)]) {
+            if (d.kind !== 'redact') continue;
+            const src = readFileSync(`server/api/${d.file}`, 'utf8');
+            for (const b of d.bucket) {
+                checked += 1;
+                if (!new RegExp(`['"]${b}['"]|[.]${b}\\b`).test(src)) missing.push(`${k}: ${d.file} never uses ${b}`);
+            }
+        }
+        console.log(`redact buckets: checked=${checked}`);
+        expect(checked).toBeGreaterThan(20);
+        expect(missing).toEqual([]);
     });
     it('exemptions carry a whitelisted reason', () => {
         const ok = new Set(['client-facing-token-track', 'repair-estimate-not-company-money', 'catalog-config-admin-only']);

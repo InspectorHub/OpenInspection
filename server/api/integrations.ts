@@ -18,6 +18,7 @@ import { resolveEmailProvider } from '../lib/email/resolve-provider';
 import { logger } from '../lib/logger';
 import { recordIntegrationTest, listIntegrationTestResults, type IntegrationTarget } from '../lib/integration-test-results';
 import { getDrizzle, createDrizzle } from '../lib/route-helpers';
+import integrationsOverviewRoutes from './integrations-overview';
 
 /**
  * Single write point for the four "Test connection" probes in this file — keeps
@@ -319,7 +320,10 @@ const integrationsRoutes = createApiRouter()
                 error: { code: 'EMAIL_KEY_INVALID', message: 'Credential validation failed unexpectedly.' },
             }, 502);
         }
-    });
+    })
+    // Its own file; chained here so the typed client reaches it as
+    // `api.integrations.overview` without a second router on this base path.
+    .route('/overview', integrationsOverviewRoutes);
 
 export type IntegrationsApi = typeof integrationsRoutes;
 export default integrationsRoutes;

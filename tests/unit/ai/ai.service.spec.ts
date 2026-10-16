@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AIService } from '../../../server/services/ai.service';
+import { OpenAiCompatibleProvider } from '../../../server/lib/ai/providers/openai-compatible';
 import { RecordingAiProvider } from '../../../server/lib/ai/providers/recording';
 import { Errors, ErrorCode } from '../../../server/lib/errors';
 import { AI_REFUSAL_REASON } from '../../../server/lib/ai/refusal-reason';
@@ -35,7 +36,7 @@ describe('AIService.rewriteComment', () => {
     const withReply = (text: string) => {
         recorder = new RecordingAiProvider([text]);
         return new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE, undefined, recorder,
         );
     };
@@ -119,9 +120,9 @@ describe('AIService.rewriteComment', () => {
         // worse than an error toast. WHICH statuses become which kind of
         // failure is the adapter's decision, asserted in its own spec.
         const svc = new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE, undefined,
-            { id: 'x', endpoint: 'https://stub.test/v1', complete: async () => { throw new Error('Failed to generate content from AI'); } },
+            { id: 'x', model: 'test-model', endpoint: 'https://stub.test/v1', complete: async () => { throw new Error('Failed to generate content from AI'); } },
         );
         await expect(svc.rewriteComment({
             itemLabel: 'Roof', sectionTitle: 'Roof', tab: 'defects',
@@ -145,12 +146,11 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
         {} as D1Database,
         'test-key',
         'saas',
-        'test-model',
         undefined,
         OWN_CONFIRMED_KEY,
         PROVENANCE,
         undefined,
-        { id: 'test', endpoint: 'https://stub.test/v1', complete: async () => { throw err; } },
+        { id: 'test', model: 'test-model', endpoint: 'https://stub.test/v1', complete: async () => { throw err; } },
     );
 
     it('re-throws an upstream credential refusal instead of returning no suggestions', async () => {
@@ -173,15 +173,47 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
             .toEqual({ suggestions: [], aiCallId: null });
     });
 
+    describe('through the real adapter', () => {
+        const realAdapterService = () => new AIService(
+            {} as D1Database, 'test-key', 'saas', undefined,
+            OWN_CONFIRMED_KEY, PROVENANCE, undefined,
+            new OpenAiCompatibleProvider({ apiKey: 'k', model: 'a-model', baseUrl: 'https://api.example.com/v1' }),
+        );
+        afterEach(() => vi.unstubAllGlobals());
+
+        it('degrades a 400 context-length failure to an empty list', async () => {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+                JSON.stringify({ error: { code: 'context_length_exceeded', message: 'too long' } }), { status: 400 },
+            )));
+            expect(await realAdapterService().suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }))
+                .toEqual({ suggestions: [], aiCallId: null });
+        });
+
+        it('degrades a 404 path error to an empty list', async () => {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('no such route', { status: 404 })));
+            expect(await realAdapterService().suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }))
+                .toEqual({ suggestions: [], aiCallId: null });
+        });
+
+        it('still refuses a true model-not-found, naming the model', async () => {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+                JSON.stringify({ error: { code: 'model_not_found' } }), { status: 404 },
+            )));
+            const err = await realAdapterService().suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }).catch(e => e);
+            expect(err.code).toBe(ErrorCode.AI_NOT_CONFIGURED);
+            expect(err.message).toContain('a-model');
+        });
+    });
+
     it('calls the provider it was given, and constructs none of its own', async () => {
         // The whole point of Task 6: credential and endpoint selection belongs
         // to the resolver. A service that built its own adapter would never see
         // this stub, and would reach a real network instead.
         const calls: string[] = [];
         const svc = new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE, undefined,
-            { id: 'injected', endpoint: 'https://stub.test/v1', complete: async (r) => { calls.push(r.prompt); return { text: '["a"]' }; } },
+            { id: 'injected', model: 'test-model', endpoint: 'https://stub.test/v1', complete: async (r) => { calls.push(r.prompt); return { text: '["a"]' }; } },
         );
         const out = await svc.suggestComment({ itemName: 'Roof', sectionName: 'Exterior' });
         expect(calls).toHaveLength(1);
@@ -194,7 +226,7 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
         // decision made for it, and inventing one here would be a second
         // answer to a question `resolve-provider.ts` owns.
         const svc = new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             OWN_CONFIRMED_KEY, PROVENANCE,
         );
         const err = await svc.suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }).catch(e => e);

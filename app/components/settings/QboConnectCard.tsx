@@ -48,7 +48,7 @@ export function QboConnectCard({
   const blockedClick = () => onNeedCredentials();
   return (
     <div className="space-y-4">
-      <div className="bg-ih-bg-card border border-ih-border rounded-lg px-6 py-10 text-center">
+      <div className="bg-ih-bg-card border border-ih-border rounded-ih-card px-6 py-10 text-center">
         <div className="mx-auto flex max-w-[520px] flex-col items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#2CA01C]/10" aria-hidden="true">
             <span className="text-2xl font-extrabold text-[#2CA01C]">QB</span>
@@ -93,9 +93,9 @@ export function QboConnectCard({
             />
           </a>
           {ready ? (
-            <p className="max-w-[44ch] text-[12.5px] text-ih-fg-3">{m.settings_qbo_connect_note()}</p>
+            <p className="max-w-[44ch] text-xs text-ih-fg-3">{m.settings_qbo_connect_note()}</p>
           ) : (
-            <p className="max-w-[44ch] text-[12.5px] text-ih-fg-3">
+            <p className="max-w-[44ch] text-xs text-ih-fg-3">
               {m.settings_qbo_connect_blocked()}{" "}
               <a href={`#${QBO_APP_SECTION_ID}`} onClick={blockedClick} className="font-semibold text-ih-primary-text underline">
                 {m.settings_qbo_connect_blocked_link()}
@@ -105,7 +105,7 @@ export function QboConnectCard({
         </div>
       </div>
 
-      <section className="bg-ih-bg-card border border-ih-border rounded-lg p-6" aria-labelledby="qbo-before-heading">
+      <section className="bg-ih-bg-card border border-ih-border rounded-ih-card p-6" aria-labelledby="qbo-before-heading">
         <h2 id="qbo-before-heading" className="text-[15px] font-bold text-ih-fg-1">
           {m.settings_qbo_before_heading()}
         </h2>

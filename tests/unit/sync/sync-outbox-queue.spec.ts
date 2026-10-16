@@ -186,4 +186,37 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         expect(stillThere).toBeDefined();
         expect(stillThere!.deletedAt).not.toBeNull();
     });
+
+    it('TeamService.updateMember emits exactly one user.role_changed carrying the new role', async () => {
+        await testDb.insert(tenants).values({ id: 't1', slug: 't1', createdAt: new Date() } as typeof tenants.$inferInsert);
+        await testDb.insert(users).values({
+            id: 'u-mover', tenantId: 't1', email: 'mover@example.com',
+            passwordHash: 'hash', role: 'inspector', createdAt: new Date(),
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, new OutboxService({} as any));
+
+        await team.updateMember({ tenantId: 't1', userId: 'u-mover', requesterId: 'u-admin', requesterRole: 'owner', role: 'staff' });
+
+        const rows = await testDb.select().from(syncOutbox).where(eq(syncOutbox.eventType, 'user.role_changed')).all();
+        expect(rows).toHaveLength(1);
+        expect(JSON.parse(rows[0]!.payload)).toEqual({ tenantId: 't1', email: 'mover@example.com', role: 'staff' });
+    });
+
+    it('TeamService.updateMember emits no user.role_changed when the role is unchanged (control)', async () => {
+        await testDb.insert(tenants).values({ id: 't1', slug: 't1', createdAt: new Date() } as typeof tenants.$inferInsert);
+        await testDb.insert(users).values({
+            id: 'u-same', tenantId: 't1', email: 'same@example.com',
+            passwordHash: 'hash', role: 'inspector', createdAt: new Date(),
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, new OutboxService({} as any));
+
+        // Same role named again, and an override-only edit: neither moves the role.
+        await team.updateMember({ tenantId: 't1', userId: 'u-same', requesterId: 'u-admin', requesterRole: 'owner', role: 'inspector' });
+        await team.updateMember({ tenantId: 't1', userId: 'u-same', requesterId: 'u-admin', requesterRole: 'owner', permissionOverrides: { companyFinance: true } });
+
+        const rows = await testDb.select().from(syncOutbox).where(eq(syncOutbox.eventType, 'user.role_changed')).all();
+        expect(rows).toHaveLength(0);
+    });
 });

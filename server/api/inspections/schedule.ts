@@ -13,7 +13,7 @@
 // TOGGLEABLE: an inspector granted the override may dispatch, and a manager whose
 // override was revoked may not. Anyone on the roster may move the date of their own job.
 import { createRoute, z } from '@hono/zod-openapi';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { guardScheduleMove } from './core-access';
@@ -28,6 +28,7 @@ import { epochMsToWallClockHm, epochMsToWallClockYmd, resolveTenantTimeZone } fr
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
+import { FIELD_ROLES } from '../../lib/auth/roles';
 import {
     ReschedulePatchSchema,
     RescheduleResponseSchema,
@@ -39,7 +40,7 @@ const scheduleRoute = createRoute(withMcpMetadata({
     path: '/{id}/schedule',
     tags: ['inspections'],
     summary: 'Reschedule and/or reassign one inspection',
-    description: 'Moves an inspection to a precise instant and optionally changes who works it. Owner and manager, and inspectors granted the scheduleOthers capability, can move any inspection and reassign it; an inspector on the inspection (lead or helper) can move its date but not change who works it; other inspectors get 403. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is "block" and the resulting assignment overlaps existing work.',
+    description: 'Moves an inspection to a precise instant and optionally changes who works it. Owner and manager, and inspectors granted the scheduleOthers capability, can move any inspection and reassign it; an inspector on the inspection (lead or helper) can move its date but not change who works it; other inspectors get 403. Staff move and reassign with scheduleOthers, which they hold by default. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is "block" and the resulting assignment overlaps existing work.',
     request: {
         params: z.object({
             id: z.string().trim().min(1).describe('Inspection id to reschedule.'),
@@ -140,12 +141,12 @@ const scheduleRoutes = createApiRouter()
             for (const candidate of [leadId, ...helperIds]) {
                 if (!candidate) continue;
                 const member = await db.select({ id: users.id }).from(users)
-                    .where(and(eq(users.id, candidate), eq(users.tenantId, tenantId)))
+                    .where(and(eq(users.id, candidate), eq(users.tenantId, tenantId), inArray(users.role, [...FIELD_ROLES])))
                     .get();
                 if (!member) {
                     return c.json({
                         success: false as const,
-                        error: { code: 'INVALID_INSPECTOR', message: 'An assignee is not a member of this tenant' },
+                        error: { code: 'INVALID_INSPECTOR', message: 'An assignee is not a member of this tenant who can inspect' },
                     }, 400);
                 }
             }

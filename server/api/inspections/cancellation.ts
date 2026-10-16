@@ -11,6 +11,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { assertStaffMayCancel, guardStaffUncancel } from './staff-status-guards';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { moneyView } from '../../lib/auth/money-access';
 import { Errors } from '../../lib/errors';
@@ -19,7 +20,8 @@ import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { CANCELLATION_REASONS } from '../../lib/cancellation-reason';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
-import { auditFromContext } from '../../lib/audit';
+import { auditFromContextAwaited } from '../../lib/audit';
+import { logger } from '../../lib/logger';
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { quoteCancellation, applyCancellationRefund } from '../../services/inspection/cancellation.service';
@@ -37,16 +39,16 @@ const CancellationQuoteSchema = z.object({
     policyConfigured: z.boolean().describe('False when the workspace has configured no ladder; nothing is ever charged.'),
 }).openapi('CancellationQuote');
 
-// What a caller WITHOUT the financial capability gets from the quote: no figure
+// What a caller WITHOUT the inspection-fees capability gets from the quote: no figure
 // at all. `moneyInvolved` is a yes/no, not an amount - it lets the dialog offer
 // a plain cancellation when nothing was collected or charged, and say who may
 // cancel when something was.
 const RestrictedQuoteSchema = z.object({
-    requiresFinancial: z.literal(true).describe('The caller lacks the financial capability, so no amount is returned.'),
+    requiresFinancial: z.literal(true).describe('The caller lacks the inspection-fees capability, so no amount is returned.'),
     moneyInvolved: z.boolean().describe('True when a fee, a refund or a collected payment is attached to this cancellation.'),
 }).openapi('CancellationQuoteRestricted');
 
-// The cancel answer as a caller without the financial capability receives it:
+// The cancel answer as a caller without the inspection-fees capability receives it:
 // the same outcome with every amount absent.
 const CancellationOutcomeSchema = CancellationQuoteSchema.partial({
     feeCents: true, refundCents: true, priceCents: true, paidCents: true, retainedProcessingFeeCents: true,
@@ -70,7 +72,7 @@ const quoteRoute = createRoute(withMcpMetadata({
                 success: z.literal(true),
                 data: z.union([CancellationQuoteSchema, RestrictedQuoteSchema]),
             }) } },
-            description: 'The computed outcome, or only requiresFinancial and moneyInvolved for a caller without the financial capability. Read-only — nothing is cancelled and no money moves.',
+            description: 'The computed outcome, or only requiresFinancial and moneyInvolved for a caller without the inspection-fees capability. Read-only — nothing is cancelled and no money moves.',
         },
     },
     operationId: 'getCancellationQuote',
@@ -112,7 +114,7 @@ const cancelRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: 'cancelInspection',
-    description: 'Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged.',
+    description: 'Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles. Staff may cancel only an unpaid inspection that has not started, and need scheduleOthers or a place on the inspection; otherwise they get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 // THE ONE DOOR BACK (#81). This endpoint shipped complete and unwired: the
@@ -128,15 +130,15 @@ const cancelRoute = createRoute(withMcpMetadata({
 // they cannot undo.
 const uncancelRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/uncancel',
-    tags: ["inspections"], summary: "Bring a cancelled inspection back to scheduled",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    tags: ["inspections"], summary: "Bring a cancelled inspection back",
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardStaffUncancel] as const,
     request: { params: z.object({ id: z.string().describe('The cancelled inspection to bring back.') }).describe('Path parameters.') },
     responses: {
         200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('Recovered.') } }, description: 'Uncancelled' },
         400: { description: 'The inspection is not cancelled, so there is nothing to recover.' },
     },
     operationId: "createInspectionUncancel",
-    description: "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
+    description: "Returns a mistakenly-cancelled inspection to the status it had before it was cancelled, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. The report status is not changed. Staff need scheduleOthers or a place on the inspection, and get 403 for an inspection that was completed when it was cancelled. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const flatten = (q: Awaited<ReturnType<typeof quoteCancellation>>) => ({
@@ -158,7 +160,7 @@ const cancellationRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const { reason } = c.req.valid('query');
         const quote = await quoteCancellation(getDrizzle(c), tenantId, id, reason);
-        if (!(await capabilitiesFor(c)).financial) {
+        if (!(await capabilitiesFor(c)).inspectionFees) {
             return c.json({ success: true as const, data: { requiresFinancial: true as const, moneyInvolved: involvesMoney(quote) } }, 200);
         }
         return c.json({ success: true as const, data: flatten(quote) }, 200);
@@ -174,10 +176,13 @@ const cancellationRoutes = createApiRouter()
         // the caller was looking at.
         const quote = await quoteCancellation(db, tenantId, id, reason);
 
+        // Staff cancel only what nothing has been collected on and the inspector has not started.
+        await assertStaffMayCancel(c, id, quote.paidCents);
+
         // Committing a fee or a refund is a money decision. The refusal carries no
         // figure, and it comes before the fee confirmation, which would show one.
-        if (involvesMoney(quote) && !(await capabilitiesFor(c)).financial) {
-            throw Errors.FinancialRequired('cancellation');
+        if (involvesMoney(quote) && !(await capabilitiesFor(c)).inspectionFees) {
+            throw Errors.FinancialRequired('cancellation', 'inspectionFees');
         }
 
         // A cancellation that silently charges 50% is a chargeback. Making the
@@ -195,7 +200,7 @@ const cancellationRoutes = createApiRouter()
             }, 409);
         }
 
-        await c.var.services.inspection.cancelInspection(tenantId, id, reason, notes);
+        const from = await c.var.services.inspection.cancelInspection(tenantId, id, reason, notes);
 
         const userId = (c.get('user') as { sub?: string } | undefined)?.sub ?? null;
         const refund = await applyCancellationRefund(db, tenantId, quote, userId);
@@ -212,16 +217,19 @@ const cancellationRoutes = createApiRouter()
         // The audit metadata names the money, because that is the part of a
         // cancellation nobody can reconstruct from the row afterwards.
         pushInspectionAfterResponse(c, tenantId, id);
-        auditFromContext(c, 'inspection.status_change', 'inspection', {
+        // AWAITED, not fire-and-forget: `from` is the only durable record of the status this job had, and a
+        // restore reads it back. The money has already moved, so a failed write is logged, not turned into a 500.
+        await auditFromContextAwaited(c, 'inspection.status_change', 'inspection', {
             entityId: id,
             metadata: {
+                from,
                 to: 'cancelled',
                 reason,
                 feeCents: quote.outcome.feeCents,
                 refundCents: quote.outcome.refundCents,
                 refundPaymentId: refund?.row.id ?? null,
             },
-        });
+        }).catch((e) => logger.error('cancel audit write failed', { inspectionId: id }, e instanceof Error ? e : undefined));
 
         // THE SEAM. All three refund writers reach money through
         // `applyCancellationRefund`, and this is the only production entry to
@@ -251,22 +259,23 @@ const cancellationRoutes = createApiRouter()
 
         return c.json({
             success: true as const,
-            data: await moneyView(c, { outcome: flatten(quote), refundPaymentId: refund?.row.id ?? null }),
+            data: await moneyView(c, { outcome: flatten(quote), refundPaymentId: refund?.row.id ?? null }, 'inspectionFees'),
         }, 200);
     })
     .openapi(uncancelRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        await c.var.services.inspection.uncancelInspection(tenantId, id);
+        const restored = await c.var.services.inspection.uncancelInspection(tenantId, id);
 
         // Both of these are what the dropdown's PATCH did and this did not.
         // The calendar entry was REMOVED by the cancel — pushInspectionToGoogle
         // re-reads the row and puts it back, same call, no case analysis here.
         pushInspectionAfterResponse(c, tenantId, id);
-        auditFromContext(c, 'inspection.status_change', 'inspection', {
+        // Awaited like the cancel row: it marks the cancellation it ends as spent (see `recordedStatusBeforeCancel`).
+        await auditFromContextAwaited(c, 'inspection.status_change', 'inspection', {
             entityId: id,
-            metadata: { from: INSPECTION_STATUS.CANCELLED, to: INSPECTION_STATUS.SCHEDULED },
-        });
+            metadata: { from: INSPECTION_STATUS.CANCELLED, to: restored },
+        }).catch((e) => logger.error('restore audit write failed', { inspectionId: id }, e instanceof Error ? e : undefined));
         return c.json({ success: true });
     });
 

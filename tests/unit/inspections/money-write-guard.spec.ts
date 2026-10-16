@@ -1,5 +1,5 @@
 /**
- * Writes that set or change a money field need the `financial` capability.
+ * Writes that set or change a money field need a money capability (`inspectionFees` for one inspection, `companyFinance` for company-wide settings).
  * What is refused is a CHANGE: the settings form forwards every field it holds,
  * so an unchanged resend of the price a caller was shown must pass.
  */
@@ -28,7 +28,7 @@ function buildApp(role: UserRole, overrides: Record<string, boolean> | null = nu
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => (err instanceof AppError
-        ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
+        ? c.json({ success: false, error: { code: err.code, message: err.message, details: err.details } }, err.status)
         : c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500)));
     const sdb = new ScopedDB(db as never, T);
     app.use('*', async (c, next) => {
@@ -44,6 +44,8 @@ function buildApp(role: UserRole, overrides: Record<string, boolean> | null = nu
     app.route('/api/inspections', inspectionsRoutes);
     return app;
 }
+
+const NO_FEES = { inspectionFees: false };
 
 const patch = (app: OpenAPIHono<HonoConfig>, body: unknown) =>
     app.request('/api/inspections/i1', {
@@ -72,31 +74,33 @@ beforeEach(async () => {
 });
 
 describe('PATCH /api/inspections/:id money guard', () => {
-    it('refuses a changed price without financial, names the code, and leaves the row alone', async () => {
-        const res = await patch(buildApp('inspector'), { price: 1 });
+    it('refuses a changed price without inspectionFees, names the code and the capability, and leaves the row alone', async () => {
+        const res = await patch(buildApp('inspector', NO_FEES), { price: 1 });
         expect(res.status).toBe(403);
-        expect(((await res.json()) as { error: { code: string } }).error.code).toBe('FINANCIAL_REQUIRED');
+        const err = ((await res.json()) as { error: { code: string; details: unknown } }).error;
+        expect(err.code).toBe('FINANCIAL_REQUIRED');
+        expect(err.details).toEqual({ field: 'price', capability: 'inspectionFees' });
         expect((await row()).price).toBe(45000);
     });
     it('accepts an unchanged price resent with another edit', async () => {
-        const res = await patch(buildApp('inspector'), { price: 45000, propertyAddress: '2 Elm St' });
+        const res = await patch(buildApp('inspector', NO_FEES), { price: 45000, propertyAddress: '2 Elm St' });
         expect(res.status).toBe(200);
         expect((await row()).propertyAddress).toBe('2 Elm St');
         expect((await row()).price).toBe(45000);
     });
     it('accepts an edit that has no money field', async () => {
-        const res = await patch(buildApp('inspector'), { propertyAddress: '3 Pine St' });
+        const res = await patch(buildApp('inspector', NO_FEES), { propertyAddress: '3 Pine St' });
         expect(res.status).toBe(200);
     });
     it('refuses a changed deposit and does not touch the override flag', async () => {
-        const res = await patch(buildApp('inspector'), { depositRequiredCents: 5000 });
+        const res = await patch(buildApp('inspector', NO_FEES), { depositRequiredCents: 5000 });
         expect(res.status).toBe(403);
         const after = await row();
         expect(after.depositRequiredCents).toBe(9000);
         expect(after.depositOverridden).toBe(true);
     });
     it('refuses clearing the deposit', async () => {
-        const res = await patch(buildApp('inspector'), { depositRequiredCents: null });
+        const res = await patch(buildApp('inspector', NO_FEES), { depositRequiredCents: null });
         expect(res.status).toBe(403);
         expect((await row()).depositRequiredCents).toBe(9000);
     });
@@ -105,13 +109,19 @@ describe('PATCH /api/inspections/:id money guard', () => {
         expect(res.status).toBe(200);
         expect((await row()).price).toBe(50000);
     });
-    it('a manager with financial switched off is refused', async () => {
-        const res = await patch(buildApp('manager', { financial: false }), { price: 50000 });
+    it('a manager with inspectionFees switched off is refused', async () => {
+        const res = await patch(buildApp('manager', NO_FEES), { price: 50000 });
         expect(res.status).toBe(403);
     });
-    it('an inspector granted financial may change the price', async () => {
-        const res = await patch(buildApp('inspector', { financial: true }), { price: 50000 });
+    it('an inspector with the default inspectionFees may change the price of their inspection', async () => {
+        const res = await patch(buildApp('inspector'), { price: 50000 });
         expect(res.status).toBe(200);
+        expect((await row()).price).toBe(50000);
+    });
+    it('companyFinance alone does not allow a price change', async () => {
+        const res = await patch(buildApp('inspector', { inspectionFees: false, companyFinance: true }), { price: 50000 });
+        expect(res.status).toBe(403);
+        expect((await row()).price).toBe(45000);
     });
 });
 
@@ -122,17 +132,22 @@ describe('POST /api/inspections money guard', () => {
             body: JSON.stringify({ propertyAddress: '9 Birch Rd', templateId: 't1', date: '2099-02-01T10:00:00Z', ...extra }),
         }, ENV);
 
-    it('refuses a create that sets a price without financial', async () => {
-        const res = await create(buildApp('inspector'), { price: 100 });
+    it('refuses a create that sets a price without inspectionFees', async () => {
+        const res = await create(buildApp('inspector', NO_FEES), { price: 100 });
         expect(res.status).toBe(403);
         expect(((await res.json()) as { error: { code: string } }).error.code).toBe('FINANCIAL_REQUIRED');
     });
-    it('refuses per-line price overrides without financial', async () => {
-        const res = await create(buildApp('inspector'), { serviceSelections: [{ serviceId: 's1', priceOverrideCents: 1 }] });
+    it('refuses per-line price overrides without inspectionFees', async () => {
+        const res = await create(buildApp('inspector', NO_FEES), { serviceSelections: [{ serviceId: 's1', priceOverrideCents: 1 }] });
         expect(res.status).toBe(403);
     });
+    it('an inspector with the default inspectionFees may create an inspection with a price and a line override', async () => {
+        const app = buildApp('inspector');
+        expect((await create(app, { price: 100 })).status).not.toBe(403);
+        expect((await create(app, { serviceSelections: [{ serviceId: 's1', priceOverrideCents: 1 }] })).status).not.toBe(403);
+    });
     it('a create without any money field passes the guard (control for the refusals above)', async () => {
-        const res = await create(buildApp('inspector'), {});
+        const res = await create(buildApp('inspector', NO_FEES), {});
         expect(res.status).not.toBe(403);
         // Passed validation too: a 400 here would make the refusals above vacuous.
         expect(res.status).not.toBe(400);

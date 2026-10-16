@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { capabilitiesFor } = vi.hoisted(() => ({ capabilitiesFor: vi.fn(async () => ({ financial: false })) }));
+const { capabilitiesFor } = vi.hoisted(() => ({ capabilitiesFor: vi.fn(async () => ({ inspectionFees: false, companyFinance: false })) }));
 vi.mock('../../../server/lib/middleware/require-capability', () => ({ capabilitiesFor }));
 
 import { guardMoneyWrite, moneyView } from '../../../server/lib/auth/money-access';
@@ -36,12 +36,12 @@ describe('guardMoneyWrite', () => {
 describe('moneyView', () => {
     it('returns a payload with no money untouched and reads nothing', async () => {
         const payload = { id: 'i1', propertyAddress: 'a', people: [{ name: 'n' }] };
-        expect(await moneyView(ctx, payload)).toBe(payload);
+        expect(await moneyView(ctx, payload, 'inspectionFees')).toBe(payload);
         expect(capabilitiesFor).not.toHaveBeenCalled();
     });
 
     it('reads them and removes the money when the payload has some', async () => {
-        const out = await moneyView(ctx, { id: 'i1', price: 450, deposit: { amountCents: 9000 } });
+        const out = await moneyView(ctx, { id: 'i1', price: 450, deposit: { amountCents: 9000 } }, 'inspectionFees');
         expect(capabilitiesFor).toHaveBeenCalledTimes(1);
         expect(out).toEqual({ id: 'i1', deposit: {} });
     });

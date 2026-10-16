@@ -4,6 +4,7 @@
  * extension fields were removed; createInvite now only carries the canonical
  * role onto the tenant_invites row.
  */
+import { OWNER_ACTOR } from '../helpers/grant-actor';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
@@ -43,7 +44,7 @@ describe('TeamService.createInvite — canonical roles', () => {
     });
 
     it('creates an inspector invite', async () => {
-        const out = await svc.createInvite({
+        const out = await svc.createInvite({ actor: OWNER_ACTOR,
             tenantId: TENANT,
             email:    'insp@acme.test',
             role:     'inspector',
@@ -61,7 +62,7 @@ describe('TeamService.createInvite — canonical roles', () => {
     // 'manager' is the administrator-tier role that is not the account owner
     // (server/lib/auth/roles.ts). 'admin' has never been a member of ROLES.
     it('creates a manager invite', async () => {
-        const out = await svc.createInvite({
+        const out = await svc.createInvite({ actor: OWNER_ACTOR,
             tenantId: TENANT,
             email:    'office@acme.test',
             role:     'manager',
@@ -72,10 +73,10 @@ describe('TeamService.createInvite — canonical roles', () => {
     });
 
     it('stores only the overrides that differ from the role template', async () => {
-        // Inspector template = publish:true, scheduleOthers:false, financial:false,
-        // manageContacts:false. publish:true matches the template (dropped);
+        // Inspector template = publish:true, scheduleOthers:false, inspectionFees:true,
+        // companyFinance:false, manageContacts:false. publish:true matches the template (dropped);
         // scheduleOthers:true differs (kept).
-        const out = await svc.createInvite({
+        const out = await svc.createInvite({ actor: OWNER_ACTOR,
             tenantId: TENANT,
             email:    'diff@acme.test',
             role:     'inspector',
@@ -87,11 +88,11 @@ describe('TeamService.createInvite — canonical roles', () => {
     });
 
     it('stores null when every requested override equals the role template', async () => {
-        const out = await svc.createInvite({
+        const out = await svc.createInvite({ actor: OWNER_ACTOR,
             tenantId: TENANT,
             email:    'samedefault@acme.test',
             role:     'inspector',
-            permissionOverrides: { publish: true, financial: false },
+            permissionOverrides: { publish: true, companyFinance: false, inspectionFees: true },
         });
         const row = await testDb.select().from(schema.tenantInvites)
             .where(eq(schema.tenantInvites.id, out.token)).get();
@@ -99,7 +100,7 @@ describe('TeamService.createInvite — canonical roles', () => {
     });
 
     it('stores null when no overrides are supplied', async () => {
-        const out = await svc.createInvite({
+        const out = await svc.createInvite({ actor: OWNER_ACTOR,
             tenantId: TENANT,
             email:    'none@acme.test',
             role:     'manager',

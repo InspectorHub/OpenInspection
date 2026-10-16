@@ -175,7 +175,7 @@ describe('deriveBlockStates — invoice block', () => {
     });
 
     it('says nothing about the balance when money is redacted for this viewer', () => {
-        // IA-95 — no `financial` capability, so `amountCents` never arrived. The
+        // IA-95 — no `companyFinance` capability, so `amountCents` never arrived. The
         // balance is not unknown to the business, only to this reader; claiming
         // "not recorded" would be the wrong statement.
         const s = partial({ amountCents: undefined, amountPaidCents: 25000 });

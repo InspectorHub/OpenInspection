@@ -122,7 +122,7 @@ try {
       );
       console.error("  moved into module scope. Find it with `wrangler check startup`, which writes a");
       console.error("  .cpuprofile — open the flamegraph in Chrome DevTools or VS Code — then defer it");
-      console.error("  behind a dynamic import the way server/durable-objects/inspector-mcp.ts defers");
+      console.error("  behind a dynamic import the way server/lib/mcp/build-server.ts defers");
       console.error("  the OpenAPI snapshot.");
       process.exit(1);
     }

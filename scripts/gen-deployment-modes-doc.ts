@@ -50,13 +50,15 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
     videoBackendManaged:
         'Whether the platform picks the video backend. Standalone operators set `videoMode` themselves, which is why the self-host settings form exists and the saas one refuses to save.',
     hasManagedCompliance:
-        'A platform-operated compliance path (managed SMS 10DLC brand/campaign filing) exists. Absent in standalone — nobody can file on your behalf.',
+        'Carrier registration (10DLC brand/campaign or toll-free verification) can be filed for a company that has a dedicated SMS number. Absent in standalone — nobody can file on your behalf. There is no shared SMS number in either mode.',
     qboAppManaged:
         'The platform supplies the Intuit app tenants connect through, so nobody is asked for a Client ID. Standalone brings its own: Intuit matches a redirect URI byte for byte and a self-hosted deploy answers on its own domain, so the platform app cannot work there — which is why the credential form, including `QBO_ENV`, renders only in standalone.',
     tenantRecordOwnedByPortal:
         'Whether a platform stores the authoritative tenant record and this worker reads a projection of it. Decides which admin provider is constructed; in standalone this deployment owns the row outright.',
     providesEmailSource:
         'The deployment supplies a shared email sender that a company can choose as its email source (shown as Built-in). Absent in standalone, where the only email source is the operator own account.',
+    envCredentialsAreCompanyOwn:
+        'A key set in the deployment environment counts as the company own key for a service the company would otherwise bring itself (address lookup, property records, calendar sync, card payments). True in standalone, where the operator environment is the one company credentials; false when the deployment hosts several companies, where an environment key is offered as Built-in.',
     hasPortalIntegrationApi:
         'Whether the portal machine-to-machine surface (`/api/platform/*`) is mounted. Standalone 404s the whole prefix rather than answering on an API nobody can authenticate to.',
     hasAssistedMigration:

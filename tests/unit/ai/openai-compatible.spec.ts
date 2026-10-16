@@ -6,6 +6,7 @@ import {
 } from '../../../server/lib/ai/providers/openai-compatible';
 import { AppError, ErrorCode } from '../../../server/lib/errors';
 import { logger } from '../../../server/lib/logger';
+import { AiUnknownModelError } from '../../../server/lib/ai/configuration-gap';
 
 const OK = (text: string) => new Response(
     JSON.stringify({ choices: [{ message: { content: text } }] }),
@@ -127,6 +128,44 @@ describe('OpenAiCompatibleProvider — which failures refuse and which throw pla
         fetchMock.mockResolvedValue(new Response('no such route', { status: 404 }));
         const err = await provider().complete({ prompt: 'p' }).catch((e) => e);
         expect(err).not.toBeInstanceOf(AppError);
+    });
+
+    it('leaves a 400 context-length body as a plain error, not an unknown model', async () => {
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ error: { code: 'context_length_exceeded', type: 'invalid_request_error', message: 'This request is too long for a-model.' } }),
+            { status: 400 },
+        ));
+        const err = await provider().complete({ prompt: 'p' }).catch((e) => e);
+        expect(err).not.toBeInstanceOf(AiUnknownModelError);
+        expect(err.message).toBe('Failed to generate content from AI');
+    });
+
+    it('leaves a 404 path error with a JSON body as a plain error', async () => {
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ error: { message: 'Route /v1/chat/completionz not found' } }),
+            { status: 404 },
+        ));
+        const err = await provider().complete({ prompt: 'p' }).catch((e) => e);
+        expect(err).not.toBeInstanceOf(AiUnknownModelError);
+    });
+
+    it('raises the unknown-model error for the documented model_not_found body', async () => {
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify({ error: { code: 'model_not_found', message: 'The model does not exist' } }),
+            { status: 404 },
+        ));
+        const err = await provider().complete({ prompt: 'p' }).catch((e) => e);
+        expect(err).toBeInstanceOf(AiUnknownModelError);
+        expect(err.model).toBe('a-model');
+    });
+
+    it('raises the unknown-model error when the message names the configured model as missing', async () => {
+        fetchMock.mockResolvedValue(new Response(
+            JSON.stringify([{ error: { code: 404, message: 'models/a-model is not found for API version v1beta' } }]),
+            { status: 404 },
+        ));
+        const err = await provider().complete({ prompt: 'p' }).catch((e) => e);
+        expect(err).toBeInstanceOf(AiUnknownModelError);
     });
 
     it('never puts the upstream body in the thrown message', async () => {

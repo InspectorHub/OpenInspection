@@ -309,8 +309,8 @@ describe('byInspector — an inspector sees a single-row view of themselves', ()
         expect(data.byInspector[0].payCents).toBe(15000);
     });
 
-    it('an inspector GRANTED financial sees the whole company — the line is the capability', async () => {
-        const data = await fetchMetrics(buildApp('inspector', U1, { financial: true }));
+    it('an inspector GRANTED companyFinance sees the whole company — the line is the capability', async () => {
+        const data = await fetchMetrics(buildApp('inspector', U1, { companyFinance: true }));
         expect(data.scope).toBe('all');
         expect(data.byInspector.map(r => r.inspectorId).sort()).toEqual([U1, U2]);
         expect(data.totalRevenue).toBe(50000);

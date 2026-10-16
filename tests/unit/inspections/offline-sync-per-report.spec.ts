@@ -28,6 +28,12 @@ import * as schema from '../../../server/lib/db/schema';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
+const auditSpy = vi.hoisted(() => vi.fn());
+vi.mock('../../../server/lib/audit', async (orig) => ({
+    ...(await orig<typeof import('../../../server/lib/audit')>()),
+    auditFromContext: auditSpy,
+}));
+
 // Imported AFTER the mock above.
 // eslint-disable-next-line import/order
 import syncRoutes from '../../../server/api/inspection-sync';
@@ -114,6 +120,23 @@ describe('offline field sync writes to the primary report, not to whichever resu
         const sewer   = await readRow('res-sewer');
         expect((primary?.data as Record<string, unknown>)['_inspector_signature']).toBeTruthy();
         expect((sewer?.data as Record<string, unknown>)['_inspector_signature']).toBeUndefined();
+    });
+
+    it('audits a signature write with the inspection id and no image data', async () => {
+        auditSpy.mockClear();
+        await seedResults();
+        const res = await buildApp(db).request(`/${INSP_ID}/inspector-signature`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ signatureBase64: SIGNATURE, signedAt: 1_754_000_000_000 }),
+        }, FAKE_ENV);
+        expect(res.status).toBe(200);
+        expect(auditSpy).toHaveBeenCalledTimes(1);
+        const [, action, entity, opts] = auditSpy.mock.calls[0] as [unknown, string, string, { entityId?: string; metadata?: unknown }];
+        expect(action).toBe('inspection.inspector_signature.update');
+        expect(entity).toBe('inspection');
+        expect(opts.entityId).toBe(INSP_ID);
+        expect(JSON.stringify(opts)).not.toContain('AAAA');
     });
 
     it('deletes a photo from the primary report, leaving the sewer report whole', async () => {

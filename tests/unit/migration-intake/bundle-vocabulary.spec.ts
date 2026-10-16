@@ -31,7 +31,7 @@ describe('bundle vocabularies', () => {
 
     it('the member roles a bundle may carry are the roles minus agent', () => {
         const bundleRoles = ROLES.filter((r) => r !== 'agent');
-        expect(bundleRoles).toEqual(['owner', 'manager', 'inspector']);
+        expect(bundleRoles).toEqual(['owner', 'manager', 'inspector', 'staff']);
         expect([...BUNDLE_MEMBER_ROLES]).toEqual(bundleRoles);
     });
 

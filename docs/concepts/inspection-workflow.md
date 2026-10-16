@@ -90,7 +90,7 @@ Report viewer: `app/routes/public/report.tsx` (card-stack layout with section na
 
 Both go through the one OpenAI-compatible adapter, at whatever endpoint and
 model the deployment or the company configured — there is no compiled-in vendor
-or model, and with `AI_MODEL` / `AI_BASE_URL` unset both fail closed with a 503.
+or model, and when the credential source a call resolves has no model or endpoint (the company's own, or the deployment's `AI_MODEL` / `AI_BASE_URL` for a company that did not save its own) both fail closed with a 503.
 See [AI](../integrations/ai.md).
 
 ## 6. Template Management

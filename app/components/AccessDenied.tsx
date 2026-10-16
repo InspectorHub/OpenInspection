@@ -5,10 +5,10 @@
  */
 import { m } from "~/paraglide/messages";
 
-export function AccessDenied() {
+export function AccessDenied({ title }: { title?: string } = {}) {
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg p-8 text-center">
-      <p className="text-ih-fg-1 font-semibold">{m.access_denied_title()}</p>
+      <p className="text-ih-fg-1 font-semibold">{title ?? m.access_denied_title()}</p>
       <p className="text-ih-fg-3 text-[13px] mt-1">
         {m.access_denied_body()}
       </p>

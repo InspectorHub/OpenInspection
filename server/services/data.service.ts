@@ -28,7 +28,7 @@ export class DataService {
 
     /**
      * `includeMoney: false` drops the price column from the header AND from every
-     * row. The route passes the caller's `financial` capability; the default keeps
+     * row. The route passes the caller's `companyFinance` capability; the default keeps
      * the full file for callers that already hold it.
      */
     async exportInspectionsCSV(tenantId: string, includeMoney = true): Promise<string> {

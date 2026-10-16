@@ -8,6 +8,9 @@ describe('roleAllowedScopeKinds', () => {
   it('inspector gets read/write only', () => {
     expect(roleAllowedScopeKinds('inspector').sort()).toEqual(['read','write']);
   });
+  it('staff are at the inspector tier: read/write only', () => {
+    expect(roleAllowedScopeKinds('staff').sort()).toEqual(['read','write']);
+  });
   it('agent gets read/agent only', () => {
     expect(roleAllowedScopeKinds('agent').sort()).toEqual(['agent','read']);
   });

@@ -134,13 +134,13 @@ describe('email with an explicit source', () => {
 
 const OWN = { TWILIO_ACCOUNT_SID: 'ACown', TWILIO_AUTH_TOKEN: 'own-tok', TWILIO_FROM_NUMBER: '+15550001111' };
 const DEP = { TWILIO_ACCOUNT_SID: 'ACdep', TWILIO_AUTH_TOKEN: 'dep-tok', TWILIO_FROM_NUMBER: '+15559998888' };
-const MANAGED = { TWILIO_API_KEY_SID: 'SKdep', TWILIO_API_KEY_SECRET: 'sec', TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MGdep' };
+const MANAGED = { TWILIO_API_KEY_SID: 'SKdep', TWILIO_API_KEY_SECRET: 'sec' };
 const smsEnv = (extra: Partial<TwilioLoaderEnv> = {}): TwilioLoaderEnv =>
     ({ DB: {} as never, TENANT_CACHE: undefined as never, JWT_SECRET, APP_MODE: 'saas', ...DEP, ...extra });
 
 describe('sms with an explicit source', () => {
-    it('hosted own uses the company number and ignores the legacy platform mode', async () => {
-        await seedConfig({ sources: { sms: 'own' }, secrets: OWN });
+    it('hosted own uses the company number', async () => {
+        await seedConfig({ sources: { sms: 'own' }, smsMode: 'own', secrets: OWN });
         expect((await loadProviderForTenant(smsEnv(), T))?.from).toBe('+15550001111');
     });
 
@@ -149,20 +149,19 @@ describe('sms with an explicit source', () => {
         expect(await loadProviderForTenant(smsEnv(), T)).toBeNull();
     });
 
-    it('hosted provided is held back while the flag is off, with a complete shared pool', async () => {
+    it('hosted provided is never offered, even with a complete shared pool', async () => {
         await seedConfig({ sources: { sms: 'provided' }, secrets: OWN });
         expect(await loadProviderForTenant(smsEnv(MANAGED), T)).toBeNull();
     });
 
-    it('hosted provided with the flag on uses the shared pool, never the company keys (control for the line above)', async () => {
+    it('the retired shared-number switch changes nothing (control for the line above)', async () => {
         await seedConfig({ sources: { sms: 'provided' }, secrets: OWN });
-        const r = await loadProviderForTenant(smsEnv({ ...MANAGED, SMS_MANAGED_SHARED_ENABLED: 'true' }), T);
-        expect(r?.messagingServiceSid).toBe('MGdep');
-        expect(r?.from).toBeNull();
+        const r = await loadProviderForTenant(smsEnv({ ...MANAGED, SMS_MANAGED_SHARED_ENABLED: 'true' } as never), T);
+        expect(r).toBeNull();
     });
 
-    it('hosted own telnyx needs the telnyx keys, and a stored choice makes mode irrelevant', async () => {
-        await seedConfig({ sources: { sms: 'own' }, smsByoProvider: 'telnyx', secrets: { TELNYX_API_KEY: 'k', TELNYX_FROM_NUMBER: '+15550002222' } });
+    it('hosted own telnyx needs the telnyx keys', async () => {
+        await seedConfig({ sources: { sms: 'own' }, smsMode: 'own', smsByoProvider: 'telnyx', secrets: { TELNYX_API_KEY: 'k', TELNYX_FROM_NUMBER: '+15550002222' } });
         expect(await loadProviderForTenant(smsEnv(), T)).not.toBeNull();
     });
 

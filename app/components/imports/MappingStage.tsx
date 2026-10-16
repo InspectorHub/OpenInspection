@@ -36,6 +36,7 @@ const MEMBER_ROLE_LABEL: Record<string, () => string> = {
     owner: m.settings_team_role_owner_name,
     manager: m.settings_team_role_manager_name,
     inspector: m.settings_team_role_inspector_name,
+    staff: m.settings_team_role_staff_name,
 };
 
 /**

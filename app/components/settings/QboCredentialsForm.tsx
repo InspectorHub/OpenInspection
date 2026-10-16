@@ -204,7 +204,7 @@ export function QboCredentialsForm({
   return (
     <section
       id="qbo-app"
-      className="scroll-mt-4 bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5"
+      className="scroll-mt-4 bg-ih-bg-card rounded-ih-card border border-ih-border p-6 space-y-5"
       aria-labelledby="qbo-app-heading"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -212,7 +212,7 @@ export function QboCredentialsForm({
           <h2 id="qbo-app-heading" className="text-[15px] font-bold text-ih-fg-1">
             {m.settings_qbo_app_heading()}
           </h2>
-          <p className="text-[12.5px] text-ih-fg-3">
+          <p className="text-xs text-ih-fg-3">
             <span>
               {environment
                 ? m.settings_qbo_app_summary_env({ env: envLabel(environment) })
@@ -303,7 +303,7 @@ export function QboCredentialsForm({
 
           <div className="space-y-2">
             <h3 className="text-[14px] font-bold text-ih-fg-1">{m.settings_qbo_urls_heading()}</h3>
-            <p className="text-[12.5px] text-ih-fg-3 max-w-[62ch]">{m.settings_qbo_urls_desc()}</p>
+            <p className="text-xs text-ih-fg-3 max-w-[62ch]">{m.settings_qbo_urls_desc()}</p>
             <QboRegistrationUrls registration={registration} />
           </div>
         </div>

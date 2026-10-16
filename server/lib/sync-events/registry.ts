@@ -47,6 +47,14 @@ const userDeletedDataSchema = z.object({
     email: z.string(),
 });
 
+/** A member's role changed here (Team page). `role` is the NEW role. Emitted
+ *  only when the role actually moved, never for a permission-override edit. */
+const userRoleChangedDataSchema = z.object({
+    tenantId: z.string(),
+    email: z.string(),
+    role: z.string(),
+});
+
 /** A-21 batch 2 — reply to a portal->core command. `correlationId` is the cmd
  *  envelope id; `replyto` is the producer's routing key
  *  (`wf:onboarding:<instanceId>`) the portal consumer uses to wake the
@@ -346,6 +354,7 @@ export const SCHEMAS = {
     'user.invited': ['v1'],
     'user.password_changed': ['v1'],
     'user.deleted': ['v1'],
+    'user.role_changed': ['v1'],
     'reply.tenant.updated': ['v1'],
     'reply.tenant.export_completed': ['v1'],
     'reply.tenant.purged': ['v1'],
@@ -373,6 +382,7 @@ export const DATA_SCHEMAS: Record<SyncEventType, z.ZodTypeAny> = {
     'user.invited': userInvitedDataSchema,
     'user.password_changed': userPasswordChangedDataSchema,
     'user.deleted': userDeletedDataSchema,
+    'user.role_changed': userRoleChangedDataSchema,
     'reply.tenant.updated': replyTenantUpdatedDataSchema,
     'reply.tenant.export_completed': replyTenantExportCompletedDataSchema,
     'reply.tenant.purged': replyTenantPurgedDataSchema,

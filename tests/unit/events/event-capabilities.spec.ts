@@ -160,3 +160,19 @@ describe('DELETE /api/inspections/:id/reports/:reportId — destroying a deliver
         expect(deleteReport).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('PUT /api/events/:id - staff change no visit status', () => {
+    it.each(['completed', 'cancelled', 'scheduled', 'results_received'])('refuses staff %s (403) and writes nothing', async (status) => {
+        const updateEventStatus = vi.fn().mockResolvedValue(undefined);
+        const res = await putStatus('staff', status, { updateEventStatus });
+        expect(res.status).toBe(403);
+        expect(updateEventStatus).not.toHaveBeenCalled();
+    });
+
+    it('control: an inspector can still complete and cancel', async () => {
+        for (const status of ['completed', 'cancelled']) {
+            const updateEventStatus = vi.fn().mockResolvedValue(undefined);
+            expect((await putStatus('inspector', status, { updateEventStatus })).status).toBe(200);
+        }
+    });
+});

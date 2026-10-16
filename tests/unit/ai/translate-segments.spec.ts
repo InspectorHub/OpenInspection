@@ -61,8 +61,7 @@ describe('AIService.translateSegments', () => {
 
     function service() {
         return new AIService(
-            {} as D1Database, 'a-key', 'saas', 'a-model',
-            { record: async () => {} },
+            {} as D1Database, 'a-key', 'saas', { record: async () => {} },
             TENANT_OWN_CONFIRMED_KEY,
             { record: async () => 'ai-call-row' },
             undefined,

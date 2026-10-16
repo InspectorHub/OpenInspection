@@ -75,7 +75,7 @@ beforeEach(() => {
 });
 
 describe("cancellation quote loader", () => {
-    describe("for a caller without the financial capability", () => {
+    describe("for a caller without the inspection fees capability", () => {
         it("offers a zero-figure quote when no money is attached, so a free cancellation can proceed", async () => {
             quoteGet.mockResolvedValue(json({ success: true, data: { requiresFinancial: true, moneyInvolved: false } }));
             const res = await get({ id: "insp-1", reason: "client_cancelled" });
@@ -86,7 +86,7 @@ describe("cancellation quote loader", () => {
             quoteGet.mockResolvedValue(json({ success: true, data: { requiresFinancial: true, moneyInvolved: true } }));
             const res = await get({ id: "insp-1", reason: "client_cancelled" });
             expect(res.ok).toBe(false);
-            expect(res).toMatchObject({ error: expect.stringMatching(/financial/i) });
+            expect(res).toMatchObject({ error: expect.stringMatching(/inspection fees/i) });
         });
     });
 

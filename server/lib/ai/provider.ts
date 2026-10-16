@@ -35,6 +35,11 @@ export interface AiProvider {
     /** Stable adapter id for logs and metering tags (e.g. `gemini`). */
     readonly id: string;
 
+    /** The model id this instance sends, as it will appear on the wire. Empty
+     *  means none is configured. Read off the instance for the same reason as
+     *  `id`: the record of a call names what ran, not what was configured. */
+    readonly model: string;
+
     /**
      * Where this adapter sends, normalised for recording — scheme, host, port
      * and path, with credentials, query and fragment structurally absent

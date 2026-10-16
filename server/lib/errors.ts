@@ -1,5 +1,6 @@
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AiRefusalReason } from './ai/refusal-reason';
+import type { MoneyBucket } from './auth/money-redaction';
 
 /**
  * Standard error codes for consistent API responses.
@@ -89,9 +90,23 @@ export enum ErrorCode {
     // future (422): the device clock is wrong, and a package dated ahead would
     // never age out. Nothing was written. `details.maxFutureSkewDays` carries the limit.
     PACKAGE_FROM_THE_FUTURE = 'PACKAGE_FROM_THE_FUTURE',
+    // Removing a team member who still has open inspections assigned to them. The
+    // caller must say what becomes of those inspections (reassign or unassign);
+    // `details.openInspections` carries the count so a UI can prompt.
+    MEMBER_HAS_OPEN_INSPECTIONS = 'MEMBER_HAS_OPEN_INSPECTIONS',
     // A write would set or change a money field and the caller lacks the
-    // `financial` capability. `details.field` names the first field refused.
+    // capability that governs it. `details.field` names the first field refused and
+    // `details.capability` the capability it needs (`inspectionFees` or `companyFinance`).
     FINANCIAL_REQUIRED = 'FINANCIAL_REQUIRED',
+    // A manager tried to give a team member a capability the manager does not hold
+    // themselves. `details.capabilities` lists the ones refused. Only an owner can
+    // grant beyond their own set.
+    CAPABILITY_CEILING = 'CAPABILITY_CEILING',
+    // A manager tried to give a role above manager (that is, owner). `details.role`
+    // names it.
+    ROLE_CEILING = 'ROLE_CEILING',
+    // A manager tried to change their own permission overrides.
+    SELF_PERMISSION_CHANGE = 'SELF_PERMISSION_CHANGE',
 }
 
 /**
@@ -117,8 +132,21 @@ export const Errors = {
     BadRequest: (msg: string, details?: unknown) => new AppError(400, ErrorCode.BAD_REQUEST, msg, details),
     Unauthorized: (msg: string = 'Unauthorized access') => new AppError(401, ErrorCode.UNAUTHORIZED, msg),
     Forbidden: (msg: string = 'Action forbidden') => new AppError(403, ErrorCode.FORBIDDEN, msg),
-    FinancialRequired: (field: string) =>
-        new AppError(403, ErrorCode.FINANCIAL_REQUIRED, `Changing '${field}' requires the 'financial' capability`, { field }),
+    FinancialRequired: (field: string, capability: MoneyBucket) =>
+        new AppError(403, ErrorCode.FINANCIAL_REQUIRED, `Changing '${field}' requires the '${capability}' capability`, { field, capability }),
+    CapabilityCeiling: (capabilities: readonly string[]) =>
+        new AppError(403, ErrorCode.CAPABILITY_CEILING, 'Only an owner can grant a permission you do not have yourself.', { capabilities }),
+    RoleCeiling: (role: string) =>
+        new AppError(
+            403,
+            ErrorCode.ROLE_CEILING,
+            role === 'agent'
+                ? 'Agents are not team members: they are given access to an inspection, not a role on the team.'
+                : 'Only an owner can grant that role.',
+            { role },
+        ),
+    SelfPermissionChange: () =>
+        new AppError(403, ErrorCode.SELF_PERMISSION_CHANGE, 'You cannot change your own permissions. Ask an owner.'),
     NotFound: (msg: string = 'Resource not found') => new AppError(404, ErrorCode.NOT_FOUND, msg),
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
     Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),
@@ -140,6 +168,13 @@ export const Errors = {
             details,
         ),
     Internal: (msg: string = 'Internal server error') => new AppError(500, ErrorCode.INTERNAL_ERROR, msg),
+    MemberHasOpenInspections: (openInspections: number) =>
+        new AppError(
+            409,
+            ErrorCode.MEMBER_HAS_OPEN_INSPECTIONS,
+            `This member still has ${openInspections} open inspection${openInspections === 1 ? '' : 's'}. Choose another team member to take them over, or leave them unassigned.`,
+            { openInspections },
+        ),
     ServiceUnavailable: (msg: string, details?: unknown) => new AppError(503, ErrorCode.SERVICE_UNAVAILABLE, msg, details),
     /**
      * The one shape for "this AI call cannot run" — 503 + AI_NOT_CONFIGURED,

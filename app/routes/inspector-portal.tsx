@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { useLoaderData, Link, isRouteErrorResponse, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
+import { useLoaderData, Link, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
 import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
+import { useCapability, useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import {
   deriveBlockStates,
   formatCents,
@@ -34,10 +34,10 @@ import { PublishReportModal } from "~/components/inspector-portal/PublishReportM
 import { CreateReinspectionModal } from "~/components/inspector-portal/CreateReinspectionModal";
 import { PublishNotice } from "~/components/inspector-portal/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
+import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import { SendSmsModal } from "~/components/inspection/SendSmsModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
-import { publishCapFromMe, viewCommunicationCapFromMe } from "~/lib/inspector-portal-helpers";
 import { COURTESY_TRANSLATION_LOCALE } from "~/lib/courtesy-locale";
 import {
   toActionResult, sendReportActionResult, reinspectionDay,
@@ -72,7 +72,7 @@ import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock
 import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
 import { resolveReferralSources } from "../../server/lib/referral-sources";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
-import { isAdminRole } from "~/lib/access";
+import { canSendReportFor, hubAccess, mayActOnThisInspection, meAccessFromBody } from "~/lib/hub-access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { useModalFetcher } from "~/hooks/useModalFetcher";
@@ -107,8 +107,8 @@ interface HubData extends HubPayload {
     date: string | null;
     inspectorId: string | null;
     templateId: string | null;
-    // IA-95 — absent when the caller lacks the `financial` capability (an
-    // inspector's default). Optional here so the compiler forces every render
+    // IA-95 — absent when the caller lacks the `inspectionFees` capability.
+    // Optional here so the compiler forces every render
     // site to say what it shows instead of money.
     price?: number;
     paymentStatus: string;
@@ -134,7 +134,7 @@ interface HubData extends HubPayload {
     id: string;
     serviceId: string;
     name: string;
-    // IA-95 — all three absent without the `financial` capability; the line
+    // IA-95 — all three absent without the `inspectionFees` capability; the line
     // itself (what was sold) is still legitimately visible.
     priceCents?: number;
     priceSnapshot?: number;
@@ -144,6 +144,8 @@ interface HubData extends HubPayload {
   // One order, several deliverables. Optional so an older payload still renders.
   reports?: ReportRow[];
   communication?: { delivered: number; needsAttention: number; unread: number; rulesActive: number };
+  /** Server-decided facts for the cancel and restore controls (a yes/no and a status, never an amount). */
+  lifecycle: { moneyCollected: boolean; statusBeforeCancel: string | null };
 }
 
 interface PeopleAgent {
@@ -204,19 +206,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const meP = (async () => {
     const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
     const meRes = meGet ? await meGet().catch(() => null) : null;
-    if (!meRes || !meRes.ok) {
-      return { canPublishCap: false, canViewCommunication: false, role: "inspector", isAdmin: false };
-    }
-    const meBody = (await meRes.json().catch(() => ({}))) as {
-      data?: { user?: { role?: string }; capabilities?: { publish?: boolean; viewCommunication?: boolean } };
-    };
-    const role = meBody.data?.user?.role ?? "inspector";
-    return {
-      canPublishCap: publishCapFromMe(meBody),
-      canViewCommunication: viewCommunicationCapFromMe(meBody),
-      role,
-      isAdmin: isAdminRole(role),
-    };
+    return meAccessFromBody(meRes && meRes.ok ? ((await meRes.json().catch(() => ({}))) as Parameters<typeof meAccessFromBody>[0]) : null);
   })();
 
   // Plan 1B Task 5 — editable People section: every contact/role pairing on
@@ -275,11 +265,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // mocked api-client in a unit test degrades to an empty list instead of
   // throwing on a missing property.
   const membersP = (async (): Promise<TeamMember[]> => {
-    const g = api.team?.members?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+    // The assignee list the schedule routes themselves use: it is open to the same people who may reassign.
+    const g = api.inspections?.inspectors?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
     const r = g ? await g({}).catch(() => null) : null;
     return r && r.ok
-      ? (((await r.json()) as { data?: { members?: Array<{ id: string; name?: string | null; email?: string | null }> } })
-          .data?.members ?? []).map((u) => ({ id: u.id, name: u.name ?? "", email: u.email ?? "" }))
+      ? (((await r.json()) as { data?: Array<{ id: string; name?: string | null; email?: string | null }> })
+          .data ?? []).map((u) => ({ id: u.id, name: u.name ?? "", email: u.email ?? "" }))
       : [];
   })();
 
@@ -366,7 +357,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     consentP, meP, peopleP, roleProfilesP, documentsP, membersP, catalogP, brandingP, versionsP, statutoryP,
   ]);
 
-  const { canPublishCap, canViewCommunication, role, isAdmin } = me;
+  const { canPublishCap, canViewCommunication, scheduleOthers, userId, role, isAdmin } = me;
   const serviceCatalog: CatalogService[] = catalogRows.map((sv) => ({ id: sv.id, name: sv.name, price: sv.price }));
   const referralSources = resolveReferralSources(customReferralSources);
 
@@ -421,7 +412,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const { visits, visitTypes, suggestedTypeIds } = visitData;
 
   return {
-    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, scheduleOthers, userId, documents, people, roleProfiles, isAdmin, versions,
     members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   };
 }
@@ -624,12 +615,14 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  * was never marked completed. Returns an ordered array of action identifiers.
  */
 export function reportActions(
-  caps: { publish: boolean },
+  caps: { publish: boolean; edit: boolean },
   reportStatus: string,
 ): Array<'submit' | 'publish' | 'return' | 'unpublish'> {
   if (reportStatus === REPORT_STATUS.PUBLISHED) return caps.publish ? ['unpublish'] : [];
   if (reportStatus === REPORT_STATUS.SUBMITTED) return caps.publish ? ['publish', 'return'] : [];
-  return caps.publish ? ['publish'] : ['submit']; // in_progress (or unknown)
+  // in_progress (or unknown). Submitting for review writes to the report, so it needs the same access the report editor does.
+  if (caps.publish) return ['publish'];
+  return caps.edit ? ['submit'] : [];
 }
 
 /* ------------------------------------------------------------------ */
@@ -638,7 +631,7 @@ export function reportActions(
 
 export default function InspectionHubPage() {
   const {
-    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, scheduleOthers, userId, documents, people, roleProfiles, isAdmin, versions,
     members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   } = useLoaderData<typeof loader>();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
@@ -649,6 +642,13 @@ export default function InspectionHubPage() {
   const displayTz = useDisplayTimeZone();
   const fmt = useInspectionDateTimeFormat();
   const blocks = deriveBlockStates(hub);
+  // Office staff run the booking, not the inspection: the order controls stay, the inspector's own ones stand down (~/lib/hub-access).
+  const viewer = { isAdmin, scheduleOthers, userId, canPublishCap, role };
+  const mayAct = mayActOnThisInspection(viewer, inspection.inspectorId);
+  const canSendReport = canSendReportFor(viewer, inspection.inspectorId);
+  const access = hubAccess({ role, status: inspection.status, reportStatus: inspection.reportStatus, mayAct, ...hub.lifecycle });
+  const { canEditOrder } = access;
+  const canEditReports = useCapability("editReports");
   const navigate = useNavigate();
   const revalidator = useRevalidator();
 
@@ -820,7 +820,7 @@ export default function InspectionHubPage() {
 
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
-  const reportActionList = reportActions({ publish: canPublishCap }, inspection.reportStatus);
+  const reportActionList = reportActions({ publish: canPublishCap, edit: canEditReports }, inspection.reportStatus);
 
   // IA-40 — when a version already exists, the next publish increments to
   // versionNumber > 1 (an amendment), so the publish modal asks what changed.
@@ -833,7 +833,7 @@ export default function InspectionHubPage() {
     !hub.publishReadiness.ready &&
     hub.publishReadiness.blockingCount > 0;
 
-  // IA-95 — the server redacts money when the caller lacks the `financial`
+  // IA-95 — the server redacts money when the caller lacks the matching money
   // capability, so ABSENCE is the signal. We deliberately do NOT ship a second
   // copy of the capability to the client to branch on: a client-side flag can
   // disagree with what the server actually sent, whereas absence cannot — it IS
@@ -887,12 +887,14 @@ export default function InspectionHubPage() {
           <>
             {/* The theme control that used to sit here was standing in for the
                 sidebar's user menu, which this page did not have. It does now. */}
-            <Link
-              to={`/inspections/${inspection.id}/edit`}
-              className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
-            >
-              {m.inspections_hub_action_open_editor()}
-            </Link>
+            {canEditReports && (
+              <Link
+                to={`/inspections/${inspection.id}/edit`}
+                className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
+              >
+                {m.inspections_hub_action_open_editor()}
+              </Link>
+            )}
             {reportShipped && (
               <Link
                 to={`/report-view/${tenantSlug}/${inspection.id}`}
@@ -929,6 +931,7 @@ export default function InspectionHubPage() {
           inspectorName={peopleCard.inspector?.name ?? peopleCard.inspector?.email ?? null}
           members={members}
           displayTz={displayTz}
+          canEdit={access.canChangeSchedule}
         />
 
         {/* 2. People — who. Editable (Plan 1B Task 5): PeopleEditor sources rows
@@ -1002,12 +1005,13 @@ export default function InspectionHubPage() {
             checked={inspection.agreementRequired}
             label={m.inspections_hub_gate_agreement()}
             testId="hub-gate-agreement"
+            canEdit={canEditOrder && (access.canTurnGateOff || !inspection.agreementRequired)}
           />
         </Card>
 
         {/* 5. Inspection status — the visit itself. Independent of report
             publishing. */}
-        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} />
+        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} canComplete={access.canEditInspection} canCancel={access.canCancel} canRestore={access.canRestore} />
 
         {/* 5b. Communication — what has been said, and what we sent. The
             client already had a Messages tab; this is the inspector's first
@@ -1046,14 +1050,16 @@ export default function InspectionHubPage() {
                   : m.inspections_hub_report_published()}
               </p>
               <div className="flex items-center gap-2 flex-wrap">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => reinspectModal.setOpen(true)}
-                >
-                  {m.inspections_hub_report_create_reinspection()}
-                </Button>
-                {canPublishCap && (
+                {canEditOrder && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => reinspectModal.setOpen(true)}
+                  >
+                    {m.inspections_hub_report_create_reinspection()}
+                  </Button>
+                )}
+                {canSendReport && (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -1062,7 +1068,7 @@ export default function InspectionHubPage() {
                     {m.inspections_hub_report_send()}
                   </Button>
                 )}
-                {canPublishCap && (
+                {canSendReport && (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -1116,7 +1122,7 @@ export default function InspectionHubPage() {
                   {m.inspections_hub_report_blockers({ count: hub.publishReadiness.blockingCount })}
                 </p>
               )}
-              {(reportActionList.length > 0 || reportBlockersPending) && (
+              {(reportActionList.length > 0 || (reportBlockersPending && canEditReports)) && (
               <div className="flex items-center gap-2 flex-wrap">
                 {reportActionList.includes('publish') && (
                   <Button
@@ -1151,7 +1157,7 @@ export default function InspectionHubPage() {
                     </button>
                   </returnReport.Form>
                 )}
-                {reportBlockersPending && (
+                {reportBlockersPending && canEditReports && (
                   <Link
                     to={`/inspections/${inspection.id}/edit`}
                     className="text-[12px] font-bold text-ih-primary-text hover:underline"
@@ -1236,6 +1242,7 @@ export default function InspectionHubPage() {
           paymentRequired={inspection.paymentRequired}
           basePriceCents={inspection.price}
           canManagePrice={isAdmin && canSeeMoney}
+          canEditGate={canEditOrder && (access.canTurnGateOff || !inspection.paymentRequired)}
           onRequestPayment={() => paymentModal.setOpen(true)}
         />
 
@@ -1248,6 +1255,7 @@ export default function InspectionHubPage() {
           referralSources={referralSources}
           referredByContactId={inspection.referredByContactId ?? null}
           referredByName={inspection.referredByName ?? null}
+          canEdit={canEditOrder}
         />
 
       </div>
@@ -1393,24 +1401,11 @@ export default function InspectionHubPage() {
  * error as an actionable message with a route back, instead of a blank page.
  */
 export function ErrorBoundary() {
-  const error = useRouteError();
-  const status = isRouteErrorResponse(error) ? error.status : null;
-  const message =
-    status === 404
-      ? m.inspections_hub_eb_not_found()
-      : status === 403
-        ? m.inspections_hub_eb_forbidden()
-        : m.inspections_hub_eb_generic();
-
   return (
-    <div className="max-w-[1080px] mx-auto pt-16 px-9 flex flex-col items-center gap-3 text-center">
-      <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
-      <Link
-        to="/inspections"
-        className="h-9 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
-      >
-        {m.inspections_hub_eb_back()}
-      </Link>
-    </div>
+    <RouteErrorNotice
+      error={useRouteError()}
+      messages={{ notFound: m.inspections_hub_eb_not_found(), forbidden: m.inspections_hub_eb_forbidden(), generic: m.inspections_hub_eb_generic() }}
+      back={{ to: "/inspections", label: m.inspections_hub_eb_back() }}
+    />
   );
 }

@@ -1,6 +1,6 @@
 /**
  * What an offline import does with a queued write that sets money when the
- * importer lacks the `financial` capability.
+ * importer lacks the `inspectionFees` capability.
  *
  * A queued update is replayed through the same PATCH route a live edit uses, so
  * the money guard answers 403 FINANCIAL_REQUIRED for it. The import is
@@ -45,10 +45,10 @@ const provider = {
     },
 };
 
-async function addMember(role: 'manager' | 'inspector'): Promise<Member> {
+async function addMember(role: 'manager' | 'inspector', overrides: Record<string, boolean> | null = null): Promise<Member> {
     const id = fresh(`user-${role}`);
-    await b.DB.prepare('INSERT INTO users (id, tenant_id, email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .bind(id, TENANT, `${id}@example.test`, 'x', id, role, Date.now()).run();
+    await b.DB.prepare('INSERT INTO users (id, tenant_id, email, password_hash, name, role, permission_overrides, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(id, TENANT, `${id}@example.test`, 'x', id, role, overrides === null ? null : JSON.stringify(overrides), Date.now()).run();
     const token = `u:g:${id}`;
     grants.set(token, { kind: 'native', userId: id, tenantId: TENANT, role, lastUsedAt: 0, grantedAt: 0 });
     return { id, token };
@@ -113,9 +113,10 @@ function importUpdates(by: Member, insp: { id: string; reportId: string }, updat
     });
 }
 
-describe('offline import and the financial capability', () => {
+describe('offline import and the inspectionFees capability', () => {
     let manager: Member;
     let inspector: Member;
+    let noFeesInspector: Member;
 
     beforeAll(async () => {
         await applyMigrations(b.DB, migrationSql);
@@ -126,11 +127,12 @@ describe('offline import and the financial capability', () => {
             .bind(TEMPLATE, TENANT, 'Standard', JSON.stringify({ sections: [] }), now).run();
         manager = await addMember('manager');
         inspector = await addMember('inspector');
+        noFeesInspector = await addMember('inspector', { inspectionFees: false });
     });
 
     it('reports a queued price change as refused and still applies the ordinary write beside it', async () => {
-        const insp = await createInspection(inspector, '1 Original Road, Anytown');
-        const res = await importUpdates(inspector, insp, [{ price: 99_000 }, { propertyAddress: '2 Changed Road, Anytown' }]);
+        const insp = await createInspection(noFeesInspector, '1 Original Road, Anytown');
+        const res = await importUpdates(noFeesInspector, insp, [{ price: 99_000 }, { propertyAddress: '2 Changed Road, Anytown' }]);
         expect(res.status, await res.clone().text()).toBe(200);
         const out = ((await res.json()) as ImportBody).data!.outbox;
         expect(out.applied).toBe(1);
@@ -139,7 +141,7 @@ describe('offline import and the financial capability', () => {
         expect(await rowOf(insp.id)).toEqual({ price: 0, address: '2 Changed Road, Anytown' });
     });
 
-    it('positive control: a member who holds financial has both writes applied', async () => {
+    it('positive control: a member who holds inspectionFees has both writes applied', async () => {
         const insp = await createInspection(manager, '3 Original Road, Anytown');
         const res = await importUpdates(manager, insp, [{ price: 99_000 }, { propertyAddress: '4 Changed Road, Anytown' }]);
         expect(res.status, await res.clone().text()).toBe(200);
@@ -167,7 +169,7 @@ describe('offline import and the financial capability', () => {
                 body: new Uint8Array(zip),
             }) };
         };
-        const refused = create(inspector, 12_000);
+        const refused = create(noFeesInspector, 12_000);
         const res = await refused.send();
         expect(res.status, await res.clone().text()).toBe(403);
         // The importer re-labels a replayed refusal as a plain forbidden; `details` names the entry and the status.
@@ -177,12 +179,30 @@ describe('offline import and the financial capability', () => {
         expect(await rowOf(refused.id)).toBeNull();
 
         // Controls: the same create without money imports for the inspector, and with money for a manager.
-        const free = create(inspector);
+        const free = create(noFeesInspector);
         expect((await free.send()).status).toBe(200);
         expect(await rowOf(free.id)).toMatchObject({ price: 0 });
         const paid = create(manager, 12_000);
         expect((await paid.send()).status).toBe(200);
         // (The create route does not store the body's price - it derives it from the services - so only the status is asserted.)
         expect(await rowOf(paid.id)).not.toBeNull();
+    });
+
+    it('an inspector with the default inspectionFees has the queued price change applied', async () => {
+        const insp = await createInspection(inspector, '6 Original Road, Anytown');
+        const res = await importUpdates(inspector, insp, [{ price: 77_000 }]);
+        expect(res.status, await res.clone().text()).toBe(200);
+        expect(((await res.json()) as ImportBody).data!.outbox).toMatchObject({ applied: 1, failed: [] });
+        expect(await rowOf(insp.id)).toMatchObject({ price: 77_000 });
+    });
+
+    it('companyFinance alone does not allow it', async () => {
+        const financeOnly = await addMember('inspector', { inspectionFees: false, companyFinance: true });
+        const insp = await createInspection(financeOnly, '7 Original Road, Anytown');
+        const res = await importUpdates(financeOnly, insp, [{ price: 55_000 }]);
+        expect(res.status, await res.clone().text()).toBe(200);
+        const out = ((await res.json()) as ImportBody).data!.outbox;
+        expect(out.failed).toHaveLength(1);
+        expect(await rowOf(insp.id)).toMatchObject({ price: 0 });
     });
 });

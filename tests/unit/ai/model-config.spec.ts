@@ -59,7 +59,7 @@ describe('AIService — model configuration', () => {
     };
 
     it('sends the configured model in the request body', async () => {
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'a-configured-model', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter('a-configured-model'));
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter('a-configured-model'));
         await svc.rewriteComment(REWRITE_INPUT);
         expect(sentBody().model).toBe('a-configured-model');
     });
@@ -68,15 +68,15 @@ describe('AIService — model configuration', () => {
         // Asserting the ABSENCE of the stale pin rather than the presence of a
         // specific model: pinning this to today's choice would make this test
         // the thing that has to be edited on every model upgrade.
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', 'some-other-model', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter('some-other-model'));
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter('some-other-model'));
         await svc.rewriteComment(REWRITE_INPUT);
         const req = JSON.stringify([fetchMock.mock.calls[0]![0], (fetchMock.mock.calls[0]![1] as RequestInit).body]);
         expect(req).not.toContain('gemini-1.5-flash');
     });
 
     it('fails closed — rewriteComment throws when no model is configured', async () => {
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', '');
-        await expect(svc.rewriteComment(REWRITE_INPUT)).rejects.toThrow(/no AI model is configured/i);
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter(''));
+        await expect(svc.rewriteComment(REWRITE_INPUT)).rejects.toThrow(/needs a model name/i);
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
@@ -84,17 +84,17 @@ describe('AIService — model configuration', () => {
         // suggestComment swallows RUNTIME failures into `[]`. A missing model is
         // a configuration failure, not a runtime one: it must reach the caller
         // as a 503 so the UI says "configure AI" instead of "no suggestions".
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', '');
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter(''));
         await expect(svc.suggestComment({ itemName: 'Roof', sectionName: 'Roof' }))
-            .rejects.toThrow(/no AI model is configured/i);
+            .rejects.toThrow(/needs a model name/i);
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('fails closed in standalone too — the dev mock never covers a missing model', async () => {
         // A self-hoster WITH a key but no model must get a clear error, not
         // `[DEV] ...` placeholder prose silently written into a real report.
-        const svc = new AIService({} as D1Database, 'test-key', 'standalone', '');
-        await expect(svc.rewriteComment(REWRITE_INPUT)).rejects.toThrow(/no AI model is configured/i);
+        const svc = new AIService({} as D1Database, 'test-key', 'standalone', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter(''));
+        await expect(svc.rewriteComment(REWRITE_INPUT)).rejects.toThrow(/needs a model name/i);
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
@@ -104,16 +104,16 @@ describe('AIService — model configuration', () => {
         // validates the model — leaving the credential picture unconfirmed here
         // would make the case pass on the attestation refusal and stop saying
         // anything about a missing model.
-        const svc = new AIService({} as D1Database, 'test-key', 'saas', '', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter(''));
+        const svc = new AIService({} as D1Database, 'test-key', 'saas', undefined, OWN_CONFIRMED_KEY, PROVENANCE, undefined, adapter(''));
         await expect(svc.generateProfessionalComment('rough note'))
-            .rejects.toThrow(/no AI model is configured/i);
+            .rejects.toThrow(/needs a model name/i);
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('still dev-mocks in standalone when there is no key at all', async () => {
         // Unchanged behavior: the local-development mock is gated on the KEY
         // being absent, and a missing model does not widen it.
-        const svc = new AIService({} as D1Database, '', 'standalone', '');
+        const svc = new AIService({} as D1Database, '', 'standalone');
         const out = await svc.rewriteComment(REWRITE_INPUT);
         expect(out.rewritten).toMatch(/^\[DEV\] /);
     });

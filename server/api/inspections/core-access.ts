@@ -9,6 +9,7 @@
  *   freely; changing the assigned inspector, or touching an inspection one is not
  *   on, requires `scheduleOthers`. A body that merely repeats the stored
  *   assignee/date is not a change - the settings sheet forwards its whole form.
+ *   Which other fields staff may write is decided by ./staff-order-guard.
  * - DELETE: needs the `deleteInspection` capability, and then owner, manager, the
  *   inspection's lead, or `scheduleOthers`. A helper can edit but cannot delete the
  *   lead's job.
@@ -21,32 +22,26 @@ import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { getDrizzle } from '../../lib/route-helpers';
 import { invoices } from '../../lib/db/schema';
 import { REPORT_STATUS } from '../../lib/status/report-status';
-import { safeISODate } from '../../lib/date';
+import { sameMoment } from '../../lib/inspection/order-fields';
+import { assertStaffMayMove, assertStaffMayPatch, auditStaffOrderEdit } from './staff-order-guard';
 import type { HonoConfig } from '../../types/hono';
-
-/**
- * Is the submitted date the stored one? Same calendar day, and when the submission
- * carries a time it must equal the stored instant - a stored date-only value has no
- * time, so a submitted time is a change. A date-only submission keeps the stored time.
- */
-function sameMoment(stored: unknown, submitted: string): boolean {
-    const a = stored instanceof Date ? safeISODate(stored) : String(stored ?? '');
-    if (a.slice(0, 10) !== submitted.slice(0, 10)) return false;
-    if (submitted.length <= 10) return true;
-    return a.length > 10 && Date.parse(a) === Date.parse(submitted);
-}
 
 export async function guardPatchReschedule(c: Context<HonoConfig>, next: Next) {
     const body = (await c.req.json().catch(() => null)) as { inspectorId?: unknown; date?: unknown } | null;
-    if (!body || (!('inspectorId' in body) && typeof body.date !== 'string')) return next();
-
-    const { inspection } = await c.var.services.inspection.getInspection(c.req.param('id') ?? '', c.get('tenantId'));
-    const reassigns = 'inspectorId' in body && (body.inspectorId ?? null) !== (inspection.inspectorId ?? null);
-    const moves = typeof body.date === 'string' && !sameMoment(inspection.date, body.date);
-    if ((reassigns || moves) && !(await mayChangeSchedule(c, c.req.param('id') ?? '', reassigns))) {
-        throw Errors.Forbidden("Requires the 'scheduleOthers' capability to change the assignee, or the date of an inspection you do not work");
+    // Staff run the booking: the order fields are theirs, nothing on the inspection side (./staff-order-guard).
+    const staffChanged = body && typeof body === 'object' && c.get('userRole') === 'staff'
+        ? await assertStaffMayPatch(c, c.req.param('id') ?? '', body as Record<string, unknown>)
+        : null;
+    if (body && (('inspectorId' in body) || typeof body.date === 'string')) {
+        const { inspection } = await c.var.services.inspection.getInspection(c.req.param('id') ?? '', c.get('tenantId'));
+        const reassigns = 'inspectorId' in body && (body.inspectorId ?? null) !== (inspection.inspectorId ?? null);
+        const moves = typeof body.date === 'string' && !sameMoment(inspection.date, body.date);
+        if ((reassigns || moves) && !(await mayChangeSchedule(c, c.req.param('id') ?? '', reassigns))) {
+            throw Errors.Forbidden("Requires the 'scheduleOthers' capability to change the assignee, or the date of an inspection you do not work");
+        }
     }
-    return next();
+    await next();
+    if (staffChanged && c.res.ok) auditStaffOrderEdit(c, c.req.param('id') ?? '', staffChanged);
 }
 
 export async function guardInspectionDelete(c: Context<HonoConfig>, next: Next) {
@@ -63,6 +58,7 @@ export async function guardInspectionDelete(c: Context<HonoConfig>, next: Next) 
 export async function guardScheduleMove(c: Context<HonoConfig>, next: Next) {
     const body = (await c.req.json().catch(() => null)) as { leadInspectorId?: unknown; helperInspectorIds?: unknown } | null;
     const reassigns = body?.leadInspectorId !== undefined || body?.helperInspectorIds !== undefined;
+    await assertStaffMayMove(c, [c.req.param('id') ?? '']);
     if (!(await mayChangeSchedule(c, c.req.param('id') ?? '', reassigns))) {
         throw Errors.Forbidden("Requires the 'scheduleOthers' capability to reassign, or to move an inspection you do not work");
     }

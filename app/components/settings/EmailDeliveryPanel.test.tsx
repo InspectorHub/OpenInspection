@@ -26,11 +26,9 @@ function Harness() {
         senderEmail: "a@example.com", replyTo: "a@example.com", resendConfigured: true,
         emailMode: "own", senderDisplayName: null, companyName: "Acme", pointOfContact: "company",
       }}
-      isSaas={false}
       emailByoProvider="resend"
       ownProviderConfigured
       mode="own"
-      setMode={() => {}}
       overrideName={false}
       setOverrideName={() => {}}
       poc="company"

@@ -14,6 +14,7 @@
  * that admits the same batch once the seat is genuinely free, so a refusal can
  * never be a check that simply says no.
  */
+import { OWNER_ACTOR } from '../helpers/grant-actor';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { Database as SqliteDatabase } from 'better-sqlite3';
@@ -119,7 +120,7 @@ describe('MigrationApplyService — member rows', () => {
             { email: 'one@example.test', name: 'One', role: 'inspector' },
             { email: 'two@example.test', role: 'manager' },
         ]);
-        const result = await apply.apply({
+        const result = await apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
         });
 
@@ -142,7 +143,7 @@ describe('MigrationApplyService — member rows', () => {
 
     it('records the invite token as the row it created, so the undo can find it', async () => {
         const staged = await stageMembers([{ email: 'one@example.test', role: 'inspector' }]);
-        const result = await apply.apply({
+        const result = await apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
         });
         const row = await db.select().from(schema.migrationRows)
@@ -156,7 +157,7 @@ describe('MigrationApplyService — member rows', () => {
     it('skips an existing member by name rather than changing their role', async () => {
         await seedMember('u1', 'one@example.test');
         const staged = await stageMembers([{ email: 'one@example.test', role: 'owner' }]);
-        const result = await apply.apply({
+        const result = await apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'overwrite', seatQuotaEnforced: true,
         });
 
@@ -178,7 +179,7 @@ describe('MigrationApplyService — member rows', () => {
         await seedMember('u1', 'boss@example.test', 'owner');
         const staged = await stageMembers(freshMembers(4));
 
-        await expect(apply.apply({
+        await expect(apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
         })).rejects.toThrow(/needs 4 seats and 2 are available/);
 
@@ -201,7 +202,7 @@ describe('MigrationApplyService — member rows', () => {
         await seedMember('u1', 'boss@example.test', 'owner');
         const staged = await stageMembers(freshMembers(4));
 
-        const result = await apply.apply({
+        const result = await apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
         });
 
@@ -217,7 +218,7 @@ describe('MigrationApplyService — member rows', () => {
         await seedInvite('earlier', 'earlier@example.test');
         const staged = await stageMembers(freshMembers(2));
 
-        await expect(apply.apply({
+        await expect(apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
         })).rejects.toThrow(/needs 2 seats and 1 are available/);
 
@@ -229,7 +230,7 @@ describe('MigrationApplyService — member rows', () => {
         await seedMember('u1', 'boss@example.test', 'owner');
         const staged = await stageMembers(freshMembers(2));
 
-        const result = await apply.apply({
+        const result = await apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
         });
 
@@ -243,7 +244,7 @@ describe('MigrationApplyService — member rows', () => {
             { email: 'known@example.test', role: 'inspector' },
             { email: 'fresh@example.test', role: 'inspector' },
         ]);
-        const result = await apply.apply({
+        const result = await apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
         });
         expect(result).toMatchObject({ applied: 1, skipped: 1, failed: 0 });
@@ -252,7 +253,7 @@ describe('MigrationApplyService — member rows', () => {
     it('ignores the cap entirely where the deployment has no seat quota', async () => {
         await setCap(1);
         const staged = await stageMembers(freshMembers(3));
-        const result = await apply.apply({
+        const result = await apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: false,
         });
         expect(result.applied).toBe(3);
@@ -263,7 +264,7 @@ describe('MigrationApplyService — member rows', () => {
         const staged = await stageMembers([
             { email: 'boss@example.test', role: 'manager', permissionOverrides: { templateDelete: false } },
         ]);
-        await apply.apply({
+        await apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
         });
         const invite = await db.select().from(schema.tenantInvites).get();
@@ -305,7 +306,7 @@ describe('MigrationApplyService — member rows', () => {
                 { email: 'agentish@example.test', role: 'agent' },
             ]);
 
-            const result = await apply.apply({
+            const result = await apply.apply({ actor: OWNER_ACTOR,
                 tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
             });
 
@@ -340,7 +341,7 @@ describe('MigrationApplyService — member rows', () => {
             await rewriteRow(staged.batchId, 1, { email: 'fixed@example.test', role: 'inspector' });
             await rewriteRow(staged.batchId, 2, { email: 'agentish@example.test', role: 'inspector' });
 
-            const result = await apply.apply({
+            const result = await apply.apply({ actor: OWNER_ACTOR,
                 tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
             });
 
@@ -354,7 +355,7 @@ describe('MigrationApplyService — member rows', () => {
                 { email: 'good@example.test', role: 'inspector' },
                 { email: '', role: 'inspector' },
             ]);
-            const result = await apply.apply({
+            const result = await apply.apply({ actor: OWNER_ACTOR,
                 tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
             });
             expect(result).toMatchObject({ applied: 1, failed: 1 });
@@ -378,7 +379,7 @@ describe('MigrationApplyService — member rows', () => {
                 { email: 'not-an-address', role: 'inspector' },
             ]);
 
-            const result = await apply.apply({
+            const result = await apply.apply({ actor: OWNER_ACTOR,
                 tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
             });
             expect(result).toMatchObject({ applied: 2, failed: 1 });
@@ -397,7 +398,7 @@ describe('MigrationApplyService — member rows', () => {
             ]);
             await rewriteRow(staged.batchId, 2, { email: 'c@example.test', role: 'inspector' });
 
-            await expect(apply.apply({
+            await expect(apply.apply({ actor: OWNER_ACTOR,
                 tenantId: TENANT, batchId: staged.batchId, conflictPolicy: 'skip', seatQuotaEnforced: true,
             })).rejects.toThrow(/needs 3 seats and 2 are available/);
             expect(await db.select().from(schema.tenantInvites).all()).toEqual([]);

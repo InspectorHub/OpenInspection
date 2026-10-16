@@ -17,7 +17,7 @@ import { qboPaymentKey } from '../../lib/qbo-payment-key';
  * `/api/invoices/{id}/payments`.
  *
  * It is its own module because the ledger is its own thing: append-only rows
- * describing money that moved, with their own capability gate (`financial`),
+ * describing money that moved, with their own capability gate (`companyFinance`),
  * their own correction mechanism, and their own relationship to QuickBooks.
  * The parent module owns the invoice ROW — create, send, void, delete.
  */
@@ -30,14 +30,14 @@ import { qboPaymentKey } from '../../lib/qbo-payment-key';
  * payment provider, because the money already moved outside every system we
  * integrate with.
  *
- * Capability-gated on `financial`, the same gate the rest of the billing
+ * Capability-gated on `companyFinance`, the same gate the rest of the billing
  * surface wears, and `recorded_by` is the authenticated user rather than
  * anything in the body — an unattributed money entry is worthless in a dispute.
  */
 const recordOfflinePaymentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/payments',
     tags: ['invoices'], summary: 'Record an offline payment against an invoice',
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('financial')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('companyFinance')],
     request: {
         params: z.object({ id: INVOICE_ID.describe('Invoice the money was received against.') }).describe('Path params for the record-payment endpoint.'),
         body: { content: { 'application/json': { schema: RecordOfflinePaymentSchema } } },
@@ -57,7 +57,7 @@ const recordOfflinePaymentRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: 'recordInvoiceOfflinePayment',
     description: 'Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session.',
-}, { scopes: ['write'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 /**
  * The correction path — `POST /api/invoices/{id}/payments/{paymentId}/corrections`.
@@ -69,7 +69,7 @@ const recordOfflinePaymentRoute = createRoute(withMcpMetadata({
 const correctPaymentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/payments/{paymentId}/corrections',
     tags: ['invoices'], summary: 'Correct a mistyped payment on an invoice',
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('financial')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('companyFinance')],
     request: {
         params: z.object({
             id: INVOICE_ID.describe('Invoice the mistyped payment was recorded against.'),
@@ -92,12 +92,12 @@ const correctPaymentRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: 'correctInvoicePayment',
     description: 'Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did.',
-}, { scopes: ['write'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 const listInvoicePaymentsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/payments',
     tags: ['invoices'], summary: 'List the payment ledger for an invoice',
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('financial')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('companyFinance')],
     request: { params: z.object({ id: INVOICE_ID.describe('Invoice whose ledger rows to return.') }).describe('Path params for the payment-ledger endpoint.') },
     responses: {
         200: {
@@ -111,7 +111,7 @@ const listInvoicePaymentsRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
     operationId: 'listInvoicePayments',
     description: 'Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute.',
-}, { scopes: ['read'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['read'], tier: 'extended', capability: 'companyFinance' }));
 
 const invoicePaymentRoutes = createApiRouter()
     .openapi(recordOfflinePaymentRoute, async (c) => {

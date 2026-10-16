@@ -42,8 +42,14 @@ export type AuditAction =
     | 'inspection.send_sms'
     | 'inspection.rescheduled'
     | 'inspection.bulk_assign'
+    // An office user edited order fields (address, price, requirements, ...). Names the
+    // fields that changed and never their values.
+    | 'inspection.order_updated'
     | 'inspection.bulk_status'
     | 'inspection.template_upgraded'
+    // The inspector's drawn signature stored on a report. Audited with the actor
+    // only: the image is evidence, not log content, and never enters the row.
+    | 'inspection.inspector_signature.update'
     | 'inspection.results_batch_patched'
     | 'inspection.sync_conflict_resolved'
     // An offline client's Yjs update applied to the live results document. Audited
@@ -69,6 +75,16 @@ export type AuditAction =
     | 'user.invite'
     | 'user.join'
     | 'user.password_change'
+    // A member taken off the team. Carries how many of their open inspections
+    // were handed to someone else or left unassigned, so the record answers
+    // "where did their work go".
+    | 'user.removed'
+    // A member's role or permission switches changed from the Team page or API.
+    | 'user.update'
+    // A manager tried to give a role or permission they do not hold themselves
+    // (or to change their own permissions) and was refused. Nothing was written;
+    // this row is the only trace of the attempt.
+    | 'user.grant_refused'
     // An owner clearing ANOTHER member's second factor. Its own action rather
     // than a generic update, because it is the only one that lowers somebody
     // else's authentication requirement and it leaves no other trace: the
@@ -136,6 +152,8 @@ export type AuditAction =
     | 'comment.updated'
     | 'comment.deleted'
     | 'config.integration.update'
+    // Which source (Built-in or the company's own account) a service runs on. Carries the choice only, never a key.
+    | 'config.integration_source.update'
     | 'config.secrets.update'
     | 'config.attention_thresholds.update'
     | 'config.dashboard_columns.update'

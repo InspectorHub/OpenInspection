@@ -14,6 +14,7 @@ import { DESTRUCTION_STATUS, DESTRUCTION_STATUSES } from '../../../status/destru
  *   'user.invited'           → { tenantId, email, role, name? }
  *   'user.password_changed'  → { tenantId, email, passwordHash }
  *   'user.deleted'           → { tenantId, email }
+ *   'user.role_changed'      → { tenantId, email, role }   (role = the new role)
  * Portal upserts into `identities` + `memberships` and uses `id` as the
  * dedup key so retries are idempotent on the receiving side.
  */

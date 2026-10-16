@@ -61,7 +61,7 @@ export interface CancellationQuoteView {
     policyConfigured: boolean;
 }
 
-/** What the API answers a caller without the financial capability: no amounts, only whether money is attached. */
+/** What the API answers a caller without the inspection-fees capability: no amounts, only whether money is attached. */
 interface CancellationQuoteRestricted {
     requiresFinancial: true;
     moneyInvolved: boolean;
@@ -137,7 +137,7 @@ export async function loader({ request, context }: Route.LoaderArgs): Promise<Ca
         );
         if (!res.ok) return { ok: false, error: await apiErrorMessage(res, failed) };
         const body = (await res.json()) as { data?: CancellationQuoteView | CancellationQuoteRestricted };
-        // A caller without the financial capability gets no figures. With no money
+        // A caller without the inspection-fees capability gets no figures. With no money
         // attached the cancellation is plainly free, so the confirm step is offered
         // with zero figures; with money attached it is not theirs to commit.
         if (body.data && isRestricted(body.data)) {

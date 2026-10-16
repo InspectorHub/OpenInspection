@@ -67,6 +67,7 @@ const gate = (over: Partial<Parameters<typeof smsSendGate>[0]> = {}) =>
         contactId: CONTACT,
         roleKind: 'client',
         bodyTemplate: '',
+        env: {},
         ...over,
     });
 

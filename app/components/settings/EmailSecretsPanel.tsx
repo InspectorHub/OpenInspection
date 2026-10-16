@@ -6,7 +6,7 @@ import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
 import { EmailStepTest } from "~/components/settings/EmailStepTest";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
-import type { action } from "~/routes/settings-communication";
+import type { action } from "~/routes/settings-integrations-email";
 import { m } from "~/paraglide/messages";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 

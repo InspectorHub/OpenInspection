@@ -272,7 +272,7 @@ describe('the gate at the AI chokepoint', () => {
         credentials: { source: 'byo' | 'managed'; tenantKeyAttested: boolean },
         record: () => Promise<void>,
     ) {
-        return new AIService({} as D1Database, 'a-key', 'saas', 'a-model', { record }, credentials, provenance, undefined, ADAPTER());
+        return new AIService({} as D1Database, 'a-key', 'saas', { record }, credentials, provenance, undefined, ADAPTER());
     }
 
     it('a refused call records NO usage and sends nothing', async () => {
@@ -314,7 +314,7 @@ describe('the gate at the AI chokepoint', () => {
         // Fail-closed default. A future call site that forgets the credential
         // picture must not inherit an open gate — the failure mode where a gate
         // treats "declared nothing" as "declared compliant".
-        const svc = new AIService({} as D1Database, 'a-key', 'saas', 'a-model');
+        const svc = new AIService({} as D1Database, 'a-key', 'saas');
         await expect(svc.generateProfessionalComment('note'))
             .rejects.toMatchObject({ code: 'ai_not_configured' });
         expect(fetchMock).not.toHaveBeenCalled();

@@ -78,7 +78,7 @@ describe("ServicesCard", () => {
   });
 
   it("shows the lines but no figures when money is redacted (IA-95)", () => {
-    // The server omits the price fields for a caller without `financial`.
+    // The server omits the price fields for a caller without `inspectionFees`.
     // Absence is the signal — the card must not re-derive the permission.
     const redacted: ServiceLine[] = LINES.map(({ id, serviceId, name }) => ({ id, serviceId, name }));
     render(<ServicesCard services={redacted} catalog={CATALOG} canManage />);

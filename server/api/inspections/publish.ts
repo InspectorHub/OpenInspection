@@ -5,11 +5,10 @@
 // people, hub, send-pdf, agent share) lives in ./report-delivery.ts; the
 // agreement signing envelope lives in ./agreements.ts; the cancellation axis in
 // both directions (cancel / uncancel / quote) lives in ./cancellation.ts.
-// Behavior-preserving extraction from inspections.ts — handler bodies + route
-// definitions are byte-identical to the original (only their location changed).
+// Handler bodies and route definitions moved here from inspections.ts unchanged.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { requireRole } from '../../lib/middleware/rbac';
+import { requireRole, denyStaff } from '../../lib/middleware/rbac';
 import { requireCapability } from '../../lib/middleware/require-capability';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
@@ -23,6 +22,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation } from '../../services/inspection/shared';
 import { refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
+import { guardStaffConfirm } from './staff-status-guards';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { translateOnPublishForRequest } from '../../lib/translation/on-publish';
@@ -39,7 +39,7 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }),
     },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff],
     responses: {
         200: {
             content: {
@@ -52,7 +52,7 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
         400: { description: 'The inspection is cancelled. Bring it back with POST /{id}/uncancel first (#81).' },
     },
     operationId: "completeInspection",
-    description: "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection."
+    description: "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -235,7 +235,7 @@ const reinspectRoute = createRoute(withMcpMetadata({
         400: { description: 'Baseline not published / invalid' },
     },
     operationId: 'createReinspection',
-    description: 'Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report.',
+    description: 'Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report. A named inspector must be a member who can inspect (400 otherwise). Available to owner, manager, inspector and staff roles.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -343,11 +343,11 @@ const publishRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/confirm',
         tags: ["inspections"], summary: "Confirm inspection for current tenant",
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+        middleware: [requireRole('owner', 'manager', 'inspector'), guardStaffConfirm] as const,
         request: { params: z.object({ id: z.string().describe('Inspection to confirm.') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
         operationId: "confirmInspection",
-        description: "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers and inspectors."
+        description: "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
@@ -363,9 +363,7 @@ const publishRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const body = c.req.valid('json');
         const service = c.var.services.inspection;
-        // Build the publish options explicitly so `recipients` is omitted (not
-        // set to `undefined`) when absent — exactOptionalPropertyTypes rejects
-        // `recipients: X[] | undefined` against the service's optional param.
+        // Built explicitly so `recipients` is omitted (not `undefined`) when absent (exactOptionalPropertyTypes).
         const publishOptions: Parameters<typeof service.publishInspection>[2] = {
             theme: body.theme,
             requireSignature: body.requireSignature,
@@ -373,6 +371,7 @@ const publishRoutes = createApiRouter()
             sendAgreementCopy: body.sendAgreementCopy,
             ...(body.recipients ? { recipients: body.recipients } : {}),
             ...(body.reportId ? { reportId: body.reportId } : {}),
+            actor: { userId: c.get('user').sub, role: c.get('userRole') },
         };
         const result = await service.publishInspection(id, tenantId, publishOptions);
 

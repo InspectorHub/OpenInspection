@@ -105,7 +105,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-1 overflow-y-auto">
-        <SidebarGroup label={m.nav_section_workspace()} items={visibleNavItems(WORKSPACE_ITEMS, capabilities).map((i) => (i.to === "/messages" ? { ...i, badge: unreadMessages } : i))} collapsed={collapsed} />
+        <SidebarGroup label={m.nav_section_workspace()} items={visibleNavItems(WORKSPACE_ITEMS, capabilities, ctx?.user?.role).map((i) => (i.to === "/messages" ? { ...i, badge: unreadMessages } : i))} collapsed={collapsed} />
         {/* ds-allow: compact sidebar nav rhythm (10/7/14px), no semantic spacing token */}
         <div className="mb-[14px]">
           <NavLink

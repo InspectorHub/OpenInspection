@@ -139,7 +139,7 @@ export function shotsFor(guideSlug: string): GuideShot {
      * the next, and the cut moves every time the page's content changes length.
      * A container is what the reader is being shown, and the pages that need
      * splitting already have stable ones — `/settings/communication` carries
-     * `#email-delivery`, `#sms-delivery`, `#email-templates`, `#google-calendar`
+     * `#email-delivery`, `#delivery-accounts`, `#email-templates`, `#google-calendar`
      * as scroll-spy anchors, guarded by settings-communication-nav.spec.ts. When
      * a screen genuinely has no container to name, the honest fix is to give it
      * one in the app, not to guess an offset here.

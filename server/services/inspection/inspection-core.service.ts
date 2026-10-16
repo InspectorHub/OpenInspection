@@ -214,7 +214,7 @@ export class InspectionCoreService extends InspectionSubService {
     }
 
     /** Creates a new inspection. See `createInspectionOnce` for the replay semantics. */
-    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
+    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string }): Promise<Inspection> {
         return (await this.createInspectionOnce(tenantId, data)).inspection;
     }
 
@@ -226,7 +226,7 @@ export class InspectionCoreService extends InspectionSubService {
      */
     async createInspectionOnce(
         tenantId: string,
-        data: CreateInspectionData & { inspectorId?: string; clientContactId?: string },
+        data: CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string },
         hooks?: CreateInspectionHooks,
     ): Promise<{ inspection: Inspection; created: boolean }> {
         if (!this.sdb) throw new Error('ScopedDB session missing');
@@ -385,7 +385,7 @@ export class InspectionCoreService extends InspectionSubService {
     /** NewInspectionWizard creation path. Body in `./inspection-create-variants.service`. */
     async createFromWizard(
         tenantId: string,
-        creatorUserId: string,
+        creatorUserId: string | null,
         input: import('../../lib/validations/wizard.schema').CreateInspectionFromWizardInput,
     ): Promise<{ id: string }> {
         return this.variants.createFromWizard(tenantId, creatorUserId, input);

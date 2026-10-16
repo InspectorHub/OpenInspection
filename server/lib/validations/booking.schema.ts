@@ -173,8 +173,17 @@ export const InspectorsResponseSchema = createApiResponseSchema(z.array(z.object
 
 export const AvailabilityResponseSchema = createApiResponseSchema(z.object({
     bookedSlots: z.array(z.string()).openapi({ example: ['2024-04-15T09:00:00Z'] }),
-    overrides: z.array(z.any()).openapi({ description: 'Active availability overrides' }),
-    baseAvailability: z.array(z.any()).openapi({ description: 'Standard weekly availability' }),
+    overrides: z.array(z.object({
+        date: z.string().openapi({ example: '2026-07-10' }).describe('Calendar date the override applies to, YYYY-MM-DD.'),
+        isAvailable: z.boolean().describe('False blocks the date; true replaces the weekly window for that date.'),
+        startTime: z.string().nullable().describe('Opening time HH:mm of the replacement window, or null.'),
+        endTime: z.string().nullable().describe('Closing time HH:mm of the replacement window, or null.'),
+    })).openapi({ description: 'Date-specific overrides inside the requested range' }),
+    baseAvailability: z.array(z.object({
+        dayOfWeek: z.number().int().describe('Day of the week, Sunday as 0 through Saturday as 6.'),
+        startTime: z.string().describe('Window opening time, HH:mm.'),
+        endTime: z.string().describe('Window closing time, HH:mm.'),
+    })).openapi({ description: 'Standard weekly availability windows' }),
 })).openapi('AvailabilityResponse');
 
 export const BookingResponseSchema = createApiResponseSchema(z.object({

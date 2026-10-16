@@ -62,7 +62,7 @@ function buildApp() {
     });
     const services = {
         ai: new AIService(
-            {} as D1Database, 'test-key', 'saas', 'test-model', undefined,
+            {} as D1Database, 'test-key', 'saas', undefined,
             { source: 'byo', tenantKeyAttested: true },
             { record: async () => 'ai-call-row' },
             undefined,

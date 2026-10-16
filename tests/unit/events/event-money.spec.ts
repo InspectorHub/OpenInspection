@@ -1,6 +1,6 @@
 /**
  * Event types and visits carry prices (`defaultPriceCents`, `priceCents`).
- * Reads omit them without the `financial` capability; writes that set one are
+ * Reads omit them without the matching money capability; writes that set one are
  * refused. Covers both mounts of the event-type catalogue: the admin settings
  * router (OpenAPI) and the plain events router.
  */
@@ -72,38 +72,49 @@ beforeEach(async () => {
     } as never);
 });
 
-const READS = ['/api/admin/event-types', '/api/event-types', '/api/inspections/i1/events'];
+// Reading an event type's default price and a visit's price are both inspectionFees, so the
+// default inspector can price a visit. Writing the price list stays companyFinance.
+const READS: Array<[url: string, bucket: 'companyFinance' | 'inspectionFees', other: 'companyFinance' | 'inspectionFees']> = [
+    ['/api/admin/event-types', 'inspectionFees', 'companyFinance'],
+    ['/api/event-types', 'inspectionFees', 'companyFinance'],
+    ['/api/inspections/i1/events', 'inspectionFees', 'companyFinance'],
+];
 
-describe.each(READS)('GET %s', (url) => {
+describe.each(READS)('GET %s', (url, bucket, other) => {
     it('positive control: a manager receives the price', async () => {
         const res = await buildApp('manager').request(url, {}, ENV);
         expect(res.status).toBe(200);
         expect(await res.text()).toMatch(MONEY_KEY);
     });
-    it('a manager with financial switched off receives no price key', async () => {
-        const res = await buildApp('manager', { financial: false }).request(url, {}, ENV);
+    it(`a manager with ${bucket} switched off receives no price key`, async () => {
+        const res = await buildApp('manager', { [bucket]: false }).request(url, {}, ENV);
         expect(res.status).toBe(200);
         const text = await res.text();
         expect(text).not.toMatch(MONEY_KEY);
         expect(text).toMatch(/"id"/);
     });
+    it(`switching ${other} off does not hide it`, async () => {
+        const res = await buildApp('manager', { [other]: false }).request(url, {}, ENV);
+        expect(res.status).toBe(200);
+        expect(await res.text()).toMatch(MONEY_KEY);
+    });
 });
 
 describe('event writes', () => {
-    it('admin: creating an event type with a price is refused without financial', async () => {
-        const res = await buildApp('manager', { financial: false }).request(
+    it('admin: creating an event type with a price is refused without companyFinance', async () => {
+        const res = await buildApp('manager', { companyFinance: false }).request(
             '/api/admin/event-types', json('POST', { name: 'Mold', slug: 'mold', defaultPriceCents: 9000 }), ENV);
         expect(res.status).toBe(403);
         expect(((await res.json()) as { error: { code: string } }).error.code).toBe('FINANCIAL_REQUIRED');
     });
     it('admin: creating an event type without a price passes the gate', async () => {
-        const res = await buildApp('manager', { financial: false }).request(
+        const res = await buildApp('manager', { companyFinance: false }).request(
             '/api/admin/event-types', json('POST', { name: 'Mold', slug: 'mold' }), ENV);
         expect(res.status).toBe(200);
         expect(await res.text()).not.toMatch(MONEY_KEY);
     });
     it('admin: changing the price is refused, resending the stored price is not', async () => {
-        const app = buildApp('manager', { financial: false });
+        const app = buildApp('manager', { companyFinance: false });
         expect((await app.request('/api/admin/event-types/et1', json('PATCH', { defaultPriceCents: 1 }), ENV)).status).toBe(403);
         const stored = await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.id, 'et1')).get();
         expect(stored!.defaultPriceCents).toBe(15000);
@@ -113,18 +124,24 @@ describe('event writes', () => {
         const res = await buildApp('manager').request('/api/admin/event-types/et1', json('PATCH', { defaultPriceCents: 1 }), ENV);
         expect(res.status).toBe(200);
     });
-    it('plain router: a new event type with a price is refused without financial, and allowed with it', async () => {
+    it('plain router: a new event type with a price is refused without companyFinance, and allowed with it', async () => {
         const body = { name: 'Mold', slug: 'mold', defaultPriceCents: 9000 };
-        expect((await buildApp('manager', { financial: false }).request('/api/event-types', json('POST', body), ENV)).status).toBe(403);
+        expect((await buildApp('manager', { companyFinance: false }).request('/api/event-types', json('POST', body), ENV)).status).toBe(403);
         expect((await buildApp('manager').request('/api/event-types', json('POST', body), ENV)).status).toBe(201);
     });
-    it('plain router: scheduling a visit with a price is refused without financial; without a price it is not', async () => {
+    it('plain router: scheduling a visit with a price is refused without inspectionFees; without a price it is not', async () => {
         const base = { eventTypeId: 'et1', scheduledAt: '2099-01-02T10:00:00.000Z', durationMin: 60 };
-        const noFin = buildApp('inspector');
+        const noFin = buildApp('inspector', { inspectionFees: false });
         const refused = await noFin.request('/api/inspections/i1/events', json('POST', { ...base, priceCents: 500 }), ENV);
         expect(refused.status).toBe(403);
         const ok = await noFin.request('/api/inspections/i1/events', json('POST', base), ENV);
         expect(ok.status).toBe(201);
         expect(await ok.text()).not.toMatch(MONEY_KEY);
+    });
+    it('plain router: an inspector with the default inspectionFees may price a visit, and companyFinance alone may not', async () => {
+        const base = { eventTypeId: 'et1', scheduledAt: '2099-01-02T10:00:00.000Z', durationMin: 60, priceCents: 500 };
+        expect((await buildApp('inspector').request('/api/inspections/i1/events', json('POST', base), ENV)).status).toBe(201);
+        const financeOnly = buildApp('inspector', { inspectionFees: false, companyFinance: true });
+        expect((await financeOnly.request('/api/inspections/i1/events', json('POST', base), ENV)).status).toBe(403);
     });
 });

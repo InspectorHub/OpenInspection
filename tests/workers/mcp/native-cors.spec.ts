@@ -15,7 +15,7 @@ const env = { ...testEnv, APP_MODE: 'standalone', NATIVE_CLIENT_ENABLED: 'true' 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 const appFetch = (r: Request, e: Record<string, unknown>, c: ExecutionContext) => app.fetch(r, e as never, c);
 const call = (req: Request) =>
-    Promise.resolve(buildOAuthHandler(appFetch as never, env as never).fetch(req, env, ctx));
+    Promise.resolve(buildOAuthHandler(appFetch as never, env as never, req).fetch(req, env, ctx));
 
 const tokenRequest = (headers: Record<string, string>) => new Request(`${SERVER}/oauth/token`, {
     method: 'POST',

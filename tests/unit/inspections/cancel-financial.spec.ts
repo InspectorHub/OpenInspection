@@ -1,8 +1,8 @@
 /**
- * Cancelling and the `financial` capability.
+ * Cancelling and the `inspectionFees` capability.
  *
  * A cancellation prices itself (a fee, a refund) and moves money on the ledger.
- * Without `financial` a caller may still cancel an inspection that has no money
+ * Without `inspectionFees` a caller may still cancel an inspection that has no money
  * attached, but must never be shown, or be the one to commit, a charge or a
  * refund. When money is involved the refusal body carries no amount either.
  */
@@ -30,6 +30,7 @@ const T = '00000000-0000-0000-0000-000000000001';
 const ENV = { DB: {} } as HonoConfig['Bindings'];
 const EXEC = makeExecutionContext().ctx;
 const MONEY_KEY = /"(price|[A-Za-z]*Cents)"\s*:/;
+const NO_FEES = { inspectionFees: false };
 const POLICY: CancellationPolicy = {
     noticeHours: 24,
     lateFee: { type: 'percent', percent: 50 },
@@ -42,7 +43,7 @@ function buildApp(role: UserRole, overrides: Record<string, boolean> | null = nu
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => (err instanceof AppError
-        ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
+        ? c.json({ success: false, error: { code: err.code, message: err.message, details: err.details } }, err.status)
         : c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500)));
     const sdb = new ScopedDB(db as never, T);
     app.use('*', async (c, next) => {
@@ -104,33 +105,42 @@ describe('GET /cancellation-quote', () => {
         expect(body.data.feeCents).toBeGreaterThan(0);
         expect(body.data.refundCents).toBeGreaterThan(0);
     });
-    it('a caller without financial gets requiresFinancial and no amount at all', async () => {
-        const res = await quote(buildApp('inspector'), 'i-paid');
+    it('a caller without inspectionFees gets requiresFinancial and no amount at all', async () => {
+        const res = await quote(buildApp('inspector', NO_FEES), 'i-paid');
         expect(res.status).toBe(200);
         const text = await res.text();
         expect(JSON.parse(text).data.requiresFinancial).toBe(true);
         expect(text).not.toMatch(MONEY_KEY);
     });
+    it('the default inspector holds inspectionFees and receives the priced quote', async () => {
+        const body = await (await quote(buildApp('inspector'), 'i-paid')).json() as { data: { feeCents: number } };
+        expect(body.data.feeCents).toBeGreaterThan(0);
+    });
+    it('companyFinance alone does not unlock the quote', async () => {
+        const res = await quote(buildApp('inspector', { inspectionFees: false, companyFinance: true }), 'i-paid');
+        expect(JSON.parse(await res.text()).data.requiresFinancial).toBe(true);
+    });
     it('says whether money is involved, so the dialog can offer a free cancellation', async () => {
-        const free = await (await quote(buildApp('inspector'), 'i-free')).json() as { data: { moneyInvolved: boolean } };
-        const paid = await (await quote(buildApp('inspector'), 'i-paid')).json() as { data: { moneyInvolved: boolean } };
+        const free = await (await quote(buildApp('inspector', NO_FEES), 'i-free')).json() as { data: { moneyInvolved: boolean } };
+        const paid = await (await quote(buildApp('inspector', NO_FEES), 'i-paid')).json() as { data: { moneyInvolved: boolean } };
         expect(free.data.moneyInvolved).toBe(false);
         expect(paid.data.moneyInvolved).toBe(true);
     });
 });
 
 describe('POST /cancel', () => {
-    it('without financial, an inspection with no money attached cancels, and the answer carries no amount', async () => {
-        const res = await cancel(buildApp('inspector'), 'i-free', { acknowledgedFeeCents: 0 });
+    it('without inspectionFees, an inspection with no money attached cancels, and the answer carries no amount', async () => {
+        const res = await cancel(buildApp('inspector', NO_FEES), 'i-free', { acknowledgedFeeCents: 0 });
         expect(res.status).toBe(200);
         expect(await res.text()).not.toMatch(MONEY_KEY);
         expect(await statusOf('i-free')).toBe('cancelled');
     });
-    it('without financial, a paid inspection is refused with FINANCIAL_REQUIRED, carries no amount, and stays uncancelled', async () => {
-        const res = await cancel(buildApp('inspector'), 'i-paid', { acknowledgedFeeCents: 22500 });
+    it('without inspectionFees, a paid inspection is refused with FINANCIAL_REQUIRED naming the capability, carries no amount, and stays uncancelled', async () => {
+        const res = await cancel(buildApp('inspector', NO_FEES), 'i-paid', { acknowledgedFeeCents: 22500 });
         expect(res.status).toBe(403);
         const text = await res.text();
         expect(JSON.parse(text).error.code).toBe('FINANCIAL_REQUIRED');
+        expect(JSON.parse(text).error.details).toMatchObject({ field: 'cancellation', capability: 'inspectionFees' });
         expect(text).not.toMatch(MONEY_KEY);
         expect(await statusOf('i-paid')).toBe('confirmed');
         const refunds = await db.select().from(schema.orderPayments).where(eq(schema.orderPayments.kind, 'refund')).all();
@@ -142,8 +152,8 @@ describe('POST /cancel', () => {
         expect(await res.text()).toMatch(MONEY_KEY);
         expect(await statusOf('i-paid')).toBe('cancelled');
     });
-    it('an inspector granted financial cancels the paid inspection', async () => {
-        const res = await cancel(buildApp('inspector', { financial: true }), 'i-paid', { acknowledgedFeeCents: 22500 });
+    it('an inspector with the default inspectionFees cancels the paid inspection', async () => {
+        const res = await cancel(buildApp('inspector'), 'i-paid', { acknowledgedFeeCents: 22500 });
         expect(res.status).toBe(200);
     });
 });

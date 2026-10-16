@@ -9,6 +9,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { eq, desc as descDz } from 'drizzle-orm';
 import { requireRole } from '../../lib/middleware/rbac';
+import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { auditFromContext } from '../../lib/audit';
 import { safeISODate } from '../../lib/date';
 import type { MemberWithCalendarSync } from '../../services/admin.service';
@@ -87,8 +88,6 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
     operationId: "inviteTenant",
     description: "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify and permissionOverrides, but this route does not apply either: it always sends the email and grants the plain role. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
-
-
 
 
 /**
@@ -271,14 +270,14 @@ const adminDataRoutes = createApiRouter()
 
         auditFromContext(c, 'data.export', 'bulk_export');
         // Only inspection rows carry company money; templates are customer JSON.
-        return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data, inspections: await moneyView(c, data.inspections) } }, 200);
+        return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data, inspections: await moneyView(c, data.inspections, 'companyFinance') } }, 200);
     })
     .openapi(inviteMemberRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
 
         const adminService = c.var.services.admin;
-        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role, c.get('userRole'));
+        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role, c.get('userRole'), await capabilitiesFor(c));
 
         const inviteLink = inviteAcceptUrl(c, inviteId);
 

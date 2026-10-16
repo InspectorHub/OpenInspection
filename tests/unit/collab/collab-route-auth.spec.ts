@@ -62,6 +62,8 @@ interface BuildAppOptions {
     tenantId?: string | null;
     userId?:   string | null;
     userRole?: string;
+    /** The caller's permission_overrides row; undefined leaves the role defaults. */
+    overrides?: Record<string, boolean> | null;
     /**
      * What getInspection returns (or throws). Only `inspectorId` — the roster
      * (who may edit) is a separate `getInspectionRoster` mock below;
@@ -83,6 +85,7 @@ function buildApp(opts: BuildAppOptions = {}) {
         tenantId      = 't1',
         userId        = 'u1',
         userRole      = 'inspector',
+        overrides,
         inspectionOverride = {
             inspectorId: 'u1',
             tenantId: 't1',
@@ -138,6 +141,7 @@ function buildApp(opts: BuildAppOptions = {}) {
         if (tenantId !== null)  c.set('tenantId', tenantId);
         if (userId   !== null)  c.set('user', { sub: userId } as never);
         if (userRole)           c.set('userRole', userRole as never);
+        if (overrides !== undefined) c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as never);
         c.set('services', { inspection: { getInspection } } as never);
         await next();
     });
@@ -149,6 +153,29 @@ function buildApp(opts: BuildAppOptions = {}) {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('collab WS route — auth gate', () => {
+
+    // ── editReports: opening the live editor needs the capability ─────────────
+
+    it('(e1) refuses a rostered user whose editReports is off, and never contacts the DO', async () => {
+        const { app, mockDo } = buildApp({ userRole: 'staff', overrides: null });
+        const res = await app.request('/api/inspections/insp1/collab/ws', { headers: { Upgrade: 'websocket' } });
+        expect(res.status).toBe(403);
+        expect(mockDo.idFromName).not.toHaveBeenCalled();
+    });
+
+    it('(e2) refuses an inspector whose editReports was withdrawn', async () => {
+        const { app, mockDo } = buildApp({ overrides: { editReports: false } });
+        const res = await app.request('/api/inspections/insp1/collab/ws', { headers: { Upgrade: 'websocket' } });
+        expect(res.status).toBe(403);
+        expect(mockDo.idFromName).not.toHaveBeenCalled();
+    });
+
+    it('(e3) admits the same staff user once editReports is granted (control)', async () => {
+        const { app, mockDo } = buildApp({ userRole: 'staff', overrides: { editReports: true } });
+        const res = await app.request('/api/inspections/insp1/collab/ws', { headers: { Upgrade: 'websocket' } });
+        expect(res.status).toBe(200);
+        expect(mockDo.idFromName).toHaveBeenCalled();
+    });
 
     // ── (a) No auth ──────────────────────────────────────────────────────────
 

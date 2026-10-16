@@ -20,7 +20,7 @@ function Stat({ value, label, href }: { value: number; label: string; href?: str
   const body: ReactNode = (
     <>
       <span className="text-[24px] font-bold leading-tight tracking-tight text-ih-fg-1">{value}</span>
-      <span className="text-[12.5px] text-ih-fg-3">{label}</span>
+      <span className="text-xs text-ih-fg-3">{label}</span>
     </>
   );
   const base = "flex flex-col gap-0.5 rounded-lg border px-4 py-3.5";
@@ -94,7 +94,7 @@ export function QboSyncStatus({
             <p className="text-[14px] font-bold text-ih-fg-1">{m.settings_qbo_sync_never()}</p>
           )}
           {hints.map((h) => (
-            <p key={h} className="text-[12.5px] text-ih-fg-3">{h}</p>
+            <p key={h} className="text-xs text-ih-fg-3">{h}</p>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-4">
@@ -115,7 +115,7 @@ export function QboSyncStatus({
                 }`}
               />
             </button>
-            <span id="qbo-auto-sync-label" className="text-[13.5px] font-semibold text-ih-fg-1">
+            <span id="qbo-auto-sync-label" className="text-sm font-semibold text-ih-fg-1">
               {m.settings_qbo_auto_sync()}
             </span>
           </div>

@@ -54,7 +54,7 @@ const listInspectorsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listBookingInspectors",
-    description: "Public, unauthenticated list of the company's inspectors for the booking page's inspector-choice dropdown: id and display name (null when the user has no name) for every user with the inspector role. The company comes from the request's tenant context (host or slug), not a parameter. Not paginated; no email or other contact details are returned. Read-only."
+    description: "Public, unauthenticated list of the company's inspectors for the booking page's inspector-choice dropdown: id and display name (null when the user has no name) for every user with the inspector role. Single-company (standalone) deployments only: the company is the deployment's own fixed company and there is no host, slug or other parameter to choose one. A multi-company deployment has no company on this path and answers 403; its booking page reads the company-scoped route GET /api/public/book/{slug} instead, which lists inspectors only when the company allows inspector choice. This route lists every inspector regardless of that setting. Not paginated; no email or other contact details are returned. Read-only."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -90,7 +90,7 @@ const listPublicServicesRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listBookingServices",
-    description: "Public, unauthenticated list of the services a client can pick on the booking page: only services that are active and have an inspection template attached. Each has id, name, description (nullable), price in integer cents, and durationMinutes (nullable). Internal service settings are not exposed. The company comes from the request's tenant context. Not paginated. Read-only."
+    description: "Public, unauthenticated list of the services a client can pick on the booking page: only services that are active and have an inspection template attached. Each has id, name, description (nullable), price in integer cents, and durationMinutes (nullable). Internal service settings are not exposed. Single-company (standalone) deployments only: the company is the deployment's own fixed company and there is no host, slug or other parameter to choose one. A multi-company deployment has no company on this path and answers 403; use GET /api/public/book/{slug}, which carries that company's services. Not paginated. Read-only."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**

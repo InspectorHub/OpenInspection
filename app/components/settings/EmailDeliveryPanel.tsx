@@ -1,5 +1,5 @@
 import { Link, Form, useNavigation } from "react-router";
-import { SegmentedControl, RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { useForm } from "@conform-to/react";
 import { m } from "~/paraglide/messages";
@@ -31,8 +31,9 @@ type EmailByoProvider = "resend" | "sendgrid" | "postmark" | "mailgun";
 
 /**
  * Settings → Communication: "Email delivery" panel. Presentational — the route
- * owns the Conform form, mode/override/PoC state, and the save action. Self-host
- * gating (`isSaas`) is threaded verbatim from the route.
+ * owns the Conform form, override/PoC state, and the save action. The
+ * sending account itself (Built-in or Your own, and its keys) lives in
+ * Integrations -> Email; this panel shows it and links there.
  *
  * The "own" mode is provider-agnostic: the actual provider (Resend / SendGrid /
  * Postmark / Mailgun) is chosen in the Email API keys panel below. This panel's
@@ -41,11 +42,9 @@ type EmailByoProvider = "resend" | "sendgrid" | "postmark" | "mailgun";
  */
 export function EmailDeliveryPanel({
   config,
-  isSaas,
   emailByoProvider,
   ownProviderConfigured,
   mode,
-  setMode,
   overrideName,
   setOverrideName,
   poc,
@@ -55,11 +54,10 @@ export function EmailDeliveryPanel({
   secretFormError,
 }: {
   config: CommConfig;
-  isSaas: boolean;
   emailByoProvider: EmailByoProvider;
   ownProviderConfigured: boolean;
+  /** The sending account in force. Read-only here: it is changed in Integrations. */
   mode: "platform" | "own";
-  setMode: (m: "platform" | "own") => void;
   overrideName: boolean;
   setOverrideName: (v: boolean) => void;
   poc: "inspector" | "company";
@@ -113,38 +111,18 @@ export function EmailDeliveryPanel({
             </div>
           ) : null}
 
-          {/* Mode switch — SaaS only. Self-host has no platform mailbox, so the
-              mode is forced to `own` (hidden input below) and the toggle hides. */}
-          {isSaas ? (
-            <>
-              <SegmentedControl
-                ariaLabel={m.settings_emaildelivery_heading()}
-                value={mode}
-                onChange={(v) => setMode(v as "platform" | "own")}
-                options={[
-                  { value: "platform", label: m.settings_emaildelivery_mode_platform() },
-                  { value: "own", label: m.settings_emaildelivery_mode_own() },
-                ]}
-              />
-              {/* SegmentedControl renders buttons, not a form field — carry the
-                  value into the native form POST via a hidden input. */}
-              <input type="hidden" name={emailFields.emailMode.name} value={mode} />
-              <p className="text-[11px] text-ih-fg-3">
-                {mode === "platform"
-                  ? m.settings_emaildelivery_mode_platform_desc()
-                  : m.settings_emaildelivery_mode_own_desc()}
-              </p>
-            </>
-          ) : (
-            <>
-              {/* Force `own` so the save action never writes the schema's
-                  default `platform` back into self-host config. */}
-              <input type="hidden" name={emailFields.emailMode.name} value="own" />
-              <p className="text-[13px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md p-3">
-                {m.settings_emaildelivery_selfhost_note()}
-              </p>
-            </>
-          )}
+          {/* Which account sends the mail is chosen in Integrations. This form
+              only carries the current mode forward, so saving here never changes it. */}
+          <input type="hidden" name={emailFields.emailMode.name} value={mode} />
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ih-fg-2 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+            <span>
+              {m.settings_emaildelivery_account_label()}:{" "}
+              <strong>{mode === "own" ? m.integrations_hub_source_own() : m.integrations_hub_source_provided()}</strong>
+            </span>
+            <Link to="/settings/integrations/email" className="text-ih-primary-text hover:underline">
+              {m.settings_emaildelivery_account_manage()}
+            </Link>
+          </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {mode === "own" && (

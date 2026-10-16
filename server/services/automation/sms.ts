@@ -84,7 +84,8 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
                 sms,
                 appName,
                 appHost,
-                ...(env ? { env } : {}),
+                // Only a context-free caller (a test seam) omits it, and it then reads as self-hosted; the cron always passes the worker's.
+                env: env ?? {},
                 ...(quotaGuard ? { quotaGuard } : {}),
                 ...(this.metering ? { metering: this.metering } : {}),
             });

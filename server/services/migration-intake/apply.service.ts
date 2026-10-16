@@ -9,6 +9,7 @@ import {
 import { MIGRATION_BATCH_STATUS, type MigrationBatchStatus } from '../../lib/status/migration-batch-status';
 import { MIGRATION_ROW_STATUS } from '../../lib/status/migration-row-status';
 import { applyMemberRow, type InviteDispatch } from './member-rows';
+import type { GrantActor } from '../../lib/auth/grant-ceiling';
 import { applyContactRow, applyTemplateRow, type RowOutcome } from './row-writers';
 import { appliedExpiry } from './assistance.service';
 import { getSeatUsage } from '../../features/seat-quota/usage';
@@ -36,6 +37,8 @@ export interface ApplyParams {
     /** `profile.hasSeatQuota`. False short-circuits every seat check. */
     seatQuotaEnforced: boolean;
     billingPortalUrl?: string | null | undefined;
+    /** Who is applying. Member rows are refused without it; see member-rows.ts. */
+    actor?: GrantActor | undefined;
 }
 
 export interface ApplyResult {

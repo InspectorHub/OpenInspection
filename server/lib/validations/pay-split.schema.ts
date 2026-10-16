@@ -28,9 +28,9 @@ const PaySplitListSchema = z.object({
     /**
      * False for an inspector reading their own row. The list is already scoped
      * to them by the query, so this drives the UI rather than the security —
-     * the rows a `financial: false` caller may not see are absent, not hidden.
+     * the rows a `companyFinance: false` caller may not see are absent, not hidden.
      */
-    canEdit: z.boolean().describe('Whether the caller may change these amounts (the financial capability).'),
+    canEdit: z.boolean().describe('Whether the caller may change these amounts (the companyFinance capability).'),
     scope:   z.enum(['all', 'self']).describe('Whether the rows cover everyone on the inspection or only the caller.'),
     splits:  z.array(PaySplitSchema).describe('Pay rows for the active billing lines of this inspection.'),
 });

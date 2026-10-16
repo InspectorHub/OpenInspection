@@ -218,6 +218,14 @@ describe('what one render asks the database twice', () => {
             paths: [
                 '/api/admin/communication',
                 '/api/admin/tenant-config',
+            ],
+        },
+        {
+            // The SMS settings moved here from Communication, with the same reads.
+            name: 'settings-integrations-sms',
+            paths: [
+                '/api/admin/communication',
+                '/api/admin/tenant-config',
                 // smsAdminRoutes mounts at /api/admin, so the routes declared
                 // '/sms/config' resolve here -- not at a top-level /api/sms.
                 '/api/admin/sms/config',

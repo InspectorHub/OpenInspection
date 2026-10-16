@@ -103,34 +103,23 @@ test.describe('Subsystem E — pre-flight, list workflow, exports, metrics, repo
     });
 
     /**
-     * P6 — the integration cards grid.
+     * P6 — the integrations hub.
      *
-     * CHANGED vs the original on three counts: the route is `/settings/integrations`
-     * (there is no `/settings/integrations-grid`); the page returns AccessDenied
-     * to an inspector, so this runs as the owner; and the six cards are not the
-     * six the old list named. Stripe Connect is NOT a card any more — it has its
-     * own StripePaymentsPanel section above the grid — and Zapier took the slot.
-     * "Resend (email)" is just "Resend".
+     * The page draws one card per service the overview API returns, grouped by
+     * category, each with a status and a source. Stripe and the video backend
+     * are still their own panels further down the page. Titles say the job; the
+     * vendor sits under them. No card is hard-coded any more, so this asserts the
+     * services a seeded standalone company is always shown.
      */
-    test('P6 — the integrations grid renders its six cards', async ({ page }) => {
+    test('P6 — the integrations hub renders a card for each service', async ({ page }) => {
         await loginAsSeedUser(page, SEED_EMAILS.admin);
         await page.goto('/settings/integrations');
 
-        // "AI provider", not "Gemini AI". The multi-provider AI work renamed the
-        // card when the feature stopped being about one vendor; the message KEY
-        // is still `settings_integrations_gemini_name`, so a grep for the key
-        // finds nothing wrong and only the rendered value moved.
-        //
-        // This assertion was stale from that rename until it first ran here.
-        // These specs only run on a pull request, and the work that renamed the
-        // card reached main by a force-push — so nothing executed them in
-        // between. The gap, not the label, is the thing worth remembering.
-        for (const name of ['QuickBooks Online', 'Google Calendar', 'Google Places',
-                            'Resend', 'Zapier', 'AI provider']) {
-            await expect(page.getByText(name, { exact: true })).toBeVisible();
+        for (const title of ['Card payments', 'Accounting', 'Email', 'SMS',
+                             'Address suggestions', 'Property facts', 'AI assistant']) {
+            await expect(page.getByRole('article', { name: title })).toBeVisible();
         }
-        // Stripe is on this page, but as its own panel — not a grid card.
-        await expect(page.getByText('Stripe Connect')).toHaveCount(0);
+        await expect(page.getByText('Zapier')).toHaveCount(0);
     });
 
     /**

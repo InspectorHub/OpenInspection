@@ -40,7 +40,7 @@ For the manual flow, see the **Quick start** section in the [README](../../READM
 | Workflow         | `SIGN_COMPLETION_WORKFLOW` | Async e-sign pipeline (Spec 5H).                           |
 | Durable Objects  | `INSPECTION_PRESENCE`, `TENANT_PRESENCE` | Live presence for the editor.               |
 | Durable Object   | `INSPECTION_DOC` | The collaborative results document (Yjs CRDT). Absent → the editor's collab routes return `501` and collaborative editing does not engage. |
-| Durable Object   | `INSPECTOR_MCP`  | The remote MCP server. Only reached when `MCP_ENABLED` is set. (`NATIVE_CLIENT_ENABLED` enables native app sign-in on the same OAuth provider and does not use this object; see [`../develop/native-clients.md`](../develop/native-clients.md).) |
+| Durable Object   | `INSPECTOR_MCP`  | Retired. The remote MCP endpoint is a stateless request handler and nothing routes to this class; the binding stays only until the migration that deletes it ships. Do not remove it from an existing deployment's config on your own: deleting a Durable Object class takes a dedicated migration step. (`NATIVE_CLIENT_ENABLED` enables native app sign-in on the same OAuth provider; see [`../develop/native-clients.md`](../develop/native-clients.md).) |
 | KV namespace     | `OAUTH_KV`       | OAuth grants (MCP and native app sign-in). The binding NAME is fixed by `@cloudflare/workers-oauth-provider`. |
 | Queue            | `CRON_QUEUE`     | **Background jobs run on this queue, one job per invocation.** With it unbound the tick logs `CRON_QUEUE is not bound — no job will run` and every sweep, reminder and retention job stops. |
 | Queue            | `WORD_EXPORT_QUEUE` | Async `.docx` export. |
@@ -81,8 +81,8 @@ bindings — declaring them in the config is all the provisioning they need.
 | `RESEND_API_KEY`  | Optional, only if you want outbound email.          |
 | `SENDER_EMAIL`    | Required when `RESEND_API_KEY` is set.              |
 | `GEMINI_API_KEY`  | Optional — read by the Advanced-settings "Test connection" diagnostic. AI features themselves run on the tenant's own key stored via Settings → Advanced → AI (or, in `saas` mode only, `AI_MANAGED_API_KEY`). |
-| `AI_MODEL`        | Required for any AI feature — the model id every AI call uses, in the chosen backend's own naming. Through an AI gateway that is `{provider}/{model}`. There is no compiled-in default; unset means AI fails closed with a 503. A company may override it per workspace. |
-| `AI_BASE_URL`     | Required for any AI feature — the root of the OpenAI-compatible API every AI call posts to. Point it at a hosted provider, at an AI gateway, or at an address on your own network running Ollama or vLLM. No compiled-in default; unset fails closed. A company may override it per workspace. See [AI](../integrations/ai.md). |
+| `AI_MODEL`        | Required for any AI feature — the model id every AI call uses, in the chosen backend's own naming. Through an AI gateway that is `{provider}/{model}`. There is no compiled-in default; unset means AI fails closed with a 503. A company may override it for itself. |
+| `AI_BASE_URL`     | Required for any AI feature — the root of the OpenAI-compatible API every AI call posts to. Point it at a hosted provider, at an AI gateway, or at an address on your own network running Ollama or vLLM. No compiled-in default; unset fails closed. A company may override it for itself. See [AI](../integrations/ai.md). |
 | `AI_MANAGED_API_KEY` | Optional, `saas` only — a deployment-provided AI key for tenants the deployment grants managed access to. A standalone deploy has no managed path and ignores it. |
 | `TURNSTILE_SECRET_KEY` | Optional but recommended for the public booking page. |
 

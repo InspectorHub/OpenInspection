@@ -6,7 +6,7 @@
  *     current disclosure + company name (the SSR opt-in page renders this).
  *   - POST /sms/optin-confirm {token}  — record a `granted` event (optin_link).
  * Webhook router (`smsWebhookRoutes`, mounted /webhooks) — provider callbacks:
- *   - POST /sms/inbound, /sms/inbound/:tenant — STOP/START (D9 shapes 1 and 2).
+ *   - POST /sms/inbound/:tenant — STOP/START/HELP on the company's own number.
  *   - POST /sms/status/:tenant, /compliance-status/:provider/:tenant,
  *     /email/:provider/:tenant — delegated to the lib modules named below.
  *   Plain Hono, signature-validated, never zod-validated, never in the BFF client.
@@ -24,7 +24,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { and, eq } from 'drizzle-orm';
-import { inspections, tenants, tenantConfigs, messagingCompliance } from '../lib/db/schema';
+import { inspections, tenants, tenantConfigs, messagingCompliance, processedWebhookEvents } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { memoOnce } from '../lib/request-scope';
 import { auditFromContext } from '../lib/audit';
@@ -79,15 +79,12 @@ function escapeXml(s: string): string {
 }
 
 /**
- * Brand name for the HELP auto-reply: the tenant's company name in the
- * tenant-scoped inbound shape, else the operator's APP_NAME (self-host) or the
- * platform default. The platform toll-free is shared, so a brand-level name is
- * the correct identity for a HELP reply on the platform shape.
+ * Brand name for the HELP auto-reply: the company's name (the inbound route is
+ * always company-scoped), else the operator's APP_NAME or the product default.
  */
-async function helpReplyBrand(c: Context<HonoConfig>, scopeTenantId: string | null): Promise<string> {
-    const platformFallback = (c.env as { APP_NAME?: string }).APP_NAME?.trim() || 'Inspector Hub';
-    if (!scopeTenantId) return platformFallback;
-    return resolveSmsBrand(getDrizzle(c), scopeTenantId, platformFallback);
+async function helpReplyBrand(c: Context<HonoConfig>, tenantId: string): Promise<string> {
+    const fallback = (c.env as { APP_NAME?: string }).APP_NAME?.trim() || 'Inspector Hub';
+    return resolveSmsBrand(getDrizzle(c), tenantId, fallback);
 }
 
 // ─── Public router — the opt-in pair the SSR page calls; a person opens these ─
@@ -185,9 +182,6 @@ export const smsPublicRoutes = createApiRouter()
 // The provider owns the body shape and the signature, so they mount at the top
 // level, outside /api/* and its middleware. The platform shape is always Twilio.
 export const smsWebhookRoutes = new Hono<HonoConfig>();
-smsWebhookRoutes.post('/sms/inbound', (c) =>
-    handleInbound(c, { provider: 'twilio', secret: c.env.TWILIO_AUTH_TOKEN ?? '', scopeTenantId: null }));
-
 smsWebhookRoutes.post('/sms/inbound/:tenant', async (c) => {
     const slug = c.req.param('tenant');
     const db = getDrizzle(c);
@@ -236,19 +230,23 @@ registerComplianceStatusRoute(smsWebhookRoutes);
 registerEmailEventsRoute(smsWebhookRoutes);
 
 /**
- * Shared inbound handler. Verifies the provider's inbound signature, extracts
- * From/Body (Twilio form params, or Telnyx JSON payload), then applies
- * STOP/START to every subject holding that number — contacts AND staff `users`
- * rows — via one shared consent tail.
- * scopeTenantId=null → platform shape (all platform-mode tenants matching From);
- * scopeTenantId set → tenant-scoped shape (that tenant only).
+ * Inbound handler for a company's OWN number (the only inbound route). Verifies
+ * the provider's inbound signature, extracts From/Body (Twilio form params, or
+ * Telnyx JSON payload), then applies STOP/START to every subject of THAT company
+ * holding the number — contacts AND staff `users` rows — via one consent tail.
+ *
+ * Consent is stored per company + recipient: a STOP revokes that company's
+ * texting to that recipient (every message class, since the ledger has no class
+ * column and the send gate reads the latest row), and a START resumes it for that
+ * company alone. Nothing here ever writes another company's rows, even when the
+ * same phone is on file there.
  *
  * Fail-closed: missing/invalid signature, missing key, out-of-tolerance
  * timestamp, or malformed body → 403/200-no-op BEFORE any side effect.
  */
 async function handleInbound(
     c: Context<HonoConfig>,
-    opts: { provider: 'twilio' | 'telnyx'; secret: string; scopeTenantId: string | null },
+    opts: { provider: 'twilio' | 'telnyx'; secret: string; scopeTenantId: string },
 ): Promise<Response> {
     const verified = await verifyInboundSignature(c, opts);
     if (!verified.ok) return c.text('', verified.status);
@@ -257,13 +255,16 @@ async function handleInbound(
     let from: string | null;
     let cmd: string;
     let isHelp: boolean;
+    // The provider's own id for THIS inbound message (Twilio MessageSid, Telnyx event id).
+    let messageId: string | null = null;
 
     if (opts.provider === 'telnyx') {
         // Parse defensively — a malformed/missing field is acknowledged (200) and
         // never throws. Telnyx does not consume TwiML; a plain 200 is correct.
         let parsed: unknown;
         try { parsed = JSON.parse(rawBody); } catch { return c.text('', 200); }
-        const data = (parsed as { data?: { event_type?: unknown; payload?: unknown } } | null)?.data;
+        const data = (parsed as { data?: { id?: unknown; event_type?: unknown; payload?: unknown } } | null)?.data;
+        if (typeof data?.id === 'string' && data.id) messageId = data.id;
         // Only an inbound user reply carries a STOP/START/HELP command.
         if (data?.event_type !== 'message.received') return c.text('', 200);
         const payload = (data as { payload?: { from?: { phone_number?: unknown }; text?: unknown } }).payload;
@@ -277,6 +278,7 @@ async function handleInbound(
         if (isHelp) return c.text('', 200);
     } else {
         from = normalizeE164(params.From ?? '');
+        if (params.MessageSid) messageId = params.MessageSid;
         cmd = (params.Body ?? '').trim().toUpperCase();
         isHelp = HELP_WORDS.has(cmd);
 
@@ -296,7 +298,19 @@ async function handleInbound(
     if (!from) return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
 
     const db = getDrizzle(c);
-    // EVERY subject holding this number, in BOTH id spaces
+    // A signed request can be delivered again (a provider retry, or a replay of a
+    // captured one). Twilio signatures carry no timestamp, so a replayed START
+    // would otherwise re-grant consent after a later STOP. The provider's message
+    // id is applied once per company; the marker is written AFTER the consent rows
+    // so a failure part-way is retried rather than lost, and re-applying a command
+    // is idempotent.
+    const replayKey = (isRevoke || isGrant) && messageId ? `sms-inbound:${opts.scopeTenantId}:${messageId}` : null;
+    if (replayKey) {
+        const seen = await db.select({ id: processedWebhookEvents.eventId }).from(processedWebhookEvents)
+            .where(eq(processedWebhookEvents.eventId, replayKey)).get();
+        if (seen) return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
+    }
+    // EVERY subject of THIS company holding this number, in BOTH id spaces
     // (`lib/sms/consent-subjects`) — not the first one found. A staff member has
     // no contact row, so a contacts-only set left the loop below running zero
     // times while the provider still got its 200, and staff are texted on an
@@ -311,9 +325,9 @@ async function handleInbound(
             // `capturedVia` stays 'admin' and it is the weakest word here: none
             // of the four capture methods names an inbound message. A fifth
             // value is its own change — the settings screen maps the four to
-            // recipient-facing copy, so an unmapped one would fault that screen
-            // on a START. What this row must get right is WHO it is about and
-            // WHICH basis they were reachable under; both have columns.
+            // recipient-facing copy, so an unmapped one would fault that screen on a
+            // START. What this row must get right is WHO it is about and WHICH
+            // basis they were reachable under; both have columns.
             await consentSvc.record(row.tenantId, row.id, isRevoke ? 'revoked' : 'granted', 'admin', {
                 recipientType: row.recipientType, subjectKind: row.kind,
             });
@@ -324,6 +338,11 @@ async function handleInbound(
         // inbound reply is tied to neither. Two-way conversation surfacing is
         // explicitly out of scope (spec §10); STOP/START consent sync is the only
         // in-scope inbound behavior, and it is handled above.
+    }
+    if (replayKey) {
+        try {
+            await db.insert(processedWebhookEvents).values({ eventId: replayKey, receivedAt: new Date() }).run();
+        } catch { /* a concurrent duplicate already marked it */ }
     }
     return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
 }

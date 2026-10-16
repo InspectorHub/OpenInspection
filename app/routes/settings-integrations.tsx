@@ -32,7 +32,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const { forbidden, token } = await requireAdminLoader(context, request);
   if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
-  const [secretsRes, logRes, configRes, tcRes, testResultsRes] = await Promise.all([
+  const [secretsRes, logRes, configRes, tcRes, testResultsRes, cards] = await Promise.all([
     api.secrets.secrets.$get().catch(() => null),
     api.integrations.stripe["webhook-log"].$get().catch(() => null),
     // Integration config — plaintext JSON: appBaseUrl, turnstileSiteKey,
@@ -41,6 +41,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // Tenant config flags — includes videoMode (default 'r2').
     api.admin["tenant-config"].$get().catch(() => null),
     api.integrations["test-results"].$get().catch(() => null),
+    // The cards the hub draws. A failed overview reads as no cards; the Stripe
+    // and video panels below it do not depend on it.
+    (async () => {
+      const res = await api.integrations.overview.$get().catch(() => null);
+      return res?.ok ? (await res.json()).data : [];
+    })(),
   ]);
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
@@ -66,6 +72,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const testResults = await parseTestResults(testResultsRes);
 
   return {
+    cards,
     webhookBase,
     webhookLog,
     testResults,
@@ -233,7 +240,7 @@ export default function SettingsIntegrations() {
   );
 
   if ("forbidden" in data) return <AccessDenied />;
-  const { secrets, webhookBase, webhookLog, videoMode, streamCustomerSubdomain, testResults } = data;
+  const { cards, secrets, webhookBase, webhookLog, videoMode, streamCustomerSubdomain, testResults } = data;
 
   const tenantSlug = ctx?.branding?.tenantSlug ?? null;
   const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
@@ -256,9 +263,11 @@ export default function SettingsIntegrations() {
   return (
     <div className="space-y-ih-list">
       <SettingsCrumb items={[{ label: m.settings_crumb_root(), href: "/settings" }, { label: m.settings_integrations_crumb() }]} />
-      <p className="text-[13px] text-ih-fg-3">
-        {m.settings_integrations_intro()}
+      <p className="text-sm text-ih-fg-3">
+        {m.integrations_hub_intro()}
       </p>
+
+      <IntegrationCardsGrid cards={cards} />
 
       {/* Flash — Stripe save */}
       {flashVisible && actionData?.success && (
@@ -279,32 +288,34 @@ export default function SettingsIntegrations() {
         </div>
       )}
 
-      {/* Stripe API keys */}
-      <StripePaymentsPanel
-        secrets={secrets}
-        webhookUrl={webhookUrl}
-        webhookLog={webhookLog}
-        saving={saving}
-        serverField={serverField}
-        serverError={actionData?.error}
-        revalidator={revalidator}
-        testResults={testResults}
-      />
+      {/* Stripe API keys. The anchor is where the Card payments card points. */}
+      <div id="stripe" className="scroll-mt-4">
+        <StripePaymentsPanel
+          secrets={secrets}
+          webhookUrl={webhookUrl}
+          webhookLog={webhookLog}
+          saving={saving}
+          serverField={serverField}
+          serverError={actionData?.error}
+          revalidator={revalidator}
+          testResults={testResults}
+        />
+      </div>
 
       {/* Video backend — shown only where the operator picks it. Where the
           platform picks it (`videoBackendManaged`) the form has nothing to
           offer, and the action in this file refuses to save from it. */}
       {!videoBackendManaged && (
-        <VideoIntegrationPanel
-          videoMode={videoMode}
-          streamCustomerSubdomain={streamCustomerSubdomain}
-          saving={savingVideo}
-          serverError={actionData?.intent === "save-video" ? actionData.error : null}
-          serverField={videoServerField}
-        />
+        <div id="video" className="scroll-mt-4">
+          <VideoIntegrationPanel
+            videoMode={videoMode}
+            streamCustomerSubdomain={streamCustomerSubdomain}
+            saving={savingVideo}
+            serverError={actionData?.intent === "save-video" ? actionData.error : null}
+            serverField={videoServerField}
+          />
+        </div>
       )}
-
-      <IntegrationCardsGrid />
     </div>
   );
 }

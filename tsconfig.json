@@ -81,10 +81,10 @@
     // graph relies on must be visible here (they live under the api config's
     // server/** include).
     "server/types/qrcode-internals.d.ts",
-    // Needed so the global `Env` type (declared here as `interface Env extends Cloudflare.Env {}`)
-    // is visible when the worker entry re-exports DOs that use it (e.g. InspectorMcp
-    // extends McpAgent<Env>). McpAgent constrains its Env param to `extends Cloudflare.Env`,
-    // and only the global `Env` satisfies that after Cloudflare.Env is augmented by this file.
+    // Declares the global `Env` type (`interface Env extends Cloudflare.Env {}`) for this
+    // program; the worker entry's Durable Object re-exports rely on it being visible. It was
+    // introduced for an `McpAgent<Env>` subclass that no longer exists. Whether the remaining
+    // classes would compile without it has not been checked, so it stays.
     "worker-configuration.d.ts",
     // packages/shared-ui SOURCES already reached this program transitively, via
     // the `@core/shared-ui` path alias every app route imports. Its 19

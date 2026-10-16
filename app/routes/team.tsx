@@ -4,7 +4,7 @@ import type { Route } from "./+types/team";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
-import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
+import { InviteSeatDrawer, drawerActorOf } from "~/components/modals/InviteSeatDrawer";
 import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
 import { TeamRolesReference } from "~/components/TeamRolesReference";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
@@ -13,7 +13,7 @@ import { ResetTwoFactorDialog, type ResetTwoFactorTarget } from "~/components/mo
 import { RemoveMemberDialog } from "~/components/modals/RemoveMemberDialog";
 import { useRemoveMember } from "~/components/modals/useRemoveMember";
 import { resolveRole } from "~/lib/access.server";
-import { relayedApiError } from "~/lib/relayed-api-error";
+import { removeMember as removeMemberAction } from "./team.remove-member.server";
 import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
 import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
@@ -95,8 +95,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok, resent: res.ok };
   }
   if (intent === "remove-member") {
-    const res = await api.team.members[":id"].$delete({ param: { id } });
-    return res.ok ? { ok: true } : { ok: false, error: await relayedApiError(res) };
+    return removeMemberAction(api, form);
   }
   if (intent === "reset-two-factor") return resetMemberTwoFactor(api, id);
   return { ok: false };
@@ -117,7 +116,7 @@ export default function TeamPage() {
   // a reset that silently rode a cancel's in-flight guard would be dropped.
   const { submit: submitResetTwoFactor, busy: resetTwoFactorBusy } = useGuardedSubmit<{ ok?: boolean }>();
   const [pendingReset, setPendingReset] = useState<ResetTwoFactorTarget | null>(null);
-  const removeMember = useRemoveMember();
+  const removeMember = useRemoveMember(members);
   const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
   const resendLatch = useSubmitLatch(resendFetcher.state);
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
@@ -128,6 +127,7 @@ export default function TeamPage() {
   const [linkInvite, setLinkInvite] = useState<InviteLinkTarget | null>(null);
   const sessionCtx = useSessionContext();
   const viewerEmail = sessionCtx?.user?.email;
+  const actor = drawerActorOf(sessionCtx);
   const locale = useDisplayLocale();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -201,8 +201,8 @@ export default function TeamPage() {
         ) : undefined}
       />
 
-      {canManage && <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />}
-      <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} />
+      {canManage && <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} actor={actor} />}
+      <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} actor={actor} />
 
       {TABS.length > 1 && <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />}
 

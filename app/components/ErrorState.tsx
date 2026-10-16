@@ -12,10 +12,8 @@
  */
 import { ContactChannels } from "./ContactChannels";
 
-interface ErrorStateAction {
-  label: string;
-  href: string;
-}
+/** A link, or (when the way forward is "try again") a button that runs `onClick`. */
+type ErrorStateAction = { label: string; href: string; onClick?: undefined } | { label: string; onClick: () => void; href?: undefined };
 
 export interface ErrorStateProps {
   /** Optional HTTP-ish code shown as an eyebrow (e.g. 404, 500). */
@@ -66,14 +64,22 @@ export function ErrorState({ code, title, message, action, contacts }: ErrorStat
         {message && (
           <p className="mt-2 text-[14px] leading-relaxed text-ih-fg-3">{message}</p>
         )}
-        {action && (
+        {action && (action.onClick ? (
+          <button
+            type="button"
+            onClick={action.onClick}
+            className="mt-6 inline-flex items-center justify-center h-11 px-6 rounded-lg text-sm font-bold text-ih-fg-inverse bg-ih-primary hover:bg-ih-primary-600 transition-colors"
+          >
+            {action.label}
+          </button>
+        ) : (
           <a
             href={action.href}
             className="mt-6 inline-flex items-center justify-center h-11 px-6 rounded-lg text-sm font-bold text-ih-fg-inverse bg-ih-primary hover:bg-ih-primary-600 transition-colors"
           >
             {action.label}
           </a>
-        )}
+        ))}
         {hasContacts && (
           /* The channel block itself is shared with the closed booking page
              (F37) — see ContactChannels. Only the surround is this component's. */

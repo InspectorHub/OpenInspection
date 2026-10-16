@@ -39,7 +39,7 @@ const inspectionServiceRoutes = createApiRouter()
         method: 'post', path: '/{id}/services',
         tags: ['inspections'],
         summary: 'Add a catalog service to an inspection',
-        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('inspectionFees')] as const,
         request: {
             params: IdParam,
             body: { content: { 'application/json': { schema: AddInspectionServiceSchema } } },
@@ -49,7 +49,7 @@ const inspectionServiceRoutes = createApiRouter()
         },
         operationId: 'addInspectionService',
         description: 'Adds a service from the tenant catalog to an existing inspection, snapshotting its name and price. Optionally charges a per-inspection override price. Adding a service the inspection already has returns the existing line unchanged.',
-    }, { scopes: ['write'], tier: 'primary', capability: 'financial' })), async (c) => {
+    }, { scopes: ['write'], tier: 'primary', capability: 'inspectionFees' })), async (c) => {
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
         const { serviceId, priceOverrideCents } = c.req.valid('json');
@@ -61,7 +61,7 @@ const inspectionServiceRoutes = createApiRouter()
         method: 'patch', path: '/{id}/services/{lineId}',
         tags: ['inspections'],
         summary: 'Reprice one service line on an inspection',
-        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('inspectionFees')] as const,
         request: {
             params: LineParam,
             body: { content: { 'application/json': { schema: UpdateInspectionServiceSchema } } },
@@ -71,7 +71,7 @@ const inspectionServiceRoutes = createApiRouter()
         },
         operationId: 'updateInspectionService',
         description: 'Sets the per-inspection price override on one service line. Passing null clears the override so the line reverts to the catalog price snapshotted when it was added.',
-    }, { scopes: ['write'], tier: 'primary', capability: 'financial' })), async (c) => {
+    }, { scopes: ['write'], tier: 'primary', capability: 'inspectionFees' })), async (c) => {
         const tenantId = getTenantId(c);
         const { id, lineId } = c.req.valid('param');
         const { priceOverrideCents } = c.req.valid('json');
@@ -83,7 +83,7 @@ const inspectionServiceRoutes = createApiRouter()
         method: 'delete', path: '/{id}/services/{lineId}',
         tags: ['inspections'],
         summary: 'Remove a service line from an inspection',
-        middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+        middleware: [requireRole('owner', 'manager'), requireCapability('inspectionFees')] as const,
         request: { params: LineParam },
         responses: {
             200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Line removed' },
@@ -91,7 +91,7 @@ const inspectionServiceRoutes = createApiRouter()
         },
         operationId: 'removeInspectionService',
         description: 'Removes one booked service line from an inspection. Does not touch the tenant service catalog. Refuses with 409 when a report (in progress or published) delivers this line.',
-    }, { scopes: ['write'], tier: 'primary', capability: 'financial' })), async (c) => {
+    }, { scopes: ['write'], tier: 'primary', capability: 'inspectionFees' })), async (c) => {
         const tenantId = getTenantId(c);
         const { id, lineId } = c.req.valid('param');
         await c.var.services.service.removeInspectionService(tenantId, id, lineId);

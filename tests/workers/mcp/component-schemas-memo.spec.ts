@@ -3,7 +3,7 @@
 // counter (the real function still runs); the module is re-imported per test so
 // each starts with an empty cache.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 
 const build = vi.hoisted(() => ({ calls: 0, failNext: false }));
 
@@ -30,7 +30,7 @@ const WIDE = ['read:inspections', 'write:inspections', 'read:contacts', 'write:c
 
 async function freshRegister() {
     vi.resetModules();
-    const mod = await import('../../../server/durable-objects/inspector-mcp');
+    const mod = await import('../../../server/lib/mcp/build-server');
     return (scopes: string[]) => mod.registerGrantedTools(new McpServer({ name: 't', version: '0' }), {} as never, props(scopes), noCtx);
 }
 

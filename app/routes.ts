@@ -227,6 +227,8 @@ export default [
       route("settings/advanced", "routes/settings-advanced.tsx"),
       route("settings/integrations", "routes/settings-integrations.tsx"),
       route("settings/integrations/qbo", "routes/settings-integrations-qbo.tsx"),
+      route("settings/integrations/email", "routes/settings-integrations-email.tsx"),
+      route("settings/integrations/sms", "routes/settings-integrations-sms.tsx"),
       route("settings/event-types", "routes/settings-event-types.tsx"),
       route("settings/contractor-types", "routes/settings-contractor-types.tsx"),
       route("settings/inspection-types", "routes/settings-inspection-types.tsx"),

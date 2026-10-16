@@ -1,12 +1,13 @@
 import { Card } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
-/** The four roles and what each is for, shown beneath the `/team` roster. */
+/** The roles and what each is for, shown beneath the `/team` roster. */
 export function TeamRolesReference() {
   const roles = [
     { role: m.settings_team_role_owner_name(), desc: m.settings_team_role_owner_desc() },
     { role: m.settings_team_role_manager_name(), desc: m.settings_team_role_manager_desc() },
     { role: m.settings_team_role_inspector_name(), desc: m.settings_team_role_inspector_desc() },
+    { role: m.settings_team_role_staff_name(), desc: m.settings_team_role_staff_desc() },
     { role: m.settings_team_role_agent_name(), desc: m.settings_team_role_agent_desc() },
   ];
   return (

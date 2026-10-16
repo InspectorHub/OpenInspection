@@ -16,6 +16,7 @@ import type { AiProvider, AiRequest, AiResponse } from '../provider';
  */
 export class RecordingAiProvider implements AiProvider {
     readonly id = 'recording';
+    readonly model = 'recording';
     /** Names itself, exactly as `id` does. This class is the standing proof
      *  that `AiProvider` stays backend-neutral (see the note above): a
      *  destination is something every transport has, so a transport that has

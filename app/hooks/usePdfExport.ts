@@ -79,6 +79,12 @@ export function usePdfExport(): PdfExportState {
         const res = await fetch(url, { credentials: "same-origin" });
         if (!res.ok) {
           viewTab?.close();
+          // 503 is "no renderer here / renderer down" (PDF_UNAVAILABLE), not a
+          // rate limit: a countdown would promise a retry that cannot succeed.
+          if (res.status === 503) {
+            setError(m.helper_pdf_unavailable());
+            return;
+          }
           setCooldown(PDF_RETRY_COOLDOWN_SEC);
           setError(m.helper_pdf_rate_limit());
           return;

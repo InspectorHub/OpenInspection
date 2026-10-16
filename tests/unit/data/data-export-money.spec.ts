@@ -1,5 +1,5 @@
 /**
- * The inspections CSV export and the financial capability: without it the
+ * The inspections CSV export and the companyFinance capability: without it the
  * price column is absent (header and cells), not blanked, and the rows are the
  * same rows.
  */
@@ -77,13 +77,13 @@ const exportAs = (role: UserRole, overrides: Record<string, boolean> | null) =>
     buildApp(role, overrides).request('/api/data/export/inspections', {}, { DB: {} } as HonoConfig['Bindings']);
 
 describe('GET /api/data/export/inspections', () => {
-    it('manager with financial: price column present', async () => {
+    it('manager with companyFinance: price column present', async () => {
         const csv = await (await exportAs('manager', null)).text();
         expect(csv.split('\n')[0]).toContain('price_cents');
         expect(csv).toContain('45000');
     });
-    it('manager with financial switched off: no price column, same rows', async () => {
-        const csv = await (await exportAs('manager', { financial: false })).text();
+    it('manager with companyFinance switched off: no price column, same rows', async () => {
+        const csv = await (await exportAs('manager', { companyFinance: false })).text();
         expect(csv.split('\n')[0]).not.toContain('price_cents');
         expect(csv).not.toContain('45000');
         expect(csv.split('\n').length).toBe(3);
@@ -115,9 +115,13 @@ describe('GET /api/admin/export (full JSON export)', () => {
     it('manager: inspection money present (positive control)', async () => {
         expect(await exportJson('manager', null)).toContain('"price":45000');
     });
-    it('manager without financial: inspection money absent, template JSON untouched', async () => {
-        const body = await exportJson('manager', { financial: false });
+    it('manager without companyFinance: inspection money absent, template JSON untouched', async () => {
+        const body = await exportJson('manager', { companyFinance: false });
         expect(body).not.toMatch(/"price":45000|depositRequiredCents/);
         expect(body).toContain('label kept');
+    });
+    it('manager with inspectionFees only: inspection money still absent from the company export', async () => {
+        const body = await exportJson('manager', { inspectionFees: true, companyFinance: false });
+        expect(body).not.toMatch(/"price":45000|depositRequiredCents/);
     });
 });

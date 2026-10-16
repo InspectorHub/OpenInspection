@@ -17,6 +17,7 @@
  * jwtAuthMiddleware checks this key per request but never re-reads the user
  * row.
  */
+import { OWNER_ACTOR } from '../helpers/grant-actor';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
@@ -92,8 +93,10 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
 
     it('removing a member WITH inspections succeeds and keeps attribution intact (FK regression)', async () => {
         await testDb.insert(schema.inspections).values({
+            // A finished inspection: removal needs no decision about it, and it keeps its inspector.
+            // (One still open must be reassigned or left unassigned; that is covered in remove-member-reassign.spec.ts.)
             id: 'insp-1', tenantId: TENANT, inspectorId: MEMBER, propertyAddress: '1 Main St',
-            date: '2026-07-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
+            date: '2026-07-01', status: 'completed', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
 
@@ -170,7 +173,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         expect((await getSeatUsage(TENANT, {} as never)).used).toBe(1);
 
         // createInvite must NOT be blocked by the soft-deleted row.
-        const invite = await team.createInvite({
+        const invite = await team.createInvite({ actor: OWNER_ACTOR,
             tenantId: TENANT,
             email: MEMBER_EMAIL,
             role: 'manager',
@@ -204,7 +207,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
         // The removal's own revocation failed: the grant is still there.
         grants.set('g-member', MEMBER);
-        const invite = await team.createInvite({ tenantId: TENANT, email: MEMBER_EMAIL, role: 'inspector' });
+        const invite = await team.createInvite({ actor: OWNER_ACTOR, tenantId: TENANT, email: MEMBER_EMAIL, role: 'inspector' });
         await auth.joinTeam(invite.token, 'new-password-123', { seatQuota: SEAT_QUOTA_UNENFORCED });
 
         expect([...grants.keys()]).toEqual(['g-admin']);
@@ -216,7 +219,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         const team = new TeamService({} as any, undefined, kv as any);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const auth = new AuthService({} as any, kv as any, undefined, oauth);
-        const invite = await team.createInvite({ tenantId: TENANT, email: 'brand-new@acme.test', role: 'inspector' });
+        const invite = await team.createInvite({ actor: OWNER_ACTOR, tenantId: TENANT, email: 'brand-new@acme.test', role: 'inspector' });
         await auth.joinTeam(invite.token, 'new-password-123', { seatQuota: SEAT_QUOTA_UNENFORCED });
         expect(oauth.listUserGrants).not.toHaveBeenCalled();
     });
@@ -237,7 +240,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
 
         await team.removeMember(TENANT, MEMBER, ADMIN, 'owner');
 
-        const invite = await team.createInvite({
+        const invite = await team.createInvite({ actor: OWNER_ACTOR,
             tenantId: TENANT,
             email: MEMBER_EMAIL,
             role: 'inspector',

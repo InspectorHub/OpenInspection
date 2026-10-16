@@ -8,9 +8,10 @@ const sms = read('server', 'api', 'sms.ts');
 const index = read('server', 'index.ts');
 
 describe('inbound provider webhooks are top-level, including the SMS/email family', () => {
-  it('registers the two inbound receivers on the webhook router', () => {
-    expect(sms).toMatch(/smsWebhookRoutes\.post\('\/sms\/inbound'/);
+  it('registers the per-company inbound receiver on the webhook router, and no shared one', () => {
     expect(sms).toMatch(/smsWebhookRoutes\.post\('\/sms\/inbound\/:tenant'/);
+    // There is no shared SMS number any more, so there is no company-less receiver to reach.
+    expect(sms).not.toMatch(/smsWebhookRoutes\.post\('\/sms\/inbound'/);
   });
 
   it('registers the three delegated receivers on the webhook router', () => {

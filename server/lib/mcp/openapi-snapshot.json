@@ -920,7 +920,7 @@
       }
     },
     "summary": "Cancel inspection for current tenant",
-    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged."
+    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles. Staff may cancel only an unpaid inspection that has not started, and need scheduleOthers or a place on the inspection; otherwise they get 403."
   },
   {
     "operationId": "cancelTeamInvite",
@@ -1040,7 +1040,7 @@
       "body": null
     },
     "summary": "Clone inspection for current tenant",
-    "description": "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles."
+    "description": "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status requested, payment status unpaid and an in-progress report. The booking and property details, price and requirements are carried over; report state, signature settings, cover photo, cancellation and unlock records, and re-inspection links are not. The source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager, inspector and staff roles."
   },
   {
     "operationId": "cloneRatingSystem",
@@ -1116,7 +1116,7 @@
       "body": null
     },
     "summary": "Complete inspection for current tenant",
-    "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection."
+    "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403."
   },
   {
     "operationId": "completeTwoFactorLogin",
@@ -1195,7 +1195,7 @@
       "body": null
     },
     "summary": "Confirm inspection for current tenant",
-    "description": "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers and inspectors."
+    "description": "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection."
   },
   {
     "operationId": "confirmSmsOptin",
@@ -1399,7 +1399,7 @@
       }
     },
     "summary": "Create ai auto summary",
-    "description": "Generate a short summary of an inspection's defects with the configured AI provider. Only the inspector's notes on items rated Defect are sent to the model (an item with no note is sent as 'No description provided'); item names, addresses and client details are not. When the inspection has no results or no defects, a fixed 'no significant defects' sentence is returned without calling the model and aiCallId is null. Otherwise aiCallId identifies the recorded AI call, which a human review can cite. The inspection must belong to this company. Fails when AI is not configured or the workspace's AI allowance is spent. Nothing is saved to the inspection, and each call is a fresh model call. Open to owners, managers and inspectors."
+    "description": "Generate a short summary of an inspection's defects with the configured AI provider. Only the inspector's notes on items rated Defect are sent to the model (an item with no note is sent as 'No description provided'); item names, addresses and client details are not. When the inspection has no results or no defects, a fixed 'no significant defects' sentence is returned without calling the model and aiCallId is null. Otherwise aiCallId identifies the recorded AI call, which a human review can cite. The inspection must belong to this company. Fails when AI is not configured or the workspace's AI allowance is spent. Nothing is saved to the inspection, and each call is a fresh model call. Open to owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff do not have by default."
   },
   {
     "operationId": "createAiCommentAssist",
@@ -1417,7 +1417,7 @@
       }
     },
     "summary": "Create ai comment assist",
-    "description": "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it."
+    "description": "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it. Requires the editReports capability; office staff do not have it by default."
   },
   {
     "operationId": "createAiCommentEdit",
@@ -1435,7 +1435,7 @@
       }
     },
     "summary": "Rewrite a canned comment with AI assistance",
-    "description": "Rewrite one inspection comment according to a free-form instruction (for example shorten it, or add location detail), using the item, section and tab it belongs to as context. Returns the rewritten text and the id of the AI call that produced it, which is null only for the local development mock. Nothing is saved: the caller decides whether to replace the original. Fails when AI is not configured, and is rate-limited per caller. Each call is a fresh model call. Open to owners, managers and inspectors."
+    "description": "Rewrite one inspection comment according to a free-form instruction (for example shorten it, or add location detail), using the item, section and tab it belongs to as context. Returns the rewritten text and the id of the AI call that produced it, which is null only for the local development mock. Nothing is saved: the caller decides whether to replace the original. Fails when AI is not configured, and is rate-limited per caller. Each call is a fresh model call. Open to owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff do not have by default."
   },
   {
     "operationId": "createAiContentReview",
@@ -1453,7 +1453,7 @@
       }
     },
     "summary": "Record a human review of AI-assisted content",
-    "description": "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate."
+    "description": "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate. Requires the editReports capability; office staff do not have it by default."
   },
   {
     "operationId": "createAiSuggestComment",
@@ -1471,7 +1471,7 @@
       }
     },
     "summary": "Suggest professional comments for a form item",
-    "description": "Ask the AI provider for up to three suggested report comments for one inspection item, given its name, section and optionally its rating, the year built and the square footage. Returns the suggestions as text plus the id of the AI call. If the model's answer cannot be read, or the model call fails, the result is an empty suggestion list rather than an error; a missing AI configuration or a spent AI allowance is still an error. Nothing is saved. Open to owners, managers and inspectors."
+    "description": "Ask the AI provider for up to three suggested report comments for one inspection item, given its name, section and optionally its rating, the year built and the square footage. Returns the suggestions as text plus the id of the AI call. If the model's answer cannot be read, or the model call fails, the result is an empty suggestion list rather than an error; a missing AI configuration or a spent AI allowance is still an error. Nothing is saved. Open to owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff do not have by default."
   },
   {
     "operationId": "createAutomation",
@@ -1788,7 +1788,7 @@
       }
     },
     "summary": "Create inspection for current tenant",
-    "description": "Initialize a new inspection for a property. (POST /, inspections domain)."
+    "description": "Initialize a new inspection for a property. Available to owner, manager, inspector and staff roles; a named inspector must be a member who can inspect (400 otherwise), and a job booked by staff without one starts unassigned."
   },
   {
     "operationId": "createInspectionAgentToken",
@@ -2061,7 +2061,7 @@
       }
     },
     "summary": "Record inspector signature on an inspection (authenticated)",
-    "description": "Stores the inspector's drawn signature image on the inspection's primary report. It is saved inside that report's results data, replacing any signature saved earlier, and a results row is created if the report has none yet. Safe to repeat: the last call wins. savedAt in the response simply echoes the signedAt the client sent, not a server time. Responds 404 if the inspection or its primary report is missing. Does not email anyone or write an audit record. Available to owner, manager and inspector roles."
+    "description": "Stores the inspector's drawn signature image on the inspection's primary report. It is saved inside that report's results data, replacing any signature saved earlier, and a results row is created if the report has none yet. Safe to repeat: the last call wins. savedAt in the response simply echoes the signedAt the client sent, not a server time. Responds 404 if the inspection or its primary report is missing. Does not email anyone. Writes an inspection.inspector_signature.update audit record (actor only, never the image) and requires the editReports capability. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionItemsPhotosAnnotation",
@@ -2270,7 +2270,7 @@
       }
     },
     "summary": "Send a manual SMS to people on the inspection",
-    "description": "Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). Recipients must be people already on the inspection who have a phone — no free-typed numbers. Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403."
+    "description": "Manual SMS via the shared sendOneSms core (TCPA consent, managed-send, quota). Recipients must be people already on the inspection who have a phone — no free-typed numbers. At most ten recipients per request, each listed once, and the same person is texted at most three times per hour per inspection (429 past that). Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403."
   },
   {
     "operationId": "createInspectionShareAgent",
@@ -4529,8 +4529,8 @@
       ],
       "body": null
     },
-    "summary": "Bring a cancelled inspection back to scheduled",
-    "description": "Returns a mistakenly-cancelled inspection to `scheduled`, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
+    "summary": "Bring a cancelled inspection back",
+    "description": "Returns a mistakenly-cancelled inspection to the status it had before it was cancelled, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. The report status is not changed. Staff need scheduleOthers or a place on the inspection, and get 403 for an inspection that was completed when it was cancelled. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
   },
   {
     "operationId": "createInspectionUnits",
@@ -4649,7 +4649,7 @@
       }
     },
     "summary": "Create an inspection from the 4-step NewInspectionWizard",
-    "description": "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector and the scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles."
+    "description": "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector, unless their role cannot inspect (staff), in which case the inspection starts unassigned unless team mode names a lead; a named lead or helper must be a member who can inspect (400 otherwise). The scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles; staff get 403."
   },
   {
     "operationId": "createInspectorCredential",
@@ -5118,7 +5118,7 @@
       }
     },
     "summary": "Create recommendation for current tenant",
-    "description": "Adds a recommendation to the company library: a name, a severity, a repair-scope summary and optionally a category and suggested contractor type. Stored alongside the canned-comment library. Owner, manager or inspector. Writes an audit entry (recommendation.created). Returns the created recommendation."
+    "description": "Adds a recommendation to the company library: a name, a severity, a repair-scope summary and optionally a category and suggested contractor type. Stored alongside the canned-comment library. Owner, manager or inspector with the template create capability. Writes an audit entry (recommendation.created). Returns the created recommendation."
   },
   {
     "operationId": "createReinspection",
@@ -5147,7 +5147,7 @@
       }
     },
     "summary": "Create a re-inspection from this (published) baseline report",
-    "description": "Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report."
+    "description": "Creates a new linked inspection that carries forward the selected still-open flagged items from a published baseline report. A named inspector must be a member who can inspect (400 otherwise). Available to owner, manager, inspector and staff roles."
   },
   {
     "operationId": "createRepairList",
@@ -5998,7 +5998,7 @@
       "body": null
     },
     "summary": "Delete inspection for current tenant",
-    "description": "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403. Everyone also needs the deleteInspection capability (on by default; a company can turn it off per person)."
+    "description": "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403. Everyone also needs the deleteInspection capability (on by default; a company can turn it off per person). Staff always get 403."
   },
   {
     "operationId": "deleteInspectionCostItem",
@@ -6436,7 +6436,7 @@
       "body": null
     },
     "summary": "Delete recommendation for current tenant",
-    "description": "Permanently deletes a recommendation from the company library. Owner, manager or inspector. Writes an audit entry (recommendation.deleted)."
+    "description": "Permanently deletes a recommendation from the company library. Owner, manager or inspector with the template delete capability. Writes an audit entry (recommendation.deleted)."
   },
   {
     "operationId": "deleteRoleProfile",
@@ -6656,12 +6656,37 @@
             "minLength": 1,
             "description": "User id of the member to remove."
           }
+        },
+        {
+          "name": "reassignTo",
+          "in": "query",
+          "required": false,
+          "description": "User id of an active owner, manager or inspector who takes over the open inspections of the member being removed.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User id of an active owner, manager or inspector who takes over the open inspections of the member being removed."
+          }
+        },
+        {
+          "name": "unassign",
+          "in": "query",
+          "required": false,
+          "description": "Pass true to leave the open inspections of the member being removed unassigned instead of reassigning them. One of: true, false.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "description": "Pass true to leave the open inspections of the member being removed unassigned instead of reassigning them. One of: true, false."
+          }
         }
       ],
       "body": null
     },
     "summary": "Remove a team member",
-    "description": "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Returns 400 when you try to remove yourself or the last owner, 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
+    "description": "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Inspections that are not finished (requested, scheduled or confirmed, report not yet published) need a decision: pass reassignTo with the id of an active owner, manager or inspector of the company, or unassign=true to leave them without an inspector; with neither, the answer is 409 MEMBER_HAS_OPEN_INSPECTIONS with details.openInspections, and nothing changes. Completed, cancelled and published inspections keep their original inspector and are never rewritten; no inspection is deleted. The reassignment and the removal are applied together or not at all, and a user.removed audit entry records the counts. Returns 400 when you try to remove yourself or the last owner, when reassignTo is not an active assignable member of this company, or when both options are given; 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
   },
   {
     "operationId": "deleteTenantAgreement",
@@ -8384,6 +8409,22 @@
     },
     "summary": "Get full snapshot for a specific version",
     "description": "Returns the full frozen snapshot captured when version n was published: the inspection record, its results data, its units, the inspectors credited at the time and the resolved report style. Reads the stored copy, so later edits to the live inspection do not change it. Returns 404 when no such version exists for the inspection in this company. Read-only. Available to owner, manager, inspector and agent roles."
+  },
+  {
+    "operationId": "getIntegrationOverview",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/overview",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "integrations",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Overview of every outside service and its source",
+    "description": "Returns one card per outside service (card payments, accounting, calendar, email, SMS, address suggestions, property facts, video, AI) with its status (connected, needs attention, not connected), its source (built-in or the company's own account) and whether the company can switch between the two. Derived from stored settings and keys with no network call. Keys are never returned, only whether they are set."
   },
   {
     "operationId": "getIntegrationSecrets",
@@ -10528,7 +10569,7 @@
       "body": null
     },
     "summary": "List booking inspectors for current tenant",
-    "description": "Public, unauthenticated list of the company's inspectors for the booking page's inspector-choice dropdown: id and display name (null when the user has no name) for every user with the inspector role. The company comes from the request's tenant context (host or slug), not a parameter. Not paginated; no email or other contact details are returned. Read-only."
+    "description": "Public, unauthenticated list of the company's inspectors for the booking page's inspector-choice dropdown: id and display name (null when the user has no name) for every user with the inspector role. Single-company (standalone) deployments only: the company is the deployment's own fixed company and there is no host, slug or other parameter to choose one. A multi-company deployment has no company on this path and answers 403; its booking page reads the company-scoped route GET /api/public/book/{slug} instead, which lists inspectors only when the company allows inspector choice. This route lists every inspector regardless of that setting. Not paginated; no email or other contact details are returned. Read-only."
   },
   {
     "operationId": "listBookingServices",
@@ -10544,7 +10585,7 @@
       "body": null
     },
     "summary": "List active services for public booking",
-    "description": "Public, unauthenticated list of the services a client can pick on the booking page: only services that are active and have an inspection template attached. Each has id, name, description (nullable), price in integer cents, and durationMinutes (nullable). Internal service settings are not exposed. The company comes from the request's tenant context. Not paginated. Read-only."
+    "description": "Public, unauthenticated list of the services a client can pick on the booking page: only services that are active and have an inspection template attached. Each has id, name, description (nullable), price in integer cents, and durationMinutes (nullable). Internal service settings are not exposed. Single-company (standalone) deployments only: the company is the deployment's own fixed company and there is no host, slug or other parameter to choose one. A multi-company deployment has no company on this path and answers 403; use GET /api/public/book/{slug}, which carries that company's services. Not paginated. Read-only."
   },
   {
     "operationId": "listCalendarBlocks",
@@ -11050,7 +11091,7 @@
       "body": null
     },
     "summary": "List inspection inspectors for current tenant",
-    "description": "Lists every user account of the company, not only users with the inspector role, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are all included; pending invitations are not. Not paginated. Read-only. Available to owner and manager roles, and to inspectors who have been granted the scheduleOthers capability; other inspectors get 403."
+    "description": "Lists the user accounts of the company who can be assigned as an inspector, for assignee pickers: id, email, role, creation time, and whether a calendar is connected and when it last synced. Owners, managers and inspectors are included; staff accounts and pending invitations are not. Not paginated. Read-only. Available to owner and manager roles, and to inspectors who have been granted the scheduleOthers capability; other inspectors get 403."
   },
   {
     "operationId": "listInspectionMedia",
@@ -11106,7 +11147,7 @@
       "body": null
     },
     "summary": "List pay splits for one inspection",
-    "description": "Returns what each inspector is owed on the active billing lines of one inspection. A caller with the financial capability receives every row and may edit them; a caller without it receives only their own rows, read-only, and a colleague's amount is absent from the payload rather than hidden in it."
+    "description": "Returns what each inspector is owed on the active billing lines of one inspection. A caller with the company-finance capability receives every row and may edit them; a caller without it receives only their own rows, read-only, and a colleague's amount is absent from the payload rather than hidden in it."
   },
   {
     "operationId": "listInspectionPdf",
@@ -11833,6 +11874,22 @@
     "description": "Returns the ZIP prefixes this inspector will travel to. An empty list means they serve every area."
   },
   {
+    "operationId": "listIntegrationSources",
+    "method": "GET",
+    "pathTemplate": "/api/admin/integration-sources",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Which source each service runs on",
+    "description": "Returns, for email, SMS and AI, the sources the company can choose between (Built-in, Your own), the choice it saved, the source in use, whether it works, and whether its own account details are complete. Keys are never returned, only whether they are complete."
+  },
+  {
     "operationId": "listIntegrationStatus",
     "method": "GET",
     "pathTemplate": "/api/integrations/status",
@@ -11906,7 +11963,7 @@
       "body": null
     },
     "summary": "List invoices for current tenant",
-    "description": "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the financial capability and the owner, manager or inspector role. Not paged."
+    "description": "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the company-finance capability and the owner, manager or inspector role. Not paged."
   },
   {
     "operationId": "listMarketplaceImportsHistory",
@@ -12188,7 +12245,7 @@
       "body": null
     },
     "summary": "List metrics for current tenant",
-    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the financial capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
+    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the company-finance capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
   },
   {
     "operationId": "listNotifications",
@@ -12477,7 +12534,7 @@
       "body": null
     },
     "summary": "List services for current tenant",
-    "description": "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the financial capability. Owner, manager or inspector."
+    "description": "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the inspection-fees capability. Owner, manager or inspector."
   },
   {
     "operationId": "listSlugCheckSlug",
@@ -13501,7 +13558,7 @@
       }
     },
     "summary": "Patch inspection for current tenant",
-    "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields."
+    "description": "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change the order fields (date, assigned inspector, price, address, reference and referral fields, closing date, payment and agreement requirements, and a status of requested, scheduled or confirmed). They may switch the payment and agreement requirements on but not off, may not change the status of a completed inspection, and may change the property details only before the inspection starts. A body changing any report setting or other inspection field gets 403, and so do changes to the inspector, address or date after the inspection has started. Staff writes need scheduleOthers or being on the inspection."
   },
   {
     "operationId": "patchInspectionComplianceDocReviewItem",
@@ -17718,7 +17775,7 @@
       }
     },
     "summary": "Replace recommendation for current tenant",
-    "description": "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector."
+    "description": "Update a recommendation in the company library. Despite the PUT verb it is a partial update: only the fields sent change. Returns 404 when the id is unknown or belongs to an ordinary canned comment with no repair summary. Writes a recommendation.updated audit entry and marks the entry as edited, since recommendations share storage with the canned-comment library. Owner, manager or inspector with the template edit capability."
   },
   {
     "operationId": "replaceService",
@@ -17811,7 +17868,7 @@
       }
     },
     "summary": "Create + email an invoice payment request for an inspection",
-    "description": "Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page."
+    "description": "Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page. Requires the inspectionFees capability (held by owners, managers, inspectors and staff by default; an inspector or staff member with it switched off is refused)."
   },
   {
     "operationId": "requestPasswordReset",
@@ -17869,7 +17926,7 @@
       }
     },
     "summary": "Reschedule and/or reassign one inspection",
-    "description": "Moves an inspection to a precise instant and optionally changes who works it. Owner and manager, and inspectors granted the scheduleOthers capability, can move any inspection and reassign it; an inspector on the inspection (lead or helper) can move its date but not change who works it; other inspectors get 403. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is \"block\" and the resulting assignment overlaps existing work."
+    "description": "Moves an inspection to a precise instant and optionally changes who works it. Owner and manager, and inspectors granted the scheduleOthers capability, can move any inspection and reassign it; an inspector on the inspection (lead or helper) can move its date but not change who works it; other inspectors get 403. Staff move and reassign with scheduleOthers, which they hold by default. The epoch-millisecond start is authoritative; the civil date is derived from it in the tenant timezone. Returns 409 when the tenant booking_conflict_policy is \"block\" and the resulting assignment overlaps existing work."
   },
   {
     "operationId": "resendTeamInvite",
@@ -18463,7 +18520,7 @@
       }
     },
     "summary": "Store this workspace's AI endpoint, model and switch",
-    "description": "Blank values mean UNSET and are stored as null, which is how a workspace clears a destination. Turning the switch off keeps the endpoint and model — the control says so, and this is what makes that true. Every save bumps a version so anything holding a resolved endpoint can tell it is stale."
+    "description": "Blank values mean UNSET and are stored as null, which is how a workspace clears a destination. Turning the switch off keeps the endpoint and model — the control says so, and this is what makes that true. Every save bumps a version so anything holding a resolved endpoint can tell it is stale. A save that enables AI while the model or endpoint is blank, with nothing to fall back on, is refused with 422 naming the field."
   },
   {
     "operationId": "saveEmailTemplate",
@@ -18493,6 +18550,24 @@
     },
     "summary": "Save email template override",
     "description": "Saves a tenant override for an editable email template. Required templates cannot be disabled. Only known block keys are accepted."
+  },
+  {
+    "operationId": "saveIntegrationSource",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/integration-sources",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/IntegrationSourceChange"
+      }
+    },
+    "summary": "Choose Built-in or Your own for a service",
+    "description": "Records whether a service (email, SMS or AI) runs on the built-in account or the company's own. Your own is refused until the company's own account details are complete, and Built-in is refused where none is offered. Saves only the choice: no key is accepted, read or changed, so switching back and forth keeps the company's keys."
   },
   {
     "operationId": "saveNotificationPreference",
@@ -22947,7 +23022,7 @@
       }
     },
     "summary": "Update a team member's role or permissions",
-    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner."
+    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner. Moving a staff member to a role that holds a seat is refused (402) when no seat is free under the seat limit."
   },
   {
     "operationId": "updateTenantAgreement",

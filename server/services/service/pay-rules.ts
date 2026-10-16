@@ -25,9 +25,10 @@
  *     ordinary case; the catch is the race backstop, because between the SELECT
  *     and the INSERT another request can land.
  */
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import { services, servicePayRules, users } from '../../lib/db/schema';
+import { FIELD_ROLES } from '../../lib/auth/roles';
 import type { ServicePayRule } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
@@ -112,10 +113,11 @@ async function requireService(db: Db, tenantId: string, serviceId: string): Prom
 }
 
 /**
- * A rule may only name a real, non-deleted, non-agent member of this tenant —
+ * A rule may only name a real, non-deleted member of this tenant with a field role —
  * the same eligibility `setServiceInspectors` enforces. A rule pointing at a
  * stranger's id is unreachable (`pickRule` never matches it) and a rule pointing
- * at an AGENT would try to pay a third-party realtor out of inspection revenue.
+ * at an AGENT would try to pay a third-party realtor out of inspection revenue,
+ * and staff do not run inspections.
  */
 async function requireMember(db: Db, tenantId: string, userId: string): Promise<void> {
     const member = await db.select({ id: users.id }).from(users)
@@ -123,7 +125,7 @@ async function requireMember(db: Db, tenantId: string, userId: string): Promise<
             eq(users.tenantId, tenantId),
             eq(users.id, userId),
             isNull(users.deletedAt),
-            ne(users.role, 'agent'),
+            inArray(users.role, [...FIELD_ROLES]),
         ))
         .limit(1).get();
     if (!member) throw Errors.BadRequest(`Invalid or ineligible user ID: ${userId}`);

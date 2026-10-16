@@ -79,7 +79,7 @@ export function QboBooksHealth({
   return (
     <>
       {openErrors.length > 0 && (
-        <div id="health" className="scroll-mt-4 bg-ih-bg-card border border-ih-bad rounded-lg p-6">
+        <div id="health" className="scroll-mt-4 bg-ih-bg-card border border-ih-bad rounded-ih-card p-6">
           <h3 className="font-bold text-[14px] text-ih-fg-1 mb-2 flex items-center gap-2">
             <svg className="w-4 h-4 text-ih-bad-fg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
@@ -150,7 +150,7 @@ export function QboBooksHealth({
 
       {/* Surfaced, never auto-corrected. */}
       {discrepancies.length > 0 && (
-        <div className="bg-ih-bg-card border border-ih-watch-fg/40 rounded-lg p-6">
+        <div className="bg-ih-bg-card border border-ih-watch rounded-ih-card p-6">
           <h3 className="font-bold text-[14px] text-ih-fg-1 mb-2">
             {m.settings_qbo_discrepancy_heading({ count: discrepancies.length })}
           </h3>
@@ -172,7 +172,7 @@ export function QboBooksHealth({
       {/* What deliberately does not reach QuickBooks, said where they would look
           for it — silence here reads as "everything synced". */}
       {heldDepositCount > 0 && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-lg p-6">
+        <div className="bg-ih-bg-card border border-ih-border rounded-ih-card p-6">
           <h3 className="font-bold text-[14px] text-ih-fg-1 mb-2">
             {m.settings_qbo_not_synced_heading()}
           </h3>

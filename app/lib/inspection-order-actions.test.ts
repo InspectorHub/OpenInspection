@@ -10,6 +10,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { pickOrderFields } from "./inspection-order-actions";
+import { ORDER_FIELDS } from "../../server/lib/inspection/order-fields";
+import { UpdateInspectionSchema } from "../../server/lib/validations/inspection.schema";
 
 describe("pickOrderFields", () => {
   it("keeps every order fact the hub's cards edit", () => {
@@ -50,5 +52,14 @@ describe("pickOrderFields", () => {
 
   it("omits absent keys so a one-field modal PATCHes one field", () => {
     expect(pickOrderFields({ agreementRequired: true })).toEqual({ agreementRequired: true });
+  });
+});
+
+describe("pickOrderFields vs the server classification", () => {
+  it("writes only keys that are order fields on the server", () => {
+    const everything = Object.fromEntries(Object.keys(UpdateInspectionSchema.shape).map((k) => [k, 1]));
+    const clientKeys = Object.keys(pickOrderFields(everything));
+    expect(clientKeys.length).toBeGreaterThan(5);
+    expect(clientKeys.filter((k) => !(ORDER_FIELDS as readonly string[]).includes(k))).toEqual([]);
   });
 });

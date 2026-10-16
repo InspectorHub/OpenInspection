@@ -3,6 +3,12 @@ import { createApiResponseSchema } from '../shared.schema';
 import { ROLES, ROLE } from '../../auth/roles';
 import { TOGGLEABLE, type Capability } from '../../auth/capabilities';
 
+/** Every role a person can be invited as: the whole vocabulary, minus the per-inspection agent. */
+const INVITABLE_ROLES = ROLES.filter((r): r is Exclude<typeof r, 'agent'> => r !== ROLE.AGENT) as [
+    Exclude<(typeof ROLES)[number], 'agent'>,
+    ...Exclude<(typeof ROLES)[number], 'agent'>[],
+];
+
 /**
  * The sparse capability-toggle map, DERIVED from `TOGGLEABLE` — never hand-listed.
  *
@@ -38,7 +44,8 @@ function capabilityToggleMap() {
 export const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
     publish:           'May publish and unpublish reports.',
     scheduleOthers:    'May schedule inspections for other inspectors.',
-    financial:         'May see money on inspections, services and invoices.',
+    inspectionFees:    'May see and set the money on an individual inspection: its price, deposit, service lines and cancellation fee.',
+    companyFinance:    'May see and manage company-wide money: invoices and payments, service prices and pay rules, pay splits, earnings, Stripe, QuickBooks and the fee policies.',
     manageContacts:    'May create, edit and archive contacts and role profiles.',
     viewCommunication: 'May read the per-inspection Outbox, including recipient addresses.',
     templateCreate:    'May create new inspection templates.',
@@ -46,6 +53,7 @@ export const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
     templateDelete:    'May delete an inspection template, directly or as part of a migration.',
     templateImport:    'May bring a template in from a Spectora export or the content marketplace.',
     deleteInspection:  'May permanently delete an inspection, its report data and its media.',
+    editReports:       'May write report content: results, media, units, statutory and compliance inputs and cost items.',
 };
 
 /**
@@ -79,8 +87,8 @@ export const InviteMemberSchema = z.object({
     // Not `agent`: agents are granted access per inspection and are never team
     // members (TeamService.updateMember refuses the same role for the same
     // reason). Offering it here would be a second, contradictory way in.
-    role: z.enum([ROLE.OWNER, ROLE.MANAGER, ROLE.INSPECTOR])
-        .default('inspector').openapi({ example: 'inspector' }).describe('Role the new member gets: owner, manager or inspector (default inspector). Only an owner may invite an owner. Agents are never invited as team members'),
+    role: z.enum(INVITABLE_ROLES)
+        .default('inspector').openapi({ example: 'inspector' }).describe('Role the new member gets: owner, manager, inspector or staff (default inspector). Only an owner may invite an owner. Agents are never invited as team members'),
     // Role permission-template overrides (2026-06-13). Optional sparse map of
     // every toggleable capability. Only differing-from-template keys are sent;
     // TeamService stores the diff (or null when nothing differs) and it is
@@ -111,7 +119,7 @@ export const InviteMemberSchema = z.object({
  */
 export const UpdateMemberSchema = z.object({
     role: z.enum(ROLES).optional().openapi({ example: 'manager' }).describe('New role for this member. Omit to leave unchanged.'),
-    permissionOverrides: capabilityToggleMap().nullable().optional().openapi({ example: { financial: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
+    permissionOverrides: capabilityToggleMap().nullable().optional().openapi({ example: { companyFinance: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
 }).openapi('UpdateMember');
 
 /**

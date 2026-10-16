@@ -221,7 +221,7 @@ The 2026-08-13 rebuild retires nine columns. Databases got them from forward mig
 
 | Table | Column | Old definition | What breaks if it stays |
 |---|---|---|---|
-| `tenants` | `name` | `text NOT NULL` | `/setup` — creating the first workspace fails |
+| `tenants` | `name` | `text NOT NULL` | `/setup` — creating the first company fails |
 | `automations` | `subject_template` | `text NOT NULL` | automation seeding, on `GET /api/automations` and on every automation trigger |
 | `automations` | `body_template` | `text NOT NULL` | same |
 | `automations` | `sms_body` | `text` | nothing; dead storage |
@@ -231,7 +231,7 @@ The 2026-08-13 rebuild retires nine columns. Databases got them from forward mig
 | `inspections` | `helper_inspector_ids` | `text DEFAULT '[]' NOT NULL` | nothing; the default satisfies the constraint |
 | `inspections` | `data_version` | `integer DEFAULT 0 NOT NULL` | nothing; the default satisfies the constraint |
 
-**Run the two backfill statements before dropping `tenants.name`.** For any workspace whose company name was never set, `tenants.name` is the only name it has anywhere — dropping the column without this leaves it blank in the agent directory, in invite emails and on public profiles. Both statements are idempotent and match nothing on a second run; a workspace that has its own company name is untouched.
+**Run the two backfill statements before dropping `tenants.name`.** For any company whose company name was never set, `tenants.name` is the only name it has anywhere — dropping the column without this leaves it blank in the agent directory, in invite emails and on public profiles. Both statements are idempotent and match nothing on a second run; a company that has its own company name is untouched.
 
 ```sql
 UPDATE tenant_configs
@@ -316,11 +316,11 @@ An upgrade moves three things automatically. Starter content is the fourth thing
 | required secrets | yes — `jwt:ensure`, `setup-code:ensure` |
 | **starter content** | **no — use Settings → Data → Install what's new** |
 
-Starter content — inspection templates, the agreement template, canned comments, event types, tags, repair items, rating systems, contractor types, services — is seeded when a workspace is **created**, and `/setup` refuses to run again once a user exists. So a release that ships a new template does not deliver it to a workspace that already exists. After upgrading, an **owner** picks it up from **Settings → Data → Install what's new** (`POST /api/admin/data/install-bundled-content`). This works in both deployment modes.
+Starter content — inspection templates, the agreement template, canned comments, event types, tags, repair items, rating systems, contractor types, services — is seeded when a company is **created**, and `/setup` refuses to run again once a user exists. So a release that ships a new template does not deliver it to a company that already exists. After upgrading, an **owner** picks it up from **Settings → Data → Install what's new** (`POST /api/admin/data/install-bundled-content`). This works in both deployment modes.
 
 The action **adds; it never updates**. Items are matched by name, so:
 
-- content this release ships that your workspace does not have is inserted;
+- content this release ships that your company does not have is inserted;
 - anything already present is left exactly as it is — a revised bundled template does **not** overwrite your copy;
 - a bundled item you **renamed** no longer matches, so it comes back as a second copy under its original name.
 

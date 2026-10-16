@@ -3,7 +3,8 @@ import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
-import { requireCapability } from '../lib/middleware/require-capability';
+import { requireCapability, capabilitiesFor } from '../lib/middleware/require-capability';
+import { auditRefusedGrant, updateMemberAudited } from './team-grant-audit';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
 import { requireSeatAvailable } from '../features/seat-quota';
@@ -31,8 +32,8 @@ import teamTwoFactorRoutes from './team-two-factor';
  * for no gain. Payroll is staff administration; this is the
  * staff-administration surface.
  *
- * Gated on `financial` and not on a new `payroll` bit: the competitor evidence
- * put the line at "sees the company's money", and a second flag that nothing
+ * Gated on `companyFinance` and not on a new `payroll` bit: the line is
+ * "sees the company's money", and a second flag that nothing
  * else reads is a permission nobody would maintain.
  *
  * A NAMED const, not inlined into the chain — `check-idempotency-coverage.mjs`
@@ -47,12 +48,12 @@ const exportPayrollRoute = createRoute(withMcpMetadata({
     tags: ['team'],
     summary: 'Lock and export pay for a period',
     description: 'Locks every unlocked pay split created inside the given period and returns them as one payroll run. Locking IS the export: once money has moved an edit would desynchronise the books from what was actually paid, so a later adjustment has to be recorded as a correction row instead.',
-    middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
     request: { body: { content: { 'application/json': { schema: PayrollExportSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: PayrollRunResponseSchema } }, description: 'The pay rows this run locked' },
     },
-}, { scopes: ['admin'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['admin'], tier: 'extended', capability: 'companyFinance' }));
 
 /**
  * GET /api/team/members
@@ -122,7 +123,7 @@ const updateTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/members/{id}',
     tags: ["team"],
     summary: 'Update a team member\'s role or permissions',
-    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner.',
+    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner. Moving a staff member to a role that holds a seat is refused (402) when no seat is free under the seat limit.',
     middleware: [requireRole('manager', 'owner')],
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('The member\'s user id.') }),
@@ -152,20 +153,29 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('manager', 'owner')],
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('User id of the member to remove.') }),
+        query: z.object({
+            reassignTo: z.string().trim().min(1).optional().describe('User id of an active owner, manager or inspector who takes over the open inspections of the member being removed.'),
+            unassign: z.enum(['true', 'false']).optional().describe('Pass true to leave the open inspections of the member being removed unassigned instead of reassigning them.'),
+        }),
     },
     responses: {
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ removed: z.boolean() })),
+                    schema: createApiResponseSchema(z.object({
+                        removed: z.boolean(),
+                        reassigned: z.number().describe('Open inspections handed to the reassignTo member.'),
+                        unassigned: z.number().describe('Open inspections the member led that were left without a lead inspector (helper seats that were dropped are not counted).'),
+                    })),
                 },
             },
             description: 'Member removed',
         },
         403: { description: 'Caller is not an owner but the member is' },
+        409: { description: 'MEMBER_HAS_OPEN_INSPECTIONS: the member has open inspections and neither reassignTo nor unassign=true was given; details.openInspections is the count' },
     },
     operationId: "deleteTeamMember",
-    description: "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Returns 400 when you try to remove yourself or the last owner, 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
+    description: "Remove a member from the team. The user is soft-deleted rather than erased, so inspections attributed to them and their report history stay intact, and the same email can be invited again later. Their live sessions and any MCP access grants are revoked immediately, and a user.deleted event is queued for the sync outbox when one is configured. Inspections that are not finished (requested, scheduled or confirmed, report not yet published) need a decision: pass reassignTo with the id of an active owner, manager or inspector of the company, or unassign=true to leave them without an inspector; with neither, the answer is 409 MEMBER_HAS_OPEN_INSPECTIONS with details.openInspections, and nothing changes. Completed, cancelled and published inspections keep their original inspector and are never rewritten; no inspection is deleted. The reassignment and the removal are applied together or not at all, and a user.removed audit entry records the counts. Returns 400 when you try to remove yourself or the last owner, when reassignTo is not an active assignable member of this company, or when both options are given; 404 for an unknown or already removed member, and 403 when the target is an owner and the caller is not. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -256,12 +266,11 @@ const teamRoutes = createApiRouter()
         // inviting as owner is minting an owner. Same rule as update/remove.
         assertMayTouchOwner(c.get('userRole'), 'inspector', body.role);
 
-        const { token, expiresAt } = await teamService.createInvite({
-            tenantId,
-            email: body.email,
-            role:  body.role,
-            permissionOverrides: body.permissionOverrides ?? null,
-        });
+        // The inviter's own resolved capabilities are the ceiling for the invite.
+        const actor = { role: c.get('userRole'), capabilities: await capabilitiesFor(c) };
+        const { token, expiresAt } = await auditRefusedGrant(c, 'invite', body.role, () => teamService.createInvite({
+            tenantId, email: body.email, role: body.role, permissionOverrides: body.permissionOverrides ?? null, actor,
+        }));
 
         // Who added whom to this company, on the durable record. The
         // `user.invited` outbox event this handler also produces is a
@@ -301,19 +310,10 @@ const teamRoutes = createApiRouter()
         }, 201);
     })
     .openapi(updateTeamMemberRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const user = c.get('user');
         const { id: memberId } = c.req.valid('param');
         const body = c.req.valid('json');
 
-        await c.var.services.team.updateMember({
-            tenantId,
-            userId: memberId,
-            requesterId: user?.sub as string,
-            requesterRole: c.get('userRole'),
-            ...(body.role ? { role: body.role } : {}),
-            ...(body.permissionOverrides !== undefined ? { permissionOverrides: body.permissionOverrides } : {}),
-        });
+        await updateMemberAudited(c, memberId, body);
 
         return c.json({ success: true as const, data: { updated: true as const } }, 200);
     })
@@ -326,12 +326,17 @@ const teamRoutes = createApiRouter()
         const teamService = c.var.services.team;
         const authService = c.var.services.auth;
 
-        await teamService.removeMember(tenantId, memberId, requesterId, c.get('userRole'));
+        const { reassignTo, unassign } = c.req.valid('query');
+        const result = await teamService.removeMember(tenantId, memberId, requesterId, c.get('userRole'), { reassignTo, unassign: unassign === 'true' });
+        auditFromContext(c, 'user.removed', 'user', {
+            entityId: memberId,
+            metadata: { reassigned: result.reassigned, unassigned: result.unassigned, keptForRecord: result.keptForRecord, reassignedTo: reassignTo ?? null },
+        });
 
         // Invalidate the deleted user's sessions so their cookie becomes invalid immediately
         await authService.invalidateUserSessions(memberId);
 
-        return c.json({ success: true, data: { removed: true } }, 200);
+        return c.json({ success: true, data: { removed: true, reassigned: result.reassigned, unassigned: result.unassigned } }, 200);
     })
     .openapi(cancelInviteRoute, async (c) => {
         const tenantId = c.get('tenantId');

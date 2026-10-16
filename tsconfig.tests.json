@@ -114,17 +114,17 @@
         // `@core/shared-ui` would be lost by adding `@core/api-types` alone.
         //
         // ⚠️ WHAT IS DELIBERATELY *NOT* MIRRORED HERE. `vitest.api.config.ts`
-        // registers three more aliases — `cloudflare:workers`,
-        // `@cloudflare/workers-oauth-provider` and `agents/mcp` — each pointing
-        // at a hand-written stub in `tests/unit/stubs/`. Those stubs exist
+        // registers two more aliases — `cloudflare:workers` and
+        // `@cloudflare/workers-oauth-provider` — each pointing at a hand-written
+        // stub in `tests/unit/stubs/`. Those stubs exist
         // because Node's ESM loader REJECTS the real modules at import time;
         // they are runtime shims, not type shims. Mirroring them as `paths`
         // would redirect the `.types/**/*.d.ts` this program consumes — which
         // the api program already checked against the REAL types — onto a
         // 22-line stub whose `DurableObject` has no `ctx: DurableObjectState`.
         // The result is errors in generated declarations with no source to fix.
-        // Verified rather than assumed: zero files under `tests/` import any of
-        // the three; only the transitive `server/index.ts` graph does, and it
+        // Verified rather than assumed: zero files under `tests/` import either
+        // stub; only the transitive `server/index.ts` graph does, and it
         // arrives here pre-compiled. If a spec ever imports a stub directly,
         // that is the moment to add the alias — and to accept the fallout above.
         "paths": {

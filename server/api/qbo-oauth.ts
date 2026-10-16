@@ -39,7 +39,7 @@ const api = new Hono<HonoConfig>();
  * by the time this runs; `requireRole` also refuses a caller with no role,
  * which is what an agent (client/realtor) JWT is.
  */
-api.get('/connect', requireRole('owner', 'manager'), requireCapability('financial'), async (c) => {
+api.get('/connect', requireRole('owner', 'manager'), requireCapability('companyFinance'), async (c) => {
     if (!c.env.QBO_CLIENT_ID || !c.env.QBO_CLIENT_SECRET) {
         return c.redirect('/settings/integrations/qbo?error=not_configured', 302);
     }

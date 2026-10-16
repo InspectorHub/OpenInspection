@@ -6,7 +6,7 @@
 // ./results.ts to keep both files under the size ceiling.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import { requireRole } from '../../lib/middleware/rbac';
+import { requireRole, denyStaff } from '../../lib/middleware/rbac';
 import { guardPatchReschedule, guardInspectionDelete, deleteFacts } from './core-access';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
@@ -30,6 +30,7 @@ import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
 import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
 import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
+import { isFieldRole } from '../../lib/auth/roles';
 
 /**
  * GET /api/inspections/:id
@@ -72,13 +73,13 @@ const deleteInspectionRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["inspections"],
     summary: "Delete inspection for current tenant",
-    description: "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403. Everyone also needs the deleteInspection capability (on by default; a company can turn it off per person).",
+    description: "Permanently remove an inspection record. Owner and manager can delete any inspection; an inspector only one they lead, unless granted the scheduleOthers capability; helpers and other inspectors get 403. Everyone also needs the deleteInspection capability (on by default; a company can turn it off per person). Staff always get 403.",
     request: {
         params: z.object({
             id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
         }),
     },
-    middleware: [requireRole('owner', 'manager', 'inspector'), guardInspectionDelete],
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff, guardInspectionDelete],
     responses: {
         200: {
             content: {
@@ -100,7 +101,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
     path: '/{id}',
     tags: ["inspections"],
     summary: "Patch inspection for current tenant",
-    description: "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields.",
+    description: "Partially update an inspection record. Available to owner, manager and inspector roles; changing the assigned inspector requires the scheduleOthers capability (owner and manager have it by default), and so does changing the date of an inspection the caller is not on (lead or helper); an inspector on the inspection can change its date, and may edit other fields. Staff may change the order fields (date, assigned inspector, price, address, reference and referral fields, closing date, payment and agreement requirements, and a status of requested, scheduled or confirmed). They may switch the payment and agreement requirements on but not off, may not change the status of a completed inspection, and may change the property details only before the inspection starts. A body changing any report setting or other inspection field gets 403, and so do changes to the inspector, address or date after the inspection has started. Staff writes need scheduleOthers or being on the inspection.",
     request: {
         params: z.object({
             id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection id.'),
@@ -151,7 +152,7 @@ const cloneInspectionRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "cloneInspection",
-    description: "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status draft and payment status unpaid; every other column of the source record is carried over as stored, and the source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager and inspector roles."
+    description: "Creates a new inspection as a copy of an existing one. The copy gets a new id, today's date and time, status requested, payment status unpaid and an in-progress report. The booking and property details, price and requirements are carried over; report state, signature settings, cover photo, cancellation and unlock records, and re-inspection links are not. The source's client and agent links and its lead and helper assignments are copied onto it. Findings, photos and reports are not copied by this route. Counts as one new inspection against the company's plan quota, and a quota-threshold notice may be sent when the limit is approached. Records an inspection.create audit entry noting the source id. Not idempotent: each call makes another copy. Responds 404 if the source is missing. Available to owner, manager, inspector and staff roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
@@ -166,7 +167,7 @@ const createFromWizardRoute = createRoute(withMcpMetadata({
     path:       '/wizard',
     tags: ["inspections"],
     summary:    'Create an inspection from the 4-step NewInspectionWizard',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff] as const,
     request: {
         body: { content: { 'application/json': { schema: CreateInspectionFromWizardSchema.describe('The wizard answers: property facts, requested services, schedule and team assignment.') } } },
     },
@@ -181,7 +182,7 @@ const createFromWizardRoute = createRoute(withMcpMetadata({
         400: { description: 'Validation error' },
     },
     operationId: "createInspectionWizard",
-    description: "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector and the scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles."
+    description: "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector, unless their role cannot inspect (staff), in which case the inspection starts unassigned unless team mode names a lead; a named lead or helper must be a member who can inspect (400 otherwise). The scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles; staff get 403."
 }, { scopes: ['write'], tier: 'extended' }));
 
 
@@ -194,7 +195,7 @@ const coreRoutes = createApiRouter()
             success: true,
             // Only the inspection row is projected: `template` is customer-authored
             // schema JSON and may legitimately contain a field called `price`.
-            data: { ...result, inspection: await moneyView(c, result.inspection) },
+            data: { ...result, inspection: await moneyView(c, result.inspection, 'inspectionFees') },
         }, 200);
     })
     .openapi(deleteInspectionRoute, async (c) => {
@@ -224,7 +225,7 @@ const coreRoutes = createApiRouter()
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
-        // Money fields need `financial`, but only a CHANGE is refused: the settings
+        // Money fields need `inspectionFees`, but only a CHANGE is refused: the settings
         // form forwards its whole form, price included. Before anything else runs.
         await guardMoneyWrite(c, body, inspection as Record<string, unknown>);
 
@@ -303,7 +304,7 @@ const coreRoutes = createApiRouter()
         // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).
         if (body.id) {
             const existing = await service.findInspectionById(tenantId, body.id);
-            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, existing, body)) } }, 200);
+            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, existing, body), 'inspectionFees') } }, 200);
         }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
@@ -325,13 +326,13 @@ const coreRoutes = createApiRouter()
         });
         // A concurrent request with the same client id won the insert: this one is a
         // replay, so it answers like one and repeats none of the side effects below.
-        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, inspection, body)) } }, 200);
+        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, inspection, body), 'inspectionFees') } }, 200);
 
         fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({
             success: true,
-            data: { inspection: await moneyView(c, inspection) },
+            data: { inspection: await moneyView(c, inspection, 'inspectionFees') },
         }, 201);
     })
     .openapi(cloneInspectionRoute, async (c) => {
@@ -345,7 +346,7 @@ const coreRoutes = createApiRouter()
             metadata: { clonedFrom: id, propertyAddress: clone.propertyAddress },
         });
         fireQuotaThresholdNotice(c, tenantId);
-        return c.json({ success: true, data: { inspection: await moneyView(c, clone) } }, 201);
+        return c.json({ success: true, data: { inspection: await moneyView(c, clone, 'inspectionFees') } }, 201);
     })
     .openapi(createFromWizardRoute, async (c) => {
         const input    = c.req.valid('json');
@@ -354,7 +355,8 @@ const coreRoutes = createApiRouter()
         const userId   = user?.sub;
         if (!userId) throw Errors.Unauthorized('Missing user identity');
 
-        const out = await c.var.services.inspection.createFromWizard(tenantId, userId, input);
+        // An office user cannot be the inspector, so their job starts unassigned.
+        const out = await c.var.services.inspection.createFromWizard(tenantId, isFieldRole(c.get('userRole')) ? userId : null, input);
         fireQuotaThresholdNotice(c, tenantId);
         return c.json({ success: true as const, data: out }, 200);
     })

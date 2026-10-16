@@ -161,15 +161,6 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv {
     // Managed-pool send path: API Key SID + API Key Secret (ISV account, not per-tenant).
     TWILIO_API_KEY_SID?: string;
     TWILIO_API_KEY_SECRET?: string;
-    /** Shared Messaging Service SID used by all managed_shared tenants. */
-    TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
-    /**
-     * Turns on the hosted shared SMS number ('true' or '1'). Absent or any other
-     * value means off: the shared number is held back until the SMS providers
-     * have confirmed it is acceptable, and a company then sends on its own
-     * account only. Ignored on a self-hosted deployment, which has no such number.
-     */
-    SMS_MANAGED_SHARED_ENABLED?: string;
     /**
      * Dedicated HMAC secret for Twilio compliance-status webhooks (brand/campaign/TFV
      * callbacks). When set, this takes precedence over TWILIO_AUTH_TOKEN for verifying

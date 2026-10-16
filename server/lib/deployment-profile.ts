@@ -36,7 +36,7 @@
  * `env.APP_MODE === 'saas'` instead of reading a capability (OI #308 §4-§5).
  */
 export interface ProfileEnv {
-    APP_MODE?: string;
+    APP_MODE?: string | undefined;
     PORTAL_API_URL?: string;
     SINGLE_TENANT_ID?: string;
     /**
@@ -90,8 +90,8 @@ export interface DeploymentProfile {
      *  form exists at all and the saas one refuses to save. */
     videoBackendManaged: boolean;
 
-    /** Whether a platform-operated compliance path (managed SMS provisioning —
-     *  10DLC brand/campaign) exists for tenants. False in standalone: there is
+    /** Whether carrier registration for a dedicated SMS number (10DLC
+     *  brand/campaign, toll-free verification) can be filed for tenants. False in standalone: there is
      *  no platform to file on the operator's behalf, so the path is ABSENT
      *  rather than disabled. Distinct from hasManagedAi — different provider,
      *  different entitlement. */
@@ -135,6 +135,15 @@ export interface DeploymentProfile {
      *  source is the operator's own account. Read this instead of borrowing a
      *  quota capability to mean the same thing. */
     providesEmailSource: boolean;
+
+    /** Whether a key set in the deployment's environment counts as the company's
+     *  OWN key for a service the company would otherwise bring itself (address
+     *  lookup, property records, calendar sync, card payments). True in standalone:
+     *  the operator runs one company and their environment variables are that
+     *  company's credentials. False in saas: an environment key belongs to the
+     *  deployment and is offered to companies as Built-in, never read as theirs.
+     *  Read this instead of comparing the mode to a literal. */
+    envCredentialsAreCompanyOwn: boolean;
 
     /** Whether the anonymous-submission surfaces (public booking, agent signup)
      *  MUST carry a bot challenge.
@@ -214,6 +223,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     hasManagedCompliance: false,
     qboAppManaged: false,
     providesEmailSource: false,
+    envCredentialsAreCompanyOwn: true,
     botProtectionMandatory: false,
     tenantRecordOwnedByPortal: false,
     hasPortalIntegrationApi: false,
@@ -236,6 +246,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     hasManagedCompliance: true,
     qboAppManaged: true,
     providesEmailSource: true,
+    envCredentialsAreCompanyOwn: false,
     botProtectionMandatory: true,
     tenantRecordOwnedByPortal: true,
     hasPortalIntegrationApi: true,

@@ -8,16 +8,17 @@
  * to "what ran", and two records of one call eventually disagree.
  *
  * WHERE THE FACTS COME FROM, AND WHY THEY ARE SPLIT THE WAY THEY ARE.
- *   - tenant / mode / model are REQUEST-scoped and arrive here already
+ *   - tenant / mode are REQUEST-scoped and arrive here already
  *     resolved, from the same single credential read in `di.ts` that tags the
  *     meter and answers the capability gate. Re-resolving them here would
  *     create a third opinion about whose key a call runs on, and the whole
  *     point of the injected picture is that there is only one.
- *   - capability / promptVersion / provider are CALL-scoped and come from the
+ *   - capability / promptVersion / provider / model are CALL-scoped and come from the
  *     chokepoint: the workload it is running, the version token of the prompt
- *     it rendered, and the id of the adapter instance it is about to call. The
- *     provider id is read off the adapter rather than off configuration so the
- *     row names the backend that actually ran.
+ *     it rendered, and the id and model of the adapter instance it is about to call.
+ *     Both are read off the adapter rather than off configuration so the row
+ *     names the backend and model that actually ran — a company's own model
+ *     wins over the deployment's, and only the adapter knows which one it got.
  *
  * WHAT IS NOT HERE: the prompt. Not truncated, not hashed, not "just the first
  * line". See the schema comment on `ai_call_provenance` — the entry type below
@@ -57,6 +58,10 @@ interface AiProvenanceEntry {
      * reason to be skippable.
      */
     endpoint: string;
+    /** `AiProvider.model` of the adapter that is about to be called. Read off
+     *  the instance like `provider` and `endpoint`: the row names the model that
+     *  was sent, which on a company's own configuration is not the deployment's. */
+    model: string;
 }
 
 export interface AiProvenanceSink {
@@ -92,10 +97,8 @@ export function buildAiProvenanceSink(args: {
     tenantId: string | null;
     /** Resolved credential source — the meter's tag and the gate's source. */
     source: AiCredentialSource;
-    /** Model id in force for this deployment (`AI_MODEL`). */
-    model: string;
 }): AiProvenanceSink | undefined {
-    const { db, tenantId, source, model } = args;
+    const { db, tenantId, source } = args;
     if (!tenantId) return undefined;
 
     return {
@@ -107,7 +110,7 @@ export function buildAiProvenanceSink(args: {
                 capability: entry.capability,
                 provider: entry.provider,
                 mode: source,
-                model,
+                model: entry.model,
                 promptVersion: entry.promptVersion,
                 endpoint: entry.endpoint,
                 createdAt: new Date(),

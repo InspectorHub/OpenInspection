@@ -11,7 +11,7 @@ export interface ServiceLine {
     id: string;
     serviceId: string;
     name: string;
-    // IA-95 — all three are absent when the caller lacks the `financial`
+    // IA-95 — all three are absent when the caller lacks the `inspectionFees`
     // capability. The LINE itself (what was sold) is still legitimately theirs
     // to see; only the figures are withheld.
     priceCents?: number;
@@ -39,7 +39,7 @@ export interface CatalogService {
  * Money verbs are owner/manager, matching what the API enforces: a card must
  * never offer an action the server refuses.
  *
- * IA-95 — a caller without the `financial` capability (an inspector's default)
+ * IA-95 — a caller without the `inspectionFees` capability
  * gets the LINES but not the figures: what was sold is theirs to see, what it
  * cost is not. The figures are redacted server-side, so this component reads
  * their absence rather than re-deriving the permission.

@@ -190,7 +190,7 @@ export class InspectionService {
      */
     async createFromWizard(
         tenantId: string,
-        creatorUserId: string,
+        creatorUserId: string | null,
         input: import('../lib/validations/wizard.schema').CreateInspectionFromWizardInput,
     ): Promise<{ id: string }> {
         return this.core.createFromWizard(tenantId, creatorUserId, input);
@@ -623,16 +623,7 @@ export class InspectionService {
      * `reportId` defaults to the order's primary report. No notify flags — see
      * `InspectionPublishService.publishInspection` (F79).
      */
-    async publishInspection(inspectionId: string, tenantId: string, _options: {
-        theme: string;
-        requireSignature: boolean;
-        requirePayment: boolean;
-        // Round-2 F1 — optional per-recipient delivery list. Older callers
-        // (legacy publish modal, AI agent flows) keep working without it.
-        recipients?: Array<{ contactId: string | null; channels: Array<'email' | 'text'> }>;
-        sendAgreementCopy?: boolean;
-        reportId?: string;
-    }) {
+    async publishInspection(inspectionId: string, tenantId: string, _options: Parameters<InspectionPublishService['publishInspection']>[2]) {
         return this.publish.publishInspection(inspectionId, tenantId, _options);
     }
 
@@ -640,11 +631,11 @@ export class InspectionService {
         return this.status.confirmInspection(tenantId, id);
     }
 
-    async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): Promise<void> {
+    async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): ReturnType<InspectionStatusService['cancelInspection']> {
         return this.status.cancelInspection(tenantId, id, reason, notes);
     }
 
-    async uncancelInspection(tenantId: string, id: string): Promise<void> {
+    async uncancelInspection(tenantId: string, id: string): ReturnType<InspectionStatusService['uncancelInspection']> {
         return this.status.uncancelInspection(tenantId, id);
     }
 

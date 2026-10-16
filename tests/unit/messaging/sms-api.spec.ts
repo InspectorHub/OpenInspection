@@ -215,15 +215,29 @@ describe('SMS consent API (Track L Task 8)', () => {
         expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, contactId)).toBe('revoked');
     });
 
-    it('platform inbound STOP → revoked across platform-mode tenants matching From', async () => {
-        await seedTenant(db, OTHER_TENANT, 'beta');
-        // beta is in 'own' SMS mode → must NOT be revoked by a platform-number STOP.
-        await db.insert(schema.tenantConfigs).values({ tenantId: OTHER_TENANT, smsMode: 'own', updatedAt: new Date() } as never);
+    it('the shared (company-less) inbound route no longer exists', async () => {
+        const cAcme = crypto.randomUUID();
+        await db.insert(schema.contacts).values({
+            id: cAcme, tenantId: TENANT, type: 'client', name: 'Jane', phone: '+15551234567', createdAt: new Date(),
+        } as never);
+        const svc = new SmsConsentService({} as D1Database);
+        await svc.record(TENANT, cAcme, 'granted', 'admin', {});
 
+        const params = { From: '+15551234567', Body: 'STOP' };
+        const sig = await signParams(PLATFORM_TOKEN, `${APP_BASE_URL}/webhooks/sms/inbound`, params);
+        const res = await buildApp(db).request('/webhooks/sms/inbound',
+            { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig } },
+            FAKE_ENV, makeExecCtx());
+        expect(res.status).toBe(404);
+        expect(await svc.getLatest(TENANT, cAcme)).toBe('granted');
+    });
+
+    it("STOP on company A's own number revokes A only, never company B holding the same phone", async () => {
+        await seedTenant(db, OTHER_TENANT, 'beta');
         const cAcme = crypto.randomUUID();
         const cBeta = crypto.randomUUID();
         await db.insert(schema.contacts).values([
-            { id: cAcme, tenantId: TENANT, type: 'client', name: 'Jane', phone: '(555) 123-4567', createdAt: new Date() },
+            { id: cAcme, tenantId: TENANT, type: 'client', name: 'Jane', phone: '+15551234567', createdAt: new Date() },
             { id: cBeta, tenantId: OTHER_TENANT, type: 'client', name: 'Jane', phone: '+15551234567', createdAt: new Date() },
         ] as never);
         const svc = new SmsConsentService({} as D1Database);
@@ -231,16 +245,35 @@ describe('SMS consent API (Track L Task 8)', () => {
         await svc.record(OTHER_TENANT, cBeta, 'granted', 'admin', {});
 
         const params = { From: '+15551234567', Body: 'STOP' };
-        const url = `${APP_BASE_URL}/webhooks/sms/inbound`;
-        const sig = await signParams(PLATFORM_TOKEN, url, params);
-
-        const app = buildApp(db);
-        const res = await app.request('/webhooks/sms/inbound',
+        const sig = await signParams(PLATFORM_TOKEN, `${APP_BASE_URL}/webhooks/sms/inbound/acme`, params);
+        const res = await buildApp(db).request('/webhooks/sms/inbound/acme',
             { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig } },
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(200);
-        expect(await svc.getLatest(TENANT, cAcme)).toBe('revoked');   // platform-mode → revoked
-        expect(await svc.getLatest(OTHER_TENANT, cBeta)).toBe('granted'); // own-mode → untouched
+        expect(await svc.getLatest(TENANT, cAcme)).toBe('revoked');
+        expect(await svc.getLatest(OTHER_TENANT, cBeta)).toBe('granted');
+    });
+
+    it("START on company A's own number restores A only, never company B holding the same phone", async () => {
+        await seedTenant(db, OTHER_TENANT, 'beta');
+        const cAcme = crypto.randomUUID();
+        const cBeta = crypto.randomUUID();
+        await db.insert(schema.contacts).values([
+            { id: cAcme, tenantId: TENANT, type: 'client', name: 'Jane', phone: '+15551234567', createdAt: new Date() },
+            { id: cBeta, tenantId: OTHER_TENANT, type: 'client', name: 'Jane', phone: '+15551234567', createdAt: new Date() },
+        ] as never);
+        const svc = new SmsConsentService({} as D1Database);
+        await svc.record(TENANT, cAcme, 'revoked', 'admin', {});
+        await svc.record(OTHER_TENANT, cBeta, 'revoked', 'admin', {});
+
+        const params = { From: '+15551234567', Body: 'START' };
+        const sig = await signParams(PLATFORM_TOKEN, `${APP_BASE_URL}/webhooks/sms/inbound/acme`, params);
+        const res = await buildApp(db).request('/webhooks/sms/inbound/acme',
+            { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig } },
+            FAKE_ENV, makeExecCtx());
+        expect(res.status).toBe(200);
+        expect(await svc.getLatest(TENANT, cAcme)).toBe('granted');
+        expect(await svc.getLatest(OTHER_TENANT, cBeta)).toBe('revoked');
     });
 
     it('inbound with a bad signature → 403, no write', async () => {
@@ -252,7 +285,7 @@ describe('SMS consent API (Track L Task 8)', () => {
 
         const params = { From: '+15551234567', Body: 'STOP' };
         const app = buildApp(db);
-        const res = await app.request('/webhooks/sms/inbound',
+        const res = await app.request('/webhooks/sms/inbound/acme',
             { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': 'wrong' } },
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(403);
@@ -325,17 +358,17 @@ describe('SMS consent API (Track L Task 8)', () => {
         await new SmsConsentService({} as D1Database).record(TENANT, contactId, 'granted', 'admin', {});
 
         const params = { From: '+15551234567', Body: 'HELP' };
-        const url = `${APP_BASE_URL}/webhooks/sms/inbound`;
+        const url = `${APP_BASE_URL}/webhooks/sms/inbound/acme`;
         const sig = await signParams(PLATFORM_TOKEN, url, params);
 
         const app = buildApp(db);
-        const res = await app.request('/webhooks/sms/inbound',
+        const res = await app.request('/webhooks/sms/inbound/acme',
             { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig } },
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(200);
         const xml = await res.text();
         expect(xml).toContain('<Message>');
-        expect(xml).toContain('Inspector Hub'); // APP_NAME unset → platform brand fallback
+        expect(xml).toContain('acme'); // no company name set -> the company's slug, never another company's
         expect(xml).toContain('STOP');
         // HELP is informational only — consent state is untouched.
         expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, contactId)).toBe('granted');
@@ -547,7 +580,7 @@ describe('PATCH /api/admin/tenant-config — smsMode tenant selector (Task 6)', 
         expect(updateBranding).not.toHaveBeenCalled();
     });
 
-    it('SaaS: PATCH smsMode=managed_shared → 200', async () => {
+    it('SaaS: PATCH smsMode=managed_shared → 400 (the shared sender is retired)', async () => {
         const updateBranding = vi.fn().mockResolvedValue(undefined);
         const getBranding = vi.fn().mockResolvedValue({});
         const app = buildTenantConfigApp(SAAS_PROFILE, updateBranding, getBranding);
@@ -558,8 +591,8 @@ describe('PATCH /api/admin/tenant-config — smsMode tenant selector (Task 6)', 
             body: JSON.stringify({ smsMode: 'managed_shared' }),
         }, FAKE_ENV, makeExecCtx());
 
-        expect(res.status).toBe(200);
-        expect(updateBranding).toHaveBeenCalledWith(TENANT, expect.objectContaining({ smsMode: 'managed_shared' }));
+        expect(res.status).toBe(400);
+        expect(updateBranding).not.toHaveBeenCalled();
     });
 
     it('SaaS: PATCH smsMode=own → 200', async () => {
@@ -577,7 +610,7 @@ describe('PATCH /api/admin/tenant-config — smsMode tenant selector (Task 6)', 
         expect(updateBranding).toHaveBeenCalledWith(TENANT, expect.objectContaining({ smsMode: 'own' }));
     });
 
-    it('Standalone: PATCH smsMode=managed_shared → coerces to own and returns 200', async () => {
+    it('Standalone: PATCH smsMode=managed_shared → 400 (the shared sender is retired everywhere)', async () => {
         const updateBranding = vi.fn().mockResolvedValue(undefined);
         const getBranding = vi.fn().mockResolvedValue({});
         const app = buildTenantConfigApp(STANDALONE_PROFILE, updateBranding, getBranding);
@@ -588,9 +621,9 @@ describe('PATCH /api/admin/tenant-config — smsMode tenant selector (Task 6)', 
             body: JSON.stringify({ smsMode: 'managed_shared' }),
         }, FAKE_ENV, makeExecCtx());
 
-        // Standalone coerces any smsMode to 'own'
-        expect(res.status).toBe(200);
-        expect(updateBranding).toHaveBeenCalledWith(TENANT, expect.objectContaining({ smsMode: 'own' }));
+        // The request schema no longer lists the shared sender, on any deployment.
+        expect(res.status).toBe(400);
+        expect(updateBranding).not.toHaveBeenCalled();
     });
 
     it('SaaS: PATCH smsMode=managed_dedicated → 200 (selectable placeholder)', async () => {
@@ -1429,16 +1462,10 @@ describe('managedSendAllowed — compliance gate unit tests (Task 8)', () => {
         expect(result.allowed).toBe(false);
     });
 
-    it('managed_shared: TWILIO_SHARED_MESSAGING_SERVICE_SID set → allowed', async () => {
+    it('managed_shared (retired) → refused as not configured, even with the old pool env present', async () => {
         const env = { TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MG_shared_test' };
-        const result = await managedSendAllowed(asD1Db(db), env, TENANT, 'managed_shared');
-        expect(result.allowed).toBe(true);
-    });
-
-    it('managed_shared: TWILIO_SHARED_MESSAGING_SERVICE_SID absent → blocked', async () => {
-        const result = await managedSendAllowed(asD1Db(db), {}, TENANT, 'managed_shared');
-        expect(result.allowed).toBe(false);
-        expect(result.reason).toBe('managed_not_approved');
+        const result = await managedSendAllowed(asD1Db(db), env as never, TENANT, 'managed_shared');
+        expect(result).toEqual({ allowed: false, reason: 'sms not configured' });
     });
 
     it('own → always allowed (no DB read needed)', async () => {
@@ -1525,29 +1552,10 @@ describe('POST /sms/test — managed-send compliance gate (Task 8)', () => {
         expect(body.error).not.toBe('managed_not_approved');
     });
 
-    it('managed_shared without TWILIO_SHARED_MESSAGING_SERVICE_SID → blocked, no send', async () => {
+    it('managed_shared (retired) → refused as not configured, no send, even with the old pool env present', async () => {
         await seedManagedConfig('managed_shared');
 
         const fetchSpy = vi.spyOn(globalThis, 'fetch');
-        const app = buildSmsApp(db, SAAS_PROFILE);
-        // managedEnvWithKeys has no TWILIO_SHARED_MESSAGING_SERVICE_SID.
-        const res = await app.request('/api/admin/sms/test', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ to: '+15559991234' }),
-        }, managedEnvWithKeys(), makeExecCtx());
-
-        fetchSpy.mockRestore();
-
-        const body = await res.json() as { success: boolean; error?: string };
-        expect(body.success).toBe(false);
-        expect(body.error).toBe('managed_not_approved');
-        expect(fetchSpy).not.toHaveBeenCalled();
-    });
-
-    it('managed_shared with TWILIO_SHARED_MESSAGING_SERVICE_SID set → gate passes (does not return managed_not_approved)', async () => {
-        await seedManagedConfig('managed_shared');
-
         const app = buildSmsApp(db, SAAS_PROFILE);
         const res = await app.request('/api/admin/sms/test', {
             method: 'POST',
@@ -1555,10 +1563,13 @@ describe('POST /sms/test — managed-send compliance gate (Task 8)', () => {
             body: JSON.stringify({ to: '+15559991234' }),
         }, managedEnvWithKeys({ TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MG_shared_test' }), makeExecCtx());
 
+        const calls = fetchSpy.mock.calls.length;
+        fetchSpy.mockRestore();
+
         const body = await res.json() as { success: boolean; error?: string };
-        // Gate passed — response must NOT be managed_not_approved.
-        // (The send may fail for other reasons like unconfigured provider in test env.)
-        expect(body.error).not.toBe('managed_not_approved');
+        expect(body.success).toBe(false);
+        expect(body.error).toBe('sms not configured');
+        expect(calls).toBe(0);
     });
 
     it('own-mode tenant → gate does not block (success=false only for missing creds, never managed_not_approved)', async () => {

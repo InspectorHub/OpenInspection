@@ -79,7 +79,12 @@ export interface SmsGateArgs {
     contactId?: string | null;
     /** Consent basis for the recipient. Only consulted when `purpose` is `notification`. */
     roleKind?: RoleKind;
-    env?: ManagedSendGateEnv | undefined;
+    /**
+     * REQUIRED. An absent env reads as a standalone deployment, which would let a
+     * hosted company on a retired sender mode through. Pass the worker env (a test
+     * of a self-hosted path passes `{}` on purpose).
+     */
+    env: ManagedSendGateEnv;
     /**
      * WHAT is being sent — a `NOTIFICATION_CLASSES` id.
      *
@@ -361,7 +366,7 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
         if (muted) return { allowed: false, reason: 'recipient switched this off' };
     }
 
-    const gate = await managedSendAllowed(db, env ?? {}, tenantId, smsMode);
+    const gate = await managedSendAllowed(db, env, tenantId, smsMode);
     if (!gate.allowed) {
         logger.info('[sms-gate] blocked by managed compliance gate', { tenantId, reason: gate.reason });
         return { allowed: false, reason: gate.reason ?? 'managed_not_approved' };
@@ -371,13 +376,14 @@ export async function smsSendGate(args: SmsGateArgs): Promise<SmsGateOutcome> {
     // returning — every caller already surfaces that as an error response, and
     // a quota block is not the same kind of answer as "this recipient opted
     // out".
-    if (quota && smsMode !== 'own') {
+    const effectiveMode = gate.resolvedMode ?? smsMode;
+    if (quota && effectiveMode !== 'own') {
         await quota.guard.checkMessagingQuota(tenantId, quota.tier, 'sms');
     }
 
     return {
         allowed: true,
-        smsMode,
+        smsMode: effectiveMode,
         companyPhone: cfg?.companyPhone ?? null,
         reviewUrl: cfg?.reviewUrl ?? null,
         companyName: cfg?.companyName ?? null,

@@ -19,7 +19,7 @@ describe('report-section-numbering', () => {
         it('denies edit to client / agent / unknown roles', () => {
             expect(canEditSection('agent')).toBe(false);
             expect(canEditSection('client')).toBe(false);
-            expect(canEditSection('viewer')).toBe(false);
+            expect(canEditSection('staff')).toBe(false);
         });
         it('denies edit when role is null / undefined / empty', () => {
             expect(canEditSection(null)).toBe(false);

@@ -1,5 +1,8 @@
 import type { migrationRows } from '../../lib/db/schema';
 import { TeamService } from '../team.service';
+import { isCeilingRefusal, type GrantActor } from '../../lib/auth/grant-ceiling';
+import { writeAuditRow } from '../../lib/audit';
+import { logger } from '../../lib/logger';
 import { asBundleMemberRole, type BundleMember } from '../../lib/migration-intake/bundle';
 
 type StagedRowRecord = typeof migrationRows.$inferSelect;
@@ -33,7 +36,7 @@ export interface InviteDispatch {
  */
 export async function applyMemberRow(
     db: D1Database,
-    params: { tenantId: string },
+    params: { tenantId: string; actor?: GrantActor | undefined },
     row: StagedRowRecord,
     invites: InviteDispatch[],
 ): Promise<
@@ -63,13 +66,27 @@ export async function applyMemberRow(
     const role = asBundleMemberRole(payload.role);
     if (!role) throw new Error(`"${payload.role}" is not a role an import may grant.`);
 
+    // An import is an invitation written on somebody's behalf, so it carries the
+    // same ceiling as the Team page: the file cannot grant what the person
+    // pressing apply could not. No actor, no grant (fails the row, not the run).
+    if (!params.actor) throw new Error('A member import needs to know who is applying it.');
+
     const team = new TeamService(db);
-    const invite = await team.createInvite({
-        tenantId: params.tenantId,
-        email: payload.email,
-        role,
-        permissionOverrides: payload.permissionOverrides ?? null,
-    });
+    let invite: Awaited<ReturnType<TeamService['createInvite']>>;
+    try {
+        invite = await team.createInvite({
+            tenantId: params.tenantId,
+            email: payload.email,
+            role,
+            permissionOverrides: payload.permissionOverrides ?? null,
+            actor: params.actor,
+        });
+    } catch (err) {
+        // A refused grant leaves no other trace (nothing was written), and an
+        // import is exactly where one is likely: record it like the Team page does.
+        if (isCeilingRefusal(err)) await recordRefusal(db, params.tenantId, params.actor.userId, role, err.code);
+        throw err;
+    }
     invites.push({
         rowId: row.id,
         email: payload.email,
@@ -79,4 +96,20 @@ export async function applyMemberRow(
     // The token is what an undo cancels, and it is the only handle this row ever
     // holds: no account exists until somebody accepts.
     return { kind: 'applied', createdId: invite.token, priorState: null };
+}
+
+/** The durable record of a refused grant. Never fails the row it describes. */
+async function recordRefusal(db: D1Database, tenantId: string, userId: string | undefined, role: string, reason: string): Promise<void> {
+    try {
+        await writeAuditRow({
+            db,
+            tenantId,
+            userId,
+            action: 'user.grant_refused',
+            entityType: 'user',
+            metadata: { reason, role, during: 'import' },
+        });
+    } catch (e) {
+        logger.error('[audit] could not record a refused grant during an import', { tenantId }, e instanceof Error ? e : undefined);
+    }
 }

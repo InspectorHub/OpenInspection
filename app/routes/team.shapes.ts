@@ -43,6 +43,7 @@ export const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warnin
   owner: "primary",
   manager: "info",
   inspector: "neutral",
+  staff: "gen",
   lead: "info",
   specialist: "sat",
   agent: "warning",

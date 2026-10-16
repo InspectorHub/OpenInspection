@@ -85,6 +85,21 @@ dynamic registration, an `https` redirect would let anyone register a client who
 code is delivered to a web origin they control, so allowing it would need an
 operator-maintained allowlist. Android uses a private scheme instead.
 
+**How the rule is enforced.** The OAuth provider (1.x) only accepts a private-use
+scheme when the deployment-wide option `allowPrivateUseRedirectUris` is on, and it
+is on, because native clients need it. The option applies to every client, so the
+per-client rule above is our own check, `isRedirectAllowedForScope`, run by both
+the authorize page and the consent action: a private-use scheme is accepted for a
+native authorization, and for other (MCP) clients only for a short list of editor
+schemes. Anything else outside https and loopback is refused.
+
+### Refresh lifetime
+
+A native refresh token is issued with a finite lifetime (400 days) and a 90-day idle
+window that every refresh re-arms. The provider enforces the window by expiring the
+grant; a refresh after it answers `400 invalid_grant`, and the grant record is then
+dropped by the store's own expiry rather than revoked at that moment.
+
 ### Grants are not bound to a device
 
 A grant belongs to a member and a client id, not to a device. Authorizing again

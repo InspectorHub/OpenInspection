@@ -4,12 +4,18 @@
  * state flips only after a render. Two submits dispatched in one frame must reach
  * the route action once, and a later submit after the action settles must go through.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, cleanup, act, waitFor, screen } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 import InspectionHubPage from "./inspector-portal";
 
 afterEach(cleanup);
+
+// Submitting a report for review needs report-editing access; this suite renders without a session, so grant that one capability.
+vi.mock("~/hooks/useSessionContext", async (importActual) => ({
+    ...(await importActual<Record<string, unknown>>()),
+    useCapability: (capability: string) => capability === "editReports",
+}));
 
 let intents: string[] = [];
 let release: () => void = () => {};
@@ -37,7 +43,7 @@ function loaderData(reportStatus: string, canPublishCap: boolean) {
             reports: [],
             publishReadiness: { ready: true, blockingCount: 0, blockers: [] },
         },
-        smsConsent: null, reinspectCandidates: [], canPublishCap, canViewCommunication: false, documents: [],
+        smsConsent: null, reinspectCandidates: [], canPublishCap, scheduleOthers: true, userId: "u1", canViewCommunication: false, documents: [],
         people: [], roleProfiles: [], isAdmin: false, versions: [], members: [], serviceCatalog: [],
         referralSources: [], visits: [], visitTypes: [], suggestedTypeIds: [], role: "owner", statutoryForm: { available: false },
     };

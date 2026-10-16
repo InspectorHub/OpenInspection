@@ -13,10 +13,12 @@ const USER_ID = '00000000-0000-0000-0000-000000000300';
 const INSP_ID = '00000000-0000-0000-0000-000000000010';
 const SAVED_SIG = 'data:image/png;base64,SAVEDSIG';
 
+// The publisher is the assigned inspector: auto-sign stamps only for the inspector or an owner or manager.
 const PUBLISH_OPTS = {
     theme: 'default',
     requireSignature: false,
     requirePayment: false,
+    actor: { userId: USER_ID, role: 'inspector' },
 };
 
 describe('InspectionService.publishInspection auto-sign behavior', () => {

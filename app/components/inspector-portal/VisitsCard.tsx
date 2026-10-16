@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, Button, Pill, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
-import { isAdminRole } from "~/lib/access";
+import { isAdminRole, isStaffRole } from "~/lib/access";
 import { AddVisitModal } from "./AddVisitModal";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -55,6 +55,8 @@ export type VisitAction = "complete" | "results" | "cancel";
  * can pin rather than a set of inline `&&`s.
  */
 export function visitActions(role: string, status: VisitStatus): VisitAction[] {
+    // The API refuses staff any visit status change (complete, cancel, results).
+    if (isStaffRole(role)) return [];
     const admin = isAdminRole(role);
     if (status === EVENT_STATUS.SCHEDULED) return admin ? ["complete", "cancel"] : ["complete"];
     if (status === EVENT_STATUS.COMPLETED) return admin ? ["results", "cancel"] : [];

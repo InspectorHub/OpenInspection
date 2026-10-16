@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
-import { useLoaderData, Link, isRouteErrorResponse, useRouteError } from "react-router";
+import { useLoaderData, Link, useRouteError } from "react-router";
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -28,6 +28,7 @@ import { useCannedComments } from "~/hooks/useCannedComments";
 import { buildCannedFromText, TAB_SEVERITY, type CannedTab } from "~/lib/editor/canned-from-library";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
+import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 
 export function meta() {
   return [{ title: m.templates_edit_meta_title() }];
@@ -702,21 +703,12 @@ export default function TemplateEditPage() {
  * blank full-screen editor that looks like "the editor never opened".
  */
 export function ErrorBoundary() {
-  const error = useRouteError();
-  const status = isRouteErrorResponse(error) ? error.status : null;
-  const message =
-    status === 404
-      ? m.templates_edit_error_not_found()
-      : status === 403
-        ? m.templates_edit_error_forbidden()
-        : m.templates_edit_error_generic();
-
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-ih-bg-app gap-3 px-6 text-center">
-      <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
-      <Link to="/library/templates" className="h-8 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600">
-        {m.templates_edit_error_back()}
-      </Link>
-    </div>
+    <RouteErrorNotice
+      error={useRouteError()}
+      messages={{ notFound: m.templates_edit_error_not_found(), forbidden: m.templates_edit_error_forbidden(), generic: m.templates_edit_error_generic() }}
+      back={{ to: "/library/templates", label: m.templates_edit_error_back() }}
+      fullScreen
+    />
   );
 }

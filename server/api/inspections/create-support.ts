@@ -14,6 +14,9 @@ import { noticeFor } from '../../features/plan-quota/notice';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import type { CreateInspectionData } from '../../services/inspection/shared';
 import type { HonoConfig } from '../../types/hono';
+import { isFieldRole } from '../../lib/auth/roles';
+import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -60,6 +63,12 @@ export function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: strin
     try { c.executionCtx.waitUntil(run); } catch { /* no execution context available (unit tests) */ }
 }
 
+/** The `inspectorId` a new job gets: the one named, else the creator when they hold a field role, else none. */
+function inspectorFor(c: Context<HonoConfig>, named: string | null | undefined): { inspectorId?: string } {
+    const inspectorId = named || (isFieldRole(c.get('userRole')) ? c.get('user').sub : undefined);
+    return inspectorId ? { inspectorId } : {};
+}
+
 /**
  * The create service's input, from the request body: the structured `client`
  * and the agent are upserted into Contacts and their ids passed through.
@@ -69,9 +78,11 @@ export function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: strin
 export async function resolveCreateInput(
     c: Context<HonoConfig>,
     body: CreateInspectionData,
-): Promise<CreateInspectionData & { inspectorId: string; clientContactId?: string }> {
+): Promise<CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string }> {
     const tenantId = c.get('tenantId');
     const contactService = c.var.services.contact;
+    // A named inspector must work in the field and belong to this company; nothing after this looks at the id again.
+    await assertFieldRoleMembers(getDrizzle(c), tenantId, [body.inspectorId]);
 
     // IA-1: Resolve client contact before creating the inspection.
     let clientContactId: string | undefined;
@@ -107,7 +118,9 @@ export async function resolveCreateInput(
     return {
         ...body,
         ...clientFields,
-        inspectorId:       body.inspectorId || c.get('user').sub,
+        // The creator leads the job only when they can inspect; an office user
+        // (staff) who books one leaves it unassigned for someone to be scheduled.
+        ...inspectorFor(c, body.inspectorId),
         referredByAgentId: resolvedAgentId ?? null,
         // IA-1: pass the resolved contact ids through; createInspection stores them.
         ...(clientContactId ? { clientContactId } : {}),

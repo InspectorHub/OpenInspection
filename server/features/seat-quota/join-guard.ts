@@ -16,6 +16,7 @@
  */
 import { Errors } from '../../lib/errors';
 import { getSeatUsage } from './usage';
+import { holdsSeat } from '../../lib/middleware/seat-guard';
 
 /**
  * Whether THIS deployment charges for seats, and where to send someone who
@@ -45,14 +46,20 @@ export const SEAT_QUOTA_UNENFORCED: SeatQuotaContext = { enforce: false, billing
  * total that is about to be tested against the cap — leaving it in would make
  * the last legitimate acceptance refuse itself, every time. A parameter the
  * caller cannot forget is the only version of that exclusion that stays true.
+ *
+ * `invitedRole` is required for the same reason: a role that holds no seat is
+ * admitted without reading usage, and a caller that could forget to say which
+ * role is arriving would silently get the wrong answer.
  */
 export async function assertSeatAvailableForJoin(
     tenantId: string,
     db: D1Database,
     seatQuota: SeatQuotaContext,
     inviteId: string,
+    invitedRole: string,
 ): Promise<void> {
     if (!seatQuota.enforce) return;
+    if (!holdsSeat(invitedRole)) return;
 
     const usage = await getSeatUsage(tenantId, db, { excludeInviteId: inviteId });
     if (usage.remaining <= 0) {

@@ -71,7 +71,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             {/* ds-allow: compact mobile drawer nav rhythm (10/2px), no semantic spacing token */}
             <div className="ih-eyebrow px-3 pt-3 pb-[10px]">{m.nav_section_workspace()}</div>
             <div className="flex flex-col gap-[2px]">
-              {visibleNavItems(WORKSPACE_ITEMS, capabilities).map((item) => (
+              {visibleNavItems(WORKSPACE_ITEMS, capabilities, ctx?.user?.role).map((item) => (
                 <NavLink key={item.to} to={item.to} onClick={onClose} className={({ isActive }) => `flex items-center gap-3 px-3 py-2 rounded-ih-button text-[13px] font-medium transition-all ${isActive ? "bg-ih-primary-tint text-ih-primary-text font-bold" : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary-text"}`}>
                   {item.icon}
                   <span>{item.label()}</span>

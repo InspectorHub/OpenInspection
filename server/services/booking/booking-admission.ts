@@ -1,5 +1,5 @@
 import type { Context } from 'hono';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, tenantConfigs } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
@@ -12,6 +12,7 @@ import type { PublicBookingSchema } from '../../lib/validations/booking.schema';
 import type { z } from '@hono/zod-openapi';
 import { fetchPlaceDetails, placeDetailsCacheKey, type ResolvedPlace } from '../../lib/places/geocode';
 import type { RoutingDecision } from '../../lib/booking/routing';
+import { FIELD_ROLES } from '../../lib/auth/roles';
 
 /** What survives admission: a slot claimed for a named, tenant-owned inspector. */
 export interface BookingClaim {
@@ -172,7 +173,7 @@ export async function admitBooking(
         // a mismatched id (tampered payload or stale form) must not reach
         // into another tenant's availability/inspection space.
         const inspectorRow = await db.select({ id: users.id }).from(users)
-            .where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId)))
+            .where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId), inArray(users.role, [...FIELD_ROLES])))
             .get();
         if (!inspectorRow) throw Errors.NotFound('Inspector not found.');
     }

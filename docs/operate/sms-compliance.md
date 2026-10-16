@@ -8,7 +8,7 @@ This guide is for operators who have deployed OpenInspection on their own infras
 
 ## Overview
 
-OpenInspection is a bring-your-own-provider SMS platform. You supply a Twilio or Telnyx account and credentials; OpenInspection routes messages through it. You are the sender of record and own compliance obligations.
+SMS goes out on a Twilio or Telnyx account that belongs to your company: you supply the account and its credentials, and OpenInspection routes messages through it. Where a deployment files carrier registrations, a dedicated number can instead be registered for your company. Either way there is no shared sender, you are the sender of record, and you own the compliance obligations.
 
 ### Per-company Privacy & Terms (no Worker env)
 
@@ -31,8 +31,16 @@ Those effective URLs appear in booking footers, the client portal, invoices, and
 
 **STOP works for everyone; opt-in EVIDENCE is consumers only.** Agents and staff
 are never shown a disclosure and never asked to agree to one — they are reachable
-under an existing relationship. They can stop, and they can start again, and both
-acts are recorded against their own `recipient_type` (`agent` / `staff`).
+under an existing relationship. A STOP is recorded against their own
+`recipient_type` (`agent` / `staff`). A START sent back to your number resumes texting
+for that person.
+
+**Consent and opt-out are kept per company and per recipient.** A STOP received on a
+number that belongs to one company (its own provider account or dedicated number)
+revokes texting for that company and that recipient, for every message type the
+company sends. A START received on that same number resumes it for that company and
+recipient only. Neither touches any other company's records, even if the same phone
+number is on file there.
 
 When a carrier asks to see your opt-in proof, the answer filters on
 `recipient_type = 'client'`. That is what keeps the layers separable inside one

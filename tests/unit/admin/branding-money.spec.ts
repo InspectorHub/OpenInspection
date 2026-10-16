@@ -1,6 +1,6 @@
 /**
  * The company settings carry two money policies: the cancellation ladder and
- * the default booking deposit. Without the `financial` capability they are
+ * the default booking deposit. Without the `companyFinance` capability they are
  * absent from the read, and a write that sets or changes one is refused. A
  * write that leaves them alone (or resends them unchanged) is not.
  */
@@ -37,7 +37,7 @@ function buildApp(role: UserRole, overrides: Record<string, boolean> | null = nu
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => (err instanceof AppError
-        ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
+        ? c.json({ success: false, error: { code: err.code, message: err.message, details: err.details } }, err.status)
         : c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500)));
     app.use('*', async (c, next) => {
         c.set('tenantId', T);
@@ -78,8 +78,8 @@ describe('GET /api/admin/branding', () => {
         expect(body.data.branding.cancellationPolicy).toEqual(POLICY);
         expect(body.data.branding.depositPolicy).toEqual(DEPOSIT);
     });
-    it('a manager with financial switched off receives neither, and still receives the rest', async () => {
-        const res = await read('manager', { financial: false });
+    it('a manager with companyFinance switched off receives neither, and still receives the rest', async () => {
+        const res = await read('manager', { companyFinance: false });
         const text = await res.text();
         const branding = (JSON.parse(text) as { data: { branding: Record<string, unknown> } }).data.branding;
         expect('cancellationPolicy' in branding).toBe(false);
@@ -89,28 +89,47 @@ describe('GET /api/admin/branding', () => {
     });
 });
 
+describe('the fee policies belong to companyFinance, not inspectionFees', () => {
+    it('inspectionFees alone does not return the policies', async () => {
+        const body = await (await read('manager', { inspectionFees: true, companyFinance: false })).json() as { data: { branding: Record<string, unknown> } };
+        expect('cancellationPolicy' in body.data.branding).toBe(false);
+        expect('depositPolicy' in body.data.branding).toBe(false);
+    });
+    it('inspectionFees alone does not allow changing one', async () => {
+        const res = await write('manager', { inspectionFees: true, companyFinance: false }, { depositPolicy: { type: 'fixed', amountCents: 1 } });
+        expect(res.status).toBe(403);
+        expect(((await res.json()) as { error: { details?: { capability?: string } } }).error.details?.capability).toBe('companyFinance');
+    });
+    it('companyFinance alone still reads and changes them', async () => {
+        const overrides = { inspectionFees: false, companyFinance: true };
+        const body = await (await read('manager', overrides)).json() as { data: { branding: Record<string, unknown> } };
+        expect(body.data.branding.depositPolicy).toEqual(DEPOSIT);
+        expect((await write('manager', overrides, { depositPolicy: { type: 'fixed', amountCents: 2 } })).status).toBe(200);
+    });
+});
+
 describe('POST /api/admin/branding', () => {
-    it('refuses a changed cancellation policy without financial and leaves it stored', async () => {
-        const res = await write('manager', { financial: false }, { cancellationPolicy: { ...POLICY, noticeHours: 48 } });
+    it('refuses a changed cancellation policy without companyFinance and leaves it stored', async () => {
+        const res = await write('manager', { companyFinance: false }, { cancellationPolicy: { ...POLICY, noticeHours: 48 } });
         expect(res.status).toBe(403);
         expect(((await res.json()) as { error: { code: string } }).error.code).toBe('FINANCIAL_REQUIRED');
         expect((await stored()).cancellationPolicy).toEqual(POLICY);
     });
-    it('refuses a changed deposit policy without financial', async () => {
-        const res = await write('manager', { financial: false }, { depositPolicy: { type: 'fixed', amountCents: 1 } });
+    it('refuses a changed deposit policy without companyFinance', async () => {
+        const res = await write('manager', { companyFinance: false }, { depositPolicy: { type: 'fixed', amountCents: 1 } });
         expect(res.status).toBe(403);
         expect((await stored()).depositPolicy).toEqual(DEPOSIT);
     });
-    it('refuses clearing a stored policy without financial', async () => {
-        expect((await write('manager', { financial: false }, { depositPolicy: null })).status).toBe(403);
+    it('refuses clearing a stored policy without companyFinance', async () => {
+        expect((await write('manager', { companyFinance: false }, { depositPolicy: null })).status).toBe(403);
     });
     it('accepts a settings save that resends the stored policies unchanged', async () => {
-        const res = await write('manager', { financial: false }, { companyName: 'Acme 2', cancellationPolicy: POLICY, depositPolicy: DEPOSIT });
+        const res = await write('manager', { companyFinance: false }, { companyName: 'Acme 2', cancellationPolicy: POLICY, depositPolicy: DEPOSIT });
         expect(res.status).toBe(200);
         expect((await stored()).companyName).toBe('Acme 2');
     });
     it('accepts a save that does not mention the policies', async () => {
-        expect((await write('manager', { financial: false }, { companyName: 'Acme 3' })).status).toBe(200);
+        expect((await write('manager', { companyFinance: false }, { companyName: 'Acme 3' })).status).toBe(200);
     });
     it('positive control: a manager may change the deposit policy', async () => {
         const res = await write('manager', null, { depositPolicy: { type: 'fixed', amountCents: 1 } });

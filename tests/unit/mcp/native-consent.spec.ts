@@ -202,4 +202,24 @@ describe('completeNativeAuthorization', () => {
     expect(completeAuthorization).not.toHaveBeenCalled();
     expect(writeAuditLog).not.toHaveBeenCalled();
   });
+
+  it('refuses an unknown role with 403 and creates no grant', async () => {
+    const { helpers, completeAuthorization } = oauth();
+    const err = await completeNativeAuthorization({
+      ...base, oauth: helpers, authReq: authReq(['native']),
+      identity: { userId: 'u3', tenantId: 't1', role: 'nope' as never },
+    }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Response);
+    expect((err as Response).status).toBe(403);
+    expect(completeAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('admits the staff role (positive control for the two refusals above)', async () => {
+    const { helpers, completeAuthorization } = oauth();
+    await completeNativeAuthorization({
+      ...base, oauth: helpers, authReq: authReq(['native']),
+      identity: { userId: 'u4', tenantId: 't1', role: 'staff' },
+    });
+    expect(completeAuthorization).toHaveBeenCalledTimes(1);
+  });
 });

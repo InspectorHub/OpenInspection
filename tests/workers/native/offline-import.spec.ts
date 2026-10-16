@@ -317,7 +317,8 @@ describe('POST /api/client/import', () => {
         const before = await call('/api/client/session', { token: exporter.token });
         expect(before.status).toBe(200);
 
-        const removal = await call(`/api/team/members/${exporter.id}`, { method: 'DELETE', token: ownerJwt });
+        // Their inspection is still open, so removal has to say what becomes of it.
+        const removal = await call(`/api/team/members/${exporter.id}?unassign=true`, { method: 'DELETE', token: ownerJwt });
         expect(removal.status, await removal.clone().text()).toBe(200);
 
         const after = await call('/api/client/session', { token: exporter.token });

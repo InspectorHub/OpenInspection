@@ -1,0 +1,343 @@
+// Builds the MCP server for ONE request from the verified OAuth grant.
+//
+// At request time the granted OpenAPI operations (scope- and tier-filtered) are
+// registered as MCP tools, resources and prompts; each tool handler reconstructs
+// the HTTP request and executes it in-process as the authenticated user via the
+// identity bridge. The server is never shared between requests: a shared
+// instance would answer one caller from another caller's registrations.
+import type { z } from 'zod';
+import { McpServer, ProtocolError, ProtocolErrorCode, ResourceTemplate } from './sdk';
+import { selectTools, toolNameFromOperationId, type SnapshotEntry } from './tools';
+import { selectResources, buildResourceRequest } from './resources';
+import { buildToolInput, toZodInputSchema, type ToolInput } from './resolve-schema';
+import { registerGrantedPrompts } from './prompts';
+import { callApiAsUser } from './identity-bridge';
+import { extendedToolsEnabled } from './flag';
+import { MCP_MAX_RESULT_BYTES } from './result-limits';
+import type { AppEnv } from '../../types/hono';
+
+/**
+ * OAuth grant props encrypted into every access token and handed to the MCP
+ * handler on each authenticated request (`ctx.props`). They carry the tenant
+ * scoping and tool authorization inputs - do not rename fields.
+ */
+export interface McpProps extends Record<string, unknown> {
+    userId:     string;
+    tenantId:   string;
+    tenantSlug: string;
+    role:       string;
+    /** e.g. ['read:inspections', 'write:bookings'] */
+    scopes:     string[];
+}
+
+/** Tool results larger than this are truncated so a single call cannot blow the
+ * model's context window. The marker tells the model the payload was clipped.
+ * Lives in `lib/mcp/result-limits` so a handler that must keep a field inside
+ * the slice can assert against the same number instead of copying it. */
+const MAX_RESULT_BYTES = MCP_MAX_RESULT_BYTES;
+
+/**
+ * The MCP tool/resource catalogue, loaded ONCE and only when a request needs it.
+ *
+ * (History: this module's catalogue used to live next to the Durable Object class
+ * the worker had to export statically. The note below records the incident; the
+ * rule it ends with still holds for `build-server.ts`, which the OAuth wrapper
+ * reaches only through a dynamic import.)
+ *
+ * ── WHY IT CANNOT BE A STATIC IMPORT ────────────────────────────────────────
+ * `openapi-snapshot.json` is ~900 KB. A static JSON import becomes a JS object
+ * literal that V8 materialises during MODULE EVALUATION — so it is paid on
+ * every cold start of the whole Worker, not on the requests that use it.
+ *
+ * And it cannot be paid anywhere cheaper. `InspectorMcp` must be a static
+ * export for wrangler to bind the Durable Object class, and
+ * `lib/mcp/oauth-provider.ts` imports this module too, with `buildOAuthHandler`
+ * running on every fetch. The snapshot therefore sat in the eager module graph
+ * in front of EVERY request, including requests that never touch MCP.
+ *
+ * `MCP_ENABLED` did not save it either: `buildOAuthHandler` returns
+ * `{ fetch: appFetch }` unchanged when the flag is off — but only after this
+ * module has already been evaluated. A deployment with MCP switched off paid
+ * the full startup cost and got nothing back for it.
+ *
+ * That is a violation of the invariant `workers/app.ts` states over the DO
+ * re-exports: "their import graphs must stay light".
+ *
+ * ── HOW IT WAS FOUND ────────────────────────────────────────────────────────
+ * From the outside, by a self-hoster hitting Cloudflare Error 1102 on `/` and
+ * `/login` at roughly 5% of requests (discussion #325). The signature was
+ * `outcome: exceededCpu` with `cpuTime: 10, wallTime: 13` — 13 ms of wall time
+ * cannot contain a per-request CPU breach, which is what identifies this as the
+ * script STARTUP limit rather than the per-request one. That limit is the same
+ * on Free and Paid, so no plan change addresses it.
+ *
+ * Measured: the eager graph reachable from the entry chunk falls from 1,291 KiB
+ * to 791 KiB, and cold starts of 120–190 ms disappear. Total upload is
+ * unchanged — compressed script size was never the binding constraint, which is
+ * why `check-bundle-size.mjs` passed at ~70% throughout.
+ *
+ * ⚠️ DO NOT RESTORE THE STATIC IMPORT. Both readers below are already async and
+ * only touch the catalogue at request-registration time, which is what makes
+ * this safe. `getComponentSchemas()` a few lines down defers the rest of the
+ * OpenAPI document for exactly the same reason.
+ */
+let snapshotPromise: Promise<SnapshotEntry[]> | undefined;
+
+const getSnapshot = (): Promise<SnapshotEntry[]> =>
+    (snapshotPromise ??= import('./openapi-snapshot.json').then(
+        (m) => m.default as unknown as SnapshotEntry[],
+    ));
+
+/** OpenAPI document config — MUST match the snapshot generator / route-metadata
+ * spec so the `components.schemas` resolved here line up with the snapshot. */
+const OPENAPI_DOC_CONFIG = {
+    openapi: '3.0.0',
+    info: { version: '1.0.0', title: 'OpenInspection Core API' },
+} as const;
+
+/** A minimal ExecutionContext for the in-process API dispatch. The request that
+ * built the server owns the real one; deferred `waitUntil` work from a tool call
+ * is dropped, which is safe for the read and write paths MCP tools reach. */
+function makeExecutionContext(): ExecutionContext {
+    return {
+        waitUntil() {},
+        passThroughOnException() {},
+        props: undefined,
+    } as unknown as ExecutionContext;
+}
+
+async function loadComponentSchemas(): Promise<Record<string, unknown>> {
+    const { app } = await import('../../index');
+    const { buildOpenApiDocument } = await import('../openapi/build-document');
+    const doc = buildOpenApiDocument(app, OPENAPI_DOC_CONFIG) as {
+        components?: { schemas?: Record<string, unknown> };
+    };
+    return doc.components?.schemas ?? {};
+}
+
+let componentSchemasPromise: Promise<Record<string, unknown>> | undefined;
+
+/** Lazily resolve `components.schemas` from the live OpenAPI document. Imported
+ * dynamically so this module's top-level graph stays small (same rationale as
+ * workers/app.ts and identity-bridge.callApiAsUser).
+ *
+ * Built ONCE per isolate: generating the ~1.2 MB document and walking it for
+ * descriptions is a large share of a 10 ms CPU budget, and every MCP request
+ * registration used to pay it again. The schemas are read-only to callers.
+ * A failed build is not kept, so the next request retries. */
+const getComponentSchemas = (): Promise<Record<string, unknown>> =>
+    (componentSchemasPromise ??= loadComponentSchemas().catch((err: unknown) => {
+        componentSchemasPromise = undefined;
+        throw err;
+    }));
+
+/** Read a Response body as text, truncating oversized payloads. */
+async function readTruncated(res: Response): Promise<string> {
+    const text = await res.text();
+    if (text.length <= MAX_RESULT_BYTES) return text;
+    const omitted = text.length - MAX_RESULT_BYTES;
+    return `${text.slice(0, MAX_RESULT_BYTES)}\n…[truncated ${omitted} chars]`;
+}
+
+/** Reconstruct the HTTP request for an operation from the tool arguments. */
+function buildRequest(entry: SnapshotEntry, input: ToolInput, args: Record<string, unknown>): Request {
+    let pathname = entry.pathTemplate;
+    for (const name of input.pathParams) {
+        const value = args[name];
+        if (value !== undefined && value !== null) {
+            pathname = pathname.replace(`{${name}}`, encodeURIComponent(String(value)));
+        }
+    }
+
+    // Host is irrelevant — the in-process API routes purely on pathname.
+    const url = new URL(pathname, 'https://mcp.internal');
+    for (const name of input.queryParams) {
+        const value = args[name];
+        if (value !== undefined && value !== null) url.searchParams.set(name, String(value));
+    }
+
+    const method = entry.method.toUpperCase();
+    const headers = new Headers();
+    const init: RequestInit = { method, headers };
+
+    const writesBody = method !== 'GET' && method !== 'DELETE' && input.bodyParams.length > 0;
+    if (writesBody) {
+        headers.set('Content-Type', 'application/json');
+        if (input.bodyParams.length === 1 && input.bodyParams[0] === 'body') {
+            // Non-object body nested under a single `body` argument.
+            init.body = JSON.stringify(args['body'] ?? null);
+        } else {
+            const payload: Record<string, unknown> = {};
+            for (const name of input.bodyParams) {
+                if (args[name] !== undefined) payload[name] = args[name];
+            }
+            init.body = JSON.stringify(payload);
+        }
+    }
+
+    return new Request(url.toString(), init);
+}
+
+/**
+ * What a tool looks like to a client, independent of who is asking: the part of
+ * registration that costs CPU (selecting by scope, folding parameters and body
+ * into one schema, building the zod schema). The handler is NOT here - it closes
+ * over the caller's props and is created per request.
+ */
+interface ToolDescriptor {
+    entry: SnapshotEntry;
+    name: string;
+    description: string;
+    input: ToolInput;
+    inputSchema: z.ZodType;
+}
+
+/** Most distinct scope sets kept. A grant's scopes are chosen from a small menu,
+ * but the key is caller-influenced, so the map is bounded and evicts oldest-first. */
+const DESCRIPTOR_CACHE_MAX = 64;
+const descriptorCache = new Map<string, ToolDescriptor[]>();
+
+/** Entries currently cached (the bound is asserted in tests). */
+export const toolDescriptorCacheSize = (): number => descriptorCache.size;
+
+/**
+ * The tool descriptors a grant's scopes allow, cached by (sorted scopes,
+ * includeExtended). Only identity-free descriptions are cached: never props,
+ * tokens or a closure over `callApiAsUser`. A failed build caches nothing.
+ */
+async function toolDescriptors(scopes: readonly string[], includeExtended: boolean): Promise<ToolDescriptor[]> {
+    const key = `${[...scopes].sort().join(',')}|${includeExtended}`;
+    const hit = descriptorCache.get(key);
+    if (hit) return hit;
+
+    const granted = selectTools(await getSnapshot(), [...scopes], { includeExtended });
+    // Only pay the OpenAPI-document cost when a granted operation actually
+    // references a named component schema (`$ref`); read-only param-only tools
+    // resolve to self-contained schemas with no component lookups.
+    const needsComponents = granted.some((e) => JSON.stringify(e.inputSchema ?? {}).includes('"$ref"'));
+    const components = needsComponents ? await getComponentSchemas() : {};
+
+    const built = granted.map((entry): ToolDescriptor => {
+        const input = buildToolInput(entry.inputSchema as never, components);
+        return {
+            entry,
+            name: toolNameFromOperationId(entry.operationId),
+            description: `${entry.summary ?? ''}. ${entry.description ?? ''}`.trim(),
+            input,
+            inputSchema: toZodInputSchema(input.jsonSchema, entry.operationId),
+        };
+    });
+    if (descriptorCache.size >= DESCRIPTOR_CACHE_MAX) {
+        const oldest = descriptorCache.keys().next().value;
+        if (oldest !== undefined) descriptorCache.delete(oldest);
+    }
+    descriptorCache.set(key, built);
+    return built;
+}
+
+/**
+ * Register every granted operation as an MCP tool on `server`.
+ *
+ * Exported so it can be driven directly in tests (against a bare `McpServer`)
+ * without standing up the full HTTP handler. The selection is the
+ * authoritative scope/tier/tag filter from Task C2; each handler re-checks the
+ * scope as defense-in-depth before dispatching.
+ */
+export async function registerGrantedTools(
+    server: McpServer,
+    env: AppEnv,
+    props: McpProps,
+    makeCtx: () => ExecutionContext = makeExecutionContext,
+): Promise<void> {
+    const includeExtended = extendedToolsEnabled(env as unknown as { MCP_EXTENDED_TOOLS?: string });
+    const descriptors = await toolDescriptors(props.scopes, includeExtended);
+
+    for (const { entry, name, description, input, inputSchema } of descriptors) {
+        server.registerTool(name, { description, inputSchema }, async (rawArgs: unknown) => {
+            const args = (rawArgs ?? {}) as Record<string, unknown>;
+            // Defense-in-depth: re-assert the scope grant at call time. The
+            // authoritative tenant scoping happens downstream via
+            // props.tenantId → internal JWT → in-process API tenant filtering.
+            if (selectTools([entry], props.scopes, { includeExtended }).length === 0) {
+                return {
+                    isError: true,
+                    content: [{ type: 'text' as const, text: JSON.stringify({ error: 'forbidden', operationId: entry.operationId }) }],
+                };
+            }
+
+            const request = buildRequest(entry, input, args);
+            const res = await callApiAsUser(env, props, request, makeCtx());
+            const text = await readTruncated(res);
+            return {
+                isError: !res.ok,
+                content: [{ type: 'text' as const, text }],
+            };
+        });
+    }
+}
+
+/**
+ * Register every granted read-only (GET) operation as an MCP resource (Phase E).
+ * Collection operations (no path param) become static resources; get-by-id
+ * operations become resource templates. Reads run through the same identity
+ * bridge as tools, so tenant scoping + RBAC are unchanged. Driven directly in tests against a bare `McpServer`.
+ */
+export async function registerGrantedResources(
+    server: McpServer,
+    env: AppEnv,
+    props: McpProps,
+    makeCtx: () => ExecutionContext = makeExecutionContext,
+): Promise<void> {
+    const includeExtended = extendedToolsEnabled(env as unknown as { MCP_EXTENDED_TOOLS?: string });
+    const resources = selectResources(await getSnapshot(), props.scopes, { includeExtended });
+
+    const read = async (entry: SnapshotEntry, vars: Record<string, string>, uri: URL) => {
+        // Defense-in-depth: re-assert the read grant before dispatching.
+        if (selectTools([entry], props.scopes, { includeExtended }).length === 0) {
+            throw new Error(`forbidden: ${entry.operationId}`);
+        }
+        const res = await callApiAsUser(env, props, buildResourceRequest(entry, vars), makeCtx());
+        // A record that does not exist is a protocol error (InvalidParams), as the
+        // SDK itself answers for an unknown URI; returning the API's 404 body as
+        // content would read as a successful resource.
+        if (res.status === 404) throw new ProtocolError(ProtocolErrorCode.InvalidParams, `Resource not found: ${uri.href}`);
+        const text = await readTruncated(res);
+        return { contents: [{ uri: uri.href, mimeType: 'application/json', text }] };
+    };
+
+    for (const r of resources) {
+        const config = {
+            title: (r.entry.summary || r.name).trim(),
+            description: `${r.entry.summary ?? ''}. ${r.entry.description ?? ''}`.trim(),
+            mimeType: 'application/json',
+        };
+        if (r.pathParam === null) {
+            server.registerResource(r.name, r.uri, config, (uri) => read(r.entry, {}, uri));
+        } else {
+            const param = r.pathParam;
+            const template = new ResourceTemplate(r.uri, { list: undefined });
+            server.registerResource(r.name, template, config, (uri, variables) => {
+                const raw = variables[param];
+                const value = Array.isArray(raw) ? raw[0] : raw;
+                return read(r.entry, { [param]: String(value ?? '') }, uri);
+            });
+        }
+    }
+}
+
+
+/**
+ * Build a NEW MCP server from a verified grant. Never reuse the result across
+ * requests: it carries this caller's tool handlers.
+ */
+export async function buildMcpServer(
+    env: AppEnv,
+    props: McpProps,
+    makeCtx: () => ExecutionContext = makeExecutionContext,
+): Promise<McpServer> {
+    const server = new McpServer({ name: 'OpenInspection', version: '1.0.0' });
+    await registerGrantedTools(server, env, props, makeCtx);
+    await registerGrantedResources(server, env, props, makeCtx);
+    registerGrantedPrompts(server, props);
+    return server;
+}

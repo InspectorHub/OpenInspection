@@ -81,8 +81,8 @@ export function QboCheckResult({ outcome }: { outcome: QboCheckOutcome | null })
       return (
         <Banner tone="success">
           <p>{m.settings_qbo_check_paired()}</p>
-          <p className="mt-1 text-[12.5px] font-normal">{m.settings_qbo_check_paired_limit_keys()}</p>
-          <p className="mt-1 text-[12.5px] font-normal">{m.settings_qbo_check_paired_limit_redirect()}</p>
+          <p className="mt-1 text-xs font-normal">{m.settings_qbo_check_paired_limit_keys()}</p>
+          <p className="mt-1 text-xs font-normal">{m.settings_qbo_check_paired_limit_redirect()}</p>
           {when}
         </Banner>
       );

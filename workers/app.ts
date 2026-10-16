@@ -235,7 +235,7 @@ app.all("*", ssr);
 export default {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fetch: (req: Request, env: any, ctx: ExecutionContext) =>
-    buildOAuthHandler(app.fetch as never, env).fetch(req, env, ctx),
+    buildOAuthHandler(app.fetch as never, env, req).fetch(req, env, ctx),
   // Imported DIRECTLY, not through `getApi()`. The cron tick decides which jobs
   // are due and enqueues one message each — it never touches a route. Reaching
   // it through server/index.ts meant evaluating the whole API graph first: all

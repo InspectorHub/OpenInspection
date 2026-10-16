@@ -1,12 +1,13 @@
 /**
- * The held-back shared SMS number, enforced at the send gate.
+ * There is no shared SMS number, enforced at the send gate.
  *
- * On a deployment that supplies a shared number, a company whose stored SMS
- * mode is the legacy platform value or a managed tier must not send while
- * SMS_MANAGED_SHARED_ENABLED is off: the gate refuses with
- * `provider_confirmation_pending`, which the automation log row records and the
- * manual-send API returns. A company on its own account, and every self-hosted
- * company, is unaffected. Each refusal sits beside a positive control.
+ * On a hosted deployment, a company whose stored SMS mode is the legacy
+ * platform value or the retired shared mode must not send: the gate refuses with
+ * `sms not configured`, which the automation log row records and the
+ * manual-send API returns. A company on its own account, a company with a
+ * registered dedicated number (which then needs carrier approval), and every
+ * self-hosted company are not held. The old SMS_MANAGED_SHARED_ENABLED switch is
+ * retired and changes nothing. Each refusal sits beside a positive control.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -43,9 +44,9 @@ beforeEach(async () => {
 });
 
 describe('managedSendAllowed: the hold', () => {
-    it.each(['platform', 'managed_shared', 'managed_dedicated'])('hosted + %s + flag off: refused as provider_confirmation_pending', async (mode) => {
+    it.each(['platform', 'managed_shared'])('hosted + %s: refused as sms not configured', async (mode) => {
         expect(await managedSendAllowed(db as never, { ...HOSTED, ...POOL }, TENANT, mode))
-            .toEqual({ allowed: false, reason: 'provider_confirmation_pending' });
+            .toEqual({ allowed: false, reason: 'sms not configured' });
     });
 
     it('hosted + own is unaffected (control)', async () => {
@@ -56,17 +57,23 @@ describe('managedSendAllowed: the hold', () => {
         expect(await managedSendAllowed(db as never, {}, TENANT, 'platform')).toEqual({ allowed: true });
     });
 
-    it('hosted + flag on: today\'s behaviour (platform allowed; shared needs the pool)', async () => {
-        const on = { ...HOSTED, SMS_MANAGED_SHARED_ENABLED: 'true' };
-        expect(await managedSendAllowed(db as never, on, TENANT, 'platform')).toEqual({ allowed: true });
-        expect(await managedSendAllowed(db as never, { ...on, ...POOL }, TENANT, 'managed_shared')).toEqual({ allowed: true });
-        expect(await managedSendAllowed(db as never, on, TENANT, 'managed_shared')).toEqual({ allowed: false, reason: 'managed_not_approved' });
+    it('hosted + managed_dedicated is not held: it goes on to the carrier approval check (control for the refusals above)', async () => {
+        expect(await managedSendAllowed(db as never, HOSTED, TENANT, 'managed_dedicated'))
+            .toEqual({ allowed: false, reason: 'managed_not_approved' });
+    });
+
+    it('the retired switch changes nothing', async () => {
+        const on = { ...HOSTED, ...POOL, SMS_MANAGED_SHARED_ENABLED: 'true' } as never;
+        for (const mode of ['platform', 'managed_shared']) {
+            expect(await managedSendAllowed(db as never, on, TENANT, mode))
+                .toEqual({ allowed: false, reason: 'sms not configured' });
+        }
     });
 
     it('a profile the caller already resolved is honoured', async () => {
         const { SAAS_PROFILE } = await import('../../../server/lib/deployment-profile');
         expect(await managedSendAllowed(db as never, { profile: SAAS_PROFILE }, TENANT, 'platform'))
-            .toMatchObject({ allowed: false, reason: 'provider_confirmation_pending' });
+            .toMatchObject({ allowed: false, reason: 'sms not configured' });
     });
 });
 
@@ -77,9 +84,9 @@ describe('smsSendGate: the same refusal on the shared chain', () => {
     const gate = (env: object) => smsSendGate({ db: db as never, tenantId: TENANT, to: '+15551234567', purpose: 'test', env, bodyTemplate: 'hello' });
 
     it('hosted platform mode: refused; a company with no config row is the same', async () => {
-        expect(await gate(HOSTED)).toEqual({ allowed: false, reason: 'provider_confirmation_pending' });
+        expect(await gate(HOSTED)).toEqual({ allowed: false, reason: 'sms not configured' });
         await setMode('platform');
-        expect(await gate(HOSTED)).toEqual({ allowed: false, reason: 'provider_confirmation_pending' });
+        expect(await gate(HOSTED)).toEqual({ allowed: false, reason: 'sms not configured' });
     });
 
     it('hosted own mode passes (control)', async () => {
@@ -125,10 +132,10 @@ describe('automation flush: the refusal is recorded on the log row', () => {
 
     beforeEach(() => { fakeSend.mockClear(); });
 
-    it('hosted platform mode, flag off: skipped with the reason, nothing sent', async () => {
+    it('hosted platform mode: skipped with the reason, nothing sent', async () => {
         const id = await seedLog('platform');
         await run(HOSTED);
-        expect(await row(id)).toMatchObject({ status: 'skipped', error: 'provider_confirmation_pending' });
+        expect(await row(id)).toMatchObject({ status: 'skipped', error: 'sms not configured' });
         expect(fakeSend).not.toHaveBeenCalled();
     });
 
@@ -139,9 +146,9 @@ describe('automation flush: the refusal is recorded on the log row', () => {
         expect(fakeSend).toHaveBeenCalledTimes(1);
     });
 
-    it('hosted platform mode, flag on: sends as before (control)', async () => {
+    it('hosted platform mode with the retired switch set: still skipped', async () => {
         const id = await seedLog('platform');
         await run({ ...HOSTED, SMS_MANAGED_SHARED_ENABLED: 'true' });
-        expect((await row(id))?.status).toBe('sent');
+        expect(await row(id)).toMatchObject({ status: 'skipped', error: 'sms not configured' });
     });
 });

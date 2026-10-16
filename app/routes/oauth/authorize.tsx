@@ -4,7 +4,7 @@ import type { Route } from "./+types/authorize";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { isRole, type Role } from "../../../server/lib/auth/roles";
-import type { McpProps } from "../../../server/durable-objects/inspector-mcp";
+import type { McpProps } from "../../../server/lib/mcp/build-server";
 import {
   computeGrantedScopes,
 } from "../../../server/lib/mcp/scopes";
@@ -19,7 +19,7 @@ import { writeAuditLog } from "../../../server/lib/audit";
 import { getDeploymentProfile } from "../../../server/lib/deployment-profile";
 import { mcpEnabled, nativeClientEnabled } from "../../../server/lib/mcp/flag";
 import type { WorkerEnv } from "../../../workers/env";
-import { assertNativeRoleAllowed, completeNativeAuthorization, hasNativePkce, isNativeAuthRequest, isNativeRedirectUri, nativeRedirectDisplay } from "../../../server/lib/auth/native-consent";
+import { assertNativeRoleAllowed, completeNativeAuthorization, hasNativePkce, isNativeAuthRequest, isNativeRedirectUri, isRedirectAllowedForScope, nativeRedirectDisplay } from "../../../server/lib/auth/native-consent";
 
 export function meta() {
   return [{ title: m.oauth_authorize_meta_title() }];
@@ -111,6 +111,27 @@ export function isRegisteredRedirectUri(
   );
 }
 
+/** A standard OAuth error body (RFC 6749 5.2) for a refusal that must not redirect. */
+function oauthErrorResponse(code: string, description: string, status = 400): Response {
+  return new Response(JSON.stringify({ error: code, error_description: description }), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/**
+ * The provider's own refusal of an authorization request (an unsupported
+ * resource, a redirect URI it will not accept). Matched by shape, not by class:
+ * this route module is loaded by the web test suite, which cannot import the
+ * provider package at runtime.
+ */
+function providerRefusal(err: unknown): { code: string; description: string; status: number } | null {
+  if (!(err instanceof Error)) return null;
+  const e = err as Error & { code?: unknown; description?: unknown; statusCode?: unknown };
+  if (typeof e.code !== "string" || typeof e.description !== "string") return null;
+  return { code: e.code, description: e.description, status: typeof e.statusCode === "number" ? e.statusCode : 400 };
+}
+
 /**
  * Login redirect preserving the in-flight authorize request. Takes the
  * normalized `url`, not `request.url`, whose `.data` suffix under
@@ -151,7 +172,19 @@ export async function loader({ request, url, context }: Route.LoaderArgs) {
   // parseAuthRequest reads the OAuth params from THIS request's query string;
   // it only works on the initial GET. We serialize the result into a hidden
   // field so the action can complete authorization without re-parsing.
-  const authReq = await env.OAUTH_PROVIDER.parseAuthRequest(request);
+  let authReq: AuthRequest;
+  try {
+    authReq = await env.OAUTH_PROVIDER.parseAuthRequest(request);
+  } catch (err) {
+    // The provider refuses requests it cannot serve (a `resource` it does not
+    // know, for one). That is an OAuth error for the client, not a server fault.
+    const refusal = providerRefusal(err);
+    if (!refusal) throw err;
+    throw oauthErrorResponse(refusal.code, refusal.description, refusal.status);
+  }
+  if (!isRedirectAllowedForScope(authReq.redirectUri, authReq.scope)) {
+    throw oauthErrorResponse("invalid_request", "Invalid redirect URI");
+  }
   const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
   const clientName = client?.clientName?.trim() || m.oauth_authorize_client_fallback();
 
@@ -213,6 +246,12 @@ export async function action({ request, url, context }: Route.ActionArgs) {
   // Same switch as the loader: an MCP authorization is dead where MCP is off.
   if (!isNativeAuthRequest(authReq.scope) && !mcpEnabled(env)) {
     throw new Response("Not Found", { status: 404 });
+  }
+
+  // The hidden field is a request the browser sent back, so it never went through
+  // parseAuthRequest: hold it to the same redirect policy as the loader.
+  if (!isRedirectAllowedForScope(authReq.redirectUri, authReq.scope)) {
+    throw oauthErrorResponse("invalid_request", "Invalid redirect URI");
   }
 
   // Cancel => bounce back to the client's redirect_uri with an OAuth error

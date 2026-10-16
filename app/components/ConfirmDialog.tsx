@@ -11,7 +11,7 @@ import { m } from "~/paraglide/messages";
  * not look like ten omissions, it looks like one.
  */
 export function ConfirmDialog({
-  open, title, message, confirmLabel, cancelLabel, tone = "danger", busy = false, onConfirm, onCancel, children,
+  open, title, message, confirmLabel, cancelLabel, tone = "danger", busy = false, confirmDisabled = false, onConfirm, onCancel, children,
 }: {
   open: boolean;
   title: string;
@@ -26,6 +26,8 @@ export function ConfirmDialog({
   cancelLabel?: string;
   tone?: "danger" | "default";
   busy?: boolean;
+  /** Keeps the confirm button inert until the dialog's own input is complete. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   /** Extra content under the message, e.g. a warning Banner or an error. */
@@ -52,7 +54,7 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
-            {...pendingProps(busy, onConfirm)}
+            {...pendingProps(busy || confirmDisabled, onConfirm)}
             className={`px-4 py-2 rounded-md text-[13px] font-bold transition-opacity ${PENDING_CLASS} ${confirmClass}`}
           >
             {confirmLabel ?? m.common_delete()}

@@ -151,6 +151,7 @@ const gate = (over: Partial<Parameters<typeof smsSendGate>[0]> = {}) =>
         roleKind: 'client',
         classId: 'booking-confirmation',
         bodyTemplate: 'Your inspection is confirmed.',
+        env: {},
         ...over,
     });
 

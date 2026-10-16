@@ -44,6 +44,8 @@ import { InspectionsFocusBar } from "~/components/dashboard/InspectionsFocusBar"
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useColumnPredicates } from "~/lib/dashboard-visible-columns";
 import { m } from "~/paraglide/messages";
+import { isStaffRole } from "~/lib/access";
+import { createLandingPath } from "~/lib/create-landing";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 // Re-exported for unit tests (tests/web import these from ~/routes/inspections).
@@ -202,7 +204,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (res.ok) {
       const body = (await res.json().catch(() => ({}))) as { data?: { inspection?: { id?: string } } };
       const id = body?.data?.inspection?.id;
-      if (id) return redirect(`/inspections/${id}/edit`);
+      if (id) return redirect(await createLandingPath(api, id));
     }
     // Surface the API rejection in the worker log — silent { ok:false }
     // responses have repeatedly cost full debugging rounds (see save-settings).
@@ -548,6 +550,10 @@ export default function InspectionsPage() {
   // indefinitely; the hook clears it once the server confirms the delete.
   const purgeOfflineData = useOfflinePurgeOnDelete(fetcher);
   const canDelete = useCapability("deleteInspection");
+  const canScheduleOthers = useCapability("scheduleOthers");
+  // Staff book jobs and set the booking's status; they have no setup checklist, no completed visits, and no editor.
+  const isStaff = sessionCtx !== null && isStaffRole(sessionCtx.user.role);
+  const canOpenEditor = useCapability("editReports");
 
   const batchDelete = () => {
     if (selectedIds.size === 0) return;
@@ -676,6 +682,8 @@ export default function InspectionsPage() {
       toggleSelect={toggleSelect}
       transitionStatus={transitionStatus}
       timeZone={displayTz}
+      orderStatusesOnly={isStaff} canChangeStatus={!isStaff || canScheduleOthers}
+      canOpenEditor={canOpenEditor}
     />
   );
 
@@ -742,9 +750,7 @@ export default function InspectionsPage() {
                 {m.inspections_list_action_export()}
               </Button>
             )}
-            <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={() => navigate("/inspections/new")}>
-              {m.inspections_list_action_new()}
-            </Button>
+            <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={() => navigate("/inspections/new")}>{m.inspections_list_action_new()}</Button>
           </>
         }
       />
@@ -753,7 +759,8 @@ export default function InspectionsPage() {
       {!listTooShortToNarrow && <InspectionsStatCards counts={counts} targets={STAT_TARGETS} />}
 
       {/* IA-12 — Onboarding checklist (hidden when dismissed or allDone) */}
-      <OnboardingChecklist
+      {/* Setup steps belong to whoever creates inspections; an office user has none to take. */}
+      {!isStaff && <OnboardingChecklist
         steps={onboardingSteps}
         dismissed={checklistDismissed}
         onDismiss={() => {
@@ -764,7 +771,7 @@ export default function InspectionsPage() {
           );
         }}
         onOpenWizard={() => navigate("/inspections/new")}
-      />
+      />}
 
       {/* Everything that narrows a list, hidden while there is no list. */}
       {!listTooShortToNarrow && (<>
