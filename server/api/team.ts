@@ -4,11 +4,10 @@ import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import { requireCapability, capabilitiesFor } from '../lib/middleware/require-capability';
-import { auditRefusedGrant } from './team-grant-audit';
+import { auditRefusedGrant, updateMemberAudited } from './team-grant-audit';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
 import { requireSeatAvailable } from '../features/seat-quota';
-import { assertSeatForRoleChange } from '../features/seat-quota/role-change-guard';
 import { inviteAcceptUrl } from '../lib/url';
 import { auditFromContext } from '../lib/audit';
 import { assertMayTouchOwner } from '../lib/auth/owner-guard';
@@ -311,27 +310,10 @@ const teamRoutes = createApiRouter()
         }, 201);
     })
     .openapi(updateTeamMemberRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const user = c.get('user');
         const { id: memberId } = c.req.valid('param');
         const body = c.req.valid('json');
 
-        // Moving staff onto a role that holds a seat takes a seat.
-        if (body.role) {
-            await assertSeatForRoleChange({
-                tenantId, userId: memberId, nextRole: body.role, db: c.env.DB,
-                seatQuota: { enforce: c.var.profile.hasSeatQuota, billingPortalUrl: c.var.profile.billingPortalUrl },
-            });
-        }
-
-        const requesterCapabilities = await capabilitiesFor(c);
-        const result = await auditRefusedGrant(c, 'update', body.role ?? null, () => c.var.services.team.updateMember({
-            tenantId, userId: memberId, requesterId: user?.sub as string, requesterRole: c.get('userRole'), requesterCapabilities,
-            ...(body.role ? { role: body.role } : {}),
-            ...(body.permissionOverrides !== undefined ? { permissionOverrides: body.permissionOverrides } : {}),
-        }));
-        // Who changed whose access, on the durable record.
-        auditFromContext(c, 'user.update', 'user', { entityId: memberId, metadata: { role: result.role } });
+        await updateMemberAudited(c, memberId, body);
 
         return c.json({ success: true as const, data: { updated: true as const } }, 200);
     })

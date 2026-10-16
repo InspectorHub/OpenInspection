@@ -4,23 +4,16 @@ import { eq, and, isNull, ne } from 'drizzle-orm';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { UserRole } from '../types/auth';
 import { assertMayTouchOwner } from '../lib/auth/owner-guard';
-import { assertMayGrant, sameOverrides, type GrantActor } from '../lib/auth/grant-ceiling';
+import { assertMayGrant, type GrantActor } from '../lib/auth/grant-ceiling';
+import { diffOverrides, planMemberUpdate, type MemberUpdatePlan, type RequestedOverrides } from './team/plan-member-update';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
-import { coerceOverrides, getCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from '../lib/auth/capabilities';
+import { coerceOverrides, getCapabilities, type CapabilitySet, type PermissionOverrides } from '../lib/auth/capabilities';
 import { revokeAllUserGrants } from '../lib/mcp/grants';
 import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import { resetMemberTwoFactor } from './team/reset-two-factor';
 import { planReassignment, runAtomically, type RemovalChoice } from './team/open-assignments';
-
-/**
- * Loose shape accepted from the validated invite body. Zod under
- * `exactOptionalPropertyTypes` infers `boolean | undefined` per key, which is
- * not assignable to the strict `PermissionOverrides`; `diffOverrides` reads each
- * value through a `typeof === 'boolean'` guard so the looseness is safe.
- */
-type RequestedOverrides = Partial<Record<Capability, boolean | undefined>>;
 
 export class TeamService {
     /**
@@ -201,22 +194,9 @@ export class TeamService {
         return row ?? null;
     }
 
-    /**
-     * Reduce a requested override map to only the capabilities whose value
-     * differs from the role's template default. Returns null when nothing
-     * differs (the role template already covers the request) so the stored
-     * column stays null. owner/agent capabilities are pinned by getCapabilities,
-     * so a diff against the effective template never persists a moot toggle.
-     */
+    /** See `diffOverrides` in ./team/plan-member-update. */
     static diffOverrides(role: UserRole, requested?: RequestedOverrides | null): PermissionOverrides | null {
-        if (!requested) return null;
-        const template = getCapabilities(role, null);
-        const diff: PermissionOverrides = {};
-        for (const cap of TOGGLEABLE) {
-            const value = requested[cap];
-            if (typeof value === 'boolean' && value !== template[cap]) diff[cap] = value;
-        }
-        return Object.keys(diff).length ? diff : null;
+        return diffOverrides(role, requested);
     }
 
     /**
@@ -254,8 +234,16 @@ export class TeamService {
          */
         requesterCapabilities?: CapabilitySet;
         role?: UserRole;
+        /** Omitted means "leave the overrides as they are"; null or an empty map clears them. */
         permissionOverrides?: RequestedOverrides | null;
-    }) {
+        /**
+         * Runs after every refusal rule has passed and before anything is written,
+         * and only when the edit changes something. Lets a caller add a check that
+         * must come AFTER the grant ceiling (a seat-quota check, say), so a person
+         * who may not make the change is never told about the company's seat count.
+         */
+        beforeWrite?: (plan: MemberUpdatePlan) => Promise<void>;
+    }): Promise<{ id: string; role: UserRole; permissionOverrides: PermissionOverrides | null } & Pick<MemberUpdatePlan, 'changed' | 'roleChanged' | 'capabilitiesChanged'>> {
         const { tenantId, userId, requesterId } = params;
         const db = this.getDB();
 
@@ -303,32 +291,25 @@ export class TeamService {
             }
         }
 
-        // Store only what differs from the (possibly new) role template, so an
-        // all-default member stores null and the role stays the single source.
-        const permissionOverrides = TeamService.diffOverrides(
+        // The ceiling, the self-edit rule and the change itself (see the planner).
+        const plan = planMemberUpdate({
+            actor,
+            isSelf: userId === requesterId,
+            current: { role: user.role as UserRole, permissionOverrides: user.permissionOverrides },
             nextRole,
-            params.permissionOverrides ?? null,
-        );
-
-        // The ceiling: only what this change newly turns ON counts, so a manager
-        // can still edit (or turn off) a member who already holds something the
-        // manager does not. Role template grants count too, not just switches.
-        const currentOverrides = coerceOverrides(user.permissionOverrides);
-        assertMayGrant(actor, {
-            from: { role: user.role as UserRole, overrides: currentOverrides },
-            to: { role: nextRole, overrides: permissionOverrides },
+            requested: params.permissionOverrides,
         });
-        // A manager does not edit their own permissions; ask an owner. (Their
-        // role is already immovable above.) Owners are exempt: owner is pinned.
-        if (userId === requesterId && actor.role !== 'owner' && !sameOverrides(currentOverrides, permissionOverrides)) {
-            throw Errors.SelfPermissionChange();
-        }
+        const { permissionOverrides, roleChanged, capabilitiesChanged, changed } = plan;
+        const result = { id: userId, role: nextRole, permissionOverrides, changed, roleChanged, capabilitiesChanged };
+        if (!changed) return result;
+
+        if (params.beforeWrite) await params.beforeWrite(plan);
 
         await db.update(users)
             .set({ role: nextRole, permissionOverrides })
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
 
-        if (params.role && params.role !== user.role) {
+        if (roleChanged) {
             await this.writeSessionInvalidation(userId);
             if (this.oauth) {
                 try {
@@ -344,15 +325,24 @@ export class TeamService {
             // Mirror the new role to the other side of the seam, after the
             // security-critical invalidation above. SaaS-only: no-op when the
             // outbox is undefined. Sent only when the role moved.
+            // The role is already saved and the session already ended, so a failed
+            // append must not turn this into an error the caller would retry.
             if (this.outbox) {
-                await this.outbox.append({
-                    type: 'user.role_changed',
-                    payload: { tenantId, email: user.email, role: nextRole },
-                });
+                try {
+                    await this.outbox.append({
+                        type: 'user.role_changed',
+                        payload: { tenantId, email: user.email, role: nextRole },
+                    });
+                } catch (err) {
+                    logger.error('Failed to append user.role_changed to the sync outbox after a role change; the other side may keep the OLD role', {
+                        userId,
+                        tenantId,
+                    }, err instanceof Error ? err : new Error(String(err)));
+                }
             }
         }
 
-        return { id: userId, role: nextRole, permissionOverrides };
+        return result;
     }
 
     async removeMember(tenantId: string, userId: string, requesterId: string, requesterRole: UserRole, choice: RemovalChoice = {}) {

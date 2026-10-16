@@ -290,7 +290,7 @@ const migrationIntakeRoutes = createApiRouter()
             rowResolutions: body.rowResolutions,
             seatQuotaEnforced: c.var.profile.hasSeatQuota,
             billingPortalUrl: c.var.profile.billingPortalUrl,
-            actor: { role: c.get('userRole'), capabilities: await capabilitiesFor(c) },
+            actor: { role: c.get('userRole'), capabilities: await capabilitiesFor(c), userId: c.get('user')?.sub },
         });
 
         // Delivery happens here: the only place holding both the provider and

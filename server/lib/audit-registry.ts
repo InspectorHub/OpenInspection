@@ -266,7 +266,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'user.password_change': { family: 'user', label: 'audit_action_user_password_change', meta: {}, status: { kind: 'live' } },
     'user.removed': { family: 'user', label: 'audit_action_user_removed', meta: { reassigned: 'count', unassigned: 'count', keptForRecord: 'count', reassignedTo: 'id' }, status: { kind: 'live' } },
     'user.two_factor_reset': { family: 'user', label: 'audit_action_user_two_factor_reset', meta: { email: 'person' }, status: { kind: 'live' } },
-    'user.update': { family: 'user', label: 'audit_action_user_update', meta: { role: 'name' }, status: { kind: 'live' } },
+    'user.update': { family: 'user', label: 'audit_action_user_update', meta: { role: 'name', capabilitiesChanged: 'name' }, status: { kind: 'live' } },
 };
 
 /**

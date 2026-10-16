@@ -20,6 +20,8 @@ import { TeamService } from '../../../server/services/team.service';
 import teamRoutes from '../../../server/api/team';
 import { applyMemberRow } from '../../../server/services/migration-intake/member-rows';
 import { createTestDb, setupSchema } from '../db';
+import { ScopedDB } from '../../../server/lib/db/scoped';
+import { asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 import { actorOf, OWNER_ACTOR } from '../helpers/grant-actor';
@@ -27,6 +29,8 @@ import type { HonoConfig } from '../../../server/types/hono';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+vi.mock('../../../server/features/seat-quota/role-change-guard', () => ({ assertSeatForRoleChange: vi.fn().mockResolvedValue(undefined) }));
+import { assertSeatForRoleChange } from '../../../server/features/seat-quota/role-change-guard';
 
 const refusal = (code: string) => expect.objectContaining({ status: 403, code });
 
@@ -183,19 +187,28 @@ describe('routes enforce the ceiling', () => {
         ]);
     });
 
-    /** `actingOverrides` are the ACTING manager's own overrides, as the per-request resolver reads them. */
-    function build(actingRole: 'owner' | 'manager', actingOverrides: PermissionOverrides | null = null) {
+    /**
+     * The acting person is a REAL row, and the route reads their access the way
+     * it does in production: `capabilitiesFor` asks a tenant-scoped database
+     * handle for that row's overrides, per request. Nothing hands the actor's
+     * permissions to the handler. Only the verified-token claims (who, which
+     * tenant, which role) are set by hand, because the token step is not what
+     * is under test; the role is read back from the row so the two cannot differ.
+     */
+    async function build(actingRole: 'owner' | 'manager', actingOverrides: PermissionOverrides | null = null) {
+        const actingId = actingRole === 'owner' ? OWNER : MANAGER;
+        await db.update(schema.users).set({ permissionOverrides: actingOverrides }).where(eq(schema.users.id, actingId));
+        const actingRow = await db.select({ role: schema.users.role }).from(schema.users).where(eq(schema.users.id, actingId)).get();
         const app = new OpenAPIHono<HonoConfig>();
         app.onError((err, c) => (err instanceof AppError
             ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
             : c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500)));
-        const actingId = actingRole === 'owner' ? OWNER : MANAGER;
         app.use('*', async (c, next) => {
-            c.set('userRole', actingRole);
+            c.set('userRole', actingRow?.role as Role);
             c.set('tenantId', TENANT);
             c.set('user', { sub: actingId } as HonoConfig['Variables']['user']);
             c.set('profile', { hasSeatQuota: false } as HonoConfig['Variables']['profile']);
-            c.set('sdb', { getById: async () => ({ permissionOverrides: actingOverrides }) } as unknown as HonoConfig['Variables']['sdb']);
+            c.set('sdb', new ScopedDB(asScopedDbSource(db), TENANT) as unknown as HonoConfig['Variables']['sdb']);
             c.set('services', {
                 team: new TeamService({} as D1Database),
                 email: { sendInvitation: vi.fn().mockResolvedValue(undefined) },
@@ -206,44 +219,48 @@ describe('routes enforce the ceiling', () => {
         return app;
     }
 
-    const ctx = makeExecutionContext().ctx;
-    const send = (app: OpenAPIHono<HonoConfig>, method: 'POST' | 'PATCH', path: string, body: unknown) =>
+    const { ctx, settle } = makeExecutionContext();
+    const send = (app: Awaited<ReturnType<typeof build>>, method: 'POST' | 'PATCH', path: string, body: unknown) =>
         app.request(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, ENV, ctx);
-    const invite = (app: OpenAPIHono<HonoConfig>, body: Record<string, unknown>) =>
+    const invite = (app: Awaited<ReturnType<typeof build>>, body: Record<string, unknown>) =>
         send(app, 'POST', '/api/team/invite', { email: 'new@a.test', notify: false, ...body });
-    const patch = (app: OpenAPIHono<HonoConfig>, id: string, body: Record<string, unknown>) =>
+    const patch = (app: Awaited<ReturnType<typeof build>>, id: string, body: Record<string, unknown>) =>
         send(app, 'PATCH', `/api/team/members/${id}`, body);
     const invites = () => db.select().from(schema.tenantInvites).all();
+    const auditRows = async (action: string) => {
+        await settle();
+        return (await db.select().from(schema.auditLogs).all()).filter((r) => r.action === action);
+    };
     const overridesOf = async (id: string) =>
         (await db.select({ o: schema.users.permissionOverrides }).from(schema.users).where(eq(schema.users.id, id)).get())?.o;
 
     describe('POST /api/team/invite', () => {
         it('refuses a manager inviting with a switch the manager does not hold, and writes nothing', async () => {
-            const res = await invite(build('manager', { companyFinance: false }), { role: 'inspector', permissionOverrides: { companyFinance: true } });
+            const res = await invite(await build('manager', { companyFinance: false }), { role: 'inspector', permissionOverrides: { companyFinance: true } });
             expect(res.status).toBe(403);
             expect(((await res.json()) as { error: { code: string } }).error.code).toBe('CAPABILITY_CEILING');
             expect(await invites()).toHaveLength(0);
         });
 
         it('CONTROL - the same manager may invite with that switch off', async () => {
-            const res = await invite(build('manager', { companyFinance: false }), { role: 'inspector', permissionOverrides: { companyFinance: false } });
+            const res = await invite(await build('manager', { companyFinance: false }), { role: 'inspector', permissionOverrides: { companyFinance: false } });
             expect(res.status).toBe(201);
             expect(await invites()).toHaveLength(1);
         });
 
         it('CONTROL - an owner may invite with any switch', async () => {
-            const res = await invite(build('owner'), { role: 'inspector', permissionOverrides: { companyFinance: true } });
+            const res = await invite(await build('owner'), { role: 'inspector', permissionOverrides: { companyFinance: true } });
             expect(res.status).toBe(201);
         });
 
         it('refuses a manager without companyFinance inviting a manager (the template carries it)', async () => {
-            const res = await invite(build('manager', { companyFinance: false }), { role: 'manager' });
+            const res = await invite(await build('manager', { companyFinance: false }), { role: 'manager' });
             expect(res.status).toBe(403);
             expect(await invites()).toHaveLength(0);
         });
 
         it('refuses a manager inviting an owner', async () => {
-            const res = await invite(build('manager'), { role: 'owner' });
+            const res = await invite(await build('manager'), { role: 'owner' });
             expect(res.status).toBe(403);
             expect(await invites()).toHaveLength(0);
         });
@@ -251,27 +268,27 @@ describe('routes enforce the ceiling', () => {
 
     describe('PATCH /api/team/members/:id', () => {
         it('refuses a manager turning on a switch the manager does not hold, and changes nothing', async () => {
-            const res = await patch(build('manager', { companyFinance: false }), INSPECTOR, { permissionOverrides: { companyFinance: true } });
+            const res = await patch(await build('manager', { companyFinance: false }), INSPECTOR, { permissionOverrides: { companyFinance: true } });
             expect(res.status).toBe(403);
             expect(((await res.json()) as { error: { code: string } }).error.code).toBe('CAPABILITY_CEILING');
             expect(await overridesOf(INSPECTOR)).toBeNull();
         });
 
         it('CONTROL - the same manager may turn a switch off, and an owner may turn it on', async () => {
-            expect((await patch(build('manager', { companyFinance: false }), INSPECTOR, { permissionOverrides: { publish: false } })).status).toBe(200);
+            expect((await patch(await build('manager', { companyFinance: false }), INSPECTOR, { permissionOverrides: { publish: false } })).status).toBe(200);
             expect(await overridesOf(INSPECTOR)).toEqual({ publish: false });
-            expect((await patch(build('owner'), INSPECTOR, { permissionOverrides: { companyFinance: true } })).status).toBe(200);
+            expect((await patch(await build('owner'), INSPECTOR, { permissionOverrides: { companyFinance: true } })).status).toBe(200);
             expect(await overridesOf(INSPECTOR)).toEqual({ companyFinance: true });
         });
 
         it('refuses a manager promoting a member to manager when the manager lacks what the role carries', async () => {
-            const res = await patch(build('manager', { companyFinance: false }), INSPECTOR, { role: 'manager' });
+            const res = await patch(await build('manager', { companyFinance: false }), INSPECTOR, { role: 'manager' });
             expect(res.status).toBe(403);
             expect((await db.select({ r: schema.users.role }).from(schema.users).where(eq(schema.users.id, INSPECTOR)).get())?.r).toBe('inspector');
         });
 
         it('refuses a manager changing their own permissions, but an unchanged save goes through', async () => {
-            const app = build('manager');
+            const app = await build('manager');
             const res = await patch(app, MANAGER, { permissionOverrides: { publish: false } });
             expect(res.status).toBe(403);
             expect(((await res.json()) as { error: { code: string } }).error.code).toBe('SELF_PERMISSION_CHANGE');
@@ -280,9 +297,36 @@ describe('routes enforce the ceiling', () => {
             expect((await patch(app, MANAGER, { permissionOverrides: {} })).status).toBe(200);
         });
 
+        it('records which capabilities moved, and nothing for a save that changes nothing', async () => {
+            const app = await build('owner');
+            expect((await patch(app, INSPECTOR, { permissionOverrides: { companyFinance: true } })).status).toBe(200);
+            const rows = await auditRows('user.update');
+            expect(rows).toHaveLength(1);
+            expect(rows[0]?.entityId).toBe(INSPECTOR);
+            expect(rows[0]?.metadata).toEqual({ role: 'inspector', capabilitiesChanged: ['companyFinance'] });
+            // The same request again changes nothing: no write, no second record.
+            expect((await patch(app, INSPECTOR, { permissionOverrides: { companyFinance: true } })).status).toBe(200);
+            expect(await auditRows('user.update')).toHaveLength(1);
+            expect(await auditRows('user.grant_refused')).toHaveLength(0);
+        });
+
+        it('records a refused grant, and the refusal comes before any seat check', async () => {
+            vi.mocked(assertSeatForRoleChange).mockClear();
+            const res = await patch(await build('manager', { companyFinance: false }), INSPECTOR, { role: 'manager' });
+            expect(res.status).toBe(403);
+            expect(assertSeatForRoleChange).not.toHaveBeenCalled();
+            const refused = await auditRows('user.grant_refused');
+            expect(refused).toHaveLength(1);
+            expect(refused[0]?.metadata).toMatchObject({ reason: 'CAPABILITY_CEILING', role: 'manager', during: 'update' });
+            expect(await auditRows('user.update')).toHaveLength(0);
+            // CONTROL: the same edit by an owner passes the ceiling and does reach the seat check.
+            expect((await patch(await build('owner'), INSPECTOR, { role: 'manager' })).status).toBe(200);
+            expect(assertSeatForRoleChange).toHaveBeenCalledTimes(1);
+        });
+
         it('refuses a manager promoting anyone to owner or touching an owner', async () => {
-            expect((await patch(build('manager'), INSPECTOR, { role: 'owner' })).status).toBe(403);
-            expect((await patch(build('manager'), OWNER, { permissionOverrides: { publish: false } })).status).toBe(403);
+            expect((await patch(await build('manager'), INSPECTOR, { role: 'owner' })).status).toBe(403);
+            expect((await patch(await build('manager'), OWNER, { permissionOverrides: { publish: false } })).status).toBe(403);
         });
     });
 });

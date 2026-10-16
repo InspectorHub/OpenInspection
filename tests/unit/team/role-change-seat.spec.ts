@@ -62,7 +62,14 @@ describe('seat check on a role change', () => {
 
     describe('PATCH /api/team/members/:id', () => {
         function build(hasSeatQuota: boolean) {
-            const updateMember = vi.fn().mockResolvedValue({ id: 'm1', role: 'manager', permissionOverrides: null });
+            // Stands in for the service's order of work: the caller's `beforeWrite`
+            // (the seat check) runs first, and only after it does anything get written.
+            const wrote = vi.fn();
+            const updateMember = vi.fn(async (p: { beforeWrite?: (plan: unknown) => Promise<void> }) => {
+                await p.beforeWrite?.({});
+                wrote();
+                return { id: 'm1', role: 'manager', permissionOverrides: null, changed: true, roleChanged: true, capabilitiesChanged: [] };
+            });
             const app = new OpenAPIHono<HonoConfig>();
             app.onError((err, c) => (err instanceof AppError
                 ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
@@ -76,22 +83,22 @@ describe('seat check on a role change', () => {
                 await next();
             });
             app.route('/api/team', teamRoutes);
-            return { app, updateMember };
+            return { app, updateMember, wrote };
         }
         const patch = (app: OpenAPIHono<HonoConfig>, role: string) => app.request('/api/team/members/s', {
             method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role }),
         }, { DB: {} }, makeExecutionContext().ctx);
 
         it('answers 402 and writes nothing when staff would take the last seat', async () => {
-            const { app, updateMember } = build(true);
+            const { app, wrote } = build(true);
             expect((await patch(app, 'inspector')).status).toBe(402);
-            expect(updateMember).not.toHaveBeenCalled();
+            expect(wrote).not.toHaveBeenCalled();
         });
 
         it('lets the same change through where seats are not enforced (control)', async () => {
-            const { app, updateMember } = build(false);
+            const { app, wrote } = build(false);
             expect((await patch(app, 'inspector')).status).toBe(200);
-            expect(updateMember).toHaveBeenCalledTimes(1);
+            expect(wrote).toHaveBeenCalledTimes(1);
         });
     });
 });

@@ -1,4 +1,4 @@
-import { Errors } from '../errors';
+import { AppError, ErrorCode, Errors } from '../errors';
 import type { Role } from './roles';
 import {
     coerceOverrides,
@@ -39,6 +39,19 @@ const MANAGER_GRANTABLE_ROLES: readonly Role[] = ['manager', 'inspector', 'staff
 export interface GrantActor {
     role: Role;
     capabilities: CapabilitySet;
+    /** Who is acting, when the caller knows; only used to attribute the record of a refusal. */
+    userId?: string | undefined;
+}
+
+const CEILING_CODES: ReadonlySet<string> = new Set([
+    ErrorCode.CAPABILITY_CEILING,
+    ErrorCode.ROLE_CEILING,
+    ErrorCode.SELF_PERMISSION_CHANGE,
+]);
+
+/** Whether an error is one of the grant ceiling's own refusals (the ones worth a durable record). */
+export function isCeilingRefusal(err: unknown): err is AppError {
+    return err instanceof AppError && CEILING_CODES.has(err.code);
 }
 
 /** Whether the actor may place someone in `role`. The Team page uses the same answer to build its role select. */
@@ -89,9 +102,25 @@ export function assertMayGrant(actor: GrantActor, change: GrantChange): void {
     if (beyond.length > 0) throw Errors.CapabilityCeiling(beyond);
 }
 
-/** Order-independent comparison of two stored override maps. */
-export function sameOverrides(a: PermissionOverrides | null, b: PermissionOverrides | null): boolean {
-    const norm = (o: PermissionOverrides | null) =>
-        JSON.stringify(TOGGLEABLE.map((cap) => (typeof o?.[cap] === 'boolean' ? o[cap] : null)));
-    return norm(a) === norm(b);
+/**
+ * Capabilities whose EFFECTIVE value differs between two states. Effective means
+ * role template plus overrides, pinned values applied: a stored override that
+ * restates the template, or a role move that changes nothing a member holds,
+ * differs in no capability.
+ */
+export function effectiveCapabilitiesDiffer(
+    a: { role: Role; overrides: PermissionOverrides | null },
+    b: { role: Role; overrides: PermissionOverrides | null },
+): Capability[] {
+    const before = getCapabilities(a.role, coerceOverrides(a.overrides));
+    const after = getCapabilities(b.role, coerceOverrides(b.overrides));
+    return TOGGLEABLE.filter((cap) => before[cap] !== after[cap]);
+}
+
+/** Whether two states grant exactly the same capabilities. */
+export function sameEffective(
+    a: { role: Role; overrides: PermissionOverrides | null },
+    b: { role: Role; overrides: PermissionOverrides | null },
+): boolean {
+    return effectiveCapabilitiesDiffer(a, b).length === 0;
 }

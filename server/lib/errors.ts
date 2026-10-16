@@ -137,7 +137,14 @@ export const Errors = {
     CapabilityCeiling: (capabilities: readonly string[]) =>
         new AppError(403, ErrorCode.CAPABILITY_CEILING, 'Only an owner can grant a permission you do not have yourself.', { capabilities }),
     RoleCeiling: (role: string) =>
-        new AppError(403, ErrorCode.ROLE_CEILING, 'Only an owner can grant that role.', { role }),
+        new AppError(
+            403,
+            ErrorCode.ROLE_CEILING,
+            role === 'agent'
+                ? 'Agents are not team members: they are given access to an inspection, not a role on the team.'
+                : 'Only an owner can grant that role.',
+            { role },
+        ),
     SelfPermissionChange: () =>
         new AppError(403, ErrorCode.SELF_PERMISSION_CHANGE, 'You cannot change your own permissions. Ask an owner.'),
     NotFound: (msg: string = 'Resource not found') => new AppError(404, ErrorCode.NOT_FOUND, msg),
