@@ -85,6 +85,7 @@
   "newinsp_review_services": "Services",
   "newinsp_review_assignee": "Inspector",
   "newinsp_review_assignee_you": "You",
+  "newinsp_review_assignee_none": "Not assigned yet",
   "newinsp_review_empty_hint": "Fills in as you go.",
   "newinsp_team_mode_label": "Team Mode",
   "newinsp_team_solo": "Solo",

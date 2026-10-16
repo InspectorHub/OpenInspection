@@ -85,6 +85,7 @@
   "newinsp_review_services": "Servicios",
   "newinsp_review_assignee": "Inspector",
   "newinsp_review_assignee_you": "Usted",
+  "newinsp_review_assignee_none": "Sin asignar todavía",
   "newinsp_review_empty_hint": "Se completa a medida que usted avanza.",
   "newinsp_team_mode_label": "Modo de equipo",
   "newinsp_team_solo": "Individual",

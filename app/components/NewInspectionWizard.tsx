@@ -220,7 +220,7 @@ export function NewInspectionWizard({
         soloMode,
         inspectorId,
         teamMembers,
-        selfName: sessionCtx?.user.name ?? null,
+        selfName: sessionCtx?.user.role === "staff" ? null : sessionCtx?.user.name ?? null,
       }),
     [address, templates, templateId, clientName, clientEmail, clientPhone, selectedAgent,
       newAgentName, serviceCatalog, services, priceOverrides, soloMode, inspectorId, teamMembers,
@@ -470,7 +470,7 @@ export function NewInspectionWizard({
           summary={summary}
           scheduledIso={civilToInstantISO(date, time, schedulingTz)}
           timeZone={schedulingTz}
-          currentStep={step}
+          currentStep={step} viewerCanInspect={sessionCtx?.user.role !== "staff"}
           onJump={(target) => {
             const idx = steps.indexOf(target);
             if (idx >= 0) setStepIdx(idx);

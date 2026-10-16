@@ -48,6 +48,7 @@ export function ReviewPanel({
     scheduledIso,
     timeZone,
     currentStep,
+    viewerCanInspect = true,
     onJump,
 }: {
     summary: NewInspectionSummary;
@@ -55,6 +56,8 @@ export function ReviewPanel({
     scheduledIso: string | null;
     timeZone: string;
     currentStep: WizardStepId;
+    /** False for a viewer who is never the inspector (office staff): no inspector chosen reads as unassigned, not as "You". */
+    viewerCanInspect?: boolean;
     onJump: (step: WizardStepId) => void;
 }) {
     const fmt = useInspectionDateTimeFormat();
@@ -96,7 +99,7 @@ export function ReviewPanel({
                 )}
                 <ReviewRow
                     label={m.newinsp_review_assignee()}
-                    value={summary.assignee ?? m.newinsp_review_assignee_you()}
+                    value={summary.assignee ?? (viewerCanInspect ? m.newinsp_review_assignee_you() : m.newinsp_review_assignee_none())}
                     {...row("confirm")}
                 />
             </div>

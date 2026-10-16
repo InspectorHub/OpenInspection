@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { reportActions } from '~/routes/inspector-portal';
 
-const publishCaps = { publish: true };
-const noCaps = { publish: false };
+const publishCaps = { publish: true, edit: true };
+const noCaps = { publish: false, edit: true };
+// Office staff: no publish, and no report editing either.
+const officeCaps = { publish: false, edit: false };
 
 describe('reportActions', () => {
   // The order lifecycle no longer gates report actions: the hub used to render
@@ -32,7 +34,11 @@ describe('reportActions', () => {
     expect(reportActions(publishCaps, 'in_progress')).toEqual(['publish']);
   });
 
-  it('in_progress + no cap → submit', () => {
+  it('in_progress + no publish cap → submit', () => {
     expect(reportActions(noCaps, 'in_progress')).toEqual(['submit']);
+  });
+
+  it('in_progress with neither publish nor report editing (office staff) → nothing to take', () => {
+    expect(reportActions(officeCaps, 'in_progress')).toEqual([]);
   });
 });

@@ -615,12 +615,14 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  * was never marked completed. Returns an ordered array of action identifiers.
  */
 export function reportActions(
-  caps: { publish: boolean },
+  caps: { publish: boolean; edit: boolean },
   reportStatus: string,
 ): Array<'submit' | 'publish' | 'return' | 'unpublish'> {
   if (reportStatus === REPORT_STATUS.PUBLISHED) return caps.publish ? ['unpublish'] : [];
   if (reportStatus === REPORT_STATUS.SUBMITTED) return caps.publish ? ['publish', 'return'] : [];
-  return caps.publish ? ['publish'] : ['submit']; // in_progress (or unknown)
+  // in_progress (or unknown). Submitting for review writes to the report, so it needs the same access the report editor does.
+  if (caps.publish) return ['publish'];
+  return caps.edit ? ['submit'] : [];
 }
 
 /* ------------------------------------------------------------------ */
@@ -818,7 +820,7 @@ export default function InspectionHubPage() {
 
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
-  const reportActionList = reportActions({ publish: canPublishCap }, inspection.reportStatus);
+  const reportActionList = reportActions({ publish: canPublishCap, edit: canEditReports }, inspection.reportStatus);
 
   // IA-40 — when a version already exists, the next publish increments to
   // versionNumber > 1 (an amendment), so the publish modal asks what changed.
