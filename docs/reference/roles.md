@@ -38,7 +38,7 @@ when its status before the cancellation is known and was not completed;
 owners and managers do the rest. Staff are never offered as an inspector
 (booking, availability, the assignee picker, service qualification, pay rules).
 Seat accounting is decided in one function, `countsTowardSeatQuota`
-(`server/lib/auth/roles.ts`); staff do not hold a seat.
+(`server/lib/auth/roles.ts`): owners, managers and inspectors hold a seat; staff do not, and agents are not company members so they do not either.
 
 Large or commercial jobs needing more than one inspector are handled by
 **assigning multiple inspectors to one inspection** (the assignment axis, `lead`
@@ -95,8 +95,10 @@ review, the property-facts card (`PATCH` and the autofill `POST`; the `GET` stay
 and approving concierge suggestions. Staff, and an inspector whose `editReports` was
 withdrawn, are refused all of these.
 
-Staff cannot publish, unpublish or return a report to draft: `publish` is pinned off
-for staff and no per-person override can turn it on (only that one switch is pinned).
+Staff cannot publish, unpublish or return a report to draft, and cannot write report
+content: `publish` and `editReports` are pinned off for staff and no per-person
+override or permission template can turn either on. A person who needs to do that work
+is an inspector or a manager, who holds a seat; staff hold none.
 Publishing with the auto-signature stamps the inspector's stored signature only when
 the publisher is that inspector or an owner or manager, and the stored record names
 who published it and which inspector it represents. A helper, staff member or other

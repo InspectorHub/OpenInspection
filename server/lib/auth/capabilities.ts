@@ -57,7 +57,7 @@ const ROLE_DEFAULTS: Record<Role, CapabilitySet> = {
                templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
                editReports: false },
 };
-/** owner is never reducible by overrides; agent is never elevated by them; staff never publish.
+/** owner is never reducible by overrides; agent is never elevated by them; staff never publish or write report content.
  *  A capability MISSING from any entry silently opts out of that guarantee,
  *  which is why each is restated in full rather than spread from the defaults. */
 const FIXED: Partial<Record<Role, Partial<CapabilitySet>>> = {
@@ -67,11 +67,12 @@ const FIXED: Partial<Record<Role, Partial<CapabilitySet>>> = {
   agent: { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
            templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
            editReports: false },
-  // Publishing is signing: the report goes out under the inspector's name. Pinned off
-  // so no override or permission template can hand it to an office user; a company
-  // that wants office publishing makes that person a manager. Only this one bit is
-  // pinned, every other staff capability stays adjustable.
-  staff: { publish: false },
+  // Publishing is signing (the report goes out under the inspector's name) and writing
+  // report content is inspection work. Both are pinned off so no override or permission
+  // template can hand them to an office user: staff hold no seat, and whoever authors or
+  // publishes holds one. A company that wants someone to do either makes that person an
+  // inspector or a manager. Every other staff capability stays adjustable.
+  staff: { publish: false, editReports: false },
 };
 
 /** The capabilities an override cannot change for `role`. A form uses this to show those switches as fixed. */

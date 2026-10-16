@@ -92,10 +92,11 @@ export function isFieldRole(role: string | null | undefined): boolean {
 export const NATIVE_APP_ROLES = [...FIELD_ROLES, ROLE.STAFF] as const;
 
 /**
- * The one place that decides whether a role occupies a member seat. Staff are
- * office users and do not; every other role does. Seat accounting reads this
- * function and nothing else.
+ * The one place that decides whether a role occupies a member seat. Owners, managers
+ * and inspectors do. Staff are office users and do not; agents are not members of a
+ * company at all (a global account linked to inspections one by one) and do not
+ * either. Seat accounting reads this function and nothing else.
  */
 export function countsTowardSeatQuota(role: Role): boolean {
-  return role !== ROLE.STAFF;
+  return role !== ROLE.STAFF && role !== ROLE.AGENT;
 }
