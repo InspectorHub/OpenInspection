@@ -44,7 +44,7 @@ import { InspectionsFocusBar } from "~/components/dashboard/InspectionsFocusBar"
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useColumnPredicates } from "~/lib/dashboard-visible-columns";
 import { m } from "~/paraglide/messages";
-import { isStaffRole } from "~/lib/access";
+import { isFieldRole, isStaffRole } from "~/lib/access";
 import { createLandingPath } from "~/lib/create-landing";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -101,12 +101,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       svcOptions = (sj.data ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price }));
     }
     // B-21 team step — non-admins get 403 → null → []; team step hidden for them.
-    const schedulingRoles = new Set(["owner", "manager", "inspector"]);
     let teamMembers: WizardTeamMember[] = [];
     if (membersRes?.ok) {
       const mb = (await membersRes.json()) as { data?: Array<{ id: string; email: string; role: string; name?: string | null }> };
       teamMembers = (mb.data ?? [])
-        .filter((m) => schedulingRoles.has(m.role))
+        .filter((m) => isFieldRole(m.role))
         .map((m) => ({ id: m.id, name: m.name ?? m.email }));
     }
     // IA-12: read checklistDismissed from onboardingState. Best-effort: if the

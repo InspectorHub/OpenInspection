@@ -15,7 +15,7 @@ import { WizardLayout } from "./new-inspection/WizardLayout";
 import { Breadcrumb } from "./Breadcrumb";
 import { PageHeader } from "@core/shared-ui";
 import { civilToInstantISO, todayInZone } from "~/lib/civil-time";
-import { useSchedulingTimeZone, useSessionContext } from "~/hooks/useSessionContext";
+import { useSchedulingTimeZone, useSessionContext, useViewerCanInspect } from "~/hooks/useSessionContext";
 import { QuotaExceededPanel } from "./new-inspection/QuotaExceededPanel";
 import type { AddressSelection } from "~/routes/resources/places";
 import { m } from "~/paraglide/messages";
@@ -111,7 +111,7 @@ export function NewInspectionWizard({
   // the zone "today" is counted in — one value, never UTC by default, which had
   // this step scheduling 9:00 AM UTC while the home checklist still asked for one.
   const schedulingTz = useSchedulingTimeZone();
-  const sessionCtx = useSessionContext();
+  const sessionCtx = useSessionContext(), viewerCanInspect = useViewerCanInspect();
   // IA-1 agent typeahead, and (Batch D) the same search for the client — one
   // hook, two instances, each with its own fetcher.
   const [agentSearch, setAgentSearch] = useState("");
@@ -220,7 +220,7 @@ export function NewInspectionWizard({
         soloMode,
         inspectorId,
         teamMembers,
-        selfName: sessionCtx?.user.role === "staff" ? null : sessionCtx?.user.name ?? null,
+        selfName: viewerCanInspect ? sessionCtx?.user.name ?? null : null,
       }),
     [address, templates, templateId, clientName, clientEmail, clientPhone, selectedAgent,
       newAgentName, serviceCatalog, services, priceOverrides, soloMode, inspectorId, teamMembers,
@@ -470,7 +470,7 @@ export function NewInspectionWizard({
           summary={summary}
           scheduledIso={civilToInstantISO(date, time, schedulingTz)}
           timeZone={schedulingTz}
-          currentStep={step} viewerCanInspect={sessionCtx?.user.role !== "staff"}
+          currentStep={step} viewerCanInspect={viewerCanInspect}
           onJump={(target) => {
             const idx = steps.indexOf(target);
             if (idx >= 0) setStepIdx(idx);

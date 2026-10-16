@@ -1,0 +1,254 @@
+{
+  "_comment": "Mutating routes with no principal guard (requireRole, requireCapability, ...). Each entry needs a category from CATEGORIES in scripts/lib/mutating-route-guards.mjs and a reason verified in the handler. The list may only shrink: lower maxEntries when you remove one. needs-owner-decision is temporary.",
+  "maxEntries": 62,
+  "entries": {
+    "server/api/agent-signup.ts::POST /": {
+      "category": "public-by-design",
+      "reason": "agent account signup: unauthenticated by design (isAgentPublic); handler enforces the Turnstile bot challenge and validates the body"
+    },
+    "server/api/agent/login.ts::POST /login": {
+      "category": "public-by-design",
+      "reason": "agent sign-in: path is unauthenticated by design (isAgentPublic); the handler checks email and password, same generic 401 for every failure"
+    },
+    "server/api/agent/login.ts::POST /login-link": {
+      "category": "public-by-design",
+      "reason": "agent magic-link request: unauthenticated by design (isAgentPublic); always answers 200 so it cannot enumerate accounts"
+    },
+    "server/api/agent/magic-login.ts::POST /magic-login/request": {
+      "category": "token-track",
+      "reason": "unauthenticated by design (isAgentPublic); the handler requires a live agent-kind report token for the inspection before emailing a link"
+    },
+    "server/api/agent/report-context.ts::POST /report-context": {
+      "category": "token-track",
+      "reason": "unauthenticated by design (isAgentPublic); read-only probe that resolves a report token via resolvePortalAccess"
+    },
+    "server/api/agent/terms.ts::POST /accept-terms": {
+      "category": "self-guarded-in-handler",
+      "reason": "handler throws 401 unless c.get(agentUserId) is set, then records acceptance for that agent only"
+    },
+    "server/api/auth.ts::POST /change-password": {
+      "category": "authenticated-any-role",
+      "reason": "own account: handler 401s without user.sub and requires the current password; agents refused centrally"
+    },
+    "server/api/auth.ts::POST /forgot-password": {
+      "category": "public-by-design",
+      "reason": "in ANONYMOUS_API_ALLOW: password reset request, sent without a session; handler answers uniformly"
+    },
+    "server/api/auth.ts::POST /join": {
+      "category": "token-track",
+      "reason": "in ANONYMOUS_API_ALLOW: accepting an invitation; the invite token is the credential (joinTeam verifies it)"
+    },
+    "server/api/auth.ts::POST /reset-password": {
+      "category": "token-track",
+      "reason": "in ANONYMOUS_API_ALLOW: the emailed reset token is the credential (resetPassword verifies it)"
+    },
+    "server/api/auth.ts::POST /setup": {
+      "category": "self-guarded-in-handler",
+      "reason": "isAuthPublic path; handler refuses with 409 once any tenant user exists and requires the SETUP_CODE secret (fails closed when unset)"
+    },
+    "server/api/auth/profile.ts::PATCH /profile": {
+      "category": "authenticated-any-role",
+      "reason": "own profile: handler 401s without user.sub and updates only the row with id = user.sub; agents are refused centrally (not in AGENT_API_ALLOW)"
+    },
+    "server/api/auth/profile.ts::POST /logout": {
+      "category": "public-by-design",
+      "reason": "in ANONYMOUS_API_ALLOW and AGENT_API_ALLOW: revokes the caller sessions if any and clears the cookie; harmless without a session"
+    },
+    "server/api/auth/totp.ts::POST /2fa/disable": {
+      "category": "authenticated-any-role",
+      "reason": "own account: needs the password and a valid code of that user; agents refused centrally"
+    },
+    "server/api/auth/totp.ts::POST /2fa/recovery-codes/regenerate": {
+      "category": "authenticated-any-role",
+      "reason": "own account: needs the password and a valid code of that user; agents refused centrally"
+    },
+    "server/api/auth/totp.ts::POST /2fa/setup": {
+      "category": "authenticated-any-role",
+      "reason": "own account: loadCurrentUser 401s without user.sub; refuses when 2FA is already enabled; agents refused centrally"
+    },
+    "server/api/auth/totp.ts::POST /2fa/verify": {
+      "category": "authenticated-any-role",
+      "reason": "own account: rate-limited, loadCurrentUser, verifies the code against that user pending secret; agents refused centrally"
+    },
+    "server/api/bookings/agreement.ts::POST /agreements/:token/decline": {
+      "category": "token-track",
+      "reason": "public signing page; the presented token resolves to a signer or 404"
+    },
+    "server/api/bookings/agreement.ts::POST /agreements/:token/sign": {
+      "category": "token-track",
+      "reason": "public signing page; the presented token resolves to a signer (getSignerByPresentedToken) or 404"
+    },
+    "server/api/bookings/create.ts::POST /book": {
+      "category": "public-by-design",
+      "reason": "public booking form: rate-limited, resolves the company from the submitted slug and validates the body"
+    },
+    "server/api/calendar.ts::DELETE /disconnect": {
+      "category": "authenticated-any-role",
+      "reason": "acts only on the caller's own calendar connection (user.sub); agents are refused centrally by api-access-policy; staff cannot be assigned jobs so a connected calendar exposes nothing. Decision 2026-10-16: no role gate (keep it minimal); add requireRole to every route in calendar.ts if that changes"
+    },
+    "server/api/calendar.ts::POST /sync": {
+      "category": "authenticated-any-role",
+      "reason": "acts only on the caller's own calendar connection (user.sub); agents are refused centrally by api-access-policy; same decision as DELETE /disconnect (2026-10-16)"
+    },
+    "server/api/calendar.ts::PUT /connections/:id/calendars": {
+      "category": "authenticated-any-role",
+      "reason": "the handler requires the connection to be the caller's own (loadOpenCalendarConnection by user.sub); agents are refused centrally by api-access-policy; same decision as DELETE /disconnect (2026-10-16)"
+    },
+    "server/api/client-documents.ts::DELETE /inspections/:id/documents/:docId": {
+      "category": "token-track",
+      "reason": "mounted at /api/public; resolveClientActor grant required, and only the uploader (uploadedByRef) may delete"
+    },
+    "server/api/client-documents.ts::PUT /inspections/:id/documents": {
+      "category": "token-track",
+      "reason": "mounted at /api/public; resolveClientActor requires a client grant (token or portal session) for the inspection, else 401"
+    },
+    "server/api/concierge.ts::POST /confirm": {
+      "category": "token-track",
+      "reason": "isConciergePublic: the magic-link token is the credential (confirmByClient verifies it)"
+    },
+    "server/api/identity.ts::POST /account/delete": {
+      "category": "authenticated-any-role",
+      "reason": "/api/identities/ is in AGENT_API_ALLOW by policy: any signed-in identity deletes its own account after confirming its email"
+    },
+    "server/api/identity.ts::POST /account/export": {
+      "category": "authenticated-any-role",
+      "reason": "/api/identities/ is in AGENT_API_ALLOW by policy: any signed-in identity exports its own data (user id from the session)"
+    },
+    "server/api/mcp-grants.ts::DELETE /grants/:id": {
+      "category": "self-guarded-in-handler",
+      "reason": "self path revokes only the caller own grant; the admin path (?admin=1) checks owner or manager inline before touching another member grant"
+    },
+    "server/api/messages.ts::POST /inspections/:id/messages": {
+      "category": "token-track",
+      "reason": "mounted at /api/public; resolveClientActor grant required, then a client seat on the inspection (403 otherwise)"
+    },
+    "server/api/messages.ts::POST /inspections/:id/messages/upload": {
+      "category": "token-track",
+      "reason": "mounted at /api/public; resolveClientActor grant required, 401 otherwise"
+    },
+    "server/api/notification-preferences.ts::PUT /notification-preferences": {
+      "category": "authenticated-any-role",
+      "reason": "own preferences: keyed by the session user id; agents have their own route under /api/agent"
+    },
+    "server/api/notification-preferences.ts::PUT /notification-preferences/bulk": {
+      "category": "authenticated-any-role",
+      "reason": "own preferences: subject is the session user"
+    },
+    "server/api/notification-preferences.ts::PUT /notification-preferences/sms-consent": {
+      "category": "authenticated-any-role",
+      "reason": "own SMS consent: subject is the session user"
+    },
+    "server/api/notifications.ts::DELETE /{id}": {
+      "category": "authenticated-any-role",
+      "reason": "own notices: requireUserId and the archive is scoped to that user"
+    },
+    "server/api/notifications.ts::POST /mark-all-read": {
+      "category": "authenticated-any-role",
+      "reason": "own notices: requireUserId and scoped to that user"
+    },
+    "server/api/notifications.ts::POST /mark-read": {
+      "category": "authenticated-any-role",
+      "reason": "own notices: requireUserId (401 without a session) and every write is scoped to that user"
+    },
+    "server/api/portal.ts::POST /{tenant}/logout": {
+      "category": "public-by-design",
+      "reason": "/api/portal/ is public: only clears the portal cookie; idempotent and tenant-agnostic"
+    },
+    "server/api/portal.ts::POST /{tenant}/request-link": {
+      "category": "public-by-design",
+      "reason": "/api/portal/ is public: asks for a sign-in link by email; answers uniformly whether or not the address has access"
+    },
+    "server/api/profile.ts::PATCH /": {
+      "category": "authenticated-any-role",
+      "reason": "own profile: handler 401s without user.sub and updates only that user row; agents refused centrally"
+    },
+    "server/api/profile.ts::POST /photo": {
+      "category": "authenticated-any-role",
+      "reason": "own profile photo: handler 401s without user.sub and stores under that user key; agents refused centrally"
+    },
+    "server/api/public-report.ts::POST /inspections/{id}/pay-intent": {
+      "category": "token-track",
+      "reason": "resolveClientActor: client or co-client grant required (401 otherwise); refuses a tenant mismatch"
+    },
+    "server/api/public-share.ts::POST /inspections/{id}/share-token": {
+      "category": "token-track",
+      "reason": "requires an existing access proof for this inspection (portal token or agent-view bridge), else 404"
+    },
+    "server/api/public/deposit-intent.ts::POST /inspections/{id}/deposit-intent": {
+      "category": "public-by-design",
+      "reason": "/api/public/ prefix: a client paying a booking deposit before any account; rate-limited, refuses once the visit is under way"
+    },
+    "server/api/public/uploads.ts::POST /uploads/photo": {
+      "category": "token-track",
+      "reason": "verifyUploadToken: signed single-purpose upload token required (401 otherwise); destination re-checked"
+    },
+    "server/api/public/uploads.ts::POST /uploads/video": {
+      "category": "token-track",
+      "reason": "verifyUploadToken: signed single-purpose upload token required (401 otherwise); destination re-checked"
+    },
+    "server/api/public/view-tracking.ts::POST /inspections/{id}/view-tracking-objection": {
+      "category": "token-track",
+      "reason": "resolvePortalRecipient: a portal access token for the inspection is required (401 otherwise)"
+    },
+    "server/api/qbo-webhook.ts::POST /": {
+      "category": "webhook-signature",
+      "reason": "/webhooks/ prefix: 401 without intuit-signature; verifies the HMAC over the raw body"
+    },
+    "server/api/repair-builder/crud-routes.ts::DELETE /repair-builder/{tenant}/{id}/lists/{rrId}/items/{itemId}": {
+      "category": "token-track",
+      "reason": "resolveBuilderAccess credential required; only the creator may remove (403 otherwise)"
+    },
+    "server/api/repair-builder/crud-routes.ts::PATCH /repair-builder/{tenant}/{id}/lists/{rrId}": {
+      "category": "token-track",
+      "reason": "resolveBuilderAccess credential required; only the creator may edit (403 otherwise)"
+    },
+    "server/api/repair-builder/crud-routes.ts::PATCH /repair-builder/{tenant}/{id}/lists/{rrId}/items/{itemId}": {
+      "category": "token-track",
+      "reason": "resolveBuilderAccess credential required (401 otherwise)"
+    },
+    "server/api/repair-builder/crud-routes.ts::POST /repair-builder/{tenant}/{id}": {
+      "category": "token-track",
+      "reason": "/repair-builder/ is token-track: resolveBuilderAccess requires a valid access credential (401 otherwise) and a published report"
+    },
+    "server/api/repair-builder/crud-routes.ts::POST /repair-builder/{tenant}/{id}/lists/{rrId}/items": {
+      "category": "token-track",
+      "reason": "resolveBuilderAccess credential required (401 otherwise)"
+    },
+    "server/api/repair-builder/share.ts::POST /repair-request/share/{shareToken}/email": {
+      "category": "token-track",
+      "reason": "/repair-request/ is token-track: the share token in the path is the credential and the report must be published"
+    },
+    "server/api/sms.ts::POST /sms/inbound/:tenant": {
+      "category": "webhook-signature",
+      "reason": "/webhooks/ prefix: verifies the provider signature with the company own secret before acting"
+    },
+    "server/api/sms.ts::POST /sms/optin-confirm": {
+      "category": "token-track",
+      "reason": "resolveOptinToken: the sealed opt-in token is the credential (404 when invalid or expired)"
+    },
+    "server/api/stripe-webhook.ts::POST /": {
+      "category": "webhook-signature",
+      "reason": "/webhooks/ prefix: 401 without stripe-signature; verifies it with the company webhook secret"
+    },
+    "server/api/test-hooks.ts::POST /calendar-connection": {
+      "category": "self-guarded-in-handler",
+      "reason": "/api/__test__/ is a public prefix; handler answers 404 unless E2E_EMAIL_SINK === 1 (absent flag, no route)"
+    },
+    "server/api/test-hooks.ts::POST /report-translation": {
+      "category": "self-guarded-in-handler",
+      "reason": "/api/__test__/ is a public prefix; handler answers 404 unless E2E_EMAIL_SINK === 1 (absent flag, no route)"
+    },
+    "server/api/unsubscribe.ts::POST /unsubscribe": {
+      "category": "token-track",
+      "reason": "/api/public/ prefix: the signed unsubscribe token is the credential (resolveLink)"
+    },
+    "server/api/users.ts::POST /me/onboarding": {
+      "category": "authenticated-any-role",
+      "reason": "own onboarding flags: handler 401s without user.sub and writes only that user row; agents refused centrally"
+    },
+    "server/api/widget.ts::POST /event": {
+      "category": "public-by-design",
+      "reason": "/api/public/widget: embeddable widget analytics; silently drops events from origins the company has not allowed"
+    }
+  }
+}

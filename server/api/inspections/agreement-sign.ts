@@ -21,6 +21,7 @@
 import { z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { Errors } from '../../lib/errors';
+import { requireRole } from '../../lib/middleware/rbac';
 import { logger } from '../../lib/logger';
 import { eq, and, asc } from 'drizzle-orm';
 import { inspections as inspectionTable, agreementRequests, agreementSigners } from '../../lib/db/schema';
@@ -32,7 +33,7 @@ import { fireAndForget } from '../../lib/fire-and-forget';
 
 const agreementSignRoutes = createApiRouter();
 
-agreementSignRoutes.post('/:id/sign', async (c) => {
+agreementSignRoutes.post('/:id/sign', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const id = c.req.param('id') as string;
         const tenantId = c.get('tenantId');
         const db = getDrizzle(c);

@@ -72,6 +72,7 @@ import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock
 import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
 import { resolveReferralSources } from "../../server/lib/referral-sources";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
+import type { RestorableStatus } from "../../server/lib/inspection/cancel-restore";
 import { canSendReportFor, hubAccess, mayActOnThisInspection, meAccessFromBody } from "~/lib/hub-access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
@@ -145,7 +146,7 @@ interface HubData extends HubPayload {
   reports?: ReportRow[];
   communication?: { delivered: number; needsAttention: number; unread: number; rulesActive: number };
   /** Server-decided facts for the cancel and restore controls (a yes/no and a status, never an amount). */
-  lifecycle: { moneyCollected: boolean; statusBeforeCancel: string | null };
+  lifecycle: { moneyCollected: boolean; statusBeforeCancel: RestorableStatus | null };
 }
 
 interface PeopleAgent {

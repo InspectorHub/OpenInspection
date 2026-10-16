@@ -16,6 +16,7 @@ import { mayActOnInspection } from '../../lib/inspection/assignment-access';
 import { loadInspectionStarted } from '../../lib/inspection/inspection-started';
 import { recordedStatusBeforeCancel } from '../../lib/inspection/cancel-restore';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
+import { staffMayCancelNow, staffMayConfirmFrom, staffMayRestoreFrom } from '../../lib/inspection/staff-rules';
 import type { HonoConfig } from '../../types/hono';
 
 const isStaff = (c: Context<HonoConfig>) => c.get('userRole') === 'staff';
@@ -31,7 +32,7 @@ export async function guardStaffConfirm(c: Context<HonoConfig>, next: Next) {
     if (isStaff(c)) {
         const id = c.req.param('id') ?? '';
         const { inspection } = await c.var.services.inspection.getInspection(id, c.get('tenantId'));
-        if (inspection.status === INSPECTION_STATUS.COMPLETED) {
+        if (!staffMayConfirmFrom(inspection.status)) {
             throw Errors.Forbidden('Office staff cannot change the status of a completed inspection');
         }
         await assertWorksOrSchedulesOthers(c, id);
@@ -49,12 +50,12 @@ export async function assertStaffMayCancel(c: Context<HonoConfig>, id: string, c
     const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
     await assertWorksOrSchedulesOthers(c, id);
     const reportStatus = inspection.reportStatus;
-    if (await loadInspectionStarted(getDrizzle(c), tenantId, { id, status: inspection.status, reportStatus })) {
-        throw Errors.Forbidden('Office staff cannot cancel an inspection that has started');
-    }
-    if (collectedCents > 0 || inspection.paymentStatus !== 'unpaid') {
-        throw Errors.Forbidden('A payment has been collected on this inspection, so an owner or manager has to cancel it');
-    }
+    const started = await loadInspectionStarted(getDrizzle(c), tenantId, { id, status: inspection.status, reportStatus });
+    const moneyCollected = collectedCents > 0 || inspection.paymentStatus !== 'unpaid';
+    if (staffMayCancelNow({ started, moneyCollected })) return;
+    throw Errors.Forbidden(started
+        ? 'Office staff cannot cancel an inspection that has started'
+        : 'A payment has been collected on this inspection, so an owner or manager has to cancel it');
 }
 
 /**
@@ -73,7 +74,7 @@ export async function guardStaffUncancel(c: Context<HonoConfig>, next: Next) {
         // Only a cancelled job has a "before"; anything else is left to the service to refuse.
         if (inspection.status === INSPECTION_STATUS.CANCELLED) {
             const before = await recordedStatusBeforeCancel(getDrizzle(c), tenantId, id);
-            if (before === null || before === INSPECTION_STATUS.COMPLETED) {
+            if (!staffMayRestoreFrom(before)) {
                 throw Errors.Forbidden('An owner or manager has to restore this inspection: it may have been completed before it was cancelled');
             }
         }
