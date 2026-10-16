@@ -102,18 +102,15 @@ describe('PlanQuotaGuard', () => {
     });
 
     describe('checkMessagingQuota', () => {
-        it('throws for a free tenant at 50 lifetime platform sms', async () => {
-            const m = new MeteringService(testD1);
-            await m.record('t5', 'sms', '2026-06', 50);
+        it('refuses a platform-sent sms on the free plan outright, and says what to do instead', async () => {
             const g = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
-            await expect(g.checkMessagingQuota('t5', 'free', 'sms')).rejects.toMatchObject({ status: 402, code: 'QUOTA_EXHAUSTED' });
-        });
-
-        it('byo volume does not count', async () => {
-            const m = new MeteringService(testD1);
-            await m.record('t6', 'sms_byo', '2026-06', 500);
-            const g = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
-            await expect(g.checkMessagingQuota('t6', 'free', 'sms')).resolves.toBeUndefined();
+            const err = await g.checkMessagingQuota('t5', 'free', 'sms').catch((e) => e);
+            expect(err).toMatchObject({ status: 402, code: 'QUOTA_EXHAUSTED' });
+            expect(err.message).toMatch(/Free plan/);
+            expect(err.message).toMatch(/own Twilio or Telnyx account/);
+            expect(err.message).toMatch(/Settings > Integrations > SMS/);
+            // Positive control: email on the same plan still has its allowance.
+            await expect(g.checkMessagingQuota('t5', 'free', 'email')).resolves.toBeUndefined();
         });
 
         it('no-op for pro tier and for enforced=false', async () => {

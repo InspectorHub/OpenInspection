@@ -168,7 +168,8 @@ describe('PATCH /api/inspections/:id/schedule', () => {
         const res = await patch(buildApp(db, 'inspector'), { scheduledStartMs: START_MS });
         expect(res.status).toBe(403);
         const body = await res.json() as { error?: { message?: string } };
-        expect(body.error?.message).toContain('scheduleOthers');
+        expect(body.error?.message).toContain('signed in as an Inspector');
+        expect(body.error?.message).toContain('"Schedule for others" permission');
     });
 
     it('inspector WITH the scheduleOthers override → 200', async () => {

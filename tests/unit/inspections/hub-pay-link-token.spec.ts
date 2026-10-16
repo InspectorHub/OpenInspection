@@ -131,6 +131,20 @@ describe('GET /api/inspections/:id/hub — tokenized pay link (IA-34 follow-up)'
         expect(issueToken).not.toHaveBeenCalled();
     });
 
+    it('still loads the hub, without a pay link, when the existing grant cannot be turned back into a link', async () => {
+        const app = buildApp({ id: 'inv-1', status: 'sent' }, { email: 'jane@example.com' });
+        issueToken.mockRejectedValueOnce(new Error('Portal token cannot be reconstructed (no token_enc)'));
+        const { status, body } = await get(app);
+
+        // This was a 500 for every owner and manager on an inspection with a sent invoice.
+        expect(status).toBe(200);
+        expect(body.data?.invoice?.payUrl).toBeNull();
+        expect(issueToken).toHaveBeenCalledTimes(1);
+        // Control: the same call succeeds when the grant is fine.
+        const ok = await get(buildApp({ id: 'inv-1', status: 'sent' }, { email: 'jane@example.com' }));
+        expect(ok.body.data?.invoice?.payUrl).toContain('?token=');
+    });
+
     it('leaves invoice null (and mints nothing) when there is no invoice', async () => {
         const { body } = await get(buildApp(null, { email: 'jane@example.com' }));
 

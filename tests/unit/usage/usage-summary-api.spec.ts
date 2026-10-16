@@ -121,7 +121,7 @@ describe('GET /api/usage/summary', () => {
         const body = await res.json() as { data: unknown };
         expect(body.data).toEqual({
             tier: 'free',
-            caps: { inspections: 5, sms: 50, email: 50 },
+            caps: { inspections: 5, email: 50 },
             usage: {
                 inspections: 3, sms: 10, email: 20,
                 smsByo: 500, emailByo: 250,

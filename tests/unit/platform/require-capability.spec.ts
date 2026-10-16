@@ -47,7 +47,8 @@ describe('requireCapability middleware', () => {
 
         const fin = await call(buildApp('companyFinance', { role: 'inspector', overrides: null }).app);
         expect(fin.status).toBe(403);
-        expect(fin.body.error).toContain('companyFinance');
+        expect(fin.body.error).toContain('signed in as an Inspector');
+        expect(fin.body.error).toContain('"Company finances" permission');
     });
 
     it('inspector + no overrides → inspectionFees allowed (the default that lets them price their own inspections)', async () => {
@@ -72,7 +73,7 @@ describe('requireCapability middleware', () => {
     it('inspector + {publish:false} → publish denied (requires review)', async () => {
         const pub = await call(buildApp('publish', { role: 'inspector', overrides: { publish: false } }).app);
         expect(pub.status).toBe(403);
-        expect(pub.body.error).toContain('publish');
+        expect(pub.body.error).toContain('"Publish reports" permission');
     });
 
     it('owner → both money capabilities allowed even with both overridden off (pinned)', async () => {

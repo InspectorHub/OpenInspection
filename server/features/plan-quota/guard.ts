@@ -163,9 +163,12 @@ export class PlanQuotaGuard {
   /** Pre-flight check for a platform-metered messaging send. Read-only — the
    *  actual counter increment happens at the existing send-site meter call,
    *  so a failed provider call never consumes quota. No-op for non-free
-   *  tiers and for standalone (enforced=false) deploys. */
+   *  tiers and for standalone (enforced=false) deploys. The Free plan has no
+   *  platform text-message allowance at all, so a platform-sent text on it is
+   *  refused outright, with the way forward in the message. */
   async checkMessagingQuota(tenantId: string, tier: string, metric: 'sms' | 'email'): Promise<void> {
     if (!this.opts.enforced || tier !== 'free') return;
+    if (metric === 'sms') throw Errors.PlatformSmsNotInPlan({ billingPortalUrl: this.opts.billingPortalUrl });
     const used = await new MeteringService(this.db).lifetimeTotal(tenantId, metric);
     const cap = FREE_TIER_CAPS[metric];
     if (used >= cap) throw Errors.QuotaExhausted({ metric, used, cap, billingPortalUrl: this.opts.billingPortalUrl });

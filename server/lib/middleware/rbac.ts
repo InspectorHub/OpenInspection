@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import { Errors } from '../errors';
+import { deniedNeedsRole } from '../permission-denied';
 import { ROLE_TIER, type Role } from '../auth/roles';
 import type { HonoConfig } from '../../types/hono';
 
@@ -25,7 +26,7 @@ export const requireRole = (...roles: Role[]) => {
     // Staff is evaluated at the inspector tier. A role with no tier
     // entry matches nothing, so it fails closed.
     if (!allowed.has(userRole) && !allowed.has(ROLE_TIER[userRole])) {
-      throw Errors.Forbidden(`Requires one of [${roles.join(', ')}]`);
+      throw deniedNeedsRole(c, roles);
     }
     return next();
   };
@@ -39,6 +40,8 @@ export const requireRole = (...roles: Role[]) => {
  * `requireRole` in a route's middleware list.
  */
 export const denyStaff = async (c: Context<HonoConfig>, next: Next) => {
-  if (c.get('userRole') === 'staff') throw Errors.Forbidden('Staff cannot do this');
+  if (c.get('userRole') === 'staff') {
+    throw deniedNeedsRole(c, ['owner', 'manager', 'inspector'], 'Office staff accounts do not create, copy or delete inspections or change their other fields');
+  }
   return next();
 };

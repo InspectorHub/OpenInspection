@@ -64,7 +64,8 @@ describe('GET /api/agent/profile — the agent portal\'s admission decision', ()
             expect(res.status).toBe(403);
             const body = await res.json() as { error: { code: string; message: string } };
             expect(body.error.code).toBe('forbidden');
-            expect(body.error.message).toContain('agent');
+            expect(body.error.message).toContain('This needs the Agent role');
+            expect(body.error.message).toContain('sign in with an agent account');
             // Refused before the read, so there is nothing to leak even in a body
             // the app tier discards.
             expect(getProfile).not.toHaveBeenCalled();

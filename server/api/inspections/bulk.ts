@@ -8,6 +8,7 @@ import { requireCapability, capabilitiesFor } from '../../lib/middleware/require
 import { auditFromContext } from '../../lib/audit';
 import { logger } from '../../lib/logger';
 import { Errors } from '../../lib/errors';
+import { deniedNeedsPermission } from '../../lib/permission-denied';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import {
     InspectionListQuerySchema,
@@ -385,7 +386,7 @@ const bulkRoutes = createApiRouter()
         // "act on others' bookings" verb the assignee picker and bulk reassign gate
         // on. Checking yourself is the wizard's own flow and stays open to all.
         if (targetId !== callerId && !(await capabilitiesFor(c)).scheduleOthers) {
-            throw Errors.Forbidden("Requires the 'scheduleOthers' capability to check another inspector's schedule");
+            throw deniedNeedsPermission(c, 'scheduleOthers', "You cannot check another inspector's schedule");
         }
         const conflicts = await findScheduleConflicts(db, tenantId, targetId, date, excludeId);
         return c.json({ success: true, data: { conflicts } }, 200);

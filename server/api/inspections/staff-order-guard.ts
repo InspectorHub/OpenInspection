@@ -12,6 +12,7 @@
  */
 import type { Context } from 'hono';
 import { Errors } from '../../lib/errors';
+import { deniedNeedsPermission } from '../../lib/permission-denied';
 import { auditFromContext } from '../../lib/audit';
 import { getDrizzle } from '../../lib/route-helpers';
 import { classifyStaffPatch, type StaffPatchRefusal } from '../../lib/inspection/order-fields';
@@ -49,7 +50,7 @@ export async function assertStaffMayPatch(c: Context<HonoConfig>, id: string, bo
     // The order fields below the schedule are written on a job one works, or with scheduleOthers.
     if (verdict.changed.some((key) => !SCHEDULE_KEYS.has(key))) {
         if (!(await mayActOnInspection(c, id))) {
-            throw Errors.Forbidden("Requires the 'scheduleOthers' capability to change the booking of an inspection you do not work");
+            throw deniedNeedsPermission(c, 'scheduleOthers', 'You cannot change the booking of an inspection you do not work');
         }
     }
     return verdict.changed;

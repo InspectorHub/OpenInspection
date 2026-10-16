@@ -21,7 +21,6 @@ export function meta() {
  *  progress bars and falls back to a plain cumulative count. */
 interface UsageCaps {
   inspections: number;
-  sms: number;
   email: number;
 }
 
@@ -110,15 +109,12 @@ export default function SettingsUsagePage() {
             sub={m.settings_usage_metric_inspections_sub()}
           />
         ))}
-        {caps ? (
-          <CappedMetricCard label={m.settings_usage_metric_sms()} used={u.sms ?? 0} cap={caps.sms} byo={u.smsByo ?? 0} locale={locale} />
-        ) : (
-          <MetricCard
-            label={m.settings_usage_metric_sms()}
-            value={formatNumber(u.sms ?? 0, { locale })}
-            sub={m.settings_usage_metric_sms_sub()}
-          />
-        )}
+        {/* No cap on the Free plan either: it includes no platform text messages, so there is no allowance to show progress against. */}
+        <MetricCard
+          label={m.settings_usage_metric_sms()}
+          value={formatNumber(u.sms ?? 0, { locale })}
+          sub={m.settings_usage_metric_sms_sub()}
+        />
         {caps ? (
           <CappedMetricCard label={m.settings_usage_metric_email()} used={u.email ?? 0} cap={caps.email} byo={u.emailByo ?? 0} locale={locale} />
         ) : (

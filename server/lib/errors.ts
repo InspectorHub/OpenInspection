@@ -131,7 +131,7 @@ export class AppError extends Error {
 export const Errors = {
     BadRequest: (msg: string, details?: unknown) => new AppError(400, ErrorCode.BAD_REQUEST, msg, details),
     Unauthorized: (msg: string = 'Unauthorized access') => new AppError(401, ErrorCode.UNAUTHORIZED, msg),
-    Forbidden: (msg: string = 'Action forbidden') => new AppError(403, ErrorCode.FORBIDDEN, msg),
+    Forbidden: (msg: string = 'Action forbidden', details?: unknown) => new AppError(403, ErrorCode.FORBIDDEN, msg, details),
     FinancialRequired: (field: string, capability: MoneyBucket) =>
         new AppError(403, ErrorCode.FINANCIAL_REQUIRED, `Changing '${field}' requires the '${capability}' capability`, { field, capability }),
     CapabilityCeiling: (capabilities: readonly string[]) =>
@@ -192,6 +192,16 @@ export const Errors = {
             ErrorCode.QUOTA_EXHAUSTED,
             `Free plan limit reached: ${details.used}/${details.cap} ${details.metric}. Subscribe to continue.`,
             details,
+        ),
+    // Same code and status as a spent allowance, because a client already handles that, but the
+    // message says what is true: the Free plan has no allowance of this kind to spend.
+    PlatformSmsNotInPlan: (details: { billingPortalUrl: string | null }) =>
+        new AppError(
+            402,
+            ErrorCode.QUOTA_EXHAUSTED,
+            'Your company is on the Free plan, which does not include text messages sent from a platform number. '
+            + 'To send texts, connect your own Twilio or Telnyx account in Settings > Integrations > SMS, or subscribe to a paid plan.',
+            { metric: 'sms', used: 0, cap: 0, billingPortalUrl: details.billingPortalUrl },
         ),
     TierNotFullPca: (msg: string = 'This action requires the inspection report tier to be full_pca.') =>
         new AppError(409, ErrorCode.TIER_NOT_FULL_PCA, msg),

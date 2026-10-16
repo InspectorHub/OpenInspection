@@ -2,7 +2,7 @@
  * Free-tier usage quotas — quota banner.
  *
  * Renders a contextual alert when a free-tier tenant is approaching or has
- * hit one of the free-plan caps (inspections/sms/email — see FREE_TIER_CAPS
+ * hit one of the free-plan caps (inspections/email — see FREE_TIER_CAPS
  * in server/features/plan-quota/policy.ts). Pattern mirrors SeatBanner: the
  * component itself owns the visibility threshold, so callers can render one
  * per capped metric and let each hide itself until it is actually relevant.
@@ -10,9 +10,8 @@
  */
 import { Banner } from "@core/shared-ui";
 
-const METRIC_LABEL: Record<"inspections" | "sms" | "email", string> = {
+const METRIC_LABEL: Record<"inspections" | "email", string> = {
   inspections: "free inspections",
-  sms: "free SMS messages",
   email: "free emails",
 };
 
@@ -22,7 +21,7 @@ export function QuotaBanner({
   cap,
   billingUrl,
 }: {
-  metric: "inspections" | "sms" | "email";
+  metric: "inspections" | "email";
   used: number;
   cap: number;
   billingUrl?: string;

@@ -174,9 +174,11 @@ describe('acting on a job one is not on is decided by scheduleOthers', () => {
         }, ENV, EXEC);
         expect(res.status).toBe(403);
         const message = ((await res.json()) as { error: { message: string } }).error.message;
+        // What was attempted, who the server thinks is asking and what they lack, and the way forward.
         expect(message).toMatch(/not on this inspection/);
-        expect(message).toMatch(/owner or manager/);
-        expect(message).toMatch(/schedule others/);
+        expect(message).toMatch(/signed in as an Inspector/);
+        expect(message).toMatch(/"Schedule for others" permission/);
+        expect(message).toMatch(/Ask an owner or manager to turn on "Schedule for others" for you on the Team page/);
     });
 
     it('an id that is not an inspection of this company is a 404 for the same caller (not a 403 about a job that is not there)', async () => {

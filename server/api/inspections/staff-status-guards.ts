@@ -11,6 +11,7 @@
  */
 import type { Context, Next } from 'hono';
 import { Errors } from '../../lib/errors';
+import { deniedNeedsPermission } from '../../lib/permission-denied';
 import { getDrizzle } from '../../lib/route-helpers';
 import { mayActOnInspection } from '../../lib/inspection/assignment-access';
 import { loadInspectionStarted } from '../../lib/inspection/inspection-started';
@@ -23,7 +24,7 @@ const isStaff = (c: Context<HonoConfig>) => c.get('userRole') === 'staff';
 
 async function assertWorksOrSchedulesOthers(c: Context<HonoConfig>, id: string): Promise<void> {
     if (!(await mayActOnInspection(c, id))) {
-        throw Errors.Forbidden("Requires the 'scheduleOthers' capability to change an inspection you do not work");
+        throw deniedNeedsPermission(c, 'scheduleOthers', 'You cannot change an inspection you do not work');
     }
 }
 

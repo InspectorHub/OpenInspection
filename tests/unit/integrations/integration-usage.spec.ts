@@ -66,7 +66,7 @@ describe('GET /api/platform/usage', () => {
     expect(free).toEqual({
       tenantId: 't-free', tier: 'free',
       inspections: 3, sms: 10, smsByo: 5, email: 20, emailByo: 7, r2Bytes: 2048,
-      caps: { inspections: 5, sms: 50, email: 50 },
+      caps: { inspections: 5, email: 50 },
     });
 
     const pro = body.data.find((r) => r.tenantId === 't-pro');

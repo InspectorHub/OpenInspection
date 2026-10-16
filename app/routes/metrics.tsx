@@ -140,7 +140,7 @@ export default function MetricsPage() {
   // not rendering them: it advertises figures they cannot have.
   const companyView = data?.scope !== "self";
 
-  if (forbidden) return <AccessDenied title={m.access_denied_title_neutral()} />;
+  if (forbidden) return <AccessDenied needs="notStaff" />;
 
   return (
     <div className="space-y-ih-list">

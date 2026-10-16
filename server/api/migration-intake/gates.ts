@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { getDrizzle } from '../../lib/route-helpers';
 import { Errors } from '../../lib/errors';
+import { deniedNeedsPermission, deniedNeedsRole } from '../../lib/permission-denied';
 import { migrationBatches, type MigrationIntent } from '../../lib/db/schema';
 import { MIGRATION_BATCH_STATUS, type MigrationBatchStatus } from '../../lib/status/migration-batch-status';
 import type { HonoConfig } from '../../types/hono';
@@ -45,7 +46,7 @@ export async function assertIntentAllowed(
 ): Promise<void> {
     if (intent === 'assisted.full') {
         if (c.get('userRole') !== 'owner') {
-            throw Errors.Forbidden('Only an owner can send a file to be converted.');
+            throw deniedNeedsRole(c, ['owner'], 'Only an owner can send a file to be converted');
         }
         return;
     }
@@ -62,10 +63,10 @@ export async function assertIntentAllowed(
     // from a button must not accept somebody the button would have hidden from,
     // and must not accept somebody who could not create the thing it is about
     // to create.
-    if (!caps.templateImport) throw Errors.Forbidden("Requires the 'templateImport' capability");
-    if (!caps.templateCreate) throw Errors.Forbidden("Requires the 'templateCreate' capability");
+    if (!caps.templateImport) throw deniedNeedsPermission(c, 'templateImport', 'You cannot import templates');
+    if (!caps.templateCreate) throw deniedNeedsPermission(c, 'templateCreate', 'Creating templates from an import needs permission to create templates');
     if (intent === 'templates.overwrite' && !caps.templateEdit) {
-        throw Errors.Forbidden("Requires the 'templateEdit' capability");
+        throw deniedNeedsPermission(c, 'templateEdit', 'Overwriting an existing template needs permission to edit templates');
     }
 }
 
