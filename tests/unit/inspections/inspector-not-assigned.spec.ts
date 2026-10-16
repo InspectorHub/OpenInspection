@@ -38,12 +38,15 @@ const EXEC = makeExecutionContext().ctx;
 
 let db: BetterSQLite3Database<typeof schema>;
 
-type Actor = 'owner' | 'on-the-job inspector' | 'inspector not on the job';
-const ACTORS: Actor[] = ['owner', 'on-the-job inspector', 'inspector not on the job'];
+type Actor = 'owner' | 'on-the-job inspector' | 'helper on the roster' | 'inspector with scheduleOthers' | 'inspector not on the job' | 'manager with scheduleOthers off';
+const ACTORS: Actor[] = ['owner', 'on-the-job inspector', 'helper on the roster', 'inspector with scheduleOthers', 'inspector not on the job', 'manager with scheduleOthers off'];
+/** The actors that must be refused every act on a job they are not on. */
+const NOT_ALLOWED: Actor[] = ['inspector not on the job', 'manager with scheduleOthers off'];
 
 function buildApp(actor: Actor) {
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-    const role: UserRole = actor === 'owner' ? 'owner' : 'inspector';
+    const role: UserRole = actor === 'owner' ? 'owner' : actor === 'manager with scheduleOthers off' ? 'manager' : 'inspector';
+    const overrides = actor === 'inspector with scheduleOthers' ? { scheduleOthers: true } : actor === 'manager with scheduleOthers off' ? { scheduleOthers: false } : null;
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => (err instanceof AppError
         ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
@@ -53,8 +56,8 @@ function buildApp(actor: Actor) {
         c.set('tenantId', T);
         c.set('userRole', role);
         c.set('user', { sub: ACTOR, role, tenantId: T });
-        // An inspector's defaults: scheduleOthers off, everything else a normal inspector has.
-        c.set('sdb', { getById: async () => ({ permissionOverrides: null }) } as unknown as HonoConfig['Variables']['sdb']);
+        // An inspector's defaults: scheduleOthers off. The override cases switch it on (inspector) or off (manager).
+        c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as unknown as HonoConfig['Variables']['sdb']);
         c.set('services', {
             inspection: new InspectionService({} as D1Database, undefined, sdb),
             people: { getPrimaryClient: async () => null },
@@ -86,24 +89,29 @@ const CONTROLS: Control[] = [
     { name: 'send-agreement', method: 'POST', path: `/api/inspections/${JOB}/agreement-requests`, body: {} },
 ];
 
-/** True where the server refuses the non-assigned inspector: the hub may hide the control from a viewer who may not act. */
+/**
+ * True where the server refuses someone who is neither on the job nor holds scheduleOthers (an inspector, or a manager
+ * whose scheduleOthers was switched off). Acting on a job one is not on is decided by scheduleOthers. The one verb left
+ * open is a PATCH of an order field other than date and inspector (the address here): it is not an act on the job's
+ * lifecycle, and it stays as it was.
+ */
 const REFUSED_FOR_NOT_ON_JOB: Record<string, boolean> = {
     'PATCH date': true,
     'PATCH inspector': true,
     'PATCH address (order field)': false,
     'PATCH /schedule': true,
-    cancel: false,
-    uncancel: false,
-    confirm: false,
-    complete: false,
-    publish: false,
-    unpublish: false,
-    return: false,
-    'request-payment': false,
-    'send-agreement': false,
+    cancel: true,
+    uncancel: true,
+    confirm: true,
+    complete: true,
+    publish: true,
+    unpublish: true,
+    return: true,
+    'request-payment': true,
+    'send-agreement': true,
 };
 
-/** Even the inspector on the job needs scheduleOthers to change WHO works it. */
+/** Even someone on the job needs scheduleOthers to change WHO works it. */
 const REFUSED_FOR_ON_THE_JOB = new Set(['PATCH inspector']);
 
 beforeEach(async () => {
@@ -126,6 +134,9 @@ async function statusOf(control: Control, actor: Actor): Promise<number> {
         id: JOB, tenantId: T, propertyAddress: '1 Main St', date: '2026-06-01', inspectorId: actor === 'on-the-job inspector' ? ACTOR : LEAD,
         status: 'scheduled', reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 0, createdAt: new Date(), ...control.state,
     });
+    if (actor === 'helper on the roster') {
+        await db.insert(schema.inspectionInspectors).values({ inspectionId: JOB, userId: ACTOR, tenantId: T, role: 'helper', createdAt: new Date() });
+    }
     const res = await buildApp(actor).request(control.path, {
         method: control.method, headers: { 'Content-Type': 'application/json' },
         ...(control.body === undefined ? {} : { body: JSON.stringify(control.body) }),
@@ -133,24 +144,54 @@ async function statusOf(control: Control, actor: Actor): Promise<number> {
     return res.status;
 }
 
-describe('an inspector who is not on the job', () => {
+describe('acting on a job one is not on is decided by scheduleOthers', () => {
     it('covers every control exactly once in the table', () => {
         expect(Object.keys(REFUSED_FOR_NOT_ON_JOB).sort()).toEqual(CONTROLS.map((c) => c.name).sort());
     });
 
     describe.each(CONTROLS)('$name', (control) => {
-        it('is refused or allowed as the table says for an inspector not on the job', async () => {
-            const status = await statusOf(control, 'inspector not on the job');
-            expect(status === 403, `status ${status}`).toBe(REFUSED_FOR_NOT_ON_JOB[control.name]);
+        it.each(NOT_ALLOWED)('is refused or allowed as the table says for: %s', async (actor) => {
+            const status = await statusOf(control, actor);
+            expect(status === 403, `${actor} got ${status}`).toBe(REFUSED_FOR_NOT_ON_JOB[control.name]);
         });
 
-        it('POSITIVE CONTROLS - the owner is not refused, and the inspector on the job is refused only where the table says', async () => {
-            for (const actor of ACTORS.filter((a) => a !== 'inspector not on the job')) {
-                await db.delete(schema.inspections).where(eq(schema.inspections.id, JOB));
-                const status = await statusOf(control, actor);
-                const mustRefuse = actor === 'on-the-job inspector' && REFUSED_FOR_ON_THE_JOB.has(control.name);
-                expect(status === 403, `${actor} got ${status}`).toBe(mustRefuse);
-            }
+        it.each(ACTORS.filter((a) => !NOT_ALLOWED.includes(a)))('POSITIVE CONTROL - %s is refused only where the table says', async (actor) => {
+            await db.delete(schema.inspectionInspectors);
+            await db.delete(schema.inspections).where(eq(schema.inspections.id, JOB));
+            const status = await statusOf(control, actor);
+            const needsScheduleOthers = control.name === 'PATCH inspector' && (actor === 'on-the-job inspector' || actor === 'helper on the roster');
+            expect(status === 403, `${actor} got ${status}`).toBe(needsScheduleOthers);
         });
+    });
+
+    it('the refusal says what to do', async () => {
+        await db.insert(schema.inspections).values({
+            id: JOB, tenantId: T, propertyAddress: '1 Main St', date: '2026-06-01', inspectorId: LEAD,
+            status: 'scheduled', reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
+        });
+        const res = await buildApp('inspector not on the job').request(`/api/inspections/${JOB}/cancel`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'client_cancelled' }),
+        }, ENV, EXEC);
+        expect(res.status).toBe(403);
+        const message = ((await res.json()) as { error: { message: string } }).error.message;
+        expect(message).toMatch(/not on this inspection/);
+        expect(message).toMatch(/owner or manager/);
+        expect(message).toMatch(/schedule others/);
+    });
+
+    it('an id that is not an inspection of this company is a 404 for the same caller (not a 403 about a job that is not there)', async () => {
+        const res = await buildApp('inspector not on the job').request('/api/inspections/no-such-job/cancel', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'client_cancelled' }),
+        }, ENV, EXEC);
+        expect(res.status).toBe(404);
+        // Control: the same caller on a job that exists is refused with 403.
+        await db.insert(schema.inspections).values({
+            id: JOB, tenantId: T, propertyAddress: '1 Main St', date: '2026-06-01', inspectorId: LEAD,
+            status: 'scheduled', reportStatus: 'in_progress', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
+        });
+        const existing = await buildApp('inspector not on the job').request(`/api/inspections/${JOB}/cancel`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'client_cancelled' }),
+        }, ENV, EXEC);
+        expect(existing.status).toBe(403);
     });
 });

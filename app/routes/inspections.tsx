@@ -681,7 +681,7 @@ export default function InspectionsPage() {
       toggleSelect={toggleSelect}
       transitionStatus={transitionStatus}
       timeZone={displayTz}
-      orderStatusesOnly={isStaff} canChangeStatus={!isStaff || canScheduleOthers}
+      orderStatusesOnly={isStaff} canChangeStatus={!isStaff || canScheduleOthers} canRestore={canScheduleOthers}
       canOpenEditor={canOpenEditor}
     />
   );

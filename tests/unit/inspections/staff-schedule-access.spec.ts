@@ -243,6 +243,8 @@ describe('staff on the inspection routes', () => {
         });
 
         it('control: an inspector is not refused on complete, cancel, restore or re-inspect (they reach validation or the handler)', async () => {
+            // The acting inspector leads the job: an inspector on someone else's job is refused these (inspector-not-assigned.spec.ts).
+            await db.update(schema.inspections).set({ inspectorId: ACTOR }).where(eq(schema.inspections.id, INSP_ID));
             const inspector = buildApp('inspector');
             for (const action of ['cancel', 'uncancel', 'complete', 'reinspect']) {
                 expect((await send(inspector, 'POST', `/${INSP_ID}/${action}`, {})).status, action).not.toBe(403);

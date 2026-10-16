@@ -59,8 +59,9 @@ beforeEach(async () => {
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now,
     });
+    await db.insert(schema.users).values({ id: 'actor', tenantId: T, email: 'actor@example.com', passwordHash: 'h', createdAt: now });
     await db.insert(schema.inspections).values({
-        id: 'i1', tenantId: T, propertyAddress: '1 St', date: '2099-01-01', status: 'confirmed',
+        id: 'i1', tenantId: T, propertyAddress: '1 St', inspectorId: 'actor', date: '2099-01-01', status: 'confirmed', // the acting inspector leads the job
         paymentStatus: 'unpaid', price: 45000, paymentRequired: false, agreementRequired: false, createdAt: now,
     });
 });

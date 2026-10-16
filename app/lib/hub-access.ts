@@ -54,8 +54,8 @@ export function meAccessFromBody(
  * also counts helpers on the roster, which the page cannot see; such a viewer is
  * under-offered here, never over-offered.
  */
-export function mayActOnThisInspection(me: Pick<MeAccess, "isAdmin" | "scheduleOthers" | "userId">, inspectorId: string | null): boolean {
-  return mayActOn({ isAdmin: me.isAdmin, scheduleOthers: me.scheduleOthers, onJob: me.userId !== null && me.userId === inspectorId });
+export function mayActOnThisInspection(me: Pick<MeAccess, "scheduleOthers" | "userId">, inspectorId: string | null): boolean {
+  return mayActOn({ scheduleOthers: me.scheduleOthers, onJob: me.userId !== null && me.userId === inspectorId });
 }
 
 /**
@@ -64,7 +64,7 @@ export function mayActOnThisInspection(me: Pick<MeAccess, "isAdmin" | "scheduleO
  * everyone but staff the page keeps the earlier condition as well (an inspector whose
  * publish was withdrawn is not offered a send); staff never hold publish.
  */
-export function canSendReportFor(me: Pick<MeAccess, "canPublishCap" | "isAdmin" | "scheduleOthers" | "userId" | "role">, inspectorId: string | null): boolean {
+export function canSendReportFor(me: Pick<MeAccess, "canPublishCap" | "scheduleOthers" | "userId" | "role">, inspectorId: string | null): boolean {
   return mayActOnThisInspection(me, inspectorId) && (isStaffRole(me.role) || me.canPublishCap);
 }
 
@@ -85,6 +85,11 @@ export interface HubAccess {
   canEditOrder: boolean;
   /** The inspector's own acts: marking the visit complete. */
   canEditInspection: boolean;
+  /**
+   * Whether the viewer may act on this inspection at all (on the job, or scheduleOthers): the gate in front of
+   * cancel, restore, complete, confirm, publish, unpublish, return, request payment and send agreement.
+   */
+  canAct: boolean;
   /** Date and inspector. */
   canChangeSchedule: boolean;
   canCancel: boolean;
@@ -100,14 +105,15 @@ export function inspectionStartedForView(status: string, reportStatus: string): 
 
 export function hubAccess({ role, status, reportStatus, moneyCollected, mayAct, statusBeforeCancel }: HubAccessInput): HubAccess {
   if (!isStaffRole(role)) {
-    // The server refuses an inspector who is neither on the job nor holds scheduleOthers a date or inspector change
-    // (and the schedule route); every other verb here it accepts from any inspector (inspector-not-assigned.spec.ts).
-    return { canEditOrder: true, canEditInspection: true, canChangeSchedule: mayAct, canCancel: true, canRestore: true, canTurnGateOff: true };
+    // Acting on a job one is not on needs scheduleOthers, for every role: the server refuses all of these
+    // (inspector-not-assigned.spec.ts). The order fields other than date and inspector stay open to everyone.
+    return { canEditOrder: true, canEditInspection: mayAct, canAct: mayAct, canChangeSchedule: mayAct, canCancel: mayAct, canRestore: mayAct, canTurnGateOff: true };
   }
   const started = inspectionStartedForView(status, reportStatus);
   return {
     canEditOrder: mayAct,
     canEditInspection: false,
+    canAct: mayAct,
     canChangeSchedule: mayAct && !started,
     canCancel: mayAct && staffMayCancelNow({ started, moneyCollected }),
     // The server restores staff only to a status the cancellation recorded, and never a completed one.

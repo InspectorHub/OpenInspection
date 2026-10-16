@@ -32,6 +32,12 @@ interface DashboardInspectionRowProps {
    * which the API will not let them move. Restore on a cancelled row is withheld too.
    */
   orderStatusesOnly?: boolean;
+  /**
+   * Restoring a cancelled inspection needs a place on it or scheduleOthers. The list knows neither who leads the
+   * job nor who is looking (and roster helpers are invisible), so the row offers it to holders of scheduleOthers
+   * only; the hub, which knows the job, offers it to whoever is on it.
+   */
+  canRestore?: boolean;
   /** Whether the viewer may write report content (`editReports`); false hides the editor link. */
   canOpenEditor?: boolean;
 }
@@ -59,6 +65,7 @@ export function DashboardInspectionRow({
   timeZone,
   canChangeStatus = true,
   orderStatusesOnly = false,
+  canRestore = true,
   canOpenEditor = true,
 }: DashboardInspectionRowProps) {
   const locale = useDisplayLocale();
@@ -216,7 +223,7 @@ export function DashboardInspectionRow({
             <option value="cancelled">{m.dashboard_row_status_cancelled()}</option>
           </select>
           {/* Not offered to staff: the server restores for them only a cancellation that recorded a status other than completed, which the list does not carry (the hub offers it where it is known). */}
-          {canChangeStatus && !orderStatusesOnly && (
+          {canChangeStatus && canRestore && !orderStatusesOnly && (
             <RestoreInspectionAction
               inspectionId={insp.id}
               variant="ghost"

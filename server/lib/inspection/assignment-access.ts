@@ -10,7 +10,8 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { inspections, inspectionInspectors, inspectionPeople } from '../db/schema';
-import { isAdminRole } from '../auth/roles';
+import { isAdminRole, ROLE } from '../auth/roles';
+import { mayActOn } from './staff-rules';
 import { Errors } from '../errors';
 import { getDrizzle } from '../route-helpers';
 import { getInspectionRoster } from './roster';
@@ -33,10 +34,12 @@ async function rosterRoleOf(c: Context<HonoConfig>, inspectionId: string): Promi
 const isElevated = (c: Context<HonoConfig>) => isAdminRole(c.get('userRole'));
 
 export async function mayActOnInspection(c: Context<HonoConfig>, inspectionId: string): Promise<boolean> {
-    // Owner and manager need no lookup.
-    if (isElevated(c)) return true;
-    if (await rosterRoleOf(c, inspectionId)) return true;
-    return (await capabilitiesFor(c)).scheduleOthers;
+    // The owner's `scheduleOthers` is pinned on, so no lookup. A manager has it by default but is NOT shortcut here:
+    // one whose scheduleOthers was switched off is treated like an inspector (the rule in ./staff-rules `mayActOn`).
+    if (c.get('userRole') === ROLE.OWNER) return true;
+    const onJob = (await rosterRoleOf(c, inspectionId)) !== null;
+    // The capability is read only when being on the job has not already answered.
+    return mayActOn({ onJob, scheduleOthers: onJob ? false : (await capabilitiesFor(c)).scheduleOthers });
 }
 
 /**

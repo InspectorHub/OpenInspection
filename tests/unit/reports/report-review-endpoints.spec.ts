@@ -112,6 +112,7 @@ async function seedInspection(
     await db.insert(schema.inspections).values({
         id:               INSP_ID,
         tenantId:         TENANT,
+        inspectorId:      USER_ID, // the acting inspector leads the job
         propertyAddress:  '1 Main St',
         date:             '2026-06-01',
         status:           INSPECTION_STATUS.COMPLETED,

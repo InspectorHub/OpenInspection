@@ -6,6 +6,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { guardActOnJob } from './act-guard';
 import { auditFromContext } from '../../lib/audit';
 import { resolveTenantSlug } from '../../lib/url';
 import { emailSignersTheirLinks } from '../../lib/agreement-send';
@@ -34,7 +35,7 @@ const sendAgreementRequestRoute = createRoute(withMcpMetadata({
     path:    '/{id}/agreement-requests',
     tags: ['inspections'],
     summary: 'Create + email an agreement signing request for an inspection',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardActOnJob] as const,
     request: {
         params: z.object({ id: z.string().min(1).describe('Inspection identifier') }),
         body: { content: { 'application/json': { schema: SendAgreementRequestSchema } } },
@@ -48,7 +49,7 @@ const sendAgreementRequestRoute = createRoute(withMcpMetadata({
         422: { description: 'No agreement template, no resolvable email, or agreement not in this tenant' },
     },
     operationId: 'createInspectionAgreementRequest',
-    description: 'Creates an agreement signing request for the inspection, emails it to the client, marks it sent, and returns the created request.',
+    description: 'Creates an agreement signing request for the inspection, emails it to the client, marks it sent, and returns the created request. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 

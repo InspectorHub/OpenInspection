@@ -31,6 +31,7 @@ export function InvoiceCard({
     basePriceCents,
     canManagePrice,
     canEditGate = true,
+    canRequestPayment = true,
     onRequestPayment,
 }: {
     /** `detail` carries the one-line money sentence a pill has no room for. */
@@ -49,6 +50,8 @@ export function InvoiceCard({
     canManagePrice: boolean;
     /** False for a viewer the API refuses order edits (an office user): the payment-required switch is not rendered. */
     canEditGate?: boolean;
+    /** False for a viewer the API refuses to request payment on this inspection (not on it, and no scheduleOthers). */
+    canRequestPayment?: boolean;
     onRequestPayment: () => void;
 }) {
     const [priceOpen, setPriceOpen] = useState(false);
@@ -112,7 +115,7 @@ export function InvoiceCard({
                         <p className="text-[12px] text-ih-fg-3">
                             {m.inspections_hub_invoice_nothing_to_request()}
                         </p>
-                    ) : (
+                    ) : canRequestPayment && (
                         <Button variant="secondary" size="sm" onClick={onRequestPayment}>
                             {sent ? m.inspections_hub_invoice_resend() : m.inspections_hub_invoice_request()}
                         </Button>

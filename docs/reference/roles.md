@@ -13,7 +13,7 @@ Owner + Manager (`isAdminRole`).
 |---|---|
 | **Owner** | Account holder — everything, plus billing on a `saas` deployment. |
 | **Manager** | Back-office: team management, settings, scheduling, all inspections. |
-| **Inspector** | Conducts inspections, edits and publishes reports. |
+| **Inspector** | Conducts inspections, edits and publishes reports. Acts on the inspections they are on (lead or helper); acting on one they are not on needs the `scheduleOthers` permission, which owners and managers have by default and which an inspector is given per person or by being made a manager. |
 | **Staff** | Office role: books and schedules the order. Creates, copies and re-inspects inspections, reschedules and reassigns them, edits the order fields, cancels an unpaid inspection that has not started, manages contacts and messages, and sends a report that is already published. Does not delete inspections, does not publish or sign, does not write report content, and cannot be assigned as the inspector on a job. May use the native app. |
 | **Agent** | External real-estate agent — their own orders, read-only. |
 
@@ -68,7 +68,7 @@ Twelve, flippable per person on top of the role default
 | Capability | Owner | Manager | Inspector | Staff | Agent |
 |---|:--:|:--:|:--:|:--:|:--:|
 | `publish` — publish a report to the client | ✅ | ✅ | ✅ | ❌ (fixed) | ❌ |
-| `scheduleOthers` — book or reassign for other inspectors | ✅ | ✅ | ❌ | ✅ | ❌ |
+| `scheduleOthers` — book, reassign and act on other inspectors' inspections | ✅ | ✅ | ❌ | ✅ | ❌ |
 | `inspectionFees` — the money on one inspection: price, deposit, service lines, cancellation fee | ✅ | ✅ | ✅ | ✅ | ❌ |
 | `companyFinance` — company-wide money: invoices and payments, price lists and pay rules, earnings, Stripe, QuickBooks, fee policies | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `manageContacts` — add/edit/delete clients and agents | ✅ | ✅ | ❌ | ✅ | ❌ |
@@ -226,12 +226,13 @@ Every `POST`, `PUT`, `PATCH` and `DELETE` route must name a guard on who may cal
 
 ### Acting on an inspection that is not yours
 
-Several actions on an inspection depend on how the caller works it. "On the inspection" means the roster (lead or helper) or being the inspector named on it. Owner and manager always qualify.
+Several actions on an inspection depend on how the caller works it. "On the inspection" means the roster (lead or helper) or being the inspector named on it. Acting on an inspection you are not on is decided by `scheduleOthers`, for every role. The owner's is pinned on and a manager has it by default, so they qualify; a manager whose `scheduleOthers` was switched off is treated like an inspector, and an inspector who was given it acts like a manager. The refusal (403) says that the person is not on the inspection and that an owner or manager, or someone with the "schedule others" permission, has to do it. Changing an order field other than the date and the inspector (the address, for one) is not an act on the inspection's lifecycle and is unchanged.
 
 | Action | Who |
 |---|---|
 | Change the **date** (`PATCH /api/inspections/:id`, `PATCH /api/inspections/:id/schedule`) | anyone on the inspection; otherwise `scheduleOthers` |
 | Change **who works it** (assignee, lead or helpers) | `scheduleOthers` |
+| **Cancel**, restore, **confirm** or mark it **complete**; **publish**, unpublish or return its report; **request payment** on it; **send an agreement** on it | anyone on the inspection; otherwise `scheduleOthers` |
 | **Delete** it | its lead; helpers cannot; otherwise `scheduleOthers` |
 | Send the report (`send-report-pdf`), email or mint an agent link (`share-agent`, `agent-token`), change its report-link expiry, send a text (`send-sms`), message its client | anyone on the inspection; otherwise `scheduleOthers` |
 

@@ -43,7 +43,7 @@ function capabilityToggleMap() {
  */
 export const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
     publish:           'May publish and unpublish reports.',
-    scheduleOthers:    'May schedule inspections for other inspectors.',
+    scheduleOthers:    "May book, reassign and act on other inspectors' inspections.",
     inspectionFees:    'May see and set the money on an individual inspection: its price, deposit, service lines and cancellation fee.',
     companyFinance:    'May see and manage company-wide money: invoices and payments, service prices and pay rules, pay splits, earnings, Stripe, QuickBooks and the fee policies.',
     manageContacts:    'May create, edit and archive contacts and role profiles.',

@@ -23,6 +23,7 @@ import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation } from '../../services/inspection/shared';
 import { refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
 import { guardStaffConfirm } from './staff-status-guards';
+import { guardActOnJob } from './act-guard';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { translateOnPublishForRequest } from '../../lib/translation/on-publish';
@@ -39,7 +40,7 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Inspection id.') }),
     },
-    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff],
+    middleware: [requireRole('owner', 'manager', 'inspector'), denyStaff, guardActOnJob],
     responses: {
         200: {
             content: {
@@ -52,7 +53,7 @@ const completeInspectionRoute = createRoute(withMcpMetadata({
         400: { description: 'The inspection is cancelled. Bring it back with POST /{id}/uncancel first (#81).' },
     },
     operationId: "completeInspection",
-    description: "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403."
+    description: "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -136,7 +137,7 @@ const returnReportRoute = createRoute(withMcpMetadata({
     path: '/{id}/return',
     tags: ['inspections'],
     summary: 'Return submitted report to inspector for revision',
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish'), guardActOnJob] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection id') }),
     },
@@ -149,7 +150,7 @@ const returnReportRoute = createRoute(withMcpMetadata({
         403: { description: 'Missing publish capability' },
     },
     operationId: 'returnReport',
-    description: 'Transitions reportStatus from submitted → in_progress. Requires publish capability.',
+    description: 'Transitions reportStatus from submitted → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.',
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -162,7 +163,7 @@ const unpublishReportRoute = createRoute(withMcpMetadata({
     path: '/{id}/unpublish',
     tags: ['inspections'],
     summary: 'Unpublish a published report',
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish'), guardActOnJob] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection id') }),
     },
@@ -175,7 +176,7 @@ const unpublishReportRoute = createRoute(withMcpMetadata({
         403: { description: 'Missing publish capability' },
     },
     operationId: 'unpublishReport',
-    description: 'Transitions reportStatus from published → in_progress. Requires publish capability.',
+    description: 'Transitions reportStatus from published → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.',
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -189,7 +190,7 @@ const publishRoute = createRoute(withMcpMetadata({
     // Task 10 — publish capability layered on top of the role gate. owner/admin
     // always pass; an inspector with permission_overrides {publish:false}
     // ("requires review") is 403'd here.
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish'), guardActOnJob] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection whose report is published.') }),
         body: {
@@ -211,7 +212,7 @@ const publishRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "publishInspection",
-    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role."
+    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -343,11 +344,11 @@ const publishRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/confirm',
         tags: ["inspections"], summary: "Confirm inspection for current tenant",
-        middleware: [requireRole('owner', 'manager', 'inspector'), guardStaffConfirm] as const,
+        middleware: [requireRole('owner', 'manager', 'inspector'), guardActOnJob, guardStaffConfirm] as const,
         request: { params: z.object({ id: z.string().describe('Inspection to confirm.') }) },
         responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
         operationId: "confirmInspection",
-        description: "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection."
+        description: "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');

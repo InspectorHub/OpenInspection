@@ -7,9 +7,13 @@
 import { INSPECTION_STATUS } from '../status/inspection-status';
 import type { RestorableStatus } from './cancel-restore';
 
-/** May this viewer act on this inspection: an owner or manager, someone working it, or someone with `scheduleOthers`. */
-export function mayActOn(who: { isAdmin: boolean; onJob: boolean; scheduleOthers: boolean }): boolean {
-    return who.isAdmin || who.onJob || who.scheduleOthers;
+/**
+ * May this viewer act on this inspection: someone working it (lead or helper), or someone with
+ * `scheduleOthers`. Owners hold that pinned and managers by default, so neither needs a role
+ * shortcut, and a manager whose `scheduleOthers` was switched off is treated like an inspector.
+ */
+export function mayActOn(who: { onJob: boolean; scheduleOthers: boolean }): boolean {
+    return who.onJob || who.scheduleOthers;
 }
 
 /** Staff cancel only a job the inspector has not started and nothing has been collected on. */
