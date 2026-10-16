@@ -170,11 +170,15 @@ describe('collab WS route — auth gate', () => {
         expect(mockDo.idFromName).not.toHaveBeenCalled();
     });
 
-    it('(e3) admits the same staff user once editReports is granted (control)', async () => {
-        const { app, mockDo } = buildApp({ userRole: 'staff', overrides: { editReports: true } });
-        const res = await app.request('/api/inspections/insp1/collab/ws', { headers: { Upgrade: 'websocket' } });
+    it('(e3) still refuses a staff user whose override says editReports, and admits an inspector (control)', async () => {
+        const staff = buildApp({ userRole: 'staff', overrides: { editReports: true } });
+        const refused = await staff.app.request('/api/inspections/insp1/collab/ws', { headers: { Upgrade: 'websocket' } });
+        expect(refused.status).toBe(403);
+        expect(staff.mockDo.idFromName).not.toHaveBeenCalled();
+        const insp = buildApp({ userRole: 'inspector' });
+        const res = await insp.app.request('/api/inspections/insp1/collab/ws', { headers: { Upgrade: 'websocket' } });
         expect(res.status).toBe(200);
-        expect(mockDo.idFromName).toHaveBeenCalled();
+        expect(insp.mockDo.idFromName).toHaveBeenCalled();
     });
 
     // ── (a) No auth ──────────────────────────────────────────────────────────

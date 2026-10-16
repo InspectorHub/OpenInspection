@@ -152,13 +152,13 @@ describe('report authoring guard', { timeout: 30_000 }, () => {
             expect(s.reached()).toBe(false);
         });
 
-        it('admits an inspector (positive control) and a staff member who was granted it', async () => {
+        it('admits an inspector (positive control) and still refuses a staff member whose override says yes', async () => {
             const i = stubApp('inspector', null, route);
             expect(await i.call()).not.toBe(403);
             expect(i.reached()).toBe(true);
             const g = stubApp('staff', { editReports: true }, route);
-            expect(await g.call()).not.toBe(403);
-            expect(g.reached()).toBe(true);
+            expect(await g.call()).toBe(403);
+            expect(g.reached()).toBe(false);
         });
 
         it('refuses an inspector whose editReports was withdrawn', async () => {
@@ -196,10 +196,10 @@ describe('report authoring guard', { timeout: 30_000 }, () => {
             } as Record<string, unknown>)[k],
         }) as never;
 
-        it('refuses staff, admits an inspector and a granted staff member', async () => {
+        it('refuses staff even with an override, and admits an inspector', async () => {
             await expect(assertMayEditReports(ctx('staff', null))).rejects.toMatchObject({ status: 403 });
+            await expect(assertMayEditReports(ctx('staff', { editReports: true }))).rejects.toMatchObject({ status: 403 });
             await expect(assertMayEditReports(ctx('inspector', null))).resolves.toBeUndefined();
-            await expect(assertMayEditReports(ctx('staff', { editReports: true }))).resolves.toBeUndefined();
         });
 
         it('refuses an agent even when an override says otherwise (pinned)', async () => {
