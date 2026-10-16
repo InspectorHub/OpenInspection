@@ -61,6 +61,13 @@ describe('deniedNeedsRole', () => {
         expect(e.message).not.toContain('owner or manager');
     });
 
+    it('for the agent area, tells a team member to sign in with an agent account rather than to change their team role', () => {
+        const e = deniedNeedsRole(ctx('owner'), ['agent']);
+        expect(e.message).toContain('This needs the Agent role, and you are signed in as an Owner.');
+        expect(e.message).toContain('Sign out and sign in with an agent account.');
+        expect(e.message).not.toContain('change your role');
+    });
+
     it('tells an agent account that it only has the agent portal', () => {
         expect(deniedNeedsRole(ctx('agent'), ['owner', 'manager', 'inspector']).message)
             .toContain('Agent accounts can only use the agent portal.');

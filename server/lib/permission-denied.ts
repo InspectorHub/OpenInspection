@@ -81,7 +81,11 @@ export function deniedNeedsRole(c: Context<HonoConfig>, roles: readonly Role[], 
     const role = c.get('userRole') as string | undefined;
     const names = joinOr(roles.map((r) => ROLE_LABELS[r]));
     const ownerOnly = roles.length === 1 && roles[0] === ROLE.OWNER;
-    const fix = role === ROLE.AGENT
+    const agentOnly = roles.length === 1 && roles[0] === ROLE.AGENT;
+    // An agent area cannot be reached by changing a team role: agents are separate accounts.
+    const fix = agentOnly
+        ? 'This area is for agent accounts. Sign out and sign in with an agent account.'
+        : role === ROLE.AGENT
         ? 'Agent accounts can only use the agent portal.'
         : `Ask ${ownerOnly ? 'an owner' : 'an owner or manager'} to do this, or to change your role on the Team page.`;
     return Errors.Forbidden(
