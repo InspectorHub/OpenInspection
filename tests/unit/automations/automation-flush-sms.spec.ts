@@ -368,36 +368,11 @@ describe('flush() — managed-send compliance gate (Task 8)', () => {
         expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 
-    it('managed_shared with TWILIO_SHARED_MESSAGING_SERVICE_SID set → sends', async () => {
+    it('managed_shared (retired shared sender) → skipped as sms not configured, nothing sent', async () => {
         await setSmsMode('managed_shared');
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
-        // Pass the shared-SID env to deliverSms via flush's env arg.
-        const envWithSid = { TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MG_shared_sid' };
-        // flush() → deliverSms() currently receives env as an additional arg.
-        // The cron would pass env; in tests we call flush with a patched svc.
-        // Directly call deliverSms through the service with env.
-        const db2 = db;   // `drizzle-orm/d1` is mocked to return this very handle
-        // Re-use the logs already created. Instead of going through flush, call deliverSms directly.
-        const logs = await db2.select().from(schema.automationLogs).all();
-        const automationRow = await db2.select().from(schema.automations).get();
-        const inspRow = logs[0] ? await loadFlushInspection(logs[0].inspectionId) : undefined;
-        const tenantRow = await db2.select().from(schema.tenants).get();
-        if (!logs[0] || !automationRow || !inspRow || !tenantRow) throw new Error('Seed missing');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (svc as any).deliverSms(
-            db2, { log: logs[0], automation: automationRow, inspection: inspRow, tenant: tenantRow },
-            smsRuntime, 'Acme', 'acme.example.com', envWithSid,
-        );
-        expect((await statusOf(logId))?.status).toBe('sent');
-        expect(fakeSendMessage).toHaveBeenCalledTimes(1);
-    });
-
-    it('managed_shared with TWILIO_SHARED_MESSAGING_SERVICE_SID absent → skipped (managed_not_approved)', async () => {
-        await setSmsMode('managed_shared');
-        const { logId } = await seedSmsLog({ contactId: 'c1' });
-        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
-        // No shared SID env → gate blocks.
+        // The retired shared mode is refused whatever the env holds.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const db2 = db;   // `drizzle-orm/d1` is mocked to return this very handle
         const logs = await db2.select().from(schema.automationLogs).all();
@@ -408,11 +383,11 @@ describe('flush() — managed-send compliance gate (Task 8)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (svc as any).deliverSms(
             db2, { log: logs[0], automation: automationRow, inspection: inspRow, tenant: tenantRow },
-            smsRuntime, 'Acme', 'acme.example.com', {}, // empty env — no shared SID
+            smsRuntime, 'Acme', 'acme.example.com', { TWILIO_SHARED_MESSAGING_SERVICE_SID: 'MG_old' },
         );
         const r = await statusOf(logId);
         expect(r?.status).toBe('skipped');
-        expect(r?.error).toBe('managed_not_approved');
+        expect(r?.error).toBe('sms not configured');
         expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 

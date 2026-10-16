@@ -57,7 +57,7 @@ function ServiceCard({ card }: { card: IntegrationCard }) {
           </span>
         </div>
         <p className="text-xs text-ih-fg-3">{copy.desc()}</p>
-        <p data-testid="integration-source" className="text-xs font-bold text-ih-fg-2">{sourceText(card.source, card.reasonKey, title)}</p>
+        <p data-testid="integration-source" className="text-xs font-bold text-ih-fg-2">{sourceText(card.source, card.reasonKey, title, card.dedicatedNumber)}</p>
         <div className="mt-auto pt-1">
           <Link
             to={card.detailPath}

@@ -73,10 +73,11 @@ export const SERVICE_SPECS: Record<IntegrationService, ServiceSpec> = {
     sms: {
         offersProvided: (p) => p.hasManagedCompliance,
         offersOwn: () => true,
-        // A shared number is not yet confirmed acceptable by the SMS providers.
-        providedHeldBack: (env) => !['true', '1'].includes(env.SMS_MANAGED_SHARED_ENABLED ?? ''),
-        provided: (env) => has(env.TWILIO_ACCOUNT_SID) && has(env.TWILIO_API_KEY_SID)
-            && has(env.TWILIO_API_KEY_SECRET) && has(env.TWILIO_SHARED_MESSAGING_SERVICE_SID),
+        // A shared SMS number is permanently not offered: a company sends on its
+        // own Twilio or Telnyx account, or on a number registered for it. The old
+        // SMS_MANAGED_SHARED_ENABLED switch is retired and no longer read.
+        providedHeldBack: () => true,
+        provided: () => false,
         own: (c) => {
             const keys = smsOwnKeys(c);
             return stateOf(keys.map((k) => secret(c, k)), keys.some((k) => secret(c, k)));

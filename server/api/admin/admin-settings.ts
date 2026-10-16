@@ -521,7 +521,7 @@ const adminSettingsRoutes = createApiRouter()
                 // force BYO, which is the only one that can work.
                 update.smsMode = 'own';
             } else {
-                // SaaS: the schema already excludes 'platform' via z.enum(['own','managed_shared','managed_dedicated']).
+                // SaaS: the schema already excludes 'platform' via z.enum(['own','managed_dedicated']).
                 // This guard is the server-side double-check against e.g. a direct API call.
                 if ((body.smsMode as string) === 'platform') {
                     throw Errors.BadRequest('Platform SMS is reserved for first-party use.', 'platform_mode_not_allowed');

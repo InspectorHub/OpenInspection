@@ -10,8 +10,7 @@ import { SourceChoice } from "./SourceChoice";
 
 afterEach(cleanup);
 
-function Harness({ kind = "email", available = ["provided", "own"], initial = "provided", error = null }: {
-  kind?: "email" | "sms";
+function Harness({ available = ["provided", "own"], initial = "provided", error = null }: {
   available?: Array<"provided" | "own">;
   initial?: "provided" | "own";
   error?: string | null;
@@ -19,7 +18,6 @@ function Harness({ kind = "email", available = ["provided", "own"], initial = "p
   const [selected, setSelected] = useState<"provided" | "own">(initial);
   return (
     <SourceChoice
-      kind={kind}
       available={available}
       selected={selected}
       onSelect={setSelected}
@@ -45,15 +43,14 @@ describe("SourceChoice", () => {
     expect(builtIn.disabled).toBe(false);
   });
 
-  it("shows Built-in SMS as not available yet and cannot select it, while Your own works", async () => {
-    renderChoice({ kind: "sms", available: ["own"], initial: "own" });
+  it("shows Built-in as not available and cannot select it when it is not on offer, while Your own works", async () => {
+    renderChoice({ available: ["own"], initial: "own" });
     const builtIn = (await screen.findByRole("radio", { name: /Built-in/ })) as HTMLInputElement;
     expect(builtIn.disabled).toBe(true);
     expect(screen.getByText("Not available yet")).toBeTruthy();
-    expect(screen.getByText(/Built-in SMS is not available yet/)).toBeTruthy();
-    // control: the same component for email, with Built-in open, has it enabled
+    // control: with Built-in open it is enabled and carries no badge
     cleanup();
-    renderChoice({ kind: "email" });
+    renderChoice({});
     expect(((await screen.findByRole("radio", { name: /Built-in/ })) as HTMLInputElement).disabled).toBe(false);
     expect(screen.queryByText("Not available yet")).toBeNull();
   });

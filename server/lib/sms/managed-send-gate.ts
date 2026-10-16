@@ -3,7 +3,6 @@ import { eq, and } from 'drizzle-orm';
 import { messagingCompliance, usageCounters } from '../db/schema';
 import { currentPeriodKey } from '../usage/period';
 import { getDeploymentProfile, type DeploymentProfile } from '../deployment-profile';
-import { SERVICE_SPECS } from '../integrations/source-catalog';
 
 /**
  * Default monthly SMS allowance for managed tenants when
@@ -12,21 +11,14 @@ import { SERVICE_SPECS } from '../integrations/source-catalog';
 export const DEFAULT_MANAGED_SMS_ALLOWANCE = 1000;
 
 /**
- * Minimal env shape the gate needs: the shared-pool SID for the
- * managed_shared branch, and the monthly SMS allowance cap.
+ * Minimal env shape the gate needs: the monthly SMS allowance cap.
  * Safe to pass any superset (AppEnv, TwilioLoaderEnv, etc.).
  */
 export interface ManagedSendGateEnv {
-    /** Shared Messaging Service SID used by all managed_shared tenants.
-     *  Its presence signals that the platform's shared pool is provisioned
-     *  and toll-free verified (TFV approved). Absent → gate blocks shared sends. */
-    TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
-    /** Platform-wide monthly SMS allowance for managed tenants (string-encoded integer).
+    /** Monthly SMS allowance for dedicated-number companies (string-encoded integer).
      *  Parsed at gate-check time; defaults to DEFAULT_MANAGED_SMS_ALLOWANCE when absent
      *  or non-numeric. */
     MANAGED_SMS_MONTHLY_ALLOWANCE?: string;
-    /** Hosted shared-number switch ('true' or '1'). Absent means off. */
-    SMS_MANAGED_SHARED_ENABLED?: string;
     /** Tells a hosted deployment from a self-hosted one. */
     APP_MODE?: string;
     /** A profile the caller already resolved; wins over APP_MODE. */
@@ -66,22 +58,19 @@ export interface ManagedSendGateResult {
  *   After approval check passes, reads current-period SMS counter and blocks
  *   when count >= MANAGED_SMS_MONTHLY_ALLOWANCE (default 1000).
  *
- * managed_shared:
- *   Platform-level TFV gate: allowed ONLY when
- *   TWILIO_SHARED_MESSAGING_SERVICE_SID is set in env.
- *   Its presence means the platform provisioned the shared pool and
- *   obtained TFV approval. Absent → blocked (managed_not_approved).
- *   After approval check passes, applies the same monthly quota check.
+ * managed_shared (retired shared sender), and `platform` on a hosted deployment:
+ *   Refused as 'sms not configured' -- the same reason a send gets when no
+ *   provider resolves. The stored value is left as it is.
  *
- * own / platform:
- *   Always allowed — no behavior change.
+ * own, and `platform` on a self-hosted deployment (the operator's own account):
+ *   Always allowed.
  *
  * This gate is INDEPENDENT of the per-recipient consent gate and must
  * run before any provider call so a blocked send makes NO Twilio call.
  *
  * @param db        - Tenant-bound Drizzle instance (caller's existing instance). Used for
  *                    both the compliance-status lookup and the quota counter read.
- * @param env       - Worker env (TWILIO_SHARED_MESSAGING_SERVICE_SID + MANAGED_SMS_MONTHLY_ALLOWANCE read).
+ * @param env       - Worker env (MANAGED_SMS_MONTHLY_ALLOWANCE read).
  * @param tenantId  - The tenant whose compliance status to check.
  * @param smsMode   - The tenant's configured SMS mode.
  */
@@ -91,14 +80,15 @@ export async function managedSendAllowed(
     tenantId: string,
     smsMode: string,
 ): Promise<ManagedSendGateResult> {
-    // The shared number is off unless the deployment turns it on. On a deployment
-    // that supplies one, every mode except an own account would send on it (or on
-    // the deployment's number), so each is refused with a reason the log row and
-    // the manual-send API carry.
-    // Self-hosted deployments offer no such number and are unaffected.
+    // There is no shared SMS number. The retired shared mode, and `platform` on a
+    // hosted deployment, would send on one, so they are refused with the same
+    // reason a send gets when no provider resolves. An own account and a
+    // registered number (managed_dedicated, checked below) are the supported
+    // paths. On a self-hosted deployment `platform` is the operator's own
+    // account and is unaffected.
     const profile = env.profile ?? getDeploymentProfile(env);
-    if (smsMode !== 'own' && SERVICE_SPECS.sms.offersProvided(profile) && SERVICE_SPECS.sms.providedHeldBack?.(env)) {
-        return { allowed: false, reason: 'provider_confirmation_pending' };
+    if (smsMode === 'managed_shared' || (smsMode === 'platform' && profile.hasManagedCompliance)) {
+        return { allowed: false, reason: 'sms not configured' };
     }
 
     if (smsMode === 'managed_dedicated') {
@@ -118,17 +108,7 @@ export async function managedSendAllowed(
         return checkManagedQuota(db, env, tenantId);
     }
 
-    if (smsMode === 'managed_shared') {
-        // Platform-TFV gate: TWILIO_SHARED_MESSAGING_SERVICE_SID being set means
-        // the platform's shared pool is provisioned and approved.
-        if (!env.TWILIO_SHARED_MESSAGING_SERVICE_SID) {
-            return { allowed: false, reason: 'managed_not_approved' };
-        }
-        // Approved — check monthly quota.
-        return checkManagedQuota(db, env, tenantId);
-    }
-
-    // own / platform — always allowed.
+    // own / self-hosted platform -- always allowed.
     return { allowed: true };
 }
 

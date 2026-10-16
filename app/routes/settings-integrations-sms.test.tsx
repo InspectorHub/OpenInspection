@@ -18,7 +18,6 @@ const getSmsConfig = vi.fn();
 const getTenantConfig = vi.fn();
 const getSmsCompliance = vi.fn();
 const getSources = vi.fn();
-const putSource = vi.fn();
 const patchTenantConfig = vi.fn();
 const putSecrets = vi.fn();
 const postSmsTest = vi.fn();
@@ -33,7 +32,7 @@ vi.mock("~/lib/api-client.server", () => ({
     admin: {
       communication: { $get: getComm },
       "tenant-config": { $get: getTenantConfig, $patch: patchTenantConfig },
-      "integration-sources": { $get: getSources, $put: putSource },
+      "integration-sources": { $get: getSources },
     },
     secrets: { secrets: { $get: getSecrets, $put: putSecrets } },
     smsAdmin: {
@@ -72,7 +71,7 @@ function actionArgs(form: Record<string, string>, env: Record<string, string> = 
 }
 
 const HOSTED_ROW = {
-  service: "sms", choiceShown: true, available: ["own"], stored: null, current: "unavailable",
+  service: "sms", choiceShown: false, available: ["own"], stored: null, current: "unavailable",
   reason: "provider_confirmation_pending", reasonKey: "integrations_source_reason_provider_confirmation_pending",
   state: "not_connected", ownReady: false,
 };
@@ -98,7 +97,6 @@ beforeEach(() => {
   getTenantConfig.mockReset().mockResolvedValue(jsonRes({ data: { smsMode: "own", companyPhone: "+15551112222" } }));
   getSmsCompliance.mockReset().mockResolvedValue(jsonRes({ data: { mode: "own", complianceStatus: "approved", rejectionReason: null, tollfree: [] } }));
   getSources.mockReset().mockResolvedValue(jsonRes(sourcesBody(HOSTED_ROW)));
-  putSource.mockReset().mockResolvedValue(jsonRes({ success: true, data: { service: "sms", source: "own" } }));
   patchTenantConfig.mockReset().mockResolvedValue(jsonRes({ success: true }));
   putSecrets.mockReset().mockResolvedValue(jsonRes({ success: true }));
   postSmsTest.mockReset().mockResolvedValue(jsonRes({ success: true }));
@@ -110,7 +108,7 @@ afterEach(cleanup);
 describe("sms page loader", () => {
   it("returns this service's source row, the effective source, company phone and masked keys", async () => {
     const data = granted(await loader(loaderArgs()));
-    expect(data.source).toMatchObject({ service: "sms", choiceShown: true, available: ["own"] });
+    expect(data.source).toMatchObject({ service: "sms", choiceShown: false, available: ["own"] });
     expect(data.smsConfig).toEqual({ mode: "own", effectiveSource: "own" });
     expect(data.companyPhone).toBe("+15551112222");
     expect(data.secrets.TWILIO_ACCOUNT_SID).toBe("AC••••1234");
@@ -220,27 +218,12 @@ describe("sms page action: company phone and keys", () => {
   });
 });
 
-describe("sms page action: save-source", () => {
-  it("saves only the choice, with the service named, and writes no key", async () => {
-    const res = await action(actionArgs({ intent: "save-source", source: "own" }));
-    expect(putSource).toHaveBeenCalledWith({ json: { service: "sms", source: "own" } });
+describe("sms page action: no source choice", () => {
+  it("has no save-source intent: SMS always goes out on the company's own account", async () => {
+    expect(await action(actionArgs({ intent: "save-source", source: "own" }))).toMatchObject({ ok: false });
+    expect(await action(actionArgs({ intent: "save-source", source: "provided" }))).toMatchObject({ ok: false });
     expect(putSecrets).not.toHaveBeenCalled();
     expect(patchTenantConfig).not.toHaveBeenCalled();
-    expect(res).toMatchObject({ intent: "save-source", ok: true });
-  });
-
-  it("explains a refused Built-in as not available", async () => {
-    putSource.mockResolvedValue(jsonRes({ success: false, error: { code: "not_offered", message: "x" } }, false, 409));
-    expect(await action(actionArgs({ intent: "save-source", source: "provided" }))).toMatchObject({
-      ok: false, error: "That choice is not available.",
-    });
-  });
-
-  it("refuses the retired value and anything unknown without calling the API", async () => {
-    for (const source of ["platform", "managed_shared", ""]) {
-      expect(await action(actionArgs({ intent: "save-source", source }))).toMatchObject({ ok: false });
-    }
-    expect(putSource).not.toHaveBeenCalled();
   });
 });
 
@@ -282,9 +265,9 @@ describe("sms page action: registration onboarding", () => {
   it("explains the two known server refusals, and passes any other through", async () => {
     postProvision.mockResolvedValue(jsonRes({ error: "managed_provision_unavailable" }, false));
     const base = { intent: "sms-compliance-provision", ...BUSINESS, channel: "sp10dlc" };
-    expect(await action(actionArgs(base))).toMatchObject({ ok: false, error: "Managed SMS provisioning is not available in standalone mode." });
+    expect(await action(actionArgs(base))).toMatchObject({ ok: false, error: "Dedicated number setup is not available here. Send SMS from your own Twilio or Telnyx account instead." });
     postProvision.mockResolvedValue(jsonRes({ error: "managed_not_configured" }, false));
-    expect(await action(actionArgs(base))).toMatchObject({ ok: false, error: "Managed Twilio credentials are not configured on this deployment." });
+    expect(await action(actionArgs(base))).toMatchObject({ ok: false, error: "Dedicated number setup is not ready yet. Try again later, or send SMS from your own Twilio or Telnyx account." });
   });
 
   it("resubmit posts to the resubmit endpoint, and validates first", async () => {
@@ -324,21 +307,19 @@ function renderPage(row: object, over: Record<string, unknown> = {}) {
 }
 
 describe("sms page", () => {
-  it("shows Built-in as not available yet and cannot be chosen, while Your own is open", async () => {
+  it("offers only the company's own account: no Built-in option, no 'Not available yet'", async () => {
     renderPage(HOSTED_ROW);
-    const builtIn = (await screen.findByRole("radio", { name: /^Built-in/ })) as HTMLInputElement;
-    expect(builtIn.disabled).toBe(true);
-    expect(screen.getByText("Not available yet")).toBeTruthy();
-    expect(screen.getByRole("radio", { name: /^Your own/ })).toBeTruthy();
-    // the connection card says the same thing once, in its own words
-    expect(screen.getByTestId("delivery-source").textContent).toContain("Built-in SMS is not available yet");
+    await screen.findByTestId("delivery-source");
+    expect(screen.queryByRole("radio", { name: /Built-in|Your own/ })).toBeNull();
+    expect(screen.queryByText("Not available yet")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save choice" })).toBeNull();
+    expect(screen.getByText("Twilio Account SID")).toBeTruthy();
   });
 
-  it("does not ask where there is no built-in account, and shows the account details", async () => {
+  it("shows the account details where there is no built-in account either", async () => {
     renderPage(SELF_HOSTED_ROW, { smsConfig: { mode: "own", effectiveSource: "own" } });
     await screen.findByTestId("delivery-source");
-    expect(screen.queryByRole("radio", { name: /^Built-in/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Save choice" })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Built-in|Your own/ })).toBeNull();
     expect(screen.getByText("Twilio Account SID")).toBeTruthy();
   });
 

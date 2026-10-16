@@ -183,18 +183,12 @@ describe('inbound STOP — every subject the number stands for', () => {
         expect(written[0]!.capturedVia).toBe('admin');
     });
 
-    it('the platform shape skips own-mode tenants for users, as it does for contacts', async () => {
-        await db.insert(schema.tenantConfigs).values({
-            tenantId: OTHER_TENANT, smsMode: 'own', updatedAt: new Date(),
-        } as never);
+    it('the company-less shared route is gone and writes nothing', async () => {
         await seedUser('u-acme', TENANT, PHONE);
-        await seedUser('u-beta', OTHER_TENANT, PHONE);
 
-        expect((await inbound('/webhooks/sms/inbound', 'STOP')).status).toBe(200);
+        expect((await inbound('/webhooks/sms/inbound', 'STOP')).status).toBe(404);
 
-        const svc = new SmsConsentService({} as D1Database);
-        expect(await svc.getLatest(TENANT, 'u-acme', 'user')).toBe('revoked');
-        expect(await svc.getLatest(OTHER_TENANT, 'u-beta', 'user')).toBeNull();
+        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-acme', 'user')).toBeNull();
     });
 
     it('a tenant-scoped STOP does not reach an identical number in another tenant', async () => {

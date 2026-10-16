@@ -6,8 +6,9 @@ import { m } from "~/paraglide/messages";
 export type SourceValue = "provided" | "own";
 
 /**
- * Whose account a service runs on, for a deployment that has a built-in one.
+ * Whose account email runs on, for a deployment that has a built-in one.
  * Only drawn where Built-in exists; a self-hosted deployment is never asked.
+ * SMS has no such choice: it always goes out on the company's own account.
  *
  * Built-in that cannot be chosen right now stays on the screen, disabled, with
  * the reason beside it, rather than vanishing: a person looking for it should
@@ -17,7 +18,6 @@ export type SourceValue = "provided" | "own";
  * are not touched, so switching to Built-in and back loses nothing.
  */
 export function SourceChoice({
-  kind,
   available,
   selected,
   onSelect,
@@ -25,7 +25,6 @@ export function SourceChoice({
   error,
   saved,
 }: {
-  kind: "email" | "sms";
   /** The sources that can be picked right now. */
   available: SourceValue[];
   selected: SourceValue;
@@ -36,16 +35,14 @@ export function SourceChoice({
 }) {
   const latch = useSubmitLatch();
   const builtInOpen = available.includes("provided");
-  const service = kind === "email" ? m.integrations_delivery_service_email() : m.integrations_hub_sms_title();
+  const service = m.integrations_delivery_service_email();
   const builtInDescription = builtInOpen
     ? m.integrations_delivery_built_in_email_desc()
-    : kind === "sms"
-      ? m.integrations_source_reason_provider_confirmation_pending()
-      : m.integrations_source_reason_provided_not_configured({ service });
+    : m.integrations_source_reason_provided_not_configured({ service });
   return (
-    <section aria-labelledby={`${kind}-source-heading`} className="space-y-3">
+    <section aria-labelledby={`email-source-heading`} className="space-y-3">
       <div>
-        <h2 id={`${kind}-source-heading`} className="text-sm font-bold text-ih-fg-1">{m.integrations_delivery_source_heading()}</h2>
+        <h2 id={`email-source-heading`} className="text-sm font-bold text-ih-fg-1">{m.integrations_delivery_source_heading()}</h2>
         <p className="text-xs text-ih-fg-3 mt-0.5">{m.integrations_delivery_source_help({ service })}</p>
       </div>
       {error && <Banner tone="danger">{error}</Banner>}
@@ -68,7 +65,7 @@ export function SourceChoice({
             {
               value: "own",
               title: m.integrations_hub_source_own(),
-              description: kind === "email" ? m.integrations_delivery_own_email_desc() : m.integrations_delivery_own_sms_desc(),
+              description: m.integrations_delivery_own_email_desc(),
             },
           ]}
         />

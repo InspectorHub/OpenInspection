@@ -30,10 +30,6 @@ export interface ScheduledEnv {
     /** Managed-ISV Telnyx API key (Plan 2) — drives the Telnyx managed compliance
      *  sweep. Absent in standalone / Twilio-only deploys → Telnyx rows skip. */
     TELNYX_API_KEY?: string;
-    /** Shared Messaging Service SID for managed_shared tenants (Task 8 send gate). */
-    TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
-    /** Hosted shared SMS number switch (see AppEnv). Absent means off. */
-    SMS_MANAGED_SHARED_ENABLED?: string;
     /** Monthly SMS allowance for managed tenants (see AppEnv). Absent or non-numeric means the default. */
     MANAGED_SMS_MONTHLY_ALLOWANCE?: string;
     TENANT_CACHE?: KVNamespace;

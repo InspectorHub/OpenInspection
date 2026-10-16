@@ -95,21 +95,16 @@ export const automationFlushJob: CronJob = {
                             ...(env.JWT_SECRET_PREVIOUS ? { JWT_SECRET_PREVIOUS: env.JWT_SECRET_PREVIOUS } : {}),
                             // Read only when the company stored an explicit SMS source.
                             profile: getDeploymentProfile(env),
-                            ...(env.SMS_MANAGED_SHARED_ENABLED ? { SMS_MANAGED_SHARED_ENABLED: env.SMS_MANAGED_SHARED_ENABLED } : {}),
                             ...(env.TWILIO_ACCOUNT_SID ? { TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID } : {}),
                             ...(env.TWILIO_AUTH_TOKEN ? { TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN } : {}),
                             ...(env.TWILIO_FROM_NUMBER ? { TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER } : {}),
                         }, tenantId)),
             }
             : null;
-        // Pass the managed-send gate env so managed_shared and managed_dedicated
-        // automation sends are fail-closed until compliance is approved.
+        // Pass the managed-send gate env so managed_dedicated automation sends
+        // are fail-closed until compliance is approved.
         const gateEnv = {
             profile: getDeploymentProfile(env),
-            ...(env.SMS_MANAGED_SHARED_ENABLED ? { SMS_MANAGED_SHARED_ENABLED: env.SMS_MANAGED_SHARED_ENABLED } : {}),
-            ...(env.TWILIO_SHARED_MESSAGING_SERVICE_SID
-                ? { TWILIO_SHARED_MESSAGING_SERVICE_SID: env.TWILIO_SHARED_MESSAGING_SERVICE_SID }
-                : {}),
             // Without this the cron path always applied the built-in default allowance.
             ...(env.MANAGED_SMS_MONTHLY_ALLOWANCE
                 ? { MANAGED_SMS_MONTHLY_ALLOWANCE: env.MANAGED_SMS_MONTHLY_ALLOWANCE }

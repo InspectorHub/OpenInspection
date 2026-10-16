@@ -1,8 +1,10 @@
 # SMS — Twilio and Telnyx
 
 Appointment reminders, report-ready notices, and the opt-in confirmations the
-consent flow depends on. Two providers; a company brings its own account, or a
-deployment that supplies a shared sender can offer a managed one.
+consent flow depends on. Two providers, Twilio and Telnyx. A company sends from
+its own account with either one; where a deployment files carrier registrations,
+a company can instead have a dedicated number registered for it. There is no
+shared sender.
 
 **Sending SMS in the United States is a regulated activity, not a technical
 one.** Carrier registration, the wording of your opt-in, and quiet hours are
@@ -25,25 +27,25 @@ check against — which is also why the field will accept a wrong paste without
 complaint, so confirm it against the Telnyx portal rather than the field's
 silence.
 
-## Your own, built-in, managed
+## Your own account, or a dedicated number
 
-In Settings the choice is **Your own** (the company's own account) or **Built-in** (the deployment's service), as described in [Integration sources](../develop/integration-sources.md). Underneath, three modes (`own`, `platform`, `managed`), resolved in `server/lib/sms/resolve-twilio.ts`, mirroring the email
-path's own-vs-platform logic:
+SMS has one source in Settings: **Your own**, the company's own Twilio or Telnyx
+account (see [Integration sources](../develop/integration-sources.md)). It is
+resolved in `server/lib/sms/resolve-twilio.ts`:
 
-- **Own** (Your own) takes effect only when the mode is set to own **and all three** of the
-  tenant's keys are present. A half-finished switch does not half-apply.
-- **Platform** (Built-in, self-hosted) uses the deployment's env credentials.
-- **Managed** (only where the deployment supplies one) uses the deployment's ISV credential triple plus a
-  Messaging Service SID, shared or dedicated to the tenant. All four fields must
-  be truthy for this branch to fire, so a standalone deployment with no ISV
-  credentials never builds a managed bag — fail-closed by construction rather
-  than by a flag.
-
-On a deployment that supplies a shared number, that number is offered as the
-Built-in source only when `SMS_MANAGED_SHARED_ENABLED` is `true` or `1`. It is
-off by default, and while it is off every send that is not on the company's
-own account is refused with a reason. See
-[Integration sources](../develop/integration-sources.md).
+- **Own** takes effect only when **all** of the company's keys for the chosen
+  provider are present. A half-finished switch does not half-apply. On a
+  self-hosted deployment the operator's environment credentials count as the
+  company's own.
+- **Dedicated number** (`managed_dedicated`, only where the deployment files
+  carrier registrations) sends from a number registered for the company, through
+  a Messaging Service. All of the deployment's registration credentials must be
+  present for this branch to fire, so a deployment without them never builds it
+  and fails closed. Sends wait for recorded carrier approval.
+- A stored shared-sender mode (`managed_shared`), and the legacy `platform` mode
+  on a hosted deployment, are not configured: nothing is sent on them. The
+  `SMS_MANAGED_SHARED_ENABLED` switch that once gated this is retired and has no
+  effect.
 
 ## Every message goes through one gate chain
 
@@ -78,10 +80,10 @@ deployment cannot use.
 
 - `server/lib/sms/` — the gate chain, consent, phone normalisation, segments
 - `server/lib/messaging/twilio.ts`, `server/lib/messaging/provider.ts`
-- `server/lib/sms/resolve-twilio.ts` — own / platform / managed resolution
+- `server/lib/sms/resolve-twilio.ts` — own / dedicated-number resolution
 
 ## Related
 
 - [SMS compliance](../operate/sms-compliance.md) — **read this first**
-- [Email](email.md) — the other channel, same own-vs-platform shape
+- [Email](email.md) — the other channel; it also has a Built-in option where the deployment supplies one
 - [Integration adapters](../develop/integration-adapters.md)

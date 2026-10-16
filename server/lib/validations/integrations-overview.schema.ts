@@ -13,6 +13,8 @@ const IntegrationCardSchema = z.object({
         .describe('Whether the service is working, derived from stored settings and keys.'),
     source: z.enum(['provided', 'own', 'unavailable'])
         .describe('Whose account the service runs on: provided (Built-in), own (Your own), or unavailable when the wanted source cannot be used right now.'),
+    dedicatedNumber: z.boolean()
+        .describe('True when the service runs on a number registered for the company, which the page names Dedicated number.'),
     canUseOwn: z.boolean()
         .describe('True when the company can switch this service between Built-in and its own account.'),
     detailPath: z.string().describe('The settings page that manages the service.'),
@@ -21,6 +23,7 @@ const IntegrationCardSchema = z.object({
         'integrations_source_reason_provided_not_configured',
         'integrations_source_reason_own_credentials_incomplete',
         'integrations_source_reason_provider_confirmation_pending',
+        'integrations_source_reason_dedicated_not_ready',
     ]).nullable().describe('Message key that explains why the source is unavailable; null when nothing needs saying.'),
 }).openapi('IntegrationCard');
 

@@ -44,8 +44,10 @@ function stateFor(
         // Half-entered keys are something the person can finish.
         case 'own_credentials_incomplete':
             return SERVICE_SPECS[service].own(company).state === 'partial' ? 'attention' : 'not_connected';
-        // The deployment is missing a credential it is supposed to provide.
         case 'provided_not_configured':
+        case 'dedicated_not_ready':
+            // A missing deployment credential, or a registration that is under way or
+            // needs a fix: something the company can follow up.
             return 'attention';
         default:
             return 'not_connected';

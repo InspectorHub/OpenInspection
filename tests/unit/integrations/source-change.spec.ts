@@ -73,9 +73,9 @@ describe('describeSwitchableSources', () => {
         expect(email).toMatchObject({ choiceShown: true, available: ['provided', 'own'], stored: null });
     });
 
-    it('shows SMS Built-in as not available yet while Your own stays open', async () => {
+    it('shows no choice for SMS: only Your own is open', async () => {
         const sms = await rowOf('sms');
-        expect(sms.choiceShown).toBe(true);
+        expect(sms.choiceShown).toBe(false);
         expect(sms.available).toEqual(['own']);
         // control: the same row for email offers Built-in, so the line above is about SMS, not about the helper
         expect((await rowOf('email')).available).toContain('provided');
@@ -119,7 +119,7 @@ describe('checkSourceChange', () => {
         expect(checkSourceChange(await inputsFor(A), 'email', 'provided')).toEqual({ ok: true });
     });
 
-    it('refuses Built-in SMS while the shared number is held back', async () => {
+    it('refuses Built-in SMS: there is no shared number', async () => {
         expect(checkSourceChange(await inputsFor(A), 'sms', 'provided')).toEqual({ ok: false, error: 'not_offered' });
     });
 

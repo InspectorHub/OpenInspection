@@ -31,14 +31,10 @@ function complianceLabel(status: ComplianceStatus | null): string {
 }
 
 /**
- * Integrations -> SMS, below the connection card and the source choice:
- * the company phone, the registration status of the company's own number, and
- * the account details (provider, keys, inbound address, test message).
- *
- * Whose account sends the SMS is chosen above this panel; nothing here changes
- * it. The account details are shown while "Your own" is the question and folded
- * once they are complete. When Built-in is selected they stay saved, out of
- * sight, and this panel says so.
+ * Integrations -> SMS, below the connection card: the company phone, the
+ * registration status of the company's own number, and the account details
+ * (provider, keys, inbound address, test message). SMS goes out on the
+ * company's own account, so the details are folded once they are complete.
  */
 export function SmsDeliveryPanel({
   effectiveSource,

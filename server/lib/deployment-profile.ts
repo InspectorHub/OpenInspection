@@ -90,8 +90,8 @@ export interface DeploymentProfile {
      *  form exists at all and the saas one refuses to save. */
     videoBackendManaged: boolean;
 
-    /** Whether a platform-operated compliance path (managed SMS provisioning —
-     *  10DLC brand/campaign) exists for tenants. False in standalone: there is
+    /** Whether carrier registration for a dedicated SMS number (10DLC
+     *  brand/campaign, toll-free verification) can be filed for tenants. False in standalone: there is
      *  no platform to file on the operator's behalf, so the path is ABSENT
      *  rather than disabled. Distinct from hasManagedAi — different provider,
      *  different entitlement. */

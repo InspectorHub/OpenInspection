@@ -97,17 +97,27 @@ describe('hosted deployment', () => {
         }
     });
 
-    it('can switch to Your own only for email, SMS and AI', () => {
-        expect(cards.filter((c) => c.canUseOwn).map((c) => c.id)).toEqual(['email', 'sms', 'ai']);
+    it('can switch to Your own only for email and AI: SMS has no Built-in to switch from', () => {
+        expect(cards.filter((c) => c.canUseOwn).map((c) => c.id)).toEqual(['email', 'ai']);
     });
 
-    it('holds back the built-in SMS number: unavailable, with the reason, but Your own can be used', () => {
+    it('offers SMS on Your own account only: unavailable until its details are added, with the reason', () => {
         expect(card(cards, 'sms')).toMatchObject({
             source: 'unavailable',
             status: 'not_connected',
-            canUseOwn: true,
+            canUseOwn: false,
             reasonKey: 'integrations_source_reason_provider_confirmation_pending',
         });
+    });
+
+    it('shows a company on a registered dedicated number as Dedicated number: connected when usable, attention when not', () => {
+        const mk = (ready: boolean) => card(buildIntegrationOverview(inputs({
+            env: DEPLOYMENT_ENV, company: { legacy: { smsMode: 'managed_dedicated' }, dedicatedNumberReady: ready },
+        })), 'sms');
+        expect(mk(true)).toMatchObject({ source: 'own', status: 'connected', dedicatedNumber: true, reasonKey: null });
+        expect(mk(false)).toMatchObject({ source: 'unavailable', status: 'attention', dedicatedNumber: true, reasonKey: 'integrations_source_reason_dedicated_not_ready' });
+        // control: an ordinary company is not labelled dedicated
+        expect(card(cards, 'sms').dedicatedNumber).toBe(false);
     });
 
     it('reads Stripe as the company\'s own account, never the deployment\'s', () => {

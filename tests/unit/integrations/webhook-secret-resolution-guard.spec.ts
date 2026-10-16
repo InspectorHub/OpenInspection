@@ -40,7 +40,6 @@ const DECLARED: Record<string, Resolution> = {
     'POST /webhooks/quickbooks':       { kind: 'realm-lookup' },
     'POST /webhooks/stripe':           { kind: 'fixed-or-none' },
     'POST /webhooks/stripe/:tenant':   { kind: 'merged' },
-    'POST /webhooks/sms/inbound':      { kind: 'platform', why: 'tenant-less platform number: the platform auth token from env; the Twilio key is outside the webhook merge set' },
     'POST /webhooks/sms/inbound/:tenant': { kind: 'own-load', file: 'server/api/sms.ts' },
     'POST /webhooks/sms/status/:tenant':  { kind: 'own-load', file: 'server/lib/sms/delivery-status.ts' },
     'POST /webhooks/compliance-status/:provider/:tenant': {

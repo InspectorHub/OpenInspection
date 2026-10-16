@@ -9,7 +9,7 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { qboConnections, tenantConfigs } from '../db/schema';
+import { messagingCompliance, qboConnections, tenantConfigs } from '../db/schema';
 import { loadTenantSecrets } from '../secrets-cache';
 import { memoOnce } from '../request-scope';
 import { getCalendarConnection } from '../calendar/connection';
@@ -51,7 +51,7 @@ export async function loadOverviewInputs(args: {
     const { env, profile, tenantId, userId, tenantSecretKeys } = args;
     const db = drizzle(env.DB);
 
-    const [config, secrets, qbo, calendar] = await Promise.all([
+    const [config, secrets, qbo, calendar, registration] = await Promise.all([
         db.select({
             emailMode: tenantConfigs.emailMode,
             smsMode: tenantConfigs.smsMode,
@@ -68,6 +68,8 @@ export async function loadOverviewInputs(args: {
         db.select({ tenantId: qboConnections.tenantId }).from(qboConnections)
             .where(eq(qboConnections.tenantId, tenantId)).get().catch(() => null),
         userId ? getCalendarConnection(env.DB, tenantId, userId).catch(() => null) : Promise.resolve(null),
+        db.select({ status: messagingCompliance.complianceStatus, resourceSid: messagingCompliance.messagingResourceSid })
+            .from(messagingCompliance).where(eq(messagingCompliance.tenantId, tenantId)).get().catch(() => null),
     ]);
 
     return {
@@ -83,6 +85,8 @@ export async function loadOverviewInputs(args: {
             senderEmail: config?.senderEmail ?? null,
             streamSubdomain: streamSubdomainOf(config?.integrationConfig),
             ownSecrets: secrets ?? {},
+            // Usable once the carrier approved the registration and a Messaging Service exists (what the send gate needs).
+            dedicatedNumberReady: registration?.status === 'approved' && !!registration.resourceSid,
         },
     };
 }

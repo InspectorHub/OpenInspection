@@ -23,12 +23,15 @@ export function DeliveryConnectionCard({
   status,
   source,
   reasonKey,
+  dedicated = false,
 }: {
   title: string;
   description: string;
   status: Status;
   source: IntegrationSource;
   reasonKey: SourceReasonMessageKey | null;
+  /** Runs on a number registered for the company. */
+  dedicated?: boolean;
 }) {
   const pill = STATUS[status];
   return (
@@ -40,7 +43,7 @@ export function DeliveryConnectionCard({
         </span>
       </div>
       <p className="text-xs text-ih-fg-3">{description}</p>
-      <p data-testid="delivery-source" className="text-xs font-bold text-ih-fg-2">{sourceText(source, reasonKey, title)}</p>
+      <p data-testid="delivery-source" className="text-xs font-bold text-ih-fg-2">{sourceText(source, reasonKey, title, dedicated)}</p>
     </Card>
   );
 }

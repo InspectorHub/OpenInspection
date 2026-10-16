@@ -160,7 +160,7 @@ export const TenantConfigPatchSchema = z.object({
     reportViewCountingEnabled: z.boolean().optional().describe('Whether this workspace counts report opens. Default false — the legitimate-interests assessment assigns the interest to the company, so the company has to be able to decline it.'),
     offlineMaxDays: z.number().int().min(1).max(365).optional().describe('Days a native client may stay offline before it locks local data. Integer 1-365; default 30.'),
     reviewUrl: z.string().url().max(500).nullish().describe('Track J (#122) — company review link (Google/Yelp/Facebook). null/empty clears it.'),
-    smsMode: z.enum(['own', 'managed_shared', 'managed_dedicated']).optional().describe('Track L (D3) — Tenant SMS sender mode. "platform" is reserved for first-party use and is rejected when submitted by a tenant.'),
+    smsMode: z.enum(['own', 'managed_dedicated']).optional().describe('Tenant SMS sender mode: your own provider account, or a dedicated registered number. "platform" is reserved for first-party use and is rejected when submitted by a tenant; the shared sender is retired and is rejected too.'),
     companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
     videoMode: z.enum(['r2', 'stream']).optional().describe('Self-host video backend: r2 (default, free) or stream (requires STREAM binding + customer subdomain).'),
     smsByoProvider: z.enum(['twilio', 'telnyx']).optional().describe('BYO SMS provider selection — which provider adapter to use when smsMode is "own".'),

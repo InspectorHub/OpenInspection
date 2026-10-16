@@ -15,18 +15,18 @@ import type { IntegrationCard } from "../../../../server/lib/integrations/overvi
 afterEach(cleanup);
 
 const CARDS: IntegrationCard[] = [
-  { id: "stripe", category: "payments", status: "connected", source: "own", canUseOwn: false, detailPath: "/settings/integrations#stripe", reasonKey: null },
-  { id: "quickbooks", category: "accounting", status: "attention", source: "provided", canUseOwn: false, detailPath: "/settings/integrations/qbo", reasonKey: null },
-  { id: "googleCalendar", category: "calendar", status: "not_connected", source: "provided", canUseOwn: false, detailPath: "/settings/schedule", reasonKey: null },
-  { id: "email", category: "messaging", status: "not_connected", source: "own", canUseOwn: true, detailPath: "/settings/integrations/email", reasonKey: null },
+  { id: "stripe", category: "payments", status: "connected", source: "own", dedicatedNumber: false, canUseOwn: false, detailPath: "/settings/integrations#stripe", reasonKey: null },
+  { id: "quickbooks", category: "accounting", status: "attention", source: "provided", dedicatedNumber: false, canUseOwn: false, detailPath: "/settings/integrations/qbo", reasonKey: null },
+  { id: "googleCalendar", category: "calendar", status: "not_connected", source: "provided", dedicatedNumber: false, canUseOwn: false, detailPath: "/settings/schedule", reasonKey: null },
+  { id: "email", category: "messaging", status: "not_connected", source: "own", dedicatedNumber: false, canUseOwn: true, detailPath: "/settings/integrations/email", reasonKey: null },
   {
-    id: "sms", category: "messaging", status: "not_connected", source: "unavailable", canUseOwn: true,
+    id: "sms", category: "messaging", status: "not_connected", source: "unavailable", dedicatedNumber: false, canUseOwn: false,
     detailPath: "/settings/integrations/sms", reasonKey: "integrations_source_reason_provider_confirmation_pending",
   },
-  { id: "places", category: "data", status: "connected", source: "provided", canUseOwn: false, detailPath: "/settings/advanced", reasonKey: null },
-  { id: "estated", category: "data", status: "not_connected", source: "unavailable", canUseOwn: false, detailPath: "/settings/advanced", reasonKey: null },
-  { id: "video", category: "video", status: "connected", source: "provided", canUseOwn: false, detailPath: "/settings/integrations", reasonKey: null },
-  { id: "ai", category: "ai", status: "connected", source: "own", canUseOwn: true, detailPath: "/settings/advanced", reasonKey: null },
+  { id: "places", category: "data", status: "connected", source: "provided", dedicatedNumber: false, canUseOwn: false, detailPath: "/settings/advanced", reasonKey: null },
+  { id: "estated", category: "data", status: "not_connected", source: "unavailable", dedicatedNumber: false, canUseOwn: false, detailPath: "/settings/advanced", reasonKey: null },
+  { id: "video", category: "video", status: "connected", source: "provided", dedicatedNumber: false, canUseOwn: false, detailPath: "/settings/integrations", reasonKey: null },
+  { id: "ai", category: "ai", status: "connected", source: "own", dedicatedNumber: false, canUseOwn: true, detailPath: "/settings/advanced", reasonKey: null },
 ];
 
 function renderGrid(cards: IntegrationCard[]) {
@@ -36,6 +36,12 @@ function renderGrid(cards: IntegrationCard[]) {
 const cardOf = (title: string) => screen.getByRole("article", { name: title });
 
 describe("IntegrationCardsGrid", () => {
+  it("names a registered number Dedicated number, not Your own", async () => {
+    renderGrid(CARDS.map((c) => (c.id === "sms" ? { ...c, source: "own" as const, status: "connected" as const, dedicatedNumber: true, reasonKey: null } : c)));
+    await screen.findByText("Card payments");
+    expect(within(cardOf("SMS")).getByText("Dedicated number")).toBeTruthy();
+  });
+
   it("groups by category in the design order", async () => {
     renderGrid(CARDS);
     await screen.findByText("Card payments");
@@ -65,7 +71,7 @@ describe("IntegrationCardsGrid", () => {
     expect(within(cardOf("Card payments")).getByText("Your own")).toBeTruthy();
     expect(within(cardOf("Accounting")).getByText("Built-in")).toBeTruthy();
     // an unavailable source says why, in words, never a bare "unavailable"
-    expect(within(cardOf("SMS")).getByText("Built-in SMS is not available yet. Use Your own account to send SMS.")).toBeTruthy();
+    expect(within(cardOf("SMS")).getByText("SMS needs your own Twilio or Telnyx account. Add its details to send texts.")).toBeTruthy();
     for (const card of screen.getAllByRole("article")) {
       expect(within(card).getAllByTestId("integration-source")).toHaveLength(1);
       expect(within(card).getAllByTestId("integration-status")).toHaveLength(1);
@@ -123,11 +129,11 @@ describe("IntegrationCardsGrid", () => {
   it("explains Built-in only when some service can be built in", async () => {
     renderGrid(CARDS);
     await screen.findByText("Card payments");
-    expect(screen.getByText(/Built-in: included and ready/)).toBeTruthy();
+    expect(screen.getByText(/Built-in: ready to use/)).toBeTruthy();
     cleanup();
-    renderGrid(CARDS.map((c) => ({ ...c, source: "own" as const, canUseOwn: false })));
+    renderGrid(CARDS.map((c) => ({ ...c, source: "own" as const, dedicatedNumber: false, canUseOwn: false })));
     await screen.findByText("Card payments");
-    expect(screen.queryByText(/Built-in: included and ready/)).toBeNull();
+    expect(screen.queryByText(/Built-in: ready to use/)).toBeNull();
     expect(screen.getByText(/Status: whether the service is working/)).toBeTruthy();
   });
 

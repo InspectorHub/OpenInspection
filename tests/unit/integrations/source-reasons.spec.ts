@@ -22,11 +22,11 @@ describe('source reason messages', () => {
         key: sourceReasonMessageKey({ service: 'email', source: 'unavailable', reason }),
     }));
 
-    it('the four unavailable reasons have a key and the three working reasons have none', () => {
+    it('the five unavailable reasons have a key and the working reasons have none', () => {
         const withKey = unavailable.filter((u) => u.key).map((u) => u.reason).sort();
-        expect(withKey).toEqual(['not_offered', 'own_credentials_incomplete', 'provided_not_configured', 'provider_confirmation_pending']);
+        expect(withKey).toEqual(['dedicated_not_ready', 'not_offered', 'own_credentials_incomplete', 'provided_not_configured', 'provider_confirmation_pending']);
         expect(unavailable.filter((u) => !u.key).map((u) => u.reason).sort())
-            .toEqual(['explicit_choice', 'legacy_setting', 'profile_default']);
+            .toEqual(['dedicated_number', 'explicit_choice', 'legacy_setting', 'profile_default']);
     });
 
     it('a source that resolved is never explained as a problem, whatever the reason (control above: unavailable is)', () => {
@@ -61,7 +61,8 @@ describe('source reason messages', () => {
     it('the messages name the sources as Built-in and Your own', () => {
         expect(EN.integrations_source_reason_provided_not_configured).toContain('Built-in');
         expect(EN.integrations_source_reason_provided_not_configured).toContain('Your own');
-        expect(EN.integrations_source_reason_provider_confirmation_pending).toContain('Your own');
+        expect(EN.integrations_source_reason_provider_confirmation_pending).toContain('your own Twilio or Telnyx account');
+        expect(EN.integrations_source_reason_provider_confirmation_pending).not.toContain('Built-in');
     });
 
     it('covers every service the resolver knows (the helper does not special-case one)', () => {

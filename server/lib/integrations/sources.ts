@@ -19,8 +19,8 @@
  *   - The retired SMS value `platform` is never a valid choice (see
  *     `stored-sources.ts`); a stored legacy `platform` mode only means "no
  *     explicit choice was made".
- *   - Hosted video has no 'own'. Hosted SMS 'provided' (a shared number) is
- *     held back behind a flag that is off unless explicitly turned on.
+ *   - Hosted video has no 'own'. Hosted SMS has no 'provided' source at all: a
+ *     company sends on its own account or on a number registered for it.
  *
  * Pure: no I/O, no clock. `env` must be the DEPLOYMENT's environment. A
  * request-scoped env that already had a company's secrets merged into it
@@ -47,6 +47,8 @@ export const SOURCE_REASONS = [
     'own_credentials_incomplete',
     'provided_not_configured',
     'provider_confirmation_pending',
+    'dedicated_number',
+    'dedicated_not_ready',
 ] as const;
 export type SourceReason = (typeof SOURCE_REASONS)[number];
 
@@ -67,6 +69,8 @@ export interface CompanyIntegrationConfig {
     streamSubdomain?: string | null | undefined;
     /** The company's decrypted stored keys. Only presence is read. */
     ownSecrets?: Record<string, string | undefined> | undefined;
+    /** SMS: the number registered for the company is approved and has its Messaging Service, so it can send. */
+    dedicatedNumberReady?: boolean | undefined;
 }
 
 /** The deployment's own environment slice. Presence is all that is read. */
@@ -78,9 +82,6 @@ export interface IntegrationEnv {
     TWILIO_FROM_NUMBER?: string | undefined;
     TWILIO_API_KEY_SID?: string | undefined;
     TWILIO_API_KEY_SECRET?: string | undefined;
-    TWILIO_SHARED_MESSAGING_SERVICE_SID?: string | undefined;
-    /** Held-back switch for the hosted shared SMS number. Off unless 'true' or '1'. */
-    SMS_MANAGED_SHARED_ENABLED?: string | undefined;
     AI_MANAGED_API_KEY?: string | undefined;
     AI_VERTEX_SERVICE_ACCOUNT?: string | undefined;
     QBO_CLIENT_ID?: string | undefined;
@@ -137,6 +138,15 @@ export function resolveIntegrationSource(
     }
     const fail = (why: SourceReason, credentialsPresent = false): IntegrationSourceResolution =>
         ({ service, source: 'unavailable', reason: why, credentialsPresent, choice });
+
+    // A company on a number registered for it (hosted only) sends on that number,
+    // which is its own sender. It is neither Built-in nor an account it typed in,
+    // so it is read from the registration, not from the keys.
+    if (service === 'sms' && spec.offersProvided(profile) && company.legacy?.smsMode === 'managed_dedicated') {
+        return company.dedicatedNumberReady
+            ? { service, source: 'own', reason: 'dedicated_number', credentialsPresent: true, choice: 'default' }
+            : { ...fail('dedicated_not_ready'), choice: 'default' };
+    }
 
     if (wanted === 'provided') {
         // Held back is a different answer from "not offered": the code path

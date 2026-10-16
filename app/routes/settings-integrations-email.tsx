@@ -37,7 +37,7 @@ const SECRET_KEYS = [
 /** What the page assumes when the source call fails: own account only, and nothing is claimed to work. */
 const FALLBACK_ROW: SwitchableSourceRow = {
   service: "email", choiceShown: false, available: ["own"], stored: null, current: "unavailable",
-  reason: "profile_default", reasonKey: null, state: "not_connected", ownReady: false,
+  reason: "profile_default", reasonKey: null, state: "not_connected", dedicatedNumber: false, ownReady: false,
 };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -169,7 +169,6 @@ function EmailPage({ data }: { data: Exclude<Awaited<ReturnType<typeof loader>>,
 
       {row.choiceShown && (
         <SourceChoice
-          kind="email"
           available={row.available}
           selected={selected}
           onSelect={setSelected}

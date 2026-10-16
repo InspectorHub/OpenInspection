@@ -23,9 +23,9 @@ import type { IntegrationSource, IntegrationSourceChoice, SourceReason } from '.
 
 export interface SwitchableSourceRow {
     service: SwitchableService;
-    /** Built-in exists on this deployment for the service, so the company is asked to choose. */
+    /** Built-in is on offer for the service, so the company is asked to choose. */
     choiceShown: boolean;
-    /** The sources the company can pick right now. Built-in may be shown but not listed here (held back). */
+    /** The sources the company can pick right now. */
     available: IntegrationSourceChoice[];
     /** The company's explicit choice, or null when it never made one. */
     stored: IntegrationSourceChoice | null;
@@ -33,6 +33,8 @@ export interface SwitchableSourceRow {
     reason: SourceReason;
     reasonKey: SourceReasonMessageKey | null;
     state: 'connected' | 'attention' | 'not_connected';
+    /** Runs on a number registered for the company. */
+    dedicatedNumber: boolean;
     /** The company's own account details are complete, so Your own can be chosen. */
     ownReady: boolean;
 }
@@ -50,13 +52,16 @@ export function describeSwitchableSources(inputs: OverviewInputs): SwitchableSou
         const hosted = spec.offersProvided(inputs.profile);
         return {
             service,
-            choiceShown: hosted && spec.offersOwn(inputs.profile),
+            // Asked to choose only where there is more than one source to choose
+            // between. Hosted SMS offers its own account alone.
+            choiceShown: hosted && spec.offersOwn(inputs.profile) && row.available.includes('provided'),
             available: row.available,
             stored: inputs.company.sources?.[service] ?? null,
             current: row.current,
             reason: row.reason,
             reasonKey: sourceReasonMessageKey({ service, source: row.current, reason: row.reason }),
             state: row.state,
+            dedicatedNumber: row.reason === 'dedicated_number' || row.reason === 'dedicated_not_ready',
             // Self-hosted: the operator's environment counts as the company's own details.
             ownReady: hosted ? spec.own(inputs.company).state === 'complete' : spec.standaloneOwn(inputs.company, inputs.env),
         };
@@ -73,7 +78,7 @@ export function checkSourceChange(
     if (!row || !row.available.includes(source)) return { ok: false, error: 'not_offered' };
     // Where a built-in account exists, Your own is only usable once the company's
     // details are complete: it never borrows the deployment's.
-    if (source === 'own' && row.choiceShown && !row.ownReady) return { ok: false, error: 'own_credentials_incomplete' };
+    if (source === 'own' && SERVICE_SPECS[service].offersProvided(inputs.profile) && !row.ownReady) return { ok: false, error: 'own_credentials_incomplete' };
     return { ok: true };
 }
 
@@ -90,7 +95,9 @@ function legacyColumns(
     if (service === 'email') return { emailMode: source === 'own' ? 'own' : 'platform' };
     if (service === 'sms') {
         if (source === 'own') return { smsMode: 'own' };
-        return { smsMode: currentSmsMode === 'managed_dedicated' ? 'managed_dedicated' : 'managed_shared' };
+        // 'provided' is refused before it gets here for SMS; keep a registered
+        // number as it is and never write the retired shared mode.
+        return currentSmsMode === 'managed_dedicated' ? { smsMode: 'managed_dedicated' } : {};
     }
     return {};
 }

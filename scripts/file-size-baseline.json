@@ -6,7 +6,7 @@
   "app/routes/inspections.tsx": 938,
   "server/services/inspection/inspection-report.service.ts": 921,
   "server/lib/collab/results-doc.ts": 874,
-  "server/api/sms.ts": 856,
+  "server/api/sms.ts": 854,
   "scripts/check-submit-guard.mjs": 816,
   "scripts/check-chrome-record.mjs": 806,
   "scripts/check-idempotency-coverage.mjs": 797,

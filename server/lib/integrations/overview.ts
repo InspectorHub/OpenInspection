@@ -36,7 +36,9 @@ export interface IntegrationCard {
     status: IntegrationStatus;
     /** Whose account it runs on. `unavailable`: the wanted source cannot be used right now. */
     source: IntegrationSource;
-    /** The company may switch between Built-in and Your own on this service. */
+    /** Runs on a number registered for the company (SMS), shown as Dedicated number. */
+    dedicatedNumber: boolean;
+    /** The company may switch between Built-in and Your own on this service. False when only Your own is on offer. */
     canUseOwn: boolean;
     /** The settings page that manages it. */
     detailPath: string;
@@ -89,12 +91,13 @@ function fromResolver(
     let status: IntegrationStatus = row.state;
     // Having the app is not being signed in to it: those services also need a connection.
     if (connection !== undefined && row.current !== 'unavailable') status = connection ? 'connected' : 'not_connected';
-    const choice = SERVICE_SPECS[service].offersProvided(inputs.profile) && row.available.includes('own');
+    const choice = SERVICE_SPECS[service].offersProvided(inputs.profile) && row.available.includes('provided') && row.available.includes('own');
     return {
         id,
         category,
         status,
         source: row.current,
+        dedicatedNumber: row.reason === 'dedicated_number' || row.reason === 'dedicated_not_ready',
         canUseOwn: choice && (SWITCHABLE_SERVICES as readonly IntegrationService[]).includes(service),
         detailPath,
         reasonKey: sourceReasonMessageKey({ service, source: row.current, reason: row.reason }),
@@ -121,7 +124,7 @@ function keyCard(
         source = stored ? 'own' : 'unavailable';
     }
     return {
-        id, category, detailPath, source,
+        id, category, detailPath, source, dedicatedNumber: false,
         status: source === 'unavailable' ? 'not_connected' : 'connected',
         canUseOwn: false,
         reasonKey: null,
@@ -135,7 +138,7 @@ function stripeCard({ profile, company, env }: OverviewInputs): IntegrationCard 
         || (profile.envCredentialsAreCompanyOwn && k === 'STRIPE_SECRET_KEY' && present(env.STRIPE_SECRET_KEY)));
     const status: IntegrationStatus = have.length === STRIPE_KEYS.length ? 'connected' : have.length > 0 ? 'attention' : 'not_connected';
     return {
-        id: 'stripe', category: 'payments', status, source: 'own', canUseOwn: false,
+        id: 'stripe', category: 'payments', status, source: 'own', dedicatedNumber: false, canUseOwn: false,
         detailPath: '/settings/integrations#stripe', reasonKey: null,
     };
 }
@@ -147,7 +150,7 @@ function calendarCard({ profile, company, env, calendarConnected }: OverviewInpu
     if (profile.envCredentialsAreCompanyOwn) source = deployment || stored ? 'own' : 'unavailable';
     else source = deployment ? 'provided' : stored ? 'own' : 'unavailable';
     return {
-        id: 'googleCalendar', category: 'calendar', source, canUseOwn: false,
+        id: 'googleCalendar', category: 'calendar', source, dedicatedNumber: false, canUseOwn: false,
         // The client is only half of it: each person signs in with their own Google account.
         status: source !== 'unavailable' && calendarConnected ? 'connected' : 'not_connected',
         detailPath: '/settings/schedule', reasonKey: null,

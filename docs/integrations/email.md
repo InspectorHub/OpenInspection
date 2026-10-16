@@ -95,5 +95,5 @@ See the [environment variables table](../../CLAUDE.md) or the project README for
 ## Related
 
 - [Integrations index](README.md) — the conventions common to all of them
-- [SMS](sms.md) — the other channel, same own-vs-platform shape
+- [SMS](sms.md) — the other channel; it has no Built-in option, only the company's own account
 - [Integration adapters](../develop/integration-adapters.md) — for changing this code

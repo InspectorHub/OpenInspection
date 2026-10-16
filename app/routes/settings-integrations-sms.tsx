@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useLoaderData, useActionData, useNavigation, useFetcher } from "react-router";
 import type { Route } from "./+types/settings-integrations-sms";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
@@ -10,13 +9,10 @@ import { getCloudflareEnv } from "~/lib/load-context";
 import { pickSecretFields, saveSecrets } from "~/lib/secret-intents.server";
 import { secretErrorReaders } from "~/lib/secret-action-errors";
 import { runComplianceIntent, saveManagedProvider } from "~/lib/sms-compliance-intents.server";
-import { sourceChangeError } from "~/lib/integration-source-intent.server";
 import { parseTestResults } from "~/lib/connection-test";
 import { fetchData } from "~/lib/fetch-data.server";
-import { useFlash } from "~/hooks/useFlash";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { DeliveryConnectionCard } from "~/components/settings/integrations/DeliveryConnectionCard";
-import { SourceChoice, type SourceValue } from "~/components/settings/integrations/SourceChoice";
 import { SmsDeliveryPanel } from "~/components/settings/SmsDeliveryPanel";
 import { ManagedComplianceWizard, type ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
 import { m } from "~/paraglide/messages";
@@ -36,7 +32,7 @@ const SECRET_KEYS = ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUM
 /** What the page assumes when the source call fails: own account only, and nothing is claimed to work. */
 const FALLBACK_ROW: SwitchableSourceRow = {
   service: "sms", choiceShown: false, available: ["own"], stored: null, current: "unavailable",
-  reason: "profile_default", reasonKey: null, state: "not_connected", ownReady: false,
+  reason: "profile_default", reasonKey: null, state: "not_connected", dedicatedNumber: false, ownReady: false,
 };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -96,17 +92,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   const intent = String(form.get("intent") ?? "");
   const api = createApi(context, { token });
 
-  if (intent === "save-source") {
-    const source = form.get("source");
-    if (source !== "provided" && source !== "own") {
-      return { intent, ok: false, error: m.integrations_delivery_error_generic(), field: null, test: null };
-    }
-    // Only the choice is written. The company's keys stay where they are.
-    const res = await api.admin["integration-sources"].$put({ json: { service: "sms", source } });
-    if (!res.ok) return { intent, ok: false, error: await sourceChangeError(res), field: null, test: null };
-    return { intent, ok: true, error: null, field: null, test: null };
-  }
-
   if (intent === "save-sms-config") {
     const companyPhone = String(form.get("companyPhone") ?? "").trim();
     const res = await api.admin["tenant-config"].$patch({ json: { companyPhone: companyPhone || null } });
@@ -145,13 +130,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   return { intent, ok: false, error: m.settings_unknown_action(), field: null, test: null };
 }
 
-function initialChoice(row: SwitchableSourceRow): SourceValue {
-  if (!row.choiceShown) return "own";
-  if (row.stored) return row.stored;
-  if (row.current === "own") return "own";
-  return row.available.includes("provided") ? "provided" : "own";
-}
-
 export default function SettingsIntegrationsSms() {
   const data = useLoaderData<typeof loader>();
   if ("forbidden" in data) return <AccessDenied />;
@@ -164,19 +142,10 @@ function SmsPage({ data }: { data: Exclude<Awaited<ReturnType<typeof loader>>, {
   const nav = useNavigation();
   const smsTestFetcher = useFetcher<typeof action>();
   const session = useSessionContext();
-  const [selected, setSelected] = useState<SourceValue>(() => initialChoice(row));
   const { fieldError, formError } = secretErrorReaders(actionData);
 
   const pendingIntent = nav.state !== "idle" ? nav.formData?.get("intent") : null;
-  const sourceResult = actionData?.intent === "save-source" ? actionData : null;
-  const { flashVisible } = useFlash(
-    (actionData?.intent === "save-sms-secrets" || actionData?.intent === "save-source") && actionData.ok,
-    actionData,
-  );
 
-  // Own details are shown wherever "own" is the question: always on a deployment
-  // with no built-in account, and when Your own is the selected choice otherwise.
-  const showDetails = !row.choiceShown || selected === "own";
   const tenantSlug = session?.branding.tenantSlug ?? "";
   const inboundUrl = typeof window !== "undefined" && tenantSlug ? `${window.location.origin}/webhooks/sms/inbound/${tenantSlug}` : "";
   const onboardingError = actionData && (actionData.intent === "sms-compliance-provision" || actionData.intent === "sms-compliance-resubmit") && !actionData.ok
@@ -197,19 +166,8 @@ function SmsPage({ data }: { data: Exclude<Awaited<ReturnType<typeof loader>>, {
         status={row.state}
         source={row.current}
         reasonKey={row.reasonKey}
+        dedicated={row.dedicatedNumber}
       />
-
-      {row.choiceShown && (
-        <SourceChoice
-          kind="sms"
-          available={row.available}
-          selected={selected}
-          onSelect={setSelected}
-          saving={pendingIntent === "save-source"}
-          error={sourceResult && !sourceResult.ok ? sourceResult.error : null}
-          saved={flashVisible && sourceResult?.ok === true}
-        />
-      )}
 
       {showOnboarding && (
         <section className="bg-ih-bg-card border border-ih-border rounded-ih-card p-5 space-y-4">
@@ -232,13 +190,13 @@ function SmsPage({ data }: { data: Exclude<Awaited<ReturnType<typeof loader>>, {
         savingSmsConfig={pendingIntent === "save-sms-config"}
         byoProvider={byoProvider}
         compliance={compliance}
-        showAccountDetails={showDetails}
+        showAccountDetails
         accountComplete={row.ownReady}
         secrets={secrets}
         secretFieldError={fieldError}
         secretFormError={formError}
         savingSmsSecrets={pendingIntent === "save-sms-secrets"}
-        showInboundUrl={showDetails}
+        showInboundUrl
         inboundUrl={inboundUrl}
         smsTestFetcher={smsTestFetcher}
         testResults={testResults}
