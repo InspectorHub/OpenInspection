@@ -97,6 +97,7 @@ describe('client document routes (token-gated)', () => {
         app.use('/api/inspections/*', async (c, next) => {
             c.set('tenantId', TENANT);
             c.set('user', { sub: INSPECTOR_USER, role: 'inspector', tenantId: TENANT } as never);
+            c.set('userRole', 'inspector');
             await next();
         });
         app.route('/api/inspections', inspectorDocumentsRoutes);

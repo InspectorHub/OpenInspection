@@ -90,6 +90,8 @@
     "lint:tenant-scope": "node scripts/check-tenant-scoping.mjs",
     "lint:status-literals": "node scripts/check-status-literals.mjs",
     "lint:capability-decl": "node scripts/check-capability-declarations.mjs",
+    "lint:mutating-route-guards": "node scripts/check-mutating-route-guards.mjs",
+    "lint:mutating-route-guards:self-test": "node scripts/check-mutating-route-guards.mjs --self-test",
     "lint:capability-readers": "node scripts/check-capability-readers.mjs",
     "lint:mode-disguises": "node scripts/check-mode-disguises.mjs",
     "lint:provider-helpers": "node scripts/check-provider-helpers.mjs",

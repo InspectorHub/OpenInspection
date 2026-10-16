@@ -23,6 +23,7 @@ import { z } from 'zod';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
 import { resolveClientActor } from '../lib/portal-client-actor';
+import { requireRole } from '../lib/middleware/rbac';
 import { contentDisposition } from '../lib/content-disposition';
 import { MAX_BYTES, PayloadTooLargeError } from '../services/client-document.service';
 import { DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITIES } from '../lib/db/schema';
@@ -168,8 +169,8 @@ function resolveInspectorActor(c: Context<HonoConfig>): { tenantId: string; user
 const inspectorDocumentsRoutes = new Hono<HonoConfig>();
 
 // PUT /api/inspections/:id/documents — streaming upload (inspector).
-inspectorDocumentsRoutes.put('/:id/documents', async (c) => {
-    const inspectionId = c.req.param('id');
+inspectorDocumentsRoutes.put('/:id/documents', requireRole('owner', 'manager', 'inspector'), async (c) => {
+    const inspectionId = c.req.param('id') as string;
     const parsed = inspectorUploadQuerySchema.safeParse({
         filename: c.req.query('filename'),
         category: c.req.query('category'),
@@ -246,9 +247,9 @@ inspectorDocumentsRoutes.get('/:id/documents/:docId', async (c) => {
 });
 
 // DELETE /api/inspections/:id/documents/:docId — delete ANY row (inspector).
-inspectorDocumentsRoutes.delete('/:id/documents/:docId', async (c) => {
-    const inspectionId = c.req.param('id');
-    const docId = c.req.param('docId');
+inspectorDocumentsRoutes.delete('/:id/documents/:docId', requireRole('owner', 'manager', 'inspector'), async (c) => {
+    const inspectionId = c.req.param('id') as string;
+    const docId = c.req.param('docId') as string;
     const actor = resolveInspectorActor(c);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
 

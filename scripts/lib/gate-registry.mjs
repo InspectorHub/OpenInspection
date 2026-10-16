@@ -227,6 +227,18 @@ export const SCRIPT_GATES = [
     { key: 'tenantscope', label: 'lint:tenant-scope', script: 'check-tenant-scoping.mjs', fix: 'npm run lint:tenant-scope', rung: PUSH },
     { key: 'statusliterals', label: 'lint:status-literals', script: 'check-status-literals.mjs', fix: 'npm run lint:status-literals', rung: PUSH },
     { key: 'capabilitydecl', label: 'lint:capability-decl', script: 'check-capability-declarations.mjs', fix: 'npm run lint:capability-decl', rung: PUSH },
+    // PRECOMMIT, unlike its neighbour above, because of WHEN the mistake is made: a write
+    // route is typed once, and the author is the only person who knows whether the missing
+    // role gate was deliberate (a public form, a token link, a webhook) or forgotten. Every
+    // other authorization check compares routes that ALREADY declare a capability, or covers
+    // anonymous access; a new write route with no guard at all is open to every signed-in
+    // user and appears in none of them. One walk of ~210 route files, ~0.3 s standalone, most
+    // of it node startup, which the runner pays once. The allow-list only shrinks.
+    { key: 'mutatingrouteguards', label: 'Mutating-route guards', script: 'check-mutating-route-guards.mjs', fix: 'npm run lint:mutating-route-guards', rung: PRECOMMIT },
+    // Its positive and negative controls, for the reason `agenttermsselftest` exists: the
+    // scan reports by SEARCHING, and a search that has quietly stopped matching reports the
+    // same "nothing wrong" as a clean tree. ~60 ms, synthetic source only.
+    { key: 'mutatingrouteguardsselftest', label: 'Mutating-route guards self-test', script: 'check-mutating-route-guards.mjs', fix: 'npm run lint:mutating-route-guards:self-test', rung: PRECOMMIT, args: ['--self-test'] },
     { key: 'capabilityreaders', label: 'lint:capability-readers', script: 'check-capability-readers.mjs', fix: 'npm run lint:capability-readers', rung: PUSH },
     { key: 'modedisguises', label: 'lint:mode-disguises', script: 'check-mode-disguises.mjs', fix: 'npm run lint:mode-disguises', rung: PUSH },
     { key: 'providerhelpers', label: 'lint:provider-helpers', script: 'check-provider-helpers.mjs', fix: 'npm run lint:provider-helpers', rung: PUSH },
