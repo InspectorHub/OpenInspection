@@ -112,6 +112,16 @@ describe('PATCH /api/inspections/:id as staff', () => {
             expect(JSON.stringify(options.metadata)).not.toMatch(/9 New Street|REF-7|250/);
         });
 
+        it('the price follows the inspection-fees switch: withdrawn from a staff member it is refused, with the switch on it is written', async () => {
+            const refused = await patch(buildApp('staff', { inspectionFees: false }), { price: 777 });
+            expect(refused.status).toBe(403);
+            expect((await readRow())?.price).toBe(100);
+            // Same request, the switch left on (the staff default): it goes through.
+            const allowed = await patch(buildApp('staff'), { price: 777 });
+            expect(allowed.status).toBe(200);
+            expect((await readRow())?.price).toBe(777);
+        });
+
         it('control: an inspector and an owner editing the same fields leave no staff audit row', async () => {
             for (const role of ['inspector', 'owner'] as const) {
                 expect((await patch(buildApp(role), { propertyAddress: '8 Other Road' })).status, role).toBe(200);

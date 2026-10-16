@@ -24,7 +24,7 @@ Staff work the order, never the inspection. Each field an inspection accepts on
 update is classified as an order field or an inspection-side field
 (`server/lib/inspection/order-fields.ts`; a spec fails when a field is
 unclassified). Staff may create, copy and re-inspect an inspection and change
-order fields (date, assigned inspector, client and property details, the
+order fields (date, assigned inspector, price while the inspection-fees switch is on for them, client and property details, the
 agreement and payment requirements). The requirements can be switched on by
 staff and never off. Inspection-side fields, unknown fields and any status
 change out of `completed` are refused. Once an inspection has started (its
@@ -157,7 +157,7 @@ invoice pages. The mechanism is the same everywhere
 
 | Capability | What it covers | Default |
 |---|---|---|
-| `inspectionFees` | The money on an inspection you can open: its price, deposit, service lines, the price list used to price a line, and the cancellation fee. | Owner, manager, inspector and staff on (staff read prices; a staff member does not set service or re-inspection prices and does not record cash deposits); agent off |
+| `inspectionFees` | The money on an inspection you can open: its price, deposit, service lines, the price list used to price a line, and the cancellation fee. | Owner, manager, inspector and staff on; agent off. The one switch covers seeing and changing the money on an inspection, including an inspection's price, so a company that withdraws it from a person hides those amounts from them and refuses their price changes |
 | `companyFinance` | Money that spans inspections or belongs to the company: invoices and payment records, writing the price list and pay rules, pay splits and the payroll export, earnings and the metrics aggregates, Stripe and QuickBooks, a contact's lifetime revenue, the cancellation and deposit policies, and the data exports. | Owner and manager on; inspector, staff and agent off |
 
 The rule of thumb: a figure on one inspection you can open is `inspectionFees`;
