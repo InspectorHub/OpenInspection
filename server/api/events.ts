@@ -4,6 +4,7 @@ import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
+import { deniedNeedsRole } from '../lib/permission-denied';
 import { moneyView, guardMoneyWrite } from '../lib/auth/money-access';
 
 const TypeBody = z.object({
@@ -82,10 +83,10 @@ const eventsRoutes = createApiRouter()
         // Staff are the office: they schedule visits but never change a visit's
         // status (completing or cancelling one moves the job), whatever the value.
         if (c.get('userRole') === 'staff') {
-            throw Errors.Forbidden('Staff cannot change the status of a visit');
+            throw deniedNeedsRole(c, ['owner', 'manager', 'inspector'], "Office staff accounts schedule visits but cannot change a visit's status");
         }
         if (parsed.data.status === 'results_received' && !isAdminRole(c.get('userRole'))) {
-            throw Errors.Forbidden('Requires one of [owner, manager]');
+            throw deniedNeedsRole(c, ['owner', 'manager'], 'Marking results as received is an owner or manager action');
         }
         await c.var.services.event.updateEventStatus(c.get('tenantId'), id, parsed.data.status);
         return c.json({ success: true });

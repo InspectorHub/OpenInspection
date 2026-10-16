@@ -121,7 +121,7 @@ describe('GET /api/imports', () => {
         const res = await get('/api/imports', 'inspector');
         expect(res.status).toBe(403);
         const body = await res.json() as { error: { message: string } };
-        expect(body.error.message).toBe('Requires one of [owner, manager]');
+        expect(body.error.message).toMatch(/needs the Owner or Manager role, and you are signed in as an Inspector/);
     });
 });
 
@@ -191,6 +191,6 @@ describe('GET /api/imports/{batchId}', () => {
         const res = await get('/api/imports/b1', 'inspector', OTHER);
         expect(res.status).toBe(403);
         const body = await res.json() as { error: { message: string } };
-        expect(body.error.message).toBe('Requires one of [owner, manager]');
+        expect(body.error.message).toMatch(/needs the Owner or Manager role, and you are signed in as an Inspector/);
     });
 });

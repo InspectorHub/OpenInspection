@@ -115,7 +115,7 @@ describe('applying and undoing an import run over HTTP', () => {
         it('keeps an inspector out of apply', async () => {
             const res = await apply({ role: 'inspector' });
             expect(res.status).toBe(403);
-            expect(await messageOf(res)).toBe('Requires one of [owner, manager]');
+            expect(await messageOf(res)).toMatch(/needs the Owner or Manager role, and you are signed in as an Inspector/);
             expect(await batchStatus()).toBe(MIGRATION_BATCH_STATUS.STAGED);
         });
 
@@ -215,7 +215,7 @@ describe('applying and undoing an import run over HTTP', () => {
             await apply();
             const res = await revert({ role: 'inspector' });
             expect(res.status).toBe(403);
-            expect(await messageOf(res)).toBe('Requires one of [owner, manager]');
+            expect(await messageOf(res)).toMatch(/needs the Owner or Manager role, and you are signed in as an Inspector/);
             expect(await db.select().from(schema.contacts).all()).toHaveLength(2);
         });
     });

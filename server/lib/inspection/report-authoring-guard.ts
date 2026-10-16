@@ -18,7 +18,7 @@
  */
 import type { Context, MiddlewareHandler } from 'hono';
 import type { OpenAPIHono } from '@hono/zod-openapi';
-import { Errors } from '../errors';
+import { deniedNeedsPermission } from '../permission-denied';
 import { ROLE } from '../auth/roles';
 import { capabilitiesFor } from '../middleware/require-capability';
 import type { HonoConfig } from '../../types/hono';
@@ -80,7 +80,7 @@ export async function mayEditReports(c: Context<HonoConfig>): Promise<boolean> {
 
 /** Throws 403 unless the acting user holds `editReports`. */
 export async function assertMayEditReports(c: Context<HonoConfig>): Promise<void> {
-    if (!(await mayEditReports(c))) throw Errors.Forbidden("Requires the 'editReports' capability");
+    if (!(await mayEditReports(c))) throw deniedNeedsPermission(c, 'editReports', 'Writing report content is inspection work');
 }
 
 /**

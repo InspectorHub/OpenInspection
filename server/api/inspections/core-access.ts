@@ -16,7 +16,7 @@
  */
 import { and, eq } from 'drizzle-orm';
 import type { Context, Next } from 'hono';
-import { Errors } from '../../lib/errors';
+import { deniedNeedsPermission } from '../../lib/permission-denied';
 import { mayChangeSchedule, mayDeleteInspection } from '../../lib/inspection/assignment-access';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { getDrizzle } from '../../lib/route-helpers';
@@ -37,7 +37,7 @@ export async function guardPatchReschedule(c: Context<HonoConfig>, next: Next) {
         const reassigns = 'inspectorId' in body && (body.inspectorId ?? null) !== (inspection.inspectorId ?? null);
         const moves = typeof body.date === 'string' && !sameMoment(inspection.date, body.date);
         if ((reassigns || moves) && !(await mayChangeSchedule(c, c.req.param('id') ?? '', reassigns))) {
-            throw Errors.Forbidden("Requires the 'scheduleOthers' capability to change the assignee, or the date of an inspection you do not work");
+            throw deniedNeedsPermission(c, 'scheduleOthers', 'You cannot change the assignee or the date of an inspection you do not work');
         }
     }
     await next();
@@ -46,10 +46,10 @@ export async function guardPatchReschedule(c: Context<HonoConfig>, next: Next) {
 
 export async function guardInspectionDelete(c: Context<HonoConfig>, next: Next) {
     if (!(await capabilitiesFor(c)).deleteInspection) {
-        throw Errors.Forbidden("Requires the 'deleteInspection' capability");
+        throw deniedNeedsPermission(c, 'deleteInspection', 'You cannot delete inspections');
     }
     if (!(await mayDeleteInspection(c, c.req.param('id') ?? ''))) {
-        throw Errors.Forbidden('Only the lead inspector of this inspection can delete it');
+        throw deniedNeedsPermission(c, 'scheduleOthers', 'Only the lead inspector of an inspection can delete it');
     }
     return next();
 }
@@ -60,7 +60,7 @@ export async function guardScheduleMove(c: Context<HonoConfig>, next: Next) {
     const reassigns = body?.leadInspectorId !== undefined || body?.helperInspectorIds !== undefined;
     await assertStaffMayMove(c, [c.req.param('id') ?? '']);
     if (!(await mayChangeSchedule(c, c.req.param('id') ?? '', reassigns))) {
-        throw Errors.Forbidden("Requires the 'scheduleOthers' capability to reassign, or to move an inspection you do not work");
+        throw deniedNeedsPermission(c, 'scheduleOthers', 'You cannot reassign an inspection, or move one you do not work');
     }
     return next();
 }

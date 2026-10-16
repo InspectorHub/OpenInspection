@@ -149,7 +149,7 @@ export default function SettingsStatutoryForms() {
     const locale = useDisplayLocale();
     const timeZone = useDisplayTimeZone();
 
-    if (forbidden) return <AccessDenied />;
+    if (forbidden) return <AccessDenied needs="owner" />;
 
     // Which row is mid-upload. Read off the in-flight submission rather than
     // tracked in state: with one action serving every row, a single `busy` flag

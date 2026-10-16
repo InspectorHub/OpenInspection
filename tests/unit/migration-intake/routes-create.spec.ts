@@ -544,7 +544,7 @@ describe('POST /api/imports', () => {
         );
         expect(res.status).toBe(403);
         // Named, because the role floor below refuses with the same code.
-        expect(await message(res)).toBe('Only an owner can send a file to be converted.');
+        expect(await message(res)).toMatch(/^Only an owner can send a file to be converted\. This needs the Owner role, and you are signed in as a Manager\. Ask an owner to do this/);
         expect(store.size).toBe(0);
     });
 
@@ -623,7 +623,7 @@ describe('POST /api/imports', () => {
         );
         expect(res.status).toBe(403);
         // The route's own floor, refusing before any intent gate is consulted.
-        expect(await message(res)).toBe('Requires one of [owner, manager]');
+        expect(await message(res)).toMatch(/needs the Owner or Manager role, and you are signed in as an Inspector/);
         expect(store.size).toBe(0);
     });
 
@@ -634,7 +634,7 @@ describe('POST /api/imports', () => {
             { name: 't.json', text: '{"id":"x","name":"R","sections":[]}' },
         );
         expect(res.status).toBe(403);
-        expect(await message(res)).toBe("Requires the 'templateImport' capability");
+        expect(await message(res)).toMatch(/signed in as a Manager, which does not have the "Import templates" permission/);
         expect(store.size).toBe(0);
     });
 

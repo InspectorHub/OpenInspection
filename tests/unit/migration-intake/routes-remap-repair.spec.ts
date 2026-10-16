@@ -138,7 +138,7 @@ describe('editing an import run over HTTP', () => {
                 jsonBody({ mapping: CONTACT_MAPPING }, 'PATCH'),
             );
             expect(res.status).toBe(403);
-            expect(await messageOf(res)).toBe('Requires one of [owner, manager]');
+            expect(await messageOf(res)).toMatch(/needs the Owner or Manager role, and you are signed in as an Inspector/);
         });
     });
 

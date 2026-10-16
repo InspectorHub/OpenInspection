@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import { Errors } from '../errors';
+import { deniedNeedsPermission } from '../permission-denied';
 import {
     getCapabilities,
     coerceOverrides,
@@ -94,7 +95,7 @@ export const requireCapability = (
     const handler = async (c: Context<HonoConfig>, next: Next) => {
         const caps = await capabilitiesFor(c, resolveOverrides);
         if (!caps[cap]) {
-            throw Errors.Forbidden(`Requires the '${cap}' capability`);
+            throw deniedNeedsPermission(c, cap);
         }
         return next();
     };

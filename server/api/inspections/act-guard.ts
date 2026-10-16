@@ -11,13 +11,13 @@
 import type { Context, Next } from 'hono';
 import { and, eq } from 'drizzle-orm';
 import { Errors } from '../../lib/errors';
+import { deniedNeedsPermission } from '../../lib/permission-denied';
 import { inspections } from '../../lib/db/schema';
 import { getDrizzle } from '../../lib/route-helpers';
 import { mayActOnInspection } from '../../lib/inspection/assignment-access';
 import type { HonoConfig } from '../../types/hono';
 
-const NOT_ON_THIS_INSPECTION =
-    "You are not on this inspection. An owner or manager, or someone with the 'schedule others' permission, has to do this.";
+const NOT_ON_THIS_INSPECTION = 'You are not on this inspection, so you cannot cancel, confirm, complete, publish, return or bill it, or send its agreement';
 
 /**
  * Throws 403 unless the caller is on the inspection or holds `scheduleOthers`. An id that is not an
@@ -28,7 +28,7 @@ export async function assertMayActOnJob(c: Context<HonoConfig>, inspectionId: st
     const exists = await getDrizzle(c).select({ id: inspections.id }).from(inspections)
         .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, c.get('tenantId')))).get();
     if (!exists) throw Errors.NotFound('Inspection not found');
-    throw Errors.Forbidden(NOT_ON_THIS_INSPECTION);
+    throw deniedNeedsPermission(c, 'scheduleOthers', NOT_ON_THIS_INSPECTION);
 }
 
 /** Route middleware for a path with `:id` / `{id}` as the inspection. */

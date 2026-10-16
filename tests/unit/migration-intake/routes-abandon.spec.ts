@@ -122,7 +122,7 @@ describe('abandoning a run', () => {
         it('keeps an inspector out of abandon', async () => {
             const res = await abandon({ role: 'inspector' });
             expect(res.status).toBe(403);
-            expect(await messageOf(res)).toBe('Requires one of [owner, manager]');
+            expect(await messageOf(res)).toMatch(/needs the Owner or Manager role, and you are signed in as an Inspector/);
             expect(await batchRow()).toBeDefined();
         });
     });
@@ -162,7 +162,7 @@ describe('the per-intent gate is re-applied on every route, not only on the uplo
         expect(res.status).toBe(403);
         // The route's own floor admits a manager, so this sentence is the only
         // evidence that the run's intent was consulted a second time.
-        expect(await messageOf(res)).toBe('Only an owner can send a file to be converted.');
+        expect(await messageOf(res)).toMatch(/^Only an owner can send a file to be converted\. This needs the Owner role, and you are signed in as a Manager\. Ask an owner to do this/);
         expect(await db.select().from(schema.migrationBatches).all()).toHaveLength(1);
     });
 

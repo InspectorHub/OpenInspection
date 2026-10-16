@@ -10,7 +10,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
-import { Errors } from '../lib/errors';
+import { deniedNeedsRole } from '../lib/permission-denied';
 import { reportLinkExpiresAt } from '../lib/report-link-ttl';
 import { ReportLinkTtlSchema } from '../lib/validations/report-link-ttl.schema';
 import {
@@ -142,7 +142,7 @@ const inspectionPrefsRoutes = createApiRouter()
         // The external access policy governs what clients and agents can open, so
         // it is a company decision, not an editor preference.
         if (('agentRepairAccess' in patch || 'reportLinkTtl' in patch) && !isAdminRole(c.get('userRole'))) {
-            throw Errors.Forbidden('Only an owner or manager can change the external access policy');
+            throw deniedNeedsRole(c, ['owner', 'manager'], 'The external access policy is a company decision');
         }
         const db = drizzle(c.env.DB as never);
         const existing = await db.select({
