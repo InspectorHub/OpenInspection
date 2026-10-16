@@ -44,14 +44,37 @@ export async function guardReportLink(c: Context<HonoConfig>, next: Next) {
     return next();
 }
 
-/** Counts one send of this inspection to this address (or `sms:<contact id>`); refuses past the hourly ceiling. */
-async function countSend(c: Context<HonoConfig>, inspectionId: string, email: string): Promise<void> {
+/** Longest contact id the SMS guard accepts; keeps the counter's KV key far below the 512-byte key limit. */
+const MAX_CONTACT_ID_LENGTH = 128;
+
+const sendKey = (c: Context<HonoConfig>, inspectionId: string, who: string) =>
+    `sendlimit:${c.get('tenantId')}:${inspectionId}:${who.toLowerCase()}`;
+
+/** Refuses when this recipient is already at the hourly ceiling for this inspection. Spends nothing. */
+async function assertUnderLimit(c: Context<HonoConfig>, inspectionId: string, who: string, message: string): Promise<void> {
+    const used = Number(await c.env.TENANT_CACHE.get(sendKey(c, inspectionId, who)) ?? '0');
+    if (used >= MAX_PER_HOUR) throw Errors.RateLimited(message);
+}
+
+/** Spends one send of this inspection on this recipient (an address, or `sms:<contact id>`). */
+async function spendSend(c: Context<HonoConfig>, inspectionId: string, who: string): Promise<void> {
     const kv = c.env.TENANT_CACHE;
-    const key = `sendlimit:${c.get('tenantId')}:${inspectionId}:${email.toLowerCase()}`;
+    const key = sendKey(c, inspectionId, who);
     const used = Number(await kv.get(key) ?? '0');
-    if (used >= MAX_PER_HOUR) throw Errors.RateLimited('This report was already sent to that recipient several times in the last hour.');
     await kv.put(key, String(used + 1), { expirationTtl: 3600 });
 }
+
+/**
+ * Called by the send-sms handler for each recipient a text actually went to.
+ * A recipient that was skipped (no consent, no phone, not seated, provider
+ * failure) spends nothing, so the ceiling counts texts sent, not texts asked for.
+ */
+export async function recordSmsSent(c: Context<HonoConfig>, inspectionId: string, contactId: string): Promise<void> {
+    await spendSend(c, inspectionId, `sms:${contactId}`);
+}
+
+const REPORT_LIMIT_MESSAGE = 'This report was already sent to that recipient several times in the last hour.';
+const SMS_LIMIT_MESSAGE = 'A text was already sent to that recipient several times in the last hour.';
 
 interface RawRecipient { contactId?: string; email?: string; roleKey: string }
 
@@ -97,7 +120,9 @@ export async function guardSendReport(c: Context<HonoConfig>, next: Next) {
         if (person.email) emails.push(person.email.toLowerCase());
     }
     // Quota is spent only once the whole request has passed every check above.
-    for (const email of emails) await countSend(c, id, email);
+    // Check every recipient first so a request refused for one of them has spent nothing for the others.
+    for (const email of emails) await assertUnderLimit(c, id, email, REPORT_LIMIT_MESSAGE);
+    for (const email of emails) await spendSend(c, id, email);
     return next();
 }
 
@@ -111,8 +136,9 @@ export async function guardLinkExpiry(c: Context<HonoConfig>, next: Next) {
  * send-sms: assigned or `scheduleOthers`, at most MAX_RECIPIENTS people per
  * request, each person listed once, and each person texted at most MAX_PER_HOUR
  * times per hour per inspection (the same counter the report sends use). The
- * TCPA gate and the seated-person check stay the handler's, so a refused
- * request spends nothing.
+ * TCPA gate and the seated-person check stay the handler's. This guard only
+ * READS the counters; the handler spends one (`recordSmsSent`) per recipient it
+ * really texted, so a refused request, or a recipient it skips, spends nothing.
  */
 export async function guardSendSms(c: Context<HonoConfig>, next: Next) {
     const id = c.req.param('id') ?? '';
@@ -123,7 +149,7 @@ export async function guardSendSms(c: Context<HonoConfig>, next: Next) {
         throw Errors.BadRequest(`A text can go to at most ${MAX_RECIPIENTS} people at a time.`);
     }
     if (new Set(list).size !== list.length) throw Errors.BadRequest('Each recipient can be listed only once.');
-    for (const contactId of list) await countSend(c, id, `sms:${contactId}`);
+    for (const contactId of list) await assertUnderLimit(c, id, `sms:${contactId}`, SMS_LIMIT_MESSAGE);
     return next();
 }
 
@@ -135,6 +161,7 @@ function readSmsContactIds(raw: unknown): string[] | null {
     for (const r of list) {
         const contactId = r && typeof r === 'object' ? (r as { contactId?: unknown }).contactId : undefined;
         if (typeof contactId !== 'string' || contactId.length === 0) return null;
+        if (contactId.length > MAX_CONTACT_ID_LENGTH) throw Errors.BadRequest('A contact id is too long.');
         ids.push(contactId);
     }
     return ids;

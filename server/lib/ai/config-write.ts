@@ -67,6 +67,19 @@ export function aiConfigGap(
 }
 
 /**
+ * Whether a save leaves the provider fields (switch, endpoint, model) exactly as
+ * they are stored and changes only the courtesy-translation flag. Such a save
+ * must not be refused over a provider gap it did not create: the company may be
+ * partway through setting up, and flipping an unrelated switch is not a reason
+ * to hold that against it.
+ */
+export function changesOnlyCourtesyTranslation(input: AiConfigInput, stored: AiConfigInput): boolean {
+    return input.aiEnabled === stored.aiEnabled
+        && input.aiBaseUrl.trim() === stored.aiBaseUrl.trim()
+        && input.aiModel.trim() === stored.aiModel.trim();
+}
+
+/**
  * Store a workspace's AI provider configuration.
  *
  * The version bump is the reason this is a function rather than an inline

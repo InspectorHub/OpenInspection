@@ -5,7 +5,7 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
 import { AiConfigBodySchema, AiConnectionTestBodySchema, AiConnectionTestResultSchema } from '../lib/validations/integrations.schema';
 import { testAiConnection } from '../lib/ai/connection-test';
-import { aiConfigGap, keyForProbe, readAiConfig, saveAiConfig } from '../lib/ai/config-write';
+import { aiConfigGap, changesOnlyCourtesyTranslation, keyForProbe, readAiConfig, saveAiConfig } from '../lib/ai/config-write';
 import { loadTenantEmailConfig } from '../lib/email/build-email-service';
 import { recordIntegrationTest } from '../lib/integration-test-results';
 
@@ -122,7 +122,10 @@ const integrationsAiRoutes = createApiRouter()
         const body = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const hasKey = Boolean((await loadTenantEmailConfig(c.env, tenantId)).dbSecrets.geminiApiKey);
-        const gap = aiConfigGap(body, c.env, hasKey);
+        // A save that only flips the courtesy-translation switch leaves the
+        // provider fields as stored, so the completeness check does not apply.
+        const stored = await readAiConfig(getDrizzle(c), tenantId);
+        const gap = changesOnlyCourtesyTranslation(body, stored) ? null : aiConfigGap(body, c.env, hasKey);
         if (gap) {
             return c.json({ success: false as const, error: { code: 'AI_CONFIG_INCOMPLETE', message: gap.message, field: gap.field } }, 422);
         }

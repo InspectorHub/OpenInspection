@@ -214,9 +214,14 @@ export class OpenAiCompatibleProvider implements AiProvider {
                     AI_REFUSAL_REASON.UPSTREAM_CREDENTIAL,
                 );
             }
-            // The same pair connection-test.ts treats as "unknown model". Typed
-            // so the service can say whose model it was.
-            if (res.status === 400 || res.status === 404) throw new AiUnknownModelError(this.creds.model);
+            // A 400 or 404 is only "unknown model" when the provider's own error
+            // body says so. A too-long prompt is also a 400 and a mistyped
+            // endpoint path is also a 404; neither is a wrong model name, and
+            // calling it one sends the company to fix the wrong field. Typed so
+            // the service can say whose model it was.
+            if ((res.status === 400 || res.status === 404) && await bodyNamesUnknownModel(res, this.creds.model)) {
+                throw new AiUnknownModelError(this.creds.model);
+            }
             // A plain Error, so the caller's runtime-failure degrade applies.
             throw new Error('Failed to generate content from AI');
         }
@@ -226,6 +231,31 @@ export class OpenAiCompatibleProvider implements AiProvider {
         if (typeof text !== 'string') throw new Error('AI provider returned no completion');
         return { text: text.trim() };
     }
+}
+
+/**
+ * Whether an error body is the provider saying it does not know the model.
+ *
+ * Conservative on purpose: the documented `model_not_found` code, or a message
+ * that both names the configured model and says it is missing. Anything else,
+ * including a body that is not JSON, is not evidence about the model. The body
+ * is read for classification only and is never logged or returned.
+ */
+async function bodyNamesUnknownModel(res: Response, model: string): Promise<boolean> {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(await res.text());
+    } catch {
+        return false;
+    }
+    const first: unknown = Array.isArray(parsed) ? parsed[0] : parsed;
+    const err = (first as { error?: { code?: unknown; message?: unknown } } | null)?.error;
+    if (!err || typeof err !== 'object') return false;
+    if (err.code === 'model_not_found') return true;
+    if (typeof err.message !== 'string' || model === '') return false;
+    const message = err.message.toLowerCase();
+    return message.includes(model.toLowerCase())
+        && /not found|does not exist|unknown model|not supported|invalid model/.test(message);
 }
 
 /**

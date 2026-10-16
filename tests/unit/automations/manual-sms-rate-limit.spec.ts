@@ -16,7 +16,10 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const sendMessage = vi.fn();
-vi.mock('../../../server/lib/sms/resolve-twilio', () => ({
+// Partial mock: only the provider loader is replaced, so other exports of the
+// module (which the send gate also imports) stay real.
+vi.mock('../../../server/lib/sms/resolve-twilio', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('../../../server/lib/sms/resolve-twilio')>()),
     loadProviderForTenant: vi.fn(async () => ({
         provider: { sendMessage },
         from: '+15550001111',
@@ -26,6 +29,7 @@ vi.mock('../../../server/lib/sms/resolve-twilio', () => ({
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { inspectionsRoutes } from '../../../server/api/inspections';
+import { SmsConsentService } from '../../../server/services/sms-consent.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -147,6 +151,47 @@ describe('send-sms send ceiling', () => {
         expect(sendMessage).not.toHaveBeenCalled();
         // the refused requests above spent nothing: three real sends still go through
         for (let i = 0; i < 3; i += 1) expect((await send(agent())).status).toBe(200);
+    });
+
+    const counter = (contactId: string) => kv.get(`sendlimit:${TENANT}:${INSP_ID}:sms:${contactId}`);
+
+    it('spends allowance only for texts actually sent: a consent-skipped recipient spends nothing', async () => {
+        await new SmsConsentService({} as D1Database).record(TENANT, AGENT_2, 'revoked', 'admin', {});
+        const res = await send([...agent(), ...agent(AGENT_2)]);
+        expect(res.status).toBe(200);
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+        expect(counter(AGENT)).toBe('1');
+        expect(counter(AGENT_2)).toBeUndefined();
+    });
+
+    it('spends nothing for a recipient who is not seated or has no phone', async () => {
+        const res = await send([{ contactId: 'ct-stranger', roleKey: 'buyer_agent' }, ...agent()]);
+        expect(res.status).toBe(200);
+        expect(counter('ct-stranger')).toBeUndefined();
+        expect(counter(AGENT)).toBe('1');
+    });
+
+    it('a mixed request refused for one recipient spends nothing for the others', async () => {
+        for (let i = 0; i < 3; i += 1) await send(agent());
+        sendMessage.mockClear();
+        const res = await send([...agent(AGENT_2), ...agent()]);
+        expect(res.status).toBe(429);
+        expect(sendMessage).not.toHaveBeenCalled();
+        expect(counter(AGENT_2)).toBeUndefined();
+        expect(counter(AGENT)).toBe('3');
+    });
+
+    it('words the 429 for a text message, not a report', async () => {
+        for (let i = 0; i < 3; i += 1) await send(agent());
+        const body = await (await send(agent())).json() as { error: { message: string } };
+        expect(body.error.message).toMatch(/text/i);
+        expect(body.error.message).not.toMatch(/report/i);
+    });
+
+    it('rejects an oversized contact id with 400 rather than a KV key error', async () => {
+        const res = await send([{ contactId: 'x'.repeat(600), roleKey: 'buyer_agent' }]);
+        expect(res.status).toBe(400);
+        expect(sendMessage).not.toHaveBeenCalled();
     });
 
     it('control: an empty recipient list is still a 400 from the schema', async () => {

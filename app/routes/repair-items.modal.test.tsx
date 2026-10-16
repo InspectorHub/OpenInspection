@@ -5,19 +5,31 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { createRoutesStub } from "react-router";
+import { createRoutesStub, Outlet } from "react-router";
 import { m } from "~/paraglide/messages";
 import RepairItemsPage from "~/routes/repair-items";
 
 afterEach(cleanup);
 
 function renderPage() {
+  const context = {
+    branding: { defaultLocale: "en-US", defaultTimezone: "UTC" },
+    user: { capabilities: { templateCreate: true, templateEdit: true, templateDelete: true } },
+  };
   const Stub = createRoutesStub([
     {
-      path: "/library/repair-items",
-      Component: RepairItemsPage,
-      action: () => ({ ok: true, intent: "create" }),
-      loader: () => ({ items: [], contractorTypes: [], loadFailed: false }),
+      id: "routes/auth-layout",
+      path: "/",
+      loader: () => ({ context }),
+      Component: () => <Outlet />,
+      children: [
+        {
+          path: "library/repair-items",
+          Component: RepairItemsPage,
+          action: () => ({ ok: true, intent: "create" }),
+          loader: () => ({ items: [], contractorTypes: [], loadFailed: false }),
+        },
+      ],
     },
   ]);
   render(<Stub initialEntries={["/library/repair-items"]} />);

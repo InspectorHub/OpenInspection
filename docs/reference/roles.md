@@ -76,6 +76,27 @@ a report to publish or send it. A spec fails when a mutating route under an
 inspection is neither guarded nor listed as not report content. Withdrawing the
 capability does not close a collaborative-editing socket that is already open.
 
+The guard also covers the inspector's signature (`POST /api/inspections/:id/inspector-signature`,
+which is stored inside the report's results data and audited as
+`inspection.inspector_signature.update`, without the image), submitting a report for
+review, the property-facts card (`PATCH` and the autofill `POST`; the `GET` stays readable)
+and approving concierge suggestions. Staff, and an inspector whose `editReports` was
+withdrawn, are refused all of these.
+
+What staff can still do today on the order side, because those routes are not report
+content and are gated by role (staff are evaluated at the inspector tier) rather than by
+`editReports`: for example confirming an inspection, agreement requests and client
+documents. Publishing, sending and
+requesting payment (below) remain open to staff. Narrowing the order-side routes is a
+separate change; until it lands, do not describe staff as read-only on the order.
+
+Requesting payment (`POST /api/invoices/request-payment`, the hub's "Request payment"
+button) needs the `inspectionFees` capability on top of the role. Owners, managers,
+inspectors and staff hold it by default, so nothing changes unless it was switched off
+for someone, who is then refused. The hub response carries the invoice's tokenized pay
+link (`invoice.payUrl`) only for callers who hold `companyFinance`; everyone else gets
+`null`, and no link is minted for them.
+
 **Owner is never reducible and Agent is never elevated.** Both columns are
 pinned in code (`FIXED`), not merely defaulted — an override row cannot demote
 an owner, and it cannot promote a referral agent into staff. That guarantee is
@@ -247,6 +268,14 @@ needs `templateCreate`, changing one needs `templateEdit`, and deleting one need
 `templateDelete`; reading the library needs only a staff role, because the editor
 uses it. With the defaults above, an inspector can add and edit library entries
 but cannot delete them unless an owner switches `templateDelete` on for them.
+
+Be precise about which endpoints that covers. Repair items (`/api/recommendations`)
+are gated by `templateCreate`, `templateEdit` and `templateDelete`, and the Repair
+Items page hides its Add, Edit and Delete controls when the signed-in user lacks the
+matching capability. The canned-comment endpoints under `/api/admin/comments`
+(create, update, delete) are **not** capability-gated: they stay owner and manager
+only, whatever the template capabilities say. Reading either library needs only a
+staff role.
 
 Removing a team member asks what becomes of their open inspections (requested,
 scheduled or confirmed, with the report not yet published). `DELETE

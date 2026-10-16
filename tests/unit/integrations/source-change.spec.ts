@@ -173,6 +173,40 @@ describe('writeIntegrationSource', () => {
         expect((await configRow(A))!.emailMode).toBe('platform');
     });
 
+    describe('when creating the row fails', () => {
+        const failingInserts = (d1: D1Database, message: string): D1Database => new Proxy(d1, {
+            get(target, prop) {
+                if (prop !== 'prepare') return (target as unknown as Record<string | symbol, unknown>)[prop];
+                return (sql: string) => {
+                    if (!/^\s*insert/i.test(sql)) return target.prepare(sql);
+                    const boom = () => { throw new Error(message); };
+                    const stmt: Record<string, unknown> = { bind: () => stmt, run: boom, raw: boom, all: boom, first: boom };
+                    return stmt;
+                };
+            },
+        });
+        async function emptyFixture(): Promise<D1Database> {
+            const fixture = createTestDb();
+            await setupSchema(fixture.sqlite);
+            await fixture.db.insert(schema.tenants).values({ id: A, slug: 'aaa', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now });
+            return toD1Binding(fixture.sqlite);
+        }
+
+        it('a real failure surfaces instead of being retried away', async () => {
+            const d1 = failingInserts(await emptyFixture(), 'D1_ERROR: disk I/O error');
+            const err = await writeIntegrationSource(d1, A, 'sms', 'own').then(() => null, (e: unknown) => e);
+            expect(err).toBeInstanceOf(Error);
+            // Not the retry-exhausted conflict: the real error came out on the first attempt.
+            expect((err as Error).message).not.toContain('integration_sources_write_conflict');
+            expect(JSON.stringify([(err as Error).message, String((err as { cause?: unknown }).cause)])).toContain('disk I/O');
+        });
+
+        it('control: a unique-constraint loss is the only thing retried, then reported as a write conflict', async () => {
+            const d1 = failingInserts(await emptyFixture(), 'UNIQUE constraint failed: tenant_configs.tenant_id');
+            await expect(writeIntegrationSource(d1, A, 'sms', 'own')).rejects.toThrow('integration_sources_write_conflict');
+        });
+    });
+
     it('touches only the named company', async () => {
         const before = await configRow(B);
         await writeIntegrationSource(DB, A, 'email', 'own');

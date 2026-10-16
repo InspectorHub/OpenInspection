@@ -30,9 +30,9 @@ const SETTINGS_PATH = 'Settings → Advanced → AI';
 /** The one sentence for a gap the company cannot close. */
 const AI_UNAVAILABLE_MESSAGE = 'AI is not available right now.';
 
-/** Thrown by the adapter when the endpoint answers 400 or 404, which is how
- *  providers say they do not know the model id. Typed so the service, which
- *  knows whose model it was, decides what the company is told. */
+/** Thrown by the adapter when the endpoint answers 400 or 404 AND its error
+ *  body says the model is unknown. A bare 400 or 404 is not this. Typed so the
+ *  service, which knows whose model it was, decides what the company is told. */
 export class AiUnknownModelError extends Error {
     constructor(readonly model: string) {
         super('The AI endpoint did not recognise the model.');

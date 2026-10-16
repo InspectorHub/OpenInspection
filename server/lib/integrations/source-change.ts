@@ -61,7 +61,7 @@ export function describeSwitchableSources(inputs: OverviewInputs): SwitchableSou
             reason: row.reason,
             reasonKey: sourceReasonMessageKey({ service, source: row.current, reason: row.reason }),
             state: row.state,
-            dedicatedNumber: row.reason === 'dedicated_number' || row.reason === 'dedicated_not_ready',
+            dedicatedNumber: row.reason === 'dedicated_number' || row.reason === 'dedicated_not_ready' || row.reason === 'dedicated_unavailable',
             // Self-hosted: the operator's environment counts as the company's own details.
             ownReady: hosted ? spec.own(inputs.company).state === 'complete' : spec.standaloneOwn(inputs.company, inputs.env),
         };
@@ -104,6 +104,16 @@ function legacyColumns(
 
 const MAX_ATTEMPTS = 4;
 
+/** The insert lost a race to another request creating the same row. */
+function isUniqueConflict(err: unknown): boolean {
+    for (let e: unknown = err, depth = 0; e && depth < 4; depth++) {
+        const message = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
+        if (/UNIQUE constraint failed|SQLITE_CONSTRAINT_(UNIQUE|PRIMARYKEY)/i.test(message)) return true;
+        e = (e as { cause?: unknown }).cause;
+    }
+    return false;
+}
+
 /** Record one service's choice for one company. Touches no key. */
 export async function writeIntegrationSource(
     d1: D1Database,
@@ -113,6 +123,7 @@ export async function writeIntegrationSource(
 ): Promise<void> {
     const db = drizzle(d1);
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        // sms_mode is read in the same statement as the JSON, and the write below is guarded on both, so the legacy column is derived from a value that was current.
         const row = await db.select({ integrationConfig: tenantConfigs.integrationConfig, smsMode: tenantConfigs.smsMode })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
         const integrationConfig = mergeStoredIntegrationSources(row?.integrationConfig, service, source);
@@ -121,8 +132,10 @@ export async function writeIntegrationSource(
             try {
                 await db.insert(tenantConfigs).values({ tenantId, integrationConfig, ...legacy, updatedAt: new Date() });
                 return;
-            } catch {
+            } catch (err) {
                 // Another request created the row first: read it and merge into that one.
+                // Anything else is a real failure and must surface.
+                if (!isUniqueConflict(err)) throw err;
                 continue;
             }
         }
@@ -131,7 +144,7 @@ export async function writeIntegrationSource(
             : eq(tenantConfigs.integrationConfig, row.integrationConfig);
         const written = await db.update(tenantConfigs)
             .set({ integrationConfig, ...legacy, updatedAt: new Date() })
-            .where(and(eq(tenantConfigs.tenantId, tenantId), unchanged))
+            .where(and(eq(tenantConfigs.tenantId, tenantId), unchanged, eq(tenantConfigs.smsMode, row.smsMode)))
             .returning({ tenantId: tenantConfigs.tenantId });
         if (written.length > 0) return;
     }

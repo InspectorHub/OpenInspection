@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AIService } from '../../../server/services/ai.service';
+import { OpenAiCompatibleProvider } from '../../../server/lib/ai/providers/openai-compatible';
 import { RecordingAiProvider } from '../../../server/lib/ai/providers/recording';
 import { Errors, ErrorCode } from '../../../server/lib/errors';
 import { AI_REFUSAL_REASON } from '../../../server/lib/ai/refusal-reason';
@@ -170,6 +171,38 @@ describe('suggestComment — refusals reach the inspector, failures degrade', ()
         const svc = serviceWhoseProviderThrows(new Error('socket hang up'));
         expect(await svc.suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }))
             .toEqual({ suggestions: [], aiCallId: null });
+    });
+
+    describe('through the real adapter', () => {
+        const realAdapterService = () => new AIService(
+            {} as D1Database, 'test-key', 'saas', undefined,
+            OWN_CONFIRMED_KEY, PROVENANCE, undefined,
+            new OpenAiCompatibleProvider({ apiKey: 'k', model: 'a-model', baseUrl: 'https://api.example.com/v1' }),
+        );
+        afterEach(() => vi.unstubAllGlobals());
+
+        it('degrades a 400 context-length failure to an empty list', async () => {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+                JSON.stringify({ error: { code: 'context_length_exceeded', message: 'too long' } }), { status: 400 },
+            )));
+            expect(await realAdapterService().suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }))
+                .toEqual({ suggestions: [], aiCallId: null });
+        });
+
+        it('degrades a 404 path error to an empty list', async () => {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('no such route', { status: 404 })));
+            expect(await realAdapterService().suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }))
+                .toEqual({ suggestions: [], aiCallId: null });
+        });
+
+        it('still refuses a true model-not-found, naming the model', async () => {
+            vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
+                JSON.stringify({ error: { code: 'model_not_found' } }), { status: 404 },
+            )));
+            const err = await realAdapterService().suggestComment({ itemName: 'Roof', sectionName: 'Exterior' }).catch(e => e);
+            expect(err.code).toBe(ErrorCode.AI_NOT_CONFIGURED);
+            expect(err.message).toContain('a-model');
+        });
     });
 
     it('calls the provider it was given, and constructs none of its own', async () => {

@@ -46,6 +46,7 @@ function stateFor(
             return SERVICE_SPECS[service].own(company).state === 'partial' ? 'attention' : 'not_connected';
         case 'provided_not_configured':
         case 'dedicated_not_ready':
+        case 'dedicated_unavailable':
             // A missing deployment credential, or a registration that is under way or
             // needs a fix: something the company can follow up.
             return 'attention';

@@ -166,7 +166,7 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
                     schema: createApiResponseSchema(z.object({
                         removed: z.boolean(),
                         reassigned: z.number().describe('Open inspections handed to the reassignTo member.'),
-                        unassigned: z.number().describe('Open inspections left without an inspector.'),
+                        unassigned: z.number().describe('Open inspections the member led that were left without a lead inspector (helper seats that were dropped are not counted).'),
                     })),
                 },
             },

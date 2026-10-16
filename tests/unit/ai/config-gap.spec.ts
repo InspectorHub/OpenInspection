@@ -3,7 +3,7 @@
  * calls would fail, and the Test button must agree with what a real call sends.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { aiConfigGap, type AiConfigInput } from '../../../server/lib/ai/config-write';
+import { aiConfigGap, changesOnlyCourtesyTranslation, type AiConfigInput } from '../../../server/lib/ai/config-write';
 import { testAiConnection } from '../../../server/lib/ai/connection-test';
 import { buildTenantAiService } from '../../../server/lib/ai/build-ai-service';
 import { STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
@@ -45,6 +45,26 @@ describe('aiConfigGap', () => {
 
     it('control: switching AI off with incomplete values is not refused', () => {
         expect(aiConfigGap({ ...full, aiEnabled: false, aiModel: '' }, NO_FALLBACK, true)).toBeNull();
+    });
+});
+
+describe('changesOnlyCourtesyTranslation', () => {
+    const incomplete: AiConfigInput = { ...full, aiModel: '' };
+
+    it('is true when only the courtesy flag differs, so a pre-existing gap does not block it', () => {
+        const next = { ...incomplete, courtesyTranslationEnabled: true };
+        expect(aiConfigGap(next, NO_FALLBACK, true)).not.toBeNull(); // the gap exists...
+        expect(changesOnlyCourtesyTranslation(next, incomplete)).toBe(true); // ...but this save did not make it
+    });
+
+    it('is false when the model, endpoint or switch changes (the check still applies)', () => {
+        expect(changesOnlyCourtesyTranslation({ ...incomplete, aiModel: 'x' }, incomplete)).toBe(false);
+        expect(changesOnlyCourtesyTranslation({ ...incomplete, aiBaseUrl: 'https://y.test/v1' }, incomplete)).toBe(false);
+        expect(changesOnlyCourtesyTranslation({ ...incomplete, aiEnabled: false }, incomplete)).toBe(false);
+    });
+
+    it('ignores surrounding whitespace', () => {
+        expect(changesOnlyCourtesyTranslation({ ...full, aiModel: ' company-model ' }, full)).toBe(true);
     });
 });
 

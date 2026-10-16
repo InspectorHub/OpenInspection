@@ -87,7 +87,14 @@ export const SERVICE_SPECS: Record<IntegrationService, ServiceSpec> = {
             return c.smsByoProvider !== 'telnyx'
                 && has(env.TWILIO_ACCOUNT_SID) && has(env.TWILIO_AUTH_TOKEN) && has(env.TWILIO_FROM_NUMBER);
         },
-        legacy: (c) => ({ choice: c.legacy?.smsMode === 'own' ? 'own' : 'provided', signal: c.legacy?.smsMode !== undefined }),
+        // A company still on a retired sender mode (the column default included)
+        // whose own account is already complete is on its own account: the send
+        // path runs it as `own`, and the card says so.
+        legacy: (c) => {
+            const mode = c.legacy?.smsMode;
+            const ownComplete = mode !== 'managed_dedicated' && SERVICE_SPECS.sms.own(c).state === 'complete';
+            return { choice: mode === 'own' || ownComplete ? 'own' : 'provided', signal: mode !== undefined || ownComplete };
+        },
     },
     ai: {
         offersProvided: (p) => p.hasManagedAi,

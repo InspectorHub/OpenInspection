@@ -2061,7 +2061,7 @@
       }
     },
     "summary": "Record inspector signature on an inspection (authenticated)",
-    "description": "Stores the inspector's drawn signature image on the inspection's primary report. It is saved inside that report's results data, replacing any signature saved earlier, and a results row is created if the report has none yet. Safe to repeat: the last call wins. savedAt in the response simply echoes the signedAt the client sent, not a server time. Responds 404 if the inspection or its primary report is missing. Does not email anyone or write an audit record. Available to owner, manager and inspector roles."
+    "description": "Stores the inspector's drawn signature image on the inspection's primary report. It is saved inside that report's results data, replacing any signature saved earlier, and a results row is created if the report has none yet. Safe to repeat: the last call wins. savedAt in the response simply echoes the signedAt the client sent, not a server time. Responds 404 if the inspection or its primary report is missing. Does not email anyone. Writes an inspection.inspector_signature.update audit record (actor only, never the image) and requires the editReports capability. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionItemsPhotosAnnotation",
@@ -17868,7 +17868,7 @@
       }
     },
     "summary": "Create + email an invoice payment request for an inspection",
-    "description": "Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page."
+    "description": "Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page. Requires the inspectionFees capability (held by owners, managers, inspectors and staff by default; an inspector or staff member with it switched off is refused)."
   },
   {
     "operationId": "requestPasswordReset",

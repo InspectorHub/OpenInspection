@@ -49,6 +49,7 @@ export const SOURCE_REASONS = [
     'provider_confirmation_pending',
     'dedicated_number',
     'dedicated_not_ready',
+    'dedicated_unavailable',
 ] as const;
 export type SourceReason = (typeof SOURCE_REASONS)[number];
 
@@ -71,6 +72,8 @@ export interface CompanyIntegrationConfig {
     ownSecrets?: Record<string, string | undefined> | undefined;
     /** SMS: the number registered for the company is approved and has its Messaging Service, so it can send. */
     dedicatedNumberReady?: boolean | undefined;
+    /** SMS: the deployment holds the account credentials the registered-number send path signs with. `false` means every send would fail. */
+    deploymentSmsSendReady?: boolean | undefined;
 }
 
 /** The deployment's own environment slice. Presence is all that is read. */
@@ -143,9 +146,10 @@ export function resolveIntegrationSource(
     // which is its own sender. It is neither Built-in nor an account it typed in,
     // so it is read from the registration, not from the keys.
     if (service === 'sms' && spec.offersProvided(profile) && company.legacy?.smsMode === 'managed_dedicated') {
-        return company.dedicatedNumberReady
-            ? { service, source: 'own', reason: 'dedicated_number', credentialsPresent: true, choice: 'default' }
-            : { ...fail('dedicated_not_ready'), choice: 'default' };
+        if (!company.dedicatedNumberReady) return { ...fail('dedicated_not_ready'), choice: 'default' };
+        // Approved, but the deployment cannot sign a send: never claim it works.
+        if (company.deploymentSmsSendReady === false) return { ...fail('dedicated_unavailable'), choice: 'default' };
+        return { service, source: 'own', reason: 'dedicated_number', credentialsPresent: true, choice: 'default' };
     }
 
     if (wanted === 'provided') {

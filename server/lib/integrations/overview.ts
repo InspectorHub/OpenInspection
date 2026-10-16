@@ -97,7 +97,7 @@ function fromResolver(
         category,
         status,
         source: row.current,
-        dedicatedNumber: row.reason === 'dedicated_number' || row.reason === 'dedicated_not_ready',
+        dedicatedNumber: row.reason === 'dedicated_number' || row.reason === 'dedicated_not_ready' || row.reason === 'dedicated_unavailable',
         canUseOwn: choice && (SWITCHABLE_SERVICES as readonly IntegrationService[]).includes(service),
         detailPath,
         reasonKey: sourceReasonMessageKey({ service, source: row.current, reason: row.reason }),

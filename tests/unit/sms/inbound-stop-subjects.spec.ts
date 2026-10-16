@@ -103,8 +103,8 @@ async function seedUser(id: string, tenantId: string, phone: string | null) {
 }
 
 /** POST the provider's inbound shape at the tenant-scoped or platform route. */
-async function inbound(path: string, body: string) {
-    const params = { From: PHONE, Body: body };
+async function inbound(path: string, body: string, messageSid?: string) {
+    const params: Record<string, string> = { From: PHONE, Body: body, ...(messageSid ? { MessageSid: messageSid } : {}) };
     const sig = await signParams(PLATFORM_TOKEN, `${APP_BASE_URL}${path}`, params);
     return buildApp().request(path, {
         method: 'POST',
@@ -189,6 +189,29 @@ describe('inbound STOP — every subject the number stands for', () => {
         expect((await inbound('/webhooks/sms/inbound', 'STOP')).status).toBe(404);
 
         expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-acme', 'user')).toBeNull();
+        expect(await rows()).toHaveLength(0);
+        expect(await rows(OTHER_TENANT)).toHaveLength(0);
+    });
+
+    it('POSITIVE CONTROL for the 404 above: the company route answers 200 and writes a row for the same input', async () => {
+        await seedUser('u-acme', TENANT, PHONE);
+
+        expect((await inbound('/webhooks/sms/inbound/acme', 'STOP')).status).toBe(200);
+
+        expect(await rows()).toHaveLength(1);
+    });
+
+    it('a START on company A restores A only while company B holds the same phone and stays opted out', async () => {
+        await seedUser('u-acme', TENANT, PHONE);
+        await seedUser('u-beta', OTHER_TENANT, PHONE);
+        await inbound('/webhooks/sms/inbound/acme', 'STOP');
+        await inbound('/webhooks/sms/inbound/beta', 'STOP');
+
+        await inbound('/webhooks/sms/inbound/acme', 'START');
+
+        const svc = new SmsConsentService({} as D1Database);
+        expect(await svc.getLatest(TENANT, 'u-acme', 'user')).toBe('granted');
+        expect(await svc.getLatest(OTHER_TENANT, 'u-beta', 'user')).toBe('revoked');
     });
 
     it('a tenant-scoped STOP does not reach an identical number in another tenant', async () => {
@@ -200,6 +223,47 @@ describe('inbound STOP — every subject the number stands for', () => {
         const svc = new SmsConsentService({} as D1Database);
         expect(await svc.getLatest(TENANT, 'u-acme', 'user')).toBe('revoked');
         expect(await svc.getLatest(OTHER_TENANT, 'u-beta', 'user')).toBeNull();
+    });
+});
+
+describe('inbound replay — the provider message id is applied once', () => {
+    it('the same START delivered twice writes one row', async () => {
+        await seedUser('u-staff', TENANT, PHONE);
+
+        expect((await inbound('/webhooks/sms/inbound/acme', 'START', 'SM-start-1')).status).toBe(200);
+        expect((await inbound('/webhooks/sms/inbound/acme', 'START', 'SM-start-1')).status).toBe(200);
+
+        expect(await rows()).toHaveLength(1);
+    });
+
+    it('a replayed START does not re-grant after a later STOP', async () => {
+        await seedUser('u-staff', TENANT, PHONE);
+        await inbound('/webhooks/sms/inbound/acme', 'START', 'SM-start-1');
+        await inbound('/webhooks/sms/inbound/acme', 'STOP', 'SM-stop-2');
+
+        await inbound('/webhooks/sms/inbound/acme', 'START', 'SM-start-1');
+
+        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-staff', 'user')).toBe('revoked');
+    });
+
+    it('CONTROL: a fresh START (new message id) after that STOP does re-grant', async () => {
+        await seedUser('u-staff', TENANT, PHONE);
+        await inbound('/webhooks/sms/inbound/acme', 'START', 'SM-start-1');
+        await inbound('/webhooks/sms/inbound/acme', 'STOP', 'SM-stop-2');
+
+        await inbound('/webhooks/sms/inbound/acme', 'START', 'SM-start-3');
+
+        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-staff', 'user')).toBe('granted');
+    });
+
+    it('the same message id on another company is not a replay of this one', async () => {
+        await seedUser('u-acme', TENANT, PHONE);
+        await seedUser('u-beta', OTHER_TENANT, PHONE);
+        await inbound('/webhooks/sms/inbound/acme', 'STOP', 'SM-same');
+        await inbound('/webhooks/sms/inbound/beta', 'STOP', 'SM-same');
+
+        expect(await rows()).toHaveLength(1);
+        expect(await rows(OTHER_TENANT)).toHaveLength(1);
     });
 });
 

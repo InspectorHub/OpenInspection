@@ -135,7 +135,7 @@ const syncRoutes = createApiRouter()
         },
     },
     operationId: "createInspectionInspectorSignature",
-    description: "Stores the inspector's drawn signature image on the inspection's primary report. It is saved inside that report's results data, replacing any signature saved earlier, and a results row is created if the report has none yet. Safe to repeat: the last call wins. savedAt in the response simply echoes the signedAt the client sent, not a server time. Responds 404 if the inspection or its primary report is missing. Does not email anyone or write an audit record. Available to owner, manager and inspector roles."
+    description: "Stores the inspector's drawn signature image on the inspection's primary report. It is saved inside that report's results data, replacing any signature saved earlier, and a results row is created if the report has none yet. Safe to repeat: the last call wins. savedAt in the response simply echoes the signedAt the client sent, not a server time. Responds 404 if the inspection or its primary report is missing. Does not email anyone. Writes an inspection.inspector_signature.update audit record (actor only, never the image) and requires the editReports capability. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' })), async (c) => {
     const { id } = c.req.valid('param');
     const { signatureBase64, signedAt } = c.req.valid('json');
@@ -166,6 +166,9 @@ const syncRoutes = createApiRouter()
             lastSyncedAt: new Date(),
         });
     }
+
+    // Actor and inspection only; the signature image is never copied into the log.
+    auditFromContext(c, 'inspection.inspector_signature.update', 'inspection', { entityId: id });
 
     return c.json({ success: true as const, data: { savedAt: signedAt } }, 200);
 })

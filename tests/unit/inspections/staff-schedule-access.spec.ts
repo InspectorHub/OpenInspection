@@ -22,6 +22,7 @@ import type { UserRole } from '../../../server/types/auth';
 import { AppError, Errors } from '../../../server/lib/errors';
 import { INSPECTION_STATUS } from '../../../server/lib/status/inspection-status';
 import { REPORT_STATUS } from '../../../server/lib/status/report-status';
+import { UpdateInspectionSchema } from '../../../server/lib/validations/inspection.schema';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -161,6 +162,27 @@ describe('staff on the inspection routes', () => {
             const row = await readRow();
             expect(row?.propertyAddress).toBe('1 Main St');
             expect(row?.date.slice(0, 10)).toBe('2026-06-01');
+        });
+
+        it('PATCH /:id refuses staff every field the schema accepts except date and inspectorId, one at a time', async () => {
+            const fields = Object.keys(UpdateInspectionSchema.shape).filter((k) => k !== 'date' && k !== 'inspectorId');
+            // A schema that lost its fields would turn this into a loop over nothing.
+            expect(fields.length).toBeGreaterThan(10);
+            const app = buildApp('staff');
+            const allowed: string[] = [];
+            for (const field of fields) {
+                const res = await send(app, 'PATCH', `/${INSP_ID}`, { [field]: null });
+                if (res.status !== 403) allowed.push(`${field}:${res.status}`);
+            }
+            expect(allowed).toEqual([]);
+            const row = await readRow();
+            expect(row?.propertyAddress).toBe('1 Main St');
+        });
+
+        it('control: the same fields are not refused for an inspector (the loop above is not a blanket 403)', async () => {
+            const app = buildApp('inspector');
+            const res = await send(app, 'PATCH', `/${INSP_ID}`, { propertyAddress: '2 Oak Street' });
+            expect(res.status).toBe(200);
         });
 
         it('control: an inspector on the same inspection can still edit another field', async () => {

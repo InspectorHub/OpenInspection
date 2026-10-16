@@ -505,11 +505,14 @@ const reportDeliveryRoutes = createApiRouter()
         const data = await c.var.services.inspection.getInspectionHub(id, tenantId, tenantSlug);
         if (!data) return c.json({ success: false, error: 'Inspection not found' }, 404);
 
-        const payUrl = await hubPayUrl(c, tenantId, id, data.invoice);
-        const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl } : null };
         // IA-95 — two kinds of money in one aggregate, projected field by field: this
         // inspection's price lines (`inspectionFees`) and the invoice block (`companyFinance`).
         const caps = await capabilitiesFor(c);
+        // The pay link is a live credential for the invoice. A caller without
+        // `companyFinance` is not shown the invoice, so no link is minted for them
+        // (issueToken would otherwise run, and the token would go out in the response).
+        const payUrl = caps.companyFinance ? await hubPayUrl(c, tenantId, id, data.invoice) : null;
+        const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl } : null };
         const { invoice, ...rest } = hub;
         return c.json({ success: true, data: { ...redactMoney(rest, caps, 'inspectionFees'), invoice: redactMoney(invoice, caps, 'companyFinance') } }, 200);
     })

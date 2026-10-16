@@ -44,6 +44,9 @@ export type AuditAction =
     | 'inspection.bulk_assign'
     | 'inspection.bulk_status'
     | 'inspection.template_upgraded'
+    // The inspector's drawn signature stored on a report. Audited with the actor
+    // only: the image is evidence, not log content, and never enters the row.
+    | 'inspection.inspector_signature.update'
     | 'inspection.results_batch_patched'
     | 'inspection.sync_conflict_resolved'
     // An offline client's Yjs update applied to the live results document. Audited

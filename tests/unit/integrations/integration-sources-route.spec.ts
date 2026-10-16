@@ -98,13 +98,13 @@ describe('GET /api/admin/integration-sources', () => {
 });
 
 describe('PUT /api/admin/integration-sources', () => {
-    it('saves a valid choice for the company on the session, and audits exactly the service and source', async () => {
+    it('saves a valid choice for the company on the session, and audits the service, the new source and the previous explicit choice', async () => {
         const res = await put('owner', { service: 'email', source: 'own' }, 'tenant-from-session');
         expect(res.status).toBe(200);
         expect(h.writes).toEqual([[expect.anything(), 'tenant-from-session', 'email', 'own']]);
         expect(h.loads[0]).toMatchObject({ tenantId: 'tenant-from-session' });
         expect(h.audits).toHaveLength(1);
-        expect(h.audits[0]!.slice(1)).toEqual(['config.integration_source.update', 'tenant_config', { metadata: { service: 'email', source: 'own' } }]);
+        expect(h.audits[0]!.slice(1)).toEqual(['config.integration_source.update', 'tenant_config', { metadata: { service: 'email', source: 'own', previous: 'none' } }]);
     });
 
     it('lets a manager save too', async () => {

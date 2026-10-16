@@ -427,7 +427,10 @@ export class TeamService {
         }
 
         const moved = choice.reassignTo ? plan.openInspections : 0;
-        return { ...user, reassigned: moved, unassigned: plan.openInspections - moved, keptForRecord: plan.keptForRecord };
+        // "Unassigned" counts inspections left WITHOUT a lead: a helper seat that
+        // is merely dropped is not an inspection nobody is on.
+        const unassigned = choice.unassign ? plan.openAsLead : 0;
+        return { ...user, reassigned: moved, unassigned, keptForRecord: plan.keptForRecord };
     }
 
     /**

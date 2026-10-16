@@ -98,6 +98,9 @@ export const automationFlushJob: CronJob = {
                             ...(env.TWILIO_ACCOUNT_SID ? { TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID } : {}),
                             ...(env.TWILIO_AUTH_TOKEN ? { TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN } : {}),
                             ...(env.TWILIO_FROM_NUMBER ? { TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER } : {}),
+                            // The dedicated-number send path signs with an API key, not the account token.
+                            ...(env.TWILIO_API_KEY_SID ? { TWILIO_API_KEY_SID: env.TWILIO_API_KEY_SID } : {}),
+                            ...(env.TWILIO_API_KEY_SECRET ? { TWILIO_API_KEY_SECRET: env.TWILIO_API_KEY_SECRET } : {}),
                         }, tenantId)),
             }
             : null;
@@ -105,6 +108,11 @@ export const automationFlushJob: CronJob = {
         // are fail-closed until compliance is approved.
         const gateEnv = {
             profile: getDeploymentProfile(env),
+            // Lets the gate open a company's stored keys when it is on a retired sender mode.
+            ...(env.TENANT_CACHE && env.JWT_SECRET
+                ? { DB: env.DB, TENANT_CACHE: env.TENANT_CACHE, JWT_SECRET: env.JWT_SECRET,
+                    ...(env.JWT_SECRET_PREVIOUS ? { JWT_SECRET_PREVIOUS: env.JWT_SECRET_PREVIOUS } : {}) }
+                : {}),
             // Without this the cron path always applied the built-in default allowance.
             ...(env.MANAGED_SMS_MONTHLY_ALLOWANCE
                 ? { MANAGED_SMS_MONTHLY_ALLOWANCE: env.MANAGED_SMS_MONTHLY_ALLOWANCE }

@@ -83,9 +83,11 @@ const adminIntegrationSourcesRoutes = createApiRouter()
         if (!check.ok) {
             return c.json({ success: false as const, error: { code: check.error, message: REFUSAL_TEXT[check.error] } }, 409);
         }
+        // The explicit choice before this change ('none' when the company never made one).
+        const previous = describeSwitchableSources(inputs).find((r) => r.service === service)?.stored ?? 'none';
         await writeIntegrationSource(c.env.DB, tenantId, service, source);
         auditFromContext(c, 'config.integration_source.update', 'tenant_config', {
-            metadata: { service, source },
+            metadata: { service, source, previous },
         });
         return c.json({ success: true as const, data: { service, source } }, 200);
     });

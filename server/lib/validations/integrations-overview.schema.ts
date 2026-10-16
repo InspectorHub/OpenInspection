@@ -24,6 +24,7 @@ const IntegrationCardSchema = z.object({
         'integrations_source_reason_own_credentials_incomplete',
         'integrations_source_reason_provider_confirmation_pending',
         'integrations_source_reason_dedicated_not_ready',
+        'integrations_source_reason_dedicated_unavailable',
     ]).nullable().describe('Message key that explains why the source is unavailable; null when nothing needs saying.'),
 }).openapi('IntegrationCard');
 

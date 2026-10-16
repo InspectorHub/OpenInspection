@@ -22,9 +22,9 @@ describe('source reason messages', () => {
         key: sourceReasonMessageKey({ service: 'email', source: 'unavailable', reason }),
     }));
 
-    it('the five unavailable reasons have a key and the working reasons have none', () => {
+    it('the six unavailable reasons have a key and the working reasons have none', () => {
         const withKey = unavailable.filter((u) => u.key).map((u) => u.reason).sort();
-        expect(withKey).toEqual(['dedicated_not_ready', 'not_offered', 'own_credentials_incomplete', 'provided_not_configured', 'provider_confirmation_pending']);
+        expect(withKey).toEqual(['dedicated_not_ready', 'dedicated_unavailable', 'not_offered', 'own_credentials_incomplete', 'provided_not_configured', 'provider_confirmation_pending']);
         expect(unavailable.filter((u) => !u.key).map((u) => u.reason).sort())
             .toEqual(['dedicated_number', 'explicit_choice', 'legacy_setting', 'profile_default']);
     });

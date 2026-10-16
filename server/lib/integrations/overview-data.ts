@@ -50,6 +50,8 @@ export async function loadOverviewInputs(args: {
 }): Promise<OverviewInputs> {
     const { env, profile, tenantId, userId, tenantSecretKeys } = args;
     const db = drizzle(env.DB);
+    // A company's own Twilio keys are merged into the request env; only the deployment's count here.
+    const deploymentEnv = deploymentEnvOf(env, tenantSecretKeys);
 
     const [config, secrets, qbo, calendar, registration] = await Promise.all([
         db.select({
@@ -74,7 +76,7 @@ export async function loadOverviewInputs(args: {
 
     return {
         profile,
-        env: deploymentEnvOf(env, tenantSecretKeys),
+        env: deploymentEnv,
         quickbooksConnected: !!qbo,
         calendarConnected: !!calendar,
         company: {
@@ -87,6 +89,8 @@ export async function loadOverviewInputs(args: {
             ownSecrets: secrets ?? {},
             // Usable once the carrier approved the registration and a Messaging Service exists (what the send gate needs).
             dedicatedNumberReady: registration?.status === 'approved' && !!registration.resourceSid,
+            // The send path signs with the deployment's API key; without it every send fails.
+            deploymentSmsSendReady: !!(deploymentEnv.TWILIO_ACCOUNT_SID && deploymentEnv.TWILIO_API_KEY_SID && deploymentEnv.TWILIO_API_KEY_SECRET),
         },
     };
 }

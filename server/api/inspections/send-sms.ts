@@ -10,7 +10,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
-import { guardSendSms } from './report-send-guards';
+import { guardSendSms, recordSmsSent } from './report-send-guards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { SendSmsSchema, SendSmsResponseDataSchema } from '../../lib/validations/send-sms.schema';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -181,6 +181,8 @@ const sendSmsRoutes = createApiRouter()
 
                 if (after?.status === 'sent') {
                     sentTo.push(seated.phone);
+                    // Only a text that went out spends the hourly allowance.
+                    await recordSmsSent(c, id, recipient.contactId).catch(() => {});
                     auditFromContext(c, 'inspection.send_sms', 'inspection', {
                         entityId: id,
                         metadata: { recipient: seated.phone, roleKey: recipient.roleKey, channel: 'sms' },

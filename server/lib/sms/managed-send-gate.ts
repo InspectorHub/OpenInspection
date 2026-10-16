@@ -1,8 +1,9 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { messagingCompliance, usageCounters } from '../db/schema';
+import { messagingCompliance, usageCounters, tenantConfigs } from '../db/schema';
 import { currentPeriodKey } from '../usage/period';
-import { getDeploymentProfile, type DeploymentProfile } from '../deployment-profile';
+import type { DeploymentProfile } from '../deployment-profile';
+import { isRetiredSenderMode, loadOwnSmsAccountComplete } from './own-account';
 
 /**
  * Default monthly SMS allowance for managed tenants when
@@ -23,12 +24,23 @@ export interface ManagedSendGateEnv {
     APP_MODE?: string;
     /** A profile the caller already resolved; wins over APP_MODE. */
     profile?: DeploymentProfile;
+    /**
+     * Needed to open the company's stored keys. A company on a retired sender mode
+     * is allowed only when its own account is complete; without DB and JWT_SECRET the
+     * keys cannot be read and the answer is "not configured".
+     */
+    DB?: D1Database;
+    TENANT_CACHE?: KVNamespace;
+    JWT_SECRET?: string;
+    JWT_SECRET_PREVIOUS?: string;
 }
 
 export interface ManagedSendGateResult {
     allowed: boolean;
     /** Present only when allowed=false. */
     reason?: string;
+    /** Set when a retired stored mode was allowed because the own account is complete: the send runs as `own`. */
+    resolvedMode?: 'own';
 }
 
 /**
@@ -86,9 +98,17 @@ export async function managedSendAllowed(
     // registered number (managed_dedicated, checked below) are the supported
     // paths. On a self-hosted deployment `platform` is the operator's own
     // account and is unaffected.
-    const profile = env.profile ?? getDeploymentProfile(env);
-    if (smsMode === 'managed_shared' || (smsMode === 'platform' && profile.hasManagedCompliance)) {
-        return { allowed: false, reason: 'sms not configured' };
+    // A retired mode with a COMPLETE own account of the company's is simply `own`.
+    if (isRetiredSenderMode(env, smsMode)) {
+        if (!env.DB || !env.JWT_SECRET) return { allowed: false, reason: 'sms not configured' };
+        const byo = await db.select({ byo: tenantConfigs.smsByoProvider }).from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId)).get()
+            .then((row) => row?.byo ?? null, () => null);
+        const complete = await loadOwnSmsAccountComplete(
+            { DB: env.DB, TENANT_CACHE: env.TENANT_CACHE, JWT_SECRET: env.JWT_SECRET, ...(env.JWT_SECRET_PREVIOUS ? { JWT_SECRET_PREVIOUS: env.JWT_SECRET_PREVIOUS } : {}) },
+            tenantId, byo,
+        );
+        return complete ? { allowed: true, resolvedMode: 'own' } : { allowed: false, reason: 'sms not configured' };
     }
 
     if (smsMode === 'managed_dedicated') {

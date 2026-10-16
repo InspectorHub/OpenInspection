@@ -7,6 +7,7 @@ import { PageHeader, Card, Pill, Button, EmptyState, Modal } from "@core/shared-
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { useCapability } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -99,6 +100,12 @@ export default function RepairItemsPage() {
   // guards so the modal save and a delete cannot abort one another.
   const { submit: submitItem, busy: saving } = useGuardedSubmit<typeof action>();
   const { submit: submitDelete, busy: deleting } = useGuardedSubmit<typeof action>();
+  // The library is gated by the same three verbs the API enforces on
+  // /api/recommendations (templateCreate / templateEdit / templateDelete), so a
+  // control is shown only when its request would be accepted. Fail-closed.
+  const canCreate = useCapability("templateCreate");
+  const canEdit = useCapability("templateEdit");
+  const canDelete = useCapability("templateDelete");
   const [pendingDelete, setPendingDelete] = useState<RepairItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
@@ -127,7 +134,7 @@ export default function RepairItemsPage() {
       <PageHeader
         title={m.repair_items_heading()}
         meta={m.repair_items_meta({ count: items.length })}
-        actions={<Button variant="primary" onClick={openCreate}>{m.repair_items_add()}</Button>}
+        actions={canCreate ? <Button variant="primary" onClick={openCreate}>{m.repair_items_add()}</Button> : undefined}
       />
 
       {items.length === 0 ? (
@@ -151,10 +158,12 @@ export default function RepairItemsPage() {
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg">{ctName(it.recommendedContractorTypeId)}</span>
                 )}
               </div>
-              <div className="mt-3 flex gap-3">
-                <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary-text hover:underline font-bold">{m.common_edit()}</button>
-                <button onClick={() => setPendingDelete(it)} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>
-              </div>
+              {(canEdit || canDelete) && (
+                <div className="mt-3 flex gap-3">
+                  {canEdit && <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary-text hover:underline font-bold">{m.common_edit()}</button>}
+                  {canDelete && <button onClick={() => setPendingDelete(it)} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>}
+                </div>
+              )}
             </Card>
           ))}
         </div>

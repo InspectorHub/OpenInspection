@@ -67,7 +67,7 @@ async function seedStaffRevocation(id: string, userId: string) {
 // spec (tests/unit/sms/marketing-block.spec.ts).
 const gate = (over: Partial<Parameters<typeof smsSendGate>[0]> = {}) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    smsSendGate({ db: db as any, tenantId: TENANT, to: PHONE, purpose: 'notification', bodyTemplate: '', ...over });
+    smsSendGate({ db: db as any, tenantId: TENANT, to: PHONE, purpose: 'notification', bodyTemplate: '', env: {}, ...over });
 
 describe('smsSendGate — express consent (consumers only)', () => {
     it('a consumer with no consent record is refused', async () => {

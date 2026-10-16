@@ -110,7 +110,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'config.attention_thresholds.update': { family: 'tenant_config', label: 'audit_action_config_attention_thresholds_update', meta: {}, status: { kind: 'live' } },
     'config.dashboard_columns.update': { family: 'tenant_config', label: 'audit_action_config_dashboard_columns_update', meta: { columns: 'name' }, status: { kind: 'live' } },
     'config.integration.update': { family: 'tenant_config', label: 'audit_action_config_integration_update', meta: { stripeConnect: 'flag' }, status: { kind: 'live' } },
-    'config.integration_source.update': { family: 'tenant_config', label: 'audit_action_config_integration_source_update', meta: { service: 'name', source: 'name' }, status: { kind: 'live' } },
+    'config.integration_source.update': { family: 'tenant_config', label: 'audit_action_config_integration_source_update', meta: { service: 'name', source: 'name', previous: 'from' }, status: { kind: 'live' } },
     'config.secrets.update': { family: 'tenant_config', label: 'audit_action_config_secrets_update', meta: { keysUpdated: 'name' }, status: { kind: 'live' } },
     'config.service_areas.replace': { family: 'inspector_service_areas', label: 'audit_action_config_service_areas_replace', meta: { zipPrefixes: 'name' }, status: { kind: 'live' } },
     'config.tenant_config.patch': {
@@ -177,6 +177,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.status_changed': { family: 'inspection', label: 'audit_action_inspection_status_changed', meta: {}, status: { kind: 'superseded', by: 'inspection.status_change' } },
     'inspection.collab.import': { family: 'inspection', label: 'audit_action_inspection_collab_import', meta: { bytes: 'count', changed: 'flag', snapshotSeq: 'id' }, status: { kind: 'live' } },
     'inspection.sync_conflict_resolved': { family: 'inspection', label: 'audit_action_inspection_sync_conflict_resolved', meta: {}, status: { kind: 'live' } },
+    'inspection.inspector_signature.update': { family: 'inspection', label: 'audit_action_inspection_inspector_signature_update', meta: {}, status: { kind: 'live' } },
     'inspection.template_snapshot.update': { family: 'inspection', label: 'audit_action_inspection_template_snapshot_update', meta: { sectionCount: 'count' }, status: { kind: 'live' } },
     'inspection.template_upgraded': {
         family: 'inspection',

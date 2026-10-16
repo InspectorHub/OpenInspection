@@ -24,7 +24,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { and, eq } from 'drizzle-orm';
-import { inspections, tenants, tenantConfigs, messagingCompliance } from '../lib/db/schema';
+import { inspections, tenants, tenantConfigs, messagingCompliance, processedWebhookEvents } from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { memoOnce } from '../lib/request-scope';
 import { auditFromContext } from '../lib/audit';
@@ -255,13 +255,16 @@ async function handleInbound(
     let from: string | null;
     let cmd: string;
     let isHelp: boolean;
+    // The provider's own id for THIS inbound message (Twilio MessageSid, Telnyx event id).
+    let messageId: string | null = null;
 
     if (opts.provider === 'telnyx') {
         // Parse defensively — a malformed/missing field is acknowledged (200) and
         // never throws. Telnyx does not consume TwiML; a plain 200 is correct.
         let parsed: unknown;
         try { parsed = JSON.parse(rawBody); } catch { return c.text('', 200); }
-        const data = (parsed as { data?: { event_type?: unknown; payload?: unknown } } | null)?.data;
+        const data = (parsed as { data?: { id?: unknown; event_type?: unknown; payload?: unknown } } | null)?.data;
+        if (typeof data?.id === 'string' && data.id) messageId = data.id;
         // Only an inbound user reply carries a STOP/START/HELP command.
         if (data?.event_type !== 'message.received') return c.text('', 200);
         const payload = (data as { payload?: { from?: { phone_number?: unknown }; text?: unknown } }).payload;
@@ -275,6 +278,7 @@ async function handleInbound(
         if (isHelp) return c.text('', 200);
     } else {
         from = normalizeE164(params.From ?? '');
+        if (params.MessageSid) messageId = params.MessageSid;
         cmd = (params.Body ?? '').trim().toUpperCase();
         isHelp = HELP_WORDS.has(cmd);
 
@@ -294,6 +298,18 @@ async function handleInbound(
     if (!from) return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
 
     const db = getDrizzle(c);
+    // A signed request can be delivered again (a provider retry, or a replay of a
+    // captured one). Twilio signatures carry no timestamp, so a replayed START
+    // would otherwise re-grant consent after a later STOP. The provider's message
+    // id is applied once per company; the marker is written AFTER the consent rows
+    // so a failure part-way is retried rather than lost, and re-applying a command
+    // is idempotent.
+    const replayKey = (isRevoke || isGrant) && messageId ? `sms-inbound:${opts.scopeTenantId}:${messageId}` : null;
+    if (replayKey) {
+        const seen = await db.select({ id: processedWebhookEvents.eventId }).from(processedWebhookEvents)
+            .where(eq(processedWebhookEvents.eventId, replayKey)).get();
+        if (seen) return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
+    }
     // EVERY subject of THIS company holding this number, in BOTH id spaces
     // (`lib/sms/consent-subjects`) — not the first one found. A staff member has
     // no contact row, so a contacts-only set left the loop below running zero
@@ -322,6 +338,11 @@ async function handleInbound(
         // inbound reply is tied to neither. Two-way conversation surfacing is
         // explicitly out of scope (spec §10); STOP/START consent sync is the only
         // in-scope inbound behavior, and it is handled above.
+    }
+    if (replayKey) {
+        try {
+            await db.insert(processedWebhookEvents).values({ eventId: replayKey, receivedAt: new Date() }).run();
+        } catch { /* a concurrent duplicate already marked it */ }
     }
     return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
 }

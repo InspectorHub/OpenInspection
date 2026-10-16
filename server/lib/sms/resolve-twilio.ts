@@ -7,6 +7,7 @@ import type { MessagingProvider } from '../messaging/provider';
 import { getDeploymentProfile, type DeploymentProfile } from '../deployment-profile';
 import { resolveIntegrationSource, type StoredIntegrationSources } from '../integrations/sources';
 import { parseStoredIntegrationSources } from '../integrations/stored-sources';
+import { isRetiredSenderMode, ownSmsAccountComplete } from './own-account';
 
 export type { TwilioCreds } from '../messaging/twilio';
 
@@ -171,19 +172,36 @@ async function buildManagedBag(
  * (for dedicated) the tenant's messagingCompliance row.
  * Use loadProviderForTenant for provider-aware dispatch (BYO Twilio or Telnyx).
  */
+type SmsMode = 'platform' | 'own' | 'managed_shared' | 'managed_dedicated';
+
 /**
- * Stored `sms_mode` values that name a sender which no longer exists.
- *
- * `managed_shared` was the deployment-wide shared number. On a hosted
- * deployment `platform` also meant "send from the deployment's number". Both
- * now read as not configured. On a self-hosted deployment `platform` is the
- * operator's own provider account (their env credentials), so it keeps working.
- * The stored column is never rewritten.
+ * The mode a send actually runs under. A retired mode with a COMPLETE own account
+ * runs as `own`, so a company that already saved its keys works without saving
+ * again; a retired mode without one is null (not configured). Stored value is
+ * never rewritten.
  */
-function isRetiredSenderMode(env: TwilioLoaderEnv, mode: string): boolean {
-    if (mode === 'managed_shared') return true;
-    if (mode !== 'platform') return false;
-    return (env.profile ?? getDeploymentProfile(env)).hasManagedCompliance;
+function effectiveSmsMode(
+    env: Pick<TwilioLoaderEnv, 'APP_MODE' | 'profile'>,
+    mode: SmsMode,
+    byoProvider: 'twilio' | 'telnyx' | null | undefined,
+    dec: Record<string, string | undefined>,
+): SmsMode | null {
+    if (!isRetiredSenderMode(env, mode)) return mode;
+    return ownSmsAccountComplete(byoProvider, dec) ? 'own' : null;
+}
+
+/**
+ * The deployment's account-level credentials a send may fall back to. Self-hosted
+ * the operator's env IS the company's own account. Hosted it belongs to the
+ * deployment and a company's incomplete own keys must never borrow it.
+ */
+function deploymentCredBag(env: TwilioLoaderEnv): CredBag {
+    if ((env.profile ?? getDeploymentProfile(env)).hasManagedCompliance) return {};
+    return {
+        TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
+        TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
+        TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
+    };
 }
 
 /**
@@ -209,27 +227,37 @@ export async function resolveTwilioSourceForTenant(
     tenant: CredBag,
     platform: CredBag,
 ): Promise<TwilioEffectiveSource> {
-    if (isRetiredSenderMode(env, mode)) return 'none';
+    const hosted = (env.profile ?? getDeploymentProfile(env)).hasManagedCompliance;
+    if (isRetiredSenderMode(env, mode)) {
+        const own = Boolean(tenant.TWILIO_ACCOUNT_SID && tenant.TWILIO_AUTH_TOKEN && tenant.TWILIO_FROM_NUMBER);
+        return own ? 'own' : 'none';
+    }
     const managed = mode === 'managed_dedicated'
         // A failed read is "no dedicated number", never a 500 on a settings page.
         ? await buildManagedBag(env, tenantId).catch(() => undefined)
         : undefined;
-    return resolveTwilioSource(mode, tenant, platform, managed);
+    // Hosted, the deployment's own account is never a fallback (matches the loaders).
+    if (hosted && mode === 'managed_dedicated' && !managed) return 'none';
+    return resolveTwilioSource(mode, tenant, hosted ? {} : platform, managed);
 }
 
 export async function loadTwilioForTenant(env: TwilioLoaderEnv, tenantId: string): Promise<TwilioCreds | null> {
     const db = drizzle(env.DB);
     const cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId)).get().catch(() => null);
-    const mode = cfg?.smsMode ?? 'platform';
-    if (isRetiredSenderMode(env, mode)) return null;
+    const stored = cfg?.smsMode ?? 'platform';
     const dec = (await loadTenantSecrets(
         env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
     ).catch(() => null)) ?? {};
+    const mode = effectiveSmsMode(env, stored, null, dec);
+    if (!mode) return null;
 
     const managed = mode === 'managed_dedicated'
         ? await buildManagedBag(env, tenantId)
         : undefined;
+    // Hosted: a registered number with an incomplete bag is not configured; it
+    // never falls through to the deployment's own account.
+    if (mode === 'managed_dedicated' && !managed && (env.profile ?? getDeploymentProfile(env)).hasManagedCompliance) return null;
 
     return resolveTwilio(
         mode,
@@ -238,11 +266,7 @@ export async function loadTwilioForTenant(env: TwilioLoaderEnv, tenantId: string
             TWILIO_AUTH_TOKEN: dec['TWILIO_AUTH_TOKEN'],
             TWILIO_FROM_NUMBER: dec['TWILIO_FROM_NUMBER'],
         },
-        {
-            TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
-            TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
-            TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
-        },
+        deploymentCredBag(env),
         managed,
     );
 }
@@ -266,11 +290,7 @@ async function loadChosenSmsProvider(
     // Own Twilio: the company's three keys. Self-hosted, the operator's env is
     // the company's own and stays as the fallback; hosted, the env is the
     // deployment's and is never consulted.
-    const operatorEnv: CredBag = (env.profile ?? getDeploymentProfile(env)).hasManagedCompliance ? {} : {
-        TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
-        TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
-        TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
-    };
+    const operatorEnv = deploymentCredBag(env);
     const creds = resolveTwilio('own', {
         TWILIO_ACCOUNT_SID: c.dec['TWILIO_ACCOUNT_SID'],
         TWILIO_AUTH_TOKEN: c.dec['TWILIO_AUTH_TOKEN'],
@@ -309,15 +329,17 @@ export async function loadProviderForTenant(env: TwilioLoaderEnv, tenantId: stri
         .where(eq(tenantConfigs.tenantId, tenantId))
         .get()
         .catch(() => null);
-    const mode = cfg?.smsMode ?? 'platform';
+    const storedMode = cfg?.smsMode ?? 'platform';
     const byoProvider = cfg?.smsByoProvider ?? null;
-    // Legacy shared-sender values are "not configured" -- before anything else,
-    // including a stored source choice.
-    if (isRetiredSenderMode(env, mode)) return null;
 
     const dec = (await loadTenantSecrets(
         env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
     ).catch(() => null)) ?? {};
+    // Legacy shared-sender values are "not configured" -- before anything else,
+    // including a stored source choice -- unless the company's own account is
+    // complete, in which case it runs as `own`.
+    const mode = effectiveSmsMode(env, storedMode, byoProvider, dec);
+    if (!mode) return null;
 
     // A stored source choice is strict: 'own' uses only the company's keys and
     // 'provided' only the deployment's pool, with no fallback either way. With
@@ -340,6 +362,7 @@ export async function loadProviderForTenant(env: TwilioLoaderEnv, tenantId: stri
     const managed = mode === 'managed_dedicated'
         ? await buildManagedBag(env, tenantId)
         : undefined;
+    if (mode === 'managed_dedicated' && !managed && (env.profile ?? getDeploymentProfile(env)).hasManagedCompliance) return null;
 
     const creds = resolveTwilio(
         mode,
@@ -348,11 +371,7 @@ export async function loadProviderForTenant(env: TwilioLoaderEnv, tenantId: stri
             TWILIO_AUTH_TOKEN: dec['TWILIO_AUTH_TOKEN'],
             TWILIO_FROM_NUMBER: dec['TWILIO_FROM_NUMBER'],
         },
-        {
-            TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
-            TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
-            TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
-        },
+        deploymentCredBag(env),
         managed,
     );
     if (!creds) return null;

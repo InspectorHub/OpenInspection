@@ -4,6 +4,8 @@
  * QuickBooks sign-in must never show up in the first company's overview.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { toD1Binding } from '../helpers/d1-binding';
@@ -73,6 +75,41 @@ describe('loadOverviewInputs', () => {
         });
         expect(inputs.env.RESEND_API_KEY).toBeUndefined();
         expect(inputs.env.SENDER_EMAIL).toBe('dep@x.test');
+    });
+
+    describe('a registered number the deployment can sign for', () => {
+        const withKeys = { TWILIO_ACCOUNT_SID: 'ACdep', TWILIO_API_KEY_SID: 'SKdep', TWILIO_API_KEY_SECRET: 'sec' };
+        const smsCard = async (env: Record<string, string>) => card(buildIntegrationOverview(await loadOverviewInputs({
+            env: { DB, JWT_SECRET, ...env }, profile: HOSTED, tenantId: B, userId: null, tenantSecretKeys: [],
+        })), 'sms');
+
+        async function registerB() {
+            const d = drizzle(DB);
+            await d.update(schema.tenantConfigs).set({ smsMode: 'managed_dedicated' }).where(eq(schema.tenantConfigs.tenantId, B));
+            await d.insert(schema.messagingCompliance).values({
+                tenantId: B, mode: 'managed_dedicated', complianceStatus: 'approved', messagingResourceSid: 'MGdedicated', createdAt: now, updatedAt: now,
+            } as never);
+        }
+
+        it('approved + Messaging Service + deployment keys: connected', async () => {
+            await registerB();
+            expect(await smsCard(withKeys)).toMatchObject({ status: 'connected', dedicatedNumber: true });
+        });
+
+        it('approved but the deployment lacks the API key pair: needs attention, with the plain reason, never connected', async () => {
+            await registerB();
+            const card_ = await smsCard({ TWILIO_ACCOUNT_SID: 'ACdep' });
+            expect(card_).toMatchObject({ status: 'attention', reasonKey: 'integrations_source_reason_dedicated_unavailable' });
+        });
+
+        it('a key the secrets middleware took from the company does not count as the deployment one', async () => {
+            await registerB();
+            const inputs = await loadOverviewInputs({
+                env: { DB, JWT_SECRET, ...withKeys }, profile: HOSTED, tenantId: B, userId: null,
+                tenantSecretKeys: ['TWILIO_API_KEY_SID'],
+            });
+            expect(inputs.company.deploymentSmsSendReady).toBe(false);
+        });
     });
 
     it('reads an unreadable company as nothing set up, never as connected', async () => {

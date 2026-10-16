@@ -117,7 +117,7 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
 const requestPaymentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/request-payment',
     tags: ['invoices'], summary: 'Create + email an invoice payment request for an inspection',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('inspectionFees')] as const,
     request: { body: { content: { 'application/json': { schema: RequestPaymentSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: RequestPaymentResponseSchema } }, description: 'Invoice marked sent and emailed' },
@@ -127,8 +127,8 @@ const requestPaymentRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: 'requestInvoicePayment',
-    description: 'Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page.',
-}, { scopes: ['write'], tier: 'extended' }));
+    description: 'Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page. Requires the inspectionFees capability (held by owners, managers, inspectors and staff by default; an inspector or staff member with it switched off is refused).',
+}, { scopes: ['write'], tier: 'extended', capability: 'inspectionFees' }));
 
 const invoiceRoutes = createApiRouter()
     // `/{id}/payments*` — the append-only payment ledger, its own sub-resource

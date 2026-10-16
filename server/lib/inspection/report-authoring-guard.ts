@@ -39,6 +39,10 @@ const AUTHORING_SUFFIXES = [
     'cost-items', 'cost-items/*',
     'pca-narrative', 'reports/*/narrative',
     'report-gate', 'report-gate/*', 'report-translation', 'report-translation/*',
+    // The inspector's signature is stored inside the report's results data, and
+    // submit/property-facts/concierge approval are the inspector's own acts on the
+    // report; none of them is an order-side edit.
+    'inspector-signature', 'submit', 'property-facts', 'property-facts/autofill', 'concierge/approve',
 ] as const;
 
 /** Whole paths outside `/api/inspections/:id/` that write report content. */

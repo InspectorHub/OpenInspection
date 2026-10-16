@@ -76,7 +76,7 @@ export type SendOneSmsArgs = {
     sms: SmsProviderSeam;
     appName: string;
     appHost: string;
-    env?: ManagedSendGateEnv | undefined;
+    env: ManagedSendGateEnv;
     quotaGuard?: PlanQuotaGuard | undefined;
     metering?: {
         record: (tenantId: string, metric: UsageMetric, periodKey: string, delta?: number) => Promise<void>;

@@ -18,6 +18,7 @@ const getSmsConfig = vi.fn();
 const getTenantConfig = vi.fn();
 const getSmsCompliance = vi.fn();
 const getSources = vi.fn();
+const putSource = vi.fn();
 const patchTenantConfig = vi.fn();
 const putSecrets = vi.fn();
 const postSmsTest = vi.fn();
@@ -32,7 +33,7 @@ vi.mock("~/lib/api-client.server", () => ({
     admin: {
       communication: { $get: getComm },
       "tenant-config": { $get: getTenantConfig, $patch: patchTenantConfig },
-      "integration-sources": { $get: getSources },
+      "integration-sources": { $get: getSources, $put: putSource },
     },
     secrets: { secrets: { $get: getSecrets, $put: putSecrets } },
     smsAdmin: {
@@ -97,6 +98,7 @@ beforeEach(() => {
   getTenantConfig.mockReset().mockResolvedValue(jsonRes({ data: { smsMode: "own", companyPhone: "+15551112222" } }));
   getSmsCompliance.mockReset().mockResolvedValue(jsonRes({ data: { mode: "own", complianceStatus: "approved", rejectionReason: null, tollfree: [] } }));
   getSources.mockReset().mockResolvedValue(jsonRes(sourcesBody(HOSTED_ROW)));
+  putSource.mockReset().mockResolvedValue(jsonRes({ success: true }));
   patchTenantConfig.mockReset().mockResolvedValue(jsonRes({ success: true }));
   putSecrets.mockReset().mockResolvedValue(jsonRes({ success: true }));
   postSmsTest.mockReset().mockResolvedValue(jsonRes({ success: true }));
@@ -198,6 +200,31 @@ describe("sms page action: company phone and keys", () => {
     expect(patchTenantConfig).toHaveBeenCalledWith({ json: { smsByoProvider: "twilio" } });
     expect(putSecrets).toHaveBeenCalledWith({ json: { TWILIO_ACCOUNT_SID: "ACnew", TWILIO_FROM_NUMBER: "+15550001111" } });
     expect(res).toMatchObject({ intent: "save-sms-secrets", ok: true });
+  });
+
+  it("hosted company on the retired platform mode: saving keys also records the own source", async () => {
+    getSmsConfig.mockResolvedValue(jsonRes({ data: { mode: "platform", effectiveSource: "none" } }));
+    const res = await action(actionArgs({ intent: "save-sms-secrets", sms_byo_provider: "twilio", TWILIO_ACCOUNT_SID: "AC1", TWILIO_AUTH_TOKEN: "t", TWILIO_FROM_NUMBER: "+15550001111" }));
+    expect(putSource).toHaveBeenCalledWith({ json: { service: "sms", source: "own" } });
+    expect(res).toMatchObject({ ok: true });
+  });
+
+  it("a 409 from the source write (details still incomplete) is not an error", async () => {
+    getSmsConfig.mockResolvedValue(jsonRes({ data: { mode: "platform", effectiveSource: "none" } }));
+    putSource.mockResolvedValue(jsonRes({ success: false, error: { code: "own_credentials_incomplete" } }, false, 409));
+    expect(await action(actionArgs({ intent: "save-sms-secrets", sms_byo_provider: "twilio", TWILIO_ACCOUNT_SID: "AC1" }))).toMatchObject({ ok: true });
+  });
+
+  it("a company on a registered number, or already on own, does not get its source rewritten", async () => {
+    getSmsConfig.mockResolvedValue(jsonRes({ data: { mode: "managed_dedicated", effectiveSource: "managed" } }));
+    await action(actionArgs({ intent: "save-sms-secrets", sms_byo_provider: "twilio", TWILIO_ACCOUNT_SID: "AC1" }));
+    expect(putSource).not.toHaveBeenCalled();
+  });
+
+  it("self-hosted never writes a source from the keys form", async () => {
+    getSmsConfig.mockResolvedValue(jsonRes({ data: { mode: "platform", effectiveSource: "own" } }));
+    await action(actionArgs({ intent: "save-sms-secrets", sms_byo_provider: "twilio", TWILIO_ACCOUNT_SID: "AC1" }, {}));
+    expect(putSource).not.toHaveBeenCalled();
   });
 
   it("save-sms-secrets for telnyx sends only the Telnyx keys", async () => {

@@ -69,7 +69,7 @@ async function seedStaffStop(id: string, userId: string) {
 
 const gate = (over: Partial<Parameters<typeof smsSendGate>[0]> = {}) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    smsSendGate({ db: db as any, tenantId: TENANT, to: PHONE, purpose: 'notification', bodyTemplate: '', ...over });
+    smsSendGate({ db: db as any, tenantId: TENANT, to: PHONE, purpose: 'notification', bodyTemplate: '', env: {}, ...over });
 
 describe('smsSendGate — a number that belongs to a users row', () => {
     it('refuses a send to a staff member who texted STOP, with no contactId to go on', async () => {

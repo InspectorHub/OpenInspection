@@ -25,6 +25,7 @@ const SourceRowSchema = z.object({
         'integrations_source_reason_own_credentials_incomplete',
         'integrations_source_reason_provider_confirmation_pending',
         'integrations_source_reason_dedicated_not_ready',
+        'integrations_source_reason_dedicated_unavailable',
     ]).nullable().describe('Message key that explains an unavailable source, or null.'),
     state: z.enum(['connected', 'attention', 'not_connected']),
     dedicatedNumber: z.boolean().describe('The service runs on a number registered for the company.'),

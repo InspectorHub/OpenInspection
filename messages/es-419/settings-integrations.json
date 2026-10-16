@@ -480,6 +480,7 @@
   "integrations_source_reason_own_credentials_incomplete": "A su propia cuenta de {service} le falta: {missing}. Agregue los datos que faltan para conectarla.",
   "integrations_source_reason_provider_confirmation_pending": "Los SMS requieren su propia cuenta de Twilio o Telnyx. Agregue sus datos para enviar mensajes.",
   "integrations_source_reason_dedicated_not_ready": "Su número dedicado aún no está listo para enviar. El registro sigue en curso.",
+  "integrations_source_reason_dedicated_unavailable": "Su número dedicado está aprobado, pero por ahora no puede enviar mensajes de texto. Comuníquese con soporte para terminar la configuración.",
   "integrations_hub_intro": "Conecte los servicios externos con los que funciona OpenInspection. Cada tarjeta muestra si el servicio funciona y de quién es la cuenta que usa.",
   "integrations_hub_summary_label": "Resumen del estado de las integraciones",
   "integrations_hub_summary_connected": "{count} conectados",

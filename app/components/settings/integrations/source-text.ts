@@ -18,6 +18,8 @@ export function sourceText(source: IntegrationSource, reasonKey: SourceReasonMes
       return m.integrations_source_reason_provided_not_configured({ service: title });
     case "integrations_source_reason_dedicated_not_ready":
       return m.integrations_source_reason_dedicated_not_ready();
+    case "integrations_source_reason_dedicated_unavailable":
+      return m.integrations_source_reason_dedicated_unavailable();
     case "integrations_source_reason_provider_confirmation_pending":
       return m.integrations_source_reason_provider_confirmation_pending();
     // The missing details are named on the service's own page; here the line

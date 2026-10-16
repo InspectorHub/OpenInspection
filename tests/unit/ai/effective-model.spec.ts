@@ -215,7 +215,12 @@ describe('the adapter refuses an empty endpoint itself', () => {
 });
 
 describe('an unknown model is a visible error, not an empty result', () => {
-    const NOT_FOUND = () => new Response('{}', { status: 404 });
+    // The provider's own words: only a body that says the model is unknown is
+    // treated as one. A bare 404 or 400 is not (see the controls below).
+    const NOT_FOUND = () => new Response(
+        JSON.stringify({ error: { code: 'model_not_found', message: 'The model does not exist' } }),
+        { status: 404 },
+    );
 
     it('suggestComment names the model and where to change it', async () => {
         fetchMock.mockImplementation(async () => NOT_FOUND());
@@ -229,10 +234,21 @@ describe('an unknown model is a visible error, not an empty result', () => {
         });
     });
 
-    it('a 400 reads the same way', async () => {
-        fetchMock.mockImplementation(async () => new Response('{}', { status: 400 }));
+    it('a 400 that names the model as missing reads the same way', async () => {
+        fetchMock.mockImplementation(async () => new Response(
+            JSON.stringify({ error: { message: 'Unknown model: retired-model' } }), { status: 400 },
+        ));
         await expect(build({ tenantModel: 'retired-model', tenantBaseUrl: COMPANY_URL }).generateProfessionalComment('x'))
             .rejects.toMatchObject({ code: 'ai_not_configured', message: expect.stringContaining('retired-model') });
+    });
+
+    it('control: a bare 400 or 404 is NOT blamed on the model, and suggestComment degrades', async () => {
+        for (const status of [400, 404]) {
+            fetchMock.mockImplementation(async () => new Response('{}', { status }));
+            const svc = build({ tenantModel: 'company-model', tenantBaseUrl: COMPANY_URL });
+            await expect(svc.generateProfessionalComment('x')).rejects.toThrow('Failed to generate content from AI');
+            expect((await svc.suggestComment(PROMPT_ARGS)).suggestions).toEqual([]);
+        }
     });
 
     it('control: an ordinary server failure still degrades to no suggestions', async () => {

@@ -8,7 +8,7 @@
  * the inspector it was done by, because that is the record.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -111,9 +111,11 @@ describe('TeamService.removeMember and the removed member\'s inspections', () =>
         expect(await helpers(db, 'open-both')).toEqual([]);
     });
 
-    it('unassigns explicitly when asked', async () => {
+    it('unassigns explicitly when asked, counting only inspections the leaver LED as unassigned', async () => {
         const out = await svc.removeMember(TENANT, LEAVER, OWNER, 'owner', { unassign: true });
-        expect(out).toMatchObject({ reassigned: 0, unassigned: 3 });
+        // open-lead and open-both lose their lead; open-helper keeps its lead (OWNER)
+        // and only drops a helper seat, so nobody was left without an inspector there.
+        expect(out).toMatchObject({ reassigned: 0, unassigned: 2 });
         expect(await lead(db, 'open-lead')).toBeNull();
         expect(await column(db, 'open-lead')).toBeNull();
         expect(await helpers(db, 'open-helper')).toEqual([]);
@@ -126,6 +128,115 @@ describe('TeamService.removeMember and the removed member\'s inspections', () =>
         expect(await column(db, 'cancelled')).toBe(LEAVER);
         const rows = await db.select().from(schema.inspections).all();
         expect(rows).toHaveLength(6);
+    });
+
+    /** Every table that records finished work, serialised so equality is byte equality. */
+    const historyOf = async (d: Db) => JSON.stringify({
+        results: await d.select().from(schema.inspectionResults).all(),
+        agreements: await d.select().from(schema.agreements).all(),
+        signed: await d.select().from(schema.agreementRequests).all(),
+        versions: await d.select().from(schema.reportVersions).all(),
+        paySplits: await d.select().from(schema.inspectionServicePaySplits).all(),
+        finished: await d.select().from(schema.inspections)
+            .where(inArray(schema.inspections.id, ['done', 'cancelled'])).all(),
+    });
+
+    async function seedHistory(d: Db) {
+        const t = new Date(1_700_000_000_000);
+        await d.insert(schema.inspectionResults).values({
+            id: 'res-done', tenantId: TENANT, inspectionId: 'done', data: { a: { rating: 'good' } }, lastSyncedAt: t, reportId: 'rep-done',
+        } as never);
+        await d.insert(schema.agreements).values({ id: 'agr-1', tenantId: TENANT, name: 'Standard', content: '<p>x</p>', createdAt: t });
+        await d.insert(schema.agreementRequests).values({
+            id: 'req-done', tenantId: TENANT, inspectionId: 'done', agreementId: 'agr-1', clientEmail: 'c@t.test',
+            status: 'signed', signedAt: t, contentSnapshot: '<p>x</p>', contentHash: 'abc', verificationToken: 'vt-1', createdAt: t,
+        });
+        await d.insert(schema.reportVersions).values({
+            id: 'rv-1', tenantId: TENANT, inspectionId: 'done', reportId: 'rep-done', versionNumber: 1, snapshotJson: '{"s":1}',
+            contentHash: 'h1', signature: 'sig', keyFingerprint: 'fp', verificationToken: 'rvt-1', publishedAt: t, publishedBy: LEAVER,
+        });
+        await d.insert(schema.inspectionServicePaySplits).values([
+            { id: 'ps-open', tenantId: TENANT, inspectionServiceId: 'line-1', userId: LEAVER, amountCents: 5000, source: 'rule', createdAt: t, updatedAt: t },
+            { id: 'ps-locked', tenantId: TENANT, inspectionServiceId: 'line-2', userId: LEAVER, amountCents: 7000, source: 'manual', lockedAt: t, createdAt: t, updatedAt: t },
+        ]);
+    }
+
+    it('leaves reports, signed agreements, published versions and pay splits byte-identical', async () => {
+        await seedHistory(db);
+        const before = await historyOf(db);
+        expect(before).toContain('ps-locked'); // the control: the snapshot really covers the locked split
+        await svc.removeMember(TENANT, LEAVER, OWNER, 'owner', { reassignTo: HEIR });
+        expect(await removed(db, LEAVER)).toBe(true);
+        expect(await historyOf(db)).toBe(before);
+    });
+
+    describe('atomicity on a driver that batches', () => {
+        /** A db whose `batch` is a real transaction and fails after `failAfter` statements. */
+        function batchingDb(failAfter: number | null) {
+            const batchSizes: number[] = [];
+            const stub = new Proxy(db, {
+                get(target, prop, recv) {
+                    if (prop === 'batch') {
+                        return (writes: Array<{ run: () => unknown }>) => {
+                            batchSizes.push(writes.length);
+                            fixture.sqlite.transaction(() => {
+                                writes.forEach((w, i) => {
+                                    if (failAfter !== null && i === failAfter) throw new Error('statement failed midway');
+                                    w.run();
+                                });
+                            })();
+                            return Promise.resolve([]);
+                        };
+                    }
+                    const v = Reflect.get(target, prop, recv);
+                    return typeof v === 'function' ? v.bind(target) : v;
+                },
+            });
+            return { stub, batchSizes };
+        }
+        const snapshot = async (d: Db) => JSON.stringify({
+            inspections: await d.select().from(schema.inspections).all(),
+            links: await d.select().from(schema.inspectionInspectors).all(),
+            users: await d.select().from(schema.users).all(),
+        });
+        let fixture: ReturnType<typeof createTestDb>;
+        beforeEach(async () => {
+            fixture = createTestDb();
+            await setupSchema(fixture.sqlite);
+            db = fixture.db;
+            await seed(db);
+        });
+
+        it('a statement that fails midway changes nothing: no inspection moved, leaver not removed', async () => {
+            const { stub } = batchingDb(2);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (mockDrizzle as any).mockReturnValue(stub);
+            const before = await snapshot(db);
+            await expect(new TeamService({} as D1Database).removeMember(TENANT, LEAVER, OWNER, 'owner', { reassignTo: HEIR }))
+                .rejects.toThrow(/failed midway/);
+            expect(await snapshot(db)).toBe(before);
+            expect(await removed(db, LEAVER)).toBe(false);
+        });
+
+        it('control: with no failure the same batch applies everything, in ONE batch call', async () => {
+            const { stub, batchSizes } = batchingDb(null);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (mockDrizzle as any).mockReturnValue(stub);
+            const before = await snapshot(db);
+            await new TeamService({} as D1Database).removeMember(TENANT, LEAVER, OWNER, 'owner', { reassignTo: HEIR });
+            expect(batchSizes).toHaveLength(1);
+            expect(batchSizes[0]).toBeGreaterThan(3); // reassignment writes plus the soft-delete
+            expect(await snapshot(db)).not.toBe(before);
+            expect(await removed(db, LEAVER)).toBe(true);
+        });
+    });
+
+    it('does not validate the reassign target when the leaver has no open work', async () => {
+        await db.delete(schema.inspectionInspectors).where(eq(schema.inspectionInspectors.userId, HEIR));
+        await db.update(schema.inspections).set({ status: 'completed', reportStatus: 'published' })
+            .where(eq(schema.inspections.status, 'scheduled'));
+        await svc.removeMember(TENANT, LEAVER, OWNER, 'owner', { reassignTo: 'nope' });
+        expect(await removed(db, LEAVER)).toBe(true);
     });
 
     it('does not touch inspections that never involved the leaver (control)', async () => {

@@ -41,13 +41,19 @@ function hubPayload(invoice: { id: string; status: string } | null) {
     };
 }
 
-function buildApp(invoice: { id: string; status: string } | null, primaryClient: { email: string | null } | null) {
+function buildApp(
+    invoice: { id: string; status: string } | null,
+    primaryClient: { email: string | null } | null,
+    role = 'manager',
+    overrides: Record<string, boolean> | null = null,
+) {
     const app = new OpenAPIHono<HonoConfig>();
     issueToken = vi.fn().mockResolvedValue('portal-token-xyz');
     getPrimaryClient = vi.fn().mockResolvedValue(primaryClient);
 
     app.use('*', async (c, next) => {
-        c.set('userRole', 'manager' as never);
+        c.set('userRole', role as never);
+        c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as never);
         c.set('tenantId', TENANT);
         c.set('user', { sub: 'user-1' } as never);
         c.set('requestedTenantSlug', SLUG as never);
@@ -125,5 +131,29 @@ describe('GET /api/inspections/:id/hub — tokenized pay link (IA-34 follow-up)'
 
         expect(body.data?.invoice).toBeNull();
         expect(issueToken).not.toHaveBeenCalled();
+    });
+
+    describe('callers without companyFinance (no live credential is minted for them)', () => {
+        it('returns a null payUrl and mints nothing for an inspector and for staff', async () => {
+            for (const role of ['inspector', 'staff']) {
+                const { status, body } = await get(buildApp({ id: 'inv-1', status: 'sent' }, { email: 'jane@example.com' }, role));
+                expect(status).toBe(200);
+                expect(body.data?.invoice?.payUrl ?? null).toBeNull();
+                expect(issueToken).not.toHaveBeenCalled();
+            }
+        });
+
+        it('an inspector granted companyFinance gets the link (positive control)', async () => {
+            const { body } = await get(buildApp({ id: 'inv-1', status: 'sent' }, { email: 'jane@example.com' }, 'inspector', { companyFinance: true }));
+            expect(body.data?.invoice?.payUrl).toContain('?token=portal-token-xyz');
+            expect(issueToken).toHaveBeenCalledTimes(1);
+        });
+
+        it('owner and manager are unchanged', async () => {
+            for (const role of ['owner', 'manager']) {
+                const { body } = await get(buildApp({ id: 'inv-1', status: 'sent' }, { email: 'jane@example.com' }, role));
+                expect(body.data?.invoice?.payUrl).toContain('?token=portal-token-xyz');
+            }
+        });
     });
 });

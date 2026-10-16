@@ -11,6 +11,7 @@ import { secretErrorReaders } from "~/lib/secret-action-errors";
 import { runComplianceIntent, saveManagedProvider } from "~/lib/sms-compliance-intents.server";
 import { parseTestResults } from "~/lib/connection-test";
 import { fetchData } from "~/lib/fetch-data.server";
+import { sourceChangeError } from "~/lib/integration-source-intent.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { DeliveryConnectionCard } from "~/components/settings/integrations/DeliveryConnectionCard";
 import { SmsDeliveryPanel } from "~/components/settings/SmsDeliveryPanel";
@@ -109,7 +110,23 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (cfgRes && !cfgRes.ok) {
       return { intent, ok: false, error: m.settings_comms_provider_save_error(), field: null, test: null };
     }
-    return saveSecrets(api, intent, pickSecretFields(form, keys), m.settings_comms_sms_credentials_save_error());
+    const saved = await saveSecrets(api, intent, pickSecretFields(form, keys), m.settings_comms_sms_credentials_save_error());
+    if (!saved.ok) return saved;
+    // A hosted company still on a retired sender mode (the column default, or no
+    // config row) can only turn SMS on by recording that it sends on its own
+    // account. Same writer as the source endpoint, which also mirrors sms_mode.
+    // A company on a registered number is left alone, and a 409 (details still
+    // incomplete) is not an error: the keys are saved either way.
+    if (getDeploymentProfile(getCloudflareEnv(context)).hasManagedCompliance) {
+      const cfg = await fetchData<{ mode?: SmsMode }>(api.smsAdmin.sms.config.$get());
+      if (cfg?.mode === "platform" || cfg?.mode === "managed_shared") {
+        const res = await api.admin["integration-sources"].$put({ json: { service: "sms", source: "own" } }).catch(() => null);
+        if (res && !res.ok && res.status !== 409) {
+          return { intent, ok: false, error: await sourceChangeError(res), field: null, test: null };
+        }
+      }
+    }
+    return saved;
   }
 
   if (intent === "test-sms") {

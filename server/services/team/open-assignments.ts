@@ -21,6 +21,8 @@ export interface RemovalChoice { reassignTo?: string | undefined; unassign?: boo
 
 export interface ReassignmentPlan {
     openInspections: number;
+    /** Of those, the ones where the member was the lead (a helper seat is dropped, not left empty). */
+    openAsLead: number;
     /** Inspections that still name the member but are finished: they keep their inspector for the record. */
     keptForRecord: number;
     /** Unexecuted statements: the reassignment writes only. */
@@ -52,13 +54,14 @@ async function openInspectionsOf(db: Db, tenantId: string, userId: string) {
 
 export async function planReassignment(db: Db, tenantId: string, userId: string, choice: RemovalChoice): Promise<ReassignmentPlan> {
     if (choice.reassignTo && choice.unassign) throw Errors.BadRequest('Choose either reassignTo or unassign, not both');
-    if (choice.reassignTo) await assertReassignTarget(db, tenantId, userId, choice.reassignTo);
     const open = await openInspectionsOf(db, tenantId, userId);
+    // The target only matters when there is open work to move to it.
+    if (choice.reassignTo && open.length > 0) await assertReassignTarget(db, tenantId, userId, choice.reassignTo);
     const named = await db.select({ id: inspections.id }).from(inspections)
         .where(and(eq(inspections.tenantId, tenantId), eq(inspections.inspectorId, userId))).all();
     const openNamed = open.filter(o => o.inspectorId === userId).length;
     const keptForRecord = named.length - openNamed;
-    if (open.length === 0) return { openInspections: 0, keptForRecord, statements: [] };
+    if (open.length === 0) return { openInspections: 0, openAsLead: 0, keptForRecord, statements: [] };
     const target = choice.reassignTo ?? null;
     if (!target && !choice.unassign) throw Errors.MemberHasOpenInspections(open.length);
 
@@ -68,11 +71,13 @@ export async function planReassignment(db: Db, tenantId: string, userId: string,
         .where(and(eq(inspectionInspectors.tenantId, tenantId), inArray(inspectionInspectors.inspectionId, mine))).all();
 
     const statements: unknown[] = [];
+    let openAsLead = 0;
     for (const insp of open) {
         const rows = links.filter(l => l.inspectionId === insp.id);
         const lead = rows.find(r => r.role === 'lead')?.userId ?? insp.inspectorId;
         const helpers = rows.filter(r => r.role === 'helper').map(r => r.userId);
         const wasHelper = helpers.includes(userId);
+        if (lead === userId) openAsLead += 1;
         const newLead = lead === userId ? target : lead;
         const newHelpers = helpers.filter(h => h !== userId);
         if (wasHelper && target && target !== newLead && !newHelpers.includes(target)) newHelpers.push(target);
@@ -82,7 +87,7 @@ export async function planReassignment(db: Db, tenantId: string, userId: string,
                 .where(and(eq(inspections.id, insp.id), eq(inspections.tenantId, tenantId))),
         );
     }
-    return { openInspections: open.length, keptForRecord, statements };
+    return { openInspections: open.length, openAsLead, keptForRecord, statements };
 }
 
 /** One D1 batch (atomic); drivers without batch support, such as the unit-test database, run in order. */

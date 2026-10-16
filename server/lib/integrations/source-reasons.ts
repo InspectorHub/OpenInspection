@@ -16,7 +16,8 @@ export type SourceReasonMessageKey =
     | 'integrations_source_reason_provided_not_configured'
     | 'integrations_source_reason_own_credentials_incomplete'
     | 'integrations_source_reason_provider_confirmation_pending'
-    | 'integrations_source_reason_dedicated_not_ready';
+    | 'integrations_source_reason_dedicated_not_ready'
+    | 'integrations_source_reason_dedicated_unavailable';
 
 const KEYS: Record<SourceReason, SourceReasonMessageKey | null> = {
     explicit_choice: null,
@@ -28,6 +29,7 @@ const KEYS: Record<SourceReason, SourceReasonMessageKey | null> = {
     provider_confirmation_pending: 'integrations_source_reason_provider_confirmation_pending',
     dedicated_number: null,
     dedicated_not_ready: 'integrations_source_reason_dedicated_not_ready',
+    dedicated_unavailable: 'integrations_source_reason_dedicated_unavailable',
 };
 
 /** The message key for a row, or null when the source works and nothing needs saying. */
