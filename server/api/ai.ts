@@ -49,7 +49,7 @@ const commentAssistRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createAiCommentAssist",
-    description: "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it. Requires the editReports capability; office staff do not have it by default."
+    description: "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it. Requires the editReports capability; office staff never have it."
 }, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 /**
@@ -89,7 +89,7 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
         + "and aiCallId is null. Otherwise aiCallId identifies the recorded AI call, which a human review can cite. "
         + "The inspection must belong to this company. Fails when AI is not configured or the workspace's AI "
         + "allowance is spent. Nothing is saved to the inspection, and each call is a fresh model call. Open to "
-        + "owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff do not have by default."
+        + "owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff never have."
 }, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 /**
@@ -122,7 +122,7 @@ const commentEditRoute = createRoute(withMcpMetadata({
         + "location detail), using the item, section and tab it belongs to as context. Returns the rewritten text "
         + "and the id of the AI call that produced it, which is null only for the local development mock. Nothing is "
         + "saved: the caller decides whether to replace the original. Fails when AI is not configured, and is "
-        + "rate-limited per caller. Each call is a fresh model call. Open to owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff do not have by default."
+        + "rate-limited per caller. Each call is a fresh model call. Open to owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff never have."
 }, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 const suggestCommentRoute = createRoute(withMcpMetadata({
@@ -147,7 +147,7 @@ const suggestCommentRoute = createRoute(withMcpMetadata({
         + "name, section and optionally its rating, the year built and the square footage. Returns the suggestions "
         + "as text plus the id of the AI call. If the model's answer cannot be read, or the model call fails, the "
         + "result is an empty suggestion list rather than an error; a missing AI configuration or a spent AI "
-        + "allowance is still an error. Nothing is saved. Open to owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff do not have by default."
+        + "allowance is still an error. Nothing is saved. Open to owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff never have."
 }, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 // Each handler returns the service result AS ITS `data`, rather than picking
@@ -178,7 +178,7 @@ const contentReviewRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createAiContentReview",
-    description: "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate. Requires the editReports capability; office staff do not have it by default.",
+    description: "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate. Requires the editReports capability; office staff never have it.",
 }, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 const aiRoutes = createApiRouter()

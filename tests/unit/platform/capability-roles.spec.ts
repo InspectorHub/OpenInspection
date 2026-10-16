@@ -26,7 +26,7 @@ const TABLE: Record<Capability, Record<Role, Cell>> = {
   templateDelete:    { owner: TP, manager: T, inspector: F, staff: F, agent: FP },
   templateImport:    { owner: TP, manager: T, inspector: T, staff: F, agent: FP },
   deleteInspection:  { owner: TP, manager: T, inspector: T, staff: F, agent: FP },
-  editReports:       { owner: TP, manager: T, inspector: T, staff: F, agent: FP },
+  editReports:       { owner: TP, manager: T, inspector: T, staff: FP, agent: FP },
 };
 
 describe('capability table', () => {
@@ -69,9 +69,13 @@ describe('editReports', () => {
     expect(TOGGLEABLE.filter((c) => caps[c])).toEqual([]);
   });
 
-  it('staff default to no, and the owner can switch it on', () => {
+  it('staff never have it: a stored override cannot grant it, and it is reported as pinned', () => {
     expect(getCapabilities('staff', null).editReports).toBe(false);
-    expect(getCapabilities('staff', { editReports: true }).editReports).toBe(true);
+    expect(getCapabilities('staff', { editReports: true }).editReports).toBe(false);
+    expect(pinnedCapabilities('staff')).toEqual(expect.arrayContaining(['publish', 'editReports']));
+    // Positive control: an inspector's value follows the override, so the pin above is the staff rule and not a global one.
+    expect(getCapabilities('inspector', { editReports: false }).editReports).toBe(false);
+    expect(getCapabilities('inspector', null).editReports).toBe(true);
   });
 
   it('an inspector can have it withdrawn; the owner cannot', () => {
@@ -88,10 +92,10 @@ describe('pinnedCapabilities', () => {
     }
   });
 
-  it('leaves inspector and manager with nothing pinned, and pins exactly publish for staff', () => {
+  it('leaves inspector and manager with nothing pinned, and pins exactly publish and editReports for staff', () => {
     expect(pinnedCapabilities('inspector')).toEqual([]);
     expect(pinnedCapabilities('manager')).toEqual([]);
-    expect(pinnedCapabilities('staff')).toEqual(['publish']);
+    expect([...pinnedCapabilities('staff')].sort()).toEqual(['editReports', 'publish']);
   });
 
   it('staff publish is off by default and no override or template-style sheet turns it on, while their other bits still move', () => {
@@ -100,7 +104,8 @@ describe('pinnedCapabilities', () => {
     const all = Object.fromEntries(TOGGLEABLE.map((c) => [c, true]));
     const caps = getCapabilities('staff', all);
     expect(caps.publish).toBe(false);
-    expect(TOGGLEABLE.filter((c) => c !== 'publish' && !caps[c])).toEqual([]);
+    expect(TOGGLEABLE.filter((c) => c !== 'publish' && c !== 'editReports' && !caps[c])).toEqual([]);
+    expect(caps.editReports).toBe(false);
     // Control: a manager and an inspector do hold it.
     expect(getCapabilities('manager', null).publish).toBe(true);
     expect(getCapabilities('inspector', null).publish).toBe(true);

@@ -128,7 +128,7 @@ describe("fixed switches show as locked", () => {
         }
     });
 
-    it("locks exactly publish for staff (it is always off for them), and no other switch", () => {
-        expect(TOGGLEABLE.filter((cap) => isCapabilityLocked("staff", cap))).toEqual(["publish"]);
+    it("locks exactly publish and editReports for staff (always off for them), and no other switch", () => {
+        expect(TOGGLEABLE.filter((cap) => isCapabilityLocked("staff", cap))).toEqual(["publish", "editReports"]);
     });
 });

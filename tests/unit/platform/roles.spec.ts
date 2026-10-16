@@ -37,9 +37,9 @@ describe('the staff role', () => {
   });
 
   it.each([
-    ['owner', true], ['manager', true], ['inspector', true], ['agent', true],
-    // Staff are office users and are decided in this one function.
-    ['staff', false],
+    ['owner', true], ['manager', true], ['inspector', true],
+    // Staff are office users and agents are not company members; both are decided in this one function.
+    ['staff', false], ['agent', false],
   ] as const)('countsTowardSeatQuota(%s) -> %s', (role, expected) => {
     expect(countsTowardSeatQuota(role)).toBe(expected);
   });

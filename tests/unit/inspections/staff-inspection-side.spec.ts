@@ -43,10 +43,11 @@ describe('AI endpoints', () => {
         expect((await call(buildApp('staff'), path)).status).toBe(403);
     });
 
-    it.each(AI_ROUTES)('%s: staff granted editReports, an inspector and an owner get past the capability (they reach validation)', async (path) => {
-        for (const app of [buildApp('staff', { editReports: true }), buildApp('inspector'), buildApp('owner')]) {
+    it.each(AI_ROUTES)('%s: an inspector and an owner get past the capability (they reach validation); staff with an override do not', async (path) => {
+        for (const app of [buildApp('inspector'), buildApp('owner')]) {
             expect((await call(app, path)).status).toBe(400);
         }
+        expect((await call(buildApp('staff', { editReports: true }), path)).status).toBe(403);
     });
 
     it.each(AI_ROUTES)('%s: refused to an inspector whose editReports was withdrawn', async (path) => {

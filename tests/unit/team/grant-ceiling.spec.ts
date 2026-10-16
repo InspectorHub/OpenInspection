@@ -123,10 +123,13 @@ describe('assertMayGrant truth table', () => {
             expect(run(noFees, 'staff', { inspectionFees: false })).not.toThrow();
         });
 
-        it('editReports: a manager without it cannot give it to staff or place an inspector', () => {
+        it('editReports: a manager without it cannot place an inspector; staff never hold it, so an override for staff grants nothing', () => {
             const noEdit = actorWith('manager', { editReports: false });
-            expect(run(noEdit, 'staff', { editReports: true })).toThrow(refusal('CAPABILITY_CEILING'));
+            // Pinned off for staff: the stored value is ignored, so it raises nothing above the manager's own ceiling.
+            expect(run(noEdit, 'staff', { editReports: true })).not.toThrow();
             expect(run(noEdit, 'inspector', null)).toThrow(refusal('CAPABILITY_CEILING'));
+            // Positive control: the same override on an inspector is a real grant and is refused.
+            expect(run(noEdit, 'inspector', { editReports: true })).toThrow(refusal('CAPABILITY_CEILING'));
             expect(run(noEdit, 'staff', null)).not.toThrow();
         });
 
