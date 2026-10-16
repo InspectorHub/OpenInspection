@@ -36,7 +36,7 @@
  * `env.APP_MODE === 'saas'` instead of reading a capability (OI #308 §4-§5).
  */
 export interface ProfileEnv {
-    APP_MODE?: string;
+    APP_MODE?: string | undefined;
     PORTAL_API_URL?: string;
     SINGLE_TENANT_ID?: string;
     /**

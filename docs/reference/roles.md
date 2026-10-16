@@ -14,17 +14,29 @@ Owner + Manager (`isAdminRole`).
 | **Owner** | Account holder — everything, plus billing on a `saas` deployment. |
 | **Manager** | Back-office: team management, settings, scheduling, all inspections. |
 | **Inspector** | Conducts inspections, edits and publishes reports. |
-| **Staff** | Office role: reschedules and reassigns inspections, manages contacts and messages, publishes and sends reports. Does not create, copy or delete inspections, does not edit an inspection's other fields, does not write report content, and cannot be assigned as the inspector on a job. May use the native app. |
+| **Staff** | Office role: books and schedules the order. Creates, copies and re-inspects inspections, reschedules and reassigns them, edits the order fields, cancels an unpaid inspection that has not started, manages contacts and messages, and sends a report that is already published. Does not delete inspections, does not publish or sign, does not write report content, and cannot be assigned as the inspector on a job. May use the native app. |
 | **Agent** | External real-estate agent — their own orders, read-only. |
 
 `staff` is evaluated at the inspector tier by `requireRole`, so every gate that
 admits an inspector admits staff and every gate that does not keeps staff out;
 what differs is expressed as capabilities and as a few explicit refusals.
-Staff may change the date and the assigned inspector of an inspection (the
-`scheduleOthers` capability, on for staff by default, still applies), but a
-staff member is refused creating, copying or deleting an inspection and editing
-any of its other fields. Staff are never offered as an inspector (booking,
-availability, the assignee picker, service qualification, pay rules).
+Staff work the order, never the inspection. Each field an inspection accepts on
+update is classified as an order field or an inspection-side field
+(`server/lib/inspection/order-fields.ts`; a spec fails when a field is
+unclassified). Staff may create, copy and re-inspect an inspection and change
+order fields (date, assigned inspector, client and property details, the
+agreement and payment requirements). The requirements can be switched on by
+staff and never off. Inspection-side fields, unknown fields and any status
+change out of `completed` are refused. Once an inspection has started (its
+report is past in-progress, the visit is completed, or results have been
+entered), staff cannot change its inspector, address or date, through the update
+route, the schedule route or the bulk assign action. Writing the order needs
+`scheduleOthers` or a place on the job, and is audited as
+`inspection.order_updated`. Staff cancel only an unpaid inspection that has not
+started (a held deposit or ledger payment also blocks it) and restore one only
+when its status before the cancellation is known and was not completed;
+owners and managers do the rest. Staff are never offered as an inspector
+(booking, availability, the assignee picker, service qualification, pay rules).
 Seat accounting is decided in one function, `countsTowardSeatQuota`
 (`server/lib/auth/roles.ts`); staff do not hold a seat.
 
@@ -55,7 +67,7 @@ Twelve, flippable per person on top of the role default
 
 | Capability | Owner | Manager | Inspector | Staff | Agent |
 |---|:--:|:--:|:--:|:--:|:--:|
-| `publish` — publish a report to the client | ✅ | ✅ | ✅ | ✅ | ❌ |
+| `publish` — publish a report to the client | ✅ | ✅ | ✅ | ❌ (fixed) | ❌ |
 | `scheduleOthers` — book or reassign for other inspectors | ✅ | ✅ | ❌ | ✅ | ❌ |
 | `inspectionFees` — the money on one inspection: price, deposit, service lines, cancellation fee | ✅ | ✅ | ✅ | ✅ | ❌ |
 | `companyFinance` — company-wide money: invoices and payments, price lists and pay rules, earnings, Stripe, QuickBooks, fee policies | ✅ | ✅ | ❌ | ❌ | ❌ |
@@ -72,7 +84,7 @@ Twelve, flippable per person on top of the role default
 that refuses every write to a report-authoring route, the live collaborative
 editor and the offline package import without the capability. Reading the same
 data, publishing and sending are not affected, so a staff member can still open
-a report to publish or send it. A spec fails when a mutating route under an
+a report to send it. A spec fails when a mutating route under an
 inspection is neither guarded nor listed as not report content. Withdrawing the
 capability does not close a collaborative-editing socket that is already open.
 
@@ -83,12 +95,20 @@ review, the property-facts card (`PATCH` and the autofill `POST`; the `GET` stay
 and approving concierge suggestions. Staff, and an inspector whose `editReports` was
 withdrawn, are refused all of these.
 
-What staff can still do today on the order side, because those routes are not report
-content and are gated by role (staff are evaluated at the inspector tier) rather than by
-`editReports`: for example confirming an inspection, agreement requests and client
-documents. Publishing, sending and
-requesting payment (below) remain open to staff. Narrowing the order-side routes is a
-separate change; until it lands, do not describe staff as read-only on the order.
+Staff cannot publish, unpublish or return a report to draft: `publish` is pinned off
+for staff and no per-person override can turn it on (only that one switch is pinned).
+Publishing with the auto-signature stamps the inspector's stored signature only when
+the publisher is that inspector or an owner or manager, and the stored record names
+who published it and which inspector it represents. A helper, staff member or other
+inspector publishes without a stamp. Any existing staff member who could publish
+before loses that access.
+
+The AI helper routes (comment assist, auto summary, suggest comment, comment edit,
+reviews) need `editReports` on top of the role.
+
+On the order side staff can still confirm an inspection that is not completed, manage
+agreement requests and client documents, send a published report, and request payment
+(below), each subject to `scheduleOthers` or a place on the job where the route says so.
 
 Requesting payment (`POST /api/invoices/request-payment`, the hub's "Request payment"
 button) needs the `inspectionFees` capability on top of the role. Owners, managers,
@@ -137,7 +157,7 @@ invoice pages. The mechanism is the same everywhere
 
 | Capability | What it covers | Default |
 |---|---|---|
-| `inspectionFees` | The money on an inspection you can open: its price, deposit, service lines, the price list used to price a line, and the cancellation fee. | Owner, manager, inspector and staff on (staff read only: a staff member can change only the date and the inspector of an inspection); agent off |
+| `inspectionFees` | The money on an inspection you can open: its price, deposit, service lines, the price list used to price a line, and the cancellation fee. | Owner, manager, inspector and staff on (staff read prices; a staff member does not set service or re-inspection prices and does not record cash deposits); agent off |
 | `companyFinance` | Money that spans inspections or belongs to the company: invoices and payment records, writing the price list and pay rules, pay splits and the payroll export, earnings and the metrics aggregates, Stripe and QuickBooks, a contact's lifetime revenue, the cancellation and deposit policies, and the data exports. | Owner and manager on; inspector, staff and agent off |
 
 The rule of thumb: a figure on one inspection you can open is `inspectionFees`;

@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 152,
-    "dollarMethods": 578,
+    "files": 153,
+    "dollarMethods": 580,
     "apiWorker": 9
   },
   "fanOut": {
@@ -29,6 +29,10 @@
     },
     "app/lib/contact-search.server.ts": {
       "dollarMethods": 1,
+      "apiWorker": 0
+    },
+    "app/lib/create-landing.ts": {
+      "dollarMethods": 2,
       "apiWorker": 0
     },
     "app/lib/inspection-order-actions.ts": {

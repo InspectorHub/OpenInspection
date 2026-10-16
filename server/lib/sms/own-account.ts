@@ -18,7 +18,7 @@ import { getDeploymentProfile, type DeploymentProfile } from '../deployment-prof
 export function isRetiredSenderMode(env: { APP_MODE?: string | undefined; profile?: DeploymentProfile | undefined }, mode: string): boolean {
     if (mode === 'managed_shared') return true;
     if (mode !== 'platform') return false;
-    return (env.profile ?? getDeploymentProfile(env.APP_MODE === undefined ? {} : { APP_MODE: env.APP_MODE })).hasManagedCompliance;
+    return (env.profile ?? getDeploymentProfile(env)).hasManagedCompliance;
 }
 
 /**
