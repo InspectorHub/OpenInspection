@@ -13,7 +13,9 @@ describe("CAP_LABELS — the advanced-permission toggles", () => {
         expect(Object.keys(CAP_LABELS).sort()).toEqual([...TOGGLEABLE].sort());
         expect(CAP_LABELS.publish).toBe("Publish reports");
         expect(CAP_LABELS.scheduleOthers).toBe("Schedule for others");
-        expect(CAP_LABELS.financial).toBe("Financial data");
+        expect(CAP_LABELS.inspectionFees).toBe("Inspection fees");
+        expect(CAP_LABELS.companyFinance).toBe("Company finances");
+        expect(CAP_LABELS).not.toHaveProperty("financial");
         expect(CAP_LABELS.manageContacts).toBe("Manage contacts");
         expect(CAP_LABELS.viewCommunication).toBe("View sent messages & notices");
         expect(CAP_LABELS.templateCreate).toBe("Create templates");
@@ -42,10 +44,10 @@ describe("CAP_GROUPS — the grouping both drawers render", () => {
 });
 
 describe("the disclosure initial state reflects the role template", () => {
-    it("inspector defaults: publish, comms and template authoring on; the rest off", () => {
+    it("inspector defaults: publish, inspection fees, comms and template authoring on; the rest off", () => {
         const caps = getCapabilities("inspector", null);
         expect(caps).toEqual({
-            publish: true, scheduleOthers: false, financial: false, manageContacts: false, viewCommunication: true,
+            publish: true, scheduleOthers: false, inspectionFees: true, companyFinance: false, manageContacts: false, viewCommunication: true,
             // An inspector authors the templates they inspect against, so
             // create/edit/import stay on. Only DELETE is off: its repair cost
             // is rebuild-from-scratch rather than change-it-back (#307).
@@ -57,7 +59,7 @@ describe("the disclosure initial state reflects the role template", () => {
     it("manager defaults: every capability on", () => {
         const caps = getCapabilities("manager", null);
         expect(caps).toEqual({
-            publish: true, scheduleOthers: true, financial: true, manageContacts: true, viewCommunication: true,
+            publish: true, scheduleOthers: true, inspectionFees: true, companyFinance: true, manageContacts: true, viewCommunication: true,
             templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true, deleteInspection: true,
         });
     });
@@ -80,5 +82,20 @@ describe("computeOverrideDiff — only differing toggles are sent", () => {
         const role = "manager" as const;
         const caps = { ...getCapabilities(role, null), manageContacts: false };
         expect(computeOverrideDiff(role, caps)).toEqual({ manageContacts: false });
+    });
+});
+
+describe("computeOverrideDiff never emits the retired financial key", () => {
+    it("a manager with company finances switched off yields only the new key", () => {
+        const caps = { ...getCapabilities("manager", null), companyFinance: false };
+        const diff = computeOverrideDiff("manager", caps);
+        expect(diff).toEqual({ companyFinance: false });
+        expect(diff).not.toHaveProperty("financial");
+    });
+    it("an inspector granted both money capabilities yields only the new keys", () => {
+        const caps = { ...getCapabilities("inspector", null), companyFinance: true };
+        const diff = computeOverrideDiff("inspector", caps);
+        expect(diff).toEqual({ companyFinance: true });
+        expect(Object.keys(diff)).not.toContain("financial");
     });
 });

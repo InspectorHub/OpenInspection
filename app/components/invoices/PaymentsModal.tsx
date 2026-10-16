@@ -10,7 +10,7 @@ import { m } from "~/paraglide/messages";
  * The staff payment surface for one invoice.
  *
  * Deliberately the STAFF list, not the client portal or checkout. Recording
- * money is capability-gated on `financial` and attributed to the acting user;
+ * money is capability-gated on `companyFinance` and attributed to the acting user;
  * the client-facing surfaces have no such actor and must never offer the form.
  * Those two also deliberately quote the full invoice total, which is a settled
  * payment-collection decision this surface does not touch.

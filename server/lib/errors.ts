@@ -1,5 +1,6 @@
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { AiRefusalReason } from './ai/refusal-reason';
+import type { MoneyBucket } from './auth/money-redaction';
 
 /**
  * Standard error codes for consistent API responses.
@@ -94,7 +95,8 @@ export enum ErrorCode {
     // `details.openInspections` carries the count so a UI can prompt.
     MEMBER_HAS_OPEN_INSPECTIONS = 'MEMBER_HAS_OPEN_INSPECTIONS',
     // A write would set or change a money field and the caller lacks the
-    // `financial` capability. `details.field` names the first field refused.
+    // capability that governs it. `details.field` names the first field refused and
+    // `details.capability` the capability it needs (`inspectionFees` or `companyFinance`).
     FINANCIAL_REQUIRED = 'FINANCIAL_REQUIRED',
 }
 
@@ -121,8 +123,8 @@ export const Errors = {
     BadRequest: (msg: string, details?: unknown) => new AppError(400, ErrorCode.BAD_REQUEST, msg, details),
     Unauthorized: (msg: string = 'Unauthorized access') => new AppError(401, ErrorCode.UNAUTHORIZED, msg),
     Forbidden: (msg: string = 'Action forbidden') => new AppError(403, ErrorCode.FORBIDDEN, msg),
-    FinancialRequired: (field: string) =>
-        new AppError(403, ErrorCode.FINANCIAL_REQUIRED, `Changing '${field}' requires the 'financial' capability`, { field }),
+    FinancialRequired: (field: string, capability: MoneyBucket) =>
+        new AppError(403, ErrorCode.FINANCIAL_REQUIRED, `Changing '${field}' requires the '${capability}' capability`, { field, capability }),
     NotFound: (msg: string = 'Resource not found') => new AppError(404, ErrorCode.NOT_FOUND, msg),
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
     Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),

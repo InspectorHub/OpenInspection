@@ -11147,7 +11147,7 @@
       "body": null
     },
     "summary": "List pay splits for one inspection",
-    "description": "Returns what each inspector is owed on the active billing lines of one inspection. A caller with the financial capability receives every row and may edit them; a caller without it receives only their own rows, read-only, and a colleague's amount is absent from the payload rather than hidden in it."
+    "description": "Returns what each inspector is owed on the active billing lines of one inspection. A caller with the company-finance capability receives every row and may edit them; a caller without it receives only their own rows, read-only, and a colleague's amount is absent from the payload rather than hidden in it."
   },
   {
     "operationId": "listInspectionPdf",
@@ -11963,7 +11963,7 @@
       "body": null
     },
     "summary": "List invoices for current tenant",
-    "description": "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the financial capability and the owner, manager or inspector role. Not paged."
+    "description": "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the company-finance capability and the owner, manager or inspector role. Not paged."
   },
   {
     "operationId": "listMarketplaceImportsHistory",
@@ -12245,7 +12245,7 @@
       "body": null
     },
     "summary": "List metrics for current tenant",
-    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the financial capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
+    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the company-finance capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
   },
   {
     "operationId": "listNotifications",
@@ -12534,7 +12534,7 @@
       "body": null
     },
     "summary": "List services for current tenant",
-    "description": "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the financial capability. Owner, manager or inspector."
+    "description": "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the inspection-fees capability. Owner, manager or inspector."
   },
   {
     "operationId": "listSlugCheckSlug",

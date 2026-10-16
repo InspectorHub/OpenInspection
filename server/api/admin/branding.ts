@@ -175,8 +175,8 @@ const adminBrandingRoutes = createApiRouter()
         };
 
         // The two money policies are the only amounts on this record. Omitted, not
-        // zeroed, for a caller without `financial` (see lib/auth/money-redaction).
-        if (!(await capabilitiesFor(c)).financial) {
+        // zeroed, for a caller without `companyFinance` (see lib/auth/money-redaction).
+        if (!(await capabilitiesFor(c)).companyFinance) {
             delete (formattedBranding as { cancellationPolicy?: unknown }).cancellationPolicy;
             delete (formattedBranding as { depositPolicy?: unknown }).depositPolicy;
         }
@@ -185,7 +185,7 @@ const adminBrandingRoutes = createApiRouter()
     .openapi(updateBrandingRoute, async (c) => {
         const brandingService = c.var.services.branding;
         const tenantId = c.get('tenantId');
-        // Only a CHANGE to a money policy needs `financial`; the form resends the whole record.
+        // Only a CHANGE to a money policy needs `companyFinance`; the form resends the whole record.
         const body = await guardMoneyWrite(
             c, c.req.valid('json'),
             await brandingService.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>,

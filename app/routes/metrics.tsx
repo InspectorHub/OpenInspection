@@ -17,7 +17,7 @@ export function meta() {
 
 interface MetricsData {
   totalInspections: number;
-  // Null, not zero, for a reader without the `financial` capability: zero would
+  // Null, not zero, for a reader without the `companyFinance` capability: zero would
   // be a claim about the business. `scope: 'self'` says why they are null.
   totalRevenue: number | null;
   avgOrderValue: number | null;
@@ -131,7 +131,7 @@ export default function MetricsPage() {
     { label: m.metrics_kpi_aov(), value: fmtOrDash(data?.avgOrderValue) },
   ];
 
-  // A reader without the `financial` capability gets their own row and nothing
+  // A reader without the `companyFinance` capability gets their own row and nothing
   // else. Rendering the company cards as a wall of dashes would be worse than
   // not rendering them: it advertises figures they cannot have.
   const companyView = data?.scope !== "self";

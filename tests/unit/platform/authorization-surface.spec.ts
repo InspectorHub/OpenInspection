@@ -5,7 +5,7 @@
  * require-capability.spec.ts proves the MIDDLEWARE decides correctly against a
  * synthetic app; it can never prove a real route wears it — a route missing its
  * guard still returns 200, just with more in it. Enumerating "which routes must
- * wear `financial`" per capability does not scale; inverting it does: every
+ * wear `companyFinance`" per capability does not scale; inverting it does: every
  * route that DECLARES a capability (x-capability metadata) must MOUNT
  * requireCapability for it, and every route that mounts the guard must declare
  * it. The declared side is greppable documentation; this gate keeps the two
@@ -59,8 +59,8 @@ function mountedGuards(): Map<string, string> {
  * hand-rolled, so its guard cannot be declared as `x-capability`.
  */
 const HAND_ROLLED_MOUNTS: Record<string, string> = {
-    'ALL /api/integrations/qbo/*': 'financial',
-    'GET /api/integrations/qbo/connect': 'financial',
+    'ALL /api/integrations/qbo/*': 'companyFinance',
+    'GET /api/integrations/qbo/connect': 'companyFinance',
 };
 
 describe('authorization surface', { timeout: 30_000 }, () => {

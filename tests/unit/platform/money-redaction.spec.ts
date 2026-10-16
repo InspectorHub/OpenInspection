@@ -1,14 +1,14 @@
 /**
- * IA-95 — the `financial` capability was enforced correctly but worn by only
+ * IA-95 — the money capability was enforced correctly but worn by only
  * one of three money-bearing endpoints, and the default inspector has
- * `financial: false`. These pin the single redactor that now covers all of
+ * no finance capability. These pin the single redactor that now covers all of
  * them, including the cases a naive deep-clone gets wrong.
  */
 import { describe, it, expect } from 'vitest';
 import { redactMoney, isMoneyField } from '../../../server/lib/auth/money-redaction';
 
-const CAN = { financial: true };
-const CANNOT = { financial: false };
+const CAN = { inspectionFees: true, companyFinance: true };
+const CANNOT = { inspectionFees: false, companyFinance: false };
 
 describe('isMoneyField — the schema rules\' naming convention', () => {
     it('matches the `_cents` convention and the legacy `price` column', () => {
@@ -25,9 +25,9 @@ describe('isMoneyField — the schema rules\' naming convention', () => {
 });
 
 describe('redactMoney', () => {
-    it('returns the payload untouched when financial is granted', () => {
+    it('returns the payload untouched when the bucket is granted', () => {
         const hub = { inspection: { price: 45000 }, invoice: { amountCents: 45000 } };
-        expect(redactMoney(hub, CAN)).toBe(hub); // identity — permitted path costs nothing
+        expect(redactMoney(hub, CAN, 'inspectionFees')).toBe(hub); // identity — permitted path costs nothing
     });
 
     it('drops money at every depth for the hub payload shape', () => {
@@ -38,7 +38,7 @@ describe('redactMoney', () => {
             ],
             invoice: { id: 'inv1', status: 'sent', amountCents: 45000 },
         };
-        const out = redactMoney(hub, CANNOT) as typeof hub;
+        const out = redactMoney(hub, CANNOT, 'inspectionFees') as typeof hub;
 
         expect(out.inspection).not.toHaveProperty('price');
         expect(out.services[0]).not.toHaveProperty('priceCents');
@@ -51,13 +51,13 @@ describe('redactMoney', () => {
     });
 
     it('deletes the key rather than zeroing it — a 0 is a lie an operator could act on', () => {
-        const out = redactMoney({ amountCents: 45000 }, CANNOT);
+        const out = redactMoney({ amountCents: 45000 }, CANNOT, 'inspectionFees');
         expect(Object.prototype.hasOwnProperty.call(out, 'amountCents')).toBe(false);
         expect((out as { amountCents?: number }).amountCents).toBeUndefined();
     });
 
     it('drops money inside arrays of arrays', () => {
-        const out = redactMoney({ groups: [[{ priceCents: 1, name: 'a' }]] }, CANNOT) as
+        const out = redactMoney({ groups: [[{ priceCents: 1, name: 'a' }]] }, CANNOT, 'inspectionFees') as
             { groups: Array<Array<{ name: string }>> };
         expect(out.groups[0][0]).not.toHaveProperty('priceCents');
         expect(out.groups[0][0].name).toBe('a');
@@ -65,14 +65,27 @@ describe('redactMoney', () => {
 
     it('preserves Date instances — a naive object spread flattens them to {}', () => {
         const when = new Date('2026-07-28T00:00:00.000Z');
-        const out = redactMoney({ createdAt: when, priceCents: 1 }, CANNOT) as { createdAt: Date };
+        const out = redactMoney({ createdAt: when, priceCents: 1 }, CANNOT, 'inspectionFees') as { createdAt: Date };
         expect(out.createdAt).toBeInstanceOf(Date);
         expect(out.createdAt.getTime()).toBe(when.getTime());
     });
 
     it('leaves null and primitives alone', () => {
-        expect(redactMoney(null, CANNOT)).toBeNull();
-        expect(redactMoney({ a: null, b: 0, c: false, priceCents: 9 }, CANNOT))
+        expect(redactMoney(null, CANNOT, 'inspectionFees')).toBeNull();
+        expect(redactMoney({ a: null, b: 0, c: false, priceCents: 9 }, CANNOT, 'inspectionFees'))
             .toEqual({ a: null, b: 0, c: false });
+    });
+});
+
+describe('redactMoney by bucket', () => {
+    const feesOnly = { inspectionFees: true, companyFinance: false };
+    const financeOnly = { inspectionFees: false, companyFinance: true };
+    const payload = { price: 45000, name: 'x' };
+
+    it('drops money for a bucket the caller lacks and keeps it for one they hold', () => {
+        expect(redactMoney(payload, feesOnly, 'companyFinance')).toEqual({ name: 'x' });
+        expect(redactMoney(payload, feesOnly, 'inspectionFees')).toBe(payload);
+        expect(redactMoney(payload, financeOnly, 'inspectionFees')).toEqual({ name: 'x' });
+        expect(redactMoney(payload, financeOnly, 'companyFinance')).toBe(payload);
     });
 });

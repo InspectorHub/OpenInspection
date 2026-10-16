@@ -4,7 +4,7 @@
  * These go through `app.request` rather than calling the service, because the
  * thing being pinned is not a function's return value — it is what a REQUEST
  * receives. The rule ("an inspector sees their own pay and nobody else's") is a
- * third state that no boolean permission can express: `financial: false` AND
+ * third state that no boolean permission can express: `companyFinance: false` AND
  * `subject = self`. It is implemented as QUERY SCOPING inside the handler, so a
  * test that bypassed the route would prove nothing at all.
  *
@@ -190,16 +190,23 @@ describe('GET /api/inspections/:id/pay-splits — who sees whose pay', () => {
         expect(body.data.canEdit).toBe(true);
     });
 
-    it('the line is the CAPABILITY, not the role — an inspector granted financial sees everyone', async () => {
+    it('the line is the CAPABILITY, not the role — an inspector granted companyFinance sees everyone', async () => {
         // The mirror test: if this returned one row, the scoping would be
         // keyed on the role tier and the override would be decorative.
-        const res = await getSplitsAs('u1', 'inspector', { financial: true });
+        const res = await getSplitsAs('u1', 'inspector', { companyFinance: true });
         const body = await res.json() as { data: { splits: { userId: string }[] } };
         expect(body.data.splits.map(s => s.userId).sort()).toEqual(['u1', 'u2']);
     });
 
-    it('a manager whose financial override is revoked drops to their own rows', async () => {
-        const res = await getSplitsAs('u2', 'manager', { financial: false });
+    it('inspectionFees does not widen it — an inspector with fees only still sees their own rows', async () => {
+        const res = await getSplitsAs('u1', 'inspector', { inspectionFees: true, companyFinance: false });
+        const body = await res.json() as { data: { splits: { userId: string }[]; scope: string } };
+        expect(body.data.splits.map(s => s.userId)).toEqual(['u1']);
+        expect(body.data.scope).toBe('self');
+    });
+
+    it('a manager whose companyFinance override is revoked drops to their own rows', async () => {
+        const res = await getSplitsAs('u2', 'manager', { companyFinance: false });
         const body = await res.json() as { data: { splits: { userId: string }[]; scope: string } };
         expect(body.data.splits.map(s => s.userId)).toEqual(['u2']);
         expect(body.data.scope).toBe('self');
@@ -212,8 +219,8 @@ describe('writing pay — an agreement only one side can move is not an agreemen
         expect(res.status).toBe(403);
     });
 
-    it('an inspector granted financial still cannot edit — the write is role-gated too', async () => {
-        const res = await patchSplitAs('u1', 'inspector', await splitIdFor('u1'), { financial: true });
+    it('an inspector granted companyFinance still cannot edit — the write is role-gated too', async () => {
+        const res = await patchSplitAs('u1', 'inspector', await splitIdFor('u1'), { companyFinance: true });
         expect(res.status).toBe(403);
     });
 
@@ -224,8 +231,8 @@ describe('writing pay — an agreement only one side can move is not an agreemen
         expect(body.data).toMatchObject({ amountCents: 20000, source: 'manual' });
     });
 
-    it('a manager without financial cannot edit', async () => {
-        const res = await patchSplitAs('mgr', 'manager', await splitIdFor('u1'), { financial: false });
+    it('a manager without companyFinance cannot edit', async () => {
+        const res = await patchSplitAs('mgr', 'manager', await splitIdFor('u1'), { companyFinance: false });
         expect(res.status).toBe(403);
     });
 
@@ -235,13 +242,13 @@ describe('writing pay — an agreement only one side can move is not an agreemen
     });
 });
 
-describe('POST /api/team/payroll-export — locking is financial work', () => {
+describe('POST /api/team/payroll-export — locking is company finance work', () => {
     it('an inspector cannot export payroll', async () => {
         expect((await exportPayrollAs('u1', 'inspector')).status).toBe(403);
     });
 
-    it('a manager without financial cannot export payroll', async () => {
-        expect((await exportPayrollAs('mgr', 'manager', { financial: false })).status).toBe(403);
+    it('a manager without companyFinance cannot export payroll', async () => {
+        expect((await exportPayrollAs('mgr', 'manager', { companyFinance: false })).status).toBe(403);
     });
 
     it('a manager exports and the rows come back locked', async () => {

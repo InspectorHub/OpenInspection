@@ -653,13 +653,13 @@ const adminSettingsRoutes = createApiRouter()
     .openapi(listEventTypesRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const data = await c.var.services.event.listEventTypes(tenantId);
-        return c.json({ success: true as const, data: await moneyView(c, data) }, 200);
+        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
     })
     .openapi(createEventTypeRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = await guardMoneyWrite(c, c.req.valid('json'), null);
         const data = await c.var.services.event.createEventType(tenantId, body);
-        return c.json({ success: true as const, data: await moneyView(c, data) }, 200);
+        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
     })
     .openapi(updateEventTypeRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -669,7 +669,7 @@ const adminSettingsRoutes = createApiRouter()
         await c.var.services.event.updateEventType(tenantId, id, body);
         const fresh = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id);
         if (!fresh) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Event type not found' } }, 404);
-        return c.json({ success: true as const, data: await moneyView(c, fresh) }, 200);
+        return c.json({ success: true as const, data: await moneyView(c, fresh, 'inspectionFees') }, 200);
     })
     .openapi(deleteEventTypeRoute, async (c) => {
         const tenantId = c.get('tenantId');

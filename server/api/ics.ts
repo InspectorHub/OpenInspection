@@ -140,7 +140,7 @@ icsRoutes.get('/:token', async (c) => {
         `DTSTART:${fmtDT(r.date)}`,
         `DTEND:${fmtDTEnd(r.date)}`,
         // No fee: this feed is one URL for the whole company and cannot tell who is
-        // reading it, so it carries nothing the `financial` capability would hide.
+        // reading it, so it carries nothing the money capabilities would hide.
         `DESCRIPTION:Client: ${escICS(primaryClientName ?? '')}`,
         `URL:${baseUrl}/inspections/${r.id}/edit`,
         'END:VEVENT',

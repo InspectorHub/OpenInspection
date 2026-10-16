@@ -250,7 +250,7 @@ const bulkRoutes = createApiRouter()
                 recentReports:  toWireDates(buckets.recentReports),
                 cancelled:      toWireDates(buckets.cancelled),
                 conciergePending,
-            }),
+            }, 'inspectionFees'),
         });
     })
     .openapi(listInspectionsRoute, async (c) => {

@@ -3,19 +3,19 @@
 //
 // THE VISIBILITY RULE IS QUERY SCOPING, NOT A CAPABILITY. Spectora's shipped
 // behaviour is "an inspector sees their own pay split on every inspection and
-// cannot see or edit anyone else's"; that is a THIRD state — `financial: false`
+// cannot see or edit anyone else's"; that is a THIRD state — `companyFinance: false`
 // AND `subject = self` — and no boolean permission flag can express it. Housecall
 // Pro and Jobber both fail to offer it for exactly that reason: their pay
 // permissions are binary, so "see your own" has nowhere to live. Ours would be
 // binary too if this were a capability, so the GET is gated on ROLE and the ROWS
 // are filtered:
 //
-//   financial: true  (owner/manager) → every split on the inspection, editable
-//   financial: false (inspector)     → only rows where user_id = the caller, read-only
+//   companyFinance: true  (owner/manager) → every split on the inspection, editable
+//   companyFinance: false (inspector) → only rows where user_id = the caller, read-only
 //
 // Deliberately NOT routed through `server/lib/auth/money-redaction.ts`. That
 // redactor exists to stop an endpoint leaking the COMPANY's money to someone
-// without `financial`; an endpoint that structurally returns only the caller's
+// without `companyFinance`; an endpoint that structurally returns only the caller's
 // own row is not leaking, so there is nothing to exempt. Leaving the single
 // shared redactor untouched is worth more than the convenience of reusing it.
 //
@@ -23,7 +23,7 @@
 // company-side figure ("attributed revenue") is a metrics concern and never
 // appears here. Never "cost": the inspector reads this payload.
 //
-// Every write is `requireCapability('financial')` on top of the role gate. An
+// Every write is `requireCapability('companyFinance')` on top of the role gate. An
 // inspector's own row is read-only to them, which is the competitor's rule and
 // also the only defensible one — a wage nobody but its recipient can change is
 // not an agreement.
@@ -96,27 +96,27 @@ const listPaySplitsRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: PaySplitListResponseSchema } }, description: 'Pay rows the caller is allowed to see' },
     },
     operationId: 'listInspectionPaySplits',
-    description: 'Returns what each inspector is owed on the active billing lines of one inspection. A caller with the financial capability receives every row and may edit them; a caller without it receives only their own rows, read-only, and a colleague\'s amount is absent from the payload rather than hidden in it.',
+    description: 'Returns what each inspector is owed on the active billing lines of one inspection. A caller with the company-finance capability receives every row and may edit them; a caller without it receives only their own rows, read-only, and a colleague\'s amount is absent from the payload rather than hidden in it.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const previewRefreshRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/pay-splits/refresh-preview',
     tags: ['inspections'],
     summary: 'Preview what refreshing pay would change',
-    middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
     request: { params: IdParam },
     responses: {
         200: { content: { 'application/json': { schema: RefreshPreviewResponseSchema } }, description: 'The moves a refresh would make' },
     },
     operationId: 'previewInspectionPaySplitRefresh',
     description: 'Shows which pay rows the current tenant rules and roster would move, and to what, WITHOUT moving them. Re-deriving amounts silently is how somebody\'s pay changes with nobody deciding it should, so the preview exists to make the decision explicit before the write.',
-}, { scopes: ['read'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['read'], tier: 'extended', capability: 'companyFinance' }));
 
 const setPaySplitRoute = createRoute(withMcpMetadata({
     method: 'patch', path: '/{id}/pay-splits/{splitId}',
     tags: ['inspections'],
     summary: 'Set an agreed pay amount by hand',
-    middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
     request: {
         params: SplitParam,
         body: { content: { 'application/json': { schema: SetPaySplitSchema } } },
@@ -129,13 +129,13 @@ const setPaySplitRoute = createRoute(withMcpMetadata({
     },
     operationId: 'setInspectionPaySplit',
     description: 'Overrides the pay owed to one inspector on one billing line and marks the row manual, which exempts it from any later refresh. Refuses once a payroll export has locked the row, because editing money that has already moved desynchronises the books with nothing surfacing the divergence.',
-}, { scopes: ['write'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 const refreshPaySplitsRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/pay-splits/refresh',
     tags: ['inspections'],
     summary: 'Re-derive rule-sourced pay for this inspection',
-    middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
     request: { params: IdParam },
     responses: {
         200: { content: { 'application/json': { schema: RefreshResultResponseSchema } }, description: 'Rule-sourced rows re-derived' },
@@ -143,13 +143,13 @@ const refreshPaySplitsRoute = createRoute(withMcpMetadata({
     },
     operationId: 'refreshInspectionPaySplits',
     description: 'Re-derives the rule-sourced pay rows from the tenant rules and roster as they stand now, leaving hand-edited and corrected rows alone. This is the only path that moves an amount that already exists, and it is deliberately an explicit act rather than something a read performs.',
-}, { scopes: ['write'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 const correctPaySplitRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/pay-splits/{splitId}/corrections',
     tags: ['inspections'],
     summary: 'Record a correction against exported pay',
-    middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
     request: {
         params: SplitParam,
         body: { content: { 'application/json': { schema: CorrectPaySplitSchema } } },
@@ -161,7 +161,7 @@ const correctPaySplitRoute = createRoute(withMcpMetadata({
     },
     operationId: 'correctInspectionPaySplit',
     description: 'Adjusts an already-exported pay row by writing a NEW row carrying the delta, leaving the original untouched so both what was paid and what was owed stay answerable. An in-place edit after payroll has run destroys that, which is why this is a separate verb.',
-}, { scopes: ['write'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 const paySplitRoutes = createApiRouter()
     .openapi(listPaySplitsRoute, async (c) => {
@@ -170,12 +170,12 @@ const paySplitRoutes = createApiRouter()
         const caps = await capabilitiesFor(c);
         const rows = await getSplitsForInspection(getDrizzle(c), tenantId, id);
         const self = c.get('user')?.sub ?? '';
-        const visible = caps.financial ? rows : rows.filter(s => s.userId === self);
+        const visible = caps.companyFinance ? rows : rows.filter(s => s.userId === self);
         return c.json({
             success: true,
             data: {
-                canEdit: caps.financial,
-                scope: caps.financial ? ('all' as const) : ('self' as const),
+                canEdit: caps.companyFinance,
+                scope: caps.companyFinance ? ('all' as const) : ('self' as const),
                 splits: visible.map(toWire),
             },
         });

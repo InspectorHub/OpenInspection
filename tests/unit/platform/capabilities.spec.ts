@@ -2,21 +2,21 @@ import { describe, it, expect } from 'vitest';
 import { getCapabilities, TOGGLEABLE } from '../../../server/lib/auth/capabilities';
 
 describe('getCapabilities', () => {
-  it('inspector defaults: publish on, schedule self, no financial, no contacts', () => {
-    expect(getCapabilities('inspector', null)).toMatchObject({ publish: true, scheduleOthers: false, financial: false, manageContacts: false });
+  it('inspector defaults: publish on, schedule self, no company finance, no contacts', () => {
+    expect(getCapabilities('inspector', null)).toMatchObject({ publish: true, scheduleOthers: false, companyFinance: false, manageContacts: false });
   });
   it('manager defaults: all four on', () => {
-    expect(getCapabilities('manager', null)).toMatchObject({ publish: true, scheduleOthers: true, financial: true, manageContacts: true });
+    expect(getCapabilities('manager', null)).toMatchObject({ publish: true, scheduleOthers: true, companyFinance: true, manageContacts: true });
   });
   it('overrides win over role defaults', () => {
-    const c = getCapabilities('inspector', { financial: true, publish: false });
-    expect(c.financial).toBe(true); expect(c.publish).toBe(false);
+    const c = getCapabilities('inspector', { companyFinance: true, publish: false });
+    expect(c.companyFinance).toBe(true); expect(c.publish).toBe(false);
   });
   it('owner is always fully capable, ignoring reducing overrides', () => {
-    expect(getCapabilities('owner', { financial: false }).financial).toBe(true);
+    expect(getCapabilities('owner', { companyFinance: false }).companyFinance).toBe(true);
   });
   it('agent has none of the staff capabilities', () => {
-    expect(getCapabilities('agent', null)).toMatchObject({ publish: false, scheduleOthers: false, financial: false, manageContacts: false });
+    expect(getCapabilities('agent', null)).toMatchObject({ publish: false, scheduleOthers: false, companyFinance: false, manageContacts: false });
   });
 });
 
@@ -57,7 +57,7 @@ describe('viewCommunication', () => {
  *
  * Agent matters most. An outside referral agent holds a real login to the
  * workspace, and this ceiling is the only thing standing between an
- * over-generous override row and a stranger with the `financial` bit.
+ * over-generous override row and a stranger with a finance bit.
  */
 describe('the pinned columns hold for every capability', () => {
     // A run that iterated nothing must not read as a pass. If TOGGLEABLE were
@@ -115,5 +115,27 @@ describe('deleteInspection', () => {
     expect(getCapabilities('inspector', { deleteInspection: false }).deleteInspection).toBe(false);
     expect(getCapabilities('agent', { deleteInspection: true }).deleteInspection).toBe(false);
     expect(getCapabilities('owner', { deleteInspection: false }).deleteInspection).toBe(true);
+  });
+});
+
+describe('inspectionFees and companyFinance', () => {
+  it('defaults: owner and manager have both, inspector has fees only, agent has neither', () => {
+    for (const r of ['owner', 'manager'] as const) {
+      expect(getCapabilities(r, null)).toMatchObject({ inspectionFees: true, companyFinance: true });
+    }
+    expect(getCapabilities('inspector', null)).toMatchObject({ inspectionFees: true, companyFinance: false });
+    expect(getCapabilities('agent', null)).toMatchObject({ inspectionFees: false, companyFinance: false });
+  });
+  it('overrides move each one independently', () => {
+    const c = getCapabilities('inspector', { inspectionFees: false, companyFinance: true });
+    expect(c.inspectionFees).toBe(false);
+    expect(c.companyFinance).toBe(true);
+  });
+  it('owner is never reduced and agent is never elevated, for both', () => {
+    expect(getCapabilities('owner', { inspectionFees: false, companyFinance: false })).toMatchObject({ inspectionFees: true, companyFinance: true });
+    expect(getCapabilities('agent', { inspectionFees: true, companyFinance: true })).toMatchObject({ inspectionFees: false, companyFinance: false });
+  });
+  it('there is no `financial` capability any more', () => {
+    expect(TOGGLEABLE).not.toContain('financial' as never);
   });
 });

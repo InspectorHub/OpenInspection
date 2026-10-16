@@ -21,7 +21,7 @@
  *   submit should never sit disabled with no explanation.
  *
  * `undefined` is deliberately NOT folded in with `0`: it means the viewer lacks
- * the `financial` capability and the amount is redacted, which is a permission
+ * the `companyFinance` capability and the amount is redacted, which is a permission
  * question this change has no business answering.
  */
 import { describe, it, expect } from "vitest";

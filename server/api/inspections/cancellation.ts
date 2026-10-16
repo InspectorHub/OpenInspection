@@ -37,16 +37,16 @@ const CancellationQuoteSchema = z.object({
     policyConfigured: z.boolean().describe('False when the workspace has configured no ladder; nothing is ever charged.'),
 }).openapi('CancellationQuote');
 
-// What a caller WITHOUT the financial capability gets from the quote: no figure
+// What a caller WITHOUT the inspection-fees capability gets from the quote: no figure
 // at all. `moneyInvolved` is a yes/no, not an amount - it lets the dialog offer
 // a plain cancellation when nothing was collected or charged, and say who may
 // cancel when something was.
 const RestrictedQuoteSchema = z.object({
-    requiresFinancial: z.literal(true).describe('The caller lacks the financial capability, so no amount is returned.'),
+    requiresFinancial: z.literal(true).describe('The caller lacks the inspection-fees capability, so no amount is returned.'),
     moneyInvolved: z.boolean().describe('True when a fee, a refund or a collected payment is attached to this cancellation.'),
 }).openapi('CancellationQuoteRestricted');
 
-// The cancel answer as a caller without the financial capability receives it:
+// The cancel answer as a caller without the inspection-fees capability receives it:
 // the same outcome with every amount absent.
 const CancellationOutcomeSchema = CancellationQuoteSchema.partial({
     feeCents: true, refundCents: true, priceCents: true, paidCents: true, retainedProcessingFeeCents: true,
@@ -70,7 +70,7 @@ const quoteRoute = createRoute(withMcpMetadata({
                 success: z.literal(true),
                 data: z.union([CancellationQuoteSchema, RestrictedQuoteSchema]),
             }) } },
-            description: 'The computed outcome, or only requiresFinancial and moneyInvolved for a caller without the financial capability. Read-only — nothing is cancelled and no money moves.',
+            description: 'The computed outcome, or only requiresFinancial and moneyInvolved for a caller without the inspection-fees capability. Read-only — nothing is cancelled and no money moves.',
         },
     },
     operationId: 'getCancellationQuote',
@@ -158,7 +158,7 @@ const cancellationRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const { reason } = c.req.valid('query');
         const quote = await quoteCancellation(getDrizzle(c), tenantId, id, reason);
-        if (!(await capabilitiesFor(c)).financial) {
+        if (!(await capabilitiesFor(c)).inspectionFees) {
             return c.json({ success: true as const, data: { requiresFinancial: true as const, moneyInvolved: involvesMoney(quote) } }, 200);
         }
         return c.json({ success: true as const, data: flatten(quote) }, 200);
@@ -176,8 +176,8 @@ const cancellationRoutes = createApiRouter()
 
         // Committing a fee or a refund is a money decision. The refusal carries no
         // figure, and it comes before the fee confirmation, which would show one.
-        if (involvesMoney(quote) && !(await capabilitiesFor(c)).financial) {
-            throw Errors.FinancialRequired('cancellation');
+        if (involvesMoney(quote) && !(await capabilitiesFor(c)).inspectionFees) {
+            throw Errors.FinancialRequired('cancellation', 'inspectionFees');
         }
 
         // A cancellation that silently charges 50% is a chargeback. Making the
@@ -251,7 +251,7 @@ const cancellationRoutes = createApiRouter()
 
         return c.json({
             success: true as const,
-            data: await moneyView(c, { outcome: flatten(quote), refundPaymentId: refund?.row.id ?? null }),
+            data: await moneyView(c, { outcome: flatten(quote), refundPaymentId: refund?.row.id ?? null }, 'inspectionFees'),
         }, 200);
     })
     .openapi(uncancelRoute, async (c) => {

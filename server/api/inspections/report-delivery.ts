@@ -522,12 +522,11 @@ const reportDeliveryRoutes = createApiRouter()
             }
         }
         const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl } : null };
-        // IA-95 — an inspector may see the inspection but not its money, and
-        // `financial` is false by default for that role. The gate on
-        // `GET /api/invoices` never covered this aggregate, so the same figures
-        // came out here unguarded. Project rather than refuse: the rest of the
-        // payload is legitimately theirs.
-        return c.json({ success: true, data: redactMoney(hub, await capabilitiesFor(c)) }, 200);
+        // IA-95 — two kinds of money in one aggregate, projected field by field: this
+        // inspection's price lines (`inspectionFees`) and the invoice block (`companyFinance`).
+        const caps = await capabilitiesFor(c);
+        const { invoice, ...rest } = hub;
+        return c.json({ success: true, data: { ...redactMoney(rest, caps, 'inspectionFees'), invoice: redactMoney(invoice, caps, 'companyFinance') } }, 200);
     })
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/agent-token',

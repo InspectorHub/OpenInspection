@@ -15,7 +15,7 @@ import type { CommunicationCounts } from '../../../server/lib/communication-coun
  *   1. the service returns the payload MINUS `invoice.payUrl`;
  *   2. the route adds `payUrl` (it needs the portal-access token issuer, which
  *      the aggregate query deliberately does not depend on) and then redacts
- *      every `*Cents` key for a caller without the financial capability;
+ *      every `*Cents` key for a caller without the companyFinance capability;
  *   3. `InspectionHubSchema` describes what actually goes on the wire.
  *
  * Nothing at runtime enforces the join between those steps: the route spreads
@@ -72,7 +72,7 @@ describe('hub invoice: the route is what adds payUrl', () => {
     /**
      * Money is `.optional()` on the wire and required off the service on
      * purpose — `redactMoney` DROPS every `*Cents` key for a caller without the
-     * financial capability, so the wire type must admit their absence while the
+     * matching money capability, so the wire type must admit their absence while the
      * service always computes them. This is not drift; asserting it keeps a
      * future reader from "fixing" it in either direction.
      */

@@ -58,10 +58,10 @@ const resolveOverridesFromDb: OverrideResolver = async (c) => {
  * this endpoint", while an endpoint that returns a MIXTURE of permitted and
  * restricted data has to decide field by field. `GET /inspections/:id/hub` is
  * exactly that — an inspector may see the inspection but not its money — so it
- * projects with `redactMoney(payload, await capabilitiesFor(c))` rather than
+ * projects with `redactMoney(payload, await capabilitiesFor(c), bucket)` rather than
  * refusing the whole request.
  *
- * Sharing one resolver is the point. `financial` was correct in the middleware
+ * Sharing one resolver is the point. The money capability was correct in the middleware
  * and still leaked, because two endpoints simply never wore it; a second,
  * hand-rolled way to compute capabilities would invite the same divergence.
  */
@@ -78,7 +78,7 @@ export async function capabilitiesFor(
  * Layer a capability check ON TOP of an existing requireRole() gate. owner/admin
  * always pass (defaults grant all four capabilities); the inspector role is the
  * only one a per-user override can restrict (publish:false) or elevate
- * (financial/scheduleOthers/manageContacts:true). agent is pinned to all-false.
+ * (companyFinance/scheduleOthers/manageContacts:true). agent is pinned to all-false.
  *
  * `resolveOverrides` is injectable purely so unit tests can supply overrides
  * deterministically without a real D1; production always uses the DB resolver.

@@ -38,14 +38,15 @@ it is not, it is just scored on the other axis.
 
 ### Staff capabilities
 
-Nine, flippable per person on top of the role default
+Eleven, flippable per person on top of the role default
 (`TOGGLEABLE` in `server/lib/auth/capabilities.ts`):
 
 | Capability | Owner | Manager | Inspector | Agent |
 |---|:--:|:--:|:--:|:--:|
 | `publish` — publish a report to the client | ✅ | ✅ | ✅ | ❌ |
 | `scheduleOthers` — book or reassign for other inspectors | ✅ | ✅ | ❌ | ❌ |
-| `financial` — pricing, invoices, payment detail | ✅ | ✅ | ❌ | ❌ |
+| `inspectionFees` — the money on one inspection: price, deposit, service lines, cancellation fee | ✅ | ✅ | ✅ | ❌ |
+| `companyFinance` — company-wide money: invoices and payments, price lists and pay rules, earnings, Stripe, QuickBooks, fee policies | ✅ | ✅ | ❌ | ❌ |
 | `manageContacts` — add/edit/delete clients and agents | ✅ | ✅ | ❌ | ❌ |
 | `viewCommunication` — see what was sent to whom | ✅ | ✅ | ✅ | ❌ |
 | `templateCreate` | ✅ | ✅ | ✅ | ❌ |
@@ -62,41 +63,68 @@ your workspace, and this is where the ceiling on that login is nailed down.
 
 ### Money visibility
 
-The `financial` capability covers every place an amount is read or written, not
-only the invoice pages. The mechanism is the same everywhere
+Two capabilities cover every place an amount is read or written, not only the
+invoice pages. The mechanism is the same everywhere
 (`server/lib/auth/money-access.ts`, `server/lib/auth/money-redaction.ts`).
 
-**Reads.** A caller without `financial` gets the same response with every money
-field **absent**: the key is deleted, never zeroed, because a zero would read as
-a true figure. A field counts as money when it is `price` or ends in `Cents`.
-This covers the inspection record, the dashboard rows, the hub, the contact
-detail (revenue and each inspection's price), inspection requests, the service
-catalogue, event types and visits, the company settings' cancellation and
-deposit policies, the full JSON export, and the inspections CSV export (the
-price column is omitted from the header and every row). The unauthenticated
+| Capability | What it covers | Default |
+|---|---|---|
+| `inspectionFees` | The money on an inspection you can open: its price, deposit, service lines, the price list used to price a line, and the cancellation fee. | Owner, manager and inspector on; agent off |
+| `companyFinance` | Money that spans inspections or belongs to the company: invoices and payment records, writing the price list and pay rules, pay splits and the payroll export, earnings and the metrics aggregates, Stripe and QuickBooks, a contact's lifetime revenue, the cancellation and deposit policies, and the data exports. | Owner and manager on; inspector and agent off |
+
+The rule of thumb: a figure on one inspection you can open is `inspectionFees`;
+anything summed across inspections, any price list or rule, the ledger, the
+accounting and payment integrations and the company's fee policies are
+`companyFinance`. Holding one never grants the other. The owner is pinned on for
+both and an agent pinned off for both.
+
+**Reads.** A caller without the capability for a field gets the same response
+with that money field **absent**: the key is deleted, never zeroed, because a
+zero would read as a true figure. A field counts as money when it is `price` or
+ends in `Cents`. A response that mixes the two kinds is projected field by field:
+the hub returns the inspection's price lines under `inspectionFees` and its
+invoice block under `companyFinance`, and a contact detail returns each
+inspection's price under `inspectionFees` and the revenue totals under
+`companyFinance`. The service catalogue is readable with `inspectionFees`, as are
+event types and their default prices, so a line or a visit can be priced; the
+company settings' cancellation and deposit policies, the full JSON export and the inspections CSV export (price column
+omitted from header and every row) need `companyFinance`. The unauthenticated
 company calendar feed carries no fee for anyone, because one URL cannot tell who
 is reading it.
 
 **Writes.** A request body that sets or changes a money field is refused with
-`403` and the code `FINANCIAL_REQUIRED`. Only a change is refused: the settings
-form forwards every field it holds, so resending the stored price is accepted.
-Creating or clearing a value counts as a change. Pricing, invoice, payout,
-pay-rule, discount-code, service-line and Stripe Connect routes require
-`financial` outright, as does every QuickBooks route.
+`403` and the code `FINANCIAL_REQUIRED`; `details.field` names the first field
+refused and `details.capability` the capability it needs (`inspectionFees` or
+`companyFinance`). The code keeps its name so clients that match on it keep
+working. Prices, deposits and per-line overrides on an inspection need
+`inspectionFees`; the catalogue price (`defaultPriceCents`) and the cancellation
+and deposit policies need `companyFinance`. A body touching both is refused for
+the capability the caller lacks. Only a change is refused: the settings form
+forwards every field it holds, so resending the stored price is accepted.
+Creating or clearing a value counts as a change. Invoice, payment, payout,
+pay-rule, price-list write, discount-code and Stripe Connect routes require
+`companyFinance` outright, as does every QuickBooks route; the service lines on
+an inspection require `inspectionFees`.
 
-**Cancelling.** A caller without `financial` can cancel an inspection that has
-no payment, fee or refund attached. When money is involved the cancel is refused
-with `FINANCIAL_REQUIRED` and the answer carries no amount; the quote endpoint
-returns only `requiresFinancial` and a yes/no `moneyInvolved`.
+**Cancelling.** A caller without `inspectionFees` can cancel an inspection that
+has no payment, fee or refund attached. When money is involved the cancel is
+refused with `FINANCIAL_REQUIRED` and the answer carries no amount; the quote
+endpoint returns only `requiresFinancial` and a yes/no `moneyInvolved`.
+
+**Overrides saved before the split.** Earlier versions stored one `financial`
+override. A stored `financial` value is read as the value of both new keys; a new
+key stored beside it wins. The old key is only ever read: the team page and
+invitations write the new keys, and no migration rewrites existing rows.
 
 **What is deliberately not hidden.** `paymentStatus` is a status, not an amount,
 and stays visible. Repair-estimate figures (cost items, repair requests) belong
 to the client's repair request rather than to company revenue and are not
 redacted. The client-facing token pages show a client their own invoice and are
 out of scope. Which endpoints carry money, and how each protects it, is
-registered in `tests/unit/platform/money-surface-registry.ts`; a spec walks the
-OpenAPI document and fails when an endpoint that can return money is missing
-from that list.
+registered in `tests/unit/platform/money-surface-registry.ts`, together with the
+capability each one needs; a spec walks the OpenAPI document and fails when an
+endpoint that can return money is missing from that list or names a capability
+its route does not wear.
 
 ### Requests without a session, and agent sessions
 
@@ -197,9 +225,9 @@ Pick a role and you are ~90% configured; the toggles cover the rest.
 |---|---|---|
 | Inspector | Inspector | — |
 | Inspector + Trainee | Inspector | Publish reports = **off** (requires senior review before delivery) |
-| Inspector + Access Financial Data | Inspector | Financial data = **on** |
+| Inspector + Access Financial Data | Inspector | Company finances = **on** |
 | Inspector + Schedule All | Inspector | Schedule for others = **on** |
-| Support Staff (with or without Admin) | Manager | Financial data = **off** if it was off in Spectora |
+| Support Staff (with or without Admin) | Manager | Company finances = **off** if it was off in Spectora |
 | Organization Manager | Owner | — |
 
 ---
@@ -208,7 +236,7 @@ Pick a role and you are ~90% configured; the toggles cover the rest.
 
 | ISN setup | OpenInspection role | Advanced toggles |
 |---|---|---|
-| Inspector | Inspector | Financial data = **on** if "view fees" was enabled in ISN |
+| Inspector | Inspector | Inspection fees = **on** (the inspector default); Company finances = **on** only if "view fees" was enabled in ISN and the person needs the company ledger |
 | Standard User / Office Administrator | Manager | Trim with the toggles as needed |
 | Account owner | Owner | — |
 

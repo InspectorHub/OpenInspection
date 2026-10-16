@@ -1,7 +1,9 @@
 /**
- * The `financial` capability over HTTP: every read that can carry money must
- * leave it out for a caller without the capability, and must still carry it for
- * a caller with it.
+ * The money capabilities over HTTP: every read that can carry money must leave
+ * it out for a caller without the capability for that kind of money, and must
+ * still carry it for a caller with it. `inspectionFees` is the money on one
+ * inspection; `companyFinance` is company-wide money. Holding the other one
+ * must not bring it back.
  *
  * The seed carries real amounts (price 45000, a deposit, a paid invoice).
  * "No money key in the body" would otherwise pass against an endpoint whose
@@ -102,32 +104,75 @@ beforeEach(async () => {
     } as never);
 });
 
-const SURFACES: Array<[string, string]> = [
+// Money on one inspection: gated by inspectionFees.
+const FEE_SURFACES: Array<[string, string]> = [
     ['GET /api/inspections/:id', '/api/inspections/i1'],
     ['GET /api/inspections/dashboard', '/api/inspections/dashboard'],
-    ['GET /api/contacts/:id', '/api/contacts/c1'],
     ['GET /api/inspection-requests/by-inspection/:id', '/api/inspection-requests/by-inspection/i1'],
 ];
 
-describe.each(SURFACES)('%s', (_name, url) => {
+describe.each(FEE_SURFACES)('%s', (_name, url) => {
     it('positive control: a manager receives money', async () => {
         const res = await get(buildApp('manager'), url);
         expect(res.status).toBe(200);
         expect(await res.text()).toMatch(MONEY_KEY);
     });
-    it('an inspector without financial gets no money key anywhere in the body', async () => {
+    it('an inspector with the default inspectionFees receives the price', async () => {
         const res = await get(buildApp('inspector'), url);
-        expect(res.status).toBe(200);
-        expect(await res.text()).not.toMatch(MONEY_KEY);
-    });
-    it('an inspector granted financial receives money', async () => {
-        const res = await get(buildApp('inspector', { financial: true }), url);
         expect(res.status).toBe(200);
         expect(await res.text()).toMatch(MONEY_KEY);
     });
-    it('a manager with financial switched off gets no money key', async () => {
-        const res = await get(buildApp('manager', { financial: false }), url);
+    it('an inspector with inspectionFees switched off gets no money key anywhere in the body', async () => {
+        const res = await get(buildApp('inspector', { inspectionFees: false }), url);
         expect(res.status).toBe(200);
+        expect(await res.text()).not.toMatch(MONEY_KEY);
+    });
+    it('companyFinance does not bring the price back', async () => {
+        const res = await get(buildApp('inspector', { inspectionFees: false, companyFinance: true }), url);
+        expect(res.status).toBe(200);
+        expect(await res.text()).not.toMatch(MONEY_KEY);
+    });
+    it('a manager with inspectionFees switched off gets no money key', async () => {
+        const res = await get(buildApp('manager', { inspectionFees: false }), url);
+        expect(res.status).toBe(200);
+        expect(await res.text()).not.toMatch(MONEY_KEY);
+    });
+});
+
+// The contact detail carries both kinds: the price on each inspection row
+// (inspectionFees) and the cumulative revenue (companyFinance, the company's books).
+describe('GET /api/contacts/:id carries both kinds of money, each behind its own capability', () => {
+    const url = '/api/contacts/c1';
+    const fetchDetail = async (app: OpenAPIHono<HonoConfig>) => {
+        const res = await get(app, url);
+        expect(res.status).toBe(200);
+        return (await res.json() as { data: { inspections: Array<Record<string, unknown>>; stats: Record<string, unknown> } }).data;
+    };
+    it('positive control: a manager receives both', async () => {
+        const d = await fetchDetail(buildApp('manager'));
+        expect(d.inspections[0]).toHaveProperty('price');
+        expect(d.stats).toHaveProperty('totalRevenueCents');
+    });
+    it('the default inspector sees the price of an inspection row but not the cumulative revenue', async () => {
+        const d = await fetchDetail(buildApp('inspector'));
+        expect(d.inspections[0]).toHaveProperty('price');
+        expect(d.stats).not.toHaveProperty('totalRevenueCents');
+        expect(d.stats).not.toHaveProperty('billedToOthersCents');
+        expect(d.stats).toHaveProperty('inspectionCount');
+    });
+    it('inspectionFees off hides the price and leaves the revenue to companyFinance', async () => {
+        const d = await fetchDetail(buildApp('manager', { inspectionFees: false }));
+        expect(d.inspections[0]).not.toHaveProperty('price');
+        expect(d.inspections[0]).toHaveProperty('id');
+        expect(d.stats).toHaveProperty('totalRevenueCents');
+    });
+    it('companyFinance off hides the revenue and leaves the price to inspectionFees', async () => {
+        const d = await fetchDetail(buildApp('manager', { companyFinance: false }));
+        expect(d.inspections[0]).toHaveProperty('price');
+        expect(d.stats).not.toHaveProperty('totalRevenueCents');
+    });
+    it('neither capability: no money key anywhere', async () => {
+        const res = await get(buildApp('manager', { inspectionFees: false, companyFinance: false }), url);
         expect(await res.text()).not.toMatch(MONEY_KEY);
     });
 });

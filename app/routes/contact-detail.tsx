@@ -44,14 +44,14 @@ interface ContactDetail {
     propertyAddress: string;
     date: string;
     status: string;
-    /** Absent when the caller lacks the `financial` capability. */
+    /** Absent when the caller lacks the matching money capability. */
     price?: number;
     paymentStatus: string;
   }>;
   stats: {
     inspectionCount: number;
     /** Paid invoices billed to THIS contact. */
-    /** Absent when the caller lacks the `financial` capability. */
+    /** Absent when the caller lacks the matching money capability. */
     totalRevenueCents?: number;
     /** Paid invoices on this contact's inspections billed to someone else. */
     billedToOthersCents?: number;

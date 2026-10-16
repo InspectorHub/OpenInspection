@@ -38,7 +38,8 @@ function capabilityToggleMap() {
 export const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
     publish:           'May publish and unpublish reports.',
     scheduleOthers:    'May schedule inspections for other inspectors.',
-    financial:         'May see money on inspections, services and invoices.',
+    inspectionFees:    'May see and set the money on an individual inspection: its price, deposit, service lines and cancellation fee.',
+    companyFinance:    'May see and manage company-wide money: invoices and payments, service prices and pay rules, pay splits, earnings, Stripe, QuickBooks and the fee policies.',
     manageContacts:    'May create, edit and archive contacts and role profiles.',
     viewCommunication: 'May read the per-inspection Outbox, including recipient addresses.',
     templateCreate:    'May create new inspection templates.',
@@ -111,7 +112,7 @@ export const InviteMemberSchema = z.object({
  */
 export const UpdateMemberSchema = z.object({
     role: z.enum(ROLES).optional().openapi({ example: 'manager' }).describe('New role for this member. Omit to leave unchanged.'),
-    permissionOverrides: capabilityToggleMap().nullable().optional().openapi({ example: { financial: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
+    permissionOverrides: capabilityToggleMap().nullable().optional().openapi({ example: { companyFinance: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
 }).openapi('UpdateMember');
 
 /**

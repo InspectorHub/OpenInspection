@@ -31,8 +31,8 @@ import teamTwoFactorRoutes from './team-two-factor';
  * for no gain. Payroll is staff administration; this is the
  * staff-administration surface.
  *
- * Gated on `financial` and not on a new `payroll` bit: the competitor evidence
- * put the line at "sees the company's money", and a second flag that nothing
+ * Gated on `companyFinance` and not on a new `payroll` bit: the line is
+ * "sees the company's money", and a second flag that nothing
  * else reads is a permission nobody would maintain.
  *
  * A NAMED const, not inlined into the chain — `check-idempotency-coverage.mjs`
@@ -47,12 +47,12 @@ const exportPayrollRoute = createRoute(withMcpMetadata({
     tags: ['team'],
     summary: 'Lock and export pay for a period',
     description: 'Locks every unlocked pay split created inside the given period and returns them as one payroll run. Locking IS the export: once money has moved an edit would desynchronise the books from what was actually paid, so a later adjustment has to be recorded as a correction row instead.',
-    middleware: [requireRole('owner', 'manager'), requireCapability('financial')] as const,
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
     request: { body: { content: { 'application/json': { schema: PayrollExportSchema } } } },
     responses: {
         200: { content: { 'application/json': { schema: PayrollRunResponseSchema } }, description: 'The pay rows this run locked' },
     },
-}, { scopes: ['admin'], tier: 'extended', capability: 'financial' }));
+}, { scopes: ['admin'], tier: 'extended', capability: 'companyFinance' }));
 
 /**
  * GET /api/team/members

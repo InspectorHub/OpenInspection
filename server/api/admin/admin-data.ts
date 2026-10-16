@@ -271,7 +271,7 @@ const adminDataRoutes = createApiRouter()
 
         auditFromContext(c, 'data.export', 'bulk_export');
         // Only inspection rows carry company money; templates are customer JSON.
-        return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data, inspections: await moneyView(c, data.inspections) } }, 200);
+        return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data, inspections: await moneyView(c, data.inspections, 'companyFinance') } }, 200);
     })
     .openapi(inviteMemberRoute, async (c) => {
         const tenantId = c.get('tenantId');

@@ -56,7 +56,7 @@ export interface NewInspectionSummary {
     client: string | null;
     agent: string | null;
     /** Null when no service was selected — an empty list and a skipped step read the same otherwise. */
-    /** `totalCents` is null when the catalogue carries no prices (the viewer lacks the financial capability). */
+    /** `totalCents` is null when the catalogue carries no prices (the viewer lacks the inspectionFees capability). */
     services: { names: string[]; totalCents: number | null } | null;
     /** Null means "whoever is creating this" — naming the caller back to themselves adds nothing. */
     assignee: string | null;

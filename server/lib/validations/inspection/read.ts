@@ -109,19 +109,19 @@ const InspectionPeopleSchema = z.object({
  * The hub's invoice block AS THE SERVICE PRODUCES IT: the ROUTE adds `payUrl` (the
  * tokenized link needs portal-access, which this aggregate deliberately does not
  * depend on) and runs `redactMoney`, which DROPS every `*Cents` key for a caller
- * without the financial capability — which is why money below is `.optional()`
+ * without the matching money capability — which is why money below is `.optional()`
  * even though the service always computes it. Neither difference is drift, and
  * splitting the schema is what makes the compiler say so.
  */
 export const HubInvoiceCoreSchema = z.object({
   id:         z.string().describe('Invoice id'),
   status:     z.string().describe('draft | sent | partial | paid'),
-  amountCents: z.number().optional().describe('Invoice total in cents. ABSENT without the financial capability.'),
+  amountCents: z.number().optional().describe('Invoice total in cents. ABSENT without the companyFinance capability.'),
   // Cumulative amount RECEIVED, not a remaining balance — the remainder is
   // derived against our own authoritative total (`amountCents`), never against
   // an external system's. Null when the invoice is partial but no figure was
   // recorded, which the UI must render as "unknown" rather than as zero.
-  amountPaidCents: z.number().nullable().optional().describe('Cumulative amount received in cents; null when unrecorded. ABSENT without the financial capability.'),
+  amountPaidCents: z.number().nullable().optional().describe('Cumulative amount received in cents; null when unrecorded. ABSENT without the companyFinance capability.'),
   currency:   z.string().optional().describe("ISO 4217 currency snapshot the invoice was created in — what its figures must be formatted in, not the viewer's default."),
   sentAt:     z.string().nullable().describe('ISO sent timestamp'),
   paidAt:     z.string().nullable().describe('ISO paid timestamp'),
@@ -166,7 +166,7 @@ export const InspectionHubSchema = z.object({
     date:              z.string().nullable().describe('Scheduled inspection date (YYYY-MM-DD)'),
     inspectorId:       z.string().nullable().describe('Assigned inspector users.id'),
     templateId:        z.string().nullable().describe('Selected template id'),
-    price:             z.number().optional().describe('Denormalized price cache in cents (authority chain tier 3). ABSENT when the caller lacks the financial capability (IA-95).'),
+    price:             z.number().optional().describe('Denormalized price cache in cents (authority chain tier 3). ABSENT when the caller lacks the inspectionFees capability (IA-95).'),
     paymentStatus:     z.string().describe('Payment status: unpaid | partial | paid'),
     paymentRequired:   z.boolean().describe('Whether report is payment-gated'),
     agreementRequired: z.boolean().describe('Whether report is agreement-gated'),
@@ -189,9 +189,9 @@ export const InspectionHubSchema = z.object({
     id:        z.string().describe('inspection_services row id'),
     serviceId: z.string().describe('Catalog service this line came from — lets a picker mark what is already booked'),
     name:      z.string().describe('Service name snapshot'),
-    priceCents: z.number().optional().describe('Effective line price (priceOverride ?? priceSnapshot). ABSENT without the financial capability.'),
-    priceSnapshot: z.number().optional().describe('Catalog price in cents when the line was added. ABSENT without the financial capability.'),
-    priceOverride: z.number().nullable().optional().describe('Per-inspection price override in cents, or null. ABSENT without the financial capability.'),
+    priceCents: z.number().optional().describe('Effective line price (priceOverride ?? priceSnapshot). ABSENT without the inspectionFees capability.'),
+    priceSnapshot: z.number().optional().describe('Catalog price in cents when the line was added. ABSENT without the inspectionFees capability.'),
+    priceOverride: z.number().nullable().optional().describe('Per-inspection price override in cents, or null. ABSENT without the inspectionFees capability.'),
   })).describe('Booked service lines'),
   agreements: z.array(z.object({
     id:   z.string().describe('Agreement template id'),

@@ -190,20 +190,20 @@ const inspectionRequestsRoutes = createApiRouter()
         // undefined. Nothing under `app/` calls this endpoint (the hono client is
         // wired in api-client.server.ts but never used), so the contract is the
         // only consumer and the handler is the side that was wrong.
-        return c.json({ success: true, data: await moneyView(c, { requests: rows, total: rows.length }) }, 200);
+        return c.json({ success: true, data: await moneyView(c, { requests: rows, total: rows.length }, 'inspectionFees') }, 200);
     })
     .openapi(detailRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const request = await c.var.services.inspectionRequest.get(tenantId, id);
         if (!request) throw Errors.NotFound('Inspection request not found');
-        return c.json({ success: true, data: await moneyView(c, { request }) }, 200);
+        return c.json({ success: true, data: await moneyView(c, { request }, 'inspectionFees') }, 200);
     })
     .openapi(byInspectionRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { inspectionId } = c.req.valid('param');
         const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId);
-        return c.json({ success: true as const, data: await moneyView(c, { request: request ?? null }) }, 200);
+        return c.json({ success: true as const, data: await moneyView(c, { request: request ?? null }, 'inspectionFees') }, 200);
     })
     .openapi(createReqRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -234,7 +234,7 @@ const inspectionRequestsRoutes = createApiRouter()
         });
 
         const created = await c.var.services.inspectionRequest.create(tenantId, reqInput, subs);
-        return c.json({ success: true, data: await moneyView(c, { request: created }) }, 201);
+        return c.json({ success: true, data: await moneyView(c, { request: created }, 'inspectionFees') }, 201);
     })
     .openapi(updateReqRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -246,7 +246,7 @@ const inspectionRequestsRoutes = createApiRouter()
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updated = await c.var.services.inspectionRequest.update(tenantId, id, patch as any);
-        return c.json({ success: true, data: await moneyView(c, { request: updated }) }, 200);
+        return c.json({ success: true, data: await moneyView(c, { request: updated }, 'inspectionFees') }, 200);
     })
     .openapi(addSubRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -256,7 +256,7 @@ const inspectionRequestsRoutes = createApiRouter()
         if (body.price !== undefined) sub.price = body.price;
         if (body.notes !== undefined) sub.notes = body.notes ?? null;
         const updated = await c.var.services.inspectionRequest.addSubInspection(tenantId, id, sub);
-        return c.json({ success: true, data: await moneyView(c, { request: updated }) }, 200);
+        return c.json({ success: true, data: await moneyView(c, { request: updated }, 'inspectionFees') }, 200);
     });
 
 export type InspectionRequestsApi = typeof inspectionRequestsRoutes;

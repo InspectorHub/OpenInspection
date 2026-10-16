@@ -69,8 +69,8 @@ api.use('*', async (c, next) => {
  * authorization gate can see a hand-rolled Hono router.
  */
 api.use('*', requireRole('owner', 'manager'));
-// The books are money state: a manager whose `financial` capability is off loses the integration too.
-api.use('*', requireCapability('financial'));
+// The books are money state: a manager whose `companyFinance` capability is off loses the integration too.
+api.use('*', requireCapability('companyFinance'));
 
 api.get('/status', async (c) => {
     const state = await c.var.services.qbo.getConnectionStatus(c.get('tenantId'));

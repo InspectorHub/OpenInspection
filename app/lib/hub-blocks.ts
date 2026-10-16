@@ -257,7 +257,7 @@ export function invoiceFromParty(
  *
  * Two distinct reasons for `null`, both of which must silence the figure rather
  * than substitute one:
- *   - the viewer lacks the `financial` capability, so `amountCents` was redacted
+ *   - the viewer lacks the `companyFinance` capability, so `amountCents` was redacted
  *     out of the payload entirely (IA-95);
  *   - `amountPaidCents` is null — the invoice is partial but no amount was ever
  *     recorded (rows that predate the column, or a source that reported the

@@ -7,7 +7,7 @@ import { assertMayTouchOwner } from '../lib/auth/owner-guard';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
-import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
+import { coerceOverrides, getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
 import { revokeAllUserGrants } from '../lib/mcp/grants';
 import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import { resetMemberTwoFactor } from './team/reset-two-factor';
@@ -102,7 +102,8 @@ export class TeamService {
         ]);
 
         const maxUsers = tenantRecord[0]?.maxUsers ?? 3;
-        return { activeUsers, pendingInvites, maxUsers };
+        const readThrough = <T extends { permissionOverrides: unknown }>(rows: T[]) => rows.map(r => ({ ...r, permissionOverrides: coerceOverrides(r.permissionOverrides) })); // rows stored before `financial` was split are read through
+        return { activeUsers: readThrough(activeUsers), pendingInvites: readThrough(pendingInvites), maxUsers };
     }
 
     async createInvite(params: {

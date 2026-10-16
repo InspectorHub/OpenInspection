@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { summariseNewInspection } from "~/lib/wizard-review";
 
 /**
- * A catalogue read by a caller without the `financial` capability has no prices
+ * A catalogue read by a caller without the `inspectionFees` capability has no prices
  * at all (the key is absent, not zero). The review must not turn that into a
  * total of $0.
  */

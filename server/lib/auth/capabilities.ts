@@ -2,7 +2,7 @@ import type { Role } from './roles';
 import { coerceOverrides as coerceWith, type BitDecl } from './capability-overrides';
 
 export const TOGGLEABLE = [
-  'publish', 'scheduleOthers', 'financial', 'manageContacts', 'viewCommunication',
+  'publish', 'scheduleOthers', 'inspectionFees', 'companyFinance', 'manageContacts', 'viewCommunication',
   // Four verbs, not one "Add/Edit Template" toggle (which is what Spectora
   // ships). The split exists because the four are not equally recoverable:
   // EDIT is the irreversible one -- there is no template_versions table, and the
@@ -28,25 +28,25 @@ export type CapabilitySet = Record<Capability, boolean>;
 export type PermissionOverrides = Partial<CapabilitySet>;
 
 const ROLE_DEFAULTS: Record<Role, CapabilitySet> = {
-  owner:     { publish: true,  scheduleOthers: true,  financial: true,  manageContacts: true,  viewCommunication: true,
+  owner:     { publish: true,  scheduleOthers: true,  inspectionFees: true,  companyFinance: true,  manageContacts: true,  viewCommunication: true,
                templateCreate: true,  templateEdit: true,  templateDelete: true,  templateImport: true, deleteInspection: true },
-  manager:   { publish: true,  scheduleOthers: true,  financial: true,  manageContacts: true,  viewCommunication: true,
+  manager:   { publish: true,  scheduleOthers: true,  inspectionFees: true,  companyFinance: true,  manageContacts: true,  viewCommunication: true,
                templateCreate: true,  templateEdit: true,  templateDelete: true,  templateImport: true, deleteInspection: true },
   // An inspector needs to know whether their own report reached the buyer's agent.
   // They also author the templates they inspect against, so create/edit/import
   // stay on; only DELETE is off, whose repair cost is rebuild-from-scratch.
-  inspector: { publish: true,  scheduleOthers: false, financial: false, manageContacts: false, viewCommunication: true,
+  inspector: { publish: true,  scheduleOthers: false, inspectionFees: true,  companyFinance: false, manageContacts: false, viewCommunication: true,
                templateCreate: true,  templateEdit: true,  templateDelete: false, templateImport: true, deleteInspection: true },
-  agent:     { publish: false, scheduleOthers: false, financial: false, manageContacts: false, viewCommunication: false,
+  agent:     { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
                templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false },
 };
 /** owner is never reducible by overrides; agent is never elevated by them.
  *  A capability MISSING from either map silently opts out of that guarantee,
  *  which is why both are restated in full rather than spread from the defaults. */
 const FIXED: Partial<Record<Role, Partial<CapabilitySet>>> = {
-  owner: { publish: true, scheduleOthers: true, financial: true, manageContacts: true, viewCommunication: true,
+  owner: { publish: true, scheduleOthers: true, inspectionFees: true, companyFinance: true, manageContacts: true, viewCommunication: true,
            templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true, deleteInspection: true },
-  agent: { publish: false, scheduleOthers: false, financial: false, manageContacts: false, viewCommunication: false,
+  agent: { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
            templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false },
 };
 
@@ -70,6 +70,22 @@ export function getCapabilities(role: Role, overrides: PermissionOverrides | nul
  * capability-overrides.ts — the contact-role axis uses the same one, so a
  * coercion fix can never land on one side only.
  */
+/**
+ * Overrides stored before `financial` was split. Read through only: the old value
+ * stands for both new keys unless a new key is stored explicitly, and nothing here
+ * ever writes the old key back (the Team page and invites emit new keys only).
+ */
+function withLegacyFinancial(value: unknown): unknown {
+  let obj: unknown = value;
+  if (typeof value === 'string') {
+    try { obj = JSON.parse(value); } catch { return value; }
+  }
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) return value;
+  const { financial, ...rest } = obj as Record<string, unknown>;
+  if (typeof financial !== 'boolean') return rest;
+  return { inspectionFees: financial, companyFinance: financial, ...rest };
+}
+
 export function coerceOverrides(value: unknown): PermissionOverrides | null {
-  return coerceWith(STAFF_BITS, value) as PermissionOverrides | null;
+  return coerceWith(STAFF_BITS, withLegacyFinancial(value)) as PermissionOverrides | null;
 }

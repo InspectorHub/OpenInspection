@@ -108,8 +108,8 @@ interface HubData extends HubPayload {
     date: string | null;
     inspectorId: string | null;
     templateId: string | null;
-    // IA-95 — absent when the caller lacks the `financial` capability (an
-    // inspector's default). Optional here so the compiler forces every render
+    // IA-95 — absent when the caller lacks the `inspectionFees` capability.
+    // Optional here so the compiler forces every render
     // site to say what it shows instead of money.
     price?: number;
     paymentStatus: string;
@@ -135,7 +135,7 @@ interface HubData extends HubPayload {
     id: string;
     serviceId: string;
     name: string;
-    // IA-95 — all three absent without the `financial` capability; the line
+    // IA-95 — all three absent without the `inspectionFees` capability; the line
     // itself (what was sold) is still legitimately visible.
     priceCents?: number;
     priceSnapshot?: number;
@@ -834,7 +834,7 @@ export default function InspectionHubPage() {
     !hub.publishReadiness.ready &&
     hub.publishReadiness.blockingCount > 0;
 
-  // IA-95 — the server redacts money when the caller lacks the `financial`
+  // IA-95 — the server redacts money when the caller lacks the matching money
   // capability, so ABSENCE is the signal. We deliberately do NOT ship a second
   // copy of the capability to the client to branch on: a client-side flag can
   // disagree with what the server actually sent, whereas absence cannot — it IS

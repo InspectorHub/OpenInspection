@@ -40,20 +40,33 @@ async function call(app: Hono<HonoConfig>) {
 }
 
 describe('requireCapability middleware', () => {
-    it('inspector + no overrides → publish allowed, financial denied', async () => {
+    it('inspector + no overrides → publish allowed, companyFinance denied', async () => {
         const pub = await call(buildApp('publish', { role: 'inspector', overrides: null }).app);
         expect(pub.status).toBe(200);
         expect(pub.body).toEqual({ ok: true });
 
-        const fin = await call(buildApp('financial', { role: 'inspector', overrides: null }).app);
+        const fin = await call(buildApp('companyFinance', { role: 'inspector', overrides: null }).app);
         expect(fin.status).toBe(403);
-        expect(fin.body.error).toContain('financial');
+        expect(fin.body.error).toContain('companyFinance');
     });
 
-    it('inspector + {financial:true} → financial allowed', async () => {
-        const fin = await call(buildApp('financial', { role: 'inspector', overrides: { financial: true } }).app);
+    it('inspector + no overrides → inspectionFees allowed (the default that lets them price their own inspections)', async () => {
+        const fees = await call(buildApp('inspectionFees', { role: 'inspector', overrides: null }).app);
+        expect(fees.status).toBe(200);
+        expect(fees.body).toEqual({ ok: true });
+    });
+
+    it('inspector + {companyFinance:true} → companyFinance allowed', async () => {
+        const fin = await call(buildApp('companyFinance', { role: 'inspector', overrides: { companyFinance: true } }).app);
         expect(fin.status).toBe(200);
         expect(fin.body).toEqual({ ok: true });
+    });
+
+    it('inspectionFees does not open companyFinance, and the other way round', async () => {
+        const feesOnly = { inspectionFees: true, companyFinance: false };
+        const financeOnly = { inspectionFees: false, companyFinance: true };
+        expect((await call(buildApp('companyFinance', { role: 'manager', overrides: feesOnly }).app)).status).toBe(403);
+        expect((await call(buildApp('inspectionFees', { role: 'manager', overrides: financeOnly }).app)).status).toBe(403);
     });
 
     it('inspector + {publish:false} → publish denied (requires review)', async () => {
@@ -62,10 +75,13 @@ describe('requireCapability middleware', () => {
         expect(pub.body.error).toContain('publish');
     });
 
-    it('owner → financial allowed even with {financial:false} override (pinned)', async () => {
-        const fin = await call(buildApp('financial', { role: 'owner', overrides: { financial: false } }).app);
-        expect(fin.status).toBe(200);
-        expect(fin.body).toEqual({ ok: true });
+    it('owner → both money capabilities allowed even with both overridden off (pinned)', async () => {
+        const off = { inspectionFees: false, companyFinance: false };
+        for (const cap of ['inspectionFees', 'companyFinance'] as const) {
+            const res = await call(buildApp(cap, { role: 'owner', overrides: off }).app);
+            expect(res.status).toBe(200);
+            expect(res.body).toEqual({ ok: true });
+        }
     });
 
     it('resolves overrides fresh on every request (resolver is invoked)', async () => {
@@ -87,10 +103,10 @@ describe('requireCapability middleware', () => {
 
 describe('coerceOverrides helper', () => {
     it('parses a JSON string column value', () => {
-        expect(coerceOverrides('{"financial":true}')).toEqual({ financial: true });
+        expect(coerceOverrides('{"companyFinance":true}')).toEqual({ companyFinance: true });
     });
     it('whitelists an already-parsed object (json-mode column)', () => {
-        expect(coerceOverrides({ financial: true, bogus: 1, publish: false })).toEqual({ financial: true, publish: false });
+        expect(coerceOverrides({ companyFinance: true, bogus: 1, publish: false })).toEqual({ companyFinance: true, publish: false });
     });
     it('returns null for null / empty / non-object / malformed', () => {
         expect(coerceOverrides(null)).toBeNull();

@@ -72,8 +72,8 @@ describe('TeamService.createInvite — canonical roles', () => {
     });
 
     it('stores only the overrides that differ from the role template', async () => {
-        // Inspector template = publish:true, scheduleOthers:false, financial:false,
-        // manageContacts:false. publish:true matches the template (dropped);
+        // Inspector template = publish:true, scheduleOthers:false, inspectionFees:true,
+        // companyFinance:false, manageContacts:false. publish:true matches the template (dropped);
         // scheduleOthers:true differs (kept).
         const out = await svc.createInvite({
             tenantId: TENANT,
@@ -91,7 +91,7 @@ describe('TeamService.createInvite — canonical roles', () => {
             tenantId: TENANT,
             email:    'samedefault@acme.test',
             role:     'inspector',
-            permissionOverrides: { publish: true, financial: false },
+            permissionOverrides: { publish: true, companyFinance: false, inspectionFees: true },
         });
         const row = await testDb.select().from(schema.tenantInvites)
             .where(eq(schema.tenantInvites.id, out.token)).get();

@@ -8,9 +8,9 @@ const dataRoutes = createApiRouter()
     .get('/export/inspections', requireRole('owner', 'manager'), async (c) => {
         const tenantId = c.get('tenantId');
         const svc = new DataService(c.env.DB);
-        // A manager whose `financial` capability is switched off still exports the
+        // A manager whose `companyFinance` capability is switched off still exports the
         // inspections, without the price column.
-        const csv = await svc.exportInspectionsCSV(tenantId, (await capabilitiesFor(c)).financial);
+        const csv = await svc.exportInspectionsCSV(tenantId, (await capabilitiesFor(c)).companyFinance);
         const date = new Date().toISOString().slice(0, 10);
         return new Response(csv, {
             headers: {

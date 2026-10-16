@@ -1,7 +1,7 @@
 /**
  * POST /api/invoices/request-payment stays available to an inspector (asking a
  * client for payment on site is a field act), but its answer repeats the
- * invoice amount, which a caller without `financial` does not get to read.
+ * invoice amount, which a caller without `inspectionFees` does not get to read.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -70,16 +70,16 @@ describe('POST /api/invoices/request-payment', () => {
         expect(res.status).toBe(200);
         expect((await res.json() as { amountCents?: number }).amountCents).toBe(45000);
     });
-    it('an inspector without financial still sends the request, and the answer omits the amount', async () => {
-        const res = await request('inspector', null);
+    it('an inspector without inspectionFees still sends the request, and the answer omits the amount', async () => {
+        const res = await request('inspector', { inspectionFees: false });
         expect(res.status).toBe(200);
         const body = await res.json() as Record<string, unknown>;
         expect(body.id).toBe('inv1');
         expect(body.status).toBe('sent');
         expect('amountCents' in body).toBe(false);
     });
-    it('an inspector granted financial receives the amount', async () => {
-        const res = await request('inspector', { financial: true });
+    it('an inspector with the default inspectionFees receives the amount', async () => {
+        const res = await request('inspector', null);
         expect((await res.json() as { amountCents?: number }).amountCents).toBe(45000);
     });
 });

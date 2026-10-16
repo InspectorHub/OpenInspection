@@ -1,7 +1,8 @@
 /**
  * The QuickBooks router administers the company's books, so it needs the
- * `financial` capability on top of the owner/manager role. A manager whose
- * `financial` bit is off loses every route; the default manager keeps them.
+ * `companyFinance` capability on top of the owner/manager role. A manager whose
+ * `companyFinance` bit is off loses every route, whatever they hold for
+ * `inspectionFees`; the default manager keeps them.
  *
  * Same harness as qbo-route-authorization.spec.ts: the real router, a stubbed
  * verifier, services faked at the edge. The only new ingredient is an `sdb`
@@ -82,8 +83,11 @@ const call = (app: Hono<HonoConfig>, [method, path, body]: Case) =>
 
 describe.each(CASES)('%s %s', (method, path, body) => {
     const c: Case = [method, path, body];
-    it('a manager with financial switched off is refused', async () => {
-        expect((await call(buildApp('manager', { financial: false }), c)).status).toBe(403);
+    it('a manager with companyFinance switched off is refused', async () => {
+        expect((await call(buildApp('manager', { companyFinance: false }), c)).status).toBe(403);
+    });
+    it('inspectionFees alone does not open it', async () => {
+        expect((await call(buildApp('manager', { inspectionFees: true, companyFinance: false }), c)).status).toBe(403);
     });
     it('positive control: a default manager gets past the gate', async () => {
         expect((await call(buildApp('manager', null), c)).status).not.toBe(403);

@@ -194,7 +194,7 @@ const coreRoutes = createApiRouter()
             success: true,
             // Only the inspection row is projected: `template` is customer-authored
             // schema JSON and may legitimately contain a field called `price`.
-            data: { ...result, inspection: await moneyView(c, result.inspection) },
+            data: { ...result, inspection: await moneyView(c, result.inspection, 'inspectionFees') },
         }, 200);
     })
     .openapi(deleteInspectionRoute, async (c) => {
@@ -224,7 +224,7 @@ const coreRoutes = createApiRouter()
 
         const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
 
-        // Money fields need `financial`, but only a CHANGE is refused: the settings
+        // Money fields need `inspectionFees`, but only a CHANGE is refused: the settings
         // form forwards its whole form, price included. Before anything else runs.
         await guardMoneyWrite(c, body, inspection as Record<string, unknown>);
 
@@ -303,7 +303,7 @@ const coreRoutes = createApiRouter()
         // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).
         if (body.id) {
             const existing = await service.findInspectionById(tenantId, body.id);
-            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, existing, body)) } }, 200);
+            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, existing, body), 'inspectionFees') } }, 200);
         }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
@@ -325,13 +325,13 @@ const coreRoutes = createApiRouter()
         });
         // A concurrent request with the same client id won the insert: this one is a
         // replay, so it answers like one and repeats none of the side effects below.
-        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, inspection, body)) } }, 200);
+        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, inspection, body), 'inspectionFees') } }, 200);
 
         fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({
             success: true,
-            data: { inspection: await moneyView(c, inspection) },
+            data: { inspection: await moneyView(c, inspection, 'inspectionFees') },
         }, 201);
     })
     .openapi(cloneInspectionRoute, async (c) => {
@@ -345,7 +345,7 @@ const coreRoutes = createApiRouter()
             metadata: { clonedFrom: id, propertyAddress: clone.propertyAddress },
         });
         fireQuotaThresholdNotice(c, tenantId);
-        return c.json({ success: true, data: { inspection: await moneyView(c, clone) } }, 201);
+        return c.json({ success: true, data: { inspection: await moneyView(c, clone, 'inspectionFees') } }, 201);
     })
     .openapi(createFromWizardRoute, async (c) => {
         const input    = c.req.valid('json');

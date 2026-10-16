@@ -30,7 +30,8 @@ const ROLE_DESC: Record<Role, () => string> = {
 export const CAP_LABELS: Record<Capability, string> = {
  get publish() { return m.label_cap_publish(); },
  get scheduleOthers() { return m.label_cap_schedule_others(); },
- get financial() { return m.label_cap_financial(); },
+ get inspectionFees() { return m.label_cap_inspection_fees(); },
+ get companyFinance() { return m.label_cap_company_finance(); },
  get manageContacts() { return m.label_cap_manage_contacts(); },
  get viewCommunication() { return m.label_cap_view_communication(); },
  get templateCreate() { return m.label_cap_template_create(); },
@@ -53,7 +54,7 @@ export const CAP_GROUPS: ReadonlyArray<{ id: string; label: () => string; caps: 
  {
   id: "general",
   label: () => m.modal_invite_cap_group_general(),
-  caps: ["publish", "scheduleOthers", "financial", "manageContacts", "viewCommunication", "deleteInspection"],
+  caps: ["publish", "scheduleOthers", "inspectionFees", "companyFinance", "manageContacts", "viewCommunication", "deleteInspection"],
  },
  {
   id: "templates",
