@@ -35,10 +35,13 @@ vi.mock("react-router", async () => {
 
 import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
 
+const OWNER = { role: "owner", capabilities: null };
+
 describe("InviteSeatDrawer — at-open seat-limit gate", () => {
     it("renders the seat-limit panel immediately when seatLimitAtOpen is set (at cap, with billing URL)", () => {
         const { getByText, queryByText } = render(
             <InviteSeatDrawer
+                actor={OWNER}
                 open
                 onClose={() => {}}
                 seatLimitAtOpen={{ used: 3, max: 3, billingUrl: "https://billing.example.com" }}
@@ -53,7 +56,7 @@ describe("InviteSeatDrawer — at-open seat-limit gate", () => {
 
     it("renders the seat-limit panel with no CTA when billingUrl is omitted (no billing portal configured)", () => {
         const { getByText, queryByText } = render(
-            <InviteSeatDrawer open onClose={() => {}} seatLimitAtOpen={{ used: 3, max: 3 }} />,
+            <InviteSeatDrawer actor={OWNER} open onClose={() => {}} seatLimitAtOpen={{ used: 3, max: 3 }} />,
         );
         expect(getByText(/Seat limit reached/)).toBeTruthy();
         expect(queryByText("Upgrade")).toBeNull();
@@ -61,7 +64,7 @@ describe("InviteSeatDrawer — at-open seat-limit gate", () => {
 
     it("renders the normal invite form when under the seat limit (seatLimitAtOpen undefined)", () => {
         const { getByText, queryByText } = render(
-            <InviteSeatDrawer open onClose={() => {}} seatLimitAtOpen={undefined} />,
+            <InviteSeatDrawer actor={OWNER} open onClose={() => {}} seatLimitAtOpen={undefined} />,
         );
         expect(queryByText(/Seat limit reached/)).toBeNull();
         expect(getByText("Email")).toBeTruthy();
@@ -69,7 +72,7 @@ describe("InviteSeatDrawer — at-open seat-limit gate", () => {
     });
 
     it("renders the normal invite form when the prop is omitted entirely (unlimited / other mounts)", () => {
-        const { getByText, queryByText } = render(<InviteSeatDrawer open onClose={() => {}} />);
+        const { getByText, queryByText } = render(<InviteSeatDrawer actor={OWNER} open onClose={() => {}} />);
         expect(queryByText(/Seat limit reached/)).toBeNull();
         expect(getByText("Email")).toBeTruthy();
     });
@@ -79,7 +82,7 @@ describe("InviteSeatDrawer in-flight latch", () => {
     const fetcherState = { state: "idle" as "idle" | "submitting", submit: vi.fn() };
 
     function ui() {
-        return <InviteSeatDrawer open onClose={() => {}} />;
+        return <InviteSeatDrawer actor={OWNER} open onClose={() => {}} />;
     }
 
     function form(): HTMLFormElement {

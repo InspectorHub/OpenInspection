@@ -4,10 +4,11 @@ import { eq, and, isNull, ne } from 'drizzle-orm';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { UserRole } from '../types/auth';
 import { assertMayTouchOwner } from '../lib/auth/owner-guard';
+import { assertMayGrant, sameOverrides, type GrantActor } from '../lib/auth/grant-ceiling';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
-import { coerceOverrides, getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
+import { coerceOverrides, getCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from '../lib/auth/capabilities';
 import { revokeAllUserGrants } from '../lib/mcp/grants';
 import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import { resetMemberTwoFactor } from './team/reset-two-factor';
@@ -112,8 +113,18 @@ export class TeamService {
         email: string;
         role: UserRole;
         permissionOverrides?: RequestedOverrides | null;
+        /** Who is inviting. Required: an invite without a known inviter is not creatable. */
+        actor: GrantActor;
     }) {
         const db = this.getDB();
+
+        // Store only what DIFFERS from the role template, so an all-default
+        // invite stores null (single source of truth = the role).
+        const permissionOverrides = TeamService.diffOverrides(params.role, params.permissionOverrides);
+
+        // Checked before anything is read, so a refused caller learns nothing
+        // about who is already on the team.
+        assertMayGrant(params.actor, { from: null, to: { role: params.role, overrides: permissionOverrides } });
 
         // Seat-quota enforcement now lives in features/seat-quota/middleware
         // (mounted on POST /api/team/invite). The service only needs to
@@ -124,10 +135,6 @@ export class TeamService {
             .where(and(eq(users.tenantId, params.tenantId), eq(users.email, params.email), isNull(users.deletedAt))).limit(1);
 
         if (existing.length > 0) throw Errors.Conflict('User is already a member');
-
-        // Only persist toggles that DIFFER from the role template, so an
-        // all-default invite stores null (single source of truth = the role).
-        const permissionOverrides = TeamService.diffOverrides(params.role, params.permissionOverrides);
 
         // Create Invite (7-day expiry)
         const inviteToken = crypto.randomUUID();
@@ -240,13 +247,26 @@ export class TeamService {
         userId: string;
         requesterId: string;
         requesterRole: UserRole;
+        /**
+         * The requester's RESOLVED capabilities (role plus their own overrides).
+         * Required for every requester but an owner, who holds everything: a
+         * non-owner call without it is refused rather than guessed at.
+         */
+        requesterCapabilities?: CapabilitySet;
         role?: UserRole;
         permissionOverrides?: RequestedOverrides | null;
     }) {
         const { tenantId, userId, requesterId } = params;
         const db = this.getDB();
 
-        const user = await db.select({ id: users.id, email: users.email, role: users.role }).from(users)
+        const actor: GrantActor | null = params.requesterRole === 'owner'
+            ? { role: 'owner', capabilities: getCapabilities('owner', null) }
+            : params.requesterCapabilities
+                ? { role: params.requesterRole, capabilities: params.requesterCapabilities }
+                : null;
+        if (!actor) throw Errors.Forbidden('Only an owner or a manager can change team access');
+
+        const user = await db.select({ id: users.id, email: users.email, role: users.role, permissionOverrides: users.permissionOverrides }).from(users)
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId), isNull(users.deletedAt)))
             .get();
         if (!user) throw Errors.NotFound('Member not found');
@@ -289,6 +309,20 @@ export class TeamService {
             nextRole,
             params.permissionOverrides ?? null,
         );
+
+        // The ceiling: only what this change newly turns ON counts, so a manager
+        // can still edit (or turn off) a member who already holds something the
+        // manager does not. Role template grants count too, not just switches.
+        const currentOverrides = coerceOverrides(user.permissionOverrides);
+        assertMayGrant(actor, {
+            from: { role: user.role as UserRole, overrides: currentOverrides },
+            to: { role: nextRole, overrides: permissionOverrides },
+        });
+        // A manager does not edit their own permissions; ask an owner. (Their
+        // role is already immovable above.) Owners are exempt: owner is pinned.
+        if (userId === requesterId && actor.role !== 'owner' && !sameOverrides(currentOverrides, permissionOverrides)) {
+            throw Errors.SelfPermissionChange();
+        }
 
         await db.update(users)
             .set({ role: nextRole, permissionOverrides })

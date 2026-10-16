@@ -73,6 +73,12 @@ export type AuditAction =
     // were handed to someone else or left unassigned, so the record answers
     // "where did their work go".
     | 'user.removed'
+    // A member's role or permission switches changed from the Team page or API.
+    | 'user.update'
+    // A manager tried to give a role or permission they do not hold themselves
+    // (or to change their own permissions) and was refused. Nothing was written;
+    // this row is the only trace of the attempt.
+    | 'user.grant_refused'
     // An owner clearing ANOTHER member's second factor. Its own action rather
     // than a generic update, because it is the only one that lowers somebody
     // else's authentication requirement and it leaves no other trace: the

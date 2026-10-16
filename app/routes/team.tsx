@@ -4,7 +4,7 @@ import type { Route } from "./+types/team";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
-import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
+import { InviteSeatDrawer, drawerActorOf } from "~/components/modals/InviteSeatDrawer";
 import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
 import { TeamRolesReference } from "~/components/TeamRolesReference";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
@@ -127,6 +127,7 @@ export default function TeamPage() {
   const [linkInvite, setLinkInvite] = useState<InviteLinkTarget | null>(null);
   const sessionCtx = useSessionContext();
   const viewerEmail = sessionCtx?.user?.email;
+  const actor = drawerActorOf(sessionCtx);
   const locale = useDisplayLocale();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -200,8 +201,8 @@ export default function TeamPage() {
         ) : undefined}
       />
 
-      {canManage && <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />}
-      <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} />
+      {canManage && <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} actor={actor} />}
+      <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} actor={actor} />
 
       {TABS.length > 1 && <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />}
 

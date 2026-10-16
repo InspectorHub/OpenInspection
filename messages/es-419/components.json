@@ -24,6 +24,8 @@
   "modal_invite_role_desc_inspector": "Crear y editar las inspecciones que se le asignen.",
   "modal_invite_role_desc_staff": "Programa inspecciones, gestiona contactos y mensajes, y puede publicar y enviar informes. No puede editar el contenido de los informes.",
   "modal_invite_cap_pinned_read_only": "Este permiso es fijo para este rol.",
+  "modal_invite_cap_owner_only": "Solo un propietario puede otorgar esto.",
+  "modal_invite_role_owner_only": "Solo un propietario puede dar este rol.",
   "form_field_select_placeholder": "Seleccione...",
   "form_field_photo_hint": "La captura de fotos está disponible en el editor de inspecciones",
   "form_rich_notes_placeholder": "Notas...",

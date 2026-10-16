@@ -22,7 +22,7 @@ import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { getCapabilities, type CapabilitySet } from "../../../server/lib/auth/capabilities";
-import { CAP_LABELS, CAP_GROUPS, ROLE_OPTIONS, computeOverrideDiff, isCapabilityLocked, toDrawerRole, type Role as EditableRole } from "./InviteSeatDrawer";
+import { CAP_LABELS, CAP_GROUPS, computeOverrideDiff, isCapabilityLocked, isCapabilityBeyondActor, offeredRoles, roleBeyondActor, toDrawerRole, type DrawerActor, type Role as EditableRole } from "./InviteSeatDrawer";
 import { m } from "~/paraglide/messages";
 
 const FORM_ID = "edit-member-form";
@@ -39,9 +39,11 @@ interface EditMemberDrawerProps {
   open: boolean;
   onClose: () => void;
   member: EditableMember | null;
+  /** The signed-in person; decides which roles and switches the form offers. */
+  actor: DrawerActor | null;
 }
 
-export function EditMemberDrawer({ open, onClose, member }: EditMemberDrawerProps) {
+export function EditMemberDrawer({ open, onClose, member, actor }: EditMemberDrawerProps) {
   const [role, setRole] = useState<EditableRole>("inspector");
   const [caps, setCaps] = useState<CapabilitySet>(() => getCapabilities("inspector", null));
   const [error, setError] = useState("");
@@ -101,6 +103,11 @@ export function EditMemberDrawer({ open, onClose, member }: EditMemberDrawerProp
   }
 
   const isOwner = member?.role === "owner";
+  // What the member holds today. Keeping or removing it is never a grant, so a
+  // switch the actor lacks stays usable only where the member already has it.
+  const currentRole = toDrawerRole(member?.role ?? "inspector");
+  const currentOverrides = member?.permissionOverrides ?? null;
+  const held = getCapabilities(currentRole, currentOverrides);
 
   return (
     <Drawer
@@ -138,7 +145,10 @@ export function EditMemberDrawer({ open, onClose, member }: EditMemberDrawerProp
               value={role}
               onChange={(e) => changeRole(e.target.value as EditableRole)}
             >
-              {ROLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label()}</option>)}
+              {offeredRoles(actor).map((o) => {
+                const beyond = o.value !== currentRole && roleBeyondActor(actor, o.value, { role: currentRole, overrides: currentOverrides });
+                return <option key={o.value} value={o.value} disabled={beyond} title={beyond ? m.modal_invite_role_owner_only() : undefined}>{o.label()}</option>;
+              })}
             </select>
           </label>
 
@@ -152,11 +162,12 @@ export function EditMemberDrawer({ open, onClose, member }: EditMemberDrawerProp
                     <input
                       type="checkbox"
                       checked={caps[cap]}
-                      disabled={isCapabilityLocked(role, cap)}
-                      title={isCapabilityLocked(role, cap) ? m.modal_invite_cap_pinned_read_only() : undefined}
+                      disabled={isCapabilityLocked(role, cap) || isCapabilityBeyondActor(actor, cap, held)}
+                      title={isCapabilityLocked(role, cap) ? m.modal_invite_cap_pinned_read_only() : isCapabilityBeyondActor(actor, cap, held) ? m.modal_invite_cap_owner_only() : undefined}
                       onChange={(e) => setCaps((prev) => ({ ...prev, [cap]: e.target.checked }))}
                     />
                     {CAP_LABELS[cap]}
+                    {!isCapabilityLocked(role, cap) && isCapabilityBeyondActor(actor, cap, held) && <span className="text-xs text-ih-fg-3">{m.modal_invite_cap_owner_only()}</span>}
                   </label>
                 ))}
               </div>

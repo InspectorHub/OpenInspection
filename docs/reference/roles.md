@@ -82,6 +82,32 @@ an owner, and it cannot promote a referral agent into staff. That guarantee is
 the whole reason the agent column exists here: an outside party holds a login to
 your workspace, and this is where the ceiling on that login is nailed down.
 
+### Who can grant what
+
+An owner can give any role and any switch. A manager can give at most what the
+manager holds; anything higher needs an owner.
+
+- **Roles.** A manager can invite someone as, or change a member to, manager,
+  inspector or staff. Only an owner can create or promote an owner, and only an
+  owner can change an owner's role or switches. A manager cannot change their
+  own role or their own switches.
+- **Switches.** A manager can turn a switch on for someone else only if the
+  manager has it too, using the manager's own resolved set (role defaults plus
+  that manager's own overrides). This counts what a role gives by default as well
+  as the switches set by hand: a manager without Company finance cannot make
+  someone a manager, because the manager role carries it. Turning a switch off is
+  always allowed, and a member who already holds a switch keeps it when a manager
+  edits something else.
+- **Refusals.** The server refuses with `403` and the code `CAPABILITY_CEILING`
+  (a switch beyond the manager's own; `details.capabilities` names them),
+  `ROLE_CEILING` (a role above manager) or `SELF_PERMISSION_CHANGE`. One check
+  covers inviting, editing a member and member rows in a bulk import. Each change
+  is recorded as `user.update` or `user.invite`, and each refusal as
+  `user.grant_refused`.
+- **The Team page** shows the same limits: switches a manager cannot grant are
+  disabled with "Only an owner can grant this.", and roles that would grant one
+  are not selectable.
+
 ### Money visibility
 
 Two capabilities cover every place an amount is read or written, not only the

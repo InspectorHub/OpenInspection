@@ -1,3 +1,4 @@
+import { getCapabilities } from '../../../server/lib/auth/capabilities';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { AdminService } from '../../../server/services/admin.service';
 import { MockKV } from '../mocks';
@@ -90,6 +91,18 @@ describe('AdminService', () => {
             .rejects.toMatchObject({ status: 403 });
         const rows = await testDb.select().from(tenantInvites).where(eq(tenantInvites.email, 'boss@example.com'));
         expect(rows).toHaveLength(0);
+    });
+
+    it('applies the grant ceiling: a manager without Company finance cannot invite a manager, and a manager who holds it can', async () => {
+        const lacking = getCapabilities('manager', { companyFinance: false });
+        await expect(adminService.createInvite('t1', 'm1@example.com', 'manager', 'manager', lacking))
+            .rejects.toMatchObject({ status: 403, code: 'CAPABILITY_CEILING' });
+        // No capabilities known: fail closed rather than assume the template.
+        await expect(adminService.createInvite('t1', 'm2@example.com', 'manager', 'manager'))
+            .rejects.toMatchObject({ status: 403 });
+        expect(await testDb.select().from(tenantInvites).where(eq(tenantInvites.email, 'm1@example.com'))).toHaveLength(0);
+        await expect(adminService.createInvite('t1', 'm3@example.com', 'manager', 'manager', getCapabilities('manager', null)))
+            .resolves.toMatchObject({ inviteId: expect.any(String) });
     });
 
     it('CONTROL - an owner may invite an owner', async () => {

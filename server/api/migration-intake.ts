@@ -4,6 +4,7 @@ import { inviteAcceptUrl } from '../lib/url';
 import { getDrizzle } from '../lib/route-helpers';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
+import { capabilitiesFor } from '../lib/middleware/require-capability';
 import { migrationBatches, migrationRows } from '../lib/db/schema';
 import type { VendorId } from '../lib/migration-intake/bundle';
 import { MIGRATION_BATCH_STATUS } from '../lib/status/migration-batch-status';
@@ -289,15 +290,14 @@ const migrationIntakeRoutes = createApiRouter()
             rowResolutions: body.rowResolutions,
             seatQuotaEnforced: c.var.profile.hasSeatQuota,
             billingPortalUrl: c.var.profile.billingPortalUrl,
+            actor: { role: c.get('userRole'), capabilities: await capabilitiesFor(c) },
         });
 
-        // Delivery happens here because this is the only place holding both the
-        // provider and the run's own record of who was invited, and it goes
-        // through the SAME provider call the team page uses rather than a
-        // second send path. A failure is NOT rolled back: the invitation exists
-        // and its seat is taken, and pressing apply again would skip the row
-        // and send nothing. So both numbers are reported instead of a clean
-        // success, and resending stays the team page's action.
+        // Delivery happens here: the only place holding both the provider and
+        // the run's record of who was invited, through the SAME provider call
+        // the team page uses. A failure is NOT rolled back: the invitation
+        // exists and its seat is taken, and pressing apply again would skip
+        // the row and send nothing. So both numbers are reported; resend from the team page.
         let invitesSent = 0;
         let invitesFailed = 0;
         for (const invite of result.invites) {

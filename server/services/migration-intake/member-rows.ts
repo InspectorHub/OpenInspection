@@ -1,5 +1,6 @@
 import type { migrationRows } from '../../lib/db/schema';
 import { TeamService } from '../team.service';
+import type { GrantActor } from '../../lib/auth/grant-ceiling';
 import { asBundleMemberRole, type BundleMember } from '../../lib/migration-intake/bundle';
 
 type StagedRowRecord = typeof migrationRows.$inferSelect;
@@ -33,7 +34,7 @@ export interface InviteDispatch {
  */
 export async function applyMemberRow(
     db: D1Database,
-    params: { tenantId: string },
+    params: { tenantId: string; actor?: GrantActor | undefined },
     row: StagedRowRecord,
     invites: InviteDispatch[],
 ): Promise<
@@ -63,12 +64,18 @@ export async function applyMemberRow(
     const role = asBundleMemberRole(payload.role);
     if (!role) throw new Error(`"${payload.role}" is not a role an import may grant.`);
 
+    // An import is an invitation written on somebody's behalf, so it carries the
+    // same ceiling as the Team page: the file cannot grant what the person
+    // pressing apply could not. No actor, no grant (fails the row, not the run).
+    if (!params.actor) throw new Error('A member import needs to know who is applying it.');
+
     const team = new TeamService(db);
     const invite = await team.createInvite({
         tenantId: params.tenantId,
         email: payload.email,
         role,
         permissionOverrides: payload.permissionOverrides ?? null,
+        actor: params.actor,
     });
     invites.push({
         rowId: row.id,

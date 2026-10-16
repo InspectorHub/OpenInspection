@@ -98,6 +98,15 @@ export enum ErrorCode {
     // capability that governs it. `details.field` names the first field refused and
     // `details.capability` the capability it needs (`inspectionFees` or `companyFinance`).
     FINANCIAL_REQUIRED = 'FINANCIAL_REQUIRED',
+    // A manager tried to give a team member a capability the manager does not hold
+    // themselves. `details.capabilities` lists the ones refused. Only an owner can
+    // grant beyond their own set.
+    CAPABILITY_CEILING = 'CAPABILITY_CEILING',
+    // A manager tried to give a role above manager (that is, owner). `details.role`
+    // names it.
+    ROLE_CEILING = 'ROLE_CEILING',
+    // A manager tried to change their own permission overrides.
+    SELF_PERMISSION_CHANGE = 'SELF_PERMISSION_CHANGE',
 }
 
 /**
@@ -125,6 +134,12 @@ export const Errors = {
     Forbidden: (msg: string = 'Action forbidden') => new AppError(403, ErrorCode.FORBIDDEN, msg),
     FinancialRequired: (field: string, capability: MoneyBucket) =>
         new AppError(403, ErrorCode.FINANCIAL_REQUIRED, `Changing '${field}' requires the '${capability}' capability`, { field, capability }),
+    CapabilityCeiling: (capabilities: readonly string[]) =>
+        new AppError(403, ErrorCode.CAPABILITY_CEILING, 'Only an owner can grant a permission you do not have yourself.', { capabilities }),
+    RoleCeiling: (role: string) =>
+        new AppError(403, ErrorCode.ROLE_CEILING, 'Only an owner can grant that role.', { role }),
+    SelfPermissionChange: () =>
+        new AppError(403, ErrorCode.SELF_PERMISSION_CHANGE, 'You cannot change your own permissions. Ask an owner.'),
     NotFound: (msg: string = 'Resource not found') => new AppError(404, ErrorCode.NOT_FOUND, msg),
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
     Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),

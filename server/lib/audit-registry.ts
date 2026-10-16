@@ -259,11 +259,13 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'template.delete': { family: 'template', label: 'audit_action_template_delete', meta: {}, status: { kind: 'live' } },
     'template.marketplace.updated': { family: 'template', label: 'audit_action_template_marketplace_updated', meta: { fromSemver: 'from', marketplaceId: 'id', newLocalId: 'id', oldLocalId: 'id', toSemver: 'to' }, status: { kind: 'live' } },
     'template.update': { family: 'template', label: 'audit_action_template_update', meta: { name: 'name' }, status: { kind: 'live' } },
+    'user.grant_refused': { family: 'user', label: 'audit_action_user_grant_refused', meta: { reason: 'reason', role: 'name', during: 'name' }, status: { kind: 'live' } },
     'user.invite': { family: 'user', label: 'audit_action_user_invite', meta: { role: 'name' }, status: { kind: 'live' } },
     'user.join': { family: 'user', label: 'audit_action_user_join', meta: { role: 'name' }, status: { kind: 'live' } },
     'user.password_change': { family: 'user', label: 'audit_action_user_password_change', meta: {}, status: { kind: 'live' } },
     'user.removed': { family: 'user', label: 'audit_action_user_removed', meta: { reassigned: 'count', unassigned: 'count', keptForRecord: 'count', reassignedTo: 'id' }, status: { kind: 'live' } },
     'user.two_factor_reset': { family: 'user', label: 'audit_action_user_two_factor_reset', meta: { email: 'person' }, status: { kind: 'live' } },
+    'user.update': { family: 'user', label: 'audit_action_user_update', meta: { role: 'name' }, status: { kind: 'live' } },
 };
 
 /**

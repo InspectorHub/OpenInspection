@@ -27,7 +27,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function ui() {
-    return <EditMemberDrawer open onClose={() => {}} member={MEMBER} />;
+    return <EditMemberDrawer actor={{ role: "owner", capabilities: null }} open onClose={() => {}} member={MEMBER} />;
 }
 
 function form(): HTMLFormElement {

@@ -24,6 +24,8 @@
   "modal_invite_role_desc_inspector": "Create and edit inspections they're assigned to.",
   "modal_invite_role_desc_staff": "Schedules inspections and manages contacts and messages, and can publish and send reports. Cannot edit report content.",
   "modal_invite_cap_pinned_read_only": "This permission is fixed for this role.",
+  "modal_invite_cap_owner_only": "Only an owner can grant this.",
+  "modal_invite_role_owner_only": "Only an owner can give this role.",
   "form_field_select_placeholder": "Select...",
   "form_field_photo_hint": "Photo capture is available in the inspection editor",
   "form_rich_notes_placeholder": "Notes...",

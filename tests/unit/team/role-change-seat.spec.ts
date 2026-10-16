@@ -62,7 +62,7 @@ describe('seat check on a role change', () => {
 
     describe('PATCH /api/team/members/:id', () => {
         function build(hasSeatQuota: boolean) {
-            const updateMember = vi.fn().mockResolvedValue(undefined);
+            const updateMember = vi.fn().mockResolvedValue({ id: 'm1', role: 'manager', permissionOverrides: null });
             const app = new OpenAPIHono<HonoConfig>();
             app.onError((err, c) => (err instanceof AppError
                 ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)

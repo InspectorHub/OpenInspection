@@ -17,6 +17,7 @@
  *    with a mutated snapshot proving the undo refuses rather than writing junk
  *    over the row it was meant to rescue.
  */
+import { OWNER_ACTOR } from '../helpers/grant-actor';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { Database as SqliteDatabase } from 'better-sqlite3';
@@ -195,7 +196,7 @@ describe('MigrationRevertService.revert', () => {
     }
 
     function applyBatch(batchId: string, conflictPolicy: 'skip' | 'overwrite' | 'per_row' = 'skip', rowResolutions?: Record<string, 'skip' | 'overwrite'>) {
-        return apply.apply({
+        return apply.apply({ actor: OWNER_ACTOR,
             tenantId: TENANT, batchId, conflictPolicy, rowResolutions, seatQuotaEnforced: false,
         });
     }

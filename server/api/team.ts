@@ -3,7 +3,8 @@ import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
-import { requireCapability } from '../lib/middleware/require-capability';
+import { requireCapability, capabilitiesFor } from '../lib/middleware/require-capability';
+import { auditRefusedGrant } from './team-grant-audit';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
 import { requireSeatAvailable } from '../features/seat-quota';
@@ -266,12 +267,11 @@ const teamRoutes = createApiRouter()
         // inviting as owner is minting an owner. Same rule as update/remove.
         assertMayTouchOwner(c.get('userRole'), 'inspector', body.role);
 
-        const { token, expiresAt } = await teamService.createInvite({
-            tenantId,
-            email: body.email,
-            role:  body.role,
-            permissionOverrides: body.permissionOverrides ?? null,
-        });
+        // The inviter's own resolved capabilities are the ceiling for the invite.
+        const actor = { role: c.get('userRole'), capabilities: await capabilitiesFor(c) };
+        const { token, expiresAt } = await auditRefusedGrant(c, 'invite', body.role, () => teamService.createInvite({
+            tenantId, email: body.email, role: body.role, permissionOverrides: body.permissionOverrides ?? null, actor,
+        }));
 
         // Who added whom to this company, on the durable record. The
         // `user.invited` outbox event this handler also produces is a
@@ -324,14 +324,14 @@ const teamRoutes = createApiRouter()
             });
         }
 
-        await c.var.services.team.updateMember({
-            tenantId,
-            userId: memberId,
-            requesterId: user?.sub as string,
-            requesterRole: c.get('userRole'),
+        const requesterCapabilities = await capabilitiesFor(c);
+        const result = await auditRefusedGrant(c, 'update', body.role ?? null, () => c.var.services.team.updateMember({
+            tenantId, userId: memberId, requesterId: user?.sub as string, requesterRole: c.get('userRole'), requesterCapabilities,
             ...(body.role ? { role: body.role } : {}),
             ...(body.permissionOverrides !== undefined ? { permissionOverrides: body.permissionOverrides } : {}),
-        });
+        }));
+        // Who changed whose access, on the durable record.
+        auditFromContext(c, 'user.update', 'user', { entityId: memberId, metadata: { role: result.role } });
 
         return c.json({ success: true as const, data: { updated: true as const } }, 200);
     })
