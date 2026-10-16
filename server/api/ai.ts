@@ -1,6 +1,7 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
+import { requireCapability } from '../lib/middleware/require-capability';
 import { checkRateLimit } from '../lib/rate-limit';
 import {
     CommentAssistSchema,
@@ -27,7 +28,7 @@ const commentAssistRoute = createRoute(withMcpMetadata({
     path: '/comment-assist',
     tags: ["ai"],
     summary: "Create ai comment assist",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('editReports')] as const,
     request: {
         body: {
             content: {
@@ -48,8 +49,8 @@ const commentAssistRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createAiCommentAssist",
-    description: "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it."
-}, { scopes: ['write'], tier: 'extended' }));
+    description: "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it. Requires the editReports capability; office staff do not have it by default."
+}, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 /**
  * POST /api/ai/auto-summary
@@ -60,7 +61,7 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
     path: '/auto-summary',
     tags: ["ai"],
     summary: "Create ai auto summary",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('editReports')] as const,
     request: {
         body: {
             content: {
@@ -81,7 +82,7 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createAiAutoSummary",
-    description: "Generate a short summary of an inspection's defects with the configured AI provider. Only the "
+    description: "Generate a short summary of an inspection's defects with the configured AI provider. Only the  Requires the editReports capability; office staff do not have it by default."
         + "inspector's notes on items rated Defect are sent to the model (an item with no note is sent as 'No "
         + "description provided'); item names, addresses and client details are not. When the inspection has no "
         + "results or no defects, a fixed 'no significant defects' sentence is returned without calling the model "
@@ -89,7 +90,7 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
         + "The inspection must belong to this company. Fails when AI is not configured or the workspace's AI "
         + "allowance is spent. Nothing is saved to the inspection, and each call is a fresh model call. Open to "
         + "owners, managers and inspectors."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 /**
  * POST /api/ai/suggest-comment
@@ -106,7 +107,7 @@ const commentEditRoute = createRoute(withMcpMetadata({
     path: '/comment/edit',
     tags: ["ai"],
     summary: 'Rewrite a canned comment with AI assistance',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('editReports')] as const,
     request: {
         body: { content: { 'application/json': { schema: CommentEditSchema } } },
     },
@@ -117,19 +118,19 @@ const commentEditRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createAiCommentEdit",
-    description: "Rewrite one inspection comment according to a free-form instruction (for example shorten it, or add "
+    description: "Rewrite one inspection comment according to a free-form instruction (for example shorten it, or add  Requires the editReports capability; office staff do not have it by default."
         + "location detail), using the item, section and tab it belongs to as context. Returns the rewritten text "
         + "and the id of the AI call that produced it, which is null only for the local development mock. Nothing is "
         + "saved: the caller decides whether to replace the original. Fails when AI is not configured, and is "
         + "rate-limited per caller. Each call is a fresh model call. Open to owners, managers and inspectors."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 const suggestCommentRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/suggest-comment',
     tags: ["ai"],
     summary: 'Suggest professional comments for a form item',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('editReports')] as const,
     request: {
         body: {
             content: { 'application/json': { schema: SuggestCommentSchema } },
@@ -142,12 +143,12 @@ const suggestCommentRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createAiSuggestComment",
-    description: "Ask the AI provider for up to three suggested report comments for one inspection item, given its "
+    description: "Ask the AI provider for up to three suggested report comments for one inspection item, given its  Requires the editReports capability; office staff do not have it by default."
         + "name, section and optionally its rating, the year built and the square footage. Returns the suggestions "
         + "as text plus the id of the AI call. If the model's answer cannot be read, or the model call fails, the "
         + "result is an empty suggestion list rather than an error; a missing AI configuration or a spent AI "
         + "allowance is still an error. Nothing is saved. Open to owners, managers and inspectors."
-}, { scopes: ['write'], tier: 'extended' }));
+}, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 // Each handler returns the service result AS ITS `data`, rather than picking
 // fields out of it. The service already shapes the payload — text/summary/
@@ -166,7 +167,7 @@ const contentReviewRoute = createRoute(withMcpMetadata({
     path: '/reviews',
     tags: ["ai"],
     summary: 'Record a human review of AI-assisted content',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('editReports')] as const,
     request: {
         body: { content: { 'application/json': { schema: AiContentReviewSchema } } },
     },
@@ -177,8 +178,8 @@ const contentReviewRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createAiContentReview",
-    description: "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate.",
-}, { scopes: ['write'], tier: 'extended' }));
+    description: "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate. Requires the editReports capability; office staff do not have it by default.",
+}, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
 const aiRoutes = createApiRouter()
     .openapi(commentAssistRoute, async (c) => {

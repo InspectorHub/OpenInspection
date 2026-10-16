@@ -623,16 +623,7 @@ export class InspectionService {
      * `reportId` defaults to the order's primary report. No notify flags — see
      * `InspectionPublishService.publishInspection` (F79).
      */
-    async publishInspection(inspectionId: string, tenantId: string, _options: {
-        theme: string;
-        requireSignature: boolean;
-        requirePayment: boolean;
-        // Round-2 F1 — optional per-recipient delivery list. Older callers
-        // (legacy publish modal, AI agent flows) keep working without it.
-        recipients?: Array<{ contactId: string | null; channels: Array<'email' | 'text'> }>;
-        sendAgreementCopy?: boolean;
-        reportId?: string;
-    }) {
+    async publishInspection(inspectionId: string, tenantId: string, _options: Parameters<InspectionPublishService['publishInspection']>[2]) {
         return this.publish.publishInspection(inspectionId, tenantId, _options);
     }
 

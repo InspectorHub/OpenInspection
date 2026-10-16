@@ -4,7 +4,7 @@ import { eq, and, desc, inArray } from 'drizzle-orm';
 import { inspections, inspectionResults, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices, contacts } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { applyAutoSignatureOnPublish } from '../../lib/inspection/auto-sign';
+import { applyAutoSignatureOnPublish, type AutoSignActor } from '../../lib/inspection/auto-sign';
 import {
     lastSiblingNotifiedAt,
     markReportNotified,
@@ -617,12 +617,12 @@ export class InspectionPublishService extends InspectionSubService {
         theme: string;
         requireSignature: boolean;
         requirePayment: boolean;
-        // Round-2 F1 — optional per-recipient delivery list. Older callers
-        // (legacy publish modal, AI agent flows) keep working without it.
+        // Round-2 F1 — optional per-recipient delivery list; older callers work without it.
         recipients?: Array<{ contactId: string | null; channels: Array<'email' | 'text'> }>;
         sendAgreementCopy?: boolean;
         /** Which report to publish. Defaults to the inspection's primary. */
         reportId?: string;
+        actor?: AutoSignActor; // who publishes: decides the automatic signature, and is recorded with it
     }) {
         const db = this.getDrizzle();
 
@@ -672,7 +672,7 @@ export class InspectionPublishService extends InspectionSubService {
         }
 
         // Spec 5H D2 — auto-sign on publish (lib/inspection/auto-sign).
-        await applyAutoSignatureOnPublish(db, tenantId, inspectionId);
+        await applyAutoSignatureOnPublish(db, tenantId, inspectionId, _options.actor);
 
         const tenantRow = await db.select({ slug: tenants.slug })
             .from(tenants).where(eq(tenants.id, tenantId)).get();

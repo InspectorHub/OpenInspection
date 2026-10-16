@@ -45,20 +45,19 @@ const ROLE_DEFAULTS: Record<Role, CapabilitySet> = {
   inspector: { publish: true,  scheduleOthers: false, inspectionFees: true,  companyFinance: false, manageContacts: false, viewCommunication: true,
                templateCreate: true,  templateEdit: true,  templateDelete: false, templateImport: true, deleteInspection: true,
                editReports: true },
-  // Office user: schedules, reschedules and reassigns, manages contacts and
-  // messages, publishes and sends reports, and sees inspection prices (read
-  // only: staff cannot edit any inspection field except date and inspector).
-  // Does not write report content or author templates and sees no company
-  // finances. Nothing is pinned, so a company can widen or narrow any of it per
-  // person or through a permission template.
-  staff:     { publish: true,  scheduleOthers: true,  inspectionFees: true,  companyFinance: false, manageContacts: true,  viewCommunication: true,
+  // Office user: runs the booking (creates, schedules, reassigns and cancels unpaid
+  // jobs, edits the order fields), manages contacts and messages, sends a report
+  // that is already published, and sees inspection prices. Does not write report
+  // content, sign or publish (`publish` is pinned off below), author templates, or
+  // see company finances. Everything else can be widened or narrowed per person.
+  staff:     { publish: false, scheduleOthers: true,  inspectionFees: true,  companyFinance: false, manageContacts: true,  viewCommunication: true,
                templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
                editReports: false },
   agent:     { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
                templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
                editReports: false },
 };
-/** owner is never reducible by overrides; agent is never elevated by them.
+/** owner is never reducible by overrides; agent is never elevated by them; staff never publish.
  *  A capability MISSING from any entry silently opts out of that guarantee,
  *  which is why each is restated in full rather than spread from the defaults. */
 const FIXED: Partial<Record<Role, Partial<CapabilitySet>>> = {
@@ -68,6 +67,11 @@ const FIXED: Partial<Record<Role, Partial<CapabilitySet>>> = {
   agent: { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
            templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
            editReports: false },
+  // Publishing is signing: the report goes out under the inspector's name. Pinned off
+  // so no override or permission template can hand it to an office user; a company
+  // that wants office publishing makes that person a manager. Only this one bit is
+  // pinned, every other staff capability stays adjustable.
+  staff: { publish: false },
 };
 
 /** The capabilities an override cannot change for `role`. A form uses this to show those switches as fixed. */

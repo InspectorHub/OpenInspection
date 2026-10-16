@@ -15,7 +15,7 @@ const TP = { v: true, pinned: true }, FP = { v: false, pinned: true };
 
 const TABLE: Record<Capability, Record<Role, Cell>> = {
   //                    owner manager inspector staff agent
-  publish:           { owner: TP, manager: T, inspector: T, staff: T, agent: FP },
+  publish:           { owner: TP, manager: T, inspector: T, staff: FP, agent: FP },
   scheduleOthers:    { owner: TP, manager: T, inspector: F, staff: T, agent: FP },
   inspectionFees:    { owner: TP, manager: T, inspector: T, staff: T, agent: FP },
   companyFinance:    { owner: TP, manager: T, inspector: F, staff: F, agent: FP },
@@ -88,9 +88,21 @@ describe('pinnedCapabilities', () => {
     }
   });
 
-  it('leaves the roles a company configures per person with nothing pinned', () => {
+  it('leaves inspector and manager with nothing pinned, and pins exactly publish for staff', () => {
     expect(pinnedCapabilities('inspector')).toEqual([]);
-    expect(pinnedCapabilities('staff')).toEqual([]);
     expect(pinnedCapabilities('manager')).toEqual([]);
+    expect(pinnedCapabilities('staff')).toEqual(['publish']);
+  });
+
+  it('staff publish is off by default and no override or template-style sheet turns it on, while their other bits still move', () => {
+    expect(getCapabilities('staff', null).publish).toBe(false);
+    expect(getCapabilities('staff', { publish: true }).publish).toBe(false);
+    const all = Object.fromEntries(TOGGLEABLE.map((c) => [c, true]));
+    const caps = getCapabilities('staff', all);
+    expect(caps.publish).toBe(false);
+    expect(TOGGLEABLE.filter((c) => c !== 'publish' && !caps[c])).toEqual([]);
+    // Control: a manager and an inspector do hold it.
+    expect(getCapabilities('manager', null).publish).toBe(true);
+    expect(getCapabilities('inspector', null).publish).toBe(true);
   });
 });

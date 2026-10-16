@@ -122,9 +122,13 @@ describe("the role select offers staff", () => {
 });
 
 describe("fixed switches show as locked", () => {
-    it("locks nothing for staff, inspector or manager (none of them has a pinned switch)", () => {
-        for (const role of ["staff", "inspector", "manager"] as const) {
+    it("locks nothing for inspector or manager (neither has a pinned switch)", () => {
+        for (const role of ["inspector", "manager"] as const) {
             expect(TOGGLEABLE.filter((cap) => isCapabilityLocked(role, cap))).toEqual([]);
         }
+    });
+
+    it("locks exactly publish for staff (it is always off for them), and no other switch", () => {
+        expect(TOGGLEABLE.filter((cap) => isCapabilityLocked("staff", cap))).toEqual(["publish"]);
     });
 });

@@ -363,9 +363,7 @@ const publishRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const body = c.req.valid('json');
         const service = c.var.services.inspection;
-        // Build the publish options explicitly so `recipients` is omitted (not
-        // set to `undefined`) when absent — exactOptionalPropertyTypes rejects
-        // `recipients: X[] | undefined` against the service's optional param.
+        // Built explicitly so `recipients` is omitted (not `undefined`) when absent (exactOptionalPropertyTypes).
         const publishOptions: Parameters<typeof service.publishInspection>[2] = {
             theme: body.theme,
             requireSignature: body.requireSignature,
@@ -373,6 +371,7 @@ const publishRoutes = createApiRouter()
             sendAgreementCopy: body.sendAgreementCopy,
             ...(body.recipients ? { recipients: body.recipients } : {}),
             ...(body.reportId ? { reportId: body.reportId } : {}),
+            actor: { userId: c.get('user').sub, role: c.get('userRole') },
         };
         const result = await service.publishInspection(id, tenantId, publishOptions);
 

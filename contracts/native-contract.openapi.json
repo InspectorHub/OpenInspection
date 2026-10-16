@@ -59,7 +59,8 @@
         ],
         "summary": "Create ai comment assist",
         "operationId": "createAiCommentAssist",
-        "description": "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it.",
+        "description": "Rewrite a rough inspector note as clear report prose. Returns the rewritten text and the id of the AI call record that produced it. Requires the editReports capability; office staff do not have it by default.",
+        "x-capability": "editReports",
         "requestBody": {
           "content": {
             "application/json": {
@@ -90,7 +91,8 @@
         ],
         "summary": "Record a human review of AI-assisted content",
         "operationId": "createAiContentReview",
-        "description": "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate.",
+        "description": "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate. Requires the editReports capability; office staff do not have it by default.",
+        "x-capability": "editReports",
         "requestBody": {
           "content": {
             "application/json": {
