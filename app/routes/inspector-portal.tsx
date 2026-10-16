@@ -72,7 +72,7 @@ import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock
 import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
 import { resolveReferralSources } from "../../server/lib/referral-sources";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
-import { hubAccess, meAccessFromBody } from "~/lib/hub-access";
+import { canSendReportFor, hubAccess, mayActOnThisInspection, meAccessFromBody } from "~/lib/hub-access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { useModalFetcher } from "~/hooks/useModalFetcher";
@@ -144,6 +144,8 @@ interface HubData extends HubPayload {
   // One order, several deliverables. Optional so an older payload still renders.
   reports?: ReportRow[];
   communication?: { delivered: number; needsAttention: number; unread: number; rulesActive: number };
+  /** Server-decided facts for the cancel and restore controls (a yes/no and a status, never an amount). */
+  lifecycle: { moneyCollected: boolean; statusBeforeCancel: string | null };
 }
 
 interface PeopleAgent {
@@ -355,7 +357,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     consentP, meP, peopleP, roleProfilesP, documentsP, membersP, catalogP, brandingP, versionsP, statutoryP,
   ]);
 
-  const { canPublishCap, canViewCommunication, canSendReport, role, isAdmin } = me;
+  const { canPublishCap, canViewCommunication, scheduleOthers, userId, role, isAdmin } = me;
   const serviceCatalog: CatalogService[] = catalogRows.map((sv) => ({ id: sv.id, name: sv.name, price: sv.price }));
   const referralSources = resolveReferralSources(customReferralSources);
 
@@ -410,7 +412,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const { visits, visitTypes, suggestedTypeIds } = visitData;
 
   return {
-    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, canSendReport, documents, people, roleProfiles, isAdmin, versions,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, scheduleOthers, userId, documents, people, roleProfiles, isAdmin, versions,
     members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   };
 }
@@ -627,7 +629,7 @@ export function reportActions(
 
 export default function InspectionHubPage() {
   const {
-    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, canSendReport, documents, people, roleProfiles, isAdmin, versions,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, scheduleOthers, userId, documents, people, roleProfiles, isAdmin, versions,
     members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   } = useLoaderData<typeof loader>();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
@@ -639,7 +641,10 @@ export default function InspectionHubPage() {
   const fmt = useInspectionDateTimeFormat();
   const blocks = deriveBlockStates(hub);
   // Office staff run the booking, not the inspection: the order controls stay, the inspector's own ones stand down (~/lib/hub-access).
-  const access = hubAccess({ role, status: inspection.status, reportStatus: inspection.reportStatus, moneyCollected: inspection.paymentStatus !== "unpaid" || hub.invoice?.status === "paid" });
+  const viewer = { isAdmin, scheduleOthers, userId, canPublishCap, role };
+  const mayAct = mayActOnThisInspection(viewer, inspection.inspectorId);
+  const canSendReport = canSendReportFor(viewer, inspection.inspectorId);
+  const access = hubAccess({ role, status: inspection.status, reportStatus: inspection.reportStatus, mayAct, ...hub.lifecycle });
   const { canEditOrder } = access;
   const canEditReports = useCapability("editReports");
   const navigate = useNavigate();

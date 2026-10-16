@@ -5,7 +5,7 @@
  * every control. The server makes finer calls, so the page asks the same ones:
  *
  * - the BOOKING (people, price, requirements, references, cancelling a job nothing
- *   has been collected on) is open to office staff;
+ *   has been collected on) is open to office staff who may act on the job;
  * - the INSPECTION (marking the visit complete, the report editor, publishing) is not;
  * - who, where and when freeze for staff once the inspection has started;
  * - staff turn a payment or agreement requirement on, never off.
@@ -24,35 +24,59 @@ import { REPORT_STATUS } from "../../server/lib/status/report-status";
 export interface MeAccess {
   canPublishCap: boolean;
   canViewCommunication: boolean;
-  /** Sending an already published report is not publishing it, so it has its own flag. */
-  canSendReport: boolean;
+  /** Whether this user holds `scheduleOthers`: the capability that lets them act on a job they are not on. */
+  scheduleOthers: boolean;
+  userId: string | null;
   role: string;
   isAdmin: boolean;
 }
 
 /** The viewer's access from the `/auth/me` body. A missing or failed body resolves to the narrowest answer. */
 export function meAccessFromBody(
-  meBody: { data?: { user?: { role?: string }; capabilities?: { publish?: boolean; viewCommunication?: boolean; scheduleOthers?: boolean } } } | null,
+  meBody: { data?: { user?: { id?: string; role?: string }; capabilities?: { publish?: boolean; viewCommunication?: boolean; scheduleOthers?: boolean } } } | null,
 ): MeAccess {
-  if (!meBody) return { canPublishCap: false, canViewCommunication: false, canSendReport: false, role: "inspector", isAdmin: false };
+  if (!meBody) return { canPublishCap: false, canViewCommunication: false, scheduleOthers: false, userId: null, role: "inspector", isAdmin: false };
   const role = meBody.data?.user?.role ?? "inspector";
-  const isAdmin = isAdminRole(role);
   return {
     canPublishCap: publishCapFromMe(meBody),
     canViewCommunication: viewCommunicationCapFromMe(meBody),
-    // The server lets a user send a report on a job they work, or any job with scheduleOthers.
-    canSendReport: isAdmin || role === "inspector" || meBody.data?.capabilities?.scheduleOthers === true,
+    scheduleOthers: meBody.data?.capabilities?.scheduleOthers === true,
+    userId: meBody.data?.user?.id ?? null,
     role,
-    isAdmin,
+    isAdmin: isAdminRole(role),
   };
+}
+
+/**
+ * Whether the viewer may act on THIS inspection: an owner or manager, someone with
+ * `scheduleOthers`, or the inspector it is assigned to. The server's `mayActOnInspection`
+ * also counts helpers on the roster, which the page cannot see; such a viewer is
+ * under-offered here, never over-offered.
+ */
+export function mayActOnThisInspection(me: Pick<MeAccess, "isAdmin" | "scheduleOthers" | "userId">, inspectorId: string | null): boolean {
+  return me.isAdmin || me.scheduleOthers || (me.userId !== null && me.userId === inspectorId);
+}
+
+/**
+ * Sending an already published report is not publishing it, so it is not the publish
+ * capability the server checks: it needs a place on the job or `scheduleOthers`. For
+ * everyone but staff the page keeps the earlier condition as well (an inspector whose
+ * publish was withdrawn is not offered a send); staff never hold publish.
+ */
+export function canSendReportFor(me: Pick<MeAccess, "canPublishCap" | "isAdmin" | "scheduleOthers" | "userId" | "role">, inspectorId: string | null): boolean {
+  return mayActOnThisInspection(me, inspectorId) && (isStaffRole(me.role) || me.canPublishCap);
 }
 
 export interface HubAccessInput {
   role: string;
   status: string;
   reportStatus: string;
-  /** Money has been collected on this inspection (an invoice paid, a deposit held). */
+  /** Money has been collected on this inspection (the server's own answer: invoice payments and held deposits count). */
   moneyCollected: boolean;
+  /** `mayActOnThisInspection` for the viewer. */
+  mayAct: boolean;
+  /** For a cancelled inspection, the status it had before; null when unknown or not cancelled. */
+  statusBeforeCancel: string | null;
 }
 
 export interface HubAccess {
@@ -72,18 +96,18 @@ export function inspectionStartedForView(status: string, reportStatus: string): 
   return status === INSPECTION_STATUS.COMPLETED || reportStatus !== REPORT_STATUS.IN_PROGRESS;
 }
 
-export function hubAccess({ role, status, reportStatus, moneyCollected }: HubAccessInput): HubAccess {
+export function hubAccess({ role, status, reportStatus, moneyCollected, mayAct, statusBeforeCancel }: HubAccessInput): HubAccess {
   if (!isStaffRole(role)) {
     return { canEditOrder: true, canEditInspection: true, canChangeSchedule: true, canCancel: true, canRestore: true, canTurnGateOff: true };
   }
   const started = inspectionStartedForView(status, reportStatus);
   return {
-    canEditOrder: true,
+    canEditOrder: mayAct,
     canEditInspection: false,
-    canChangeSchedule: !started,
-    canCancel: !started && !moneyCollected,
-    // A restore brings back the status the job had; one that had started may have been completed.
-    canRestore: reportStatus === REPORT_STATUS.IN_PROGRESS,
+    canChangeSchedule: mayAct && !started,
+    canCancel: mayAct && !started && !moneyCollected,
+    // The server restores staff only to a status the cancellation recorded, and never a completed one.
+    canRestore: mayAct && statusBeforeCancel !== null && statusBeforeCancel !== INSPECTION_STATUS.COMPLETED,
     canTurnGateOff: false,
   };
 }

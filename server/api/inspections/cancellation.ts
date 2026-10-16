@@ -20,7 +20,8 @@ import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { CANCELLATION_REASONS } from '../../lib/cancellation-reason';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
-import { auditFromContext } from '../../lib/audit';
+import { auditFromContextAwaited } from '../../lib/audit';
+import { logger } from '../../lib/logger';
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { quoteCancellation, applyCancellationRefund } from '../../services/inspection/cancellation.service';
@@ -216,7 +217,9 @@ const cancellationRoutes = createApiRouter()
         // The audit metadata names the money, because that is the part of a
         // cancellation nobody can reconstruct from the row afterwards.
         pushInspectionAfterResponse(c, tenantId, id);
-        auditFromContext(c, 'inspection.status_change', 'inspection', {
+        // AWAITED, not fire-and-forget: `from` is the only durable record of the status this job had, and a
+        // restore reads it back. The money has already moved, so a failed write is logged, not turned into a 500.
+        await auditFromContextAwaited(c, 'inspection.status_change', 'inspection', {
             entityId: id,
             metadata: {
                 from,
@@ -226,7 +229,7 @@ const cancellationRoutes = createApiRouter()
                 refundCents: quote.outcome.refundCents,
                 refundPaymentId: refund?.row.id ?? null,
             },
-        });
+        }).catch((e) => logger.error('cancel audit write failed', { inspectionId: id }, e instanceof Error ? e : undefined));
 
         // THE SEAM. All three refund writers reach money through
         // `applyCancellationRefund`, and this is the only production entry to
@@ -268,10 +271,11 @@ const cancellationRoutes = createApiRouter()
         // The calendar entry was REMOVED by the cancel — pushInspectionToGoogle
         // re-reads the row and puts it back, same call, no case analysis here.
         pushInspectionAfterResponse(c, tenantId, id);
-        auditFromContext(c, 'inspection.status_change', 'inspection', {
+        // Awaited like the cancel row: it marks the cancellation it ends as spent (see `recordedStatusBeforeCancel`).
+        await auditFromContextAwaited(c, 'inspection.status_change', 'inspection', {
             entityId: id,
             metadata: { from: INSPECTION_STATUS.CANCELLED, to: restored },
-        });
+        }).catch((e) => logger.error('restore audit write failed', { inspectionId: id }, e instanceof Error ? e : undefined));
         return c.json({ success: true });
     });
 

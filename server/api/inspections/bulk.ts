@@ -27,6 +27,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import { moneyView } from '../../lib/auth/money-access';
 import { safeISODate } from '../../lib/date';
+import { assertStaffMayMove } from './staff-order-guard';
 
 /**
  * `getDashboardBuckets` hands back raw `inspections` rows, whose `created_at` /
@@ -300,6 +301,8 @@ const bulkRoutes = createApiRouter()
 
         if (body.action === 'assignInspector') {
             if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
+            // Staff cannot move a job that has started; the whole batch is refused, as for a cancelled member below.
+            await assertStaffMayMove(c, body.ids);
             const assignee = await db.select({ id: users.id }).from(users)
                 .where(and(eq(users.id, body.inspectorId), eq(users.tenantId, tenantId), inArray(users.role, [...FIELD_ROLES])))
                 .limit(1).get();

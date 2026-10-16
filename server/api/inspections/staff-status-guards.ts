@@ -14,7 +14,7 @@ import { Errors } from '../../lib/errors';
 import { getDrizzle } from '../../lib/route-helpers';
 import { mayActOnInspection } from '../../lib/inspection/assignment-access';
 import { loadInspectionStarted } from '../../lib/inspection/inspection-started';
-import { statusBeforeCancel } from '../../lib/inspection/cancel-restore';
+import { recordedStatusBeforeCancel } from '../../lib/inspection/cancel-restore';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import type { HonoConfig } from '../../types/hono';
 
@@ -57,7 +57,13 @@ export async function assertStaffMayCancel(c: Context<HonoConfig>, id: string, c
     }
 }
 
-/** POST /:id/uncancel: staff restore a cancelled booking, but not one that was completed when it was cancelled. */
+/**
+ * POST /:id/uncancel: staff restore a cancelled booking only when the cancellation
+ * recorded the status it left, and that status was not `completed`. A cancellation with
+ * no record (written before the status was kept, or whose record was lost) cannot say
+ * what it was, and restoring a finished visit as a scheduled one is the one thing staff
+ * must not do; an owner or manager restores those from what the row still says.
+ */
 export async function guardStaffUncancel(c: Context<HonoConfig>, next: Next) {
     if (isStaff(c)) {
         const id = c.req.param('id') ?? '';
@@ -66,11 +72,9 @@ export async function guardStaffUncancel(c: Context<HonoConfig>, next: Next) {
         await assertWorksOrSchedulesOthers(c, id);
         // Only a cancelled job has a "before"; anything else is left to the service to refuse.
         if (inspection.status === INSPECTION_STATUS.CANCELLED) {
-            const before = await statusBeforeCancel(getDrizzle(c), tenantId, {
-                id, reportStatus: inspection.reportStatus, confirmedAt: inspection.confirmedAt,
-            });
-            if (before === INSPECTION_STATUS.COMPLETED) {
-                throw Errors.Forbidden('Office staff cannot restore an inspection that was completed before it was cancelled');
+            const before = await recordedStatusBeforeCancel(getDrizzle(c), tenantId, id);
+            if (before === null || before === INSPECTION_STATUS.COMPLETED) {
+                throw Errors.Forbidden('An owner or manager has to restore this inspection: it may have been completed before it was cancelled');
             }
         }
     }

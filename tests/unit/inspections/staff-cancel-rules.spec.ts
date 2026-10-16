@@ -81,17 +81,9 @@ const readJob = () => db.select().from(schema.inspections).where(eq(schema.inspe
 const setJob = (values: Partial<typeof schema.inspections.$inferInsert>) =>
     db.update(schema.inspections).set(values).where(eq(schema.inspections.id, JOB));
 
-/** The status-change rows the cancel route has written, kept as the audit table would hold them. */
-async function persistAuditRows(): Promise<void> {
-    for (const [i, call] of auditSpy.mock.calls.entries()) {
-        const [, action, entityType, options] = call as [unknown, string, string, { entityId?: string; metadata?: Record<string, unknown> }];
-        if (action !== 'inspection.status_change') continue;
-        await db.insert(schema.auditLogs).values({
-            id: `audit-${i}`, tenantId: T, userId: ACTOR, action, entityType, entityId: options.entityId ?? null,
-            metadata: options.metadata ?? null, createdAt: new Date(1_800_000_000_000 + i),
-        } as typeof schema.auditLogs.$inferInsert);
-    }
-}
+/** The cancel and restore rows the routes wrote, oldest first. */
+const statusRows = async () => (await db.select().from(schema.auditLogs).where(eq(schema.auditLogs.action, 'inspection.status_change')).all())
+    .sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime());
 
 beforeEach(async () => {
     auditSpy.mockClear();
@@ -117,8 +109,8 @@ describe('cancel', () => {
         const res = await cancel(buildApp('staff'));
         expect(res.status, await res.clone().text()).toBe(200);
         expect((await readJob())?.status).toBe('cancelled');
-        const call = auditSpy.mock.calls.find((c) => (c as unknown[])[1] === 'inspection.status_change') as unknown[];
-        expect((call[3] as { metadata: Record<string, unknown> }).metadata).toMatchObject({ from: 'scheduled', to: 'cancelled' });
+        // Written through the awaited helper, so it is in the table by the time the response returns.
+        expect((await statusRows()).map((r) => r.metadata)).toEqual([expect.objectContaining({ from: 'scheduled', to: 'cancelled' })]);
     });
 
     it('refuses staff a job with money collected on it, however the money is recorded, and changes nothing', async () => {
@@ -176,15 +168,29 @@ describe('cancel', () => {
     });
 });
 
+describe('cancelling twice', () => {
+    it('is refused, and the first cancellation record is left as it was', async () => {
+        expect((await cancel(buildApp('owner'))).status).toBe(200);
+        const again = await cancel(buildApp('owner'));
+        expect(again.status, await again.clone().text()).toBe(400);
+        expect(await statusRows()).toHaveLength(1);
+        expect((await readJob())?.status).toBe('cancelled');
+    });
+
+    it('POSITIVE CONTROL - after a restore the job can be cancelled again', async () => {
+        expect((await cancel(buildApp('owner'))).status).toBe(200);
+        expect((await post(buildApp('owner'), '/uncancel')).status).toBe(200);
+        expect((await cancel(buildApp('owner'))).status).toBe(200);
+    });
+});
+
 describe('restore', () => {
     async function ownerCancels(): Promise<void> {
         expect((await cancel(buildApp('owner'))).status).toBe(200);
-        await persistAuditRows();
     }
 
     it.each(['requested', 'scheduled', 'confirmed'] as const)('brings back a job that was %s when it was cancelled, for staff and for an owner', async (before) => {
         for (const role of ['staff', 'owner'] as const) {
-            auditSpy.mockClear();
             await db.delete(schema.auditLogs);
             await setJob({ status: before, cancelReason: null });
             await ownerCancels();
@@ -208,19 +214,53 @@ describe('restore', () => {
         expect([row?.cancelReason, row?.cancelNotes]).toEqual([null, null]);
     });
 
-    it('reads a cancellation recorded without its old status from what the row still says', async () => {
+    it('a cancellation with no record: an owner restores from what the row says, staff are refused', async () => {
         // A published report belongs to a finished visit; a confirmation stamp to a confirmed one; otherwise scheduled.
-        await setJob({ status: 'cancelled', cancelReason: 'client_cancelled', reportStatus: 'published' });
+        const cases: Array<[Partial<typeof schema.inspections.$inferInsert>, string]> = [
+            [{ reportStatus: 'published' }, 'completed'],
+            [{ reportStatus: 'in_progress', confirmedAt: new Date(1_700_000_000_000) }, 'confirmed'],
+            [{ reportStatus: 'in_progress', confirmedAt: null }, 'scheduled'],
+        ];
+        for (const [state, expected] of cases) {
+            await setJob({ status: 'cancelled', cancelReason: 'client_cancelled', ...state });
+            expect((await post(buildApp('staff'), '/uncancel')).status, expected).toBe(403);
+            expect((await readJob())?.status).toBe('cancelled');
+            expect((await post(buildApp('owner'), '/uncancel')).status, expected).toBe(200);
+            expect((await readJob())?.status).toBe(expected);
+        }
+    });
+
+    it('a job that was completed with its report still in progress is not restored by staff, and stays completed for an owner', async () => {
+        await setJob({ status: 'completed', reportStatus: 'in_progress' });
+        await ownerCancels();
         expect((await post(buildApp('staff'), '/uncancel')).status).toBe(403);
         expect((await post(buildApp('owner'), '/uncancel')).status).toBe(200);
         expect((await readJob())?.status).toBe('completed');
+    });
 
-        await setJob({ status: 'cancelled', cancelReason: 'client_cancelled', reportStatus: 'in_progress', confirmedAt: new Date(1_700_000_000_000) });
-        expect((await post(buildApp('staff'), '/uncancel')).status).toBe(200);
+    it('only the latest cancellation counts: a record from an earlier cancel and restore cycle is not reused', async () => {
+        // Cycle 1: confirmed, cancelled, restored. Cycle 2: the job is completed, cancelled with its record lost.
+        await setJob({ status: 'confirmed' });
+        await ownerCancels();
+        expect((await post(buildApp('owner'), '/uncancel')).status).toBe(200);
         expect((await readJob())?.status).toBe('confirmed');
+        await setJob({ status: 'completed', reportStatus: 'published' });
+        await ownerCancels();
+        // Lose the second cancel's row only; the first cycle's rows stay.
+        const rows = await statusRows();
+        await db.delete(schema.auditLogs).where(eq(schema.auditLogs.id, rows[rows.length - 1]!.id));
+        expect((await post(buildApp('staff'), '/uncancel')).status).toBe(403);
+        expect((await post(buildApp('owner'), '/uncancel')).status).toBe(200);
+        expect((await readJob())?.status, 'derived from the row, not the earlier cycle').toBe('completed');
+    });
 
-        await setJob({ status: 'cancelled', cancelReason: 'client_cancelled', confirmedAt: null });
-        expect((await post(buildApp('staff'), '/uncancel')).status).toBe(200);
+    it('ignores a recorded status of cancelled', async () => {
+        await setJob({ status: 'cancelled', reportStatus: 'in_progress', confirmedAt: null });
+        await db.insert(schema.auditLogs).values({
+            id: 'a-bad', tenantId: T, userId: ACTOR, action: 'inspection.status_change', entityType: 'inspection', entityId: JOB,
+            metadata: { from: 'cancelled', to: 'cancelled' }, createdAt: new Date(),
+        } as typeof schema.auditLogs.$inferInsert);
+        expect((await post(buildApp('owner'), '/uncancel')).status).toBe(200);
         expect((await readJob())?.status).toBe('scheduled');
     });
 
@@ -251,7 +291,6 @@ describe('restore', () => {
         const before = await snapshot();
 
         expect((await cancel(buildApp('staff'))).status).toBe(200);
-        await persistAuditRows();
         expect((await post(buildApp('staff'), '/uncancel')).status).toBe(200);
         expect(await snapshot()).toBe(before);
         expect((await readJob())?.status).toBe('scheduled');

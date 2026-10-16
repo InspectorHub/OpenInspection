@@ -254,4 +254,54 @@ describe('staff on the inspection routes', () => {
             expect(res.status).toBe(403);
         });
     });
+    describe('once the inspection has started, staff cannot move or reassign it through any route', () => {
+        const startIt = [
+            ['the report was submitted', () => db.update(schema.inspections).set({ reportStatus: REPORT_STATUS.SUBMITTED }).where(eq(schema.inspections.id, INSP_ID))],
+            ['the visit is completed', () => db.update(schema.inspections).set({ status: INSPECTION_STATUS.COMPLETED }).where(eq(schema.inspections.id, INSP_ID))],
+            ['a results row holds a key', () => db.insert(schema.inspectionResults).values({
+                id: 'res-1', tenantId: TENANT, inspectionId: INSP_ID, data: { item1: { rating: 'good' } }, lastSyncedAt: new Date(),
+            })],
+        ] as const;
+
+        it.each(startIt)('PATCH /:id/schedule is refused to staff once %s, and nothing changes', async (_name, start) => {
+            await start();
+            const app = buildApp('staff');
+            expect((await send(app, 'PATCH', `/${INSP_ID}/schedule`, { scheduledStartMs: START_MS })).status).toBe(403);
+            expect((await send(app, 'PATCH', `/${INSP_ID}/schedule`, { scheduledStartMs: START_MS, leadInspectorId: LEAD_B })).status).toBe(403);
+            const row = await readRow();
+            expect([row?.scheduledStartMs, row?.inspectorId]).toEqual([null, LEAD_A]);
+        });
+
+        it.each(startIt)('bulk assignInspector is refused to staff once %s, and nothing changes', async (_name, start) => {
+            await start();
+            const res = await send(buildApp('staff'), 'PATCH', '/bulk', { ids: [INSP_ID], action: 'assignInspector', inspectorId: LEAD_B });
+            expect(res.status).toBe(403);
+            expect((await readRow())?.inspectorId).toBe(LEAD_A);
+        });
+
+        it('bulk refuses the whole batch when one member has started, and moves none', async () => {
+            await db.insert(schema.inspections).values({
+                id: 'other-job', tenantId: TENANT, propertyAddress: '2 Elm St', date: '2026-06-02', inspectorId: LEAD_A,
+                status: INSPECTION_STATUS.COMPLETED, reportStatus: REPORT_STATUS.IN_PROGRESS, price: 0, createdAt: new Date(),
+            });
+            const res = await send(buildApp('staff'), 'PATCH', '/bulk', { ids: [INSP_ID, 'other-job'], action: 'assignInspector', inspectorId: LEAD_B });
+            expect(res.status).toBe(403);
+            expect((await readRow())?.inspectorId).toBe(LEAD_A);
+        });
+
+        it('POSITIVE CONTROL - an unstarted job is moved and reassigned by staff through both routes', async () => {
+            const staff = buildApp('staff');
+            expect((await send(staff, 'PATCH', `/${INSP_ID}/schedule`, { scheduledStartMs: START_MS })).status).toBe(200);
+            expect((await send(staff, 'PATCH', '/bulk', { ids: [INSP_ID], action: 'assignInspector', inspectorId: LEAD_B })).status).toBe(200);
+            expect((await readRow())?.inspectorId).toBe(LEAD_B);
+        });
+
+        it('POSITIVE CONTROL - an owner moves and reassigns a started job through both routes', async () => {
+            await db.update(schema.inspections).set({ reportStatus: REPORT_STATUS.SUBMITTED }).where(eq(schema.inspections.id, INSP_ID));
+            const owner = buildApp('owner');
+            expect((await send(owner, 'PATCH', `/${INSP_ID}/schedule`, { scheduledStartMs: START_MS })).status).toBe(200);
+            expect((await send(owner, 'PATCH', '/bulk', { ids: [INSP_ID], action: 'assignInspector', inspectorId: LEAD_B })).status).toBe(200);
+            expect((await readRow())?.inspectorId).toBe(LEAD_B);
+        });
+    });
 });

@@ -15,7 +15,7 @@ import { Errors } from '../../lib/errors';
 import { auditFromContext } from '../../lib/audit';
 import { getDrizzle } from '../../lib/route-helpers';
 import { classifyStaffPatch, type StaffPatchRefusal } from '../../lib/inspection/order-fields';
-import { loadInspectionStarted } from '../../lib/inspection/inspection-started';
+import { anyInspectionStarted, loadInspectionStarted } from '../../lib/inspection/inspection-started';
 import { mayActOnInspection } from '../../lib/inspection/assignment-access';
 import type { HonoConfig } from '../../types/hono';
 
@@ -63,4 +63,17 @@ export function auditStaffOrderEdit(c: Context<HonoConfig>, id: string, changed:
         entityId: id,
         metadata: { fields: fields.join(','), count: fields.length },
     });
+}
+
+/**
+ * Who, where and when freeze for staff once an inspection has started. The PATCH body
+ * rule covers `PATCH /:id`; the schedule and bulk-assign routes move the same facts, so
+ * they ask the same question here. Refuses the whole request (403, nothing written) when
+ * any of the inspections has started. Other roles pass.
+ */
+export async function assertStaffMayMove(c: Context<HonoConfig>, ids: readonly string[]): Promise<void> {
+    if (c.get('userRole') !== 'staff') return;
+    if (await anyInspectionStarted(getDrizzle(c), c.get('tenantId'), ids)) {
+        throw Errors.Forbidden(REFUSAL_TEXT.started_locked);
+    }
 }

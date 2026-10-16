@@ -550,6 +550,7 @@ export default function InspectionsPage() {
   // indefinitely; the hook clears it once the server confirms the delete.
   const purgeOfflineData = useOfflinePurgeOnDelete(fetcher);
   const canDelete = useCapability("deleteInspection");
+  const canScheduleOthers = useCapability("scheduleOthers");
   // Staff book jobs and set the booking's status; they have no setup checklist, no completed visits, and no editor.
   const isStaff = sessionCtx !== null && isStaffRole(sessionCtx.user.role);
   const canOpenEditor = useCapability("editReports");
@@ -681,7 +682,7 @@ export default function InspectionsPage() {
       toggleSelect={toggleSelect}
       transitionStatus={transitionStatus}
       timeZone={displayTz}
-      orderStatusesOnly={isStaff}
+      orderStatusesOnly={isStaff} canChangeStatus={!isStaff || canScheduleOthers}
       canOpenEditor={canOpenEditor}
     />
   );

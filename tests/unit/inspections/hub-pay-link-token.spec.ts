@@ -19,6 +19,11 @@ import { inspectionsRoutes } from '../../../server/api/inspections';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 
+// The lifecycle facts have their own spec (hub-lifecycle.spec.ts); this one stubs the database away.
+vi.mock('../../../server/lib/inspection/hub-lifecycle', () => ({
+    hubLifecycle: async () => ({ moneyCollected: false, statusBeforeCancel: null }),
+}));
+
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SLUG = 'acme';

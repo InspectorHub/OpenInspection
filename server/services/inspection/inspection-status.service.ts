@@ -38,6 +38,8 @@ export class InspectionStatusService extends InspectionSubService {
     /** Cancels, and returns the status the inspection had, which the caller records so a restore can bring it back. */
     async cancelInspection(tenantId: string, id: string, reason: CancellationReason, notes?: string): Promise<InspectionStatus> {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, id);
+        // A second cancel would record "cancelled" as the status to restore to, and its fee and refund would be applied again.
+        if (inspection.status === INSPECTION_STATUS.CANCELLED) throw Errors.BadRequest('Inspection is already cancelled');
         await db.update(inspections).set({
             status:       INSPECTION_STATUS.CANCELLED,
             cancelReason: reason,

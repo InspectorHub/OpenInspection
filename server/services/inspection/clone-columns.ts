@@ -10,7 +10,9 @@
  * Carried: where and what (address, property facts, template and its snapshot), who
  * (the inspector), and the booking terms (price, requirements, references, deposit).
  * Not carried, so they start as the table defaults: report and payment state,
- * signature switch, cover, confirmation, cancellation, unlock, schedule instants,
+ * signature switch, the per-inspection report look overrides (profile, badge layout,
+ * photo columns, required defect fields: inspection-side fields an office user cannot
+ * set, so a copy must not hand them on), cover, confirmation, cancellation, unlock, schedule instants,
  * request and re-inspection links, concierge state, discount, and the inspection's own
  * findings-side data (property facts envelope, PCA narrative, deviations, sampling).
  */
@@ -66,10 +68,6 @@ export function cloneInsertValues(source: Row, fresh: { id: string; tenantId: st
         disableAutomations: source.disableAutomations,
         teamMode: source.teamMode,
         durationMin: source.durationMin,
-        profileOverride: source.profileOverride,
-        requireDefectFieldsOverride: source.requireDefectFieldsOverride,
-        badgeLayoutOverride: source.badgeLayoutOverride,
-        reportPhotoColumns: source.reportPhotoColumns,
         reportPhotoMode: source.reportPhotoMode,
     };
 }

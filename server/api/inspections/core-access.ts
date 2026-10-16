@@ -23,7 +23,7 @@ import { getDrizzle } from '../../lib/route-helpers';
 import { invoices } from '../../lib/db/schema';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { sameMoment } from '../../lib/inspection/order-fields';
-import { assertStaffMayPatch, auditStaffOrderEdit } from './staff-order-guard';
+import { assertStaffMayMove, assertStaffMayPatch, auditStaffOrderEdit } from './staff-order-guard';
 import type { HonoConfig } from '../../types/hono';
 
 export async function guardPatchReschedule(c: Context<HonoConfig>, next: Next) {
@@ -58,6 +58,7 @@ export async function guardInspectionDelete(c: Context<HonoConfig>, next: Next) 
 export async function guardScheduleMove(c: Context<HonoConfig>, next: Next) {
     const body = (await c.req.json().catch(() => null)) as { leadInspectorId?: unknown; helperInspectorIds?: unknown } | null;
     const reassigns = body?.leadInspectorId !== undefined || body?.helperInspectorIds !== undefined;
+    await assertStaffMayMove(c, [c.req.param('id') ?? '']);
     if (!(await mayChangeSchedule(c, c.req.param('id') ?? '', reassigns))) {
         throw Errors.Forbidden("Requires the 'scheduleOthers' capability to reassign, or to move an inspection you do not work");
     }

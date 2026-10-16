@@ -53,7 +53,7 @@ export async function applyAutoSignatureOnPublish(
     }
 
     const resultsRow = await db.select().from(inspectionResults)
-        .where(eq(inspectionResults.inspectionId, inspectionId)).get();
+        .where(and(eq(inspectionResults.tenantId, tenantId), eq(inspectionResults.inspectionId, inspectionId))).get();
     const data: Record<string, unknown> = (resultsRow?.data as Record<string, unknown>) ?? {};
     data._inspector_signature = {
         signatureBase64: inspector.defaultSignatureBase64,

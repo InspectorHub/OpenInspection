@@ -121,7 +121,7 @@ describe('office staff create, copy and re-inspect', () => {
             id: SOURCE_ID, tenantId: TENANT_ID, inspectorId: INSPECTOR_ID, propertyAddress: '7 Source Road', date: '2026-05-01',
             templateId: TEMPLATE_ID, status: 'completed' as const, reportStatus: 'published' as const, paymentStatus: 'paid' as const,
             price: 52000, paymentRequired: true, agreementRequired: true, sqft: 1800, yearBuilt: 1975, referenceNumber: 'REF-7',
-            autoSignOnPublish: true, confirmedAt: new Date(1_700_000_000_000), cancelReason: 'client_cancelled' as const, cancelNotes: 'old note',
+            autoSignOnPublish: true, profileOverride: 'meridian', badgeLayoutOverride: 'inline' as const, reportPhotoColumns: 3, requireDefectFieldsOverride: 'both' as const, confirmedAt: new Date(1_700_000_000_000), cancelReason: 'client_cancelled' as const, cancelNotes: 'old note',
             unlockedAt: new Date(1_700_000_000_000), unlockedBy: OWNER_ID, unlockReason: 'released',
             coverPhotoId: 'old/cover.jpg', coverImageKey: 'old/cover-key.jpg', scheduledStartMs: new Date(1_700_000_000_000),
             scheduledEndMs: new Date(1_700_003_600_000), reportsGeneratedAt: new Date(1_700_000_000_000),
@@ -151,6 +151,7 @@ describe('office staff create, copy and re-inspect', () => {
             // Reset: one assertion per column the plan names.
             expect(clone?.reportStatus).toBe('in_progress');
             expect(clone?.autoSignOnPublish).toBe(false);
+            expect([clone?.profileOverride, clone?.badgeLayoutOverride, clone?.reportPhotoColumns, clone?.requireDefectFieldsOverride]).toEqual([null, null, null, null]);
             expect(clone?.paymentStatus).toBe('unpaid');
             expect((INSPECTION_STATUSES as readonly string[]).includes(clone?.status ?? '')).toBe(true);
             expect(clone?.status).toBe('requested');

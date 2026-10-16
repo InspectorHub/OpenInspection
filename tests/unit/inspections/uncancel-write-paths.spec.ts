@@ -199,11 +199,10 @@ describe('#81 — leaving `cancelled` goes through POST /api/inspections/:id/unc
             await seedCancelled();
             await postUncancel('cancelled');
 
-            expect(auditSpy).toHaveBeenCalledTimes(1);
-            expect(auditSpy.mock.calls[0]?.[1]).toBe('inspection.status_change');
-            expect(auditSpy.mock.calls[0]?.[3]).toMatchObject({
-                metadata: { from: 'cancelled', to: 'scheduled' },
-            });
+            // Written through the awaited helper (the restore marks the cancellation it ends as spent), so it is in the table.
+            const rows = await db.select().from(schema.auditLogs).where(eq(schema.auditLogs.action, 'inspection.status_change')).all();
+            expect(rows).toHaveLength(1);
+            expect(rows[0]?.metadata).toMatchObject({ from: 'cancelled', to: 'scheduled' });
         });
 
         it('restores the Google Calendar entry the cancel took off', async () => {
