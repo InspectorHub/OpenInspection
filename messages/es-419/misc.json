@@ -174,6 +174,8 @@
   "access_denied_you_are_staff": "Usted inició sesión como personal de oficina.",
   "access_denied_you_are_agent": "Usted inició sesión como Agente.",
   "access_denied_needs_admin": "Esta página es para propietarios y gerentes. Pida a un propietario o gerente que la abra por usted, o que cambie su rol en la página Equipo.",
+  "access_denied_needs_finance": "Esta página requiere el permiso «Finanzas de la empresa». Pida a un propietario que lo active para usted en la página Equipo.",
+  "access_denied_needs_not_staff": "Esta página no está disponible para cuentas de personal de oficina. Si la necesita, pida a un propietario que cambie su rol en la página Equipo.",
   "access_denied_needs_owner": "Esta página es para el propietario. Pida a un propietario que la abra por usted, o que cambie su rol en la página Equipo.",
   "breadcrumb_aria": "Ruta de navegación",
   "template_menu_template": "Plantilla",

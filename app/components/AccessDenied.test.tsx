@@ -36,6 +36,29 @@ describe("AccessDenied", () => {
     expect(text).not.toContain("owners and managers");
   });
 
+  it("for a page gated by one permission, names the permission and sends a manager to an owner, not to themselves", () => {
+    role = "manager";
+    const text = render(<AccessDenied needs="companyFinance" />).container.textContent ?? "";
+    expect(text).toContain("You are signed in as a Manager.");
+    expect(text).toContain("needs the “Company finances” permission");
+    expect(text).toContain("Ask an owner to turn it on");
+    expect(text).not.toContain("owners and managers");
+  });
+
+  it("for a page that only office staff are kept out of, says that instead of claiming it is for owners and managers", () => {
+    role = "staff";
+    const text = render(<AccessDenied needs="notStaff" />).container.textContent ?? "";
+    expect(text).toContain("You are signed in as an office staff member.");
+    expect(text).toContain("not available to office staff accounts");
+    expect(text).not.toContain("owners and managers");
+  });
+
+  it("uses the neutral title for anything but the owner/manager pages", () => {
+    role = "inspector";
+    expect(render(<AccessDenied />).container.textContent).toContain("Admins only");
+    expect(render(<AccessDenied needs="owner" />).container.textContent).not.toContain("Admins only");
+  });
+
   it("still explains the block when the session cannot be read, without inventing a role", () => {
     const text = render(<AccessDenied />).container.textContent ?? "";
     expect(text).toContain("You don’t have permission to view this page.");

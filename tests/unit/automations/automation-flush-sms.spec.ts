@@ -427,7 +427,6 @@ describe('flush() — SMS free-tier pre-flight + source tagging (Task 5)', () =>
 
     it('free tenant sending from a platform number → log failed with the Free-plan explanation, no provider send', async () => {
         const quotaGuard = new PlanQuotaGuard({} as D1Database, { enforced: true, billingPortalUrl: null });
-        await new MeteringService({} as D1Database).record(TENANT, 'sms', '2026-06', 50);
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
 

@@ -2,6 +2,7 @@ import type { Context } from 'hono';
 import { getBookingHost } from '../url';
 import { paymentUrl } from '../public-urls';
 import { logger } from '../logger';
+import { AppError } from '../errors';
 import type { HonoConfig } from '../../types/hono';
 
 /**
@@ -37,7 +38,9 @@ export async function hubPayUrl(
         return paymentUrl(getBookingHost(c), inspectionId, payToken);
     } catch (err) {
         logger.warn('hub pay link not produced; the hub loads without it', {
-            inspectionId, error: err instanceof Error ? err.message : String(err),
+            // Our own errors carry text written by us. Anything else (a wrapped database failure) can repeat the
+            // query parameters, which here include the client's email, so only its class name is logged.
+            inspectionId, reason: err instanceof AppError ? err.message : err instanceof Error ? err.name : 'unknown',
         });
         return null;
     }

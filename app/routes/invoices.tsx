@@ -269,7 +269,7 @@ export default function InvoicesPage() {
     setPickerFor(null);
   }
 
-  if (forbidden) return <AccessDenied title={m.access_denied_title_neutral()} />;
+  if (forbidden) return <AccessDenied needs="companyFinance" />;
 
   return (
     <div className="space-y-ih-list">
