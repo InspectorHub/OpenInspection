@@ -111,6 +111,24 @@ describe('applyAutoSignatureOnPublish', () => {
     });
 });
 
+describe('applyAutoSignatureOnPublish results row', () => {
+    // inspection_results is unique on report_id only, so a row of ANOTHER company that names this inspection id is
+    // storable (corrupt data, but nothing in the key forbids it). The stamp must read and write the caller's own row.
+    it('neither reads nor stamps a foreign company row that names the same inspection', async () => {
+        await db.delete(schema.inspectionResults);
+        const now = new Date();
+        // The foreign row goes in FIRST, so an unfiltered read-by-inspection picks it.
+        await db.insert(schema.inspectionResults).values({ id: 'res-foreign', tenantId: OTHER_T, inspectionId: JOB, data: { foreign: true }, reportId: 'rep-foreign', lastSyncedAt: now });
+        await db.insert(schema.inspectionResults).values({ id: 'res-own', tenantId: T, inspectionId: JOB, data: { own: true }, reportId: 'rep-own', lastSyncedAt: now });
+        await run({ userId: OWNER, role: 'owner' });
+        const foreign = await db.select().from(schema.inspectionResults).where(eq(schema.inspectionResults.id, 'res-foreign')).get();
+        const own = await db.select().from(schema.inspectionResults).where(eq(schema.inspectionResults.id, 'res-own')).get();
+        expect(foreign?.data).toEqual({ foreign: true });
+        expect((own?.data as Record<string, unknown>)._inspector_signature).toMatchObject({ publishedBy: OWNER });
+        expect((own?.data as Record<string, unknown>).own).toBe(true);
+    });
+});
+
 describe('publish routes', () => {
     const publishService = vi.fn();
 

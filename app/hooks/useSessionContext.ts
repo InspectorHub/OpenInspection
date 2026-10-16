@@ -1,4 +1,5 @@
 import { useRouteLoaderData } from "react-router";
+import { isFieldRole } from "../../server/lib/auth/roles";
 import type { Capability, CapabilitySet } from "../../server/lib/auth/capabilities";
 import {
   resolveDisplayPrefs,
@@ -126,6 +127,16 @@ export function useCapability(capability: Capability): boolean {
 /** Every resolved capability, for callers filtering a list. */
 export function useCapabilities(): Partial<CapabilitySet> | null {
   return useSessionContext()?.user.capabilities ?? null;
+}
+
+/**
+ * Whether the viewer can be the inspector on a job (an owner, manager or inspector;
+ * office staff cannot). The server's own role test, so a page never compares a role literal.
+ * With no session to read it says yes: only a role that is known not to inspect is excluded.
+ */
+export function useViewerCanInspect(): boolean {
+  const role = useSessionContext()?.user.role;
+  return role === undefined || isFieldRole(role);
 }
 
 export function useSessionContext(): SessionContext | null {

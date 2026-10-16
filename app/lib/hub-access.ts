@@ -18,8 +18,9 @@
  */
 import { isAdminRole, isStaffRole } from "~/lib/access";
 import { publishCapFromMe, viewCommunicationCapFromMe } from "~/lib/inspector-portal-helpers";
-import { INSPECTION_STATUS } from "../../server/lib/status/inspection-status";
-import { REPORT_STATUS } from "../../server/lib/status/report-status";
+import { inspectionStarted } from "../../server/lib/inspection/order-fields";
+import { mayActOn, staffMayCancelNow, staffMayRestoreFrom } from "../../server/lib/inspection/staff-rules";
+import type { RestorableStatus } from "../../server/lib/inspection/cancel-restore";
 
 export interface MeAccess {
   canPublishCap: boolean;
@@ -54,7 +55,7 @@ export function meAccessFromBody(
  * under-offered here, never over-offered.
  */
 export function mayActOnThisInspection(me: Pick<MeAccess, "isAdmin" | "scheduleOthers" | "userId">, inspectorId: string | null): boolean {
-  return me.isAdmin || me.scheduleOthers || (me.userId !== null && me.userId === inspectorId);
+  return mayActOn({ isAdmin: me.isAdmin, scheduleOthers: me.scheduleOthers, onJob: me.userId !== null && me.userId === inspectorId });
 }
 
 /**
@@ -76,7 +77,7 @@ export interface HubAccessInput {
   /** `mayActOnThisInspection` for the viewer. */
   mayAct: boolean;
   /** For a cancelled inspection, the status it had before; null when unknown or not cancelled. */
-  statusBeforeCancel: string | null;
+  statusBeforeCancel: RestorableStatus | null;
 }
 
 export interface HubAccess {
@@ -93,21 +94,24 @@ export interface HubAccess {
 }
 
 export function inspectionStartedForView(status: string, reportStatus: string): boolean {
-  return status === INSPECTION_STATUS.COMPLETED || reportStatus !== REPORT_STATUS.IN_PROGRESS;
+  // The part of the server's rule the page can see; results already entered are not in the payload.
+  return inspectionStarted({ status, reportStatus, hasResultKeys: false });
 }
 
 export function hubAccess({ role, status, reportStatus, moneyCollected, mayAct, statusBeforeCancel }: HubAccessInput): HubAccess {
   if (!isStaffRole(role)) {
-    return { canEditOrder: true, canEditInspection: true, canChangeSchedule: true, canCancel: true, canRestore: true, canTurnGateOff: true };
+    // The server refuses an inspector who is neither on the job nor holds scheduleOthers a date or inspector change
+    // (and the schedule route); every other verb here it accepts from any inspector (inspector-not-assigned.spec.ts).
+    return { canEditOrder: true, canEditInspection: true, canChangeSchedule: mayAct, canCancel: true, canRestore: true, canTurnGateOff: true };
   }
   const started = inspectionStartedForView(status, reportStatus);
   return {
     canEditOrder: mayAct,
     canEditInspection: false,
     canChangeSchedule: mayAct && !started,
-    canCancel: mayAct && !started && !moneyCollected,
+    canCancel: mayAct && staffMayCancelNow({ started, moneyCollected }),
     // The server restores staff only to a status the cancellation recorded, and never a completed one.
-    canRestore: mayAct && statusBeforeCancel !== null && statusBeforeCancel !== INSPECTION_STATUS.COMPLETED,
+    canRestore: mayAct && staffMayRestoreFrom(statusBeforeCancel),
     canTurnGateOff: false,
   };
 }

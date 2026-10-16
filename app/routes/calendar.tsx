@@ -5,7 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { isAdminRole } from "~/lib/access";
+import { isAdminRole, isFieldRole } from "~/lib/access";
 import {
   startOfWeek,
   addDays,
@@ -82,7 +82,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         }>;
       };
       members = (membersBody.data ?? [])
-        .filter((member) => ["owner", "manager", "inspector"].includes(member.role))
+        .filter((member) => isFieldRole(member.role))
         .map((member) => ({
           id: member.id,
           email: member.email,

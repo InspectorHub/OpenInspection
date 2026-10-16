@@ -12,7 +12,7 @@
  * who pokes the API directly is rejected server-side regardless of what the UI
  * renders.
  */
-export { isAdminRole } from "../../server/lib/auth/roles";
+export { isAdminRole, isFieldRole } from "../../server/lib/auth/roles";
 import { isAdminRole, ROLE } from "../../server/lib/auth/roles";
 
 /**

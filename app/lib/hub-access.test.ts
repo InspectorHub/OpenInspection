@@ -40,13 +40,18 @@ describe("staff who may not act on this inspection", () => {
             canEditOrder: false, canEditInspection: false, canChangeSchedule: false, canCancel: false, canRestore: false, canTurnGateOff: false,
         });
     });
-    it("POSITIVE CONTROL - an inspector without the capability keeps everything (the server decides for them)", () => {
-        expect(hubAccess({ role: "inspector", ...open, mayAct: false }).canCancel).toBe(true);
+    it("an inspector who may not act on the job loses only Edit schedule: the server accepts every other verb from them", () => {
+        expect(hubAccess({ role: "inspector", ...open, mayAct: false })).toEqual({
+            canEditOrder: true, canEditInspection: true, canChangeSchedule: false, canCancel: true, canRestore: true, canTurnGateOff: true,
+        });
+    });
+    it("POSITIVE CONTROL - an inspector who may act keeps Edit schedule", () => {
+        expect(hubAccess({ role: "inspector", ...open, mayAct: true }).canChangeSchedule).toBe(true);
     });
 });
 
 describe("restore for staff follows the recorded status", () => {
-    const staff = (statusBeforeCancel: string | null) => hubAccess({ role: "staff", ...open, status: "cancelled", statusBeforeCancel }).canRestore;
+    const staff = (statusBeforeCancel: "scheduled" | "confirmed" | "completed" | null) => hubAccess({ role: "staff", ...open, status: "cancelled", statusBeforeCancel }).canRestore;
     it("is offered for a recorded, non-completed status only", () => {
         expect(staff("scheduled")).toBe(true);
         expect(staff("confirmed")).toBe(true);

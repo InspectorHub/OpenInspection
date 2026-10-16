@@ -29,7 +29,7 @@ interface DashboardInspectionRowProps {
   /**
    * Office staff set the booking's status (requested, scheduled, confirmed) and never
    * the visit's: the dropdown lists only those, and is withheld from a completed job,
-   * which the API will not let them move.
+   * which the API will not let them move. Restore on a cancelled row is withheld too.
    */
   orderStatusesOnly?: boolean;
   /** Whether the viewer may write report content (`editReports`); false hides the editor link. */
@@ -215,7 +215,8 @@ export function DashboardInspectionRow({
           >
             <option value="cancelled">{m.dashboard_row_status_cancelled()}</option>
           </select>
-          {canChangeStatus && (
+          {/* Not offered to staff: the server restores for them only a cancellation that recorded a status other than completed, which the list does not carry (the hub offers it where it is known). */}
+          {canChangeStatus && !orderStatusesOnly && (
             <RestoreInspectionAction
               inspectionId={insp.id}
               variant="ghost"

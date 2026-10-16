@@ -220,8 +220,14 @@ describe("DashboardInspectionRow - controls an office user is not offered", () =
       expect(renderRow(0, "completed").container.querySelector("select")).not.toBeNull();
     });
 
-    it("a cancelled row still offers Restore (the server decides which ones they may restore)", () => {
-      expect(restoreButton(renderRow(0, "cancelled", { orderStatusesOnly: true }).container)).toBeDefined();
+    it("a cancelled row offers staff no Restore (the list does not know the pre-cancel status the server requires)", () => {
+      const { container } = renderRow(0, "cancelled", { orderStatusesOnly: true });
+      expect(restoreButton(container)).toBeUndefined();
+      expect(container.querySelector("select")?.value).toBe("cancelled");
+    });
+
+    it("POSITIVE CONTROL - a cancelled row still offers Restore to everyone else", () => {
+      expect(restoreButton(renderRow(0, "cancelled").container)).toBeDefined();
     });
   });
 });

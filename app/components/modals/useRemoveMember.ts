@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { isFieldRole } from "~/lib/access";
 import { UNASSIGN, type RemoveMemberTarget } from "./RemoveMemberDialog";
 
 /**
@@ -36,7 +37,7 @@ export function useRemoveMember(team: readonly TeamEntry[] = []) {
     const close = () => { setTarget(null); setAttempted(false); setChoice(""); };
     const openInspections = settled?.ok === false ? (settled.openInspections ?? null) : null;
     const candidates = team
-        .filter((t) => t.status !== "pending" && t.id !== target?.id && ["owner", "manager", "inspector"].includes(t.role))
+        .filter((t) => t.status !== "pending" && t.id !== target?.id && isFieldRole(t.role))
         .map((t) => ({ value: t.id, label: t.name || t.email }));
 
     return {

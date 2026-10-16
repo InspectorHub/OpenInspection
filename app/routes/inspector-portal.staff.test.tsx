@@ -71,6 +71,20 @@ async function offers(o: Opts, label: string): Promise<boolean> {
     return found;
 }
 
+describe("hub as an inspector who is not on the job", () => {
+    it("is not offered Edit schedule (the server refuses the date and inspector), but keeps the verbs it accepts", async () => {
+        const notOn = { role: "inspector", scheduleOthers: false, inspectorId: "someone-else" };
+        expect(await offers(notOn, "Edit schedule")).toBe(false);
+        expect(await offers(notOn, "Cancel inspection")).toBe(true);
+        expect(await offers(notOn, "Mark fieldwork complete")).toBe(true);
+    });
+
+    it("POSITIVE CONTROL - the inspector on the job, or one with scheduleOthers, is offered it", async () => {
+        expect(await offers({ role: "inspector", scheduleOthers: false, inspectorId: "me" }, "Edit schedule")).toBe(true);
+        expect(await offers({ role: "inspector", scheduleOthers: true, inspectorId: "someone-else" }, "Edit schedule")).toBe(true);
+    });
+});
+
 describe("hub as office staff", () => {
     it("on an unpaid, unstarted job: can cancel and edit the schedule, cannot mark the visit complete", async () => {
         const hub = await renderHub({ role: "staff" });
