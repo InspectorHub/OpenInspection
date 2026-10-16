@@ -425,7 +425,7 @@ describe('flush() — SMS free-tier pre-flight + source tagging (Task 5)', () =>
         smsRuntime.resolveProvider.mockResolvedValue({ provider: fakeProvider, from: '+1999' });
     });
 
-    it('free tenant (platform mode) at 50 lifetime sms → log failed (quota exceeded), no provider send', async () => {
+    it('free tenant sending from a platform number → log failed with the Free-plan explanation, no provider send', async () => {
         const quotaGuard = new PlanQuotaGuard({} as D1Database, { enforced: true, billingPortalUrl: null });
         await new MeteringService({} as D1Database).record(TENANT, 'sms', '2026-06', 50);
         const { logId } = await seedSmsLog({ contactId: 'c1' });
@@ -435,7 +435,8 @@ describe('flush() — SMS free-tier pre-flight + source tagging (Task 5)', () =>
 
         const r = await statusOf(logId);
         expect(r?.status).toBe('failed');
-        expect(r?.error).toMatch(/Free plan limit reached/);
+        expect(r?.error).toMatch(/Free plan/);
+        expect(r?.error).toMatch(/own Twilio or Telnyx account/);
         expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 
@@ -457,7 +458,8 @@ describe('flush() — SMS free-tier pre-flight + source tagging (Task 5)', () =>
         expect(record).toHaveBeenCalledWith(TENANT, 'sms_byo', expect.stringMatching(/^\d{4}-\d{2}$/));
     });
 
-    it('platform-mode send under the cap → records plain \'sms\'', async () => {
+    it('platform-mode send on a paid plan → records plain sms', async () => {
+        await db.update(schema.tenants).set({ tier: 'pro' } as never).where(eq(schema.tenants.id, TENANT));
         const quotaGuard = new PlanQuotaGuard({} as D1Database, { enforced: true, billingPortalUrl: null });
         const record = vi.fn().mockResolvedValue(undefined);
         svc = new AutomationService({} as D1Database, undefined, undefined, { record } as never);

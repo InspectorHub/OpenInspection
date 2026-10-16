@@ -62,7 +62,7 @@ describe('SettingsUsagePage — Inspections meter visibility (Fix 4)', () => {
 
     it('shows the Inspections card for a free SaaS tenant (capped)', () => {
         vi.mocked(useLoaderData).mockReturnValue({
-            usage: { tier: 'free', caps: { inspections: 5, sms: 50, email: 50 }, usage: { inspections: 3, sms: 3, email: 1, r2Bytes: 1024 } },
+            usage: { tier: 'free', caps: { inspections: 5, email: 50 }, usage: { inspections: 3, sms: 3, email: 1, r2Bytes: 1024 } },
         } as never);
         vi.mocked(useSessionContext).mockReturnValue(sessionCtx(true) as never);
 

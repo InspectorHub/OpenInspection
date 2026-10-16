@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -67,7 +68,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS
 async function seedTenant(db: BetterSQLite3Database<typeof schema>, id: string) {
     await db.insert(schema.tenants).values({
         id, slug: id, status: 'active',
-        deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        deploymentMode: 'shared', tier: 'pro', createdAt: new Date(),
     } as never);
 }
 
@@ -198,17 +199,21 @@ describe('POST /api/message-templates/test-send (SMS) — STOP revocation', () =
     });
 });
 
+const setTier = (tier: string) => db.update(schema.tenants).set({ tier } as never).where(eq(schema.tenants.id, TENANT));
+
 describe('POST /api/message-templates/test-send (SMS) — free-tier pre-flight + metering (Fix 3)', () => {
-    it('free tenant at 50/50 lifetime sms (platform mode) → 402 QUOTA_EXHAUSTED, provider never called', async () => {
-        await new MeteringService(db as unknown as D1Database).record(TENANT, 'sms', '2026-06', 50);
+    it('free tenant sending from a platform number (platform mode) → 402, says the Free plan has no platform texts and what to do, provider never called', async () => {
+        await setTier('free');
         const { sendMessage } = stubResolvedProvider();
 
         const app = buildApp(db, SAAS_PROFILE);
         const res = await sendReq(app, FAKE_ENV);
 
         expect(res.status).toBe(402);
-        const body = await res.json() as { error: { code: string } };
+        const body = await res.json() as { error: { code: string; message: string } };
         expect(body.error.code).toBe('QUOTA_EXHAUSTED');
+        expect(body.error.message).toMatch(/Free plan/);
+        expect(body.error.message).toMatch(/own Twilio or Telnyx account/);
         expect(sendMessage).not.toHaveBeenCalled();
     });
 
@@ -216,6 +221,7 @@ describe('POST /api/message-templates/test-send (SMS) — free-tier pre-flight +
         await db.insert(schema.tenantConfigs).values({
             tenantId: TENANT, smsMode: 'own', updatedAt: new Date(),
         } as never);
+        await setTier('free');
         await new MeteringService(db as unknown as D1Database).record(TENANT, 'sms', '2026-06', 50);
         const record = vi.spyOn(MeteringService.prototype, 'record');
         const { sendMessage } = stubResolvedProvider('SM_own_1');
@@ -229,7 +235,8 @@ describe('POST /api/message-templates/test-send (SMS) — free-tier pre-flight +
         expect(record).toHaveBeenCalledWith(TENANT, 'sms_byo', expect.stringMatching(/^\d{4}-\d{2}$/));
     });
 
-    it('platform-mode send under the cap → records plain \'sms\'', async () => {
+    it('platform-mode send on a paid plan → records plain sms', async () => {
+        await setTier('pro');
         const record = vi.spyOn(MeteringService.prototype, 'record');
         const { sendMessage } = stubResolvedProvider('SM_plat_1');
 

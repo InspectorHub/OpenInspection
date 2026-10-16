@@ -259,8 +259,8 @@ describe('PlanQuotaGuard.consumeInspection counts rows, not creates', () => {
 
         // And the messaging gate still reads that tally, with zero rows anywhere
         // to count — converting it to a row count would silently uncap it.
-        await metering.record('t1', 'sms', '2026-08', FREE_TIER_CAPS.sms);
-        await expect(guard.checkMessagingQuota('t1', 'free', 'sms')).rejects.toMatchObject({
+        await metering.record('t1', 'email', '2026-08', FREE_TIER_CAPS.email);
+        await expect(guard.checkMessagingQuota('t1', 'free', 'email')).rejects.toMatchObject({
             code: 'QUOTA_EXHAUSTED',
         });
     });

@@ -117,12 +117,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       };
       checklistDismissed = meBody.data?.user?.onboardingState?.checklistDismissed === true;
     }
-    let quotaCaps: { inspections: number; sms: number; email: number } | null = null;
-    let quotaUsage: { inspections: number; sms: number; email: number } | null = null;
+    let quotaCaps: { inspections: number; email: number } | null = null;
+    let quotaUsage: { inspections: number; email: number } | null = null;
     if (usageRes && usageRes.ok) {
       const ub = (await usageRes.json().catch(() => ({}))) as {
         data?: {
-          caps?: { inspections: number; sms: number; email: number } | null;
+          caps?: { inspections: number; email: number } | null;
           usage?: { inspections?: number; sms?: number; email?: number };
         };
       };
@@ -130,7 +130,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       if (quotaCaps) {
         quotaUsage = {
           inspections: ub.data?.usage?.inspections ?? 0,
-          sms: ub.data?.usage?.sms ?? 0,
           email: ub.data?.usage?.email ?? 0,
         };
       }
@@ -701,7 +700,7 @@ export default function InspectionsPage() {
           itself below 80% usage (see QuotaBanner). */}
       {quotaCaps && quotaUsage && (
         <>
-          {(["inspections", "sms", "email"] as const).map((metric) => (
+          {(["inspections", "email"] as const).map((metric) => (
             <QuotaBanner
               key={metric}
               metric={metric}

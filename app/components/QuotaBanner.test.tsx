@@ -13,9 +13,9 @@ describe('QuotaBanner', () => {
 
   it('renders a soft warning at >=80% but below the cap', () => {
     const { getByText } = render(
-      <QuotaBanner metric="sms" used={40} cap={50} billingUrl="https://billing.example.com" />,
+      <QuotaBanner metric="email" used={40} cap={50} billingUrl="https://billing.example.com" />,
     );
-    expect(getByText(/40 of 50 free SMS messages used/)).toBeTruthy();
+    expect(getByText(/40 of 50 free emails used/)).toBeTruthy();
     expect(getByText('Upgrade')).toBeTruthy();
   });
 

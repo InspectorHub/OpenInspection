@@ -1705,7 +1705,8 @@ describe('POST /sms/test — free-tier pre-flight + source tagging (Task 5)', ()
         expect(record).toHaveBeenCalledWith(TENANT, 'sms_byo', expect.stringMatching(/^\d{4}-\d{2}$/));
     });
 
-    it('platform-mode send under the cap → records plain \'sms\'', async () => {
+    it('platform-mode send on a paid plan → records plain sms', async () => {
+        await db.update(schema.tenants).set({ tier: 'pro' } as never).where(eq(schema.tenants.id, TENANT));
         const record = vi.spyOn(MeteringService.prototype, 'record');
         const { sendMessage } = stubResolvedProvider('SM_plat_1');
 
