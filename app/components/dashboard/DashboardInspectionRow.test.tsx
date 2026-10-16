@@ -41,7 +41,7 @@ const INSPECTION = {
 function renderRow(
   price: number | null,
   status = "requested",
-  access: { canChangeStatus?: boolean; canOpenEditor?: boolean } = {},
+  access: { canChangeStatus?: boolean; canOpenEditor?: boolean; orderStatusesOnly?: boolean } = {},
 ) {
   const Stub = createRoutesStub([
     {
@@ -193,10 +193,35 @@ describe("DashboardInspectionRow - controls an office user is not offered", () =
     expect(editorLink(renderRow(0, "scheduled").container)).not.toBeNull();
   });
 
-  it("a cancelled row offers no Restore to a viewer who cannot change status (staff)", () => {
-    // POST /:id/uncancel answers 403 for staff; the status still shows.
+  it("a cancelled row offers no Restore to a viewer who cannot change status", () => {
     const { container } = renderRow(0, "cancelled", { canChangeStatus: false });
     expect(restoreButton(container)).toBeUndefined();
     expect(container.querySelector("select")?.value).toBe("cancelled");
+  });
+
+  describe("office staff (order statuses only)", () => {
+    const options = (c: HTMLElement) => Array.from(c.querySelectorAll("select option")).map((o) => (o as HTMLOptionElement).value);
+
+    it("lists the booking statuses and not completed", () => {
+      const { container } = renderRow(0, "scheduled", { orderStatusesOnly: true });
+      expect(options(container)).toEqual(["requested", "scheduled", "confirmed"]);
+    });
+
+    it("POSITIVE CONTROL - everyone else also gets completed", () => {
+      const { container } = renderRow(0, "scheduled");
+      expect(options(container)).toEqual(["requested", "scheduled", "confirmed", "completed"]);
+    });
+
+    it("withholds the dropdown from a completed job, which they cannot move", () => {
+      expect(renderRow(0, "completed", { orderStatusesOnly: true }).container.querySelector("select")).toBeNull();
+    });
+
+    it("POSITIVE CONTROL - the same completed job keeps the dropdown for everyone else", () => {
+      expect(renderRow(0, "completed").container.querySelector("select")).not.toBeNull();
+    });
+
+    it("a cancelled row still offers Restore (the server decides which ones they may restore)", () => {
+      expect(restoreButton(renderRow(0, "cancelled", { orderStatusesOnly: true }).container)).toBeDefined();
+    });
   });
 });

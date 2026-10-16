@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { STAFF_ORDER_STATUSES } from "../../../server/lib/inspection/order-fields";
 import { INSPECTION_STATUS, isReportPublished, statusTone } from "~/lib/status";
 import { reportStateLabel } from "~/lib/dashboard-filters";
 import { REPORT_STATE_TONE, type Inspection } from "~/lib/dashboard-schema";
@@ -21,16 +22,28 @@ interface DashboardInspectionRowProps {
    *  an omitted zone renders scheduled times in whatever zone the browser is in. */
   timeZone: string;
   /**
-   * Whether the viewer may write the inspection's status. False for an office
-   * user (staff), whose only writes on an inspection are its date and inspector:
-   * the API answers 403 to a status PATCH, a restore or a cancel, so neither the
-   * dropdown nor Restore is offered.
+   * Whether the viewer may write the inspection's status (the dropdown and Restore).
    * Defaults to true so a caller that does not say keeps today's behaviour.
    */
   canChangeStatus?: boolean;
+  /**
+   * Office staff set the booking's status (requested, scheduled, confirmed) and never
+   * the visit's: the dropdown lists only those, and is withheld from a completed job,
+   * which the API will not let them move.
+   */
+  orderStatusesOnly?: boolean;
   /** Whether the viewer may write report content (`editReports`); false hides the editor link. */
   canOpenEditor?: boolean;
 }
+
+const STATUS_LABEL = {
+  requested: m.dashboard_row_status_requested,
+  scheduled: m.dashboard_row_status_scheduled,
+  confirmed: m.dashboard_row_status_confirmed,
+  completed: m.dashboard_row_status_completed,
+} as const;
+/** The statuses a row can be set to: the order statuses the server lets staff write, then the visit's own. */
+const ROW_STATUSES = [...STAFF_ORDER_STATUSES, INSPECTION_STATUS.COMPLETED] as const;
 
 /* ---- Render inspection row ---- */
 // reportView=true on the Published tab: render a report-state badge and, for
@@ -45,6 +58,7 @@ export function DashboardInspectionRow({
   transitionStatus,
   timeZone,
   canChangeStatus = true,
+  orderStatusesOnly = false,
   canOpenEditor = true,
 }: DashboardInspectionRowProps) {
   const locale = useDisplayLocale();
@@ -171,17 +185,16 @@ export function DashboardInspectionRow({
             entry. That endpoint is the one door now and this write refuses, so
             the cancelled cluster below shows the status and offers the button
             instead of four options the server would reject. */}
-        {!cancelled && canChangeStatus && (
+        {!cancelled && canChangeStatus && !(orderStatusesOnly && insp.status === INSPECTION_STATUS.COMPLETED) && (
           <select
             value={insp.status}
             onChange={(e) => transitionStatus(insp.id, e.target.value)}
             onClick={(e) => e.stopPropagation()}
             className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-2 border-0 outline-none cursor-pointer"
           >
-            <option value="requested">{m.dashboard_row_status_requested()}</option>
-            <option value="scheduled">{m.dashboard_row_status_scheduled()}</option>
-            <option value="confirmed">{m.dashboard_row_status_confirmed()}</option>
-            <option value="completed">{m.dashboard_row_status_completed()}</option>
+            {(orderStatusesOnly ? STAFF_ORDER_STATUSES : ROW_STATUSES).map((status) => (
+              <option key={status} value={status}>{STATUS_LABEL[status]()}</option>
+            ))}
           </select>
         )}
       </div>

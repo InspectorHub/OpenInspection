@@ -32,9 +32,9 @@ export function GateToggle({
     label: string;
     testId?: string;
     /**
-     * False for a viewer whose order edits the API refuses (an office user may
-     * change only the date and inspector). The switch is then not rendered: a
-     * read-only checkbox would still invite the click.
+     * False for a viewer whose change the API refuses (office staff may switch a
+     * requirement on, never off). The switch is then not rendered: a read-only
+     * checkbox would still invite the click.
      */
     canEdit?: boolean;
 }) {

@@ -34,6 +34,7 @@ export function ScheduleCard({
     inspectorName,
     members,
     displayTz,
+    canEdit = true,
 }: {
     inspectionId: string;
     date: string | null;
@@ -41,6 +42,8 @@ export function ScheduleCard({
     inspectorName: string | null;
     members: TeamMember[];
     displayTz: string;
+    /** False once an office user's window to change who, where and when has closed (the inspection has started). */
+    canEdit?: boolean;
 }) {
     const fmt = useInspectionDateTimeFormat();
     const [open, setOpen] = useState(false);
@@ -91,11 +94,13 @@ export function ScheduleCard({
                     : m.inspections_hub_schedule_inspector_none()}
             </p>
             {error && <p className="text-[12px] text-ih-bad-fg mb-2">{error}</p>}
-            <Button variant="secondary" size="sm" onClick={() => setOpen(true)} pending={saving}>
-                {m.inspections_hub_schedule_edit()}
-            </Button>
+            {canEdit && (
+                <Button variant="secondary" size="sm" onClick={() => setOpen(true)} pending={saving}>
+                    {m.inspections_hub_schedule_edit()}
+                </Button>
+            )}
 
-            <Modal open={open} onClose={() => setOpen(false)} title={m.inspections_hub_schedule_edit()}>
+            <Modal open={open && canEdit} onClose={() => setOpen(false)} title={m.inspections_hub_schedule_edit()}>
                 <form
                     id={`schedule-form-${inspectionId}`}
                     onSubmit={(e) => {

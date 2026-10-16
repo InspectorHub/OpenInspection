@@ -41,7 +41,7 @@ function loaderData(reportStatus: string, canPublishCap: boolean) {
             reports: [],
             publishReadiness: { ready: true, blockingCount: 0, blockers: [] },
         },
-        smsConsent: null, reinspectCandidates: [], canPublishCap, canViewCommunication: false, documents: [],
+        smsConsent: null, reinspectCandidates: [], canPublishCap, canSendReport: canPublishCap, canViewCommunication: false, documents: [],
         people: [], roleProfiles: [], isAdmin: false, versions: [], members: [], serviceCatalog: [],
         referralSources: [], visits: [], visitTypes: [], suggestedTypeIds: [], role: "owner", statutoryForm: { available: false },
     };

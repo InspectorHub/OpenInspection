@@ -23,6 +23,7 @@ import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
 /** Mutable seam the mocked api-client reaches through — set per test. */
 const seam = vi.hoisted(() => ({
     post: null as null | ((args: { json: unknown }, options?: { headers?: Record<string, string> }) => Promise<Response>),
+    me: null as null | (() => Promise<Response>),
 }));
 
 vi.mock("~/lib/session.server", () => ({
@@ -30,6 +31,7 @@ vi.mock("~/lib/session.server", () => ({
 }));
 vi.mock("~/lib/api-client.server", () => ({
     createApi: () => ({
+        auth: { me: { $get: () => seam.me!() } },
         inspections: {
             index: {
                 $post: (args: { json: unknown }, options?: { headers?: Record<string, string> }) =>
@@ -46,6 +48,8 @@ const CONTEXT = {} as Parameters<typeof action>[0]["context"];
 
 let db: ReturnType<typeof createTestDb>["db"];
 let created: Record<string, unknown>[] = [];
+/** What the stand-in profile endpoint says about the creator's editReports capability. */
+let editReports = true;
 
 /**
  * A stand-in for the mounted API: the same middleware, in the same position
@@ -59,6 +63,7 @@ function buildApiApp() {
         await next();
     });
     app.use("*", idempotencyMiddleware({ getDb: () => db as never }));
+    app.get("/api/auth/me", (c) => c.json({ data: { capabilities: { editReports } } }));
     app.post("/api/inspections", async (c) => {
         const body = (await c.req.json()) as Record<string, unknown>;
         created.push(body);
@@ -88,8 +93,10 @@ describe("POST /inspections (create) — idempotency key hand-off", () => {
         const t = createTestDb();
         await setupSchema(t.sqlite);
         db = t.db;
+        editReports = true;
         created = [];
         const api = buildApiApp();
+        seam.me = async () => api.request("/api/auth/me");
         seam.post = async (args, options) =>
             api.request("/api/inspections", {
                 method: "POST",
@@ -117,6 +124,11 @@ describe("POST /inspections (create) — idempotency key hand-off", () => {
         // a fresh id would mean a second row was written after all.
         expect(first.headers.get("location")).toBe("/inspections/insp-1/edit");
         expect(second.headers.get("location")).toBe("/inspections/insp-1/edit");
+    });
+
+    it("sends a creator who cannot open the editor (office staff) to the inspection page instead", async () => {
+        editReports = false;
+        expect((await submit("key-1")).headers.get("location")).toBe("/inspections/insp-1");
     });
 
     it("still creates when the wizard rotates to a fresh key", async () => {

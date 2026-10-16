@@ -33,23 +33,30 @@ import { m } from "~/paraglide/messages";
  * /:id/cancel` mounts `requireRole('owner','manager','inspector')`, so an
  * inspector standing at a door nobody answered may cancel, and hiding the button
  * from them would be this page holding a second, stricter opinion than the
- * endpoint that enforces it. The endpoints (complete, cancel, uncancel) do refuse
- * office users (staff), so `canChangeStatus` is false for them and the card shows
- * the status without any verb.
+ * endpoint that enforces it. Office staff keep cancel and restore only where the
+ * server allows them (a job that is unpaid and has not started) and never get
+ * "Mark complete"; each verb has its own flag (see `hubAccess`), and a card with
+ * no verb shows the status alone.
  */
 export function LifecycleCard({
     status,
     inspectionId,
     fetcher,
-    canChangeStatus = true,
+    canComplete = true,
+    canCancel = true,
+    canRestore = true,
 }: {
     status: string;
     /** The order being cancelled — the quote and the cancel are both keyed on it. */
     inspectionId: string;
     /** The hub's complete-fieldwork fetcher, so the button reflects its state. */
     fetcher: ReturnType<typeof useFetcher>;
-    /** False for a viewer the API refuses to complete, cancel or restore an inspection (staff). */
-    canChangeStatus?: boolean;
+    /** False for a viewer the API refuses to mark the visit complete (office staff). */
+    canComplete?: boolean;
+    /** False when the API would refuse the cancel (office staff on a paid or started inspection). */
+    canCancel?: boolean;
+    /** False when the API would refuse the restore (office staff on one that had started). */
+    canRestore?: boolean;
 }) {
     const state = lifecycleState(status);
     const marking = fetcher.state !== "idle";
@@ -61,33 +68,39 @@ export function LifecycleCard({
                 title={m.inspections_hub_lifecycle_title()}
                 pill={{ tone: statusTone(status), label: humanizeStatus(status) }}
             />
-            {!canChangeStatus ? null : state === "actionable" ? (
+            {state === "actionable" ? (canComplete || canCancel) && (
                 <>
-                    <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_lifecycle_hint()}</p>
+                    {canComplete && <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_lifecycle_hint()}</p>}
                     {/* Secondary, and the shared Button rather than a hand-rolled
                         one. As a solid primary it was the loudest control on the
                         page while being, by its own contract above, advisory and
                         never a precondition — it outranked Publish report, which
                         is the irreversible one. */}
                     <div className="flex flex-wrap items-center gap-2">
-                        {/* busy-controls-allow: POST /:id/complete is idempotent server-side (an already completed inspection short-circuits before any write or automation), so a same-frame double click is harmless */}
-                        <fetcher.Form method="post">
-                            <input type="hidden" name="intent" value="complete" />
-                            <Button type="submit" variant="secondary" size="sm" disabled={marking}>
-                                {marking ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
-                            </Button>
-                        </fetcher.Form>
+                        {canComplete && (
+                            <>
+                            {/* busy-controls-allow: POST /:id/complete is idempotent server-side (an already completed inspection short-circuits before any write or automation), so a same-frame double click is harmless */}
+                            <fetcher.Form method="post">
+                                <input type="hidden" name="intent" value="complete" />
+                                <Button type="submit" variant="secondary" size="sm" disabled={marking}>
+                                    {marking ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
+                                </Button>
+                            </fetcher.Form>
+                            </>
+                        )}
                         {/* A link-weight danger control: cancelling is rare and
                             irreversible, so it must be findable without competing
                             with the button beside it. */}
-                        <Button
-                            type="button"
-                            variant="danger-link"
-                            size="sm"
-                            onClick={() => setCancelOpen(true)}
-                        >
-                            {m.inspections_hub_cancel_action()}
-                        </Button>
+                        {canCancel && (
+                            <Button
+                                type="button"
+                                variant="danger-link"
+                                size="sm"
+                                onClick={() => setCancelOpen(true)}
+                            >
+                                {m.inspections_hub_cancel_action()}
+                            </Button>
+                        )}
                     </div>
                     {/* Mounted only while open, so closing it discards the
                         chosen reason, the notes, the quote and any error. A
@@ -112,8 +125,12 @@ export function LifecycleCard({
                    look for. The axis this card owns runs both ways. */
                 <div className="space-y-2">
                     <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_lifecycle_cancelled()}</p>
-                    <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_lifecycle_cancelled_recover()}</p>
-                    <RestoreInspectionAction inspectionId={inspectionId} />
+                    {canRestore && (
+                        <>
+                            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_lifecycle_cancelled_recover()}</p>
+                            <RestoreInspectionAction inspectionId={inspectionId} />
+                        </>
+                    )}
                 </div>
             )}
         </Card>

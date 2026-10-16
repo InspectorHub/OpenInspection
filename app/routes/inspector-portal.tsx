@@ -38,7 +38,6 @@ import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import { SendSmsModal } from "~/components/inspection/SendSmsModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
-import { publishCapFromMe, viewCommunicationCapFromMe } from "~/lib/inspector-portal-helpers";
 import { COURTESY_TRANSLATION_LOCALE } from "~/lib/courtesy-locale";
 import {
   toActionResult, sendReportActionResult, reinspectionDay,
@@ -73,7 +72,7 @@ import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock
 import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
 import { resolveReferralSources } from "../../server/lib/referral-sources";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
-import { isAdminRole, isStaffRole } from "~/lib/access";
+import { hubAccess, meAccessFromBody } from "~/lib/hub-access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { useModalFetcher } from "~/hooks/useModalFetcher";
@@ -205,19 +204,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const meP = (async () => {
     const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
     const meRes = meGet ? await meGet().catch(() => null) : null;
-    if (!meRes || !meRes.ok) {
-      return { canPublishCap: false, canViewCommunication: false, role: "inspector", isAdmin: false };
-    }
-    const meBody = (await meRes.json().catch(() => ({}))) as {
-      data?: { user?: { role?: string }; capabilities?: { publish?: boolean; viewCommunication?: boolean } };
-    };
-    const role = meBody.data?.user?.role ?? "inspector";
-    return {
-      canPublishCap: publishCapFromMe(meBody),
-      canViewCommunication: viewCommunicationCapFromMe(meBody),
-      role,
-      isAdmin: isAdminRole(role),
-    };
+    return meAccessFromBody(meRes && meRes.ok ? ((await meRes.json().catch(() => ({}))) as Parameters<typeof meAccessFromBody>[0]) : null);
   })();
 
   // Plan 1B Task 5 — editable People section: every contact/role pairing on
@@ -276,11 +263,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // mocked api-client in a unit test degrades to an empty list instead of
   // throwing on a missing property.
   const membersP = (async (): Promise<TeamMember[]> => {
-    const g = api.team?.members?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+    // The assignee list the schedule routes themselves use: it is open to the same people who may reassign.
+    const g = api.inspections?.inspectors?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
     const r = g ? await g({}).catch(() => null) : null;
     return r && r.ok
-      ? (((await r.json()) as { data?: { members?: Array<{ id: string; name?: string | null; email?: string | null }> } })
-          .data?.members ?? []).map((u) => ({ id: u.id, name: u.name ?? "", email: u.email ?? "" }))
+      ? (((await r.json()) as { data?: Array<{ id: string; name?: string | null; email?: string | null }> })
+          .data ?? []).map((u) => ({ id: u.id, name: u.name ?? "", email: u.email ?? "" }))
       : [];
   })();
 
@@ -367,7 +355,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     consentP, meP, peopleP, roleProfilesP, documentsP, membersP, catalogP, brandingP, versionsP, statutoryP,
   ]);
 
-  const { canPublishCap, canViewCommunication, role, isAdmin } = me;
+  const { canPublishCap, canViewCommunication, canSendReport, role, isAdmin } = me;
   const serviceCatalog: CatalogService[] = catalogRows.map((sv) => ({ id: sv.id, name: sv.name, price: sv.price }));
   const referralSources = resolveReferralSources(customReferralSources);
 
@@ -422,7 +410,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const { visits, visitTypes, suggestedTypeIds } = visitData;
 
   return {
-    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, canSendReport, documents, people, roleProfiles, isAdmin, versions,
     members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   };
 }
@@ -639,7 +627,7 @@ export function reportActions(
 
 export default function InspectionHubPage() {
   const {
-    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, documents, people, roleProfiles, isAdmin, versions,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, canSendReport, documents, people, roleProfiles, isAdmin, versions,
     members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   } = useLoaderData<typeof loader>();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
@@ -650,10 +638,9 @@ export default function InspectionHubPage() {
   const displayTz = useDisplayTimeZone();
   const fmt = useInspectionDateTimeFormat();
   const blocks = deriveBlockStates(hub);
-  // An office user may move a job and reassign it, and change nothing else on it
-  // (PATCH /api/inspections/:id answers 403 to any other field), and writes no
-  // report content (`editReports`). The controls below stand down for them.
-  const canEditOrder = !isStaffRole(role);
+  // Office staff run the booking, not the inspection: the order controls stay, the inspector's own ones stand down (~/lib/hub-access).
+  const access = hubAccess({ role, status: inspection.status, reportStatus: inspection.reportStatus, moneyCollected: inspection.paymentStatus !== "unpaid" || hub.invoice?.status === "paid" });
+  const { canEditOrder } = access;
   const canEditReports = useCapability("editReports");
   const navigate = useNavigate();
   const revalidator = useRevalidator();
@@ -937,6 +924,7 @@ export default function InspectionHubPage() {
           inspectorName={peopleCard.inspector?.name ?? peopleCard.inspector?.email ?? null}
           members={members}
           displayTz={displayTz}
+          canEdit={access.canChangeSchedule}
         />
 
         {/* 2. People — who. Editable (Plan 1B Task 5): PeopleEditor sources rows
@@ -1010,13 +998,13 @@ export default function InspectionHubPage() {
             checked={inspection.agreementRequired}
             label={m.inspections_hub_gate_agreement()}
             testId="hub-gate-agreement"
-            canEdit={canEditOrder}
+            canEdit={canEditOrder && (access.canTurnGateOff || !inspection.agreementRequired)}
           />
         </Card>
 
         {/* 5. Inspection status — the visit itself. Independent of report
             publishing. */}
-        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} canChangeStatus={canEditOrder} />
+        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} canComplete={access.canEditInspection} canCancel={access.canCancel} canRestore={access.canRestore} />
 
         {/* 5b. Communication — what has been said, and what we sent. The
             client already had a Messages tab; this is the inspector's first
@@ -1064,7 +1052,7 @@ export default function InspectionHubPage() {
                     {m.inspections_hub_report_create_reinspection()}
                   </Button>
                 )}
-                {canPublishCap && (
+                {canSendReport && (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -1073,7 +1061,7 @@ export default function InspectionHubPage() {
                     {m.inspections_hub_report_send()}
                   </Button>
                 )}
-                {canPublishCap && (
+                {canSendReport && (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -1247,7 +1235,7 @@ export default function InspectionHubPage() {
           paymentRequired={inspection.paymentRequired}
           basePriceCents={inspection.price}
           canManagePrice={isAdmin && canSeeMoney}
-          canEditGate={canEditOrder}
+          canEditGate={canEditOrder && (access.canTurnGateOff || !inspection.paymentRequired)}
           onRequestPayment={() => paymentModal.setOpen(true)}
         />
 
