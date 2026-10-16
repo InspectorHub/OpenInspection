@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import { getBookingHost } from '../url';
 import { paymentUrl } from '../public-urls';
+import { logger } from '../logger';
 import type { HonoConfig } from '../../types/hono';
 
 /**
@@ -13,6 +14,12 @@ import type { HonoConfig } from '../../types/hono';
  * reconstructs the existing plaintext instead of rotating, so re-reading the hub
  * never invalidates a link already in a client's inbox. Only for a SENT or part
  * paid invoice: a draft has no recipient bound yet.
+ *
+ * The link is a convenience on a READ. When it cannot be produced (a portal grant
+ * stored without its sealed token, so the existing link cannot be reconstructed;
+ * a missing secret) the hub still loads and the pay link is simply absent. It used
+ * to fail the whole hub with a 500 for anyone holding `companyFinance`, which is
+ * every owner and manager, on any inspection whose invoice had been sent.
  */
 export async function hubPayUrl(
     c: Context<HonoConfig>,
@@ -21,10 +28,17 @@ export async function hubPayUrl(
     invoice: { status: string } | null | undefined,
 ): Promise<string | null> {
     if (!invoice || (invoice.status !== 'sent' && invoice.status !== 'partial')) return null;
-    const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, inspectionId);
-    if (!primaryClient?.email) return null;
-    const payToken = await c.var.services.portalAccess.issueToken({
-        tenantId, inspectionId, recipientEmail: primaryClient.email,
-    });
-    return paymentUrl(getBookingHost(c), inspectionId, payToken);
+    try {
+        const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, inspectionId);
+        if (!primaryClient?.email) return null;
+        const payToken = await c.var.services.portalAccess.issueToken({
+            tenantId, inspectionId, recipientEmail: primaryClient.email,
+        });
+        return paymentUrl(getBookingHost(c), inspectionId, payToken);
+    } catch (err) {
+        logger.warn('hub pay link not produced; the hub loads without it', {
+            inspectionId, error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+    }
 }
