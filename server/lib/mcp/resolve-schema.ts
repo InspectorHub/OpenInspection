@@ -14,7 +14,7 @@
  * `buildToolInput` additionally folds the operation's path/query parameters and
  * request body into a single object schema and reports which argument names map
  * to the path, the query string, and the JSON body (consumed by the tool
- * handler in inspector-mcp.ts when reconstructing the HTTP request).
+ * handler in build-server.ts when reconstructing the HTTP request).
  */
 
 import { z } from 'zod';

@@ -2,45 +2,27 @@
 
 # MCP Remote + OAuth Integration — Discovery Notes
 
-> Produced by Task A0 spike (2026-06-29). Later tasks depend on the exact symbol names
-> recorded here — update this file if a package version bump changes the API surface.
+> First written as a spike (2026-06-29) and rewritten for the stateless handler and
+> OAuth provider 1.x. Code depends on the exact symbol names recorded here; update
+> this file if a package version bump changes the API surface. The reasoning behind
+> the current design is in [`mcp-migration-decisions.md`](mcp-migration-decisions.md).
 
 ---
 
 ## 1. Resolved package versions
 
-| Package | Resolved version | Notes |
+| Package | Version | Notes |
 |---|---|---|
-| `@cloudflare/workers-oauth-provider` | **0.8.1** | latest stable |
-| `agents` | **0.17.1** | latest stable |
-| `@modelcontextprotocol/sdk` | **1.29.0** | pinned by `agents` too |
-| `zod` (project) | **4.4.3** | our existing floor |
+| `@cloudflare/workers-oauth-provider` | **1.2.3** | pinned exactly |
+| `agents` | **0.28.0** | pinned exactly; only `agents/mcp/server` is imported |
+| `@modelcontextprotocol/server` | **2.0.0** | pinned exactly; imported only through `server/lib/mcp/sdk.ts` |
+| `@modelcontextprotocol/client` | **2.0.0** | pinned exactly; used by tests |
+| `zod` (project) | **4.4.3** | a single copy is shared with the MCP packages |
 
-### Zod compatibility verdict
-
-**No conflict.** `@modelcontextprotocol/sdk@1.29.0` declares `peerDependencies: { zod: "^3.25 || ^4.0" }`.
-`agents@0.17.1` declares `peerDependencies: { zod: "^4.0.0" }`. Both work with our existing
-`zod@^4.4.3`. `npm ls` confirms a single `zod@4.4.3` at the root, with only
-`@cloudflare/vitest-pool-workers` nesting an unrelated `zod@3.25.76` under itself.
-No `overrides` entry is needed for zod.
-
-### React peer dep (agents) — the original conflict is gone
-
-`agents@0.17.1` requires `react@^19.0.0` as a **peer dependency** (not listed in
-`peerDependenciesMeta` as optional).
-
-⚠️ **This section recorded a conflict that no longer exists.** It was written when the
-project was on `react@^18.3.1` and said an upgrade was out of scope; the project has since
-moved to React 19 (`react@^19.2.8`), so the peer dependency is satisfied on its own terms.
-
-The committed project-root `.npmrc` still carries `legacy-peer-deps=true`, and its comment
-still gives the React 18 reason. Nothing has been changed here on that basis — removing an
-install-wide flag is a dependency-tree decision, not a documentation one — but a reader
-should not take that comment as a current statement about React. Re-audit with
-`npm ls --depth=0` before assuming the flag is still load-bearing.
-
-We import only from `agents/mcp` (the Durable Object base class), which has no React runtime
-dependency; `agents/react` (the frontend hooks the peer dep exists for) is not imported.
+The v1 `@modelcontextprotocol/sdk` package is no longer a dependency. `agents` still
+declares it as a peer for its other entry points, which this codebase does not
+import; the repository's `.npmrc` sets `legacy-peer-deps=true`, so the unmet peer is
+not reported. The check is `npm ls`: it must show no `invalid` or `missing` line.
 
 ---
 
@@ -63,14 +45,14 @@ All fields are on `OAuthProviderOptions<Env>`:
 | `clientRegistrationEndpoint` | `string` | optional | Provider implements RFC 7591 DCR here |
 | `scopesSupported` | `string[]` | optional | Included as `scopes_supported` in RFC 8414 metadata |
 | `accessTokenTTL` | `number` | optional | Seconds; default 3600 |
-| `refreshTokenTTL` | `number` | optional | Seconds; default 2,592,000 (30 days); `0` disables |
+| `refreshTokenTTL` | `number` | optional | Seconds; default 2,592,000 (30 days); `0` issues no refresh token. A callback result's `refreshTokenTTL` applies at code exchange only; `undefined` there keeps the provider value, it never means "no expiry". |
 | `clientRegistrationTTL` | `number` | optional | Seconds; default 7,776,000 (90 days) |
-| `allowImplicitFlow` | `boolean` | optional | Default false |
-| `allowPlainPKCE` | `boolean` | optional | Default true — ⚠️ **we set it to `false`, and the default is why.** See below. |
+| `allowImplicitFlow` | — | removed | Removed in 1.x. Setting it to `true` throws at construction. |
+| `allowPrivateUseRedirectUris` | `boolean` | optional | Default false. Deployment-wide; we set it `true` and apply a per-scope policy ourselves (see below). |
+| `allowPlainPKCE` | — | removed | Removed in 1.x (PKCE is S256 only). Setting it to `true` throws at construction. |
 | `allowTokenExchangeGrant` | `boolean` | optional | Default false |
 | `disallowPublicClientRegistration` | `boolean` | optional | Default false |
-| `resourceMetadata` | `{ resource?, authorization_servers?, scopes_supported?, bearer_methods_supported?, resource_name? }` | optional | Customises `/.well-known/oauth-protected-resource` |
-| `resourceMatchOriginOnly` | `boolean` | optional | Default false; when true, compares origins only during resource validation |
+| `resourceMetadata` | `{ resource, authorization_servers?, bearer_methods_supported?, resource_name? }` | **`resource` required** | The canonical resource every token is bound to (see §4). |
 | `tokenExchangeCallback` | `fn` | optional | Mutate props on `authorization_code` / `refresh_token` exchange |
 | `clientRegistrationCallback` | `fn` | optional | Intercept and approve/reject DCR requests |
 | `resolveExternalToken` | `fn` | optional | Bridge external OAuth tokens (non-KV) |
@@ -78,37 +60,23 @@ All fields are on `OAuthProviderOptions<Env>`:
 | `clientIdMetadataDocumentEnabled` | `boolean` | optional | Default false; requires `global_fetch_strictly_public` compat flag |
 | `enterpriseManagedAuthorization` | `EmaOptions` | optional | Experimental EMA/ID-JAG grant |
 
-### ⚠️ `allowPlainPKCE` must stay `false`, and an omission is not neutral
+### PKCE is S256 only, and the redirect policy is ours
 
-`server/lib/mcp/oauth-provider.ts` passes `allowPlainPKCE: false`. Leaving it out
-is not "taking the safe default" — the library's default is `true`, and three
-things follow from it:
+In 0.x `plain` PKCE was an option whose default was the weak setting and had to be
+switched off. In 1.x `plain` and the implicit grant were removed from the library:
+the discovery document advertises `["S256"]`, a `plain` challenge is refused, and
+constructing a provider with either removed option throws.
+`tests/unit/mcp/oauth-pkce.spec.ts` keeps our construction site free of both
+options; `tests/workers/mcp/native-authorize.spec.ts` ("provider 1.x behaviours")
+checks the behaviour against the real provider.
 
-1. `/.well-known/oauth-authorization-server` advertises
-   `code_challenge_methods_supported: ["plain", "S256"]`, so a client is told
-   `plain` is acceptable on this deployment.
-2. An authorize request that simply **omits** `code_challenge_method` is read as
-   `plain` rather than refused. The weaker method is what you get by saying
-   nothing, which is the opposite of how a security default should fail.
-3. The token endpoint's `plain` branch compares the submitted verifier to the
-   stored challenge **verbatim**. That is not a check. The challenge travelled to
-   the browser in the same redirect URL as the authorization code, so anyone who
-   intercepted the code already holds the value needed to redeem it.
-
-PKCE exists to make a stolen authorization code unusable. `plain` returns it to
-being usable, which makes advertising it **worse than offering no PKCE at all**:
-a client that negotiates down believes it is protected and is not.
-
-Setting the option to `false` does both halves — it narrows the advertisement to
-`["S256"]` **and** makes the authorize parse refuse `plain` instead of serving
-it. Narrowing the document alone would not be enough, because a client that
-ignores the document, or that omits the parameter, would still be served.
-
-Held by `tests/unit/mcp/oauth-pkce.spec.ts`, which deliberately asserts against
-the INSTALLED LIBRARY rather than only against our options object: the defect was
-an omission, so a test that checked only "we pass the flag" would stay green
-through a rename of the option and leave the deployment advertising `plain`
-again.
+`allowPrivateUseRedirectUris: true` lets the provider accept private-use-scheme
+redirect URIs for **every** client, and `/oauth/register` is open. The check that
+scopes that is `isRedirectAllowedForScope` in `server/lib/auth/native-consent.ts`,
+called by the authorize loader and by its action (which re-reads a request the
+browser sent back, so it never went through `parseAuthRequest`). Policy: https and
+loopback `http` for anyone; a private-use scheme for native clients, and for other
+clients only `cursor`, `vscode`, `vscode-insiders` and `windsurf`; nothing else.
 
 Unrelated, and worth not confusing with the above: the **outbound** Google
 Calendar client in `server/lib/calendar/google.ts` also does PKCE, as a client
@@ -133,7 +101,6 @@ const { redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
   scope: string[],           // granted scopes
   props: unknown,            // arbitrary payload — encrypted into token, passed to apiHandler as ctx.props
   revokeExistingGrants?: boolean,         // default true
-  revokeExistingGrantsBatchSize?: number, // default 50
 });
 
 // Enumerate grants for a user (for audit/revocation UI)
@@ -165,63 +132,45 @@ apiHandler, `this.ctx.props` holds the decrypted props object.
 
 ---
 
-## 3. McpAgent — import path, serve signature, Props generic, this.props
-
-### Import path
+## 3. The MCP handler — import path, options, how props arrive
 
 ```ts
-import { McpAgent, getMcpAuthContext } from 'agents/mcp';
+import { createMcpHandler } from 'agents/mcp/server';
 ```
 
-The `agents/mcp` export (defined in `agents` package.json `exports[./mcp]`) maps to
-`dist/mcp/index.js`. `McpAgent` is the only abstract base class needed for a DO-hosted MCP server.
+`createMcpHandler(factory, options)` returns a handler `(request, env, ctx) => Promise<Response>`.
+The factory is called on **every** request and must return a new `McpServer`.
+Options we use (`server/lib/mcp/handler.ts`):
 
-### Class declaration
+- `route: '/mcp'` — an exact pathname match, so `/mcp/{slug}` is reduced to `/mcp` first
+  (`stripMcpSlugPrefix`), and `/mcp/` or `/mcp/acme/extra` do not match.
+- `legacy: 'stateless'` — a client that opens with `initialize` (2025-11-25 and earlier) is
+  served per request with no session; `GET` and `DELETE` answer `405`.
+- `allowedOriginHostnames` — an array **replaces** the library's default list (localhost and
+  `workers.dev`), it does not extend it, so the localhost set is spelled out
+  (`localhostAllowedOrigins()`) and the engine's own hostname is added. Matching is by
+  hostname only. A request with no `Origin` header is always accepted.
+- `authContext: { props }` — the verified grant props, readable from handlers.
 
-```ts
-abstract class McpAgent<
-  Env extends Cloudflare.Env = Cloudflare.Env,
-  State = unknown,
-  Props extends Record<string, unknown> = Record<string, unknown>
-> extends Agent<Env, State, Props>
-```
+The handler module is only reached through a dynamic `import()` in `oauth-provider.ts`, so a
+deployment with MCP switched off never evaluates it. Never `export default createMcpHandler(...)`:
+Wrangler treats a function default export as an entrypoint class.
 
-Generic position: **Env, State, Props** (in that order). For a tenant-aware agent:
+### How the props arrive
 
-```ts
-type MyProps = { tenantSlug: string; userId: string; scopes: string[] };
-class InspectorMcp extends McpAgent<Env, never, MyProps> { ... }
-```
+1. **Authorization flow**: the consent action calls `completeAuthorization({ ..., props })`. The
+   provider encrypts `props` into the grant.
+2. **Authenticated request**: the provider decrypts the token and sets `ctx.props` before calling
+   the `apiHandler` (`buildOAuthHandler` in `server/lib/mcp/oauth-provider.ts`).
+3. **Guards, in order**: a grant that claims to be native is `403`; MCP switched off is `404`; a
+   slug in the path that differs from `props.tenantSlug` is `403 tenant_mismatch`; missing props
+   is `401`.
+4. **Server construction**: `buildMcpServer(env, props)` (`server/lib/mcp/build-server.ts`)
+   registers the tools, resources and prompts the grant's scopes allow. The identity-free part
+   (scope selection, schemas) is cached per scope set, bounded to 64 entries.
 
-### `serve()` signature
-
-```ts
-static serve(
-  path: string,
-  {
-    binding = 'MCP_OBJECT',   // wrangler.jsonc DO binding name; change if needed
-    corsOptions?: CORSOptions,
-    transport?: 'streamable-http' | 'sse' | 'auto',  // default 'streamable-http'
-    jurisdiction?: DurableObjectJurisdiction
-  }?: ServeOptions
-): { fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> }
-```
-
-`McpAgent.serve()` returns a fetch handler object that routes incoming HTTP/WebSocket requests
-to the Durable Object. The DO instance name is `streamable-http:{sessionId}` (where `sessionId`
-comes from the `mcp-session-id` request header, or a new unique ID for a fresh session).
-
-### How `this.props` is populated
-
-1. **Authorization flow**: The consent handler calls `env.OAUTH_PROVIDER.completeAuthorization({ ..., props: { tenantSlug, userId, ... } })`. The provider encrypts `props` into the access token.
-2. **Authenticated API request**: `OAuthProvider` decrypts the token and sets `ctx.props` on the execution context before forwarding the request to the `apiHandler`.
-3. **Inside `McpAgent.serve()`**: The handler calls `getAgentByName(namespace, doName, { props: ctx.props })`. The framework calls `onStart(props?: Props)` on the DO, which sets `this.props`.
-4. **Inside the DO**: `this.props` (typed as `Props | undefined`) holds the decrypted OAuth grant props. Access them in `init()`, tool handlers, etc.
-
-The `updateProps(props?: Props)` method re-runs `onStart` and persists new props to DO storage.
-
-For non-DO MCP servers (using `createMcpHandler`), use `getMcpAuthContext()` which returns
-`McpAuthContext | undefined` — reads `{ props: Record<string, unknown> }` from AsyncLocalStorage.
+The `McpServer`, `ResourceTemplate` and protocol error types come from one seam,
+`server/lib/mcp/sdk.ts`; nothing else imports the server package directly.
 
 ---
 
@@ -257,96 +206,63 @@ PRM response are the same for all path variants — only the `resource` identifi
 
 **Conclusion: both modes use `apiRoute: '/mcp'`. Standalone serves the single fixed
 endpoint `/mcp`; SaaS serves per-workspace endpoint URLs `/mcp/{slug}` under the same
-prefix. The tenant slug is present in BOTH the URL path (for per-workspace URLs +
-per-workspace RFC 8707 resource binding) AND the OAuth grant `props` (the authoritative
-value the DO trusts for tenant scoping).**
+prefix. Every token is bound to ONE canonical resource, `<origin>/mcp`. The tenant slug is
+present in the URL path (to select the workspace endpoint) and in the OAuth grant `props`
+(the authoritative value for tenant scoping); the two must agree.**
 
 > **Superseded — the SaaS mount used to be `apiRoute: '/company/'`.** `apiRoute` is a
 > literal prefix, so that value made the OAuth provider treat EVERY `/company/*` request
-> as an authenticated API request. It held a whole top-level namespace hostage to a "do
-> not add a `/company/*` route" caveat written in this file — a rule enforced by nothing,
-> in a document a route author has no reason to open. Narrowing the mount to `/mcp`
-> releases `/company/*` and deletes the caveat instead of restating it. An even earlier
-> draft used the abbreviated `/t/` prefix — also superseded.
+> as an authenticated API request. Narrowing the mount to `/mcp` released `/company/*`.
 
-The design deliberately keeps **tenant-in-URL + RFC 8707 resource indicator**; only the
-prefix changed. The path-based approach is REQUIRED — not merely cosmetic — because two
-things a query-string approach cannot provide are mandatory here:
-
-1. **Per-workspace distinct URLs** — each workspace gets its own canonical MCP endpoint
-   (`https://host.com/mcp/acme`), so MCP clients register and store one URL per workspace.
-2. **Per-workspace RFC 8707 resource binding** — path-scoped RFC 9728 PRM derives a *distinct*
-   resource identifier per workspace (`/.well-known/oauth-protected-resource/mcp/acme` →
-   `resource: 'https://host.com/mcp/acme'`). Access tokens are then bound (via the RFC 8707
-   `resource` indicator) to that specific workspace's resource, so a token minted for `acme`
-   cannot be replayed against `globex`'s endpoint.
+> **Superseded — per-workspace resource identifiers.** With provider 0.x each workspace
+> endpoint had its own resource identifier (`https://host.com/mcp/acme`) and tokens were
+> bound to it. Provider 1.x requires one configured resource. Isolation between workspaces
+> therefore does not come from the token audience: the handler rejects any request whose
+> path slug differs from the granted `props.tenantSlug`, and data access is scoped by the
+> grant's tenant. Grants made against a workspace resource cannot refresh after the upgrade
+> (`400`, `invalid_grant` or `invalid_target`); the user connects again.
 
 How `apiRoute` matching works (mechanical facts that shape the implementation):
 
-- `apiRoute` is a **literal string prefix match** — no patterns, no wildcards, no `:slug`
-  expansion. A slug-parameterized value would only match URLs literally containing the
-  characters of the parameter (the colon is literal), so it CANNOT be used. The prefix
-  `'/mcp'` covers `/mcp` and `/mcp/{slug}` alike, and the handler matches the precise
-  shape.
-- The tenant slug is parsed from the URL path segment to select the workspace endpoint, but the
-  DO trusts `this.props.tenantSlug` (encrypted in the OAuth grant) as the authoritative tenant
-  for all data access. The URL slug and the props slug MUST agree — the handler rejects any
-  request where the path slug ≠ the granted `props.tenantSlug` (prevents a token for one
-  workspace being used against another workspace's URL).
-- The DO instance name is determined by session ID (`streamable-http:{sessionId}`), not by slug.
+- `apiRoute` is a **literal string prefix match** — no patterns, no wildcards. The prefix
+  `'/mcp'` covers `/mcp` and `/mcp/{slug}` alike; the handler matches the precise shape. In 1.x
+  every route must also be the resource's path or a descendant of it.
+- The URL slug and `props.tenantSlug` MUST agree — the handler rejects any request where they
+  differ (prevents a token for one workspace being used against another workspace's URL).
 
-**Standalone:** endpoint `/mcp`
-- Single fixed endpoint; no slug segment, so the slug guard is inert by construction
-- PRM auto-served at `/.well-known/oauth-protected-resource/mcp` → `resource: 'https://host.com/mcp'`
-- `this.props.tenantSlug` carries the tenant from the OAuth grant (SINGLE_TENANT_ID is the only tenant)
+**Discovery.** The protected-resource metadata is served at
+`/.well-known/oauth-protected-resource/mcp` with `resource: <origin>/mcp`. The `401` challenge
+for both `/mcp` and `/mcp/{slug}` carries `resource_metadata` pointing at that one document. The
+per-workspace metadata path of 0.x (`.../mcp/{slug}`) answers `404`. Pinned by
+`tests/workers/mcp/native-authorize.spec.ts`.
 
-**SaaS:** endpoint `/mcp/{slug}`
-- Same registered prefix `'/mcp'`; the slug is the segment after it
-- Per-workspace PRM is auto-derived: `/.well-known/oauth-protected-resource/mcp/acme` →
-  `resource: 'https://host.com/mcp/acme'` (distinct resource id per workspace = RFC 8707 binding)
-- The MCP agent (DO) reads `this.props.tenantSlug` for tenant scoping; path slug is validated against it
-- `McpAgent.serve('/mcp')` matches its mount literally via URLPattern, so the handler reduces
-  `/mcp/{slug}` back to `/mcp` before delegating
+**Standalone:** endpoint `/mcp`, no slug segment, so the slug guard is inert by construction.
+
+**SaaS:** endpoint `/mcp/{slug}`; the slug is validated against `props.tenantSlug`, then the
+path is reduced to `/mcp` before the handler's exact route match.
 
 > **Why one handler covers both modes.** The slug guard fires on the PATH shape, not on the
 > mode: `/mcp` has no slug segment and is delegated untouched, `/mcp/{slug}` is checked and
 > reduced. Deriving the guard from the request rather than from a second mode flag is what
 > stops the two from drifting apart (OI #308).
 
-**Rejected alternative — `apiRoute: '/mcp'` + `?workspace={slug}` query param.** Simpler to
-route, but it FAILS the spec's requirements: all workspaces would share the single endpoint URL
-`https://host.com/mcp` and therefore a single PRM resource identifier (`https://host.com/mcp`).
-That collapses the per-workspace RFC 8707 resource binding — one token would be valid for the
-shared resource regardless of workspace, losing the per-workspace token isolation §4.2 requires.
-
 ---
 
 ## 5. Required wrangler.jsonc additions
 
-For any MCP integration to work, the following must be present in wrangler.jsonc:
-
-What actually shipped, in the committed `wrangler.jsonc` — the binding name and class are
-**not** `McpAgent`'s defaults, and the migration tag is whichever one is next in that file's
-own chain (`v3` here, because two DO classes preceded it):
+MCP needs the `OAUTH_KV` namespace and the `nodejs_compat` flag (`agents/mcp/server` uses
+`node:async_hooks`). **No Durable Object is needed any more.** The committed `wrangler.jsonc`
+still declares the retired `InspectorMcp` class and its `v3` migration, kept only so the class
+already deployed keeps resolving until a dedicated deletion migration ships (see
+[`mcp-migration-decisions.md`](mcp-migration-decisions.md)):
 
 ```jsonc
 {
-  "durable_objects": {
-    "bindings": [
-      { "name": "INSPECTOR_MCP", "class_name": "InspectorMcp" }
-    ]
-  },
-  "kv_namespaces": [
-    { "binding": "OAUTH_KV", "id": "<your-kv-id>" }
-  ],
-  "migrations": [
-    { "tag": "v3", "new_sqlite_classes": ["InspectorMcp"] }
-  ]
+  "durable_objects": { "bindings": [ { "name": "INSPECTOR_MCP", "class_name": "InspectorMcp" } ] },
+  "kv_namespaces": [ { "binding": "OAUTH_KV", "id": "<your-kv-id>" } ],
+  "migrations": [ { "tag": "v3", "new_sqlite_classes": ["InspectorMcp"] } ]
 }
 ```
 
 The `OAUTH_KV` binding name is hardcoded in `@cloudflare/workers-oauth-provider` — it cannot be
 changed without forking the library.
-
-`McpAgent.serve()` defaults its binding to `MCP_OBJECT`; this deployment overrides it by
-passing `{ binding: 'INSPECTOR_MCP' }`.

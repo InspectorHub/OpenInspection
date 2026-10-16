@@ -1,7 +1,7 @@
 /**
  * Shared OAuth grant-revocation helper for the remote MCP server.
  *
- * Grant `props` (userId/tenantId/role — see durable-objects/inspector-mcp.ts
+ * Grant `props` (userId/tenantId/role — see lib/mcp/build-server.ts
  * McpProps) are baked in ONCE at /oauth/authorize time (app/routes/oauth/
  * authorize.tsx) and never re-validated per MCP call: the OAuthProvider only
  * checks that the grant/access-token KV entries it owns still exist (see

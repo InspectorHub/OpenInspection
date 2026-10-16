@@ -183,16 +183,17 @@
     "lint:route-dispatch": "node scripts/check-route-dispatch-parity.mjs"
   },
   "dependencies": {
-    "@cloudflare/workers-oauth-provider": "^0.8.1",
+    "@cloudflare/workers-oauth-provider": "1.2.3",
     "@conform-to/react": "^1.19.4",
     "@conform-to/zod": "^1.19.4",
     "@googlemaps/js-api-loader": "^1.16.10",
     "@inlang/paraglide-js": "2.22.0",
-    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/server": "2.0.0",
     "@stripe/react-stripe-js": "^6.5.0",
     "@stripe/stripe-js": "^9.7.0",
     "@types/sortablejs": "^1.15.9",
-    "agents": "^0.17.4",
+    "agents": "0.28.0",
     "docx": "^9.7.1",
     "dompurify": "^3.4.16",
     "drizzle-orm": "^0.45.2",
@@ -287,7 +288,6 @@
     "valibot": ">=1.4.2",
     "source-map-js": ">=1.2.2",
     "proxy-addr": ">=2.0.8",
-    "@modelcontextprotocol/sdk": "$@modelcontextprotocol/sdk",
     "wrangler": "$wrangler"
   },
   "optionalDependencies": {

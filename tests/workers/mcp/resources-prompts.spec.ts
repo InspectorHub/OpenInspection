@@ -9,9 +9,8 @@
 //
 // callApiAsUser is stubbed (same rationale as tools-call.spec).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/server';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 
 const bridge = vi.hoisted(() => ({
     calls: [] as Array<{ method: string; url: string }>,
@@ -36,7 +35,7 @@ vi.mock('../../../server/lib/mcp/identity-bridge', async (importOriginal) => {
 import {
     registerGrantedResources,
     type McpProps,
-} from '../../../server/durable-objects/inspector-mcp';
+} from '../../../server/lib/mcp/build-server';
 import { registerGrantedPrompts } from '../../../server/lib/mcp/prompts';
 
 const props = (scopes: string[]): McpProps => ({

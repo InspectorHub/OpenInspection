@@ -78,6 +78,41 @@ export function isNativeRedirectUri(uri: string): boolean {
 }
 
 /**
+ * Private-use schemes a non-native (MCP) client may use for its callback. These
+ * are the editors that register a custom scheme beside their https and loopback
+ * callbacks: Cursor (`cursor://`), VS Code (`vscode://`, `vscode-insiders://`)
+ * and Windsurf (`windsurf://`). Adding another host is one entry here plus one
+ * case in the redirect-guard spec.
+ */
+const MCP_PRIVATE_SCHEME_ALLOWLIST: readonly string[] = ['cursor', 'vscode', 'vscode-insiders', 'windsurf'];
+
+/**
+ * The per-scope redirect policy. The OAuth provider is configured to accept
+ * private-use schemes for the whole deployment (`allowPrivateUseRedirectUris`),
+ * and `/oauth/register` is open, so this is the check that keeps that option
+ * from reaching MCP clients wholesale. Both the authorize loader and the action
+ * call it (the action re-reads a request the browser sent back, not a parsed one).
+ *
+ *  - https, and loopback http (RFC 8252 7.3): any scope.
+ *  - a private-use scheme: with the native scope when it is a valid native
+ *    redirect; without it only for the editor schemes above.
+ *  - everything else, including active-content schemes and remote http: refused.
+ */
+export function isRedirectAllowedForScope(redirectUri: string, scopes: readonly string[] | undefined): boolean {
+  let u: URL;
+  try {
+    u = new URL(redirectUri);
+  } catch {
+    return false;
+  }
+  if (u.username || u.password) return false;
+  if (u.protocol === 'https:') return true;
+  if (u.protocol === 'http:') return u.hostname === '127.0.0.1' || u.hostname === '[::1]' || u.hostname === 'localhost';
+  if (isNativeAuthRequest(scopes)) return isNativeRedirectUri(redirectUri);
+  return MCP_PRIVATE_SCHEME_ALLOWLIST.includes(u.protocol.slice(0, -1));
+}
+
+/**
  * A native authorization must carry a PKCE S256 challenge. The provider only
  * enforces PKCE when the request includes a challenge, and a private-use scheme
  * can be claimed by a second app on the same device, so without this a

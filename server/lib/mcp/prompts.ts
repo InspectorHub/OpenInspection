@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { McpProps } from '../../durable-objects/inspector-mcp';
+import type { McpServer } from './sdk';
+import type { McpProps } from './build-server';
 
 /**
  * MCP Prompts (Phase E): a curated set of argument-bearing prompt templates an

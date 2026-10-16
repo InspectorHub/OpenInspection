@@ -20,7 +20,7 @@ import app from '../../../server/index';
 import { buildOAuthHandler } from '../../../server/lib/mcp/oauth-provider';
 import { completeNativeAuthorization, NATIVE_GRANTS_PER_USER_MAX } from '../../../server/lib/auth/native-consent';
 import { revokeAllUserGrants } from '../../../server/lib/mcp/grants';
-import { NATIVE_IDLE_LIMIT_S } from '../../../server/lib/auth/native-token';
+import { NATIVE_IDLE_LIMIT_S, NATIVE_REFRESH_MAX_TTL_S } from '../../../server/lib/auth/native-token';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { applyMigrations as replayMigrations } from '../migration-replay';
 
@@ -102,6 +102,10 @@ async function appOrConsent(req: Request, e: Record<string, unknown>, c: Executi
         await revokeAllUserGrants(oauth, url.searchParams.get('user') ?? USER);
         return new Response('ok');
     }
+    if (url.pathname === '/__test/grants') {
+        const { items } = await oauth.listUserGrants(url.searchParams.get('user') ?? USER);
+        return Response.json(items.map((g) => ({ id: g.id, scope: g.scope, expiresAt: g.expiresAt ?? null })));
+    }
     if (url.pathname === '/__test/grant-count') {
         const { items } = await oauth.listUserGrants(url.searchParams.get('user') ?? USER);
         return Response.json({ count: items.length });
@@ -110,7 +114,7 @@ async function appOrConsent(req: Request, e: Record<string, unknown>, c: Executi
 }
 
 const callIn = (e: Record<string, unknown>) => (req: Request) =>
-    Promise.resolve(buildOAuthHandler(appOrConsent as never, e as never).fetch(req, e, ctx));
+    Promise.resolve(buildOAuthHandler(appOrConsent as never, e as never, req).fetch(req, e, ctx));
 const call = callIn(env);
 type Call = typeof call;
 
@@ -243,7 +247,6 @@ describe('native client OAuth lifecycle (real provider)', () => {
     it('refresh slides the idle clock; 90+ idle days is 400 invalid_grant and revokes the grant', async () => {
         const clientId = await registerClient();
         const first = (await (await authorizeAndExchange(clientId, 'native')).json()) as Tokens;
-        const before = await grantCount();
 
         // Positive control: a refresh now succeeds and the new token works.
         const refreshed = await token({ grant_type: 'refresh_token', refresh_token: first.refresh_token!, client_id: clientId });
@@ -264,10 +267,17 @@ describe('native client OAuth lifecycle (real provider)', () => {
         const expired = await token({ grant_type: 'refresh_token', refresh_token: third.refresh_token!, client_id: clientId });
         expect(expired.status).toBe(400);
         expect(((await expired.json()) as { error: string }).error).toBe('invalid_grant');
-        vi.useRealTimers();
-        expect(await grantCount()).toBe(before - 1);
-        // The revoked grant's access token no longer works.
+        // The provider enforces the idle window itself (the refresh token's own expiry,
+        // re-armed to 90 days on every refresh), so it refuses before the idle check in
+        // nativeTokenExchange is reached. The refused grant is not revoked on the spot:
+        // its record carries the same expiry and the store drops it, so the count is not
+        // asserted here (it would need the store's clock, which a fake Date does not move).
+        // The access token minted 90+ days ago is long past its own hour.
         expect((await sessionContext(third.access_token)).status).toBe(401);
+        vi.useRealTimers();
+        // Control: the grant is not unusable by nature; a new sign-in under the same user works.
+        const again = await authorizeAndExchange(clientId, 'native');
+        expect(again.status).toBe(200);
     });
 
     it('with the switch turned off, a native refresh is 400 invalid_grant and the grant is revoked; with it on it refreshes', async () => {
@@ -303,17 +313,26 @@ describe('native client OAuth lifecycle (real provider)', () => {
             body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
         }));
         expect(res.status).toBe(403);
-        // Control: an MCP grant's token gets past the same guard and reaches the MCP server. This
-        // workers project has no INSPECTOR_MCP Durable Object, so reaching it surfaces as the
-        // agent's missing-binding error; the native request above never got that far.
+        // Control: an MCP grant's token gets past the same guard and reaches the MCP server.
         const mcp = (await (await authorizeAndExchange(clientId, 'read:inspections')).json()) as Tokens;
-        const reached = await call(new Request(`${ORIGIN}/mcp`, {
+        expect((await mcpCall(mcp.access_token, call)).status).toBe(200);
+    }, 60_000);
+
+    it('the company in the URL must be the company of the grant: /mcp/{other} is 403 tenant_mismatch, /mcp/{own} is served', async () => {
+        const clientId = await registerClient();
+        const mcp = (await (await authorizeAndExchange(clientId, 'read:inspections')).json()) as Tokens;
+        const at = (path: string) => call(new Request(`${ORIGIN}${path}`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${mcp.access_token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
             body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
-        })).then((r) => (r.status === 403 ? 'forbidden' : 'answered'), (e: unknown) => String(e));
-        expect(reached === 'answered' || reached.includes('INSPECTOR_MCP')).toBe(true);
-    });
+        }));
+        // The stand-in consent page above writes tenantSlug 'native' into MCP grants.
+        const own = await at('/mcp/native');
+        expect(own.status).toBe(200);
+        const other = await at('/mcp/other-company');
+        expect(other.status).toBe(403);
+        expect(((await other.json()) as { error: string }).error).toBe('tenant_mismatch');
+    }, 60_000);
 
     it('a grant that claims to be native but is not well-formed is refused at the token endpoint and revoked, never handed on as an MCP grant (positive control: a well-formed native grant exchanges)', async () => {
         const clientId = await registerClient();
@@ -386,9 +405,8 @@ describe('native client OAuth lifecycle (real provider)', () => {
             const nativeTok = (await (await authorizeAndExchange(await registerClient(nativeOnly), 'native', USER, nativeOnly)).json()) as Tokens;
             expect((await mcpCall(mcp.access_token, nativeOnly)).status).toBe(404);
             expect((await sessionContext(nativeTok.access_token, nativeOnly)).status).toBe(200);
-            // Control: with MCP on the guard lets the MCP token through (this project has no MCP Durable Object).
-            const reached = await mcpCall(mcp.access_token, call).then((r) => (r.status === 404 ? 'not-found' : 'answered'), (e: unknown) => String(e));
-            expect(reached === 'answered' || reached.includes('INSPECTOR_MCP')).toBe(true);
+            // Control: with MCP on the guard lets the MCP token through to the server.
+            expect((await mcpCall(mcp.access_token, call)).status).toBe(200);
             await call(new Request(`${ORIGIN}/__test/revoke-all?user=${MULTI_USER}`));
         });
 
@@ -566,6 +584,115 @@ describe('native client OAuth lifecycle (real provider)', () => {
             expect((await grantsApi(via, USER, '/api/mcp/grants/anything', { method: 'DELETE' })).status).toBe(404);
             // Control: the same request on the opted-in deployment is served.
             expect((await grantsApi(call, USER)).status).toBe(200);
+        });
+    });
+    describe('provider 1.x behaviours', () => {
+        const DAY = 86400;
+        const nowSec = () => Math.floor(Date.now() / 1000); // seed-lint-ok: OAuth grant expiry is epoch seconds (provider contract), not a tenants.created_at value
+        interface GrantRow { id: string; scope: string[]; expiresAt: number | null }
+        const grantsOf = async (user: string): Promise<GrantRow[]> =>
+            (await (await call(new Request(`${ORIGIN}/__test/grants?user=${user}`))).json()) as GrantRow[];
+        const grantOf = async (t: Tokens, user: string) => (await grantsOf(user)).find((g) => g.id === t.access_token.split(':')[1])!;
+        const KV = () => (testEnv as unknown as { OAUTH_KV: KVNamespace }).OAUTH_KV;
+        const revokeAll = (user: string) => call(new Request(`${ORIGIN}/__test/revoke-all?user=${user}`));
+
+        it('refresh lifetime: a native grant is finite at code exchange and re-armed to 90 idle days on refresh; an MCP grant keeps the 30-day default', async () => {
+            const clientId = await registerClient();
+            const first = (await (await authorizeAndExchange(clientId, 'native', USER)).json()) as Tokens;
+            const atExchange = (await grantOf(first, USER)).expiresAt;
+            expect(atExchange, 'a finite expiry, not "never"').not.toBeNull();
+            expect(atExchange!).toBeGreaterThan(nowSec() + 399 * DAY);
+            expect(atExchange!).toBeLessThanOrEqual(nowSec() + NATIVE_REFRESH_MAX_TTL_S + 60);
+
+            const refreshed = (await (await refreshWith(call, clientId, first)).json()) as Tokens;
+            const afterRefresh = (await grantOf(refreshed, USER)).expiresAt!;
+            expect(Math.abs(afterRefresh - (nowSec() + NATIVE_IDLE_LIMIT_S))).toBeLessThan(120);
+
+            // Control: an MCP grant does not take the native lifetime.
+            const mcp = (await (await authorizeAndExchange(await registerClient(), 'read:inspections', OTHER_USER)).json()) as Tokens;
+            const mcpExpiry = (await grantOf(mcp, OTHER_USER)).expiresAt!;
+            expect(Math.abs(mcpExpiry - (nowSec() + 30 * DAY))).toBeLessThan(120);
+            await revokeAll(USER);
+            await revokeAll(OTHER_USER);
+        });
+
+        it('PKCE: the discovery document advertises S256 only, and a plain challenge is refused while S256 is served', async () => {
+            const meta = await call(new Request(`${ORIGIN}/.well-known/oauth-authorization-server`));
+            expect(meta.status).toBe(200);
+            expect(((await meta.json()) as { code_challenge_methods_supported: string[] }).code_challenge_methods_supported).toEqual(['S256']);
+
+            const clientId = await registerClient();
+            const plainUrl = new URL(`${ORIGIN}/oauth/authorize`);
+            plainUrl.search = new URLSearchParams({
+                response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope: 'read:inspections', state: 'st',
+                code_challenge: 'c'.repeat(43), code_challenge_method: 'plain', as: USER,
+            }).toString();
+            const refused = await call(new Request(plainUrl)).then((r) => r, () => null);
+            expect((refused?.headers.get('Location') ?? '').includes('code='), 'no authorization code is issued for a plain challenge').toBe(false);
+            // Control: the same request with S256 is served.
+            expect((await authorize(clientId, 'read:inspections', call)).authRes.status).toBe(302);
+        });
+
+        it('discovery: one canonical resource, and the 401 challenge for a workspace endpoint points at its metadata', async () => {
+            const prm = await call(new Request(`${ORIGIN}/.well-known/oauth-protected-resource/mcp`));
+            expect(prm.status).toBe(200);
+            expect(((await prm.json()) as { resource: string }).resource).toBe(`${ORIGIN}/mcp`);
+            // Both endpoint shapes challenge toward the same metadata document, so a client that follows the
+            // challenge learns the canonical resource whichever URL it was configured with.
+            for (const path of ['/mcp', '/mcp/native']) {
+                const res = await call(new Request(`${ORIGIN}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }));
+                expect(res.status, path).toBe(401);
+                expect(res.headers.get('www-authenticate'), path).toContain(`resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp"`);
+            }
+            // The per-workspace metadata path of the earlier provider no longer exists (a client that probes it
+            // before following the challenge sees a plain 404 and falls back).
+            expect((await call(new Request(`${ORIGIN}/.well-known/oauth-protected-resource/mcp/native`))).status).toBe(404);
+        });
+
+        it('an authorization whose resource names a workspace path is an OAuth invalid_target error, not a server error', async () => {
+            const clientId = await registerClient();
+            const { challenge } = await pkcePair();
+            const base = { response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope: 'read:inspections', state: 'st', code_challenge: challenge, code_challenge_method: 'S256', as: USER };
+            const withResource = (resource: string) => {
+                const u = new URL(`${ORIGIN}/oauth/authorize`);
+                u.search = new URLSearchParams({ ...base, resource }).toString();
+                return call(new Request(u)).then((r) => ({ status: r.status }), (e: unknown) => ({ error: (e as { code?: string }).code }));
+            };
+            expect(await withResource(`${ORIGIN}/mcp/native`)).toEqual({ error: 'invalid_target' });
+            // Control: the canonical resource is served.
+            expect(await withResource(`${ORIGIN}/mcp`)).toEqual({ status: 302 });
+        });
+
+        it('a grant bound to the old per-workspace resource cannot refresh: 400 invalid_grant or invalid_target, never a 500', async () => {
+            const clientId = await registerClient();
+            const t = (await (await authorizeAndExchange(clientId, 'read:inspections', MULTI_USER)).json()) as Tokens;
+            // Control: while the grant carries the canonical resource, a refresh works.
+            const ok = await refreshWith(call, clientId, t);
+            expect(ok.status).toBe(200);
+            const current = (await ok.json()) as Tokens;
+
+            // Rewrite the stored record into the shape an earlier provider wrote for a workspace endpoint.
+            const [userId, grantId] = current.access_token.split(':');
+            const key = `grant:${userId}:${grantId}`;
+            const stored = await KV().getWithMetadata<Record<string, unknown>>(key, 'json');
+            expect(stored.value?.resource, 'the stored grant records the resource it is bound to').toBe(`${ORIGIN}/mcp`);
+            await KV().put(key, JSON.stringify({ ...stored.value, resource: `${ORIGIN}/mcp/native` }), stored.metadata ? { metadata: stored.metadata } : undefined);
+
+            for (const extra of [{}, { resource: `${ORIGIN}/mcp/native` }] as Array<Record<string, string>>) {
+                const res = await token({ grant_type: 'refresh_token', refresh_token: current.refresh_token!, client_id: clientId, ...extra });
+                expect(res.status).toBe(400);
+                expect(['invalid_grant', 'invalid_target']).toContain(((await res.json()) as { error: string }).error);
+            }
+            await revokeAll(MULTI_USER);
+        });
+
+        it('the provider refuses a user id containing a colon (the id we mint never has one)', async () => {
+            const clientId = await registerClient();
+            const bad = await authorize(clientId, 'read:inspections', call, 'tenant:user').then((r) => r.authRes.status, () => 'threw');
+            expect(bad === 'threw' || Number(bad) >= 400, 'a colon in the user id is refused').toBe(true);
+            // Control: a plain id is served.
+            expect((await authorize(clientId, 'read:inspections', call, USER)).authRes.status).toBe(302);
+            await revokeAll(USER);
         });
     });
 });

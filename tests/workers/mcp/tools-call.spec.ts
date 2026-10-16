@@ -15,9 +15,8 @@
 // its full JWT-signing + in-process-app dispatch needs a seeded D1 + keyring
 // that belongs at the integration layer.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/server';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 
 const bridge = vi.hoisted(() => ({
     calls: [] as Array<{ method: string; url: string; body: string }>,
@@ -45,7 +44,7 @@ vi.mock('../../../server/lib/mcp/identity-bridge', async (importOriginal) => {
     };
 });
 
-import { registerGrantedTools, type McpProps } from '../../../server/durable-objects/inspector-mcp';
+import { registerGrantedTools, type McpProps } from '../../../server/lib/mcp/build-server';
 
 const props = (scopes: string[]): McpProps => ({
     userId: 'u1',

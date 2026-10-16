@@ -333,7 +333,7 @@ describe("authorize action, native branch (the real action)", () => {
   });
 
   it("control: an MCP request still takes the module-scope path", async () => {
-    const mcp = { ...base, scope: ["read:inspections"], codeChallenge: undefined, codeChallengeMethod: undefined };
+    const mcp = { ...base, scope: ["read:inspections"], redirectUri: "https://claude.ai/cb", codeChallenge: undefined, codeChallengeMethod: undefined };
     const h = harness({ parsed: mcp });
     const res = (await action(post(h.context, mcp))) as Response;
     expect(res.status).toBe(302);

@@ -249,13 +249,13 @@
       "lifecycle_owner": "vendor-library",
       "data_categories": ["mcp_session", "staff_identity"],
       "subjects": ["staff"],
-      "purpose": "Remote MCP server session host — one object per authenticated MCP connection, carrying the caller's props (tenant and user identity).",
+      "purpose": "Retired. The remote MCP endpoint is now a stateless request handler and nothing routes to this class; it stays bound only until the migration that deletes it ships. Objects created by the previous session-hosting implementation carried the caller's props (tenant and user identity) and may still hold what the vendor library persisted until that deletion.",
       "retention_rule": "unknown",
       "deletion_mechanism": "none",
       "export_mechanism": "none",
       "tenant_scope": "unknown",
       "evidence_level": "E2",
-      "note": "The only entry whose lifecycle_owner is not us. Our subclass makes no ctx.storage call, but it extends McpAgent from the `agents` library and is declared new_sqlite_classes, so whatever that base class persists is at rest under our account and we did not write it. What it stores and how it is addressed are both UNKNOWN rather than none — reading the vendor's storage shape is the work that would let this entry make a claim."
+      "note": "The only entry whose lifecycle_owner is not us. The class is now an empty shell that answers 410 and writes nothing, so no NEW data reaches it. It was previously a subclass of McpAgent from the `agents` library and is declared new_sqlite_classes, so whatever that base class persisted for sessions created before the stateless handler shipped is still at rest under our account until the deleted_classes migration removes the class and its storage. What it stored and how it was addressed remain UNKNOWN rather than none; the deletion migration, not a reading of the vendor's storage shape, is what closes this entry."
     },
 
     // ── Queues ──────────────────────────────────────────────────────────────

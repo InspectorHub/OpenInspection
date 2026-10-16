@@ -7,17 +7,17 @@ export default defineConfig({
       // `cloudflare:workers` is only available in the Workers runtime; stub
       // it out so route-metadata tests can import server/index.ts in Node.
       'cloudflare:workers': path.resolve(__dirname, 'tests/unit/stubs/cloudflare-workers.ts'),
-      // The remote-MCP feature pulls two Workers-runtime-only packages into the
-      // worker-entry graph (workers/app.ts → oauth-provider.ts and the
-      // re-exported InspectorMcp → inspector-mcp.ts). Both packages' dist code
-      // does `import ... from "cloudflare:workers" | "cloudflare:email"` at
-      // module load, which Node's ESM loader rejects. They're external
-      // node_modules (native-loaded), so the `cloudflare:*` aliases above can't
-      // reach inside them — instead alias each package to a local stub so the
-      // real ones are never loaded in Node. The real packages run in the
-      // Workers-runtime tests (tests/workers/mcp/*) and production.
+      // The remote-MCP feature pulls a Workers-runtime-only package into the
+      // worker-entry graph (workers/app.ts → oauth-provider.ts). Its dist code
+      // does `import ... from "cloudflare:workers"` at module load, which Node's
+      // ESM loader rejects. It's an external node_modules package (native-loaded),
+      // so the `cloudflare:*` alias above can't reach inside it — instead alias
+      // the package to a local stub so the real one is never loaded in Node. The
+      // real package runs in the Workers-runtime tests (tests/workers/mcp/*) and
+      // production. (`agents/mcp/server` needs no stub: it depends only on
+      // `node:async_hooks` and `@modelcontextprotocol/server`, which load in Node,
+      // and a string alias for `agents/mcp` would also capture that subpath.)
       '@cloudflare/workers-oauth-provider': path.resolve(__dirname, 'tests/unit/stubs/workers-oauth-provider.ts'),
-      'agents/mcp': path.resolve(__dirname, 'tests/unit/stubs/agents-mcp.ts'),
       // `server/lib/i18n/messages.ts` re-exports the compiled Paraglide
       // catalogue, which lives under `app/`. The worker build resolves this
       // through vite.config.ts's own `~` alias and the api tsc pass through
@@ -116,8 +116,8 @@ export default defineConfig({
     //     `extendZodWithOpenApi` would patch a prototype half the schemas never
     //     see.
     //
-    // `exclude` keeps the stubbed Workers packages out: they are aliased above
-    // to local stubs, and pre-bundling would resolve the real ones.
+    // `exclude` keeps the stubbed Workers package out: it is aliased above
+    // to a local stub, and pre-bundling would resolve the real one.
     //
     // To verify a change here, look for the artifact, never at the clock. Runs
     // of this suite vary by ±70% on an otherwise busy machine, which is more
@@ -135,7 +135,7 @@ export default defineConfig({
         ssr: {
           enabled: true,
           include: [],
-          exclude: ['@cloudflare/workers-oauth-provider', 'agents/mcp'],
+          exclude: ['@cloudflare/workers-oauth-provider'],
         },
       },
     },

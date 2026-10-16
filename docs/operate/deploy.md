@@ -40,7 +40,7 @@ For the manual flow, see the **Quick start** section in the [README](../../READM
 | Workflow         | `SIGN_COMPLETION_WORKFLOW` | Async e-sign pipeline (Spec 5H).                           |
 | Durable Objects  | `INSPECTION_PRESENCE`, `TENANT_PRESENCE` | Live presence for the editor.               |
 | Durable Object   | `INSPECTION_DOC` | The collaborative results document (Yjs CRDT). Absent → the editor's collab routes return `501` and collaborative editing does not engage. |
-| Durable Object   | `INSPECTOR_MCP`  | The remote MCP server. Only reached when `MCP_ENABLED` is set. (`NATIVE_CLIENT_ENABLED` enables native app sign-in on the same OAuth provider and does not use this object; see [`../develop/native-clients.md`](../develop/native-clients.md).) |
+| Durable Object   | `INSPECTOR_MCP`  | Retired. The remote MCP endpoint is a stateless request handler and nothing routes to this class; the binding stays only until the migration that deletes it ships. Do not remove it from an existing deployment's config on your own: deleting a Durable Object class takes a dedicated migration step. (`NATIVE_CLIENT_ENABLED` enables native app sign-in on the same OAuth provider; see [`../develop/native-clients.md`](../develop/native-clients.md).) |
 | KV namespace     | `OAUTH_KV`       | OAuth grants (MCP and native app sign-in). The binding NAME is fixed by `@cloudflare/workers-oauth-provider`. |
 | Queue            | `CRON_QUEUE`     | **Background jobs run on this queue, one job per invocation.** With it unbound the tick logs `CRON_QUEUE is not bound — no job will run` and every sweep, reminder and retention job stops. |
 | Queue            | `WORD_EXPORT_QUEUE` | Async `.docx` export. |

@@ -162,27 +162,34 @@ export async function resolveNativeToken(env: NativeTokenEnv, token: string): Pr
 const ACCESS_TOKEN_TTL_S = 3600;
 /** A native grant unused for this long is refused and revoked. */
 export const NATIVE_IDLE_LIMIT_S = 90 * 86400;
+/**
+ * Lifetime of a native refresh token as issued at code exchange. The provider
+ * (1.x) can no longer express "never expires" per grant, so the value is finite
+ * and longer than the idle limit: a quiet grant ends at the idle limit, and
+ * every refresh re-arms the window.
+ */
+export const NATIVE_REFRESH_MAX_TTL_S = 400 * 86400;
 
 export type NativeExchangeDecision =
-  | { kind: 'allow'; result: { accessTokenTTL: number; refreshTokenTTL?: undefined; newProps?: NativeProps } }
+  | { kind: 'allow'; result: { accessTokenTTL: number; refreshTokenTTL?: number; refreshTokenIdleTTL?: number; newProps?: NativeProps } }
   | { kind: 'deny' };
 
 /**
- * Native refresh tokens follow the common sliding rule: they never expire on a
- * fixed date, but a grant left unused for 90 days is refused. The provider fixes
- * a refresh expiry per grant and cannot change it on refresh, so the idle clock
- * lives in the grant props and is checked here.
+ * Native refresh tokens follow the common sliding rule: a grant left unused for
+ * 90 days is refused, and each refresh re-arms a 90-day window. The idle clock
+ * also lives in the grant props and is checked here.
  *
- * `refreshTokenTTL: undefined` is only legal on the code exchange; the provider
- * rejects the key on a refresh (even when undefined), so the refresh result
- * must not carry it. Returns undefined for non-native grants (library defaults).
+ * The provider reads `refreshTokenTTL` at the code exchange only and
+ * `refreshTokenIdleTTL` at a refresh only (anywhere else it is ignored), so each
+ * grant type carries just its own. Returns undefined for non-native grants
+ * (library defaults).
  */
 export function nativeTokenExchange(props: unknown, grantType: string, nowSec: number): NativeExchangeDecision | undefined {
   if (!isNativeProps(props)) return undefined;
   const newProps: NativeProps = { ...props, lastUsedAt: nowSec };
   if (grantType === 'authorization_code') {
-    return { kind: 'allow', result: { accessTokenTTL: ACCESS_TOKEN_TTL_S, refreshTokenTTL: undefined, newProps } };
+    return { kind: 'allow', result: { accessTokenTTL: ACCESS_TOKEN_TTL_S, refreshTokenTTL: NATIVE_REFRESH_MAX_TTL_S, newProps } };
   }
   if (nowSec - props.lastUsedAt > NATIVE_IDLE_LIMIT_S) return { kind: 'deny' };
-  return { kind: 'allow', result: { accessTokenTTL: ACCESS_TOKEN_TTL_S, newProps } };
+  return { kind: 'allow', result: { accessTokenTTL: ACCESS_TOKEN_TTL_S, refreshTokenIdleTTL: NATIVE_IDLE_LIMIT_S, newProps } };
 }

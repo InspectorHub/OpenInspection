@@ -17,7 +17,7 @@ import {
     stripMcpSlugPrefix,
     isGrantUserActive,
 } from '../../../server/lib/mcp/identity-bridge';
-import type { McpProps } from '../../../server/durable-objects/inspector-mcp';
+import type { McpProps } from '../../../server/lib/mcp/build-server';
 
 const sample: McpProps = {
     userId: 'u-123',
