@@ -101,9 +101,13 @@ export async function managedSendAllowed(
     // A retired mode with a COMPLETE own account of the company's is simply `own`.
     if (isRetiredSenderMode(env, smsMode)) {
         if (!env.DB || !env.JWT_SECRET) return { allowed: false, reason: 'sms not configured' };
-        const byo = await db.select({ byo: tenantConfigs.smsByoProvider }).from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId)).get()
-            .then((row) => row?.byo ?? null, () => null);
+        const byo = await (async () => {
+            try {
+                const row = await db.select({ byo: tenantConfigs.smsByoProvider }).from(tenantConfigs)
+                    .where(eq(tenantConfigs.tenantId, tenantId)).get();
+                return row?.byo ?? null;
+            } catch { return null; }
+        })();
         const complete = await loadOwnSmsAccountComplete(
             { DB: env.DB, TENANT_CACHE: env.TENANT_CACHE, JWT_SECRET: env.JWT_SECRET, ...(env.JWT_SECRET_PREVIOUS ? { JWT_SECRET_PREVIOUS: env.JWT_SECRET_PREVIOUS } : {}) },
             tenantId, byo,

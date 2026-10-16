@@ -4,12 +4,17 @@
  * collected amounts (companyFinance). Each field is projected for its own
  * capability; one cannot stand in for the other.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { inspectionsRoutes } from '../../../server/api/inspections';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
+
+// The lifecycle facts have their own spec (hub-lifecycle.spec.ts); this one stubs the database away.
+vi.mock('../../../server/lib/inspection/hub-lifecycle', () => ({
+    hubLifecycle: async () => ({ moneyCollected: false, statusBeforeCancel: null }),
+}));
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
