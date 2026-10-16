@@ -91,8 +91,9 @@ describe('POST /api/inspections/:id/agreement-requests — multi-party send (IA-
             id: TENANT, slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
+        await db.insert(schema.users).values({ id: USER_ID, tenantId: TENANT, email: 'acting@example.com', passwordHash: 'h', createdAt: new Date() });
         await db.insert(schema.inspections).values({
-            id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St',
+            id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St', inspectorId: USER_ID, // the acting inspector leads the job
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });

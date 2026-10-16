@@ -80,13 +80,14 @@ beforeEach(async () => {
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now,
     });
+    await db.insert(schema.users).values({ id: 'actor', tenantId: T, email: 'actor@example.com', passwordHash: 'h', createdAt: now });
     await db.insert(schema.tenantConfigs).values({ tenantId: T, updatedAt: now, cancellationPolicy: POLICY } as never);
     const soon = new Date(Date.now() + 12 * 3_600_000);
     // i-free: nothing owed, nothing collected. i-paid: fully paid by card.
     await db.insert(schema.inspections).values([
-        { id: 'i-free', tenantId: T, propertyAddress: '1 St', date: '2099-08-07', status: 'confirmed',
+        { id: 'i-free', tenantId: T, propertyAddress: '1 St', inspectorId: 'actor', date: '2099-08-07', status: 'confirmed',
           paymentStatus: 'unpaid', price: 0, scheduledStartMs: soon, agreementRequired: false, paymentRequired: false, createdAt: now },
-        { id: 'i-paid', tenantId: T, propertyAddress: '2 St', date: '2099-08-07', status: 'confirmed',
+        { id: 'i-paid', tenantId: T, propertyAddress: '2 St', inspectorId: 'actor', date: '2099-08-07', status: 'confirmed',
           paymentStatus: 'paid', price: 45000, scheduledStartMs: soon, agreementRequired: false, paymentRequired: true, createdAt: now },
     ] as never);
     await db.insert(schema.invoices).values({

@@ -1,3 +1,4 @@
+import { assertMayActOnJob } from './inspections/act-guard';
 import { createRoute, z } from '@hono/zod-openapi';
 import { and, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
@@ -127,7 +128,7 @@ const requestPaymentRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: 'requestInvoicePayment',
-    description: 'Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page. Requires the inspectionFees capability (held by owners, managers, inspectors and staff by default; an inspector or staff member with it switched off is refused).',
+    description: 'Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page. Requires the inspectionFees capability (held by owners, managers, inspectors and staff by default; an inspector or staff member with it switched off is refused). The caller must also be on the inspection or hold the scheduleOthers permission; otherwise 403.',
 }, { scopes: ['write'], tier: 'extended', capability: 'inspectionFees' }));
 
 const invoiceRoutes = createApiRouter()
@@ -239,6 +240,7 @@ const invoiceRoutes = createApiRouter()
         const tenantId = getTenantId(c);
         const { inspectionId } = c.req.valid('json');
         const db = getDrizzle(c);
+        await assertMayActOnJob(c, inspectionId); // on the job, or scheduleOthers
 
         // 404 if the inspection is missing or belongs to another tenant.
         const inspection = await db.select().from(inspections)

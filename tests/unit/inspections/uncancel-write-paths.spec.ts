@@ -173,8 +173,9 @@ describe('#81 — leaving `cancelled` goes through POST /api/inspections/:id/unc
             id: TENANT, slug: 's', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
+        await db.insert(schema.users).values({ id: USER_ID, tenantId: TENANT, email: 'acting@example.com', passwordHash: 'h', createdAt: new Date() });
         await db.insert(schema.inspections).values({
-            id: INSP_ID, tenantId: TENANT,
+            id: INSP_ID, tenantId: TENANT, inspectorId: USER_ID, // the acting inspector leads the job
             propertyAddress: '1 Main St', date: '2026-06-01',
             status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),

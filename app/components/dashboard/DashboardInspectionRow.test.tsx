@@ -41,7 +41,7 @@ const INSPECTION = {
 function renderRow(
   price: number | null,
   status = "requested",
-  access: { canChangeStatus?: boolean; canOpenEditor?: boolean; orderStatusesOnly?: boolean } = {},
+  access: { canChangeStatus?: boolean; canOpenEditor?: boolean; orderStatusesOnly?: boolean; canRestore?: boolean } = {},
 ) {
   const Stub = createRoutesStub([
     {
@@ -224,6 +224,10 @@ describe("DashboardInspectionRow - controls an office user is not offered", () =
       const { container } = renderRow(0, "cancelled", { orderStatusesOnly: true });
       expect(restoreButton(container)).toBeUndefined();
       expect(container.querySelector("select")?.value).toBe("cancelled");
+    });
+
+    it("a cancelled row offers no Restore to a viewer without scheduleOthers (the list cannot see whether they lead the job)", () => {
+      expect(restoreButton(renderRow(0, "cancelled", { canRestore: false }).container)).toBeUndefined();
     });
 
     it("POSITIVE CONTROL - a cancelled row still offers Restore to everyone else", () => {

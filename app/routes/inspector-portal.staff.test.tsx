@@ -48,7 +48,7 @@ function loaderData(o: Opts) {
             lifecycle: { moneyCollected: o.moneyCollected ?? false, statusBeforeCancel: o.statusBeforeCancel ?? null },
         },
         smsConsent: null, reinspectCandidates: [], canPublishCap: o.canPublishCap ?? false,
-        scheduleOthers: o.scheduleOthers ?? o.role === "staff", userId: o.userId ?? "me",
+        scheduleOthers: o.scheduleOthers ?? o.role !== "inspector", userId: o.userId ?? "me",
         canViewCommunication: false, documents: [], people: [], roleProfiles: [], isAdmin: o.role === "owner", versions: [],
         members: [], serviceCatalog: [], referralSources: [], visits: [], visitTypes: [], suggestedTypeIds: [],
         role: o.role, statutoryForm: { available: false },
@@ -72,16 +72,24 @@ async function offers(o: Opts, label: string): Promise<boolean> {
 }
 
 describe("hub as an inspector who is not on the job", () => {
-    it("is not offered Edit schedule (the server refuses the date and inspector), but keeps the verbs it accepts", async () => {
+    it("is offered none of the acts on it: acting on a job one is not on needs scheduleOthers", async () => {
         const notOn = { role: "inspector", scheduleOthers: false, inspectorId: "someone-else" };
-        expect(await offers(notOn, "Edit schedule")).toBe(false);
-        expect(await offers(notOn, "Cancel inspection")).toBe(true);
-        expect(await offers(notOn, "Mark fieldwork complete")).toBe(true);
+        for (const label of ["Edit schedule", "Cancel inspection", "Mark fieldwork complete"]) expect(await offers(notOn, label), label).toBe(false);
+    });
+
+    it("is not offered Request payment or Send agreement, nor Unpublish on a published report", async () => {
+        const notOn = { role: "inspector", scheduleOthers: false, inspectorId: "someone-else", canPublishCap: true };
+        expect(await offers({ ...notOn }, "Send agreement")).toBe(false);
+        expect(await offers({ ...notOn, reportStatus: "published" }, "Unpublish")).toBe(false);
+        // Control: on the job, the same inspector gets both.
+        expect(await offers({ ...notOn, inspectorId: "me" }, "Send agreement")).toBe(true);
+        expect(await offers({ ...notOn, inspectorId: "me", reportStatus: "published" }, "Unpublish")).toBe(true);
     });
 
     it("POSITIVE CONTROL - the inspector on the job, or one with scheduleOthers, is offered it", async () => {
         expect(await offers({ role: "inspector", scheduleOthers: false, inspectorId: "me" }, "Edit schedule")).toBe(true);
         expect(await offers({ role: "inspector", scheduleOthers: true, inspectorId: "someone-else" }, "Edit schedule")).toBe(true);
+        expect(await offers({ role: "inspector", scheduleOthers: true, inspectorId: "someone-else" }, "Cancel inspection")).toBe(true);
     });
 });
 

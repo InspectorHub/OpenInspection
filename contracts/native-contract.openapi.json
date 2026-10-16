@@ -1099,7 +1099,7 @@
         ],
         "summary": "Complete inspection for current tenant",
         "operationId": "completeInspection",
-        "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403.",
+        "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.",
         "parameters": [
           {
             "schema": {

@@ -821,7 +821,7 @@ export default function InspectionHubPage() {
 
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
-  const reportActionList = reportActions({ publish: canPublishCap, edit: canEditReports }, inspection.reportStatus);
+  const reportActionList = reportActions({ publish: canPublishCap && access.canAct, edit: canEditReports }, inspection.reportStatus);
 
   // IA-40 — when a version already exists, the next publish increments to
   // versionNumber > 1 (an amendment), so the publish modal asks what changed.
@@ -996,6 +996,7 @@ export default function InspectionHubPage() {
             canManageSigners={isAdmin}
             displayTz={displayTz}
             onSend={() => agreementModal.setOpen(true)}
+            canSend={access.canAct}
             onPreSign={setPreSigningId}
           />
           {/* The gate that decides whether a signature is required at all. It
@@ -1244,6 +1245,7 @@ export default function InspectionHubPage() {
           basePriceCents={inspection.price}
           canManagePrice={isAdmin && canSeeMoney}
           canEditGate={canEditOrder && (access.canTurnGateOff || !inspection.paymentRequired)}
+          canRequestPayment={access.canAct}
           onRequestPayment={() => paymentModal.setOpen(true)}
         />
 

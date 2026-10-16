@@ -920,7 +920,7 @@
       }
     },
     "summary": "Cancel inspection for current tenant",
-    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles. Staff may cancel only an unpaid inspection that has not started, and need scheduleOthers or a place on the inspection; otherwise they get 403."
+    "description": "Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles. Staff may cancel only an unpaid inspection that has not started, and need scheduleOthers or a place on the inspection; otherwise they get 403. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "cancelTeamInvite",
@@ -1116,7 +1116,7 @@
       "body": null
     },
     "summary": "Complete inspection for current tenant",
-    "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403."
+    "description": "Marks the on-site work as finished. Advisory: publishing a report does not require it. Idempotent, and refuses a cancelled inspection. Staff get 403. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "completeTwoFactorLogin",
@@ -1195,7 +1195,7 @@
       "body": null
     },
     "summary": "Confirm inspection for current tenant",
-    "description": "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection."
+    "description": "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "confirmSmsOptin",
@@ -1845,7 +1845,7 @@
       }
     },
     "summary": "Create + email an agreement signing request for an inspection",
-    "description": "Creates an agreement signing request for the inspection, emails it to the client, marks it sent, and returns the created request."
+    "description": "Creates an agreement signing request for the inspection, emails it to the client, marks it sent, and returns the created request. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "createInspectionCostItem",
@@ -4530,7 +4530,7 @@
       "body": null
     },
     "summary": "Bring a cancelled inspection back",
-    "description": "Returns a mistakenly-cancelled inspection to the status it had before it was cancelled, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. The report status is not changed. Staff need scheduleOthers or a place on the inspection, and get 403 for an inspection that was completed when it was cancelled. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
+    "description": "Returns a mistakenly-cancelled inspection to the status it had before it was cancelled, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. The report status is not changed. Staff need scheduleOthers or a place on the inspection, and get 403 for an inspection that was completed when it was cancelled. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "createInspectionUnits",
@@ -16945,7 +16945,7 @@
       }
     },
     "summary": "Publish inspection for current tenant",
-    "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role."
+    "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "putInspectorServiceOrigin",
@@ -17868,7 +17868,7 @@
       }
     },
     "summary": "Create + email an invoice payment request for an inspection",
-    "description": "Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page. Requires the inspectionFees capability (held by owners, managers, inspectors and staff by default; an inspector or staff member with it switched off is refused)."
+    "description": "Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page. Requires the inspectionFees capability (held by owners, managers, inspectors and staff by default; an inspector or staff member with it switched off is refused). The caller must also be on the inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "requestPasswordReset",
@@ -18211,7 +18211,7 @@
       "body": null
     },
     "summary": "Return submitted report to inspector for revision",
-    "description": "Transitions reportStatus from submitted → in_progress. Requires publish capability."
+    "description": "Transitions reportStatus from submitted → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "revertImportRun",
@@ -19769,7 +19769,7 @@
       "body": null
     },
     "summary": "Unpublish a published report",
-    "description": "Transitions reportStatus from published → in_progress. Requires publish capability."
+    "description": "Transitions reportStatus from published → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "unreadCountMessage",

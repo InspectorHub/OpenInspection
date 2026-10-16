@@ -7,14 +7,14 @@ describe("hubAccess", () => {
     it("gives every role but staff everything", () => {
         for (const role of ["owner", "manager", "inspector"]) {
             expect(hubAccess({ role, ...open, moneyCollected: true, status: "completed", reportStatus: "published" })).toEqual({
-                canEditOrder: true, canEditInspection: true, canChangeSchedule: true, canCancel: true, canRestore: true, canTurnGateOff: true,
+                canEditOrder: true, canEditInspection: true, canAct: true, canChangeSchedule: true, canCancel: true, canRestore: true, canTurnGateOff: true,
             });
         }
     });
 
     it("staff keep the booking and lose the inspection", () => {
         expect(hubAccess({ role: "staff", ...open })).toEqual({
-            canEditOrder: true, canEditInspection: false, canChangeSchedule: true, canCancel: true, canRestore: false, canTurnGateOff: false,
+            canEditOrder: true, canEditInspection: false, canAct: true, canChangeSchedule: true, canCancel: true, canRestore: false, canTurnGateOff: false,
         });
     });
 
@@ -37,16 +37,19 @@ describe("hubAccess", () => {
 describe("staff who may not act on this inspection", () => {
     it("get none of the order controls", () => {
         expect(hubAccess({ role: "staff", ...open, mayAct: false })).toEqual({
-            canEditOrder: false, canEditInspection: false, canChangeSchedule: false, canCancel: false, canRestore: false, canTurnGateOff: false,
+            canEditOrder: false, canEditInspection: false, canAct: false, canChangeSchedule: false, canCancel: false, canRestore: false, canTurnGateOff: false,
         });
     });
-    it("an inspector who may not act on the job loses only Edit schedule: the server accepts every other verb from them", () => {
-        expect(hubAccess({ role: "inspector", ...open, mayAct: false })).toEqual({
-            canEditOrder: true, canEditInspection: true, canChangeSchedule: false, canCancel: true, canRestore: true, canTurnGateOff: true,
+    it.each(["inspector", "manager", "owner"])("%s who may not act on the job loses every act on it, and keeps the order fields", (role) => {
+        expect(hubAccess({ role, ...open, mayAct: false })).toEqual({
+            canEditOrder: true, canEditInspection: false, canAct: false, canChangeSchedule: false, canCancel: false, canRestore: false, canTurnGateOff: true,
         });
     });
-    it("POSITIVE CONTROL - an inspector who may act keeps Edit schedule", () => {
-        expect(hubAccess({ role: "inspector", ...open, mayAct: true }).canChangeSchedule).toBe(true);
+    it("POSITIVE CONTROL - the same roles who may act keep all of them", () => {
+        for (const role of ["inspector", "manager", "owner"]) {
+            const a = hubAccess({ role, ...open, mayAct: true });
+            expect([a.canEditInspection, a.canAct, a.canChangeSchedule, a.canCancel, a.canRestore]).toEqual([true, true, true, true, true]);
+        }
     });
 });
 
@@ -61,10 +64,9 @@ describe("restore for staff follows the recorded status", () => {
 });
 
 describe("mayActOnThisInspection and canSendReportFor", () => {
-    const base = { isAdmin: false, scheduleOthers: false, userId: "me", canPublishCap: true, role: "inspector" };
-    it("needs admin, scheduleOthers or the assignment", () => {
+    const base = { scheduleOthers: false, userId: "me", canPublishCap: true, role: "inspector" };
+    it("needs scheduleOthers or the assignment, for every role: there is no admin shortcut", () => {
         expect(mayActOnThisInspection(base, "other")).toBe(false);
-        expect(mayActOnThisInspection({ ...base, isAdmin: true }, "other")).toBe(true);
         expect(mayActOnThisInspection({ ...base, scheduleOthers: true }, "other")).toBe(true);
         expect(mayActOnThisInspection(base, "me")).toBe(true);
         expect(mayActOnThisInspection({ ...base, userId: null }, null)).toBe(false);

@@ -68,12 +68,15 @@ export function SigningRequests({
   canManageSigners,
   displayTz,
   onSend,
+  canSend = true,
   onPreSign,
 }: {
   requests: HubAgreementRequest[];
   canManageSigners: boolean;
   displayTz: string;
   onSend: () => void;
+  /** False for a viewer the API refuses to send an agreement on this inspection (not on it, and no scheduleOthers). */
+  canSend?: boolean;
   /** Inspector pre-sign, offered only while the envelope is still pending. */
   onPreSign: (requestId: string) => void;
 }) {
@@ -147,9 +150,11 @@ export function SigningRequests({
       ) : (
         <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_agreement_empty()}</p>
       )}
-      <Button variant="secondary" size="sm" onClick={onSend}>
-        {m.inspections_hub_agreement_send()}
-      </Button>
+      {canSend && (
+        <Button variant="secondary" size="sm" onClick={onSend}>
+          {m.inspections_hub_agreement_send()}
+        </Button>
+      )}
     </>
   );
 }

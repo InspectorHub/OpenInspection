@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 import { hubAccess, mayActOnThisInspection, type HubAccess } from "~/lib/hub-access";
 import { getCapabilities, type PermissionOverrides } from "../../server/lib/auth/capabilities";
-import { isAdminRole, type Role } from "../../server/lib/auth/roles";
+import type { Role } from "../../server/lib/auth/roles";
 import { classifyStaffPatch, inspectionStarted } from "../../server/lib/inspection/order-fields";
 import { mayActOn, staffMayCancelNow, staffMayRestoreFrom } from "../../server/lib/inspection/staff-rules";
 import type { RestorableStatus } from "../../server/lib/inspection/cancel-restore";
@@ -28,6 +28,8 @@ const ACTORS: Actor[] = [
     { name: "manager", role: "manager", overrides: null, assigned: false },
     { name: "inspector on the job", role: "inspector", overrides: null, assigned: true },
     { name: "inspector not on the job", role: "inspector", overrides: null, assigned: false },
+    { name: "inspector not on the job, scheduleOthers switched on for them", role: "inspector", overrides: { scheduleOthers: true }, assigned: false },
+    { name: "manager with scheduleOthers switched off", role: "manager", overrides: { scheduleOthers: false }, assigned: false },
     { name: "staff with scheduleOthers", role: "staff", overrides: null, assigned: false },
     { name: "staff without scheduleOthers", role: "staff", overrides: { scheduleOthers: false }, assigned: false },
 ];
@@ -47,16 +49,18 @@ const JOBS: Job[] = [
 function serverAllows(actor: Actor, job: Job): HubAccess {
     const caps = getCapabilities(actor.role, actor.overrides);
     const isStaff = actor.role === "staff";
-    const mayAct = mayActOn({ isAdmin: isAdminRole(actor.role), onJob: actor.assigned, scheduleOthers: caps.scheduleOthers });
+    const mayAct = mayActOn({ onJob: actor.assigned, scheduleOthers: caps.scheduleOthers });
     if (!isStaff) {
-        // Non-staff: the server refuses only a date or inspector change by someone who is neither on the job nor holds scheduleOthers.
-        return { canEditOrder: true, canEditInspection: true, canChangeSchedule: mayAct, canCancel: true, canRestore: true, canTurnGateOff: true };
+        // Non-staff: acting on a job one is not on needs scheduleOthers (cancel, restore, complete, confirm, publish, unpublish, return,
+        // request payment, send agreement, and a date or inspector change). The order fields other than those stay open.
+        return { canEditOrder: true, canEditInspection: mayAct, canAct: mayAct, canChangeSchedule: mayAct, canCancel: mayAct, canRestore: mayAct, canTurnGateOff: true };
     }
     const started = inspectionStarted({ status: job.status, reportStatus: job.reportStatus, hasResultKeys: false });
     const state = { status: job.status, reportStatus: job.reportStatus, started, paymentRequired: true, agreementRequired: true };
     return {
         canEditOrder: mayAct && classifyStaffPatch({ referenceNumber: "R-1" }, state).ok,
         canEditInspection: false,
+        canAct: mayAct,
         canChangeSchedule: mayAct && classifyStaffPatch({ date: "2099-01-01", inspectorId: "someone" }, state).ok,
         canCancel: mayAct && staffMayCancelNow({ started, moneyCollected: job.moneyCollected }),
         canRestore: mayAct && staffMayRestoreFrom(job.before),
@@ -66,12 +70,12 @@ function serverAllows(actor: Actor, job: Job): HubAccess {
 
 function pageOffers(actor: Actor, job: Job): HubAccess {
     const caps = getCapabilities(actor.role, actor.overrides);
-    const me = { isAdmin: isAdminRole(actor.role), scheduleOthers: caps.scheduleOthers, userId: "me" };
+    const me = { scheduleOthers: caps.scheduleOthers, userId: "me" };
     const mayAct = mayActOnThisInspection(me, actor.assigned ? "me" : "someone-else");
     return hubAccess({ role: actor.role, status: job.status, reportStatus: job.reportStatus, moneyCollected: job.moneyCollected, mayAct, statusBeforeCancel: job.before });
 }
 
-const KEYS = ["canEditOrder", "canEditInspection", "canChangeSchedule", "canCancel", "canRestore", "canTurnGateOff"] as const;
+const KEYS = ["canEditOrder", "canEditInspection", "canAct", "canChangeSchedule", "canCancel", "canRestore", "canTurnGateOff"] as const;
 const CELLS = ACTORS.flatMap((actor) => JOBS.map((job) => [actor.name, job.name, actor, job] as const));
 
 describe("hub access parity with the server", () => {
@@ -91,6 +95,26 @@ describe("hub access parity with the server", () => {
 
     it.each(CELLS.filter(([, , actor]) => actor.role === "staff"))("%s / %s: staff are offered exactly what the server accepts", (_a, _j, actor, job) => {
         expect(pageOffers(actor, job)).toEqual(serverAllows(actor, job));
+    });
+
+    it("the matrix covers every class of actor the rule distinguishes", () => {
+        const names = ACTORS.map((a) => a.name);
+        expect(names).toEqual(expect.arrayContaining([
+            "owner", "manager", "inspector on the job", "inspector not on the job",
+            "inspector not on the job, scheduleOthers switched on for them", "manager with scheduleOthers switched off",
+            "staff with scheduleOthers", "staff without scheduleOthers",
+        ]));
+    });
+
+    it("someone not on the job and without scheduleOthers is offered no act on it, whatever their role; one with scheduleOthers is", () => {
+        const job = JOBS[0]!;
+        for (const name of ["inspector not on the job", "manager with scheduleOthers switched off", "staff without scheduleOthers"]) {
+            const a = pageOffers(ACTORS.find((x) => x.name === name)!, job);
+            expect([a.canAct, a.canCancel, a.canChangeSchedule], name).toEqual([false, false, false]);
+        }
+        for (const name of ["owner", "manager", "inspector on the job", "inspector not on the job, scheduleOthers switched on for them", "staff with scheduleOthers"]) {
+            expect(pageOffers(ACTORS.find((x) => x.name === name)!, job).canAct, name).toBe(true);
+        }
     });
 
     it("the matrix is not vacuous: it contains both offered and refused controls for staff", () => {

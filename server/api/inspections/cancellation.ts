@@ -12,6 +12,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { assertStaffMayCancel, guardStaffUncancel } from './staff-status-guards';
+import { guardActOnJob } from './act-guard';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { moneyView } from '../../lib/auth/money-access';
 import { Errors } from '../../lib/errors';
@@ -84,7 +85,7 @@ const cancelRoute = createRoute(withMcpMetadata({
     path: '/{id}/cancel',
     tags: ['inspections'],
     summary: 'Cancel inspection for current tenant',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardActOnJob] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection id.') }),
         body: { content: { 'application/json': { schema: CancelInspectionSchema } } },
@@ -114,7 +115,7 @@ const cancelRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: 'cancelInspection',
-    description: 'Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles. Staff may cancel only an unpaid inspection that has not started, and need scheduleOthers or a place on the inspection; otherwise they get 403.',
+    description: 'Cancels an inspection and applies the tenant cancellation policy: keeps the fee the policy allows and appends the refund to the payment ledger. Refuses to charge a fee the caller has not acknowledged. Available to owner, manager and inspector roles. Staff may cancel only an unpaid inspection that has not started, and need scheduleOthers or a place on the inspection; otherwise they get 403. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 // THE ONE DOOR BACK (#81). This endpoint shipped complete and unwired: the
@@ -131,14 +132,14 @@ const cancelRoute = createRoute(withMcpMetadata({
 const uncancelRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/uncancel',
     tags: ["inspections"], summary: "Bring a cancelled inspection back",
-    middleware: [requireRole('owner', 'manager', 'inspector'), guardStaffUncancel] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), guardActOnJob, guardStaffUncancel] as const,
     request: { params: z.object({ id: z.string().describe('The cancelled inspection to bring back.') }).describe('Path parameters.') },
     responses: {
         200: { content: { 'application/json': { schema: SuccessResponseSchema.describe('Recovered.') } }, description: 'Uncancelled' },
         400: { description: 'The inspection is not cancelled, so there is nothing to recover.' },
     },
     operationId: "createInspectionUncancel",
-    description: "Returns a mistakenly-cancelled inspection to the status it had before it was cancelled, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. The report status is not changed. Staff need scheduleOthers or a place on the inspection, and get 403 for an inspection that was completed when it was cancelled. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment."
+    description: "Returns a mistakenly-cancelled inspection to the status it had before it was cancelled, clears the recorded cancellation reason and notes, and restores the lead inspector's Google Calendar entry. The report status is not changed. Staff need scheduleOthers or a place on the inspection, and get 403 for an inspection that was completed when it was cancelled. Does NOT reverse a cancellation fee or a refund: both are already ledger entries, and undoing them is an invoice adjustment. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const flatten = (q: Awaited<ReturnType<typeof quoteCancellation>>) => ({
