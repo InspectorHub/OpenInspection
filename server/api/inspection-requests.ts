@@ -40,7 +40,7 @@ const listRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listInspectionRequests",
-    description: "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles."
+    description: "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const detailRoute = createRoute(withMcpMetadata({
@@ -57,7 +57,7 @@ const detailRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getInspectionRequest",
-    description: "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles."
+    description: "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // Sprint 2 S2-2 — resolve the parent request for an inspection.
@@ -86,7 +86,7 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getInspectionRequestByInspection",
-    description: "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles."
+    description: "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const createReqRoute = createRoute(withMcpMetadata({

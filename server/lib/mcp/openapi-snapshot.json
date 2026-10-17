@@ -1339,7 +1339,7 @@
       }
     },
     "summary": "Correct a mistyped payment on an invoice",
-    "description": "Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did."
+    "description": "Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "countsInspection",
@@ -1355,7 +1355,7 @@
       "body": null
     },
     "summary": "Get inspection tab counts",
-    "description": "Returns six counts across all of the company's inspections for the list tabs: all; today (scheduled date is today, UTC); upcoming (dated after today and not completed or cancelled); past (dated before today, or completed or cancelled); needsConfirmation (status scheduled or requested); awaitingReport (completed with the report not yet published). Cancelled inspections are counted in all and past. The tab counts overlap, so they do not sum to all. Read-only. Available to owner, manager and inspector roles."
+    "description": "Returns six counts across all of the company's inspections (or, for a caller whose access is limited to the inspections assigned to them, across those) for the list tabs: all; today (scheduled date is today, UTC); upcoming (dated after today and not completed or cancelled); past (dated before today, or completed or cancelled); needsConfirmation (status scheduled or requested); awaitingReport (completed with the report not yet published). Cancelled inspections are counted in all and past. The tab counts overlap, so they do not sum to all. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createAgent",
@@ -5738,7 +5738,7 @@
       "body": null
     },
     "summary": "Bucketed inspections for dashboard",
-    "description": "Returns the inspection dashboard in one response, as buckets of inspections for the whole company (not filtered to the caller): needsAttention, today, thisWeek (after today through 7 days ahead), later (beyond 7 days, capped at the first 50, with laterTotal giving the full count), recentReports (completed with a published report) and cancelled (cancelled in the last 30 days judged by creation time, at most 20). The today, thisWeek and later buckets exclude cancelled inspections. Each row carries defect counts, agent name and status flags. Also returns conciergePending, the number of agent bookings awaiting inspector approval (0 if that lookup fails), and defectAggregate. needsAttention uses the company's attention thresholds (see the attention thresholds route). Dates are compared as UTC calendar days. Read-only. Available to owner, manager and inspector roles."
+    "description": "Returns the inspection dashboard in one response, as buckets of inspections for the whole company (not filtered to the caller), unless the caller's access is limited to the inspections assigned to them, in which case only those: needsAttention, today, thisWeek (after today through 7 days ahead), later (beyond 7 days, capped at the first 50, with laterTotal giving the full count), recentReports (completed with a published report) and cancelled (cancelled in the last 30 days judged by creation time, at most 20). The today, thisWeek and later buckets exclude cancelled inspections. Each row carries defect counts, agent name and status flags. Also returns conciergePending, the number of agent bookings awaiting inspector approval (0 if that lookup fails), and defectAggregate. needsAttention uses the company's attention thresholds (see the attention thresholds route). Dates are compared as UTC calendar days. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "declineBooking",
@@ -7733,7 +7733,7 @@
       "body": null
     },
     "summary": "Contact detail: record + inspection history + stats",
-    "description": "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents)."
+    "description": "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents). For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "getContractorTypeDeletePreflight",
@@ -8249,7 +8249,7 @@
       "body": null
     },
     "summary": "Get inspection request for current tenant",
-    "description": "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles."
+    "description": "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "getInspectionRequestByInspection",
@@ -8277,7 +8277,7 @@
       "body": null
     },
     "summary": "Get parent request by inspection id",
-    "description": "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles."
+    "description": "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "getInspectionStatutoryCoverage",
@@ -8622,7 +8622,7 @@
       "body": null
     },
     "summary": "One contact's full thread (marks it read)",
-    "description": "Every message with this contact — across inspections and the rows with no inspection attached — oldest first. Reading it marks the thread's counterparty messages read."
+    "description": "Every message with this contact — across inspections and the rows with no inspection attached — oldest first. Reading it marks the thread's counterparty messages read. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "getMyAccount",
@@ -9624,7 +9624,7 @@
       "body": null
     },
     "summary": "Latest SMS consent status for an inspection client",
-    "description": "Returns the latest SMS consent action for the inspection client contact (granted/revoked/none) for the inspection-view status display."
+    "description": "Returns the latest SMS consent action for the inspection client contact (granted/revoked/none) for the inspection-view status display. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "getStripeWebhookLog",
@@ -10453,7 +10453,7 @@
       "body": null
     },
     "summary": "Section × rating-level counts across this tenant's inspections",
-    "description": "Counts rated items by template section and rating level over an inclusive `from`..`to` window. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections ordered by volume, with unresolvable sections collected in a flagged catch-all row. Available to owner, manager and inspector roles."
+    "description": "Counts rated items by template section and rating level over an inclusive `from`..`to` window. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections ordered by volume, with unresolvable sections collected in a flagged catch-all row. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listAnalyticGrowth",
@@ -10483,7 +10483,7 @@
       "body": null
     },
     "summary": "Inspection count per month for the last N months",
-    "description": "Returns the number of inspections created in each of the last N calendar months (UTC), oldest first, as {ym, count} buckets. The current month is the last bucket and months with no inspections appear with a count of 0. Counts every inspection of the company by creation time, with no status or archive filter. Read-only. Available to owner, manager and inspector roles."
+    "description": "Returns the number of inspections created in each of the last N calendar months (UTC), oldest first, as {ym, count} buckets. The current month is the last bucket and months with no inspections appear with a count of 0. Counts every inspection of the company by creation time, with no status or archive filter. Read-only. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listAutomationLogsRecent",
@@ -10721,7 +10721,7 @@
       "body": null
     },
     "summary": "Get calendar events for FullCalendar",
-    "description": "Returns combined calendar events (local inspections + Google Calendar busy blocks) in FullCalendar-compatible format. Used by the dashboard month/week views."
+    "description": "Returns combined calendar events (local inspections + Google Calendar busy blocks) in FullCalendar-compatible format. Used by the dashboard month/week views. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listCalendarItems",
@@ -10888,7 +10888,7 @@
       "body": null
     },
     "summary": "List the live report links a contact still holds",
-    "description": "Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email."
+    "description": "Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "listContacts",
@@ -10973,7 +10973,7 @@
       "body": null
     },
     "summary": "List contacts for current tenant",
-    "description": "Lists the company's contacts (clients, agents and other parties) with the number of inspections each appears on and, for agents, how many they referred as buyer agent. Live contacts by default; pass archived=only for archived ones. Results are paged with limit and offset and are not explicitly ordered. Available to owner, manager and inspector roles."
+    "description": "Lists the company's contacts (clients, agents and other parties) with the number of inspections each appears on and, for agents, how many they referred as buyer agent. Live contacts by default; pass archived=only for archived ones. Results are paged with limit and offset and are not explicitly ordered. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listContractorTypes",
@@ -11508,7 +11508,7 @@
       "body": null
     },
     "summary": "List inspection requests for current tenant",
-    "description": "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles."
+    "description": "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listInspectionResults",
@@ -11673,7 +11673,7 @@
       "body": null
     },
     "summary": "List inspections for current tenant",
-    "description": "Retrieve a paginated list of inspections with optional filtering."
+    "description": "Retrieve a paginated list of inspections with optional filtering. A caller whose access is limited to the inspections assigned to them receives only those; the first page carries counts over the same set."
   },
   {
     "operationId": "listInspectionTemplates",
@@ -11994,7 +11994,7 @@
       "body": null
     },
     "summary": "List the payment ledger for an invoice",
-    "description": "Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute."
+    "description": "Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "listInvoices",
@@ -12010,7 +12010,7 @@
       "body": null
     },
     "summary": "List invoices for current tenant",
-    "description": "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the company-finance capability and the owner, manager or inspector role. Not paged."
+    "description": "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the company-finance capability and the owner, manager or inspector role. Not paged. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listMarketplaceImportsHistory",
@@ -12253,7 +12253,7 @@
       "body": null
     },
     "summary": "Company-wide message inbox: one row per contact thread",
-    "description": "Per-contact thread summaries across every inspection and the no-inspection outreach rows, newest activity first."
+    "description": "Per-contact thread summaries across every inspection and the no-inspection outreach rows, newest activity first. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listMetrics",
@@ -12292,7 +12292,7 @@
       "body": null
     },
     "summary": "List metrics for current tenant",
-    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the company-finance capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
+    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the company-finance capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listNotifications",
@@ -12682,7 +12682,7 @@
       "body": null
     },
     "summary": "List inspections that have any item tagged with this tag",
-    "description": "List the ids of the company's inspections that have at least one item carrying this tag. An unknown tag id is a not-found."
+    "description": "List the ids of the company's inspections that have at least one item carrying this tag. An unknown tag id is a not-found. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "listTagItemsTags",
@@ -12781,7 +12781,7 @@
       "body": null
     },
     "summary": "List team members and pending invites",
-    "description": "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link, returned only to owner and manager callers (an inspector gets an empty invites list, because the accept link is a bearer credential for the invited role); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles; invitations are included for owner and manager only."
+    "description": "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link, returned only to owner and manager callers (an inspector gets an empty invites list, because the accept link is a bearer credential for the invited role); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles; invitations are included for owner and manager only. Callers below owner and manager receive each member's id, name and role only (and email when they hold the scheduleOthers capability), without permission overrides, the two-factor flag, creation time or last active time."
   },
   {
     "operationId": "listTenantAgreements",
@@ -17074,7 +17074,7 @@
       }
     },
     "summary": "Record an offline payment against an invoice",
-    "description": "Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session."
+    "description": "Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "redeemAgentMagicLogin",
@@ -18776,7 +18776,7 @@
       }
     },
     "summary": "Send into a contact thread, optionally mentioning an inspection",
-    "description": "Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet."
+    "description": "Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
     "operationId": "sendTenant",
@@ -19848,7 +19848,7 @@
       "body": null
     },
     "summary": "Unread client-message count for the tenant",
-    "description": "Returns the count of unread client messages across all inspections in the tenant (sidebar badge). The lone cross-cutting messages summary — every other messages route is per-inspection."
+    "description": "Returns the count of unread client messages across all inspections in the tenant (sidebar badge). The lone cross-cutting messages summary — every other messages route is per-inspection. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
   },
   {
     "operationId": "unreadCountNotification",

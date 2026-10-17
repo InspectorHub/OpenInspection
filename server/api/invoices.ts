@@ -45,7 +45,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listInvoices",
-    description: "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the company-finance capability and the owner, manager or inspector role. Not paged."
+    description: "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the company-finance capability and the owner, manager or inspector role. Not paged. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'primary', capability: 'companyFinance' }));
 
 const createInvoiceRoute = createRoute(withMcpMetadata({

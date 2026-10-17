@@ -40,7 +40,7 @@ const listThreadsRoute = createRoute(withMcpMetadata({
     },
     operationId: 'listMessageThreads',
     summary: 'Company-wide message inbox: one row per contact thread',
-    description: 'Per-contact thread summaries across every inspection and the no-inspection outreach rows, newest activity first.',
+    description: 'Per-contact thread summaries across every inspection and the no-inspection outreach rows, newest activity first. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const getThreadRoute = createRoute(withMcpMetadata({
@@ -60,7 +60,7 @@ const getThreadRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getMessageThread',
     summary: "One contact's full thread (marks it read)",
-    description: "Every message with this contact — across inspections and the rows with no inspection attached — oldest first. Reading it marks the thread's counterparty messages read.",
+    description: "Every message with this contact — across inspections and the rows with no inspection attached — oldest first. Reading it marks the thread's counterparty messages read. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.",
 }, { scopes: ['read'], tier: 'extended' }));
 
 const sendThreadRoute = createRoute(withMcpMetadata({
@@ -80,7 +80,7 @@ const sendThreadRoute = createRoute(withMcpMetadata({
     },
     operationId: 'sendMessageThread',
     summary: 'Send into a contact thread, optionally mentioning an inspection',
-    description: 'Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet.',
+    description: 'Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const messageThreadRoutes = createApiRouter()

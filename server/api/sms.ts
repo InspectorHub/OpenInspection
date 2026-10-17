@@ -411,7 +411,7 @@ const consentStatusRoute = createRoute(withMcpMetadata({
         }) } }, description: 'Consent status' },
     },
     operationId: 'getSmsConsentStatus',
-    description: 'Returns the latest SMS consent action for the inspection client contact (granted/revoked/none) for the inspection-view status display.',
+    description: 'Returns the latest SMS consent action for the inspection client contact (granted/revoked/none) for the inspection-view status display. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
 const complianceRoute = createRoute(withMcpMetadata({

@@ -112,7 +112,7 @@ const listTagInspectionsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTagInspections",
-    description: "List the ids of the company's inspections that have at least one item carrying this tag. An unknown tag id is a not-found."
+    description: "List the ids of the company's inspections that have at least one item carrying this tag. An unknown tag id is a not-found. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /* ── DELETE /api/tags/:id ─────────────────────────────────────────────── */

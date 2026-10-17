@@ -41,7 +41,7 @@ const listContactsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listContacts",
-    description: "Lists the company's contacts (clients, agents and other parties) with the number of inspections each appears on and, for agents, how many they referred as buyer agent. Live contacts by default; pass archived=only for archived ones. Results are paged with limit and offset and are not explicitly ordered. Available to owner, manager and inspector roles."
+    description: "Lists the company's contacts (clients, agents and other parties) with the number of inspections each appears on and, for agents, how many they referred as buyer agent. Live contacts by default; pass archived=only for archived ones. Results are paged with limit and offset and are not explicitly ordered. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'primary' }));
 
 const getContactDetailRoute = createRoute(withMcpMetadata({
@@ -58,7 +58,7 @@ const getContactDetailRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getContactDetail",
-    description: "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents)."
+    description: "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents). For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
 }, { scopes: ['read'], tier: 'primary' }));
 
 const createContactRoute = createRoute(withMcpMetadata({
@@ -162,7 +162,7 @@ const listContactAccessRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/access',
     tags: ["contacts"],
     summary: "List the live report links a contact still holds",
-    description: 'Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email.',
+    description: 'Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {

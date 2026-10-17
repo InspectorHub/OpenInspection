@@ -305,6 +305,8 @@ List all inspections for the tenant.
 
 **Roles:** any authenticated user
 
+**Visibility:** a caller whose access is limited to the inspections assigned to them (lead or helper) receives only those. The counts, the dashboard, contacts, message threads, analytics, metrics, invoices, inspection requests and the calendar's local events follow the same rule, and a request for a single inspection outside that set answers `404`, the same answer as for an id that does not exist.
+
 **Response:**
 ```json
 {

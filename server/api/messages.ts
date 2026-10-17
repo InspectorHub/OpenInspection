@@ -144,7 +144,7 @@ const unreadRoute = createRoute(withMcpMetadata({
     },
     operationId: 'unreadCountMessage',
     summary: 'Unread client-message count for the tenant',
-    description: 'Returns the count of unread client messages across all inspections in the tenant (sidebar badge). The lone cross-cutting messages summary — every other messages route is per-inspection.',
+    description: 'Returns the count of unread client messages across all inspections in the tenant (sidebar badge). The lone cross-cutting messages summary — every other messages route is per-inspection. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 // ── helpers (shared upload logic) ────────────────────────────────────────────

@@ -58,7 +58,7 @@ const recordOfflinePaymentRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: 'recordInvoiceOfflinePayment',
-    description: 'Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session.',
+    description: 'Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 /**
@@ -93,7 +93,7 @@ const correctPaymentRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: 'correctInvoicePayment',
-    description: 'Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did.',
+    description: 'Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 const listInvoicePaymentsRoute = createRoute(withMcpMetadata({
@@ -112,7 +112,7 @@ const listInvoicePaymentsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: 'listInvoicePayments',
-    description: 'Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute.',
+    description: 'Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['read'], tier: 'extended', capability: 'companyFinance' }));
 
 const invoicePaymentRoutes = createApiRouter()

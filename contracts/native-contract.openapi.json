@@ -547,7 +547,7 @@
           "inspections"
         ],
         "summary": "List inspections for current tenant",
-        "description": "Retrieve a paginated list of inspections with optional filtering.",
+        "description": "Retrieve a paginated list of inspections with optional filtering. A caller whose access is limited to the inspections assigned to them receives only those; the first page carries counts over the same set.",
         "operationId": "listInspections",
         "parameters": [
           {

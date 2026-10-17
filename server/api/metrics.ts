@@ -31,7 +31,7 @@ const metricsRoutes = createApiRouter()
     responses: { 200: { content: { 'application/json': { schema: MetricsApiResponseSchema.describe('Revenue, volume, agent, inspector and service aggregates for the window.') } }, description: 'Metrics' } },
     operationId: "listMetrics",
     summary: "List metrics for current tenant",
-    description: "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the company-finance capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months."
+    description: "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the company-finance capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'extended' })), async (c) => {
     const tenantId = c.get('tenantId');
     const { from, to } = resolveMetricsWindow(c.req.valid('query'));
