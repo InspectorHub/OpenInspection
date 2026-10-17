@@ -9844,7 +9844,7 @@
       "body": null
     },
     "summary": "Get the current tenant's usage summary (inspections/sms/email/storage/seats + free-tier caps)",
-    "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against."
+    "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "grantAgentSmsConsent",
@@ -10453,7 +10453,7 @@
       "body": null
     },
     "summary": "Section × rating-level counts across this tenant's inspections",
-    "description": "Counts rated items by template section and rating level over an inclusive `from`..`to` window. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections ordered by volume, with unresolvable sections collected in a flagged catch-all row."
+    "description": "Counts rated items by template section and rating level over an inclusive `from`..`to` window. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections ordered by volume, with unresolvable sections collected in a flagged catch-all row. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listAnalyticGrowth",
@@ -10483,7 +10483,7 @@
       "body": null
     },
     "summary": "Inspection count per month for the last N months",
-    "description": "Returns the number of inspections created in each of the last N calendar months (UTC), oldest first, as {ym, count} buckets. The current month is the last bucket and months with no inspections appear with a count of 0. Counts every inspection of the company by creation time, with no status or archive filter. Read-only."
+    "description": "Returns the number of inspections created in each of the last N calendar months (UTC), oldest first, as {ym, count} buckets. The current month is the last bucket and months with no inspections appear with a count of 0. Counts every inspection of the company by creation time, with no status or archive filter. Read-only. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listAutomationLogsRecent",
@@ -10572,7 +10572,7 @@
       "body": null
     },
     "summary": "Get tenant seat-quota summary (permanent + guests + cap)",
-    "description": "Returns the company's seat summary: its tier, the user cap (maxUsers, 1 when unset), and seatsUsed, which counts current non-removed members and excludes invitations not yet accepted. permanent mirrors seatsUsed and guests is always 0, kept only for response shape. When the deployment has a billing portal configured, portalUrl points to its billing page; otherwise it is omitted. Read-only and never contacts a payment provider. The route applies no role check of its own beyond a signed-in session. Returns 404 if the company record is missing."
+    "description": "Returns the company's seat summary: its tier, the user cap (maxUsers, 1 when unset), and seatsUsed, which counts current non-removed members and excludes invitations not yet accepted. permanent mirrors seatsUsed and guests is always 0, kept only for response shape. When the deployment has a billing portal configured, portalUrl points to its billing page; otherwise it is omitted. Read-only and never contacts a payment provider. Available to owner and manager roles; inspectors and staff get 403. Returns 404 if the company record is missing."
   },
   {
     "operationId": "listBookingAgreements",
@@ -11950,7 +11950,7 @@
       "body": null
     },
     "summary": "Snapshot of every integration for the active tenant",
-    "description": "Returns a per-integration enabled/configured status row for the active tenant. Drives the integrations overview grid on the settings page."
+    "description": "Returns a per-integration enabled/configured status row for the active tenant. Drives the integrations overview grid on the settings page. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "listIntegrationTestResults",
