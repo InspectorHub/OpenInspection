@@ -114,8 +114,9 @@ export async function action({ request, context }: Route.ActionArgs) {
                 param: { id },
                 // A template is applied whole: its role and switches stand in for the
                 // drawer's, so no "clear every override" null travels with it.
+                // The template does not carry the scope, so the drawer may state it beside the template's id.
                 json: (templateId
-                    ? { templateId }
+                    ? { templateId, ...(permissionOverrides ? { permissionOverrides } : {}) }
                     : { ...(role ? { role } : {}), permissionOverrides }) as Parameters<typeof api.team.members[":id"]["$patch"]>[0]["json"],
             });
             if (!res.ok) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import { useFetcher } from "react-router";
 import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { getCapabilities, pinnedCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
@@ -9,6 +9,8 @@ import type { Role as AnyRole } from "../../../server/lib/auth/roles";
 import { SeatLimitPanel } from "./SeatLimitPanel";
 import { PermissionTemplatePicker } from "../team/PermissionTemplatePicker";
 import { SaveAsTemplate } from "../team/SaveAsTemplate";
+import { ScopeControl } from "../team/ScopeControl";
+import { hasScopeChoice, inviteCapabilities, statedScope, withScope } from "../team/scope";
 import { templateMatchesForm, type TemplateOption } from "../team/permission-template-ui";
 import { MAX_COMPANY_TEMPLATES } from "../../../server/lib/auth/permission-templates";
 import { m } from "~/paraglide/messages";
@@ -140,13 +142,19 @@ export const CAP_GROUPS: ReadonlyArray<{ id: string; label: () => string; caps: 
  * role's template default (happy-dom has no render harness, so the submit
  * logic lives here and is unit-tested directly — see invite-overrides.spec).
  */
-export function computeOverrideDiff(role: Role, caps: CapabilitySet): PermissionOverrides {
+export function computeOverrideDiff(role: Role, caps: CapabilitySet, companyRestrictsNew = false): PermissionOverrides {
  const template = getCapabilities(role, null);
  const diff: PermissionOverrides = {};
  for (const cap of TOGGLEABLE) {
   if (caps[cap] !== template[cap]) diff[cap] = caps[cap];
  }
- return diff;
+ // Where the company default would otherwise decide for an inspector, "all inspections" is sent outright.
+ return { ...diff, ...statedScope(role, caps, companyRestrictsNew) };
+}
+
+/** Whether a switch is greyed out because it depends on the scope: scheduling for others needs every inspection. */
+export function isCapabilityScopeLocked(caps: CapabilitySet, cap: Capability): boolean {
+ return cap === "scheduleOthers" && !caps.viewAllInspections;
 }
 
 interface InviteSeatDrawerProps {
@@ -169,9 +177,13 @@ interface InviteSeatDrawerProps {
  actor: DrawerActor | null;
  /** Built-in and company permission templates to start from. Without any, the form is the plain role + switches form. */
  templates?: readonly TemplateOption[];
+ /** The company default for new inspectors: false starts every inspector invite on "only assigned inspections". */
+ newInspectorsViewAll?: boolean;
 }
 
-export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templates = NO_TEMPLATES }: InviteSeatDrawerProps) {
+export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templates = NO_TEMPLATES, newInspectorsViewAll = true }: InviteSeatDrawerProps) {
+ const restrictsNew = !newInspectorsViewAll;
+ const scopeName = useId();
  const [email, setEmail] = useState("");
  const [notify, setNotify] = useState(true);
  const [role, setRole] = useState<Role>("inspector");
@@ -179,7 +191,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
  // Effective capability set the toggles render. Re-derived from the role
  // template whenever the role changes (so the disclosure always shows the
  // selected role's defaults until the inviter edits them).
- const [caps, setCaps] = useState(() => getCapabilities("inspector", null));
+ const [caps, setCaps] = useState(() => inviteCapabilities("inspector", restrictsNew));
  // The permission template the form started from ("" = none). It is a starting
  // point, copied in: the form below stays editable and, once it no longer shows
  // what the template gives, reads "Customized" and is sent as plain role + switches.
@@ -189,7 +201,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
 
  function changeRole(next: Role) {
   setRole(next);
-  setCaps(getCapabilities(next, null));
+  setCaps(inviteCapabilities(next, restrictsNew));
  }
 
  function pickTemplate(id: string) {
@@ -197,7 +209,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
   const t = templates.find((x) => x.id === id);
   if (!t) return;
   setRole(toDrawerRole(t.baseRole));
-  setCaps(getCapabilities(t.baseRole, t.overrides));
+  setCaps(inviteCapabilities(t.baseRole, restrictsNew, t.overrides));
  }
  const [error, setError] = useState("");
  // At-open seat-limit gate — seeded from the caller-supplied prop every time
@@ -211,6 +223,14 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
  useEffect(() => {
   if (open) setSeatLimit(seatLimitAtOpen);
  }, [open]);
+
+ // A fresh invite starts from the company default for new inspectors as it is NOW (it can change while
+ // the drawer is closed), so the form opens showing what an invite sent right then would carry.
+ useEffect(() => {
+  if (!open) return;
+  setCaps(inviteCapabilities(role, restrictsNew));
+  setTemplateId("");
+ }, [open, restrictsNew]);
 
  // The default role may be one this person cannot grant; start on one they can.
  useEffect(() => {
@@ -246,7 +266,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
   setError("");
   // Only send capabilities that differ from the role template; the server
   // re-diffs and stores null when nothing differs.
-  const diff = computeOverrideDiff(role, caps);
+  const diff = computeOverrideDiff(role, caps, restrictsNew);
   const fd = new FormData();
   fd.append("intent", "invite");
   fd.append("email", email);
@@ -260,7 +280,10 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
  // is written on every submit now rather than only when false, so the request
  // says what the screen says.
  fd.append("notify", notify ? "true" : "false");
-  if (!fromTemplate && Object.keys(diff).length > 0) fd.append("permissionOverrides", JSON.stringify(diff));
+  // A template does not carry the scope, so an inspector invite from one states what the screen shows
+  // wherever the company default or the form could make it differ; an untouched one goes by id alone.
+  if (fromTemplate && hasScopeChoice(role) && (restrictsNew || !caps.viewAllInspections)) fd.append("permissionOverrides", JSON.stringify({ viewAllInspections: caps.viewAllInspections }));
+  else if (!fromTemplate && Object.keys(diff).length > 0) fd.append("permissionOverrides", JSON.stringify(diff));
   inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
  }
 
@@ -313,6 +336,8 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
  </label>
  <p className="text-xs text-ih-fg-3">{ROLE_OPTIONS.find((o) => o.value === role)?.desc()}</p>
 
+ {hasScopeChoice(role) && <ScopeControl name={scopeName} viewAll={caps.viewAllInspections} onChange={(v) => setCaps((prev) => withScope(prev, v))} />}
+
  <div className="border-t border-ih-border pt-3">
  <button
  type="button"
@@ -333,12 +358,13 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
  <input
  type="checkbox"
  checked={caps[cap]}
- disabled={isCapabilityLocked(role, cap) || isCapabilityBeyondActor(actor, cap, null)}
- title={isCapabilityLocked(role, cap) ? m.modal_invite_cap_pinned_read_only() : isCapabilityBeyondActor(actor, cap, null) ? m.modal_invite_cap_owner_only() : undefined}
+ disabled={isCapabilityLocked(role, cap) || isCapabilityBeyondActor(actor, cap, null) || isCapabilityScopeLocked(caps, cap)}
+ title={isCapabilityLocked(role, cap) ? m.modal_invite_cap_pinned_read_only() : isCapabilityBeyondActor(actor, cap, null) ? m.modal_invite_cap_owner_only() : isCapabilityScopeLocked(caps, cap) ? m.team_scope_requires_all() : undefined}
  onChange={(e) => setCaps((prev) => ({ ...prev, [cap]: e.target.checked }))}
  />
  {CAP_LABELS[cap]}
  {!isCapabilityLocked(role, cap) && isCapabilityBeyondActor(actor, cap, null) && <span className="text-xs text-ih-fg-3">{m.modal_invite_cap_owner_only()}</span>}
+ {isCapabilityScopeLocked(caps, cap) && <span className="text-xs text-ih-fg-3">{m.team_scope_requires_all()}</span>}
  </label>
  ))}
  </div>

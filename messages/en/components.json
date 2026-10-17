@@ -223,5 +223,14 @@
   "team_template_save_name_label": "Template name",
   "team_template_save_submit": "Save template",
   "team_template_save_done": "Template saved.",
-  "team_template_save_failed": "Could not save the template."
+  "team_template_save_failed": "Could not save the template.",
+  "team_scope_heading": "Inspections this person can see",
+  "team_scope_all": "All inspections",
+  "team_scope_assigned": "Only inspections assigned to them",
+  "team_scope_hint": "Unassigned inspections are visible to managers and owners only.",
+  "team_scope_requires_all": "Requires access to all inspections",
+  "team_scope_badge_assigned": "Assigned only",
+  "team_defaults_new_inspectors_title": "New inspectors can see all inspections",
+  "team_defaults_new_inspectors_desc": "Applies to inspectors you invite from now on. Existing members keep their current setting.",
+  "team_defaults_save_failed": "Could not save this setting. Try again."
 }

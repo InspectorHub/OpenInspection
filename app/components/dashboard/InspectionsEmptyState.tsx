@@ -19,6 +19,7 @@ export function InspectionsEmptyState({
     filters,
     onClearFilters,
     onCreate,
+    restricted = false,
 }: {
     /** Rows the loader returned, before filtering — how we tell the two cases apart. */
     totalAll: number;
@@ -26,6 +27,12 @@ export function InspectionsEmptyState({
     onClearFilters: () => void;
     /** Absent for a viewer who cannot create inspections (staff): the empty state then offers no button. */
     onCreate?: () => void;
+    /**
+     * True for an inspector who sees only the inspections assigned to them. Their empty list usually
+     * means nothing has been assigned yet, not that the company has no work, and the default wording
+     * ("No inspections yet") would read as the second.
+     */
+    restricted?: boolean;
 }) {
     const count = activeListFilters(filters).length;
 
@@ -51,8 +58,8 @@ export function InspectionsEmptyState({
     return (
         <EmptyState
             icon={<Icon name="check" size={32} />}
-            title={m.inspections_list_empty_title()}
-            description={onCreate ? m.inspections_list_empty_desc() : undefined}
+            title={restricted ? m.inspections_list_empty_restricted_title() : m.inspections_list_empty_title()}
+            description={restricted ? m.inspections_list_empty_restricted_desc() : onCreate ? m.inspections_list_empty_desc() : undefined}
             action={
                 onCreate ? (
                     <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={onCreate}>

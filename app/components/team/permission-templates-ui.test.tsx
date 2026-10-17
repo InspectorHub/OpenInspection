@@ -114,6 +114,33 @@ describe("InviteSeatDrawer with templates", () => {
         expect(screen.queryByText("Save as template")).toBeNull();
     });
 
+    it("an invite from a template states the scope beside the template's id wherever the company default could decide otherwise", () => {
+        render(<InviteSeatDrawer actor={OWNER} open onClose={() => {}} templates={TEMPLATES} newInspectorsViewAll={false} />);
+        choose("Start from a template", "inspector_trainee");
+        // The template does not mention the scope, so the company default shows on screen, and is what is sent.
+        expect((screen.getByLabelText("Only inspections assigned to them") as HTMLInputElement).checked).toBe(true);
+        expect(screen.queryByText("Customized")).toBeNull();
+        act(() => { form().requestSubmit(); });
+        expect(lastSubmitted()).toMatchObject({ templateId: "inspector_trainee" });
+        expect(JSON.parse(lastSubmitted().permissionOverrides as string)).toEqual({ viewAllInspections: false });
+    });
+
+    it("choosing every inspection under a restricting default is sent beside the template, and a restricted choice under a permissive default too", () => {
+        const { unmount } = render(<InviteSeatDrawer actor={OWNER} open onClose={() => {}} templates={TEMPLATES} newInspectorsViewAll={false} />);
+        choose("Start from a template", "inspector_trainee");
+        fireEvent.click(screen.getByLabelText("All inspections"));
+        expect(screen.queryByText("Customized")).toBeNull();
+        act(() => { form().requestSubmit(); });
+        expect(JSON.parse(lastSubmitted().permissionOverrides as string)).toEqual({ viewAllInspections: true });
+        unmount();
+        cleanup();
+        render(<InviteSeatDrawer actor={OWNER} open onClose={() => {}} templates={TEMPLATES} />);
+        choose("Start from a template", "inspector_trainee");
+        fireEvent.click(screen.getByLabelText("Only inspections assigned to them"));
+        act(() => { form().requestSubmit(); });
+        expect(JSON.parse(lastSubmitted().permissionOverrides as string)).toEqual({ viewAllInspections: false });
+    });
+
     it("choosing a template sets the role and the switches, and an unedited template is sent by id alone", () => {
         render(drawer());
         choose("Start from a template", "inspector_trainee");

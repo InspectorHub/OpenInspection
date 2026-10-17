@@ -38,7 +38,7 @@ export interface Member {
   totpEnabled: boolean;
 }
 
-export interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null; totpEnabled?: boolean; lastActiveAt?: string | null }
+export interface LoaderActiveUser { id: string; /** Left out of the reduced roster a non-administrator without scheduleOthers receives. */ email?: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null; totpEnabled?: boolean; lastActiveAt?: string | null }
 export interface LoaderInvite { id: string; email: string; role: string; expiresAt: string; inviteLink?: string }
 
 /**
@@ -47,7 +47,7 @@ export interface LoaderInvite { id: string; email: string; role: string; expires
  */
 export function toMembers(users: LoaderActiveUser[], invites: LoaderInvite[]): Member[] {
   const active: Member[] = users.map((u) => ({
-    id: u.id, name: u.name ?? null, email: u.email, role: u.role,
+    id: u.id, name: u.name ?? null, email: u.email ?? "", role: u.role,
     // LAST ACTIVE, layer 2 of 2 — this hardcoded null; layer 1 is the service projection, which explains both.
     status: "active", lastActiveAt: u.lastActiveAt ?? null, token: null, expiresAt: null,
     inviteLink: null,

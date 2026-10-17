@@ -18,13 +18,15 @@
  * colleague's access, and folding it in here would make it a two-click
  * accident.
  */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import { useFetcher } from "react-router";
 import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { getCapabilities, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
-import { CAP_LABELS, CAP_GROUPS, computeOverrideDiff, isCapabilityLocked, isCapabilityBeyondActor, offeredRoles, roleBeyondActor, toDrawerRole, type DrawerActor, type Role as EditableRole } from "./InviteSeatDrawer";
+import { CAP_LABELS, CAP_GROUPS, computeOverrideDiff, isCapabilityLocked, isCapabilityBeyondActor, isCapabilityScopeLocked, offeredRoles, roleBeyondActor, toDrawerRole, type DrawerActor, type Role as EditableRole } from "./InviteSeatDrawer";
 import { PermissionTemplatePicker } from "../team/PermissionTemplatePicker";
 import { SaveAsTemplate } from "../team/SaveAsTemplate";
+import { ScopeControl } from "../team/ScopeControl";
+import { hasScopeChoice, withScope } from "../team/scope";
 import { matchedTemplate, templateMatchesForm, type TemplateOption } from "../team/permission-template-ui";
 import { isTemplateRole, MAX_COMPANY_TEMPLATES } from "../../../server/lib/auth/permission-templates";
 import { m } from "~/paraglide/messages";
@@ -51,6 +53,7 @@ interface EditMemberDrawerProps {
 }
 
 export function EditMemberDrawer({ open, onClose, member, actor, templates = NO_TEMPLATES }: EditMemberDrawerProps) {
+  const scopeName = useId();
   const [role, setRole] = useState<EditableRole>("inspector");
   const [caps, setCaps] = useState<CapabilitySet>(() => getCapabilities("inspector", null));
   const [error, setError] = useState("");
@@ -93,7 +96,11 @@ export function EditMemberDrawer({ open, onClose, member, actor, templates = NO_
     const t = templates.find((x) => x.id === id);
     if (!t) return;
     setRole(toDrawerRole(t.baseRole));
-    setCaps(getCapabilities(t.baseRole, t.overrides));
+    // Which inspections a person sees is chosen beside the template: applying one keeps the scope on screen,
+    // unless the template states its own.
+    const fromTemplate = getCapabilities(t.baseRole, t.overrides);
+    const states = typeof t.overrides.viewAllInspections === "boolean";
+    setCaps(hasScopeChoice(t.baseRole) && !states ? withScope(fromTemplate, caps.viewAllInspections) : fromTemplate);
   }
 
   useEffect(() => {
@@ -119,6 +126,8 @@ export function EditMemberDrawer({ open, onClose, member, actor, templates = NO_
     // recorded as made from it. Once edited it is plain role + switches.
     if (chosenTemplate !== undefined && !customized) {
       fd.append("templateId", chosenTemplate.id);
+      // The template does not carry the scope, so the edit states what the screen shows rather than resetting it.
+      if (hasScopeChoice(role)) fd.append("permissionOverrides", JSON.stringify({ viewAllInspections: caps.viewAllInspections }));
     } else {
       fd.append("role", role);
       // Always send the field, even when empty: an absent payload means "clear
@@ -188,6 +197,8 @@ export function EditMemberDrawer({ open, onClose, member, actor, templates = NO_
             </select>
           </label>
 
+          {hasScopeChoice(role) && <ScopeControl name={scopeName} viewAll={caps.viewAllInspections} onChange={(v) => setCaps((prev) => withScope(prev, v))} />}
+
           <div className="border-t border-ih-border pt-3 space-y-3">
             <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.modal_invite_advanced()}</span>
             {CAP_GROUPS.map((group) => (
@@ -198,12 +209,13 @@ export function EditMemberDrawer({ open, onClose, member, actor, templates = NO_
                     <input
                       type="checkbox"
                       checked={caps[cap]}
-                      disabled={isCapabilityLocked(role, cap) || isCapabilityBeyondActor(actor, cap, held)}
-                      title={isCapabilityLocked(role, cap) ? m.modal_invite_cap_pinned_read_only() : isCapabilityBeyondActor(actor, cap, held) ? m.modal_invite_cap_owner_only() : undefined}
+                      disabled={isCapabilityLocked(role, cap) || isCapabilityBeyondActor(actor, cap, held) || isCapabilityScopeLocked(caps, cap)}
+                      title={isCapabilityLocked(role, cap) ? m.modal_invite_cap_pinned_read_only() : isCapabilityBeyondActor(actor, cap, held) ? m.modal_invite_cap_owner_only() : isCapabilityScopeLocked(caps, cap) ? m.team_scope_requires_all() : undefined}
                       onChange={(e) => setCaps((prev) => ({ ...prev, [cap]: e.target.checked }))}
                     />
                     {CAP_LABELS[cap]}
                     {!isCapabilityLocked(role, cap) && isCapabilityBeyondActor(actor, cap, held) && <span className="text-xs text-ih-fg-3">{m.modal_invite_cap_owner_only()}</span>}
+                    {isCapabilityScopeLocked(caps, cap) && <span className="text-xs text-ih-fg-3">{m.team_scope_requires_all()}</span>}
                   </label>
                 ))}
               </div>

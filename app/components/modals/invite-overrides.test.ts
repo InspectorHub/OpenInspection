@@ -29,10 +29,11 @@ describe("CAP_LABELS — the advanced-permission toggles", () => {
 });
 
 describe("CAP_GROUPS — the grouping both drawers render", () => {
-    it("covers TOGGLEABLE exactly once, apart from the visibility scope that has no switch yet", () => {
-        // A tenth capability added to TOGGLEABLE and forgotten here would simply
-        // not render -- unsettable by anyone, in silence. That is #77 again, one
-        // layer up.
+    it("covers TOGGLEABLE exactly once, apart from the visibility scope, which has its own control", () => {
+        // A capability added to TOGGLEABLE and forgotten here would simply not
+        // render -- unsettable by anyone, in silence. That is #77 again, one
+        // layer up. The scope control carries exactly one capability (asserted
+        // in team/scope.test.ts), and the two lists together cover the set.
         const flat = CAP_GROUPS.flatMap(g => g.caps);
         expect([...flat].sort()).toEqual(TOGGLEABLE.filter((cap) => cap !== "viewAllInspections").sort());
         expect(new Set(flat).size).toBe(flat.length);

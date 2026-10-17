@@ -334,5 +334,7 @@
   "inspections_repair_log_items_one": "1 item",
   "inspections_repair_log_items_other": "{count} items",
   "inspections_repair_log_list_empty": "This list was started and nothing was added to it.",
-  "inspections_repair_log_ask_heading": "Asked for"
+  "inspections_repair_log_ask_heading": "Asked for",
+  "inspections_list_empty_restricted_title": "No inspections are assigned to you yet",
+  "inspections_list_empty_restricted_desc": "A manager can assign one to you."
 }
