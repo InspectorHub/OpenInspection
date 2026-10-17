@@ -460,4 +460,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // successful refresh. Enforced on the device; the server only publishes it.
     // Appended at END per the D1 add-column-at-end rule (tenant_configs is FK-referenced).
     offlineMaxDays: integer('offline_max_days').notNull().default(30),
+    // Whether an inspector invited from now on starts able to see every inspection in the company
+    // (true) or only the ones assigned to them (false). Read once, when an invite is created, and
+    // copied onto that invite; changing it never touches an existing member or invite. Appended at
+    // END per the D1 add-column-at-end rule (tenant_configs is FK-referenced).
+    newInspectorsViewAll: integer('is_new_inspectors_view_all', { mode: 'boolean' }).notNull().default(true),
 });

@@ -84,6 +84,14 @@ describe('matchTemplate', () => {
         expect(matchTemplate('inspector', null, all)?.ref).toBe('inspector_standard');
     });
 
+    it('does not count which inspections a person sees: it is chosen beside the template', () => {
+        const trainee = resolveTemplate('inspector_trainee').permissionOverrides ?? {};
+        expect(matchTemplate('inspector', { ...trainee, viewAllInspections: false }, all)?.ref).toBe('inspector_trainee');
+        expect(matchTemplate('inspector', { viewAllInspections: false }, all)?.ref).toBe('inspector_standard');
+        // Control: any other difference still breaks the match, restricted or not.
+        expect(matchTemplate('inspector', { ...trainee, viewAllInspections: false, companyFinance: true }, all)).toBeNull();
+    });
+
     it('is null when one extra switch is changed, and when the role differs', () => {
         const trainee = resolveTemplate('inspector_trainee').permissionOverrides ?? {};
         expect(matchTemplate('inspector', { ...trainee, scheduleOthers: true }, all)).toBeNull();

@@ -21,7 +21,7 @@
 import { and, eq, exists, inArray, isNull, notExists, or, sql, type SQL } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Context } from 'hono';
-import { inspections, inspectionInspectors, inspectionPeople, inspectionMessages, invoices, inspectionEvents } from '../db/schema';
+import { inspections, inspectionInspectors, inspectionPeople, inspectionMessages, invoices, inspectionEvents, agreementRequests } from '../db/schema';
 import { contacts } from '../db/schema/contact';
 import { Errors } from '../errors';
 import { isAdminRole, isRole } from '../auth/roles';
@@ -119,6 +119,20 @@ export async function requireVisibleEvent(db: DB, scope: InspectionScope, tenant
         .where(and(eq(inspectionEvents.id, eventId), eq(inspectionEvents.tenantId, tenantId)))
         .get();
     if (!row || !row.visible) throw Errors.NotFound('Event not found');
+}
+
+/**
+ * The same for an agreement request (an e-sign envelope): it is as visible as the inspection it belongs to.
+ * An envelope that does not exist, or belongs to another company, answers the same 404.
+ */
+export async function requireVisibleAgreementRequest(db: DB, scope: InspectionScope, tenantId: string, envelopeId: string): Promise<void> {
+    if (scope.kind === 'all') return;
+    const row = await db.select({ visible: sql<number>`(${assignedCondition(db, scope.userId, tenantId)})` })
+        .from(agreementRequests)
+        .innerJoin(inspections, and(eq(inspections.id, agreementRequests.inspectionId), eq(inspections.tenantId, agreementRequests.tenantId)))
+        .where(and(eq(agreementRequests.id, envelopeId), eq(agreementRequests.tenantId, tenantId)))
+        .get();
+    if (!row || !row.visible) throw Errors.NotFound('Agreement request not found');
 }
 
 /**

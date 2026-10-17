@@ -14,17 +14,20 @@ import { RemoveMemberDialog } from "~/components/modals/RemoveMemberDialog";
 import { useRemoveMember } from "~/components/modals/useRemoveMember";
 import { resolveRole } from "~/lib/access.server";
 import { removeMember as removeMemberAction } from "./team.remove-member.server";
+import { loadNewInspectorDefault, setNewInspectorDefault } from "./team.defaults.server";
 import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
 import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table, Banner, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Button, EmptyState, Table, Banner, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
 import { isAdminRole } from "~/lib/access";
-import { ROLE_TONES, canRemove, expiryLabel, lastActiveLabel, toMembers, loadTemplates, type Member, type LoaderActiveUser, type LoaderInvite } from "./team.shapes";
-import { PermissionTemplatesPanel, TemplateBadge } from "~/components/team/PermissionTemplatesPanel";
+import { canRemove, expiryLabel, lastActiveLabel, toMembers, loadTemplates, type Member, type LoaderActiveUser, type LoaderInvite } from "./team.shapes";
+import { PermissionTemplatesPanel } from "~/components/team/PermissionTemplatesPanel";
+import { RoleCell } from "~/components/team/RoleCell";
+import { NewInspectorDefaultCard } from "~/components/team/NewInspectorDefaultCard";
 import type { TemplateOption } from "~/components/team/permission-template-ui";
 
 export function meta() {
@@ -51,7 +54,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const res = await api.team.members.$get();
     if (!res.ok) throw new Error(`team members ${res.status}`);
     const body = (await res.json()) as unknown as { data?: { members?: LoaderActiveUser[]; invites?: LoaderInvite[] } };
-    return { members: toMembers(body.data?.members ?? [], body.data?.invites ?? []), templates: await loadTemplates(api), canManage: isAdminRole(role), isOwner: role === "owner", loadFailed };
+    const [templates, newInspectorsViewAll] = await Promise.all([loadTemplates(api), loadNewInspectorDefault(api)]);
+    return { members: toMembers(body.data?.members ?? [], body.data?.invites ?? []), templates, newInspectorsViewAll, canManage: isAdminRole(role), isOwner: role === "owner", loadFailed };
   } catch {
     // `canManage` is derived from the JWT role, which was resolved BEFORE this
     // try block and is not in doubt. Returning false here downgraded an owner's
@@ -59,7 +63,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // affordances, which reads as "you are not allowed" rather than "we could
     // not load this".
     loadFailed = true;
-    return { members: [] as Member[], templates: [] as TemplateOption[], canManage: isAdminRole(role), isOwner: role === "owner", loadFailed };
+    return { members: [] as Member[], templates: [] as TemplateOption[], newInspectorsViewAll: true, canManage: isAdminRole(role), isOwner: role === "owner", loadFailed };
   }
 }
 
@@ -82,12 +86,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     return removeMemberAction(api, form);
   }
   if (intent === "reset-two-factor") return resetMemberTwoFactor(api, id);
+  if (intent === "set-new-inspector-default") return setNewInspectorDefault(api, form);
   return { ok: false };
 }
 
 
 export default function TeamPage() {
-  const { members, templates, canManage, isOwner, loadFailed } = useLoaderData<typeof loader>();
+  const { members, templates, newInspectorsViewAll, canManage, isOwner, loadFailed } = useLoaderData<typeof loader>();
   // `members` is active + pending, so the heading read "2 members" above one
   // person. The seat banner adds invites deliberately: a quota reserves every
   // claimable seat while a heading says who is here. They must not be unified.
@@ -185,7 +190,8 @@ export default function TeamPage() {
         ) : undefined}
       />
 
-      {canManage && <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} actor={actor} templates={templates} />}
+      {canManage && <NewInspectorDefaultCard viewAll={newInspectorsViewAll} />}
+      {canManage && <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} actor={actor} templates={templates} newInspectorsViewAll={newInspectorsViewAll} />}
       <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} actor={actor} templates={templates} />
 
       {TABS.length > 1 && <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />}
@@ -208,20 +214,13 @@ export default function TeamPage() {
                 cell: (member) => (
                   <>
                     <p className="text-[13px] font-medium text-ih-fg-1">{member.name || m.settings_team_member_unnamed()}</p>
-                    <p className="text-[11px] text-ih-fg-3">{member.email}</p>
+                    {member.email && <p className="text-[11px] text-ih-fg-3">{member.email}</p>}
                   </>
                 ),
               },
               {
                 label: m.settings_team_col_role(),
-                cell: (member) => (
-                  <>
-                    <Pill tone={ROLE_TONES[member.role] || "gen"}>{member.role}</Pill>
-                    {/* The template this member matches, or "Custom". Worked out from their
-                        resolved permissions: nothing records where they started. */}
-                    {canManage && <TemplateBadge member={member} templates={templates as TemplateOption[]} />}
-                  </>
-                ),
+                cell: (member) => <RoleCell member={member} canManage={canManage} templates={templates as TemplateOption[]} />,
               },
               {
                 label: m.settings_team_col_status(),

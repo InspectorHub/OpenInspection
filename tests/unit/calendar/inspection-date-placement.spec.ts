@@ -7,6 +7,7 @@ import {
     listCalendarItems,
 } from '../../../server/services/calendar-items.service';
 import { createTestDb, setupSchema } from '../db';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 vi.mock('drizzle-orm/d1', () => ({
     drizzle: vi.fn(),
@@ -118,7 +119,7 @@ describe('inspections.date → calendar placement', () => {
             end: '2026-09-30',
             userIds: [INSPECTOR],
             effectiveTz,
-        });
+        }, ALL_INSPECTIONS);
 
         it('buckets a full-ISO inspection on the civil day a grid cell asks for', async () => {
             await seed('iso-row', '2026-09-10T09:00:00.000Z');
@@ -179,7 +180,7 @@ describe('inspections.date → calendar placement', () => {
                 end: '2027-03-31',
                 userIds: [INSPECTOR],
                 effectiveTz: 'America/New_York',
-            });
+            }, ALL_INSPECTIONS);
             const item = items.find((i) => i.id === 'dst-row');
             expect(item?.civilDate).toBe('2027-03-14');
             expect(item?.startTime).toBe('02:30');

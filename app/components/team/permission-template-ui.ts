@@ -59,15 +59,12 @@ export function templateDescription(t: Pick<TemplateOption, "id" | "system" | "d
   return t.system ? (SYSTEM_DESCRIPTIONS[t.id]?.() ?? t.description) : null;
 }
 
-/** The role and resolved switches a template gives. */
-function templateCapabilities(t: TemplateOption): CapabilitySet {
-  return getCapabilities(t.baseRole, t.overrides);
-}
-
 /** Whether the form still shows exactly what the template gives. A template with edits applied is "Customized". */
 export function templateMatchesForm(t: TemplateOption, role: string, caps: CapabilitySet): boolean {
   if (t.baseRole !== role) return false;
-  const own = templateCapabilities(t);
+  // Which inspections a person sees is chosen beside the template, so the template is compared as if it
+  // carried the form's own scope: choosing "only assigned" does not make the form read "Customized".
+  const own = getCapabilities(t.baseRole, { ...t.overrides, viewAllInspections: caps.viewAllInspections });
   return TOGGLEABLE.every((cap) => own[cap] === caps[cap]);
 }
 

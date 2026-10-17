@@ -28,3 +28,30 @@ describe("InspectionsEmptyState - create button", () => {
     expect(queryByRole("button")).toBeNull();
   });
 });
+
+describe("InspectionsEmptyState - an inspector who sees only their assignments", () => {
+  it("says nothing is assigned to them yet, not that the company has no inspections", () => {
+    const { getByText, queryByText } = render(
+      <InspectionsEmptyState totalAll={0} filters={NO_FILTERS} onClearFilters={() => {}} onCreate={() => {}} restricted />,
+    );
+    expect(getByText("No inspections are assigned to you yet")).toBeTruthy();
+    expect(getByText("A manager can assign one to you.")).toBeTruthy();
+    expect(queryByText("No inspections yet")).toBeNull();
+  });
+
+  it("keeps the ordinary wording for everyone else (control)", () => {
+    const { getByText, queryByText } = render(
+      <InspectionsEmptyState totalAll={0} filters={NO_FILTERS} onClearFilters={() => {}} onCreate={() => {}} />,
+    );
+    expect(getByText("No inspections yet")).toBeTruthy();
+    expect(queryByText("No inspections are assigned to you yet")).toBeNull();
+  });
+
+  it("keeps the no-matches wording when filters emptied the list, even for a restricted viewer", () => {
+    const filtered = { ...NO_FILTERS, search: "main street" } as unknown as ListFilterState;
+    const { queryByText } = render(
+      <InspectionsEmptyState totalAll={3} filters={filtered} onClearFilters={() => {}} restricted />,
+    );
+    expect(queryByText("No inspections are assigned to you yet")).toBeNull();
+  });
+});

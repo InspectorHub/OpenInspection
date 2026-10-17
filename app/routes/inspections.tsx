@@ -830,6 +830,7 @@ export default function InspectionsPage() {
             filters={listFilterState}
             onClearFilters={clearAllFilters}
             onCreate={() => navigate("/inspections/new")}
+            restricted={sessionCtx?.user.capabilities?.viewAllInspections === false}
           />
         </Card>
       ) : filteredBuckets ? (

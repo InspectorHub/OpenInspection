@@ -12,13 +12,25 @@
  * because agents are granted access per inspection, so the invite door has to
  * refuse it too or the Team page grows a second, contradictory way in.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import teamRoutes from '../../../server/api/team';
 import adminRoutes from '../../../server/api/admin';
 import { AppError } from '../../../server/lib/errors';
 import { makeExecutionContext } from '../helpers/exec-ctx';
+import { createTestDb, setupSchema } from '../db';
 import type { HonoConfig } from '../../../server/types/hono';
+
+// An inspector invite reads the company default for new inspectors, so the route needs a database to read it from.
+vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+
+beforeAll(async () => {
+    const fix = createTestDb();
+    await setupSchema(fix.sqlite);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mockDrizzle as any).mockReturnValue(fix.db);
+});
 
 type RequesterRole = 'owner' | 'manager';
 
@@ -52,7 +64,7 @@ function buildApp(requesterRole: RequesterRole) {
 }
 
 const EXECUTION_CTX = makeExecutionContext().ctx;
-const ENV = { JWT_SECRET: 'x', APP_BASE_URL: 'https://oi.test' };
+const ENV = { JWT_SECRET: 'x', APP_BASE_URL: 'https://oi.test', DB: {} };
 
 function post(app: OpenAPIHono<HonoConfig>, path: string, role: string) {
     return app.request(path, {

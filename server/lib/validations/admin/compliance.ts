@@ -126,7 +126,7 @@ export const InviteMemberSchema = z.object({
  */
 export const UpdateMemberSchema = z.object({
     role: z.enum(ROLES).optional().openapi({ example: 'manager' }).describe('New role for this member. Omit to leave unchanged.'),
-    permissionOverrides: capabilityToggleMap().nullable().optional().openapi({ example: { companyFinance: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
+    permissionOverrides: capabilityToggleMap().nullable().optional().openapi({ example: { companyFinance: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides, except viewAllInspections: that one is kept unless the request states it, so leaving it out (or sending null or an empty map) never lifts a stored restriction to assigned inspections, and only an explicit true or false changes it.'),
     templateId: z.string().trim().min(1).max(100).optional().openapi({ example: 'inspector_trainee' })
         .describe('A permission template to apply: the key of a built-in template or the id of a company template. Its role and switches replace the member\'s current ones (permissionOverrides, when also sent, are applied on top of the template). The member keeps nothing that links them to the template afterwards'),
 }).openapi('UpdateMember');

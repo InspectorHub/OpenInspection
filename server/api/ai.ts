@@ -17,6 +17,8 @@ import {
 } from '../lib/validations/ai.schema';
 import { recordContentReview } from '../lib/ai/content-review';
 import { Errors } from '../lib/errors';
+import { requireVisibleInspection, resolveInspectionScope } from '../lib/inspection/visibility';
+import { getDrizzle } from '../lib/route-helpers';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
 /**
@@ -87,7 +89,7 @@ const autoSummaryRoute = createRoute(withMcpMetadata({
         + "description provided'); item names, addresses and client details are not. When the inspection has no "
         + "results or no defects, a fixed 'no significant defects' sentence is returned without calling the model "
         + "and aiCallId is null. Otherwise aiCallId identifies the recorded AI call, which a human review can cite. "
-        + "The inspection must belong to this company. Fails when AI is not configured or the workspace's AI "
+        + "The inspection must belong to this company and, for a caller whose access is limited to the inspections assigned to them, be one of those (otherwise it is answered as not found). Fails when AI is not configured or the workspace's AI "
         + "allowance is spent. Nothing is saved to the inspection, and each call is a fresh model call. Open to "
         + "owners, managers and inspectors who can edit reports. Requires the editReports capability, which office staff never have."
 }, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
@@ -193,6 +195,8 @@ const aiRoutes = createApiRouter()
         const { inspectionId } = c.req.valid('json');
         const tenantId = c.get('tenantId');
         const service = c.var.services.ai;
+        // The summary is built from the inspection's own notes: one outside the caller's set is not found.
+        await requireVisibleInspection(getDrizzle(c), await resolveInspectionScope(c), tenantId, inspectionId);
 
         const data = await service.generateInspectionSummary(tenantId, inspectionId);
         return c.json({ success: true, data }, 200);

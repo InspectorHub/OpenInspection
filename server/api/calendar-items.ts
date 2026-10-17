@@ -16,7 +16,8 @@ import {
 } from '../lib/validations/calendar-items.schema';
 import { listCalendarItems, type CalendarItem } from '../services/calendar-items.service';
 import { getDrizzle } from '../lib/route-helpers';
-import { isAdminRole } from '../lib/auth/roles';
+import { canViewOthersCalendar } from '../lib/calendar/view-others';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 
 /** Viewer's calendar display tz: their own override, else the tenant default. */
 async function resolveEffectiveTz(database: D1Database, tenantId: string, userId: string): Promise<string> {
@@ -37,7 +38,7 @@ const listItemsRoute = createRoute(withMcpMetadata({
     operationId: 'listCalendarItems',
     tags: ['calendar'],
     summary: 'List unified calendar items',
-    description: 'Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers may select multiple users; inspectors are restricted to themselves.',
+    description: 'Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers, and anyone holding the scheduleOthers capability, may select other users; everyone else is restricted to themselves. Inspections and scheduled visits are limited to the inspections the caller can see in the inspection list.',
     middleware: [allowedRoles],
     request: {
         query: ListCalendarItemsQuerySchema,
@@ -104,20 +105,15 @@ function errorResponse(message: string, code: 'FORBIDDEN') {
     };
 }
 
-function isAdmin(role: string | undefined): boolean {
-    return isAdminRole(role);
-}
-
 const calendarItemsRoutes = createApiRouter()
     .openapi(listItemsRoute, async (c) => {
         const user = c.get('user');
-        const role = c.get('userRole');
         const tenantId = c.get('tenantId');
         const query = c.req.valid('query');
         const requestedUserIds = query.userId ? [query.userId] : query.userIds;
 
         let userIds = requestedUserIds;
-        if (!isAdmin(role)) {
+        if (!await canViewOthersCalendar(c)) {
             if (requestedUserIds?.some((userId) => userId !== user.sub)) {
                 return c.json(errorResponse(
                     'Inspectors can only view their own calendar',
@@ -133,7 +129,7 @@ const calendarItemsRoutes = createApiRouter()
             end: query.end,
             effectiveTz,
             ...(userIds ? { userIds } : {}),
-        });
+        }, await resolveInspectionScope(c));
 
         return c.json({
             success: true as const,
@@ -180,7 +176,7 @@ const calendarItemsRoutes = createApiRouter()
             start: date,
             end: date,
             effectiveTz: tenantTz,
-        });
+        }, await resolveInspectionScope(c));
 
         // The items feed reports inspections as all-day, which is all a month
         // grid needs. A board places cards on a time axis, so the precise

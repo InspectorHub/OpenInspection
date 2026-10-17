@@ -17,6 +17,8 @@ import { getInspectionRoster } from '../inspection/roster';
 import { collabDocName } from './doc-name';
 import { resolvePrimaryReportId } from '../inspection/reports';
 import { getDrizzle } from '../route-helpers';
+import { isRole } from '../auth/roles';
+import { requireVisibleInspection, resolveInspectionScope } from '../inspection/visibility';
 
 /**
  * Result of the shared fail-closed auth: either an early `Response` (the caller
@@ -69,6 +71,21 @@ export async function authorizeCollab(
             err instanceof Error ? err : undefined,
         );
         return { ok: false, response: new Response('not found', { status: 404 }) };
+    }
+
+    // (4b) A caller who sees only their assigned inspections gets the answer a missing inspection would
+    // give. The path guard already answers that way for `/api/inspections/:id/...`; this is for the callers
+    // that reach here without it (the offline package import names its inspections in the body), and it
+    // keeps "exists but not yours" from reading as a 403 against a 404 for an id that does not exist.
+    // An identity that is no known role cannot hold a scope, and was refused at step 5 anyway.
+    if (!isRole(c.get('userRole'))) return { ok: false, response: new Response('forbidden', { status: 403 }) };
+    const scope = await resolveInspectionScope(c);
+    if (scope.kind === 'assigned') {
+        try {
+            await requireVisibleInspection(getDrizzle(c), scope, tenantId, id);
+        } catch {
+            return { ok: false, response: new Response('not found', { status: 404 }) };
+        }
     }
 
     // (5) Edit-permission check (mirrors presence route)

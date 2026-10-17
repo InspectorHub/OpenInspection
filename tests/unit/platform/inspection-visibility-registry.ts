@@ -69,23 +69,23 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/admin/sms/consent': E('handler-assert', 'the inspection must be visible'),
     'GET /api/team/members': E('projection', 'non-administrators get id, name and role (and email with scheduleOthers)'),
 
-    // Writes that answer with the row they touched. They need manageContacts (off by default for an inspector), so
-    // today only a person explicitly granted it can reach them; the flip must wait until each asserts visibility.
-    'POST /api/contacts': P('capability-gated', 'manageContacts; a plain create is not a read, but a duplicate-email answer can name an existing contact outside the visible set'),
-    'PUT /api/contacts/:id': P('capability-gated', 'manageContacts; updates and returns a contact that may be outside the visible set'),
-    'DELETE /api/contacts/:id': P('capability-gated', 'manageContacts; archives a contact that may be outside the visible set'),
-    'POST /api/contacts/:id/restore': P('capability-gated', 'manageContacts; restores and returns a contact that may be outside the visible set'),
-    'POST /api/contacts/:id/access/revoke': P('capability-gated', 'manageContacts; acts on links of a contact that may be outside the visible set'),
-    'POST /api/contacts/import': P('capability-gated', 'manageContacts; the report back can name existing contacts outside the visible set'),
-    // A plain create that names another inspector leaves the creator off the roster (the wizard keeps them on it).
-    'POST /api/inspections': P('handler-assert', 'plain create naming another inspector: the creator cannot open what they just made'),
-    // Calendar and schedule. Aligning these with the list belongs with the change that opens the write surface.
+    // Contact writes. They need manageContacts (off by default for an inspector); each one asserts the contact is in the
+    // caller's set before it acts, so holding that switch never reaches a contact outside it.
+    'POST /api/contacts': E('handler-assert', 'manageContacts; a duplicate email answers 409 without describing the contact it collided with'),
+    'PUT /api/contacts/:id': E('handler-assert', 'manageContacts; the contact must be visible (404 otherwise)'),
+    'DELETE /api/contacts/:id': E('handler-assert', 'manageContacts; the contact must be visible (404 otherwise)'),
+    'POST /api/contacts/:id/restore': E('handler-assert', 'manageContacts; the contact must be visible (404 otherwise)'),
+    'POST /api/contacts/:id/access/revoke': E('scoped-service', 'manageContacts; the contact must be visible, and only links to visible inspections are withdrawn'),
+    'POST /api/contacts/import': E('admin-only', 'requireRole(owner, manager): the existing-contact report never reaches a restricted caller'),
+    // A plain create that names another inspector keeps the creator on the roster, as a helper (the wizard does the same).
+    'POST /api/inspections': E('handler-assert', 'plain create naming another inspector: the creator joins the roster as a helper'),
+    // Calendar and schedule.
     'GET /api/calendar/events': E('scoped-service', 'local inspections cut to the visible set'),
-    'GET /api/calendar/items': P('self-only', 'forced to the caller for a non-administrator; reconciled with the list later'),
+    'GET /api/calendar/items': E('scoped-service', 'inspections and visits cut to the visible set; another person needs scheduleOthers'),
     'GET /api/calendar/dispatch': E('capability-gated', 'scheduleOthers, normalised off for a restricted inspector'),
-    'GET /api/schedule/week-summary': P('self-only', 'forced to the caller for a non-administrator; reconciled with the list later'),
+    'GET /api/schedule/week-summary': E('capability-gated', 'another inspector needs scheduleOthers; the caller is otherwise summarized against themselves'),
     'GET /api/schedule/day-slots': E('capability-gated', 'scheduleOthers, normalised off for a restricted inspector'),
-    'GET /api/tenant/presence/ws': P('scoped-service', 'the company-wide presence socket names the inspection each colleague has open; the room is not filtered per person yet'),
+    'GET /api/tenant/presence/ws': E('projection', 'a restricted viewer receives the roster with every colleague open-inspection id withheld'),
     'GET /api/calendar/blocks': E('no-inspection-data', 'personal time blocks'),
     'GET /api/calendar/ics-links': E('self-only', 'the caller own feed links'),
     'GET /api/calendar/status': E('no-inspection-data', 'calendar connection state'),
@@ -94,6 +94,14 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/calendar/callback': E('no-inspection-data', 'calendar OAuth redirect'),
     'GET /api/ics/inspector/:token': E('self-only', 'the token resolves to one user and that user own roster'),
     'GET /api/ics/:token': E('self-only', 'the token resolves to one user and that user own roster'),
+
+    // Agreement requests (e-sign envelopes) are addressed by their own id; each belongs to an inspection.
+    'GET /api/admin/agreement-requests/:id/pdf': E('handler-assert', 'the envelope must belong to a visible inspection (404 otherwise)'),
+    'GET /api/admin/agreement-requests/:id/certificate.pdf': E('handler-assert', 'the envelope must belong to a visible inspection (404 otherwise)'),
+    'GET /api/admin/agreement-requests/:id/evidence.zip': E('handler-assert', 'the envelope must belong to a visible inspection (404 otherwise)'),
+    'POST /api/admin/agreement-requests/:id/inspector-sign': E('handler-assert', 'the envelope must belong to a visible inspection (404 otherwise)'),
+
+    'POST /api/ai/auto-summary': E('handler-assert', 'the summary is built from the inspection whose id the body names, which must be visible (404 otherwise)'),
 
     // Exports and company-level reads that are owner/manager only.
     'GET /api/data/export/inspections': E('admin-only', 'requireRole(owner, manager)'),
@@ -139,13 +147,18 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
     'server/api/inspections/bulk.ts': E('scoped-service', 'list, counts and dashboard take the scope; bulk update and the inspector list are capability-gated'),
     // Staff-readable, outside the family.
     'server/api/calendar-events.ts': E('scoped-service', 'GET / is cut to the visible set'),
-    'server/api/calendar-items.ts': P('self-only', 'forced to the caller for a non-administrator; the dispatch board is capability-gated'),
+    'server/api/calendar-items.ts': E('scoped-service', 'the feed is cut to the visible set; another person needs scheduleOthers; the dispatch board is capability-gated'),
     'server/api/invoices.ts': E('scoped-service', 'the list is cut to visible inspections; mutations are owner/manager'),
     'server/api/metrics.ts': E('scoped-service', 'a restricted caller gets the own-row view'),
     'server/api/usage.ts': E('company-open-staff', 'lifetime capacity counters'),
     'server/api/ics.ts': E('self-only', 'a token resolves to one user and that user own roster'),
     'server/api/sms.ts': E('handler-assert', 'public opt-in and webhooks are token-driven; GET /sms/consent asserts visibility; the rest is owner/manager'),
     'server/api/agent.ts': E('self-only', 'the agent portal is keyed to the signed-in agent account; the leaderboard is owner/manager'),
+    'server/api/inspections/statutory-details.ts': E('guarded-by-path', '/{id}/statutory-details routes'),
+    'server/api/inspections/statutory-inputs.ts': E('guarded-by-path', '/{id}/statutory inputs routes'),
+    'server/api/inspections/statutory.ts': E('guarded-by-path', 'helpers for the /{id}/statutory-form routes'),
+    'server/api/evidence.ts': E('handler-assert', 'each download asserts the envelope belongs to a visible inspection'),
+    'server/api/agreements-render.ts': E('public-token', 'internal /m2m surface, reached with the service credential and never by a staff session'),
     // Admin-only.
     'server/api/admin/admin-esign.ts': E('admin-only', 'every route is requireRole(owner, manager)'),
     'server/api/admin/admin-finding-keys.ts': E('admin-only', 'requireRole(owner)'),

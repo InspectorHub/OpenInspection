@@ -223,5 +223,14 @@
   "team_template_save_name_label": "Nombre de la plantilla",
   "team_template_save_submit": "Guardar plantilla",
   "team_template_save_done": "Plantilla guardada.",
-  "team_template_save_failed": "No se pudo guardar la plantilla."
+  "team_template_save_failed": "No se pudo guardar la plantilla.",
+  "team_scope_heading": "Inspecciones que esta persona puede ver",
+  "team_scope_all": "Todas las inspecciones",
+  "team_scope_assigned": "Solo las inspecciones que se le asignan",
+  "team_scope_hint": "Las inspecciones sin asignar solo las ven los gerentes y los titulares.",
+  "team_scope_requires_all": "Requiere acceso a todas las inspecciones",
+  "team_scope_badge_assigned": "Solo asignadas",
+  "team_defaults_new_inspectors_title": "Los inspectores nuevos pueden ver todas las inspecciones",
+  "team_defaults_new_inspectors_desc": "Se aplica a los inspectores que invite de ahora en adelante. Los miembros actuales conservan su configuración.",
+  "team_defaults_save_failed": "No se pudo guardar este ajuste. Inténtelo de nuevo."
 }

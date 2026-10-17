@@ -207,6 +207,7 @@ export const CommunicationPatchSchema = z.object({
  */
 export const TeamDefaultsSchema = z.object({
     teamModeDefault:          z.boolean().optional().describe('Company-wide default for team mode, the setting that enables a lead inspector plus helpers on inspections. Stored on the team page defaults; it is read and written there, and sending nothing leaves it unchanged.'),
+    newInspectorsViewAll:     z.boolean().optional().describe('Whether an inspector invited from now on can see every inspection in the company (true, the default) or only the inspections assigned to them (false). It is applied when an invite is created, only if the invite does not say otherwise; existing members and pending invites keep what they have, and sending nothing leaves it unchanged.'),
 });
 
 /**

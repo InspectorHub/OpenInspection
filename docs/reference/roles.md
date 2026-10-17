@@ -62,7 +62,7 @@ it is not, it is just scored on the other axis.
 
 ### Staff capabilities
 
-Twelve, flippable per person on top of the role default
+Thirteen, flippable per person on top of the role default
 (`TOGGLEABLE` in `server/lib/auth/capabilities.ts`):
 
 | Capability | Owner | Manager | Inspector | Staff | Agent |
@@ -79,6 +79,7 @@ Twelve, flippable per person on top of the role default
 | `templateImport` | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `deleteInspection` — permanently delete an inspection (an inspector only one they lead) | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `editReports` — write report content: results, media, units, compliance and statutory inputs, cost items | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `viewAllInspections` — see every inspection in the company, not only the ones assigned to you | ✅ (fixed) | ✅ (fixed) | ✅ | ✅ (fixed) | ❌ |
 
 `editReports` is enforced by one path-scoped guard (`server/lib/inspection/report-authoring-guard.ts`)
 that refuses every write to a report-authoring route, the live collaborative
@@ -185,6 +186,55 @@ adjusted; once they no longer match the template the form reads "Customized".
 - **API.** `GET`/`POST /api/team/permission-templates`, `PUT`/`DELETE
   /api/team/permission-templates/{id}`, and an optional `templateId` on
   `POST /api/team/invite` and `PATCH /api/team/members/{id}`; see the API reference.
+
+### Inspection visibility
+
+`viewAllInspections` decides which inspections a person can see. It is on for every role by
+default, so turning the feature on changes nothing until an administrator narrows someone.
+Only an inspector can be narrowed: owners, managers and staff are pinned to see everything.
+
+When an inspector has it off, they see only inspections they are assigned to:
+
+- **Assigned** means on the inspection's roster, as lead or as helper. An inspection that has
+  no roster rows at all (created before rosters existed and never reassigned) falls back to its
+  `inspector_id` column; a roster that names someone else wins over a stale column.
+- **Unassigned inspections** are visible to owners and managers only.
+- Everything derived from an inspection follows the same rule: the list, counts, dashboard,
+  search, the calendar and its week summary, contacts and message threads of those inspections,
+  analytics and metrics, invoices, signed agreements and their evidence downloads, AI summaries, scheduled visits,
+  inspection requests, the realtime editor and
+  presence, bulk actions, the native client's sync and package import, and the remote tools.
+  The company-wide presence roster still shows who is online, but withholds which inspection
+  each colleague has open.
+- An inspection outside the set answers `404`, the same answer as for an id that does not exist,
+  never `403`.
+- A restricted inspector never holds `scheduleOthers`, even when it is granted: the capability set
+  switches it off, because the dispatch board returns the whole team's inspections. Opening another
+  person's calendar, week summary, availability or time blocks needs `scheduleOthers` or an owner or
+  manager role, so a restricted inspector sees only their own.
+- The calendar feed and the inspection list agree: whatever the feed returns for a restricted
+  inspector is a subset of their list. They differ on purpose in one place: a person granted
+  `scheduleOthers` sees colleagues' calendars, which the list does not show them.
+- A person who creates an inspection naming another inspector stays on its roster as a helper, so
+  they can open what they just made.
+- Data a device has already synced is not wiped remotely when someone is narrowed. It is bounded by
+  the offline period, after which the device locks. An editor connection that is already open is
+  not closed.
+
+**Setting it.** On the Team page an administrator chooses "Inspections this person can see" in the
+invite and edit forms, or sends `viewAllInspections: false` in `permissionOverrides` on
+`POST /api/team/invite` and `PATCH /api/team/members/{id}`. A member edit that sends
+`permissionOverrides` replaces the whole map for every other switch, but a stored
+`viewAllInspections` is kept unless the request states it, so a partial or empty map never lifts
+a restriction by accident; only an explicit `true` or `false` changes it. A change is recorded in the audit trail as a capability change that names
+`viewAllInspections`.
+
+**Company default for new inspectors.** `GET` and `PUT /api/team/defaults` carry
+`newInspectorsViewAll` (true unless changed). When an inspector is invited and the request says
+nothing about the scope, a default of `false` is stamped onto the invite as the restriction. An
+explicit `true` in the request wins over the default. A permission template that carries the switch
+is respected. The default is read once, when an invite is created: changing it never affects a
+pending invite or an existing member.
 
 ### Money visibility
 

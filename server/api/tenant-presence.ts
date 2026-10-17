@@ -8,6 +8,7 @@
  */
 import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 
 const tenantPresenceRoutes = createApiRouter()
     .get('/presence/ws', async (c) => {
@@ -23,6 +24,9 @@ const tenantPresenceRoutes = createApiRouter()
         const userId   = user?.sub;
         if (!tenantId || !userId) return new Response('unauthorized', { status: 401 });
 
+        // The roster names the inspection each colleague has open; a restricted caller's frames leave that out.
+        const scope = await resolveInspectionScope(c);
+
         const doId = c.env.TENANT_PRESENCE.idFromName(tenantId);
         const stub = c.env.TENANT_PRESENCE.get(doId);
 
@@ -33,6 +37,7 @@ const tenantPresenceRoutes = createApiRouter()
                 'x-user-id':        userId,
                 'x-user-name':      'User',
                 'x-user-photo-url': '',
+                'x-inspection-scope': scope.kind === 'assigned' ? 'assigned' : 'all',
             },
         });
         return stub.fetch(fwd);

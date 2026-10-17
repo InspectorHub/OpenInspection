@@ -84,7 +84,7 @@ describe('contact access (IA-100)', () => {
   });
 
   it('revokes only the inspections named', async () => {
-    const n = await svc.revokeAccess(CONTACT, T, ['i1']);
+    const n = await svc.revokeAccess(CONTACT, T, ALL_INSPECTIONS, ['i1']);
     expect(n).toBe(1);
 
     const left = (await svc.listAccess(CONTACT, T, ALL_INSPECTIONS))?.map((a) => a.inspectionId);
@@ -92,7 +92,7 @@ describe('contact access (IA-100)', () => {
   });
 
   it('revokes everything when no ids are given', async () => {
-    const n = await svc.revokeAccess(CONTACT, T);
+    const n = await svc.revokeAccess(CONTACT, T, ALL_INSPECTIONS);
     expect(n).toBe(2); // i1 + i2; i3 was already revoked and is not re-counted
 
     expect(await svc.listAccess(CONTACT, T, ALL_INSPECTIONS)).toEqual([]);
@@ -101,7 +101,7 @@ describe('contact access (IA-100)', () => {
   it('reports what it actually revoked, not what was asked for', async () => {
     // i3 is already dead. Counting it would teach an operator to trust a
     // number that is not measuring anything.
-    const n = await svc.revokeAccess(CONTACT, T, ['i1', 'i3']);
+    const n = await svc.revokeAccess(CONTACT, T, ALL_INSPECTIONS, ['i1', 'i3']);
     expect(n).toBe(1);
   });
 
@@ -109,7 +109,7 @@ describe('contact access (IA-100)', () => {
     // Both would render as "nothing to see" but mean very different things,
     // so the route needs to be able to 404 rather than show an empty list.
     expect(await svc.listAccess('99999999-9999-9999-9999-999999999999', T, ALL_INSPECTIONS)).toBeNull();
-    expect(await svc.revokeAccess('99999999-9999-9999-9999-999999999999', T)).toBeNull();
+    expect(await svc.revokeAccess('99999999-9999-9999-9999-999999999999', T, ALL_INSPECTIONS)).toBeNull();
   });
 
   it('will not reach across tenants', async () => {

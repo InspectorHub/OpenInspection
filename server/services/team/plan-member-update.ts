@@ -37,7 +37,9 @@ export function diffOverrides(role: UserRole, requested?: RequestedOverrides | n
     // in a stored map from here; `planMemberUpdate` carries an existing value across an edit.
     for (const cap of SETTABLE_CAPABILITIES) {
         const value = requested[cap];
-        if (typeof value === 'boolean' && value !== template[cap]) diff[cap] = value;
+        // A switch the role pins (a manager's view of every inspection, an owner's anything) takes no
+        // effect, so storing it would only record a request nothing honours.
+        if (typeof value === 'boolean' && value !== template[cap] && getCapabilities(role, { [cap]: value })[cap] === value) diff[cap] = value;
     }
     return Object.keys(diff).length ? diff : null;
 }
@@ -62,6 +64,20 @@ function withUnsettableKept(
         if (typeof value === 'boolean' && value !== base[cap] && getCapabilities(role, { [cap]: value })[cap] === value) out[cap] = value;
     }
     return Object.keys(out).length ? out : null;
+}
+
+/**
+ * A restriction on which inspections a person can see must never be lifted by accident. A request
+ * that carries a map replaces the stored one for every switch, but for `viewAllInspections` an
+ * absent key means "leave it": only an explicit true or false changes it (and the grant ceiling
+ * still decides who may). Without this, an API or MCP client that sends a partial map, or clears
+ * the overrides, would silently give a restricted inspector access to everything.
+ */
+function withScopeKept(requested: RequestedOverrides | null, current: PermissionOverrides | null): RequestedOverrides {
+    const out: RequestedOverrides = { ...(requested ?? {}) };
+    const stored = current?.viewAllInspections;
+    if (typeof out.viewAllInspections !== 'boolean' && typeof stored === 'boolean') out.viewAllInspections = stored;
+    return out;
 }
 
 export interface MemberUpdatePlan {
@@ -94,7 +110,9 @@ export function planMemberUpdate(args: {
     const currentOverrides = coerceOverrides(current.permissionOverrides);
     const permissionOverrides = withUnsettableKept(
         nextRole,
-        requested === undefined ? diffOverrides(nextRole, currentOverrides) : diffOverrides(nextRole, requested),
+        requested === undefined
+            ? diffOverrides(nextRole, currentOverrides)
+            : diffOverrides(nextRole, withScopeKept(requested, currentOverrides)),
         currentOverrides,
     );
 

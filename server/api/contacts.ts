@@ -11,7 +11,8 @@ import {
 } from '../lib/validations/contact.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { moneyView } from "../lib/auth/money-access";
-import { resolveInspectionScope } from "../lib/inspection/visibility";
+import { resolveInspectionScope, requireVisibleContact } from "../lib/inspection/visibility";
+import { getDrizzle } from "../lib/route-helpers";
 
 /**
  * `contacts.id` is a TEXT column holding an opaque identifier. Every writer
@@ -72,10 +73,11 @@ const createContactRoute = createRoute(withMcpMetadata({
             content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ contact: ContactResponseSchema }) }) } },
             description: 'Created',
         },
+        409: { description: 'An active contact in this company already holds that email' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "createContact",
-    description: "Creates a contact (client, agent or other party). Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the contact is also pushed to QuickBooks as a customer in the background. Returns the created contact."
+    description: "Creates a contact (client, agent or other party). Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the contact is also pushed to QuickBooks as a customer in the background. Returns the created contact, or 409 when an active contact already holds the email; the refusal does not describe that contact."
 }, { scopes: ['write'], tier: 'primary', capability: 'manageContacts' }));
 
 const updateContactRoute = createRoute(withMcpMetadata({
@@ -101,7 +103,8 @@ const updateContactRoute = createRoute(withMcpMetadata({
         + "agent across companies; to change it, archive the contact and create a new one. Requires the "
         + "manageContacts capability and the owner, manager or inspector role. Does not email the contact. When "
         + "the QuickBooks integration is configured, the change is also pushed to QuickBooks in the background. "
-        + "Returns the updated contact, or 404 when the id is not in this company. Idempotent."
+        + "Returns the updated contact, or 404 when the id is not in this company or, for a caller whose access is "
+        + "limited to the inspections assigned to them, not one they can see. Idempotent."
 }, { scopes: ['write'], tier: 'extended', capability: 'manageContacts' }));
 
 const deleteContactRoute = createRoute(withMcpMetadata({
@@ -118,7 +121,7 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "deleteContact",
-    description: "Removes a contact. A contact that no inspection references is deleted permanently; one that appears on any inspection is archived instead (restorable via the restore route) so past inspections keep their history. Archiving may also revoke that contact's live report links, if the company's archive-revokes-access setting is on. Requires the manageContacts capability."
+    description: "Removes a contact. A contact that no inspection references is deleted permanently; one that appears on any inspection is archived instead (restorable via the restore route) so past inspections keep their history. Archiving may also revoke that contact's live report links, if the company's archive-revokes-access setting is on. Requires the manageContacts capability. For a caller whose access is limited to the inspections assigned to them, a contact outside that set is answered as not found."
 }, { scopes: ['write'], tier: 'primary', capability: 'manageContacts' }));
 
 /**
@@ -147,7 +150,7 @@ const restoreContactRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "restoreContact",
-    description: "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued."
+    description: "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued. For a caller whose access is limited to the inspections assigned to them, a contact outside that set is answered as not found."
 }, { scopes: ['write'], tier: 'extended', capability: 'manageContacts' }));
 
 /**
@@ -197,7 +200,7 @@ const revokeContactAccessRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/access/revoke',
     tags: ["contacts"],
     summary: "Revoke a contact's report links",
-    description: 'Revokes the named inspections\' links for this contact, or every live link when inspectionIds is omitted. Returns the number actually revoked, which can be lower than requested if some were already gone.',
+    description: 'Revokes the named inspections\' links for this contact, or every live link when inspectionIds is omitted. Returns the number actually revoked, which can be lower than requested if some were already gone. For a caller whose access is limited to the inspections assigned to them, only links to inspections they can open are withdrawn, and a contact outside their set is answered as not found.',
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
     request: {
         params: z.object({ id: CONTACT_ID.describe('Contact id.') }),
@@ -231,6 +234,7 @@ const contactRoutes = createApiRouter()
     .openapi(restoreContactRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
+        await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
         const { restored } = await c.var.services.contact.restoreContact(id, tenantId);
         return c.json({ success: true as const, data: { restored } }, 200);
     })
@@ -266,6 +270,7 @@ const contactRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const raw = c.req.valid('json');
+        await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id as string);
         // Strip undefined keys to satisfy exactOptionalPropertyTypes.
         //
         // `'x' in raw` rather than `raw.x !== undefined` for every nullable
@@ -292,6 +297,7 @@ const contactRoutes = createApiRouter()
     .openapi(deleteContactRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
+        await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id as string);
         await c.var.services.contact.deleteContact(id as string, tenantId);
         return c.json({ success: true }, 200);
     })
@@ -307,7 +313,7 @@ const contactRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const { inspectionIds } = c.req.valid('json');
         const revoked = await c.var.services.contact.revokeAccess(
-            id, tenantId,
+            id, tenantId, await resolveInspectionScope(c),
             ...(inspectionIds ? [inspectionIds] as const : [] as const),
         );
         if (revoked === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);

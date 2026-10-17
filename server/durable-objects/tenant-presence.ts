@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { purgePathMatches } from './purge-path';
+import { membersFor, type TenantMemberState } from './tenant-presence-view';
 
 /**
  * Design System 0520 subsystem B phase 2 task 2.4 — TenantPresenceDO.
@@ -26,12 +27,8 @@ interface ClientAttachment {
     name:          string;
     photoUrl:      string | null;
     lastHeartbeat: number;
-}
-
-interface TenantMemberState {
-    online:              boolean;
-    currentInspectionId: string | null;
-    lastSeenAt:          number;
+    /** True unless the worker said this person sees every inspection. */
+    restricted:    boolean;
 }
 
 interface TenantState {
@@ -58,7 +55,10 @@ export class TenantPresenceDO extends DurableObject {
             const client = pair[0];
             const server = pair[1];
 
-            const att: ClientAttachment = { userId, name, photoUrl, lastHeartbeat: Date.now() };
+            // Stamped by the worker from the caller's verified capabilities; this object is not reachable from outside it.
+            // Fails closed: only an explicit 'all' sees the open inspections.
+            const restricted = req.headers.get('x-inspection-scope') !== 'all';
+            const att: ClientAttachment = { userId, name, photoUrl, lastHeartbeat: Date.now(), restricted };
             server.serializeAttachment(att);
             this.ctx.acceptWebSocket(server);
 
@@ -170,9 +170,16 @@ export class TenantPresenceDO extends DurableObject {
         }
         if (dirty) await this.ctx.storage.put('state', state);
 
-        const payload = JSON.stringify({ type: 'tenant-roster', members: state.members });
+        // One frame per viewer: a restricted viewer is not told which inspection a colleague has open.
+        // A connection that predates the attachment's `restricted` flag has none and is treated as restricted.
+        const full = JSON.stringify({ type: 'tenant-roster', members: state.members });
         for (const ws of this.ctx.getWebSockets()) {
-            try { ws.send(payload); } catch { /* already closed */ }
+            try {
+                const att = ws.deserializeAttachment() as ClientAttachment | null;
+                if (att && att.restricted === false) { ws.send(full); continue; }
+                const members = membersFor(state.members, { userId: att?.userId ?? '', restricted: true });
+                ws.send(JSON.stringify({ type: 'tenant-roster', members }));
+            } catch { /* already closed */ }
         }
     }
 }

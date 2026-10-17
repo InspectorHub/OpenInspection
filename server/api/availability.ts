@@ -6,6 +6,7 @@ import { safeISODate } from '../lib/date';
 import { deniedByRule } from '../lib/permission-denied';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
+import { canViewOthersCalendar } from '../lib/calendar/view-others';
 import {
     AvailabilitySchema,
     OverrideSchema,
@@ -27,7 +28,7 @@ const listAvailabilityRoute = createRoute(withMcpMetadata({
     operationId: 'listRecurringAvailability',
     tags: ['bookings'],
     summary: 'List recurring weekly availability',
-    description: 'Returns the recurring weekly availability slots for an inspector. Defaults to the caller; admins can query any inspector via the inspectorId query parameter.',
+    description: 'Returns the recurring weekly availability slots for an inspector. Defaults to the caller; owners, managers and anyone holding the scheduleOthers capability can query any inspector via the inspectorId query parameter.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         query: z.object({
@@ -88,7 +89,7 @@ const listOverridesRoute = createRoute(withMcpMetadata({
     operationId: 'listAvailabilityOverrides',
     tags: ['bookings'],
     summary: 'List availability override entries',
-    description: 'Returns availability override entries (blocked dates and custom slots) for an inspector. Used by the calendar UI to render day-level adjustments.',
+    description: 'Returns availability override entries (blocked dates and custom slots) for an inspector. Used by the calendar UI to render day-level adjustments. The entries of another inspector need an owner or manager role or the scheduleOthers capability.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         query: z.object({
@@ -170,11 +171,10 @@ export const availabilityRoutes = createApiRouter()
         const db = getDrizzle(c);
         const tenantId = c.get('tenantId');
         const user = c.get('user');
-        const userRole = c.get('userRole');
         const { inspectorId: queryId } = c.req.valid('query');
 
-        if (queryId && queryId !== user.sub && !isAdminRole(userRole)) {
-            throw deniedByRule(c, 'You can only view your own availability', 'An owner or manager');
+        if (queryId && queryId !== user.sub && !await canViewOthersCalendar(c)) {
+            throw deniedByRule(c, 'You can only view your own availability', 'An owner, a manager or someone with the scheduleOthers capability');
         }
 
         const inspectorId = queryId || user.sub;
@@ -213,11 +213,10 @@ export const availabilityRoutes = createApiRouter()
         const db = getDrizzle(c);
         const tenantId = c.get('tenantId');
         const user = c.get('user');
-        const userRole = c.get('userRole');
         const { inspectorId: queryId } = c.req.valid('query');
 
-        if (queryId && queryId !== user.sub && !isAdminRole(userRole)) {
-            throw deniedByRule(c, 'You can only view your own availability', 'An owner or manager');
+        if (queryId && queryId !== user.sub && !await canViewOthersCalendar(c)) {
+            throw deniedByRule(c, 'You can only view your own availability', 'An owner, a manager or someone with the scheduleOthers capability');
         }
 
         const inspectorId = queryId || user.sub;

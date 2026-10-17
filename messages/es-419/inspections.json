@@ -334,5 +334,7 @@
   "inspections_repair_log_items_one": "1 elemento",
   "inspections_repair_log_items_other": "{count} elementos",
   "inspections_repair_log_list_empty": "Esta lista se creó y no se le agregó nada.",
-  "inspections_repair_log_ask_heading": "Solicitó"
+  "inspections_repair_log_ask_heading": "Solicitó",
+  "inspections_list_empty_restricted_title": "Aún no tiene inspecciones asignadas",
+  "inspections_list_empty_restricted_desc": "Un gerente puede asignarle una."
 }

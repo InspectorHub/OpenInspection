@@ -175,7 +175,11 @@ export function matchTemplate(
 ): MatchableTemplate | null {
     const mine = getCapabilities(role, overrides);
     const ordered = [...templates].sort((x, y) => Number(x.system) - Number(y.system));
-    return ordered.find((t) => t.baseRole === role && sameCaps(mine, getCapabilities(t.baseRole, t.overrides))) ?? null;
+    // Which inspections a person sees is a choice made beside the template, not part of it, so a template
+    // is compared as if it carried the person's own scope: an inspector restricted to their assignments
+    // still matches the template they started from.
+    const withMyScope = (t: MatchableTemplate) => getCapabilities(t.baseRole, { ...t.overrides, viewAllInspections: mine.viewAllInspections });
+    return ordered.find((t) => t.baseRole === role && sameCaps(mine, withMyScope(t))) ?? null;
 }
 
 /** System templates in the shape `matchTemplate` takes. */

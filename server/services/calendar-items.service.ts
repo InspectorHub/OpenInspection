@@ -13,6 +13,7 @@ import {
     loadTenantHolidayConfig,
     resolveCompanyClosedDatesInRange,
 } from '../lib/holidays/load-tenant-holidays';
+import { visibleInspectionIds, visibleInspectionsCondition, type InspectionScope } from '../lib/inspection/visibility';
 import { epochMsToRfc3339, resolveTenantTimeZone, wallClockToEpochMs } from '../lib/tz';
 
 /** Civil date (YYYY-MM-DD) + wall-clock (HH:MM) of an instant in `tz`. */
@@ -179,6 +180,7 @@ export async function listCalendarItems(
     database: D1Database,
     tenantId: string,
     input: ListCalendarItemsInput,
+    scope: InspectionScope,
 ): Promise<CalendarItem[]> {
     const db = drizzle(database);
     const range = toRange(input);
@@ -207,6 +209,9 @@ export async function listCalendarItems(
                 inArray(inspectionInspectors.userId, selectedUsers),
             )
             : undefined,
+        // Never wider than the inspection list: a stale `inspector_id` the roster has since overruled
+        // would otherwise put a colleague's job on a restricted person's calendar.
+        visibleInspectionsCondition(db, scope, tenantId),
     );
 
     const inspectionRows = await db.select({
@@ -251,6 +256,7 @@ export async function listCalendarItems(
         });
     }
 
+    const visibleEventInspections = visibleInspectionIds(db, scope, tenantId);
     const eventRows = await db.select({
         id: inspectionEvents.id,
         inspectionId: inspectionEvents.inspectionId,
@@ -272,6 +278,8 @@ export async function listCalendarItems(
             gte(inspectionEvents.scheduledAt, range.startInstant),
             lte(inspectionEvents.scheduledAt, range.endInstant),
             selectedUsers ? inArray(inspectionEvents.inspectorId, selectedUsers) : undefined,
+            // A visit is as visible as the inspection it belongs to, whoever is named on the visit.
+            visibleEventInspections ? inArray(inspectionEvents.inspectionId, visibleEventInspections) : undefined,
         ))
         .orderBy(asc(inspectionEvents.scheduledAt), asc(inspectionEvents.id));
 
