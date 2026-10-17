@@ -14,6 +14,7 @@ import { enforceTenantActive } from './lib/middleware/tenant-status-guard';
 import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
 import { registerReportAuthoringGuard } from './lib/inspection/report-authoring-guard';
+import { registerInspectionScopeGuards } from './lib/middleware/inspection-scope';
 import { tenantRouter } from './features/tenant-routing';
 import { diMiddleware } from './lib/middleware/di';
 import { checkRateLimit } from './lib/rate-limit';
@@ -297,6 +298,8 @@ app.use('*', inspectorPaletteMiddleware);
 // so TeamStrip's "last active Nm ago" pill stays accurate without hammering
 // D1 on every fetch.
 app.use('/api/*', touchLastActiveMiddleware);
+// Ahead of the report-authoring guard and every router: a refusal for an inspection the caller cannot see must come before any capability refusal.
+registerInspectionScopeGuards(app);
 registerReportAuthoringGuard(app);
 
 // API Routes
