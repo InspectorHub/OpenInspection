@@ -13,6 +13,8 @@ import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
 import { deniedNeedsPermission } from '../lib/permission-denied';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { assertInspectionVisible, requireVisibleContact, resolveInspectionScope } from '../lib/inspection/visibility';
+import { getDrizzle } from '../lib/route-helpers';
 
 // ── Company inbox routes (Track D, design §3.9) — mounted at /api/messages ────
 // Threads are contact-keyed, so the company-wide Conversations view is
@@ -38,7 +40,7 @@ const listThreadsRoute = createRoute(withMcpMetadata({
     },
     operationId: 'listMessageThreads',
     summary: 'Company-wide message inbox: one row per contact thread',
-    description: 'Per-contact thread summaries across every inspection and the no-inspection outreach rows, newest activity first.',
+    description: 'Per-contact thread summaries across every inspection and the no-inspection outreach rows, newest activity first. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 const getThreadRoute = createRoute(withMcpMetadata({
@@ -58,7 +60,7 @@ const getThreadRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getMessageThread',
     summary: "One contact's full thread (marks it read)",
-    description: "Every message with this contact — across inspections and the rows with no inspection attached — oldest first. Reading it marks the thread's counterparty messages read.",
+    description: "Every message with this contact — across inspections and the rows with no inspection attached — oldest first. Reading it marks the thread's counterparty messages read. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.",
 }, { scopes: ['read'], tier: 'extended' }));
 
 const sendThreadRoute = createRoute(withMcpMetadata({
@@ -78,24 +80,27 @@ const sendThreadRoute = createRoute(withMcpMetadata({
     },
     operationId: 'sendMessageThread',
     summary: 'Send into a contact thread, optionally mentioning an inspection',
-    description: 'Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet.',
+    description: 'Owner and manager, and inspectors who work an inspection the contact is on or hold scheduleOthers (a contact on no inspection yet is open to all staff); other inspectors get 403. Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const messageThreadRoutes = createApiRouter()
     .openapi(listThreadsRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const threads = await c.var.services.message.listThreads(tenantId);
+        const threads = await c.var.services.message.listThreads(tenantId, await resolveInspectionScope(c));
         return c.json({ success: true as const, data: threads }, 200);
     })
     .openapi(getThreadRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { contactId } = c.req.valid('param');
         const svc = c.var.services.message;
+        const scope = await resolveInspectionScope(c);
+        // A contact outside the caller's scope answers exactly like one that does not exist.
+        await requireVisibleContact(getDrizzle(c), scope, tenantId, contactId);
         const contact = await svc.contactById(tenantId, contactId);
         if (!contact) throw Errors.NotFound('Contact not found');
-        const messages = await svc.listThreadForContact(tenantId, contactId);
-        // Reading stays company-wide; clearing the counts belongs to whoever works the contact.
-        if (await mayActOnContact(c, contactId)) await svc.markContactThreadReadForStaff(tenantId, contactId);
+        const messages = await svc.listThreadForContact(tenantId, contactId, scope);
+        // Clearing the counts belongs to whoever works the contact, and only ever clears what the caller could read.
+        if (await mayActOnContact(c, contactId)) await svc.markContactThreadReadForStaff(tenantId, contactId, scope);
         return c.json({ success: true as const, data: { contact: { contactId: contact.contactId, name: contact.name, email: contact.email }, messages } }, 200);
     })
     .openapi(sendThreadRoute, async (c) => {
@@ -104,6 +109,10 @@ export const messageThreadRoutes = createApiRouter()
         const { body, inspectionId } = c.req.valid('json');
         const jwtUser = c.get('user');
         const svc = c.var.services.message;
+        const scope = await resolveInspectionScope(c);
+        await requireVisibleContact(getDrizzle(c), scope, tenantId, contactId);
+        // A mentioned inspection the caller cannot see is not found, however the rest of the request reads.
+        if (inspectionId) await assertInspectionVisible(getDrizzle(c), scope, tenantId, inspectionId);
         const contact = await svc.contactById(tenantId, contactId);
         if (!contact) throw Errors.NotFound('Contact not found');
         // Messaging a client is the assignee's act: the thread's contact must be on one of the

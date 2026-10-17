@@ -27,6 +27,7 @@ import { qboPaymentKey } from '../lib/qbo-payment-key';
 import invoicePaymentRoutes from './invoices/payments';
 
 import { fireAndForget } from '../lib/fire-and-forget';
+import { ALL_INSPECTIONS, resolveInspectionScope } from '../lib/inspection/visibility';
 
 const listInvoicesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
@@ -44,7 +45,7 @@ const listInvoicesRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listInvoices",
-    description: "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the company-finance capability and the owner, manager or inspector role. Not paged."
+    description: "Lists all of the company's invoices, newest first, including voided ones (status void). Amounts are integer cents. Requires the company-finance capability and the owner, manager or inspector role. Not paged. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'primary', capability: 'companyFinance' }));
 
 const createInvoiceRoute = createRoute(withMcpMetadata({
@@ -136,7 +137,7 @@ const invoiceRoutes = createApiRouter()
     // with its own `companyFinance` capability gate. See ./invoices/payments.
     .route('/', invoicePaymentRoutes)
     .openapi(listInvoicesRoute, async (c) => {
-        const rows = await c.var.services.invoice.listInvoices(c.get('tenantId'));
+        const rows = await c.var.services.invoice.listInvoices(c.get('tenantId'), await resolveInspectionScope(c));
         return c.json({ success: true as const, data: rows }, 200);
     })
     .openapi(createInvoiceRoute, async (c) => {
@@ -175,7 +176,8 @@ const invoiceRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         await c.var.services.invoice.markSent(id, tenantId);
         if (c.env.QBO_CLIENT_ID) {
-            const inv = (await c.var.services.invoice.listInvoices(tenantId)).find(
+            // Owner and manager only (the route's role gate), so this is the whole company on purpose.
+            const inv = (await c.var.services.invoice.listInvoices(tenantId, ALL_INSPECTIONS)).find(
                 (i: Awaited<ReturnType<typeof c.var.services.invoice.listInvoices>>[number]) => i.id === id,
             );
             if (inv) {

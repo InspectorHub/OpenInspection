@@ -23,6 +23,8 @@ import {
 } from '../lib/validations/inspection-request.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { moneyView } from "../lib/auth/money-access";
+import { requireVisibleInspection, resolveInspectionScope } from "../lib/inspection/visibility";
+import { getDrizzle } from "../lib/route-helpers";
 
 const listRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
@@ -38,7 +40,7 @@ const listRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listInspectionRequests",
-    description: "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles."
+    description: "Lists the company's inspection requests (a client, property and schedule with the inspections grouped under it), each with its inspections and their template names. Newest scheduled date first, paged with limit and offset. Filter by status and by a scheduled-date range (from and to, both inclusive). Note that total in the response is the number of requests on this page, not the count across all pages. Read-only. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const detailRoute = createRoute(withMcpMetadata({
@@ -55,7 +57,7 @@ const detailRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getInspectionRequest",
-    description: "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles."
+    description: "Returns one inspection request with its inspections, each with the inspection's template name. Returns 404 when the id is not a request of this company. Read-only. Available to owner, manager and inspector roles. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // Sprint 2 S2-2 — resolve the parent request for an inspection.
@@ -84,7 +86,7 @@ const byInspectionRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getInspectionRequestByInspection",
-    description: "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles."
+    description: "Finds the parent request of an inspection, with all of its inspections, so a caller can show sibling inspections from the same booking. Returns 200 with request null (not 404) when the inspection has no parent request, which is the case for inspections created singly, or when the inspection id does not exist in this company. Read-only. Available to owner, manager and inspector roles. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const createReqRoute = createRoute(withMcpMetadata({
@@ -181,7 +183,7 @@ const inspectionRequestsRoutes = createApiRouter()
         if (q.status) filter.status = q.status;
         if (q.from)   filter.from   = q.from;
         if (q.to)     filter.to     = q.to;
-        const rows = await c.var.services.inspectionRequest.list(tenantId, filter);
+        const rows = await c.var.services.inspectionRequest.list(tenantId, await resolveInspectionScope(c), filter);
         // `InspectionRequestListResponseSchema` puts `{ requests, total }` INSIDE
         // `data` — that is what the OpenAPI document publishes and what
         // `packages/api-types` exports. The handler had drifted to the bare
@@ -195,14 +197,17 @@ const inspectionRequestsRoutes = createApiRouter()
     .openapi(detailRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const request = await c.var.services.inspectionRequest.get(tenantId, id);
+        const request = await c.var.services.inspectionRequest.get(tenantId, id, await resolveInspectionScope(c));
         if (!request) throw Errors.NotFound('Inspection request not found');
         return c.json({ success: true, data: await moneyView(c, { request }, 'inspectionFees') }, 200);
     })
     .openapi(byInspectionRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { inspectionId } = c.req.valid('param');
-        const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId);
+        const scope = await resolveInspectionScope(c);
+        // For a restricted caller an inspection that is hidden and one that does not exist answer alike.
+        await requireVisibleInspection(getDrizzle(c), scope, tenantId, inspectionId);
+        const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId, scope);
         return c.json({ success: true as const, data: await moneyView(c, { request: request ?? null }, 'inspectionFees') }, 200);
     })
     .openapi(createReqRoute, async (c) => {

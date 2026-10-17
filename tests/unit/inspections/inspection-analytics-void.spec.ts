@@ -14,6 +14,7 @@ import { InspectionAnalyticsService } from '../../../server/services/inspection/
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
@@ -86,7 +87,7 @@ describe('InspectionAnalyticsService — voided invoice exclusion', () => {
             createdAt: new Date(),
         } as never);
 
-        const result = await svc.getDashboardBuckets(TENANT);
+        const result = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
 
         const row = result.needsAttention.find(r => r.id === INSP_B);
         expect(row).toBeUndefined();
@@ -104,7 +105,7 @@ describe('InspectionAnalyticsService — voided invoice exclusion', () => {
             createdAt: new Date(),
         } as never);
 
-        const result = await svc.getDashboardBuckets(TENANT);
+        const result = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
 
         const row = result.needsAttention.find(r => r.id === INSP_B);
         // A real overdue invoice must flag the row — confirms the predicate didn't break the happy path.

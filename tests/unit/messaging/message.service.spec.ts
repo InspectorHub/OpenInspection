@@ -10,6 +10,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 describe('MessageService', () => {
     let svc: MessageService;
@@ -56,7 +57,7 @@ describe('MessageService', () => {
         await svc.createMessage({ tenantId: 't1', inspectionId: 'i1', contactId: 'c1', fromRole: 'client', body: 'hi', attachments: [] });
         await svc.createMessage({ tenantId: 't1', inspectionId: 'i1', contactId: 'c2', fromRole: 'agent', body: 'report?', attachments: [] });
         await svc.createMessage({ tenantId: 't1', inspectionId: 'i1', contactId: 'c1', fromRole: 'inspector', body: 'hi back', attachments: [] });
-        const count = await svc.unreadCountForTenant('t1');
+        const count = await svc.unreadCountForTenant('t1', ALL_INSPECTIONS);
         expect(count).toBe(2);
     });
 
@@ -194,7 +195,7 @@ describe('MessageService', () => {
         });
 
         it('summarises one row per contact, newest activity first, with unread counts', async () => {
-            const threads = await svc.listThreads('t1');
+            const threads = await svc.listThreads('t1', ALL_INSPECTIONS);
             expect(threads.map(t => t.contactId)).toEqual(['ct-b', 'ct-a']);
             const a = threads.find(t => t.contactId === 'ct-a')!;
             expect(a.contactName).toBe('Ann');
@@ -204,7 +205,7 @@ describe('MessageService', () => {
         });
 
         it('the contact thread INCLUDES rows with no inspection attached', async () => {
-            const rows = await svc.listThreadForContact('t1', 'ct-a');
+            const rows = await svc.listThreadForContact('t1', 'ct-a', ALL_INSPECTIONS);
             expect(rows.map(r => r.body)).toEqual(['first', 'pre-booking note']);
             expect(rows[1].inspectionId).toBeNull();
             // …and an attached inspection resolves its address for the mention link.
@@ -212,15 +213,15 @@ describe('MessageService', () => {
         });
 
         it('markContactThreadReadForStaff clears one thread and leaves the other', async () => {
-            await svc.markContactThreadReadForStaff('t1', 'ct-a');
-            const threads = await svc.listThreads('t1');
+            await svc.markContactThreadReadForStaff('t1', 'ct-a', ALL_INSPECTIONS);
+            const threads = await svc.listThreads('t1', ALL_INSPECTIONS);
             expect(threads.find(t => t.contactId === 'ct-a')!.unread).toBe(0);
             expect(threads.find(t => t.contactId === 'ct-b')!.unread).toBe(1);
         });
 
         it('unreadCountForTenant covers the no-inspection rows too', async () => {
             await svc.createMessage({ tenantId: 't1', inspectionId: null, contactId: 'ct-b', fromRole: 'client', fromName: 'Bob', body: 'outreach reply', attachments: [] });
-            expect(await svc.unreadCountForTenant('t1')).toBe(3);
+            expect(await svc.unreadCountForTenant('t1', ALL_INSPECTIONS)).toBe(3);
         });
     });
 });

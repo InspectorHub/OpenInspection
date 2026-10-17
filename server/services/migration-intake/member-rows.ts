@@ -1,6 +1,7 @@
 import type { migrationRows } from '../../lib/db/schema';
 import { TeamService } from '../team.service';
 import { isCeilingRefusal, type GrantActor } from '../../lib/auth/grant-ceiling';
+import { pickSettable } from '../../lib/auth/capabilities';
 import { writeAuditRow } from '../../lib/audit';
 import { logger } from '../../lib/logger';
 import { asBundleMemberRole, type BundleMember } from '../../lib/migration-intake/bundle';
@@ -78,7 +79,7 @@ export async function applyMemberRow(
             tenantId: params.tenantId,
             email: payload.email,
             role,
-            permissionOverrides: payload.permissionOverrides ?? null,
+            permissionOverrides: pickSettable(payload.permissionOverrides),
             actor: params.actor,
         });
     } catch (err) {

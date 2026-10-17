@@ -60,6 +60,7 @@ describe('GET /api/billing/summary', () => {
         });
         app.use('*', async (c, next) => {
             c.set('profile', profile);
+            c.set('userRole', 'owner');
             if (tenantId) c.set('tenantId', tenantId);
             await next();
         });

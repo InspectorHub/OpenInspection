@@ -311,6 +311,9 @@ type AppVariables = AuthVariables & {
      *  filled from the company's stored values. Absent when it did not run or the
      *  company has none; every other secret in `c.env` is the deployment's. */
     tenantSecretKeys?: readonly string[];
+    /** Which inspections this request's caller can see, resolved once per request by
+     *  `resolveInspectionScope` (lib/inspection/visibility.ts). Absent until something asks. */
+    inspectionScope?: import('../lib/inspection/visibility').InspectionScope;
 };
 
 /**

@@ -7,6 +7,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const T = '11111111-1111-1111-1111-1111111111f1';
 const INSP = '99999999-9999-9999-9999-999999999991';
@@ -86,13 +87,13 @@ describe('ContactService archive + agent-email immutability', () => {
 
   it('listContacts excludes archived rows', async () => {
     await svc.deleteContact(AGENT, T);
-    const rows = await svc.listContacts(T, { limit: 50, offset: 0 });
+    const rows = await svc.listContacts(T, { limit: 50, offset: 0 }, ALL_INSPECTIONS);
     expect(rows.map((r) => r.id)).not.toContain(AGENT);
     expect(rows.map((r) => r.id)).toContain(CLIENT);
   });
 
   it('listContacts reports referralCount (buyer_agent) distinct from inspectionCount (①)', async () => {
-    const rows = await svc.listContacts(T, { type: 'agent', limit: 50, offset: 0 });
+    const rows = await svc.listContacts(T, { type: 'agent', limit: 50, offset: 0 }, ALL_INSPECTIONS);
     const agent = rows.find((r) => r.id === AGENT)!;
     expect(agent.inspectionCount).toBe(1);
     expect(agent.referralCount).toBe(1);

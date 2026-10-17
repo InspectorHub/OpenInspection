@@ -43,11 +43,12 @@ async function logTest(
 const statusRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/status',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     tags: ['integrations'],
     summary: 'Snapshot of every integration for the active tenant',
     responses: { 200: { description: 'ok' } },
     operationId: 'listIntegrationStatus',
-    description: 'Returns a per-integration enabled/configured status row for the active tenant. Drives the integrations overview grid on the settings page.',
+    description: 'Returns a per-integration enabled/configured status row for the active tenant. Drives the integrations overview grid on the settings page. Available to owner, manager and inspector roles.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 // ─── POST /stripe/test ────────────────────────────────────────────────────────

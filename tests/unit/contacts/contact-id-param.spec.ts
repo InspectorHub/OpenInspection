@@ -45,7 +45,7 @@ describe('contact id param accepts any opaque id', () => {
         );
 
         expect(res.status).toBe(200);
-        expect(listAccess).toHaveBeenCalledWith(OPAQUE_ID, 't1');
+        expect(listAccess).toHaveBeenCalledWith(OPAQUE_ID, 't1', { kind: 'all' });
     });
 
     it('POST /{id}/access/revoke does not reject a non-UUID id', async () => {

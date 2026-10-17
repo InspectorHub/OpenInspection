@@ -18,6 +18,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const TENANT_B = '00000000-0000-0000-0000-000000000002';
@@ -68,25 +69,25 @@ describe('ContactService.listContacts inspectionCount', () => {
     });
 
     it('counts client inspections via inspection_people within tenant', async () => {
-        const rows = await svc.listContacts(TENANT_A, { type: 'client', limit: 50, offset: 0 });
+        const rows = await svc.listContacts(TENANT_A, { type: 'client', limit: 50, offset: 0 }, ALL_INSPECTIONS);
         const jane = rows.find(r => r.id === CLIENT_JANE);
         expect(jane?.inspectionCount).toBe(2);
     });
 
     it('returns 0 for contacts with no inspection_people rows', async () => {
-        const rows = await svc.listContacts(TENANT_A, { type: 'client', limit: 50, offset: 0 });
+        const rows = await svc.listContacts(TENANT_A, { type: 'client', limit: 50, offset: 0 }, ALL_INSPECTIONS);
         const noEmail = rows.find(r => r.id === CLIENT_NO_EMAIL);
         expect(noEmail?.inspectionCount).toBe(0);
     });
 
     it('agent counts via inspection_people too — uniform path, no agent/client branching', async () => {
-        const rows = await svc.listContacts(TENANT_A, { type: 'agent', limit: 50, offset: 0 });
+        const rows = await svc.listContacts(TENANT_A, { type: 'agent', limit: 50, offset: 0 }, ALL_INSPECTIONS);
         const bob = rows.find(r => r.id === AGENT_BOB);
         expect(bob?.inspectionCount).toBe(1);
     });
 
     it('does not count cross-tenant inspection_people rows', async () => {
-        const rows = await svc.listContacts(TENANT_B, { type: 'client', limit: 50, offset: 0 });
+        const rows = await svc.listContacts(TENANT_B, { type: 'client', limit: 50, offset: 0 }, ALL_INSPECTIONS);
         expect(rows.length).toBe(0); // no contacts seeded in B
     });
 });

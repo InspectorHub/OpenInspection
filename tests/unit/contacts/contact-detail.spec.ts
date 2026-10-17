@@ -18,6 +18,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER = '00000000-0000-0000-0000-0000000000ff';
@@ -71,7 +72,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         await people.addPerson(TENANT, 'insp-both', 'client-1', roleProfileId('client'));
         await people.addPerson(TENANT, 'insp-both', 'client-1', roleProfileId('co_client'));
 
-        const detail = await svc.getContactDetail('client-1', TENANT);
+        const detail = await svc.getContactDetail('client-1', TENANT, ALL_INSPECTIONS);
         expect(detail).not.toBeNull();
         if (!detail) throw new Error('unreachable');
 
@@ -104,7 +105,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         await people.addPerson(TENANT, 'insp-agent-both', 'agent-1', roleProfileId('buyer_agent'));
         await people.addPerson(TENANT, 'insp-agent-both', 'agent-1', roleProfileId('listing_agent'));
 
-        const detail = await svc.getContactDetail('agent-1', TENANT);
+        const detail = await svc.getContactDetail('agent-1', TENANT, ALL_INSPECTIONS);
         expect(detail).not.toBeNull();
         if (!detail) throw new Error('unreachable');
 
@@ -140,7 +141,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
               lineItems: [], paidAt: null, createdAt: new Date(1000) },
         ]);
 
-        const detail = await svc.getContactDetail('client-rev', TENANT);
+        const detail = await svc.getContactDetail('client-rev', TENANT, ALL_INSPECTIONS);
         expect(detail).not.toBeNull();
         if (!detail) throw new Error('unreachable');
 
@@ -177,7 +178,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
               amountCents: 38000, lineItems: [], paidAt: null, createdAt: new Date(1000) },
         ]);
 
-        const detail = await svc.getContactDetail('client-drift', TENANT);
+        const detail = await svc.getContactDetail('client-drift', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
 
         const byId = Object.fromEntries(detail.inspections.map(i => [i.id, i.price]));
@@ -212,7 +213,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
             lineItems: [], paidAt: null, createdAt: new Date(1000),
         });
 
-        const detail = await svc.getContactDetail('client-partial', TENANT);
+        const detail = await svc.getContactDetail('client-partial', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
         expect(detail.inspections[0].paymentStatus).toBe('partial');
         expect(detail.inspections[0].price).toBe(50000);
@@ -232,7 +233,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         });
         await people.addPerson(TENANT, 'insp-noinv', 'client-nocache', roleProfileId('client'));
 
-        const detail = await svc.getContactDetail('client-nocache', TENANT);
+        const detail = await svc.getContactDetail('client-nocache', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
         expect(detail.inspections[0].price).toBe(27500);
     });
@@ -255,7 +256,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
             lineItems: [], paidAt: null, voidedAt: new Date(9000), createdAt: new Date(1000),
         });
 
-        const detail = await svc.getContactDetail('client-void', TENANT);
+        const detail = await svc.getContactDetail('client-void', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
         expect(detail.inspections[0].price).toBe(19900);
     });
@@ -272,7 +273,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         });
         await people.addPerson(TENANT, 'insp-arch', 'client-arch', roleProfileId('client'));
 
-        const detail = await svc.getContactDetail('client-arch', TENANT);
+        const detail = await svc.getContactDetail('client-arch', TENANT, ALL_INSPECTIONS);
         expect(detail).not.toBeNull();
         if (!detail) throw new Error('unreachable');
         expect(detail.contact.archivedAt).not.toBeNull();
@@ -285,7 +286,7 @@ describe('IA-18 — ContactService.getContactDetail', () => {
             email: 'foreign@example.com', createdAt: new Date(),
         });
 
-        expect(await svc.getContactDetail('foreign-1', TENANT)).toBeNull();
-        expect(await svc.getContactDetail('does-not-exist', TENANT)).toBeNull();
+        expect(await svc.getContactDetail('foreign-1', TENANT, ALL_INSPECTIONS)).toBeNull();
+        expect(await svc.getContactDetail('does-not-exist', TENANT, ALL_INSPECTIONS)).toBeNull();
     });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCapabilities, TOGGLEABLE } from '../../../server/lib/auth/capabilities';
+import { getCapabilities, TOGGLEABLE, SETTABLE_CAPABILITIES, VIEW_ALL_SETTABLE, pickSettable } from '../../../server/lib/auth/capabilities';
 
 describe('getCapabilities', () => {
   it('inspector defaults: publish on, schedule self, no company finance, no contacts', () => {
@@ -138,4 +138,33 @@ describe('inspectionFees and companyFinance', () => {
   it('there is no `financial` capability any more', () => {
     expect(TOGGLEABLE).not.toContain('financial' as never);
   });
+});
+
+describe('viewAllInspections', () => {
+    it('defaults on for owner, manager, inspector and staff so deploying changes nothing', () => {
+        for (const r of ['owner', 'manager', 'inspector', 'staff'] as const) expect(getCapabilities(r, null).viewAllInspections).toBe(true);
+    });
+    it('is pinned off for agent even when an override grants it', () => {
+        expect(getCapabilities('agent', { viewAllInspections: true }).viewAllInspections).toBe(false);
+    });
+    it('is pinned on for owner, manager and staff, but an inspector can be restricted', () => {
+        expect(getCapabilities('owner', { viewAllInspections: false }).viewAllInspections).toBe(true);
+        expect(getCapabilities('manager', { viewAllInspections: false }).viewAllInspections).toBe(true);
+        expect(getCapabilities('staff', { viewAllInspections: false }).viewAllInspections).toBe(true);
+        expect(getCapabilities('inspector', { viewAllInspections: false }).viewAllInspections).toBe(false);
+    });
+    it('a restricted inspector loses scheduleOthers even when granted it', () => {
+        const caps = getCapabilities('inspector', { viewAllInspections: false, scheduleOthers: true });
+        expect(caps.scheduleOthers).toBe(false);
+        // control: the same grant on an unrestricted inspector survives
+        expect(getCapabilities('inspector', { scheduleOthers: true }).scheduleOthers).toBe(true);
+    });
+    it('the write surface excludes it until the flag flips, the read surface does not', () => {
+        expect(VIEW_ALL_SETTABLE).toBe(false);
+        expect(SETTABLE_CAPABILITIES).not.toContain('viewAllInspections');
+        expect(TOGGLEABLE).toContain('viewAllInspections');
+        expect(pickSettable({ viewAllInspections: false, publish: false })).toEqual({ publish: false });
+        expect(pickSettable({ viewAllInspections: false })).toBeNull();
+        expect(pickSettable(null)).toBeNull();
+    });
 });

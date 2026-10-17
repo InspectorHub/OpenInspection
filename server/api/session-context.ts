@@ -15,7 +15,8 @@ import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { mcpEnabled, oauthProviderEnabled } from '../lib/mcp/flag';
 import { coerceOverrides, getCapabilities, type CapabilitySet } from '../lib/auth/capabilities';
-import { isRole } from '../lib/auth/roles';
+import { isRole, isAdminRole } from '../lib/auth/roles';
+import { ALL_INSPECTIONS, scopeFromCapabilities } from '../lib/inspection/visibility';
 import type { DeploymentProfile } from '../lib/deployment-profile';
 
 /**
@@ -321,11 +322,6 @@ const sessionContextRoutes = createApiRouter()
             termsUrl = links.termsUrl;
         }
 
-        let unreadMessages = 0;
-        try {
-            unreadMessages = await c.var.services.message.unreadCountForTenant(tenantId);
-        } catch { /* badge degrades to 0; the layout must never fail on it */ }
-
         // An unknown role resolves as an inspector rather than throwing: the
         // chrome must still render, and inspector is the least-privileged tier.
         const roleForCaps = isRole(user.role) ? user.role : 'inspector';
@@ -333,6 +329,13 @@ const sessionContextRoutes = createApiRouter()
             roleForCaps,
             coerceOverrides(permissionOverridesRaw),
         );
+
+        // Counted over what this caller can see, from the capabilities just resolved.
+        let unreadMessages = 0;
+        try {
+            const scope = isAdminRole(roleForCaps) ? ALL_INSPECTIONS : scopeFromCapabilities(user.sub, capabilities);
+            unreadMessages = await c.var.services.message.unreadCountForTenant(tenantId, scope);
+        } catch { /* badge degrades to 0; the layout must never fail on it */ }
 
         return c.json({
             success: true,

@@ -7,6 +7,7 @@ import { cloneInsertValues } from './clone-columns';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { getInspectionRoster } from '../../lib/inspection/roster';
 import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
+import type { InspectionScope } from '../../lib/inspection/visibility';
 import type { Inspection, CreateInspectionData } from './shared';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
@@ -62,6 +63,7 @@ export class InspectionCreateVariantsService extends InspectionSubService {
         tenantId: string,
         creatorUserId: string | null,
         input: import('../../lib/validations/wizard.schema').CreateInspectionFromWizardInput,
+        scope: InspectionScope,
     ): Promise<{ id: string }> {
         // `creatorUserId` is null when the creator cannot inspect (an office user):
         // the job is then left unassigned unless team mode names a lead.
@@ -109,6 +111,13 @@ export class InspectionCreateVariantsService extends InspectionSubService {
                 teamFieldsPatched = true;
                 effectiveLead    = input.teamMode ? (input.leadInspectorId ?? creatorUserId) : null;
                 effectiveHelpers = input.teamMode ? (input.helperInspectorIds ?? []) : [];
+                // A creator who can see only their own assignments stays on the roster of what they
+                // create: left off it, the inspection would answer "not found" on the very next request.
+                // They join as a helper, so a lead named in the request stays the lead.
+                if (scope.kind === 'assigned' && creatorUserId === scope.userId
+                    && effectiveLead !== creatorUserId && !effectiveHelpers.includes(creatorUserId)) {
+                    effectiveHelpers = [...effectiveHelpers, creatorUserId];
+                }
             }
             if (Object.keys(patch).length > 0) {
                 await db.update(inspections)

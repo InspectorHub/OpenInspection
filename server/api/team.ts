@@ -25,6 +25,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
 import teamDefaultsRoutes from './team-defaults';
 import teamTwoFactorRoutes from './team-two-factor';
+import { projectMembers } from '../lib/team/member-projection';
 
 /**
  * POST /api/team/payroll-export — the company-level half of #278.
@@ -79,7 +80,7 @@ const listTeamMembersRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "listTeamMembers",
-    description: "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link, returned only to owner and manager callers (an inspector gets an empty invites list, because the accept link is a bearer credential for the invited role); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles; invitations are included for owner and manager only."
+    description: "Lists the company's team: members (non-removed users) with id, name, email, role, permission overrides, whether two-factor sign-in is enabled (the flag only, never secrets), creation time and last active time; the pending invitations, each with its accept link, returned only to owner and manager callers (an inspector gets an empty invites list, because the accept link is a bearer credential for the invited role); and maxUsers, the seat cap (3 when the company has none recorded). Accepted, expired or cancelled invitations are not listed. Not paginated. Read-only. Available to owner, manager and inspector roles; invitations are included for owner and manager only. Callers below owner and manager receive each member's id, name and role only (and email when they hold the scheduleOthers capability), without permission overrides, the two-factor flag, creation time or last active time."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -247,11 +248,18 @@ const teamRoutes = createApiRouter()
         // invitations may see it; anyone else gets members and the seat cap only.
         const role = c.get('userRole');
         const mayViewInvites = isAdminRole(role);
+        // Everyone below the administrator tier gets a reduced roster: id, name and role, plus the
+        // email for someone who schedules for others. Who holds which switch, who has a second
+        // factor and when each colleague was last active are the administrators' to see.
+        const members = projectMembers(activeUsers, {
+            administrator: mayViewInvites,
+            schedulesOthers: mayViewInvites || (await capabilitiesFor(c)).scheduleOthers,
+        });
 
         return c.json({
             success: true,
             data: {
-                members: activeUsers,
+                members,
                 invites: mayViewInvites
                     ? pendingInvites.map((invite) => ({
                         ...invite,

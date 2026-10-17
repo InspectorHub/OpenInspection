@@ -11,6 +11,8 @@ import {
 import { safeISODate } from '../../lib/date';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { qboPaymentKey } from '../../lib/qbo-payment-key';
+import { requireVisibleInvoice, resolveInspectionScope } from '../../lib/inspection/visibility';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * The payment-ledger sub-resource of an invoice — everything under
@@ -56,7 +58,7 @@ const recordOfflinePaymentRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: 'recordInvoiceOfflinePayment',
-    description: 'Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session.',
+    description: 'Appends one payment-ledger row for money received outside the system (cash, cheque, other offline method). The date the money moved is supplied by the caller, never defaulted to now, and the recording user is taken from the session. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 /**
@@ -91,7 +93,7 @@ const correctPaymentRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: 'correctInvoicePayment',
-    description: 'Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did.',
+    description: 'Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
 const listInvoicePaymentsRoute = createRoute(withMcpMetadata({
@@ -110,7 +112,7 @@ const listInvoicePaymentsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: 'listInvoicePayments',
-    description: 'Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute.',
+    description: 'Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['read'], tier: 'extended', capability: 'companyFinance' }));
 
 const invoicePaymentRoutes = createApiRouter()
@@ -121,6 +123,7 @@ const invoicePaymentRoutes = createApiRouter()
         // The recorder is the SESSION, never the body. A money entry nobody is
         // named on cannot be defended when the payment is later disputed.
         const recordedBy = c.get('user')?.sub as string;
+        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
 
         const appended = await c.var.services.invoice.recordOfflinePayment(tenantId, id, {
             amountCents: body.amountCents,
@@ -177,6 +180,7 @@ const invoicePaymentRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { correctedAmountCents, reason } = c.req.valid('json');
         const recordedBy = c.get('user')?.sub as string;
+        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
 
         // The service also re-syncs the report's payment gate: a correction can
         // take an invoice back OUT of paid, which is precisely the state the old
@@ -207,6 +211,7 @@ const invoicePaymentRoutes = createApiRouter()
     })
     .openapi(listInvoicePaymentsRoute, async (c) => {
         const id = c.req.valid('param').id as string;
+        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), id);
         const rows = await c.var.services.invoice.listPayments(c.get('tenantId'), id);
         return c.json({ success: true as const, data: rows }, 200);
     });

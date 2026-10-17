@@ -27,6 +27,7 @@ import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import { moneyView } from '../../lib/auth/money-access';
+import { resolveInspectionScope } from '../../lib/inspection/visibility';
 import { safeISODate } from '../../lib/date';
 import { assertStaffMayMove } from './staff-order-guard';
 
@@ -66,7 +67,7 @@ const dashboardRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "dashboardInspection",
-    description: "Returns the inspection dashboard in one response, as buckets of inspections for the whole company (not filtered to the caller): needsAttention, today, thisWeek (after today through 7 days ahead), later (beyond 7 days, capped at the first 50, with laterTotal giving the full count), recentReports (completed with a published report) and cancelled (cancelled in the last 30 days judged by creation time, at most 20). The today, thisWeek and later buckets exclude cancelled inspections. Each row carries defect counts, agent name and status flags. Also returns conciergePending, the number of agent bookings awaiting inspector approval (0 if that lookup fails), and defectAggregate. needsAttention uses the company's attention thresholds (see the attention thresholds route). Dates are compared as UTC calendar days. Read-only. Available to owner, manager and inspector roles."
+    description: "Returns the inspection dashboard in one response, as buckets of inspections for the whole company (not filtered to the caller), unless the caller's access is limited to the inspections assigned to them, in which case only those: needsAttention, today, thisWeek (after today through 7 days ahead), later (beyond 7 days, capped at the first 50, with laterTotal giving the full count), recentReports (completed with a published report) and cancelled (cancelled in the last 30 days judged by creation time, at most 20). The today, thisWeek and later buckets exclude cancelled inspections. Each row carries defect counts, agent name and status flags. Also returns conciergePending, the number of agent bookings awaiting inspector approval (0 if that lookup fails), and defectAggregate. needsAttention uses the company's attention thresholds (see the attention thresholds route). Dates are compared as UTC calendar days. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -78,7 +79,7 @@ const listInspectionsRoute = createRoute(withMcpMetadata({
     path: '/',
     tags: ["inspections"],
     summary: "List inspections for current tenant",
-    description: 'Retrieve a paginated list of inspections with optional filtering.',
+    description: 'Retrieve a paginated list of inspections with optional filtering. A caller whose access is limited to the inspections assigned to them receives only those; the first page carries counts over the same set.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         query: InspectionListQuerySchema,
@@ -185,7 +186,7 @@ const getCountsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "countsInspection",
-    description: "Returns six counts across all of the company's inspections for the list tabs: all; today (scheduled date is today, UTC); upcoming (dated after today and not completed or cancelled); past (dated before today, or completed or cancelled); needsConfirmation (status scheduled or requested); awaitingReport (completed with the report not yet published). Cancelled inspections are counted in all and past. The tab counts overlap, so they do not sum to all. Read-only. Available to owner, manager and inspector roles."
+    description: "Returns six counts across all of the company's inspections (or, for a caller whose access is limited to the inspections assigned to them, across those) for the list tabs: all; today (scheduled date is today, UTC); upcoming (dated after today and not completed or cancelled); past (dated before today, or completed or cancelled); needsConfirmation (status scheduled or requested); awaitingReport (completed with the report not yet published). Cancelled inspections are counted in all and past. The tab counts overlap, so they do not sum to all. Read-only. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 // IA-6 — GET /api/inspections/schedule-conflicts
@@ -229,12 +230,13 @@ const scheduleConflictsRoute = createRoute(withMcpMetadata({
 const bulkRoutes = createApiRouter()
     .openapi(dashboardRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const buckets  = await c.var.services.inspection.getDashboardBuckets(tenantId);
+        const scope    = await resolveInspectionScope(c);
+        const buckets  = await c.var.services.inspection.getDashboardBuckets(tenantId, scope);
         // Agent Accounts A3 — count concierge bookings awaiting this inspector's
         // approval so the dashboard's UPCOMING card can render the substate line.
         let conciergePending = 0;
         try {
-            const result = await c.var.services.concierge.listAwaitingInspector(tenantId);
+            const result = await c.var.services.concierge.listAwaitingInspector(tenantId, scope);
             conciergePending = result.count;
         } catch (err) {
             logger.warn('inspections.dashboard.concierge.failed', {
@@ -266,12 +268,13 @@ const bulkRoutes = createApiRouter()
             Object.entries(params).filter(([_, v]) => v !== undefined)
         ) as typeof params;
 
-        const result = await service.listInspections(tenantId, serviceParams);
+        const scope = await resolveInspectionScope(c);
+        const result = await service.listInspections(tenantId, serviceParams, scope);
 
         // Add stats on the first page
         let counts;
         if (!params.cursor) {
-            counts = await service.getStats(tenantId);
+            counts = await service.getStats(tenantId, scope);
         }
 
         return c.json({
@@ -369,7 +372,7 @@ const bulkRoutes = createApiRouter()
     })
     .openapi(getCountsRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const counts = await c.var.services.inspection.getCounts(tenantId);
+        const counts = await c.var.services.inspection.getCounts(tenantId, await resolveInspectionScope(c));
         return c.json({ success: true, data: counts });
     })
     // IA-6 — advisory schedule conflict check; placed before /{id} to prevent

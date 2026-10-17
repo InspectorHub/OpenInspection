@@ -38,6 +38,7 @@ import type { TranslationIdentity } from './inspection/report-grain';
 import { InspectionPublishService } from './inspection/inspection-publish.service';
 import { InspectionCoreService } from './inspection/inspection-core.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
+import type { InspectionScope } from '../lib/inspection/visibility';
 import type { CancellationReason } from '../lib/cancellation-reason';
 export {
     resolveCoverUrl,
@@ -90,15 +91,15 @@ export class InspectionService {
     /**
      * Lists inspections with pagination and filtering.
      */
-    async listInspections(tenantId: string, params: InspectionListParams) {
-        return this.core.listInspections(tenantId, params);
+    async listInspections(tenantId: string, params: InspectionListParams, scope: InspectionScope) {
+        return this.core.listInspections(tenantId, params, scope);
     }
 
     /**
      * Fetches counts for the dashboard.
      */
-    async getStats(tenantId: string) {
-        return this.core.getStats(tenantId);
+    async getStats(tenantId: string, scope: InspectionScope) {
+        return this.core.getStats(tenantId, scope);
     }
 
     /** Publish pre-flight gates (pure aggregator in server/lib/preflight.ts). */
@@ -192,8 +193,9 @@ export class InspectionService {
         tenantId: string,
         creatorUserId: string | null,
         input: import('../lib/validations/wizard.schema').CreateInspectionFromWizardInput,
+        scope: InspectionScope,
     ): Promise<{ id: string }> {
-        return this.core.createFromWizard(tenantId, creatorUserId, input);
+        return this.core.createFromWizard(tenantId, creatorUserId, input, scope);
     }
 
     /**
@@ -547,11 +549,11 @@ export class InspectionService {
      * Returns tab counts for the inspection list UI.
      * Single query with 6 conditional aggregates to avoid N+1.
      */
-    async getCounts(tenantId: string): Promise<{
+    async getCounts(tenantId: string, scope: InspectionScope): Promise<{
         all: number; today: number; upcoming: number;
         past: number; needsConfirmation: number; awaitingReport: number;
     }> {
-        return this.analytics.getCounts(tenantId);
+        return this.analytics.getCounts(tenantId, scope);
     }
 
     /**
@@ -693,8 +695,8 @@ export class InspectionService {
      * All filtering is done in-process from a single tenant query.
      * Note: uses the `date` column (TEXT "YYYY-MM-DD") for scheduling logic.
      */
-    async getDashboardBuckets(tenantId: string) {
-        return this.analytics.getDashboardBuckets(tenantId);
+    async getDashboardBuckets(tenantId: string, scope: InspectionScope) {
+        return this.analytics.getDashboardBuckets(tenantId, scope);
     }
 
     /**

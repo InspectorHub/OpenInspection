@@ -16,6 +16,7 @@ import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { hashToken } from '../lib/token-hash';
 import { PeopleService } from './people.service';
+import { visibleInspectionsCondition, type InspectionScope } from '../lib/inspection/visibility';
 import { ContactService } from './contact.service';
 import type { EmailService } from './email.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
@@ -533,7 +534,7 @@ export class ConciergeService {
      * dashboard's UPCOMING substate. Used by GET /api/inspections/dashboard
      * + the dashboard count widget.
      */
-    async listAwaitingInspector(tenantId: string): Promise<{ count: number }> {
+    async listAwaitingInspector(tenantId: string, scope: InspectionScope): Promise<{ count: number }> {
         const db = this.getDrizzle();
         const rows = await db
             .select({ id: inspections.id })
@@ -542,6 +543,8 @@ export class ConciergeService {
                 and(
                     eq(inspections.tenantId, tenantId),
                     eq(inspections.conciergeStatus, 'awaiting_inspector'),
+                    // The dashboard's pending count is over the inspections the caller can see.
+                    visibleInspectionsCondition(db, scope, tenantId),
                 ),
             )
             .all();

@@ -40,6 +40,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS
     app.use('*', async (c, next) => {
         if (tenantId) c.set('tenantId', tenantId);
         c.set('profile', profile);
+        c.set('userRole', 'owner');
         await next();
     });
     app.route('/api/usage', usageRoutes);

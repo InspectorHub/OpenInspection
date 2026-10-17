@@ -9,6 +9,7 @@
  * Read-only — does not call Stripe. Subscription mutations land via
  * the portal's checkout + webhook pipeline (P7 + P8).
  */
+import { requireRole } from '../lib/middleware/rbac';
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { eq } from 'drizzle-orm';
@@ -22,6 +23,7 @@ import { getDrizzle } from '../lib/route-helpers';
 const summaryRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/summary',
+    middleware: [requireRole('owner', 'manager')] as const,
     tags: ["invoices"],
     summary: 'Get tenant seat-quota summary (permanent + guests + cap)',
     responses: {
@@ -29,7 +31,7 @@ const summaryRoute = createRoute(withMcpMetadata({
         404: { description: 'Tenant not found' },
     },
     operationId: "listBillingSummary",
-    description: "Returns the company's seat summary: its tier, the user cap (maxUsers, 1 when unset), and seatsUsed, which counts current non-removed members and excludes invitations not yet accepted. permanent mirrors seatsUsed and guests is always 0, kept only for response shape. When the deployment has a billing portal configured, portalUrl points to its billing page; otherwise it is omitted. Read-only and never contacts a payment provider. The route applies no role check of its own beyond a signed-in session. Returns 404 if the company record is missing."
+    description: "Returns the company's seat summary: its tier, the user cap (maxUsers, 1 when unset), and seatsUsed, which counts current non-removed members and excludes invitations not yet accepted. permanent mirrors seatsUsed and guests is always 0, kept only for response shape. When the deployment has a billing portal configured, portalUrl points to its billing page; otherwise it is omitted. Read-only and never contacts a payment provider. Available to owner and manager roles; inspectors and staff get 403. Returns 404 if the company record is missing."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const billingRoutes = createApiRouter()

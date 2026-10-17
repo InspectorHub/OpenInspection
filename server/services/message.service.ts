@@ -7,6 +7,7 @@ import type { RoleKind } from '../lib/people/role-kinds';
 import { Errors } from '../lib/errors';
 import type { NotificationService } from './notification.service';
 import { PeopleService } from './people.service';
+import { visibleMessagesCondition, type InspectionScope } from '../lib/inspection/visibility';
 
 interface CreateMessageInput {
     tenantId: string;
@@ -84,7 +85,7 @@ export class MessageService {
      * contact: who, their newest message, and how many counterparty rows are
      * unread. Ordered newest-activity first.
      */
-    async listThreads(tenantId: string): Promise<Array<{
+    async listThreads(tenantId: string, scope: InspectionScope): Promise<Array<{
         contactId: string;
         contactName: string | null;
         contactEmail: string | null;
@@ -93,6 +94,9 @@ export class MessageService {
         lastAt: number;
         unread: number;
     }>> {
+        // Both passes read the same visible rows, so a thread's newest line and its unread count
+        // describe what the caller can see and nothing else.
+        const visible = visibleMessagesCondition(this.db(), scope, tenantId);
         const rows = await this.db().select({
             contactId: inspectionMessages.contactId,
             lastAt: sql<number>`max(${inspectionMessages.createdAt})`,
@@ -102,7 +106,7 @@ export class MessageService {
         })
             .from(inspectionMessages)
             .leftJoin(contacts, and(eq(contacts.id, inspectionMessages.contactId), eq(contacts.tenantId, inspectionMessages.tenantId)))
-            .where(eq(inspectionMessages.tenantId, tenantId))
+            .where(and(eq(inspectionMessages.tenantId, tenantId), visible))
             .groupBy(inspectionMessages.contactId)
             .orderBy(sql`max(${inspectionMessages.createdAt}) desc`);
 
@@ -118,7 +122,7 @@ export class MessageService {
                 createdAt: inspectionMessages.createdAt,
             })
                 .from(inspectionMessages)
-                .where(eq(inspectionMessages.tenantId, tenantId))
+                .where(and(eq(inspectionMessages.tenantId, tenantId), visible))
                 .orderBy(inspectionMessages.createdAt);
             for (const r of all) latest.set(r.contactId, { body: r.body, fromRole: r.fromRole });
         }
@@ -141,7 +145,7 @@ export class MessageService {
      * them. Inspection addresses ride along so a mention renders as a link
      * with a human label.
      */
-    async listThreadForContact(tenantId: string, contactId: string) {
+    async listThreadForContact(tenantId: string, contactId: string, scope: InspectionScope) {
         const rows = await this.db().select({
             msg: inspectionMessages,
             propertyAddress: inspections.propertyAddress,
@@ -151,13 +155,13 @@ export class MessageService {
                 eq(inspections.id, inspectionMessages.inspectionId),
                 eq(inspections.tenantId, inspectionMessages.tenantId),
             ))
-            .where(and(eq(inspectionMessages.tenantId, tenantId), eq(inspectionMessages.contactId, contactId)))
+            .where(and(eq(inspectionMessages.tenantId, tenantId), eq(inspectionMessages.contactId, contactId), visibleMessagesCondition(this.db(), scope, tenantId)))
             .orderBy(inspectionMessages.createdAt);
         return rows.map((r) => ({ ...r.msg, propertyAddress: r.propertyAddress ?? null }));
     }
 
     /** Mark one contact's counterparty-authored rows read (staff opened the thread). */
-    async markContactThreadReadForStaff(tenantId: string, contactId: string) {
+    async markContactThreadReadForStaff(tenantId: string, contactId: string, scope: InspectionScope) {
         await this.db().update(inspectionMessages)
             .set({ readAt: new Date() })
             .where(and(
@@ -165,6 +169,8 @@ export class MessageService {
                 eq(inspectionMessages.contactId, contactId),
                 ne(inspectionMessages.fromRole, 'inspector'),
                 isNull(inspectionMessages.readAt),
+                // Only the rows the caller could read: opening a thread must not clear what they never saw.
+                visibleMessagesCondition(this.db(), scope, tenantId),
             ));
     }
 
@@ -220,13 +226,14 @@ export class MessageService {
     }
 
     /** Unread counterparty-authored messages across the tenant (sidebar badge). */
-    async unreadCountForTenant(tenantId: string): Promise<number> {
+    async unreadCountForTenant(tenantId: string, scope: InspectionScope): Promise<number> {
         const [row] = await this.db().select({ c: sql<number>`count(*)` })
             .from(inspectionMessages)
             .where(and(
                 eq(inspectionMessages.tenantId, tenantId),
                 ne(inspectionMessages.fromRole, 'inspector'),
                 isNull(inspectionMessages.readAt),
+                visibleMessagesCondition(this.db(), scope, tenantId),
             ));
         return Number(row?.c ?? 0);
     }

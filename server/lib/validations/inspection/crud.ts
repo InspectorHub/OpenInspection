@@ -3,6 +3,7 @@ import { createApiResponseSchema, SuccessResponseSchema } from '../shared.schema
 import { INSPECTION_STATUSES } from '../../status/inspection-status';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
 import { INSPECTION_PROPERTY_TYPES } from '../../inspection-property-type';
+import { RESERVED_INSPECTION_SEGMENTS } from '../../inspection/reserved-segments';
 
 /**
  * Core Inspection Schema (Output)
@@ -47,7 +48,9 @@ export const InspectionListQuerySchema = z.object({
  * Validation schema for creating a new inspection.
  */
 export const CreateInspectionSchema = z.object({
-    id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Use 1-64 letters, digits, hyphens or underscores').optional()
+    id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/, 'Use 1-64 letters, digits, hyphens or underscores')
+        .refine((id) => !RESERVED_INSPECTION_SEGMENTS.has(id), 'That id is reserved for a route name; choose another')
+        .optional()
         .openapi({ example: '550e8400-e29b-41d4-a716-446655440000' })
         .describe('Client-generated identifier (opaque, safe characters only); repeating a create with the same id returns the existing inspection'),
     propertyAddress: z.string().min(5, 'Property address is too short').openapi({ example: '123 Main St, Anytown' }).describe('Street address of the property to inspect (at least 5 characters).'),

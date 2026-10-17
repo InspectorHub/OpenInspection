@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
 import { capabilityToggleMap } from './admin/compliance';
+import { TOGGLEABLE } from '../auth/capabilities';
 import { MAX_TEMPLATE_NAME_LENGTH, TEMPLATE_ROLES } from '../auth/permission-templates';
 
 /** Body of POST and PUT /api/team/permission-templates. */
@@ -23,7 +24,7 @@ const PermissionTemplateSchema = z.object({
     name: z.string().describe('The template\'s name. For a built-in template this is the English name; the Team page shows a translated one.'),
     description: z.string().nullable().describe('A sentence on what the template is for. Null for a company template.'),
     baseRole: z.enum(TEMPLATE_ROLES).describe('The role a person gets when the template is applied.'),
-    overrides: capabilityToggleMap().describe('Capability switches that differ from the base role\'s defaults, exactly as they are stamped onto an invite or a member.'),
+    overrides: capabilityToggleMap(TOGGLEABLE).describe('Capability switches that differ from the base role\'s defaults, exactly as they are stamped onto an invite or a member.'),
 }).openapi('PermissionTemplate');
 
 export const PermissionTemplateListResponseSchema = createApiResponseSchema(z.object({

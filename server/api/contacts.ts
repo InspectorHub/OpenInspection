@@ -11,6 +11,7 @@ import {
 } from '../lib/validations/contact.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { moneyView } from "../lib/auth/money-access";
+import { resolveInspectionScope } from "../lib/inspection/visibility";
 
 /**
  * `contacts.id` is a TEXT column holding an opaque identifier. Every writer
@@ -40,7 +41,7 @@ const listContactsRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "listContacts",
-    description: "Lists the company's contacts (clients, agents and other parties) with the number of inspections each appears on and, for agents, how many they referred as buyer agent. Live contacts by default; pass archived=only for archived ones. Results are paged with limit and offset and are not explicitly ordered. Available to owner, manager and inspector roles."
+    description: "Lists the company's contacts (clients, agents and other parties) with the number of inspections each appears on and, for agents, how many they referred as buyer agent. Live contacts by default; pass archived=only for archived ones. Results are paged with limit and offset and are not explicitly ordered. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'primary' }));
 
 const getContactDetailRoute = createRoute(withMcpMetadata({
@@ -57,7 +58,7 @@ const getContactDetailRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "getContactDetail",
-    description: "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents)."
+    description: "Returns the contact record, its inspection history (newest first; clients match via clientContactId or legacy clientEmail, agents via referredByAgentId or sellingAgentId), and aggregate stats (inspection count + total paid-invoice revenue in cents). For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
 }, { scopes: ['read'], tier: 'primary' }));
 
 const createContactRoute = createRoute(withMcpMetadata({
@@ -161,7 +162,7 @@ const listContactAccessRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/access',
     tags: ["contacts"],
     summary: "List the live report links a contact still holds",
-    description: 'Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email.',
+    description: 'Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
@@ -224,7 +225,7 @@ const contactRoutes = createApiRouter()
             { limit: q.limit, offset: q.offset, archived: q.archived };
         if (q.type) opts.type = q.type;
         if (q.search) opts.search = q.search;
-        const rows = await c.var.services.contact.listContacts(tenantId, opts);
+        const rows = await c.var.services.contact.listContacts(tenantId, opts, await resolveInspectionScope(c));
         return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
     })
     .openapi(restoreContactRoute, async (c) => {
@@ -236,7 +237,7 @@ const contactRoutes = createApiRouter()
     .openapi(getContactDetailRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const detail = await c.var.services.contact.getContactDetail(id, tenantId);
+        const detail = await c.var.services.contact.getContactDetail(id, tenantId, await resolveInspectionScope(c));
         if (!detail) return c.json({ success: false, error: { message: 'Contact not found', code: 'NOT_FOUND' } }, 404);
         return c.json({ success: true as const, data: {
             ...detail,
@@ -297,7 +298,7 @@ const contactRoutes = createApiRouter()
     .openapi(listContactAccessRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const access = await c.var.services.contact.listAccess(id, tenantId);
+        const access = await c.var.services.contact.listAccess(id, tenantId, await resolveInspectionScope(c));
         if (access === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);
         return c.json({ success: true as const, data: { access } }, 200);
     })

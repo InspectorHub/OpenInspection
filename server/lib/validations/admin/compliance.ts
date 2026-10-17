@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
 import { ROLES, ROLE } from '../../auth/roles';
-import { TOGGLEABLE, type Capability } from '../../auth/capabilities';
+import { TOGGLEABLE, SETTABLE_CAPABILITIES, type Capability } from '../../auth/capabilities';
 
 /** Every role a person can be invited as: the whole vocabulary, minus the per-inspection agent. */
 const INVITABLE_ROLES = ROLES.filter((r): r is Exclude<typeof r, 'agent'> => r !== ROLE.AGENT) as [
@@ -21,12 +21,14 @@ const INVITABLE_ROLES = ROLES.filter((r): r is Exclude<typeof r, 'agent'> => r !
  * the same way. Each call returns a fresh `z.object` so the three consumers do
  * not share one OpenAPI-decorated instance.
  *
- * Parity with `TOGGLEABLE` is asserted by
- * `tests/unit/platform/capability-schema-parity.spec.ts`.
+ * It is derived from `SETTABLE_CAPABILITIES`, the subset a request may write: a capability
+ * whose enforcement is not complete yet is readable everywhere and writable nowhere. A response
+ * passes `TOGGLEABLE` instead, because it must describe what is stored.
+ * Parity with it is asserted by `tests/unit/platform/capability-schema-parity.spec.ts`.
  */
-export function capabilityToggleMap() {
+export function capabilityToggleMap(keys: readonly Capability[] = SETTABLE_CAPABILITIES) {
     return z.object(
-        Object.fromEntries(TOGGLEABLE.map((cap) => [cap, z.boolean().optional()])) as {
+        Object.fromEntries(keys.map((cap) => [cap, z.boolean().optional()])) as {
             [K in Capability]: z.ZodOptional<z.ZodBoolean>;
         },
     );
@@ -54,6 +56,7 @@ export const CAPABILITY_DESCRIPTIONS: Record<Capability, string> = {
     templateImport:    'May bring a template in from a Spectora export or the content marketplace.',
     deleteInspection:  'May permanently delete an inspection, its report data and its media.',
     editReports:       'May write report content: results, media, units, statutory and compliance inputs and cost items.',
+    viewAllInspections: 'May see every inspection in the company. When off, only inspections assigned to this person are visible.',
 };
 
 /**
@@ -248,20 +251,20 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
     members: z.array(z.object({
         id: z.string().trim().min(1),
         name: z.string().nullable().describe("The member's display name; null when never set (renders as 'Unnamed')."),
-        email: z.string(),
+        email: z.string().optional().describe('Email address. Left out for a caller who is neither an administrator nor allowed to schedule for others.'),
         role: z.string(),
         // Named bits, not `z.record(z.string(), z.boolean())`. The column holds a
         // SPARSE map (`PermissionOverrides` = `Partial<CapabilitySet>`), so a
         // record-of-required-booleans described a payload the server never sends
         // and left the toggle names undiscoverable in the OpenAPI document. The
         // names come from TOGGLEABLE, so read and write describe one set.
-        permissionOverrides: capabilityToggleMap().nullable().optional()
+        permissionOverrides: capabilityToggleMap(TOGGLEABLE).nullable().optional()
             .describe("Capability toggles that differ from this member's role template, or null when they match it exactly."),
         // The FLAG only. Never the secret and never the recovery-code hashes:
         // this list is readable by every inspector, and the page needs exactly
         // one bit — whether there is a second factor for an owner to clear.
-        totpEnabled: z.boolean().describe('Whether this member has two-factor authentication enrolled. An owner can clear it from the team page when they have lost both their authenticator and their recovery codes.'),
-        createdAt: z.string(),
+        totpEnabled: z.boolean().optional().describe('Whether this member has two-factor authentication enrolled. An owner can clear it from the team page when they have lost both their authenticator and their recovery codes. Left out for callers below owner and manager.'),
+        createdAt: z.string().optional().describe('When the member joined. Left out for callers below owner and manager.'),
     })),
     invites: z.array(z.object({
         id: z.string(),

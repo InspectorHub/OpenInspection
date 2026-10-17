@@ -23,6 +23,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const T1 = 't1-core-reads';
 const CLIENT = 'contact-client-core-reads';
@@ -97,7 +98,7 @@ describe('InspectionCoreService.getInspection / .listInspections — primary-cli
     describe('listInspections', () => {
         it('sources each row\'s clientName/clientEmail from the inspection_people primary-client join (single LEFT JOIN, not N+1)', async () => {
             const svc = makeSvc();
-            const { inspections } = await svc.listInspections(T1, { limit: 20 });
+            const { inspections } = await svc.listInspections(T1, { limit: 20 }, ALL_INSPECTIONS);
             expect(inspections).toHaveLength(2);
 
             const withClient = inspections.find(i => i.id === INSP_WITH_CLIENT);
@@ -114,14 +115,14 @@ describe('InspectionCoreService.getInspection / .listInspections — primary-cli
             // "Jane Client" is seeded exclusively via inspection_people ->
             // contacts; `inspections` has no client_name column to fall back
             // on, so search must find it through the primary-client join.
-            const { inspections } = await svc.listInspections(T1, { limit: 20, search: 'Jane' });
+            const { inspections } = await svc.listInspections(T1, { limit: 20, search: 'Jane' }, ALL_INSPECTIONS);
             expect(inspections.map(i => i.id)).toEqual([INSP_WITH_CLIENT]);
 
-            const noMatch = await svc.listInspections(T1, { limit: 20, search: 'Nobody Named This' });
+            const noMatch = await svc.listInspections(T1, { limit: 20, search: 'Nobody Named This' }, ALL_INSPECTIONS);
             expect(noMatch.inspections).toHaveLength(0);
 
             // Address search on the same predicate keeps working alongside it.
-            const byAddress = await svc.listInspections(T1, { limit: 20, search: 'Oak Ave' });
+            const byAddress = await svc.listInspections(T1, { limit: 20, search: 'Oak Ave' }, ALL_INSPECTIONS);
             expect(byAddress.inspections.map(i => i.id)).toEqual([INSP_NO_CLIENT]);
         });
     });
