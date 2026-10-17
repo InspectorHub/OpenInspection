@@ -17,7 +17,7 @@ export const PermissionTemplateInputSchema = z.object({
 }).openapi('PermissionTemplateInput');
 
 /** One template in the list: a built-in (system) one or the company's own. */
-export const PermissionTemplateSchema = z.object({
+const PermissionTemplateSchema = z.object({
     id: z.string().describe('The key of a built-in template or the id of a company template. Pass it as templateId on an invite or a member update.'),
     system: z.boolean().describe('True for a built-in template, which cannot be changed or archived.'),
     name: z.string().describe('The template\'s name. For a built-in template this is the English name; the Team page shows a translated one.'),

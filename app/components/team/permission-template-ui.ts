@@ -60,7 +60,7 @@ export function templateDescription(t: Pick<TemplateOption, "id" | "system" | "d
 }
 
 /** The role and resolved switches a template gives. */
-export function templateCapabilities(t: TemplateOption): CapabilitySet {
+function templateCapabilities(t: TemplateOption): CapabilitySet {
   return getCapabilities(t.baseRole, t.overrides);
 }
 
@@ -94,7 +94,7 @@ export function templateBeyondActor(
   return newlyGranted({ from, to: { role: t.baseRole, overrides: t.overrides } }).some((cap) => actor.capabilities?.[cap] !== true);
 }
 
-export function toMatchable(t: TemplateOption): MatchableTemplate {
+function toMatchable(t: TemplateOption): MatchableTemplate {
   return { ref: t.id, system: t.system, name: templateName(t), baseRole: t.baseRole, overrides: t.overrides };
 }
 
