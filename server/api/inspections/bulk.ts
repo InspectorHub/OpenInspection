@@ -28,6 +28,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import { moneyView } from '../../lib/auth/money-access';
 import { resolveInspectionScope } from '../../lib/inspection/visibility';
+import { requireBatchInScope } from './bulk-scope-guard';
 import { safeISODate } from '../../lib/date';
 import { assertStaffMayMove } from './staff-order-guard';
 
@@ -155,7 +156,7 @@ const bulkUpdateRoute = createRoute(withMcpMetadata({
     // {scheduleOthers:true} override. NOTE: this route also serves the
     // updateStatus bulk action, which is correspondingly gated (acceptable —
     // bulk status changes are an admin-grade operation).
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('scheduleOthers')],
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('scheduleOthers'), requireBatchInScope()],
     responses: {
         200: {
             content: {
