@@ -1,5 +1,7 @@
 import { formatRelativeTime } from "~/lib/format";
 import { m } from "~/paraglide/messages";
+import type { createApi } from "~/lib/api-client.server";
+import type { TemplateOption } from "~/components/team/permission-template-ui";
 
 /**
  * What `/team` renders, and the two shapes the API answers with.
@@ -38,6 +40,49 @@ export interface Member {
 
 export interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null; totpEnabled?: boolean; lastActiveAt?: string | null }
 export interface LoaderInvite { id: string; email: string; role: string; expiresAt: string; inviteLink?: string }
+
+/**
+ * The page's rows from the two lists the API returns: active members first, then
+ * pending invitations. Written once here so the loader stays a call and a return.
+ */
+export function toMembers(users: LoaderActiveUser[], invites: LoaderInvite[]): Member[] {
+  const active: Member[] = users.map((u) => ({
+    id: u.id, name: u.name ?? null, email: u.email, role: u.role,
+    // LAST ACTIVE, layer 2 of 2 — this hardcoded null; layer 1 is the service projection, which explains both.
+    status: "active", lastActiveAt: u.lastActiveAt ?? null, token: null, expiresAt: null,
+    inviteLink: null,
+    permissionOverrides: u.permissionOverrides ?? null,
+    totpEnabled: u.totpEnabled === true,
+  }));
+  const pending: Member[] = invites.map((i) => ({
+    id: i.id, name: null, email: i.email, role: i.role,
+    status: "pending", lastActiveAt: null, token: i.id, expiresAt: i.expiresAt,
+    inviteLink: i.inviteLink ?? null,
+    // A pending invite's overrides live on tenant_invites and are replayed
+    // at accept time; there is no member row to edit yet.
+    permissionOverrides: null,
+    // Nobody has enrolled anything until they accept.
+    totpEnabled: false,
+  }));
+  return [...active, ...pending];
+}
+
+/**
+ * The permission templates to offer, built-in then the company's own. Empty when
+ * the caller may not list them (an inspector) or the request fails: the drawers
+ * then show the plain role and switches form, and the page claims nothing about
+ * which template anyone matches. A failure here must not take the roster with it.
+ */
+export async function loadTemplates(api: ReturnType<typeof createApi>): Promise<TemplateOption[]> {
+  try {
+    const res = await api.team["permission-templates"].$get();
+    if (!res.ok) return [];
+    const body = (await res.json()) as unknown as { data?: { templates?: TemplateOption[] } };
+    return body.data?.templates ?? [];
+  } catch {
+    return [];
+  }
+}
 
 export const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "monitor" | "sat" | "gen"> = {
   owner: "primary",

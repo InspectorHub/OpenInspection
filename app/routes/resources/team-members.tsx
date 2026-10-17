@@ -7,6 +7,7 @@
 import type { Route } from "./+types/team-members";
 import { getToken, requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { permissionTemplateIntent } from "../team.templates.server";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
     const token = await getToken(context, request);
@@ -36,7 +37,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     if (intent === "invite") {
         const email = fd.get("email") as string | null;
-        const role = (fd.get("role") ?? "inspector") as string;
+        // Absent when a permission template supplies it. The server falls back to
+        // inspector when neither a role nor a template is given.
+        const role = (fd.get("role") as string | null) || undefined;
+        const templateId = (fd.get("templateId") as string | null) || undefined;
 
         // Absent means TRUE. The checkbox that produces this defaulted to on
         // for its whole life while sending nothing, so "the field is missing"
@@ -61,7 +65,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
         try {
             const res = await api.team.invite.$post({
-                json: { email, role, permissionOverrides, notify } as Parameters<typeof api.team.invite.$post>[0]["json"],
+                json: { email, role, templateId, permissionOverrides, notify } as Parameters<typeof api.team.invite.$post>[0]["json"],
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({})) as { error?: string };
@@ -85,6 +89,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (intent === "update") {
         const id = fd.get("id") as string | null;
         const role = fd.get("role") as string | null;
+        const templateId = (fd.get("templateId") as string | null) || undefined;
         if (!id) return { ok: false, intent, error: "Member id is required", url: null };
 
         // Unlike invite, an ABSENT override payload here means "clear all
@@ -107,7 +112,11 @@ export async function action({ request, context }: Route.ActionArgs) {
         try {
             const res = await api.team.members[":id"].$patch({
                 param: { id },
-                json: { ...(role ? { role } : {}), permissionOverrides } as Parameters<typeof api.team.members[":id"]["$patch"]>[0]["json"],
+                // A template is applied whole: its role and switches stand in for the
+                // drawer's, so no "clear every override" null travels with it.
+                json: (templateId
+                    ? { templateId }
+                    : { ...(role ? { role } : {}), permissionOverrides }) as Parameters<typeof api.team.members[":id"]["$patch"]>[0]["json"],
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({})) as { error?: { message?: string } | string };
@@ -119,6 +128,10 @@ export async function action({ request, context }: Route.ActionArgs) {
             return { ok: false, intent, error: e instanceof Error ? e.message : "Failed", url: null };
         }
     }
+
+    // Saving, renaming and archiving a company permission template.
+    const templateResult = await permissionTemplateIntent(api, intent, fd);
+    if (templateResult) return templateResult;
 
     return { ok: false, intent, error: "Unknown intent", url: null };
 }

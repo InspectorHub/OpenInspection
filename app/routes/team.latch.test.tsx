@@ -30,7 +30,7 @@ describe("/team resend invitation", () => {
             {
                 path: "/team",
                 Component: TeamPage,
-                loader: () => ({ members: [invite], canManage: true, loadFailed: false }),
+                loader: () => ({ members: [invite], templates: [], canManage: true, loadFailed: false }),
                 action: async () => {
                     posts += 1;
                     await new Promise<void>((resolve) => { release = resolve; });

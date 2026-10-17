@@ -34,7 +34,7 @@ function renderTeam(
                 {
                     path: "/team",
                     Component: TeamPage,
-                    loader: () => ({ members: rows, canManage, isOwner, loadFailed: false }),
+                    loader: () => ({ members: rows, templates: [], canManage, isOwner, loadFailed: false }),
                 },
             ],
         },

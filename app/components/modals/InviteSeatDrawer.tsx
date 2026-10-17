@@ -7,9 +7,14 @@ import type { Role as AnyRole } from "../../../server/lib/auth/roles";
 // TOGGLEABLE is still the source of truth for computeOverrideDiff below; the
 // RENDERING now walks CAP_GROUPS so the two drawers cannot group differently.
 import { SeatLimitPanel } from "./SeatLimitPanel";
+import { PermissionTemplatePicker } from "../team/PermissionTemplatePicker";
+import { SaveAsTemplate } from "../team/SaveAsTemplate";
+import { templateMatchesForm, type TemplateOption } from "../team/permission-template-ui";
+import { MAX_COMPANY_TEMPLATES } from "../../../server/lib/auth/permission-templates";
 import { m } from "~/paraglide/messages";
 
 const FORM_ID = "invite-seat-form";
+const NO_TEMPLATES: readonly TemplateOption[] = [];
 
 // Only the roles this drawer can actually offer. `owner` is never selectable
 // here (ownership transfer is not a Team-page action) and `agent` is granted per
@@ -161,9 +166,11 @@ interface InviteSeatDrawerProps {
  seatLimitAtOpen?: { used: number; max: number; billingUrl?: string };
  /** The signed-in person; decides which roles and switches the form offers. */
  actor: DrawerActor | null;
+ /** Built-in and company permission templates to start from. Without any, the form is the plain role + switches form. */
+ templates?: readonly TemplateOption[];
 }
 
-export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor }: InviteSeatDrawerProps) {
+export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templates = NO_TEMPLATES }: InviteSeatDrawerProps) {
  const [email, setEmail] = useState("");
  const [notify, setNotify] = useState(true);
  const [role, setRole] = useState<Role>("inspector");
@@ -172,6 +179,25 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor }: Invi
  // template whenever the role changes (so the disclosure always shows the
  // selected role's defaults until the inviter edits them).
  const [caps, setCaps] = useState(() => getCapabilities("inspector", null));
+ // The permission template the form started from ("" = none). It is a starting
+ // point, copied in: the form below stays editable and, once it no longer shows
+ // what the template gives, reads "Customized" and is sent as plain role + switches.
+ const [templateId, setTemplateId] = useState("");
+ const chosenTemplate = templates.find((t) => t.id === templateId);
+ const customized = chosenTemplate !== undefined && !templateMatchesForm(chosenTemplate, role, caps);
+
+ function changeRole(next: Role) {
+  setRole(next);
+  setCaps(getCapabilities(next, null));
+ }
+
+ function pickTemplate(id: string) {
+  setTemplateId(id);
+  const t = templates.find((x) => x.id === id);
+  if (!t) return;
+  setRole(toDrawerRole(t.baseRole));
+  setCaps(getCapabilities(t.baseRole, t.overrides));
+ }
  const [error, setError] = useState("");
  // At-open seat-limit gate — seeded from the caller-supplied prop every time
  // the drawer opens (not on every re-render) so a tenant already at cap sees
@@ -182,10 +208,6 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor }: Invi
  const emailRef = useRef<HTMLInputElement>(null);
 
  useEffect(() => {
-  setCaps(getCapabilities(role, null));
- }, [role]);
-
- useEffect(() => {
   if (open) setSeatLimit(seatLimitAtOpen);
  }, [open]);
 
@@ -193,7 +215,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor }: Invi
  useEffect(() => {
   const usable = offeredRoles(actor).filter((o) => !roleBeyondActor(actor, o.value, null));
   const first = usable[0];
-  if (first && !usable.some((o) => o.value === role)) setRole(first.value);
+  if (first && !usable.some((o) => o.value === role)) changeRole(first.value);
  }, [actor, role]);
 
  const inviteFetcher = useFetcher<{ ok: boolean; intent?: string | null; error: string | null; url: string | null }>();
@@ -227,13 +249,17 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor }: Invi
   const fd = new FormData();
   fd.append("intent", "invite");
   fd.append("email", email);
-  fd.append("role", role);
+  // A template the form still shows exactly is sent by id, so the invite is recorded
+  // as made from it. Once edited it is plain role + switches ("Customized").
+  const fromTemplate = chosenTemplate !== undefined && !customized;
+  if (fromTemplate) fd.append("templateId", chosenTemplate.id);
+  else fd.append("role", role);
  // Sent explicitly, both ways. This checkbox existed for a long time and was
  // never submitted, so unticking "send email" emailed them anyway; the field
  // is written on every submit now rather than only when false, so the request
  // says what the screen says.
  fd.append("notify", notify ? "true" : "false");
-  if (Object.keys(diff).length > 0) fd.append("permissionOverrides", JSON.stringify(diff));
+  if (!fromTemplate && Object.keys(diff).length > 0) fd.append("permissionOverrides", JSON.stringify(diff));
   inviteFetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
  }
 
@@ -267,9 +293,11 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor }: Invi
  </label>
  </div>
 
+ <PermissionTemplatePicker templates={templates} value={templateId} customized={customized} onChange={pickTemplate} actor={actor} from={null} />
+
  <label className="block">
  <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.modal_invite_role_label()}</span>
- <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => setRole(e.target.value as Role)}>
+ <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => changeRole(e.target.value as Role)}>
  {offeredRoles(actor).map((o) => {
  const beyond = roleBeyondActor(actor, o.value, null);
  return <option key={o.value} value={o.value} disabled={beyond} title={beyond ? m.modal_invite_role_owner_only() : undefined}>{o.label()}</option>;
@@ -317,6 +345,10 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor }: Invi
  </div>
  )}
  </div>
+
+ {templates.length > 0 && (
+ <SaveAsTemplate role={role} overrides={computeOverrideDiff(role, caps)} savedCount={templates.filter((t) => !t.system).length} maxTemplates={MAX_COMPANY_TEMPLATES} />
+ )}
 
  {error && <p className="text-xs text-ih-bad-fg font-semibold">{error}</p>}
  </form>

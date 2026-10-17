@@ -302,5 +302,13 @@
   "settings_profile_statutory_licence_hint": "Se imprime en la casilla “License Type” de los formularios legales. Escriba la clase tal como la nombra la autoridad. No es una certificación de asociación — esas viven en Licencias y afiliaciones.",
   "settings_profile_statutory_qualification_label": "Calificación legal",
   "settings_profile_statutory_qualification_none": "Sin declarar",
-  "settings_profile_statutory_qualification_hint": "La categoría que algunos formularios le piden declarar sobre usted mismo, junto a su licencia y no en su lugar. El texto junto a cada casilla es el del propio formulario; déjela en “Sin declarar” si ningún formulario que produce la pide."
+  "settings_profile_statutory_qualification_hint": "La categoría que algunos formularios le piden declarar sobre usted mismo, junto a su licencia y no en su lugar. El texto junto a cada casilla es el del propio formulario; déjela en “Sin declarar” si ningún formulario que produce la pide.",
+  "settings_team_templates_heading": "Plantillas de permisos",
+  "settings_team_templates_help": "Plantillas que su empresa ha guardado. Elija una al invitar a alguien o al editar a un miembro y rellenará el rol y los permisos; cambiarla o archivarla más adelante no modifica a quienes ya la tienen.",
+  "settings_team_templates_empty": "Todavía no hay plantillas. Defina el rol y los permisos en el formulario de invitación o de edición y elija Guardar como plantilla.",
+  "settings_team_templates_rename": "Cambiar nombre",
+  "settings_team_templates_archive": "Archivar",
+  "settings_team_templates_archive_title": "¿Archivar esta plantilla?",
+  "settings_team_templates_archive_confirm": "{name} ya no se podrá elegir y su nombre se podrá volver a usar. Quienes ya la tienen conservan sus permisos.",
+  "settings_team_templates_limit": "Una empresa puede tener {max} plantillas. Archive una para guardar otra."
 }

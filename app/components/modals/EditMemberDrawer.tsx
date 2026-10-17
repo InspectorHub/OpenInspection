@@ -21,11 +21,16 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
-import { getCapabilities, type CapabilitySet } from "../../../server/lib/auth/capabilities";
+import { getCapabilities, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
 import { CAP_LABELS, CAP_GROUPS, computeOverrideDiff, isCapabilityLocked, isCapabilityBeyondActor, offeredRoles, roleBeyondActor, toDrawerRole, type DrawerActor, type Role as EditableRole } from "./InviteSeatDrawer";
+import { PermissionTemplatePicker } from "../team/PermissionTemplatePicker";
+import { SaveAsTemplate } from "../team/SaveAsTemplate";
+import { matchedTemplate, templateMatchesForm, type TemplateOption } from "../team/permission-template-ui";
+import { isTemplateRole, MAX_COMPANY_TEMPLATES } from "../../../server/lib/auth/permission-templates";
 import { m } from "~/paraglide/messages";
 
 const FORM_ID = "edit-member-form";
+const NO_TEMPLATES: readonly TemplateOption[] = [];
 
 export interface EditableMember {
   id: string;
@@ -41,12 +46,19 @@ interface EditMemberDrawerProps {
   member: EditableMember | null;
   /** The signed-in person; decides which roles and switches the form offers. */
   actor: DrawerActor | null;
+  /** Built-in and company permission templates to start from. Without any, the form is the plain role + switches form. */
+  templates?: readonly TemplateOption[];
 }
 
-export function EditMemberDrawer({ open, onClose, member, actor }: EditMemberDrawerProps) {
+export function EditMemberDrawer({ open, onClose, member, actor, templates = NO_TEMPLATES }: EditMemberDrawerProps) {
   const [role, setRole] = useState<EditableRole>("inspector");
   const [caps, setCaps] = useState<CapabilitySet>(() => getCapabilities("inspector", null));
   const [error, setError] = useState("");
+  // The template the form shows ("" = none). Starts as the one the member already
+  // matches; it is a starting point to copy from, never a link the member keeps.
+  const [templateId, setTemplateId] = useState("");
+  const chosenTemplate = templates.find((t) => t.id === templateId);
+  const customized = chosenTemplate !== undefined && !templateMatchesForm(chosenTemplate, role, caps);
 
   const fetcher = useFetcher<{ ok: boolean; intent?: string | null; error: string | null }>();
   const submitting = fetcher.state !== "idle";
@@ -64,6 +76,7 @@ export function EditMemberDrawer({ open, onClose, member, actor }: EditMemberDra
     const seededRole: EditableRole = toDrawerRole(member.role);
     setRole(seededRole);
     setCaps(getCapabilities(seededRole, member.permissionOverrides ?? null));
+    setTemplateId(matchedTemplate(seededRole, (member.permissionOverrides ?? null) as PermissionOverrides | null, templates)?.id ?? "");
     setError("");
   }, [open, member?.id]);
 
@@ -73,6 +86,14 @@ export function EditMemberDrawer({ open, onClose, member, actor }: EditMemberDra
   function changeRole(next: EditableRole) {
     setRole(next);
     setCaps(getCapabilities(next, null));
+  }
+
+  function pickTemplate(id: string) {
+    setTemplateId(id);
+    const t = templates.find((x) => x.id === id);
+    if (!t) return;
+    setRole(toDrawerRole(t.baseRole));
+    setCaps(getCapabilities(t.baseRole, t.overrides));
   }
 
   useEffect(() => {
@@ -94,11 +115,17 @@ export function EditMemberDrawer({ open, onClose, member, actor }: EditMemberDra
     const fd = new FormData();
     fd.append("intent", "update");
     fd.append("id", member.id);
-    fd.append("role", role);
-    // Always send the field, even when empty: an absent payload means "clear
-    // every override" on the server, which is exactly what an all-default
-    // capability set should do.
-    fd.append("permissionOverrides", JSON.stringify(diff));
+    // A template the form still shows exactly is applied by id, so the edit is
+    // recorded as made from it. Once edited it is plain role + switches.
+    if (chosenTemplate !== undefined && !customized) {
+      fd.append("templateId", chosenTemplate.id);
+    } else {
+      fd.append("role", role);
+      // Always send the field, even when empty: an absent payload means "clear
+      // every override" on the server, which is exactly what an all-default
+      // capability set should do.
+      fd.append("permissionOverrides", JSON.stringify(diff));
+    }
     fetcher.submit(fd, { method: "POST", action: "/resources/team-members" });
   }
 
@@ -137,6 +164,15 @@ export function EditMemberDrawer({ open, onClose, member, actor }: EditMemberDra
           <p className="text-sm text-ih-fg-2">
             <span className="font-semibold text-ih-fg-1">{member?.name || member?.email}</span>
           </p>
+
+          <PermissionTemplatePicker
+            templates={templates}
+            value={templateId}
+            customized={customized}
+            onChange={pickTemplate}
+            actor={actor}
+            from={isTemplateRole(member?.role) ? { role: member.role, overrides: (member.permissionOverrides ?? null) as PermissionOverrides | null } : null}
+          />
 
           <label className="block">
             <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.modal_invite_role_label()}</span>
@@ -179,6 +215,10 @@ export function EditMemberDrawer({ open, onClose, member, actor }: EditMemberDra
               claim, so the server ends the member's sessions to make it real.
               Saying so beats having them wonder why they were logged out. */}
           <p className="text-xs text-ih-fg-3">{m.modal_edit_member_role_change_note()}</p>
+
+          {templates.length > 0 && (
+            <SaveAsTemplate role={role} overrides={computeOverrideDiff(role, caps)} savedCount={templates.filter((t) => !t.system).length} maxTemplates={MAX_COMPANY_TEMPLATES} />
+          )}
 
           {error && <p className="text-xs text-ih-bad-fg font-semibold">{error}</p>}
         </form>
