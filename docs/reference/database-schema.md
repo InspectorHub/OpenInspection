@@ -10,10 +10,10 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 | | |
 |---|---|
 | Tables | 112 |
-| Columns | 1287 |
+| Columns | 1288 |
 | Indexes (excluding primary keys) | 185 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 617 (48%) |
+| Columns carrying a source comment | 618 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -2640,7 +2640,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 ## `tenant_configs`
 
-<sub>server/lib/db/schema/tenant/core.ts · 83 columns · primary key `tenant_id`</sub>
+<sub>server/lib/db/schema/tenant/core.ts · 84 columns · primary key `tenant_id`</sub>
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2727,6 +2727,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `report_pdf_retention_years` | integer | NN | `7` |  | Years a rendered report PDF is kept. `0` = indefinite, which is an explicit controller instruction the platform executes rather than an absence of a setting. **[more]** |
 | `is_report_view_counting_enabled` | integer | NN | `false` |  | Whether this workspace counts report opens. Default FALSE. **[more]** |
 | `offline_max_days` | integer | NN | `30` |  | Native clients lock their local data after this many days without a successful refresh. Enforced on the device; the server only publishes it. |
+| `is_new_inspectors_view_all` | integer | NN | `true` |  | Whether an inspector invited from now on starts able to see every inspection in the company (true) or only the ones assigned to them (false). |
 
 ---
 

@@ -54,7 +54,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const res = await api.team.members.$get();
     if (!res.ok) throw new Error(`team members ${res.status}`);
     const body = (await res.json()) as unknown as { data?: { members?: LoaderActiveUser[]; invites?: LoaderInvite[] } };
-    return { members: toMembers(body.data?.members ?? [], body.data?.invites ?? []), templates: await loadTemplates(api), newInspectorsViewAll: await loadNewInspectorDefault(api), canManage: isAdminRole(role), isOwner: role === "owner", loadFailed };
+    const [templates, newInspectorsViewAll] = await Promise.all([loadTemplates(api), loadNewInspectorDefault(api)]);
+    return { members: toMembers(body.data?.members ?? [], body.data?.invites ?? []), templates, newInspectorsViewAll, canManage: isAdminRole(role), isOwner: role === "owner", loadFailed };
   } catch {
     // `canManage` is derived from the JWT role, which was resolved BEFORE this
     // try block and is not in doubt. Returning false here downgraded an owner's

@@ -212,6 +212,16 @@
       "controller_override": "required",
       "override_surface": "app/routes/settings-compliance.tsx"
     },
+    {
+      "column": "is_new_inspectors_view_all",
+      "property": "newInspectorsViewAll",
+      "default_value": "true",
+      "default_owner": "engine",
+      "decision_type": "controller_choice",
+      "basis": "Whether an inspector invited from now on can see every inspection in the company or only the ones assigned to them. The company decides how widely its own inspection data is shared among its staff; the starting position (everyone sees everything) matches how the product behaved before the switch existed, and it is read once, when an invite is created.",
+      "controller_override": "available",
+      "override_surface": "app/routes/team.tsx"
+    },
     // ── Settled by review ───────────────────────────────────────────────────
     {
       "column": "is_report_view_counting_enabled",

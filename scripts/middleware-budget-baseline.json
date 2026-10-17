@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 155,
-    "dollarMethods": 586,
+    "files": 156,
+    "dollarMethods": 588,
     "apiWorker": 9
   },
   "fanOut": {
@@ -596,6 +596,10 @@
       "apiWorker": 0
     },
     "app/routes/setup.tsx": {
+      "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/routes/team.defaults.server.ts": {
       "dollarMethods": 2,
       "apiWorker": 0
     },
