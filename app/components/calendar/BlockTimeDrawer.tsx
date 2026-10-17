@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useFetcherResult } from "~/hooks/useFetcherResult";
 import { Drawer, Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { blockFormSeed, type CalendarEvent } from "./calendar-helpers";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -72,9 +73,9 @@ export function BlockTimeDrawer({
     setConfirmDelete(false);
   }, [block, currentUserId, dateSeed, open]);
 
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data?.ok) onClose();
-  }, [fetcher.data, fetcher.state, onClose]);
+  useFetcherResult(fetcher, (d) => {
+    if (d.ok) onClose();
+  });
 
   const error = fetcher.data?.ok === false ? fetcher.data.message : null;
 

@@ -15,6 +15,7 @@ import { deniedNeedsPermission } from '../../lib/permission-denied';
 import { inspections } from '../../lib/db/schema';
 import { getDrizzle } from '../../lib/route-helpers';
 import { mayActOnInspection } from '../../lib/inspection/assignment-access';
+import { requireVisibleInspection, resolveInspectionScope } from '../../lib/inspection/visibility';
 import type { HonoConfig } from '../../types/hono';
 
 const NOT_ON_THIS_INSPECTION = 'You are not on this inspection, so you cannot cancel, confirm, complete, publish, return or bill it, or send its agreement';
@@ -24,6 +25,10 @@ const NOT_ON_THIS_INSPECTION = 'You are not on this inspection, so you cannot ca
  * inspection of this company answers 404, as the handler would, rather than a 403 about a job that is not there.
  */
 export async function assertMayActOnJob(c: Context<HonoConfig>, inspectionId: string): Promise<void> {
+    // Visibility first: for a caller who sees only their assignments, an inspection outside that set answers the
+    // same 404 as one that does not exist, so the refusal below cannot be used to tell the two apart. Path routes
+    // are already narrowed by the path guard; this is for an id that arrives in a body.
+    await requireVisibleInspection(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), inspectionId);
     if (await mayActOnInspection(c, inspectionId)) return;
     const exists = await getDrizzle(c).select({ id: inspections.id }).from(inspections)
         .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, c.get('tenantId')))).get();

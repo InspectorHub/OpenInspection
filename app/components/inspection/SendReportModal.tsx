@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useFetcherResult } from "~/hooks/useFetcherResult";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox } from "@core/shared-ui";
@@ -109,19 +110,11 @@ export function SendReportModal({
       ? fetcher.data.error
       : undefined;
 
-  // Auto-close on success — read via an effect keyed on the fetcher's settled
-  // state, never at render (RoleProfileModal / the hub's useModalFetcher
-  // lesson: the render pass that triggers a submission always observes the
-  // PREVIOUS result, so a render-time check either closes on a stale result
-  // or never closes at all).
-  const succeeded =
-    fetcher.state === "idle" &&
-    fetcher.data?.intent === "send-report" &&
-    "ok" in fetcher.data &&
-    fetcher.data.ok;
-  useEffect(() => {
-    if (succeeded) onClose();
-  }, [succeeded, onClose]);
+  // Auto-close on a successful send. The fetcher belongs to the parent and outlives this modal, so only a
+  // result delivered while the modal is open may close it (see useFetcherResult).
+  useFetcherResult(fetcher, (d) => {
+    if (d.intent === "send-report" && "ok" in d && d.ok) onClose();
+  });
 
   const groups = ROLE_KINDS.map((kind) => ({
     kind,

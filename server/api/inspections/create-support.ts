@@ -17,7 +17,8 @@ import type { HonoConfig } from '../../types/hono';
 import { isFieldRole } from '../../lib/auth/roles';
 import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
 import { getDrizzle } from '../../lib/route-helpers';
-import { resolveInspectionScope } from '../../lib/inspection/visibility';
+import { ANONYMOUS_CLIENT } from '../../services/inspection/create-pipeline';
+import { requireVisibleContact, resolveInspectionScope } from '../../lib/inspection/visibility';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -84,6 +85,17 @@ export async function resolveCreateInput(
     const contactService = c.var.services.contact;
     // A named inspector must work in the field and belong to this company; nothing after this looks at the id again.
     await assertFieldRoleMembers(getDrizzle(c), tenantId, [body.inspectorId]);
+    // A contact the caller cannot see answers like one that does not exist, and is never linked: linking it to the
+    // inspection being created would make it visible to them.
+    for (const contactId of [body.referredByAgentId, body.sellingAgentId, body.agentContactId]) {
+        if (contactId) await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, contactId);
+    }
+
+    // A caller who sees only their assignments may not reuse a contact outside that set by naming its address:
+    // every address in the request is checked before anything is written, so the create is refused whole.
+    const scope = await resolveInspectionScope(c);
+    const flatClient = !body.client && body.clientName && body.clientName !== ANONYMOUS_CLIENT;
+    await contactService.assertEmailsNotHidden(tenantId, [body.client?.email, body.newAgent?.email, flatClient ? body.clientEmail : undefined], scope);
 
     // IA-1: Resolve client contact before creating the inspection.
     let clientContactId: string | undefined;
@@ -94,13 +106,21 @@ export async function resolveCreateInput(
             email: body.client.email,
             phone: body.client.phone,
             type:  'client',
-        });
+        }, scope);
         clientContactId = id;
         // Double-write denormalized columns so legacy read paths keep working.
         // Unconditional: the structured client object is the authoritative
         // source — the flat clientName carries a zod default ('Private
         // Client') that would otherwise always win and mask the real name.
         clientFields = { clientName: body.client.name, clientEmail: body.client.email ?? null, clientPhone: body.client.phone ?? null };
+    } else if (flatClient && scope.kind === 'assigned') {
+        // The create pipeline would match a flat client to an existing contact by name when there is no address, which
+        // for this caller could be one they cannot see. Resolve it here through the scoped upsert instead, so only
+        // contacts in their set can be reused.
+        const { id } = await contactService.upsertClientContact(tenantId, {
+            name: body.clientName, email: body.clientEmail ?? undefined, phone: body.clientPhone ?? undefined, type: 'client',
+        }, scope);
+        clientContactId = id;
     }
 
     // IA-1: Resolve agent — newAgent creates/finds a contacts row; agentContactId uses an existing one.
@@ -110,7 +130,7 @@ export async function resolveCreateInput(
             name:  body.newAgent.name,
             email: body.newAgent.email,
             type:  'agent',
-        });
+        }, scope);
         resolvedAgentId = id;
     } else if (body.agentContactId) {
         resolvedAgentId = body.agentContactId;
@@ -119,7 +139,6 @@ export async function resolveCreateInput(
     // A creator who can see only their own assignments stays on the roster of what they create: naming someone
     // else as the inspector would leave them off it, and the inspection would answer "not found" on the very next
     // request. They join as a helper, so the inspector they named stays the lead (the wizard does the same).
-    const scope = await resolveInspectionScope(c);
     const lead = inspectorFor(c, body.inspectorId).inspectorId;
     const creatorOnRosterId = scope.kind === 'assigned' && lead && lead !== scope.userId && isFieldRole(c.get('userRole'))
         ? scope.userId : undefined;

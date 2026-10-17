@@ -23,7 +23,7 @@ export function RoleCell({ member, canManage, templates }: { member: Member; can
       {/* The template this member matches, or "Custom". Worked out from their
           resolved permissions: nothing records where they started. */}
       {canManage && <TemplateBadge member={member} templates={templates} />}
-      {member.status === "active" && seesOnlyAssigned(member) && <Pill tone="neutral">{m.team_scope_badge_assigned()}</Pill>}
+      {member.status === "active" && seesOnlyAssigned(member) && <span className="ih-pill ih-pill--ni">{m.team_scope_badge_assigned()}</span>}
     </>
   );
 }

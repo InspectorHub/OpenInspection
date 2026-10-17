@@ -39,6 +39,7 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users } from '../../lib/db/schema';
+import { visibleContactsCondition, type InspectionScope } from '../../lib/inspection/visibility';
 import { FIELD_ROLES } from '../../lib/auth/roles';
 import {
     refuseCancelViaStatusWrite,
@@ -68,7 +69,9 @@ export async function findPatchRefusal(
     // item photos and the loose pool), so it stays where that knowledge lives.
     isInspectionPhotoKey: (id: string, tenantId: string, key: string) => Promise<boolean>,
     /** What the row says NOW — the only way to recognise a recovery (#81). */
-    currentStatus?: string | null,
+    currentStatus: string | null | undefined,
+    /** Whose contacts may be named as the referrer. Required, so a caller cannot forget to narrow it. */
+    scope: InspectionScope,
 ): Promise<PatchRefusal | null> {
     // #78 — checked FIRST, and it refuses the whole patch rather than dropping
     // the one field. A patch that saved the county and quietly discarded the
@@ -118,8 +121,9 @@ export async function findPatchRefusal(
     // foreign or unknown id rather than writing a dangling soft reference.
     if (typeof body.referredByContactId === 'string' && body.referredByContactId) {
         const { contacts } = await import('../../lib/db/schema');
+        // A contact outside the caller's scope is refused exactly as one that does not exist, and is not stored.
         const owner = await db.select({ id: contacts.id }).from(contacts)
-            .where(and(eq(contacts.id, body.referredByContactId), eq(contacts.tenantId, tenantId)))
+            .where(and(eq(contacts.id, body.referredByContactId), eq(contacts.tenantId, tenantId), visibleContactsCondition(db, scope, tenantId)))
             .get();
         if (!owner) {
             return { code: 'INVALID_REFERRER', message: 'referredByContactId is not a contact in this tenant' };

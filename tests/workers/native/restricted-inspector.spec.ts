@@ -144,6 +144,21 @@ describe('a restricted inspector over the native and MCP credentials', () => {
             expect(refused.status, await refused.clone().text()).toBe(404);
             expect(await ratingStored(theirs)).toBe(false);
         });
+        it('a hidden id and an id that does not exist are refused with the same body, so the id probe learns nothing', async () => {
+            const ghost = { id: fresh('insp-ghost'), reportId: 'report-ghost' };
+            const hidden = await importPackage(restricted.token, packageFor(peer.id, theirs));
+            const absent = await importPackage(restricted.token, packageFor(restricted.id, ghost));
+            expect(hidden.status).toBe(404);
+            expect(absent.status).toBe(404);
+            const norm = async (r: Response, id: string) => JSON.stringify(await r.json()).split(id).join('<ID>');
+            expect(await norm(hidden, theirs.id)).toBe(await norm(absent, ghost.id));
+        });
+        it('an unrestricted caller keeps the more specific answers (control)', async () => {
+            const ghost = { id: fresh('insp-ghost'), reportId: 'report-ghost' };
+            const absent = await importPackage(owner.token, packageFor(owner.id, ghost));
+            expect(absent.status).toBe(404);
+            expect(await absent.text()).toContain('does not exist and the package does not create it');
+        });
         it('the package import accepts a package for an inspection inside the set (control)', async () => {
             const ok = await importPackage(restricted.token, packageFor(restricted.id, mine));
             expect(ok.status, await ok.clone().text()).toBe(200);

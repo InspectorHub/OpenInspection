@@ -21,6 +21,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { Errors } from '../../lib/errors';
+import { requireVisibleContact, resolveInspectionScope } from '../../lib/inspection/visibility';
 import { contacts, contactRoleProfiles, inspections } from '../../lib/db/schema';
 import { AddPersonSchema } from '../../lib/validations/role-profile.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -246,6 +247,9 @@ const peopleRoutes = createApiRouter()
         // Tenant-ownership pre-check for BOTH ids before ever calling
         // PeopleService.addPerson — see file header for why this can't be
         // skipped (addPerson does not verify contactId at all).
+        // A contact the caller cannot see answers exactly like one that does not exist, and is never attached:
+        // attaching it to a visible inspection would make it visible to them.
+        await requireVisibleContact(db, await resolveInspectionScope(c), tenantId, contactId);
         const contact = await db.select({ id: contacts.id }).from(contacts)
             .where(and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId))).get();
         if (!contact) throw Errors.NotFound('Contact not found');

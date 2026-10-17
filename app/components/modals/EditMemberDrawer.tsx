@@ -19,6 +19,7 @@
  * accident.
  */
 import { useState, useEffect, useRef, useId } from "react";
+import { useFetcherResult } from "~/hooks/useFetcherResult";
 import { useFetcher } from "react-router";
 import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { getCapabilities, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
@@ -103,15 +104,15 @@ export function EditMemberDrawer({ open, onClose, member, actor, templates = NO_
     setCaps(hasScopeChoice(t.baseRole) && !states ? withScope(fromTemplate, caps.viewAllInspections) : fromTemplate);
   }
 
-  useEffect(() => {
-    const d = fetcher.data;
-    if (!d) return;
+  // Only a result delivered while mounted acts: the fetcher keeps its last success after the drawer
+  // closes, and `onClose` is a new function on every parent render (see useFetcherResult).
+  useFetcherResult(fetcher, (d) => {
     if (!d.ok) {
       setError(d.error ?? m.modal_edit_member_error_failed());
       return;
     }
     if (d.intent === "update") onClose();
-  }, [fetcher.data, onClose]);
+  });
 
   function submit(e?: React.FormEvent) {
     e?.preventDefault();

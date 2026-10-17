@@ -40,6 +40,7 @@ import { r2Keys } from '../lib/r2-keys';
 import { imagesBinding } from '../lib/media/serve-photo';
 import { signedPhotoExtFor, storePhotoAtKey } from '../lib/media/store-photo';
 import { authorizeCollab, collabStub, type AuthResult } from '../lib/collab/authorize';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 import { importUpdateIntoDo } from '../lib/collab/import-route';
 import { resolvePendingInDo } from '../lib/collab/resolve-pending-route';
 import {
@@ -85,15 +86,26 @@ function parseEntry(zip: Uint8Array, entries: ReadonlyMap<string, number>, name:
 }
 
 /**
+ * The answer for an id the importer cannot see. A caller scoped to their assigned inspections gets this one
+ * both for an id that does not exist and for one that exists but is not theirs, so the import cannot be used
+ * to find out which ids exist.
+ */
+function absentInspection(inspectionId: string): AppError {
+    return new AppError(404, ErrorCode.NOT_FOUND, `Inspection ${inspectionId} does not exist and the package does not create it`, { inspectionId });
+}
+
+/**
  * Why an inspection in the package cannot be imported. The 403 and 404 carry
  * `details.inspectionId`, so a client holding a package that one bad inspection
  * keeps refusing can take that inspection out and send the rest (see the
  * documentation on splitting a package).
  */
-function refusal(auth: Extract<AuthResult, { ok: false }>, inspectionId: string): AppError {
+function refusal(auth: Extract<AuthResult, { ok: false }>, inspectionId: string, scopedToAssigned: boolean): AppError {
     switch (auth.response.status) {
         case 403: return new AppError(403, ErrorCode.FORBIDDEN, 'You do not have edit access to every inspection in this package', { inspectionId });
-        case 404: return new AppError(404, ErrorCode.NOT_FOUND, `Inspection ${inspectionId} cannot be opened for import`, { inspectionId });
+        case 404: return scopedToAssigned
+            ? absentInspection(inspectionId)
+            : new AppError(404, ErrorCode.NOT_FOUND, `Inspection ${inspectionId} cannot be opened for import`, { inspectionId });
         case 501: return Errors.ServiceUnavailable('Collaborative editing is unavailable');
         default: return Errors.Unauthorized();
     }
@@ -208,9 +220,10 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
 
     // Authorize every existing inspection as the IMPORTER before anything is written.
     const identities = new Map<string, CollabIdentity>();
+    const scopedToAssigned = (await resolveInspectionScope(c)).kind === 'assigned';
     for (const id of existing) {
         const auth = await authorizeCollab(c, id);
-        if (!auth.ok) throw refusal(auth, id);
+        if (!auth.ok) throw refusal(auth, id, scopedToAssigned);
         // The device's document belongs to one report. If the server's primary report
         // for this inspection is a different one, importing would merge two documents.
         // A package that creates the inspection itself carries a placeholder: the device
@@ -244,7 +257,7 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
     const created = new Set<string>();
     for (const id of ids) {
         if (existing.has(id)) continue;
-        if (!creates.has(id)) throw new AppError(404, ErrorCode.NOT_FOUND, `Inspection ${id} does not exist and the package does not create it`, { inspectionId: id });
+        if (!creates.has(id)) throw absentInspection(id);
         created.add(id);
     }
     return { manifest, outbox, media, entries, identities, created };
@@ -307,9 +320,10 @@ export async function importOfflinePackage(c: Context<HonoConfig>, zip: Uint8Arr
     const created = await applyOutbox(c, creates, { tolerateRefusals: false });
 
     // Inspections the package just created need their own authorization now that they exist.
+    const scopedToAssigned = (await resolveInspectionScope(c)).kind === 'assigned';
     for (const id of plan.created) {
         const auth = await authorizeCollab(c, id);
-        if (!auth.ok) throw refusal(auth, id);
+        if (!auth.ok) throw refusal(auth, id, scopedToAssigned);
         plan.identities.set(id, auth);
     }
 
