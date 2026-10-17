@@ -82,6 +82,20 @@ export async function assertInspectionVisible(db: DB, scope: InspectionScope, te
     if (row && !row.visible) throw Errors.NotFound('Inspection not found');
 }
 
+/**
+ * The path guard's form of the assertion: for a restricted caller, an inspection that does not
+ * exist, belongs to another company or is not on the caller's roster all answer the same 404.
+ * Use `assertInspectionVisible` instead where the handler follows with its own not-found.
+ */
+export async function requireVisibleInspection(db: DB, scope: InspectionScope, tenantId: string, inspectionId: string): Promise<void> {
+    if (scope.kind === 'all') return;
+    const row = await db.select({ visible: sql<number>`(${assignedCondition(db, scope.userId, tenantId)})` })
+        .from(inspections)
+        .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+        .get();
+    if (!row || !row.visible) throw Errors.NotFound('Inspection not found');
+}
+
 /** The subset of `ids` the scope can see. Batched below D1's bind-parameter ceiling. */
 export async function filterVisibleInspectionIds(db: DB, scope: InspectionScope, tenantId: string, ids: string[]): Promise<Set<string>> {
     if (scope.kind === 'all') return new Set(ids);
