@@ -29,6 +29,13 @@
       "when": 1791995801332,
       "tag": "0003_qbo_display_name",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1792207487427,
+      "tag": "0004_permission_templates",
+      "breakpoints": true
     }
   ]
 }

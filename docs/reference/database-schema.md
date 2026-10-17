@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 111 |
-| Columns | 1278 |
-| Indexes (excluding primary keys) | 184 |
+| Tables | 112 |
+| Columns | 1287 |
+| Indexes (excluding primary keys) | 185 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 616 (48%) |
+| Columns carrying a source comment | 617 (48%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 13 of 111. If a table you just added appears here,
+That is 13 of 112. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 209 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 212 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -1821,6 +1821,30 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 **Indexes**
 
 - `idx_parked_cmd_events_received_at` (received_at)
+
+---
+
+## `permission_templates`
+
+<sub>server/lib/db/schema/permission-template.ts · 9 columns · primary key `id`</sub>
+
+> A company's own permission template: a name, a base role and a sparse set of capability switches that differ from that role's defaults.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `name` | text | NN UQ |  |  |  |
+| `base_role` | text | NN |  | `manager, inspector, staff` | Not owner (never reducible) and not agent (never a team member). |
+| `overrides` | text | NN |  |  |  |
+| `created_by` | text |  |  |  |  |
+| `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
+| `updated_at` | integer | NN |  |  | *Last write time, epoch milliseconds.* |
+| `archived_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- **UNIQUE** `uq_permission_templates_name` (tenant_id, name) — partial, `WHERE archived_at IS NULL`
 
 ---
 
