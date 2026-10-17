@@ -107,6 +107,8 @@ describe('ids in a request body, for a restricted inspector', () => {
             .bind(PROFILE, TENANT, 'client', 'Client', 'client', now, now).run();
         await b.DB.prepare('INSERT OR IGNORE INTO contact_role_profiles (id, tenant_id, key, label, kind, is_system, sort_order, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0, 1, ?, ?)')
             .bind(PROFILE_OTHER, TENANT, 'other', 'Other', 'other', now, now).run();
+        await b.DB.prepare('INSERT OR IGNORE INTO contact_role_profiles (id, tenant_id, key, label, kind, is_system, sort_order, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, 0, 1, ?, ?)')
+            .bind('body-ids-profile-agent', TENANT, 'buyer_agent', 'Buyer agent', 'agent', now, now).run();
         owner = await addMember('owner');
         restricted = await addMember('inspector', { viewAllInspections: false });
         peer = await addMember('inspector', { viewAllInspections: false });
@@ -203,6 +205,75 @@ describe('ids in a request body, for a restricted inspector', () => {
             expect(ok.status, await ok.clone().text()).toBe(201);
             const byOwner = await create(owner, fresh('insp-new'), await addContact(owner.id, theirs));
             expect(byOwner.status, await byOwner.clone().text()).toBe(201);
+        });
+    });
+
+    describe('POST /api/inspections naming a person by email', () => {
+        const emailOf = (contactId: string) => `${contactId}@example.test`;
+        type Field = 'client' | 'newAgent' | 'flat';
+        const create = (m: Member, id: string, field: Field, email: string) => call('/api/inspections', m.token, {
+            method: 'POST',
+            json: {
+                id, propertyAddress: `${id} Road`, templateId: TEMPLATE, date: '2026-10-01T10:00:00.000Z',
+                ...(field === 'client' ? { client: { name: 'Pat Example', email } } : {}),
+                ...(field === 'newAgent' ? { newAgent: { name: 'Agent Example', email } } : {}),
+                ...(field === 'flat' ? { clientName: 'Pat Example', clientEmail: email } : {}),
+            },
+        });
+        const linked = async (inspectionId: string, contactId: string) => (await b.DB.prepare('SELECT COUNT(*) AS n FROM inspection_people WHERE inspection_id = ? AND contact_id = ?').bind(inspectionId, contactId).first<{ n: number }>())?.n ?? 0;
+        const rows = async (inspectionId: string) => (await b.DB.prepare('SELECT COUNT(*) AS n FROM inspections WHERE id = ?').bind(inspectionId).first<{ n: number }>())?.n ?? 0;
+
+        for (const field of ['client', 'newAgent', 'flat'] as const) {
+            it(`${field}: an address that belongs to a hidden contact is refused whole, like a contact create`, async () => {
+                const hiddenOne = await addContact(owner.id, theirs);
+                const id = fresh('insp-new');
+                const res = await create(restricted, id, field, emailOf(hiddenOne));
+                const text = await res.text();
+                expect(res.status, text).toBe(409);
+                expect(text).toContain('A contact with this email already exists');
+                expect(text).not.toContain(hiddenOne);
+                expect(await rows(id)).toBe(0);
+                expect(await linked(id, hiddenOne)).toBe(0);
+                expect((await call(`/api/contacts/${hiddenOne}`, restricted.token)).status).toBe(404);
+                expect((await call(`/api/messages/threads/${hiddenOne}`, restricted.token)).status).toBe(404);
+            });
+        }
+        it('a hidden address in the agent field refuses the whole create even when the client is new', async () => {
+            const hiddenOne = await addContact(owner.id, theirs);
+            const id = fresh('insp-new');
+            const res = await call('/api/inspections', restricted.token, {
+                method: 'POST',
+                json: { id, propertyAddress: `${id} Road`, templateId: TEMPLATE, date: '2026-10-01T10:00:00.000Z',
+                    client: { name: 'Fresh Client', email: `${id}-fresh@example.test` }, newAgent: { name: 'A', email: emailOf(hiddenOne) } },
+            });
+            expect(res.status).toBe(409);
+            expect(await rows(id)).toBe(0);
+            const orphan = await b.DB.prepare('SELECT COUNT(*) AS n FROM contacts WHERE email = ?').bind(`${id}-fresh@example.test`).first<{ n: number }>();
+            expect(orphan?.n).toBe(0);
+        });
+        it('controls: a new address creates a visible contact, and a visible contact is reused and linked', async () => {
+            for (const field of ['client', 'newAgent', 'flat'] as const) {
+                const id = fresh('insp-new');
+                const email = `${id}-new@example.test`;
+                const ok = await create(restricted, id, field, email);
+                expect(ok.status, await ok.clone().text()).toBe(201);
+                const row = await b.DB.prepare('SELECT id FROM contacts WHERE email = ?').bind(email).first<{ id: string }>();
+                expect(row, field).not.toBeNull();
+                expect((await call(`/api/contacts/${row!.id}`, restricted.token)).status).toBe(200);
+            }
+            const id = fresh('insp-new');
+            const reuse = await create(restricted, id, 'client', emailOf(visibleContact));
+            expect(reuse.status, await reuse.clone().text()).toBe(201);
+            expect(await linked(id, visibleContact)).toBe(1);
+        });
+        it('controls: an owner naming a hidden contact address reuses and links it', async () => {
+            for (const field of ['client', 'newAgent', 'flat'] as const) {
+                const hiddenOne = await addContact(peer.id, theirs);
+                const id = fresh('insp-new');
+                const ok = await create(owner, id, field, emailOf(hiddenOne));
+                expect(ok.status, `${field} ${await ok.clone().text()}`).toBe(201);
+                expect(await linked(id, hiddenOne), field).toBe(1);
+            }
         });
     });
 

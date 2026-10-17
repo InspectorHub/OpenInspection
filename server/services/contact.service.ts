@@ -5,6 +5,7 @@ import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema/inspecti
 import { Errors } from '../lib/errors';
 import { isUniqueViolation } from '../lib/db/unique-violation';
 import { visibleContactsCondition, visibleInspectionIds, filterVisibleInspectionIds, type InspectionScope } from '../lib/inspection/visibility';
+import { assertEmailsNotHidden, upsertContactByEmail, type UpsertContactInput } from './contact-upsert';
 import { buildContactDetail } from './contact-detail';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
@@ -309,89 +310,20 @@ export class ContactService {
         return (await this.listAccess(id, tenantId, scope))?.length ?? 0;
     }
 
+    /** Refuses the whole request when an address belongs to a contact the scope cannot see. Body in `./contact-upsert`. */
+    async assertEmailsNotHidden(tenantId: string, emails: ReadonlyArray<string | null | undefined>, scope: InspectionScope): Promise<void> {
+        return assertEmailsNotHidden(this.getDrizzle(), tenantId, emails, scope);
+    }
+
     /**
-     * IA-1 — Idempotent upsert used during inspection creation to capture client
-     * and agent people without double-creating rows.
+     * IA-1 — idempotent upsert used during inspection creation to capture client and agent people. Body and rules
+     * in `./contact-upsert`.
      *
-     * Rules:
-     * - Email is normalized to lowercase+trim before any lookup or write.
-     * - Email present: find ACTIVE (archived_at IS NULL) row by (tenantId, normalizedEmail).
-     *   - Found: fill-forward: set name/phone ONLY where existing value is null/empty. Returns {id, created:false}.
-     *   - Not found: INSERT a new row. Returns {id, created:true}.
-     * - Email absent: always INSERT a name-only row. Returns {id, created:true}.
-     * - Archived rows with matching email are NOT matched (the partial unique allows a fresh active row).
+     * `scope` is whose contacts may be matched: a match outside it is refused like contact create refuses an address
+     * already in use. Omitted means the whole company, which is what the system paths want (public booking, the agent
+     * concierge, the owner/manager-only request screens); the one route a restricted inspector can reach passes it.
      */
-    async upsertClientContact(
-        tenantId: string,
-        // `?: T | undefined` rather than `?: T`: under exactOptionalPropertyTypes the
-        // bare form refuses an explicitly-passed `undefined`, and every caller builds
-        // this object out of Zod `.optional()` fields, which are exactly `T | undefined`.
-        // The body below reads each of these through a truthiness check or `?? null`,
-        // so an omitted key and an undefined one are already the same input.
-        input: { name: string; email?: string | undefined; phone?: string | undefined; type: 'client' | 'agent'; locale?: string | null | undefined },
-    ): Promise<{ id: string; created: boolean }> {
-        const db = this.getDrizzle();
-        const normalizedEmail = input.email ? input.email.toLowerCase().trim() : undefined;
-
-        if (normalizedEmail) {
-            // Look for an ACTIVE row with this email (archived_at IS NULL).
-            const existing = await db
-                .select()
-                .from(contacts)
-                .where(
-                    and(
-                        eq(contacts.tenantId, tenantId),
-                        eq(contacts.email, normalizedEmail),
-                        isNull(contacts.archivedAt),
-                    ),
-                )
-                .get();
-
-            if (existing) {
-                // Fill-forward: only update name/phone if currently null/empty.
-                const updates: Partial<{ name: string; phone: string; locale: string }> = {};
-                if ((!existing.name || existing.name.trim() === '') && input.name) {
-                    updates.name = input.name;
-                }
-                if ((!existing.phone || existing.phone.trim() === '') && input.phone) {
-                    updates.phone = input.phone;
-                }
-                // Locale does NOT fill forward: the contact has just told us
-                // again, and the newer answer is the true one. Being written to
-                // in English after asking for Spanish is the failure this
-                // avoids. An omitted choice still never clears a stored one —
-                // silence is not a retraction.
-                if (input.locale && input.locale !== existing.locale) {
-                    updates.locale = input.locale;
-                }
-                if (Object.keys(updates).length > 0) {
-                    await db
-                        .update(contacts)
-                        .set(updates)
-                        // tenantId as well as id: `existing` came from a
-                        // tenant-scoped read, so this is belt-and-braces, but
-                        // an id-only write is the shape the scoping gate exists
-                        // to keep out of the codebase — and it costs nothing.
-                        .where(and(eq(contacts.id, existing.id), eq(contacts.tenantId, tenantId)));
-                }
-                return { id: existing.id, created: false };
-            }
-        }
-
-        // INSERT — either no email or no matching active row found.
-        const id = crypto.randomUUID();
-        await db.insert(contacts).values({
-            id,
-            tenantId,
-            type: input.type,
-            name: input.name,
-            email: normalizedEmail ?? null,
-            phone: input.phone ?? null,
-            agency: null,
-            notes: null,
-            locale: input.locale ?? null,
-            createdAt: new Date(),
-        });
-        return { id, created: true };
+    async upsertClientContact(tenantId: string, input: UpsertContactInput, scope: InspectionScope = { kind: 'all' }): Promise<{ id: string; created: boolean }> {
+        return upsertContactByEmail(this.getDrizzle(), tenantId, input, scope);
     }
 }

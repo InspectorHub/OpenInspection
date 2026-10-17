@@ -38,7 +38,7 @@ import { fireAutomation } from './automation-fire';
 type Db = DrizzleD1Database & { $client: D1Database };
 
 /** The client name the request carries when it names none; such a client is never saved as a contact. */
-const ANONYMOUS_CLIENT = 'Private Client';
+export const ANONYMOUS_CLIENT = 'Private Client';
 
 export interface CreatePipelineDeps {
     d1: D1Database;

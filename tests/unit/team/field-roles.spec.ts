@@ -95,7 +95,7 @@ describe('field roles', () => {
     const ctxFor = (userRole: string, sub: string) => ({
       get: (k: string) => ({ tenantId: T, userRole, user: { sub } } as Record<string, unknown>)[k],
       set: () => undefined,
-      var: { services: { contact: {} } },
+      var: { services: { contact: { assertEmailsNotHidden: async () => undefined } } },
       env: { DB: {} },
     }) as never;
     const body = { propertyAddress: '1 Main St', date: '2026-06-22' } as never;

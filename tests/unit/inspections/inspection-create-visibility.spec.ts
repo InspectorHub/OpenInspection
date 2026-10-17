@@ -112,7 +112,7 @@ describe('the plain create keeps a restricted creator on the roster', () => {
             c.set('user', { sub: userId, role: 'inspector', tenantId: TENANT } as never);
             c.set('tenantId', TENANT);
             c.set('sdb', new ScopedDB(asScopedDbSource(db), TENANT));
-            c.set('services', { contact: {} } as never);
+            c.set('services', { contact: { assertEmailsNotHidden: async () => undefined } } as never);
             await next();
         });
         app.post('/resolve', async (c) => c.json(await resolveCreateInput(c, input as never)));
