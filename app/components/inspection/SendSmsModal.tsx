@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useFetcherResult } from "~/hooks/useFetcherResult";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
@@ -50,16 +51,10 @@ export function SendSmsModal({
       ? fetcher.data.error
       : undefined;
 
-  useEffect(() => {
-    if (
-      fetcher.state === "idle" &&
-      fetcher.data?.intent === "send-sms" &&
-      "ok" in fetcher.data &&
-      fetcher.data.ok
-    ) {
-      onClose();
-    }
-  }, [fetcher.state, fetcher.data, onClose]);
+  // The fetcher belongs to the parent and outlives this modal: only a result delivered while it is open acts.
+  useFetcherResult(fetcher, (d) => {
+    if (d.intent === "send-sms" && "ok" in d && d.ok) onClose();
+  });
 
   const byKind = ROLE_KINDS.map((kind) => ({
     kind,

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useId } from "react";
+import { useFetcherResult } from "~/hooks/useFetcherResult";
 import { useFetcher } from "react-router";
 import { Drawer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { getCapabilities, pinnedCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
@@ -247,9 +248,9 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
   if (!submitting) inFlight.current = false;
  }, [submitting]);
 
- useEffect(() => {
-  const d = inviteFetcher.data;
-  if (!d) return;
+ // Only a result delivered while mounted acts (see useFetcherResult): the fetcher keeps its last
+ // success after the drawer closes, and `onClose` is a new function on every parent render.
+ useFetcherResult(inviteFetcher, (d) => {
   if (!d.ok) {
    setError(d.error ?? m.modal_invite_error_failed());
    return;
@@ -257,7 +258,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
   if (d.intent === "invite") {
    onClose();
   }
- }, [inviteFetcher.data, onClose]);
+ });
 
  function submitPermanent(e?: React.FormEvent) {
   e?.preventDefault();
