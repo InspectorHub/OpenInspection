@@ -10173,7 +10173,7 @@
       }
     },
     "summary": "Invite tenant for current tenant",
-    "description": "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify, permissionOverrides and templateId, but this route does not apply any of them: it always sends the email and grants the plain role (inspector when none is given). Use POST /api/team/invite to start from a permission template. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
+    "description": "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify, permissionOverrides and templateId, but this route does not apply notify or permissionOverrides: it always sends the email and grants the plain role (inspector when none is given). A templateId is refused with 400; use POST /api/team/invite to start from a permission template. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
   },
   {
     "operationId": "issueCollabTicket",
