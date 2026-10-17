@@ -13,6 +13,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { resolveMetricsWindow } from '../lib/metrics-window';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 
 const growthRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -46,14 +47,14 @@ const analyticsRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
         const { months } = c.req.valid('query');
-        const out = await c.var.services.analytics.growth(tenantId, months);
+        const out = await c.var.services.analytics.growth(tenantId, months, await resolveInspectionScope(c));
         return c.json({ success: true as const, data: out }, 200);
     })
     .openapi(heatmapRoute, async (c) => {
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
         const window = resolveMetricsWindow(c.req.valid('query'));
-        const out = await c.var.services.analytics.findingsHeatmap(tenantId, window);
+        const out = await c.var.services.analytics.findingsHeatmap(tenantId, await resolveInspectionScope(c), window);
         return c.json({ success: true as const, data: out }, 200);
     });
 

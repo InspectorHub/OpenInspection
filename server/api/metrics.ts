@@ -20,6 +20,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { sumEffectivePriceCentsSql } from '../lib/effective-price.sql';
 import { inclusiveUpperBound, resolveMetricsWindow } from '../lib/metrics-window';
 import { getDrizzle } from '../lib/route-helpers';
+import { resolveInspectionScope, visibleInspectionsCondition } from '../lib/inspection/visibility';
 
 const metricsRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
@@ -37,6 +38,11 @@ const metricsRoutes = createApiRouter()
     const db = getDrizzle(c);
     const caps = await capabilitiesFor(c);
     const self = c.get('user')?.sub ?? '';
+    // `financial` decides whether the caller may see money; the visibility scope decides whether they may
+    // see other people's work. They are independent, and the company view needs both: a restricted
+    // inspector who also holds `companyFinance` still gets their own row and null company figures.
+    const scope = await resolveInspectionScope(c);
+    const companyView = caps.companyFinance && scope.kind === 'all';
 
     // Both bounds are inclusive. `inspections.date` may hold a bare civil date
     // or a full ISO instant, so the upper bound carries a sentinel that sorts
@@ -50,7 +56,9 @@ const metricsRoutes = createApiRouter()
         count:   sql<number>`count(*)`,
     })
         .from(inspections)
-        .where(and(eq(inspections.tenantId, tenantId), inWindow))
+        // The only company figure a caller outside the company view still receives is the inspection
+        // count taken from this series, so it is cut to what they can see.
+        .where(and(eq(inspections.tenantId, tenantId), inWindow, visibleInspectionsCondition(db, scope, tenantId)))
         .groupBy(sql`strftime('%Y-%m', ${inspections.date})`)
         .orderBy(sql`strftime('%Y-%m', ${inspections.date})`);
 
@@ -161,7 +169,7 @@ const metricsRoutes = createApiRouter()
     // caller without `companyFinance` is not being shown a censored version of the
     // company's numbers, they are being shown THEIR OWN row. A colleague's pay
     // is absent from the payload, not hidden inside it.
-    const byInspector = caps.companyFinance
+    const byInspector = companyView
         ? everyInspector
         : everyInspector
             .filter(r => r.inspectorId === self)
@@ -173,25 +181,25 @@ const metricsRoutes = createApiRouter()
         data: {
             from,
             to,
-            scope: caps.companyFinance ? ('all' as const) : ('self' as const),
-            totalRevenue: caps.companyFinance ? totalRevenue : null,
+            scope: companyView ? ('all' as const) : ('self' as const),
+            totalRevenue: companyView ? totalRevenue : null,
             totalInspections,
-            avgOrderValue: caps.companyFinance ? avgOrderValue : null,
-            monthly: caps.companyFinance
+            avgOrderValue: companyView ? avgOrderValue : null,
+            monthly: companyView
                 ? monthly.map(r => ({ month: r.month, revenue: Number(r.revenue || 0), count: Number(r.count) }))
                 : [],
             // "Which agent sends the most work" is commercially sensitive in a
             // multi-inspector firm — same gate as attributed revenue.
-            topAgents: caps.companyFinance ? [...topAgents, ...referralSources] : [],
+            topAgents: companyView ? [...topAgents, ...referralSources] : [],
             byInspector,
-            serviceBreakdown: caps.companyFinance
+            serviceBreakdown: companyView
                 ? serviceBreakdown.map(r => ({
                     serviceName: r.serviceName,
                     count:       Number(r.count),
                     revenue:     Number(r.revenue || 0),
                 }))
                 : [],
-            paymentSummary: caps.companyFinance ? { paid: paidAmt, unpaid: unpaidAmt, overdue: 0 } : null,
+            paymentSummary: companyView ? { paid: paidAmt, unpaid: unpaidAmt, overdue: 0 } : null,
         },
     });
 });

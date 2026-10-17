@@ -11,6 +11,7 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, gte, lte } from 'drizzle-orm';
+import { visibleInspectionsCondition, type InspectionScope } from '../lib/inspection/visibility';
 import { inspections, inspectionResults, ratingSystems, templates } from '../lib/db/schema';
 import { inclusiveUpperBound, type MetricsWindow } from '../lib/metrics-window';
 import {
@@ -43,11 +44,11 @@ export class AnalyticsService {
         return drizzle(this.db);
     }
 
-    async growth(tenantId: string, months: number): Promise<{ months: MonthBucket[] }> {
+    async growth(tenantId: string, months: number, scope: InspectionScope): Promise<{ months: MonthBucket[] }> {
         const db = this.getDrizzle();
         const rows = await db.select({ createdAt: inspections.createdAt })
             .from(inspections)
-            .where(eq(inspections.tenantId, tenantId))
+            .where(and(eq(inspections.tenantId, tenantId), visibleInspectionsCondition(db, scope, tenantId)))
             .all();
         const buckets = groupInspectionsByMonth(
             rows.map(r => ({ createdAt: r.createdAt ?? new Date() })),
@@ -81,7 +82,7 @@ export class AnalyticsService {
      * tenant uses those systems. Same rule the editor applies when it decides
      * which levels an inspector may pick.
      */
-    async findingsHeatmap(tenantId: string, window?: MetricsWindow): Promise<FindingsMatrix> {
+    async findingsHeatmap(tenantId: string, scope: InspectionScope, window?: MetricsWindow): Promise<FindingsMatrix> {
         const db = this.getDrizzle();
 
         const resultRows = await db.select({ data: inspectionResults.data })
@@ -93,10 +94,11 @@ export class AnalyticsService {
             .where(window
                 ? and(
                     eq(inspectionResults.tenantId, tenantId),
+                    visibleInspectionsCondition(db, scope, tenantId),
                     gte(inspections.date, window.from),
                     lte(inspections.date, inclusiveUpperBound(window.to)),
                 )
-                : eq(inspectionResults.tenantId, tenantId))
+                : and(eq(inspectionResults.tenantId, tenantId), visibleInspectionsCondition(db, scope, tenantId)))
             .all();
 
         const templateRows = await db.select({ schema: templates.schema, ratingSystemId: templates.ratingSystemId })

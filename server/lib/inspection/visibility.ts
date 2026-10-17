@@ -164,8 +164,10 @@ export async function resolveInspectionScope(c: Context<HonoConfig>): Promise<In
     if (cached) return cached;
     const role = c.get('userRole');
     const userId = c.get('user')?.sub;
-    if (!isRole(role) || !userId) throw Errors.Unauthorized('No identity in context');
-    const scope = isAdminRole(role) ? ALL_INSPECTIONS : scopeFromCapabilities(userId, await capabilitiesFor(c));
+    if (!isRole(role)) throw Errors.Unauthorized('No identity in context');
+    // The administrator tier is pinned to everything and needs no identity to say so; anyone else must be a known person.
+    if (!isAdminRole(role) && !userId) throw Errors.Unauthorized('No identity in context');
+    const scope = isAdminRole(role) ? ALL_INSPECTIONS : scopeFromCapabilities(userId as string, await capabilitiesFor(c));
     c.set('inspectionScope', scope);
     return scope;
 }

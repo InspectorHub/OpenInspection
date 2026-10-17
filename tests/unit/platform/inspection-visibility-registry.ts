@@ -51,9 +51,9 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/messages/unread-count': E('scoped-service', 'same rule as the threads'),
 
     // Analytics, money, events, requests.
-    'GET /api/analytics/growth': P('scoped-service', 'counts visible inspections'),
-    'GET /api/analytics/findings-heatmap': P('scoped-service', 'rated items of visible inspections'),
-    'GET /api/metrics': P('scoped-service', 'a restricted caller gets the own-row view, never company totals'),
+    'GET /api/analytics/growth': E('scoped-service', 'counts visible inspections'),
+    'GET /api/analytics/findings-heatmap': E('scoped-service', 'rated items of visible inspections'),
+    'GET /api/metrics': E('scoped-service', 'a restricted caller gets the own-row view, never company totals'),
     'GET /api/invoices': P('scoped-service', 'invoices of visible inspections'),
     'GET /api/invoices/:id/payments': P('handler-assert', 'the invoice must belong to a visible inspection'),
     'POST /api/invoices/:id/payments': P('handler-assert', 'the invoice must belong to a visible inspection'),
@@ -130,7 +130,7 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
     'server/api/calendar-events.ts': P('scoped-service', 'GET / is cut to the visible set'),
     'server/api/calendar-items.ts': P('self-only', 'forced to the caller for a non-administrator; the dispatch board is capability-gated'),
     'server/api/invoices.ts': P('scoped-service', 'the list is cut to visible inspections; mutations are owner/manager'),
-    'server/api/metrics.ts': P('scoped-service', 'a restricted caller gets the own-row view'),
+    'server/api/metrics.ts': E('scoped-service', 'a restricted caller gets the own-row view'),
     'server/api/usage.ts': E('company-open-staff', 'lifetime capacity counters'),
     'server/api/ics.ts': E('self-only', 'a token resolves to one user and that user own roster'),
     'server/api/sms.ts': P('handler-assert', 'public opt-in and webhooks are token-driven; GET /sms/consent asserts visibility; the rest is owner/manager'),
