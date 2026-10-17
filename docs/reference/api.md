@@ -744,6 +744,57 @@ List workspace members and pending invites.
 
 ---
 
+#### `GET /api/team/permission-templates`
+List the permission templates a person can start from when inviting a team member or editing one: the built-in templates (`system: true`, fixed) followed by the company's own, oldest first. Each has a `baseRole` and the capability switches in `overrides` that differ from that role's defaults, exactly as they are copied onto an invite or a member. Also returns `maxCompanyTemplates`.
+
+**Roles:** `owner`, `manager`
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "templates": [
+      { "id": "inspector_trainee", "system": true, "name": "Trainee inspector", "description": "…", "baseRole": "inspector", "overrides": { "publish": false } },
+      { "id": "template-id", "system": false, "name": "Weekend helper", "description": null, "baseRole": "staff", "overrides": { "companyFinance": true } }
+    ],
+    "maxCompanyTemplates": 25
+  }
+}
+```
+
+---
+
+#### `POST /api/team/permission-templates`
+Save a company template.
+
+**Roles:** `owner`, `manager`
+
+**Request body:** `{ "name": "Weekend helper", "baseRole": "inspector", "overrides": { "publish": false } }` — `baseRole` is `manager`, `inspector` or `staff`.
+
+**Response:** `201 Created` with the template. `409` when the name is used by another live template or the company already keeps 25. `403` (`CAPABILITY_CEILING`) when a manager asks for a switch, or a base role, that turns on something the manager does not hold.
+
+---
+
+#### `PUT /api/team/permission-templates/{id}`
+Replace a company template's name, base role and switches. People who already received it are not changed. Built-in templates cannot be changed (`400`). The same ceiling as on creation applies.
+
+**Roles:** `owner`, `manager`
+
+---
+
+#### `DELETE /api/team/permission-templates/{id}`
+Archive a company template: it can no longer be applied and its name can be used again. Nothing is deleted and nobody who received it is changed. Built-in templates cannot be archived (`400`).
+
+**Roles:** `owner`, `manager`
+
+---
+
+#### `POST /api/team/invite` and `PATCH /api/team/members/{id}` with `templateId`
+Both accept an optional `templateId` (a built-in key or a company template id). Its role and switches are copied onto the invite or the member; any `permissionOverrides` sent alongside are applied on top. On the invite, `role` becomes optional (it must match the template's role if sent, and defaults to `inspector` when neither is given). An unknown id, or another company's, is `404`. The ceiling applies to the result exactly as to the same role and switches sent by hand.
+
+---
+
 #### `GET /api/admin/agreements`
 List all agreement templates for the tenant.
 
