@@ -119,3 +119,63 @@ describe("InviteSeatDrawer in-flight latch", () => {
         expect(fetcherState.submit).toHaveBeenCalledTimes(2);
     });
 });
+
+describe("InviteSeatDrawer form after a send", () => {
+    type Result = { ok: boolean; intent?: string | null; error: string | null; url: string | null };
+    const fetcherState = { state: "idle" as "idle" | "submitting", data: undefined as Result | undefined, submit: vi.fn() };
+
+    beforeEach(() => {
+        fetcherState.state = "idle";
+        fetcherState.data = undefined;
+        fetcherState.submit.mockReset();
+        vi.mocked(useFetcher).mockImplementation(
+            () => ({ state: fetcherState.state, data: fetcherState.data, submit: fetcherState.submit, load: vi.fn() }) as unknown as ReturnType<typeof useFetcher>,
+        );
+    });
+    afterEach(cleanup);
+
+    const emailInput = () => document.querySelector<HTMLInputElement>('input[type="email"]');
+    function type(value: string) {
+        const input = emailInput();
+        if (!input) throw new Error("email input not rendered");
+        const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        act(() => { set?.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    }
+
+    it("opens empty after a successful send, and still opens (the drawer reopens after a save)", () => {
+        const onClose = vi.fn();
+        const ui = (open: boolean) => <InviteSeatDrawer actor={OWNER} open={open} onClose={onClose} />;
+        const { rerender } = render(ui(true));
+        type("first@example.test");
+        expect(emailInput()?.value).toBe("first@example.test");
+        // the send settles
+        fetcherState.state = "submitting";
+        rerender(ui(true));
+        fetcherState.state = "idle";
+        fetcherState.data = { ok: true, intent: "invite", error: null, url: null };
+        rerender(ui(true));
+        expect(onClose).toHaveBeenCalledTimes(1);
+        rerender(ui(false));
+        rerender(ui(true));
+        expect(emailInput()?.value).toBe("");
+        // the fetcher still holds the old success: reopening must not close the drawer again
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("also opens empty after a drawer that was closed without sending", () => {
+        const ui = (open: boolean) => <InviteSeatDrawer actor={OWNER} open={open} onClose={() => {}} />;
+        const { rerender } = render(ui(true));
+        type("draft@example.test");
+        rerender(ui(false));
+        rerender(ui(true));
+        expect(emailInput()?.value).toBe("");
+    });
+
+    it("control: while the drawer stays open the typed address is kept across re-renders", () => {
+        const ui = () => <InviteSeatDrawer actor={OWNER} open onClose={() => {}} />;
+        const { rerender } = render(ui());
+        type("keep@example.test");
+        rerender(ui());
+        expect(emailInput()?.value).toBe("keep@example.test");
+    });
+});
