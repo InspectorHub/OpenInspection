@@ -94,6 +94,7 @@ describe('field roles', () => {
   describe('a new inspection is only assigned to its creator when the creator can inspect', () => {
     const ctxFor = (userRole: string, sub: string) => ({
       get: (k: string) => ({ tenantId: T, userRole, user: { sub } } as Record<string, unknown>)[k],
+      set: () => undefined,
       var: { services: { contact: {} } },
       env: { DB: {} },
     }) as never;

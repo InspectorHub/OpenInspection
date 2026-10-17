@@ -159,12 +159,12 @@ describe('viewAllInspections', () => {
         // control: the same grant on an unrestricted inspector survives
         expect(getCapabilities('inspector', { scheduleOthers: true }).scheduleOthers).toBe(true);
     });
-    it('the write surface excludes it until the flag flips, the read surface does not', () => {
-        expect(VIEW_ALL_SETTABLE).toBe(false);
-        expect(SETTABLE_CAPABILITIES).not.toContain('viewAllInspections');
-        expect(TOGGLEABLE).toContain('viewAllInspections');
-        expect(pickSettable({ viewAllInspections: false, publish: false })).toEqual({ publish: false });
-        expect(pickSettable({ viewAllInspections: false })).toBeNull();
+    it('the write surface is open: every toggleable capability, including the visibility scope, may be written', () => {
+        expect(VIEW_ALL_SETTABLE).toBe(true);
+        expect([...SETTABLE_CAPABILITIES].sort()).toEqual([...TOGGLEABLE].sort());
+        expect(pickSettable({ viewAllInspections: false, publish: false })).toEqual({ viewAllInspections: false, publish: false });
+        expect(pickSettable({ viewAllInspections: false })).toEqual({ viewAllInspections: false });
         expect(pickSettable(null)).toBeNull();
+        expect(pickSettable({})).toBeNull();
     });
 });

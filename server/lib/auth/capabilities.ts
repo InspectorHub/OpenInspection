@@ -109,15 +109,15 @@ export function getCapabilities(role: Role, overrides: PermissionOverrides | nul
 }
 
 /**
- * The write surface for `viewAllInspections` stays closed until every read path that
- * can return inspection data applies the visibility scope, so nothing can be saved
- * that looks like a restriction but is not enforced everywhere. The read surface
- * (`getCapabilities`, `coerceOverrides`) still honours a stored value, which is what
- * lets the tests exercise the real paths. The registry test in
- * tests/unit/platform/inspection-visibility-registry.spec.ts refuses to let this flip
- * while any read path is still marked pending.
+ * Whether a request may WRITE `viewAllInspections`. It stayed closed while any read path that
+ * can return inspection data did not yet apply the visibility scope, so that nothing could be
+ * saved that looked like a restriction but was not enforced everywhere. It is open now: the
+ * registry test in tests/unit/platform/inspection-visibility-registry.spec.ts refuses to let
+ * it be true while any read path is marked pending, so a new unscoped path closes the switch
+ * again by failing that test rather than by leaking. The read surface (`getCapabilities`,
+ * `coerceOverrides`) honours a stored value whatever this says.
  */
-export const VIEW_ALL_SETTABLE = false;
+export const VIEW_ALL_SETTABLE = true;
 
 /** The capabilities a request body, an invite or an import may set. */
 export const SETTABLE_CAPABILITIES: readonly Capability[] =

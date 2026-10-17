@@ -37,7 +37,9 @@ export function diffOverrides(role: UserRole, requested?: RequestedOverrides | n
     // in a stored map from here; `planMemberUpdate` carries an existing value across an edit.
     for (const cap of SETTABLE_CAPABILITIES) {
         const value = requested[cap];
-        if (typeof value === 'boolean' && value !== template[cap]) diff[cap] = value;
+        // A switch the role pins (a manager's view of every inspection, an owner's anything) takes no
+        // effect, so storing it would only record a request nothing honours.
+        if (typeof value === 'boolean' && value !== template[cap] && getCapabilities(role, { [cap]: value })[cap] === value) diff[cap] = value;
     }
     return Object.keys(diff).length ? diff : null;
 }
