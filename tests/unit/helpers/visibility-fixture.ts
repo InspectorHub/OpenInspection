@@ -31,30 +31,42 @@ const base = (id: string, tenantId: string, inspectorId: string | null) => ({
     paymentRequired: false, agreementRequired: false, createdAt: new Date(), inspectorId,
 });
 
-export async function seedVisibilityFixture(db: TestDb): Promise<void> {
-    const now = new Date();
-    for (const [id, slug] of [[TENANT, 'vis'], [OTHER_TENANT, 'vis-other']] as const) {
-        await db.insert(schema.tenants).values({ id, slug, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now });
-    }
+/**
+ * The fixture as plain rows, with no database in sight, so a node-environment spec (better-sqlite3)
+ * and a workerd spec (real D1) can insert exactly the same data and be compared on the same expectations.
+ */
+export function visibilityFixtureRows(now: Date = new Date()) {
     const mk = (id: string, role: 'owner' | 'manager' | 'inspector', overrides: Record<string, boolean> | null) =>
         ({ id, tenantId: TENANT, email: `${id}@example.test`, passwordHash: 'x', role, permissionOverrides: overrides, createdAt: now });
-    await db.insert(schema.users).values([
-        mk(USERS.owner, 'owner', null), mk(USERS.manager, 'manager', null), mk(USERS.inspAll, 'inspector', null),
-        mk(USERS.inspA, 'inspector', { viewAllInspections: false }),
-        mk(USERS.inspB, 'inspector', { viewAllInspections: false }),
-        mk(USERS.inspC, 'inspector', { viewAllInspections: false }),
-    ]);
-    await db.insert(schema.inspections).values([
-        base(INSP.own, TENANT, USERS.inspA), base(INSP.other, TENANT, USERS.inspB), base(INSP.team, TENANT, USERS.inspB),
-        base(INSP.unassigned, TENANT, null), base(INSP.legacy, TENANT, USERS.inspA), base(INSP.stale, TENANT, USERS.inspA),
-        base(INSP.foreign, OTHER_TENANT, null),
-    ]);
     const link = (inspectionId: string, userId: string, role: 'lead' | 'helper', tenantId = TENANT) =>
         ({ inspectionId, userId, tenantId, role, createdAt: now });
-    await db.insert(schema.inspectionInspectors).values([
-        link(INSP.own, USERS.inspA, 'lead'), link(INSP.other, USERS.inspB, 'lead'),
-        link(INSP.team, USERS.inspB, 'lead'), link(INSP.team, USERS.inspA, 'helper'),
-        link(INSP.stale, USERS.inspB, 'lead'),
-        link(INSP.foreign, USERS.inspA, 'lead', OTHER_TENANT),
-    ]);
+    return {
+        tenants: [[TENANT, 'vis'], [OTHER_TENANT, 'vis-other']].map(([id, slug]) =>
+            ({ id: id!, slug: slug!, status: 'active' as const, deploymentMode: 'shared' as const, tier: 'free' as const, createdAt: now })),
+        users: [
+            mk(USERS.owner, 'owner', null), mk(USERS.manager, 'manager', null), mk(USERS.inspAll, 'inspector', null),
+            mk(USERS.inspA, 'inspector', { viewAllInspections: false }),
+            mk(USERS.inspB, 'inspector', { viewAllInspections: false }),
+            mk(USERS.inspC, 'inspector', { viewAllInspections: false }),
+        ],
+        inspections: [
+            base(INSP.own, TENANT, USERS.inspA), base(INSP.other, TENANT, USERS.inspB), base(INSP.team, TENANT, USERS.inspB),
+            base(INSP.unassigned, TENANT, null), base(INSP.legacy, TENANT, USERS.inspA), base(INSP.stale, TENANT, USERS.inspA),
+            base(INSP.foreign, OTHER_TENANT, null),
+        ],
+        roster: [
+            link(INSP.own, USERS.inspA, 'lead'), link(INSP.other, USERS.inspB, 'lead'),
+            link(INSP.team, USERS.inspB, 'lead'), link(INSP.team, USERS.inspA, 'helper'),
+            link(INSP.stale, USERS.inspB, 'lead'),
+            link(INSP.foreign, USERS.inspA, 'lead', OTHER_TENANT),
+        ],
+    };
+}
+
+export async function seedVisibilityFixture(db: TestDb): Promise<void> {
+    const rows = visibilityFixtureRows();
+    await db.insert(schema.tenants).values(rows.tenants);
+    await db.insert(schema.users).values(rows.users);
+    await db.insert(schema.inspections).values(rows.inspections);
+    await db.insert(schema.inspectionInspectors).values(rows.roster);
 }
