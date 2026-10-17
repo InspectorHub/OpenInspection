@@ -193,8 +193,9 @@ export class InspectionService {
         tenantId: string,
         creatorUserId: string | null,
         input: import('../lib/validations/wizard.schema').CreateInspectionFromWizardInput,
+        scope: InspectionScope,
     ): Promise<{ id: string }> {
-        return this.core.createFromWizard(tenantId, creatorUserId, input);
+        return this.core.createFromWizard(tenantId, creatorUserId, input, scope);
     }
 
     /**

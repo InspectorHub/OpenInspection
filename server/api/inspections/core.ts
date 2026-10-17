@@ -31,6 +31,7 @@ import { completeReplayedCreate } from './create-replay';
 import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
 import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
 import { isFieldRole } from '../../lib/auth/roles';
+import { resolveInspectionScope } from '../../lib/inspection/visibility';
 
 /**
  * GET /api/inspections/:id
@@ -356,7 +357,7 @@ const coreRoutes = createApiRouter()
         if (!userId) throw Errors.Unauthorized('Missing user identity');
 
         // An office user cannot be the inspector, so their job starts unassigned.
-        const out = await c.var.services.inspection.createFromWizard(tenantId, isFieldRole(c.get('userRole')) ? userId : null, input);
+        const out = await c.var.services.inspection.createFromWizard(tenantId, isFieldRole(c.get('userRole')) ? userId : null, input, await resolveInspectionScope(c));
         fireQuotaThresholdNotice(c, tenantId);
         return c.json({ success: true as const, data: out }, 200);
     })

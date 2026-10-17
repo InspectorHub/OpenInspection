@@ -15,6 +15,7 @@ import type { CreateInspectionFromWizardInput } from '../../../server/lib/valida
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT = '00000000-0000-0000-0000-0000000000cc';
 const U = { inspector: 'u-inspector', lead: 'u-lead', staff: 'u-staff' } as const;
@@ -57,33 +58,33 @@ async function inspectorOf(id: string) {
 
 describe('createFromWizard and who becomes the inspector', () => {
     it('an inspector who books a job is the inspector (control)', async () => {
-        const { id } = await svc.createFromWizard(TENANT, U.inspector, wizard());
+        const { id } = await svc.createFromWizard(TENANT, U.inspector, wizard(), ALL_INSPECTIONS);
         expect(await inspectorOf(id)).toBe(U.inspector);
     });
 
     it('a creator who cannot inspect leaves the job unassigned, with no roster row', async () => {
-        const { id } = await svc.createFromWizard(TENANT, null, wizard());
+        const { id } = await svc.createFromWizard(TENANT, null, wizard(), ALL_INSPECTIONS);
         expect(await inspectorOf(id)).toBeNull();
         expect(await rosterOf(id)).toEqual([]);
     });
 
     it('a creator who cannot inspect can still name a lead, and the lead is the one on the roster', async () => {
-        const { id } = await svc.createFromWizard(TENANT, null, wizard({ teamMode: true, leadInspectorId: U.lead }));
+        const { id } = await svc.createFromWizard(TENANT, null, wizard({ teamMode: true, leadInspectorId: U.lead }), ALL_INSPECTIONS);
         expect(await rosterOf(id)).toEqual([`lead:${U.lead}`]);
     });
 
     it('refuses a lead or helper who is staff, and creates nothing', async () => {
         for (const bad of [U.staff]) {
-            await expect(svc.createFromWizard(TENANT, U.inspector, wizard({ teamMode: true, leadInspectorId: bad })))
+            await expect(svc.createFromWizard(TENANT, U.inspector, wizard({ teamMode: true, leadInspectorId: bad }), ALL_INSPECTIONS))
                 .rejects.toMatchObject({ status: 400 });
-            await expect(svc.createFromWizard(TENANT, U.inspector, wizard({ teamMode: true, helperInspectorIds: [bad] })))
+            await expect(svc.createFromWizard(TENANT, U.inspector, wizard({ teamMode: true, helperInspectorIds: [bad] }), ALL_INSPECTIONS))
                 .rejects.toMatchObject({ status: 400 });
         }
         expect(await db.select().from(schema.inspections).all()).toEqual([]);
     });
 
     it('accepts field-role helpers (control)', async () => {
-        const { id } = await svc.createFromWizard(TENANT, U.inspector, wizard({ teamMode: true, helperInspectorIds: [U.lead] }));
+        const { id } = await svc.createFromWizard(TENANT, U.inspector, wizard({ teamMode: true, helperInspectorIds: [U.lead] }), ALL_INSPECTIONS);
         expect((await rosterOf(id)).sort()).toEqual([`helper:${U.lead}`, `lead:${U.inspector}`]);
     });
 });

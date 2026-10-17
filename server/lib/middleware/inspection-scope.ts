@@ -7,16 +7,11 @@ import { deniedNeedsRole } from '../permission-denied';
 import { ROLE, ROLE_TIER, isAdminRole } from '../auth/roles';
 import { getDrizzle } from '../route-helpers';
 import { memoOnce } from '../request-scope';
+import { RESERVED_INSPECTION_SEGMENTS } from '../inspection/reserved-segments';
 import { requireVisibleInspection, resolveInspectionScope } from '../inspection/visibility';
 import type { HonoConfig } from '../../types/hono';
 
-/**
- * Static first segments under /api/inspections. They are routes, never inspection ids.
- * A test compares this set with the static segments the route table actually carries.
- */
-export const RESERVED_INSPECTION_SEGMENTS: ReadonlySet<string> = new Set([
-    'bulk', 'counts', 'dashboard', 'inspectors', 'schedule-conflicts', 'templates', 'wizard',
-]);
+export { RESERVED_INSPECTION_SEGMENTS };
 
 /** The tiers that may touch an inspection at all. `staff` is evaluated at the inspector tier. */
 const STAFF_TIERS: ReadonlySet<string> = new Set([ROLE.OWNER, ROLE.MANAGER, ROLE.INSPECTOR]);

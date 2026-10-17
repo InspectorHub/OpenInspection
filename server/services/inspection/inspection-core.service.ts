@@ -388,8 +388,9 @@ export class InspectionCoreService extends InspectionSubService {
         tenantId: string,
         creatorUserId: string | null,
         input: import('../../lib/validations/wizard.schema').CreateInspectionFromWizardInput,
+        scope: InspectionScope,
     ): Promise<{ id: string }> {
-        return this.variants.createFromWizard(tenantId, creatorUserId, input);
+        return this.variants.createFromWizard(tenantId, creatorUserId, input, scope);
     }
 
     /** Clones an existing inspection. Body in `./inspection-create-variants.service`. */
