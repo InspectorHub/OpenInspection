@@ -1,4 +1,4 @@
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
@@ -52,7 +52,11 @@ export async function assertEmailsNotHidden(
  *   - Found: fill-forward: set name/phone ONLY where existing value is null/empty. Returns {id, created:false}.
  *     A match outside `scope` is refused (see refuseHiddenMatch) before anything is touched.
  *   - Not found: INSERT a new row. Returns {id, created:true}.
- * - Email absent: always INSERT a name-only row. Returns {id, created:true}.
+ * - Email absent, unrestricted scope: always INSERT a name-only row. Returns {id, created:true}.
+ * - Email absent, scope limited to assignments: the name is looked up among ACTIVE contacts of the same type the
+ *   scope can see, and nowhere else. None: INSERT. One: reuse it. Several: reuse the most recently created.
+ *   A contact outside the scope is never matched, touched or hinted at, so a name only a hidden contact carries
+ *   simply creates a new row. Nothing is filled forward on a name match; the caller gave no address to trust.
  * - Archived rows with matching email are NOT matched (the partial unique allows a fresh active row).
  */
 export async function upsertContactByEmail(
@@ -100,6 +104,15 @@ export async function upsertContactByEmail(
         }
     }
 
+    if (!normalizedEmail && scope.kind !== 'all') {
+        const name = input.name.trim();
+        const reuse = name ? await db.select({ id: contacts.id }).from(contacts).where(and(
+            eq(contacts.tenantId, tenantId), eq(contacts.type, input.type), eq(contacts.name, name), isNull(contacts.archivedAt),
+            visibleContactsCondition(db, scope, tenantId),
+        )).orderBy(desc(contacts.createdAt), desc(contacts.id)).get() : undefined;
+        if (reuse) return { id: reuse.id, created: false };
+    }
+
     // INSERT — either no email or no matching active row found.
     const id = crypto.randomUUID();
     await db.insert(contacts).values({
@@ -112,6 +125,9 @@ export async function upsertContactByEmail(
         agency: null,
         notes: null,
         locale: input.locale ?? null,
+        // A creator limited to their assignments keeps seeing the contact they made, so a second create that names
+        // it finds it even before it is attached to a visible inspection.
+        ...(scope.kind === 'all' ? {} : { createdByUserId: scope.userId }),
         createdAt: new Date(),
     });
     return { id, created: true };

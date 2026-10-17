@@ -10,7 +10,6 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeProfileSchema, overrideFieldFromForm } from "~/lib/forms/settings.schema";
 import { Select, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
-import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import { LOCALE_OPTIONS } from "~/lib/locales";
 import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields";
 import { SectionNav } from "~/components/settings/SectionNav";
@@ -23,6 +22,7 @@ import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
+import { useTimezoneOptions } from "~/hooks/useTimezoneOptions";
 
 // F68 — with no `meta` this page's browser tab reads only "OpenInspection".
 // Why it is a catalogue key and not a literal: settings-meta-titles.test.ts.
@@ -380,6 +380,7 @@ export default function SettingsProfilePage() {
   const companyTz = useSessionContext()?.branding.defaultTimezone ?? null;
   const tzSelectRef = useRef<HTMLSelectElement>(null);
   const [selectedTz, setSelectedTz] = useState(profile.timezone ?? "");
+  const timezoneOptions = useTimezoneOptions(profile.timezone);
   function adoptBrowserTz(zone: string) {
     const el = tzSelectRef.current;
     if (el) {
@@ -452,7 +453,7 @@ export default function SettingsProfilePage() {
                     ? m.settings_profile_timezone_company_named({ zone: companyTz.replace(/_/g, " ") })
                     : m.settings_profile_timezone_inherit_option(),
                 },
-                ...TIMEZONE_SELECT_OPTIONS,
+                ...timezoneOptions,
               ]}
             />
             <BrowserTimezoneHint

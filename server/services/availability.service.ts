@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { availability, availabilityOverrides } from '../lib/db/schema';
+import { availability, availabilityOverrides, users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
+import { isUniqueViolation } from '../lib/db/unique-violation';
 
 /**
  * Service to manage internal inspector availability schedules.
@@ -67,7 +68,20 @@ export class AvailabilityService {
             createdAt: new Date(),
         };
 
-        await db.insert(availabilityOverrides).values(newOverride);
+        // The inspector must be a member of this company: an unknown id and another company's answer alike.
+        const member = await db.select({ id: users.id }).from(users)
+            .where(and(eq(users.id, data.inspectorId), eq(users.tenantId, tenantId))).get();
+        if (!member) throw Errors.BadRequest('Unknown inspector for this workspace');
+
+        try {
+            await db.insert(availabilityOverrides).values(newOverride);
+        } catch (err) {
+            // At most one blocking override per inspector per date (idx_avail_overrides_block_unique).
+            if (!newOverride.isAvailable && isUniqueViolation(err, 'availability_overrides')) {
+                throw Errors.Conflict('A blocking override already exists for that date');
+            }
+            throw err;
+        }
         return {
             ...newOverride,
             createdAt: safeISODate(newOverride.createdAt)

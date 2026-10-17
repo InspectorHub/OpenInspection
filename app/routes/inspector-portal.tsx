@@ -40,7 +40,7 @@ import { SendSmsModal } from "~/components/inspection/SendSmsModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { COURTESY_TRANSLATION_LOCALE } from "~/lib/courtesy-locale";
 import {
-  toActionResult, sendReportActionResult, reinspectionDay,
+  toActionResult, sendReportActionResult, deliveryActionResult, reinspectionDay,
   handlePersonAdd,
   handlePersonRemove,
   handlePersonResetAccess,
@@ -599,7 +599,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       param: { id },
       json: { recipients },
     });
-    return toActionResult(res, "send-sms", m.inspections_hub_error_send_sms());
+    return deliveryActionResult(res, "send-sms", m.inspections_hub_error_send_sms());
   }
 
   return { ok: false, intent: undefined, error: m.inspections_hub_error_unknown_action() };

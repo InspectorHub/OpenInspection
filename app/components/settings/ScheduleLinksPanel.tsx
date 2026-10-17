@@ -1,5 +1,6 @@
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
 import { m } from "~/paraglide/messages";
+import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 /**
  * The inspector's personal BOOKING link. Calendar subscription feeds moved to
@@ -15,7 +16,7 @@ export function ScheduleLinksPanel({
   slug: string | null | undefined;
 }) {
   const { copied: copiedField, copy } = useCopyClipboard();
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = usePageOrigin();
   const deepLink = tenant && slug ? `${origin}/book/${tenant}/${slug}` : null;
 
   return (

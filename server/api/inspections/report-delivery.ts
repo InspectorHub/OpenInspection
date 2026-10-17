@@ -368,7 +368,7 @@ const reportDeliveryRoutes = createApiRouter()
         }
 
         const sentTo: string[] = [];
-        const skipped: Array<{ recipient: string; reason: string }> = [];
+        const skipped: Array<{ recipient: string; reason: string; outcome: 'skipped' | 'failed' }> = [];
 
         // A2.2 — manual sends land in the SAME ledger the automations write,
         // with `automation_id IS NULL` as the manual marker; one factory call =
@@ -389,7 +389,7 @@ const reportDeliveryRoutes = createApiRouter()
                 }
                 if (!recipientEmail) {
                     const reason = 'No email on file for this recipient';
-                    skipped.push({ recipient: recipientLabel, reason });
+                    skipped.push({ recipient: recipientLabel, reason, outcome: 'skipped' });
                     await logManualSend({ recipient: recipientLabel, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'skipped', error: reason });
                     continue;
                 }
@@ -460,7 +460,7 @@ const reportDeliveryRoutes = createApiRouter()
                 if (err instanceof AppError) throw err;
                 logger.error('[send-report-pdf] recipient send failed', { inspectionId: id, recipient: recipientLabel }, err instanceof Error ? err : undefined);
                 const reason = err instanceof Error ? err.message : 'Send failed';
-                skipped.push({ recipient: recipientLabel, reason });
+                skipped.push({ recipient: recipientLabel, reason, outcome: 'failed' });
                 await logManualSend({ recipient: recipientLabel, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'failed', error: reason });
             }
         }

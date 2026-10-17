@@ -115,5 +115,14 @@
   "comm_report_delivery_opened_many": "Abierto {count} veces · primera {first} · última {last}",
   "comm_report_delivery_objected": "Este destinatario pidió no ser contabilizado, por lo que ya no se registran sus aperturas.",
   "comm_report_delivery_caveat": "Las aperturas se registran de nuestro lado cuando se carga la página del informe. Un escáner de seguridad de correo puede activar una, así que tómelo como un indicio, no como prueba de lectura.",
-  "comm_report_delivery_norole": "Destinatario"
+  "comm_report_delivery_norole": "Destinatario",
+  "comm_reason_not_on_inspection": "No enviado: esta persona ya no está en la inspección con ese rol.",
+  "comm_reason_no_phone": "No enviado: no hay un número de teléfono registrado.",
+  "comm_reason_no_email": "No enviado: no hay un correo electrónico registrado.",
+  "comm_reason_express_consent": "No enviado: se requiere consentimiento por escrito para recibir mensajes de texto donde se encuentra esta persona.",
+  "comm_reason_no_rule": "No enviado: los mensajes de texto no están configurados para el lugar donde se encuentra esta persona.",
+  "comm_reason_recipient_muted": "No enviado: esta persona desactivó estos mensajes.",
+  "comm_reason_managed_quota": "No enviado: se agotó el límite de mensajes de texto de este mes.",
+  "comm_reason_skipped_generic": "No enviado: una regla de envío lo detuvo.",
+  "comm_reason_failed_generic": "No entregado: el servicio de envío lo rechazó o no pudo entregarlo. Inténtelo más tarde."
 }

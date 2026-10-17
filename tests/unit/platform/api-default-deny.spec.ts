@@ -303,9 +303,11 @@ describe('review follow-ups: allow-list and agent surface', () => {
         const { h, call } = await setup('standalone');
         try {
             expect((await call('agent', 'GET', '/api/auth/me')).status).toBe(200);
-            expect((await call('agent', 'POST', '/api/auth/logout')).status).toBe(200);
             expect((await call('agent', 'POST', '/api/auth/2fa/setup', {})).status).toBe(403);
             expect((await call('agent', 'POST', '/api/auth/checklist/dismiss', {})).status).toBe(403);
+            // Last: logout invalidates every token issued before it (second granularity), so a request made
+            // after it with the same token is a 401 whenever the clock ticked between signing and logging out.
+            expect((await call('agent', 'POST', '/api/auth/logout')).status).toBe(200);
         } finally { h.close(); }
     });
 });

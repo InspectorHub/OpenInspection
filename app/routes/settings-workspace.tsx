@@ -24,11 +24,11 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
 import { getBrowserTimeZone, onboardingTzPrefill } from "~/lib/timezones";
-import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import { LOCALE_OPTIONS, CURRENCY_OPTIONS } from "~/lib/locales";
 import { DateTimeFormatFields } from "~/components/settings/DateTimeFormatFields";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
+import { useTimezoneOptions } from "~/hooks/useTimezoneOptions";
 
 // F68 — with no `meta` this page's browser tab reads only "OpenInspection".
 // Why it is a catalogue key and not a literal: settings-meta-titles.test.ts.
@@ -164,6 +164,7 @@ export default function SettingsWorkspacePage() {
   const [searchParams] = useSearchParams();
   const tzSelectRef = useRef<HTMLSelectElement>(null);
   const [selectedTz, setSelectedTz] = useState(branding.defaultTimezone || "UTC");
+  const timezoneOptions = useTimezoneOptions(branding.defaultTimezone || "UTC");
   const [tzPrefilled, setTzPrefilled] = useState(false);
   const tzPrefillDone = useRef(false);
   function adoptTz(zone: string) {
@@ -182,7 +183,8 @@ export default function SettingsWorkspacePage() {
   // instead of defaulting silently to UTC. Runs after mount (no hydration
   // mismatch) and only once.
   useEffect(() => {
-    if (tzPrefillDone.current) return;
+    // The picker holds only the stored zone until the browser has the full list; the suggestion needs its option.
+    if (tzPrefillDone.current || timezoneOptions.length < 2) return;
     const zone = onboardingTzPrefill({
       isTimezoneSetup: searchParams.get("setup") === "timezone",
       storedTz: branding.defaultTimezone ?? null,
@@ -193,7 +195,7 @@ export default function SettingsWorkspacePage() {
     adoptTz(zone);
     setTzPrefilled(true);
     tzSelectRef.current?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [searchParams, branding.defaultTimezone]);
+  }, [searchParams, branding.defaultTimezone, timezoneOptions.length]);
 
   if ("forbidden" in data) return <AccessDenied />;
 
@@ -299,7 +301,7 @@ export default function SettingsWorkspacePage() {
                 setSelectedTz(e.target.value);
                 setTzPrefilled(false);
               }}
-              options={TIMEZONE_SELECT_OPTIONS}
+              options={timezoneOptions}
             />
             {tzPrefilled && (
               <p className="mt-2 text-[12px] text-ih-primary-text">

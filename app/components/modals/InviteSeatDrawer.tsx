@@ -233,6 +233,17 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
   setTemplateId("");
  }, [open, restrictsNew]);
 
+ // A closed drawer forgets the form, whether the invite went out or not, so the next one opens empty rather
+ // than showing the previous address. (The result the fetcher still holds is not acted on again: see useFetcherResult.)
+ useEffect(() => {
+  if (open) return;
+  setEmail("");
+  setNotify(true);
+  setRole("inspector");
+  setAdvancedOpen(false);
+  setError("");
+ }, [open]);
+
  // The default role may be one this person cannot grant; start on one they can.
  useEffect(() => {
   const usable = offeredRoles(actor).filter((o) => !roleBeyondActor(actor, o.value, null));

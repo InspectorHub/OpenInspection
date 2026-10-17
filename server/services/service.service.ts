@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc, inArray } from 'drizzle-orm';
-import { services, inspectionServices, inspections, eventTypes, reports } from '../lib/db/schema';
+import { services, inspectionServices, inspections, eventTypes, reports, templates, agreements } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { getServiceInspectors, setServiceInspectors } from './service/qualification';
 import { listPayRules, createPayRule, updatePayRule, deletePayRule } from './service/pay-rules';
@@ -55,7 +55,26 @@ export class ServiceService {
         return slugs.map(s => bySlug.get(s)).filter((r): r is NonNullable<typeof r> => r != null);
     }
 
+    /**
+     * A service may name a template and an agreement, and both must be this company's own. An id that is unknown
+     * and one that belongs to another company are refused with the same answer.
+     */
+    private async assertTemplateAndAgreementOwned(tenantId: string, data: { templateId?: string | null | undefined; agreementId?: string | null | undefined }) {
+        const db = this.getDrizzle();
+        if (data.templateId) {
+            const row = await db.select({ id: templates.id }).from(templates)
+                .where(and(eq(templates.id, data.templateId), eq(templates.tenantId, tenantId))).get();
+            if (!row) throw Errors.BadRequest('Unknown template for this workspace');
+        }
+        if (data.agreementId) {
+            const row = await db.select({ id: agreements.id }).from(agreements)
+                .where(and(eq(agreements.id, data.agreementId), eq(agreements.tenantId, tenantId))).get();
+            if (!row) throw Errors.BadRequest('Unknown agreement for this workspace');
+        }
+    }
+
     async createService(tenantId: string, data: CreateServiceData) {
+        await this.assertTemplateAndAgreementOwned(tenantId, data);
         const db = this.getDrizzle();
         const id = nanoid();
         const now = new Date();
@@ -85,6 +104,7 @@ export class ServiceService {
         const existing = await db.select().from(services)
             .where(and(eq(services.id, id), eq(services.tenantId, tenantId))).limit(1);
         if (!existing[0]) throw Errors.NotFound('Service not found');
+        await this.assertTemplateAndAgreementOwned(tenantId, data);
 
         const update = Object.fromEntries(
             Object.entries(data).filter(([_, v]) => v !== undefined)
