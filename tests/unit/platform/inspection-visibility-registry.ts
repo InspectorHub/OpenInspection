@@ -67,7 +67,7 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/tags': E('company-open-staff', 'the tag vocabulary with a usage count per tag; no inspection ids'),
     'GET /api/tags/:id/inspections': E('scoped-service', 'inspection ids reduced to the visible set'),
     'GET /api/admin/sms/consent': E('handler-assert', 'the inspection must be visible'),
-    'GET /api/team/members': P('projection', 'non-administrators get id, name and role (and email with scheduleOthers)'),
+    'GET /api/team/members': E('projection', 'non-administrators get id, name and role (and email with scheduleOthers)'),
 
     // Calendar and schedule. Aligning these with the list belongs with the change that opens the write surface.
     'GET /api/calendar/events': E('scoped-service', 'local inspections cut to the visible set'),

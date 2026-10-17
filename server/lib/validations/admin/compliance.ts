@@ -251,7 +251,7 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
     members: z.array(z.object({
         id: z.string().trim().min(1),
         name: z.string().nullable().describe("The member's display name; null when never set (renders as 'Unnamed')."),
-        email: z.string(),
+        email: z.string().optional().describe('Email address. Left out for a caller who is neither an administrator nor allowed to schedule for others.'),
         role: z.string(),
         // Named bits, not `z.record(z.string(), z.boolean())`. The column holds a
         // SPARSE map (`PermissionOverrides` = `Partial<CapabilitySet>`), so a
@@ -263,8 +263,8 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
         // The FLAG only. Never the secret and never the recovery-code hashes:
         // this list is readable by every inspector, and the page needs exactly
         // one bit — whether there is a second factor for an owner to clear.
-        totpEnabled: z.boolean().describe('Whether this member has two-factor authentication enrolled. An owner can clear it from the team page when they have lost both their authenticator and their recovery codes.'),
-        createdAt: z.string(),
+        totpEnabled: z.boolean().optional().describe('Whether this member has two-factor authentication enrolled. An owner can clear it from the team page when they have lost both their authenticator and their recovery codes. Left out for callers below owner and manager.'),
+        createdAt: z.string().optional().describe('When the member joined. Left out for callers below owner and manager.'),
     })),
     invites: z.array(z.object({
         id: z.string(),
