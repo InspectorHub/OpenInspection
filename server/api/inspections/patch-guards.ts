@@ -39,7 +39,7 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users } from '../../lib/db/schema';
-import { ALL_INSPECTIONS, visibleContactsCondition, type InspectionScope } from '../../lib/inspection/visibility';
+import { visibleContactsCondition, type InspectionScope } from '../../lib/inspection/visibility';
 import { FIELD_ROLES } from '../../lib/auth/roles';
 import {
     refuseCancelViaStatusWrite,
@@ -69,9 +69,9 @@ export async function findPatchRefusal(
     // item photos and the loose pool), so it stays where that knowledge lives.
     isInspectionPhotoKey: (id: string, tenantId: string, key: string) => Promise<boolean>,
     /** What the row says NOW — the only way to recognise a recovery (#81). */
-    currentStatus?: string | null,
-    /** Whose contacts may be named as the referrer. Omitted means every contact of the company. */
-    scope: InspectionScope = ALL_INSPECTIONS,
+    currentStatus: string | null | undefined,
+    /** Whose contacts may be named as the referrer. Required, so a caller cannot forget to narrow it. */
+    scope: InspectionScope,
 ): Promise<PatchRefusal | null> {
     // #78 — checked FIRST, and it refuses the whole patch rather than dropping
     // the one field. A patch that saved the county and quietly discarded the

@@ -80,7 +80,7 @@ describe('field roles', () => {
 
   it('refuses a patch that assigns staff, and accepts a field role (control)', async () => {
     const check = (inspectorId: string) =>
-      findPatchRefusal(db as never, T, 'insp-1', { inspectorId }, async () => true);
+      findPatchRefusal(db as never, T, 'insp-1', { inspectorId }, async () => true, undefined, { kind: 'all' });
     expect(await check(ID.staff)).toMatchObject({ code: 'INVALID_INSPECTOR' });
     for (const ok of [ID.owner, ID.manager, ID.inspector]) expect(await check(ok)).toBeNull();
   });
