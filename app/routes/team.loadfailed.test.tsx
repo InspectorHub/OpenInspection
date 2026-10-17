@@ -30,7 +30,7 @@ function renderTeam(loaderData: Record<string, unknown>) {
   return render(<Stub initialEntries={["/team"]} />);
 }
 
-const BASE = { members: [], canManage: true, loadFailed: false };
+const BASE = { members: [], templates: [], canManage: true, loadFailed: false };
 
 describe("team page — a failed load is not an empty team", () => {
   it("says the list may be incomplete when the fetch failed", async () => {

@@ -3,6 +3,8 @@ import { isCeilingRefusal } from '../lib/auth/grant-ceiling';
 import { auditFromContext } from '../lib/audit';
 import { capabilitiesFor } from '../lib/middleware/require-capability';
 import { assertSeatForRoleChange } from '../features/seat-quota/role-change-guard';
+import { PermissionTemplateService, type AppliedTemplate } from '../services/team/permission-templates.service';
+import { applyTemplateToRequest } from '../services/team/apply-template';
 import type { UpdateMemberSchema } from '../lib/validations/admin.schema';
 import type { HonoConfig } from '../types/hono';
 import type { z } from '@hono/zod-openapi';
@@ -18,7 +20,7 @@ import type { z } from '@hono/zod-openapi';
  */
 export async function auditRefusedGrant<T>(
     c: Context<HonoConfig>,
-    action: 'invite' | 'update',
+    action: 'invite' | 'update' | 'template',
     requestedRole: string | null,
     run: () => Promise<T>,
 ): Promise<T> {
@@ -53,14 +55,19 @@ export async function updateMemberAudited(
 ): Promise<void> {
     const tenantId = c.get('tenantId');
     const requesterCapabilities = await capabilitiesFor(c);
-    const result = await auditRefusedGrant(c, 'update', body.role ?? null, () => c.var.services.team.updateMember({
+    // A template, when named, is copied in first; what it stamps then goes through
+    // the same ceiling and seat checks as the same role and switches typed by hand.
+    const applied = body.templateId ? await new PermissionTemplateService(c.env.DB).resolveRef(tenantId, body.templateId) : null;
+    const stamped = applyTemplateToRequest({ applied, requestedRole: body.role, requestedOverrides: body.permissionOverrides });
+    const nextRole = stamped.role;
+    const result = await auditRefusedGrant(c, 'update', nextRole ?? null, () => c.var.services.team.updateMember({
         tenantId, userId: memberId, requesterId: c.get('user')?.sub as string, requesterRole: c.get('userRole'), requesterCapabilities,
-        ...(body.role ? { role: body.role } : {}),
-        ...(body.permissionOverrides !== undefined ? { permissionOverrides: body.permissionOverrides } : {}),
+        ...(nextRole ? { role: nextRole } : {}),
+        ...(stamped.overrides !== undefined ? { permissionOverrides: stamped.overrides } : {}),
         beforeWrite: async () => {
-            if (!body.role) return;
+            if (!nextRole) return;
             await assertSeatForRoleChange({
-                tenantId, userId: memberId, nextRole: body.role, db: c.env.DB,
+                tenantId, userId: memberId, nextRole, db: c.env.DB,
                 seatQuota: { enforce: c.var.profile.hasSeatQuota, billingPortalUrl: c.var.profile.billingPortalUrl },
             });
         },
@@ -68,7 +75,13 @@ export async function updateMemberAudited(
     if (result.changed) {
         auditFromContext(c, 'user.update', 'user', {
             entityId: memberId,
-            metadata: { role: result.role, capabilitiesChanged: result.capabilitiesChanged },
+            metadata: { role: result.role, capabilitiesChanged: result.capabilitiesChanged, ...templateAuditMeta(applied) },
         });
     }
+}
+
+/** Which template an invite or edit started from: the key of a built-in one, the id of a company one. Never a person's details. */
+export function templateAuditMeta(applied: AppliedTemplate | null): Record<string, string> {
+    if (!applied) return {};
+    return applied.system ? { templateKey: applied.ref } : { templateId: applied.ref };
 }

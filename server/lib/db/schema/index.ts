@@ -148,3 +148,8 @@ export { statutoryFormProductions } from './statutory-productions';
 export type {
     StatutoryFormProductionRow, NewStatutoryFormProductionRow,
 } from './statutory-productions';
+
+// A company's own permission templates ("custom roles"): a name, a base role and a
+// sparse switch diff, copied onto an invite or a member when applied. No live link.
+export { permissionTemplates } from './permission-template';
+export type { PermissionTemplateRow, NewPermissionTemplateRow } from './permission-template';

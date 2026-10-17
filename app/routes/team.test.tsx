@@ -35,7 +35,7 @@ function renderTeam(loaderData: Record<string, unknown>) {
   return render(<Stub initialEntries={["/team"]} />);
 }
 
-const BASE = { members: [], canManage: true, loadFailed: false };
+const BASE = { members: [], templates: [], canManage: true, loadFailed: false };
 
 describe("/team — who is offered the invite controls", () => {
   it("shows neither Invite Member nor Import members to someone who cannot manage the team", async () => {

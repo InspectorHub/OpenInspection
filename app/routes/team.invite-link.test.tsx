@@ -64,7 +64,7 @@ const active = {
 
 function renderTeam(members: unknown[]) {
     const Stub = createRoutesStub([
-        { path: "/team", Component: TeamPage, loader: () => ({ members, canManage: true, loadFailed: false }) },
+        { path: "/team", Component: TeamPage, loader: () => ({ members, templates: [], canManage: true, loadFailed: false }) },
     ]);
     return render(<Stub initialEntries={["/team"]} />);
 }

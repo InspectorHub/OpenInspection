@@ -153,6 +153,39 @@ manager holds; anything higher needs an owner.
   disabled with "Only an owner can grant this.", and roles that would grant one
   are not selectable.
 
+### Permission templates
+
+Setting switches one person at a time does not scale, so the invite and edit forms
+offer **permission templates**: a base role plus the switches that differ from that
+role's defaults. Choosing one fills in the role and the switches, which can still be
+adjusted; once they no longer match the template the form reads "Customized".
+
+- **Built-in templates** are fixed by the engine and need no setup: Inspector,
+  Assistant inspector, Trainee inspector, Lead inspector, Manager, Office manager
+  (no report editing), Office scheduler, Office finance and Office auditor. They can
+  change between versions; the key (for example `inspector_trainee`) is stable.
+- **Company templates** are the company's own ("custom roles"): a name, a base role
+  (manager, inspector or staff, never owner or agent) and a switch set. Save one
+  with "Save as template" at the foot of the invite or edit form, then rename or
+  archive it from the list under the Team roster. A company keeps at most 25, and
+  names are unique among live ones; an archived name can be used again.
+- **Applying copies.** The role and switches are stamped onto the invite or the
+  member. Nothing links back: changing or archiving a template changes nobody who
+  already received it, and no column records where a person started. The Team page
+  shows which template a member currently matches (or "Custom") by comparing their
+  resolved switches with each template's.
+- **The ceiling applies to templates.** A manager cannot save a template that turns
+  on a switch the manager does not hold, including through its base role, and cannot
+  apply one that would; the form shows such templates disabled. An owner is not
+  limited. Applying a template is checked exactly like the same role and switches set
+  by hand, and it is recorded on the `user.invite` or `user.update` entry (the
+  template's key, or the id of a company template). Saving, changing and archiving a
+  company template are recorded as `permission_template.create`, `.update` and
+  `.archive`.
+- **API.** `GET`/`POST /api/team/permission-templates`, `PUT`/`DELETE
+  /api/team/permission-templates/{id}`, and an optional `templateId` on
+  `POST /api/team/invite` and `PATCH /api/team/members/{id}`; see the API reference.
+
 ### Money visibility
 
 Two capabilities cover every place an amount is read or written, not only the

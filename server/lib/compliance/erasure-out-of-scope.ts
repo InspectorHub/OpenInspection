@@ -138,6 +138,7 @@ export const ERASURE_OUT_OF_SCOPE: ErasureOutOfScopeEntry[] = [
     { table: 'calendar_connection_read_calendars', column: 'summary',    reason: 'display name of the staff calendar as the provider reports it — not consumer-DSAR scope' },
     { table: 'integration_test_results', column: 'tested_by_user_id',    reason: 'staff user who ran the Test connection probe — not consumer-DSAR scope' },
     { table: 'tenant_marketplace_import_history', column: 'created_by',  reason: 'staff user who performed the template import — not consumer-DSAR scope' },
+    { table: 'permission_templates', column: 'created_by',  reason: 'staff user who saved the template, a soft reference to users.id with no foreign key; a template is company configuration, not consumer data, and it is removed with the company on a tenant purge' },
     // The core->portal user-sync outbox. The heuristic flags neither column, and
     // `payload` is the heaviest staff-PII blob in the schema: a serialized
     // CloudEvent carrying email, name and — for user.password_changed — the

@@ -30,7 +30,7 @@ export const AUDIT_FAMILIES = [
     'contact', 'contact_role_profile', 'contractor_type', 'credential', 'defect_category',
     'import', 'inspection', 'inspection_item', 'inspection_results',
     'inspector_service_areas', 'library', 'mcp_grant', 'migration_batch',
-    'migration_row', 'rating_system',
+    'migration_row', 'permission_template', 'rating_system',
     'recommendation', 'signing_key', 'starter_content', 'tag', 'template',
     'tenant', 'tenant_config', 'user', 'user_service_origin', 'widget',
 ] as const;

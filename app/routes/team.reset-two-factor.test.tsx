@@ -48,7 +48,7 @@ function renderTeam(members: unknown[], isOwner: boolean) {
         {
             path: "/team",
             Component: TeamPage,
-            loader: () => ({ members, canManage: true, isOwner, loadFailed: false }),
+            loader: () => ({ members, templates: [], canManage: true, isOwner, loadFailed: false }),
         },
     ]);
     return render(<Stub initialEntries={["/team"]} />);

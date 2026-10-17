@@ -550,6 +550,34 @@
     "description": "Archives the notice for this agent. Never a row deletion, and never a write to automation_logs — the sending company keeps its delivery record."
   },
   {
+    "operationId": "archivePermissionTemplate",
+    "method": "DELETE",
+    "pathTemplate": "/api/team/permission-templates/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The id of a company template, as listed by GET /api/team/permission-templates.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The id of a company template, as listed by GET /api/team/permission-templates."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Archive a company permission template",
+    "description": "Archives a company template so it can no longer be applied and its name can be used again. Nothing is deleted and nobody who received the template is changed. Built-in templates cannot be archived (400). Writes a permission_template.archive audit entry. Restricted to owners and managers."
+  },
+  {
     "operationId": "attachInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/media/attach",
@@ -4913,6 +4941,24 @@
     "description": "Creates a reusable email or SMS template for the current tenant."
   },
   {
+    "operationId": "createPermissionTemplate",
+    "method": "POST",
+    "pathTemplate": "/api/team/permission-templates",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/PermissionTemplateInput"
+      }
+    },
+    "summary": "Create a company permission template",
+    "description": "Saves a company permission template: a name, a base role (manager, inspector or staff) and the capability switches that differ from that role's defaults. Applying it later copies its role and switches onto an invite or a member; changing or archiving it afterwards does not change anyone who already received it. A manager cannot save a template that turns on a switch the manager does not hold themselves, including through the base role; an owner can. The name must be unique among live templates, and a company keeps at most 25. Writes a permission_template.create audit entry. Restricted to owners and managers."
+  },
+  {
     "operationId": "createPublicPayIntent",
     "method": "POST",
     "pathTemplate": "/api/public/inspections/{id}/pay-intent",
@@ -5473,6 +5519,7 @@
               "mcp_grant",
               "migration_batch",
               "migration_row",
+              "permission_template",
               "rating_system",
               "recommendation",
               "signing_key",
@@ -10108,7 +10155,7 @@
       }
     },
     "summary": "Invite a new team member",
-    "description": "Invite a person to join the team. Creates a pending invite that expires after 7 days and returns its accept link and expiry. The invitation email is sent unless notify is false, in which case nothing is sent and the caller must deliver the returned inviteLink. Role and the optional permissionOverrides are stored on the invite and applied when it is accepted; only an owner may invite someone as an owner (403). Returns 409 when the email already belongs to an active member and is refused when no seat is free under the seat limit, when one applies. Writes a user.invite audit entry. Each call creates another invite. Restricted to owners and managers."
+    "description": "Invite a person to join the team. Creates a pending invite that expires after 7 days and returns its accept link and expiry. The invitation email is sent unless notify is false, in which case nothing is sent and the caller must deliver the returned inviteLink. Pass templateId (a built-in template key or a company template id from GET /api/team/permission-templates) to start from a permission template: its role and switches are copied onto the invite, and a permissionOverrides map sent alongside is applied on top (404 for an unknown template, 400 when role names a different role than the template). Role and the optional permissionOverrides are stored on the invite and applied when it is accepted; only an owner may invite someone as an owner (403). Returns 409 when the email already belongs to an active member and is refused when no seat is free under the seat limit, when one applies. Writes a user.invite audit entry. Each call creates another invite. Restricted to owners and managers."
   },
   {
     "operationId": "inviteTenant",
@@ -10126,7 +10173,7 @@
       }
     },
     "summary": "Invite tenant for current tenant",
-    "description": "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify and permissionOverrides, but this route does not apply either: it always sends the email and grants the plain role. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
+    "description": "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify, permissionOverrides and templateId, but this route does not apply notify or permissionOverrides: it always sends the email and grants the plain role (inspector when none is given). A templateId is refused with 400; use POST /api/team/invite to start from a permission template. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
   },
   {
     "operationId": "issueCollabTicket",
@@ -12314,6 +12361,22 @@
     },
     "summary": "List notifications for current user",
     "description": "Lists the calling user's own in-app notifications, newest first, within the current company. Archived ones are excluded unless includeArchived=1. Paged with a cursor: when meta.nextCursor is non-null, pass it as cursor to fetch the next page. Requires a signed-in user."
+  },
+  {
+    "operationId": "listPermissionTemplates",
+    "method": "GET",
+    "pathTemplate": "/api/team/permission-templates",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List built-in and company permission templates",
+    "description": "Lists the permission templates a person can start from when inviting a team member or editing one: the built-in templates (system true, fixed) followed by the company's own live templates, oldest first. Each has a base role and the capability switches that differ from that role's defaults, exactly as they are copied onto an invite or a member. Also returns how many company templates one company may keep. Read-only. Restricted to owners and managers."
   },
   {
     "operationId": "listPlaceDetails",
@@ -22722,6 +22785,36 @@
     "description": "Updates the authenticated user's display name, phone number, and inspector license number. Empty strings clear the field; missing keys leave existing values unchanged."
   },
   {
+    "operationId": "updatePermissionTemplate",
+    "method": "PUT",
+    "pathTemplate": "/api/team/permission-templates/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The id of a company template, as listed by GET /api/team/permission-templates.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The id of a company template, as listed by GET /api/team/permission-templates."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/PermissionTemplateInput"
+      }
+    },
+    "summary": "Change a company permission template",
+    "description": "Replaces a company template's name, base role and switches. People who already received the template keep what was copied onto them; only future applications see the change. Built-in templates cannot be changed (400). The same ceiling as on creation applies: a manager cannot widen a template past the manager's own permissions. Writes a permission_template.update audit entry. Restricted to owners and managers."
+  },
+  {
     "operationId": "updateRepairItem",
     "method": "PATCH",
     "pathTemplate": "/api/public/repair-builder/{tenant}/{id}/lists/{rrId}/items/{itemId}",
@@ -23022,7 +23115,7 @@
       }
     },
     "summary": "Update a team member's role or permissions",
-    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner. Moving a staff member to a role that holds a seat is refused (402) when no seat is free under the seat limit."
+    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Pass templateId to apply a permission template: its role and switches replace the member's current ones (a copy; the member is not linked to the template afterwards). Only an owner may change an owner or promote anyone to owner. Moving a staff member to a role that holds a seat is refused (402) when no seat is free under the seat limit."
   },
   {
     "operationId": "updateTenantAgreement",

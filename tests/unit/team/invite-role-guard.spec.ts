@@ -112,3 +112,26 @@ describe.each([
         expect(pick(built)).not.toHaveBeenCalled();
     });
 });
+
+// The legacy route cannot apply a permission template. Accepting the field and
+// quietly granting the plain role would tell the caller something false.
+describe('POST /api/admin/invite and templateId', () => {
+    const withTemplate = (app: OpenAPIHono<HonoConfig>, path: string) => app.request(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: 'x@y.test', templateId: 'inspector_trainee', notify: false }),
+    }, ENV, EXECUTION_CTX);
+
+    it('refuses a templateId and creates no invite', async () => {
+        const built = buildApp('owner');
+        const res = await withTemplate(built.app, '/api/admin/invite');
+        expect(res.status).toBe(400);
+        expect(built.createAdminInvite).not.toHaveBeenCalled();
+    });
+
+    it('CONTROL - the team route accepts the same body', async () => {
+        const built = buildApp('owner');
+        const res = await withTemplate(built.app, '/api/team/invite');
+        expect(res.status).not.toBe(400);
+    });
+});
