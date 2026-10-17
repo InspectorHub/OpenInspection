@@ -34,6 +34,28 @@ export async function toActionResult<I extends string>(
 }
 
 /**
+ * Result of a send that answers 200 with per-recipient outcomes (`data.sentTo`, `data.skipped`). When nobody was
+ * reached and at least one recipient was skipped, the request did not do what the person asked, so the dialog must
+ * stay open and say why; closing it as a success would leave them believing the message went out. Someone reached
+ * (even with others skipped) stays a success.
+ */
+export async function deliveryActionResult<I extends string>(
+  res: { ok: boolean; json: () => Promise<unknown> },
+  intent: I,
+  fallbackError: string,
+): Promise<{ ok: boolean; intent: I; error: string | undefined }> {
+  if (!res.ok) return toActionResult(res, intent, fallbackError);
+  const body = (await res.json().catch(() => null)) as { data?: { sentTo?: unknown[]; skipped?: Array<{ reason?: string }> } } | null;
+  const sent = body?.data?.sentTo?.length ?? 0;
+  const skipped = body?.data?.skipped ?? [];
+  if (sent === 0 && skipped.length > 0) {
+    const reasons = [...new Set(skipped.map((s) => s.reason).filter((r): r is string => Boolean(r)))];
+    return { ok: false, intent, error: reasons.length ? reasons.join("; ") : fallbackError };
+  }
+  return { ok: true, intent, error: undefined };
+}
+
+/**
  * `send-report` result. The API refuses a send for three reasons a reader can act
  * on, and each gets its own sentence instead of the generic failure: the report is
  * not published (409), the recipient was already sent this inspection several times
@@ -54,7 +76,7 @@ export async function sendReportActionResult(
       return { ok: false, intent: "send-report", error: message || m.inspections_hub_error_send_report() };
     }
   }
-  return toActionResult(res, "send-report", m.inspections_hub_error_send_report());
+  return deliveryActionResult(res, "send-report", m.inspections_hub_error_send_report());
 }
 
 /* ------------------------------------------------------------------ */
