@@ -19,6 +19,9 @@
  *   the enforcement side.
  * - MOUNTED: Hono's own routing table (app.routes), where every middleware is
  *   its own entry and requireCapability stamps `capability` on its closure.
+ *
+ * Which inspections a route may return is a separate question with its own registry:
+ * see inspection-visibility-registry.spec.ts.
  */
 import { describe, it, expect } from 'vitest';
 import { app } from '../../../server/index';
