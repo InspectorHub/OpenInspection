@@ -15,7 +15,12 @@ describe('video upload token', () => {
     });
     it('rejects tamper', async () => {
         const tok = await signUploadToken(claims, 300, secret);
-        expect(await verifyUploadToken(tok.slice(0, -2) + 'xx', secret)).toBeNull();
+        // Change one character that carries all six of its bits. Overwriting the last two with fixed letters
+        // left the token intact about once in a thousand runs: the final base64 character holds only four
+        // significant bits, so a tail that already decoded like 'xx' decoded to the same signature.
+        const at = tok.length - 2;
+        const tampered = tok.slice(0, at) + (tok[at] === 'A' ? 'B' : 'A') + tok.slice(at + 1);
+        expect(await verifyUploadToken(tampered, secret)).toBeNull();
     });
     it('rejects expiry', async () => {
         const tok = await signUploadToken(claims, -1, secret);
