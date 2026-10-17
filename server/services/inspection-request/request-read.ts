@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, inArray, desc, type SQL } from 'drizzle-orm';
+import { and, eq, gte, lte, inArray, desc, isNotNull, type SQL } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import {
     inspectionRequests,
@@ -10,6 +10,7 @@ import {
 } from '../../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { safeISODate } from '../../lib/date';
+import { visibleInspectionsCondition, type InspectionScope } from '../../lib/inspection/visibility';
 
 /**
  * READING an inspection request: the joins that assemble a parent plus its
@@ -94,8 +95,15 @@ function selectSubInspections(
  * Filters can narrow by status / date window. Pagination is offset-based
  * (offset/limit) — cursor pagination not needed at this scale.
  */
-export async function listRequests(db: DrizzleD1Database, tenantId: string, filter: ListFilter = {}) {
+export async function listRequests(db: DrizzleD1Database, tenantId: string, scope: InspectionScope, filter: ListFilter = {}) {
     const conds = [eq(inspectionRequests.tenantId, tenantId)];
+    // A request carries the client's name, address and phone, so a restricted caller sees only the
+    // requests that have at least one inspection they can see.
+    const visible = visibleInspectionsCondition(db, scope, tenantId);
+    if (visible) {
+        conds.push(inArray(inspectionRequests.id, db.select({ id: inspections.requestId }).from(inspections)
+            .where(and(eq(inspections.tenantId, tenantId), isNotNull(inspections.requestId), visible))));
+    }
     if (filter.status) conds.push(eq(inspectionRequests.status, filter.status));
     if (filter.from)   conds.push(gte(inspectionRequests.scheduledAt, new Date(filter.from)));
     if (filter.to)     conds.push(lte(inspectionRequests.scheduledAt, new Date(filter.to)));
@@ -113,7 +121,7 @@ export async function listRequests(db: DrizzleD1Database, tenantId: string, filt
     const reqIds = reqs.map(r => r.id);
     const subRows: SubInspectionRow[] = reqIds.length === 0
         ? []
-        : await selectSubInspections(db, tenantId, inArray(inspections.requestId, reqIds));
+        : await selectSubInspections(db, tenantId, and(inArray(inspections.requestId, reqIds), visible));
 
     return reqs.map(r => shapeRequest(r, subRows.filter(s => s.requestId === r.id)));
 }
@@ -124,13 +132,15 @@ export async function listRequests(db: DrizzleD1Database, tenantId: string, filt
  * (e.g. the inspection-edit request switcher) can render readable chips
  * without an extra round-trip.
  */
-export async function getRequest(db: DrizzleD1Database, tenantId: string, id: string) {
+export async function getRequest(db: DrizzleD1Database, tenantId: string, id: string, scope: InspectionScope) {
     const req = await db.select().from(inspectionRequests)
         .where(and(eq(inspectionRequests.id, id), eq(inspectionRequests.tenantId, tenantId)))
         .get();
     if (!req) return null;
 
-    const subs = await selectSubInspections(db, tenantId, eq(inspections.requestId, id));
+    const subs = await selectSubInspections(db, tenantId, and(eq(inspections.requestId, id), visibleInspectionsCondition(db, scope, tenantId)));
+    // A request none of whose inspections the caller can see answers like one that does not exist.
+    if (scope.kind === 'assigned' && subs.length === 0) return null;
 
     const tplIds = Array.from(new Set(subs.map(s => s.templateId).filter((x): x is string => !!x)));
     const tplNameById = new Map<string, string>();

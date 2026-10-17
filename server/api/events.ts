@@ -6,6 +6,8 @@ import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
 import { deniedNeedsRole } from '../lib/permission-denied';
 import { moneyView, guardMoneyWrite } from '../lib/auth/money-access';
+import { requireVisibleEvent, resolveInspectionScope } from '../lib/inspection/visibility';
+import { getDrizzle } from '../lib/route-helpers';
 
 const TypeBody = z.object({
     name:               z.string().min(1).describe('Display name of the event type, shown when scheduling a visit and on the calendar.'),
@@ -88,6 +90,8 @@ const eventsRoutes = createApiRouter()
         if (parsed.data.status === 'results_received' && !isAdminRole(c.get('userRole'))) {
             throw deniedNeedsRole(c, ['owner', 'manager'], 'Marking results as received is an owner or manager action');
         }
+        // A visit of an inspection the caller cannot see is not found, whatever the body says.
+        await requireVisibleEvent(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), id);
         await c.var.services.event.updateEventStatus(c.get('tenantId'), id, parsed.data.status);
         return c.json({ success: true });
     })

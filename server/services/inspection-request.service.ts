@@ -21,6 +21,7 @@ import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { PeopleService } from './people.service';
 import { ContactService } from './contact.service';
 import { listRequests, getRequest, type ListFilter } from './inspection-request/request-read';
+import { ALL_INSPECTIONS, type InspectionScope } from '../lib/inspection/visibility';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 export interface CreateRequestInput {
@@ -77,8 +78,8 @@ export class InspectionRequestService {
      * List parent requests for the tenant, eager-loading child inspections.
      * Body in `./inspection-request/request-read`.
      */
-    async list(tenantId: string, filter: ListFilter = {}) {
-        return listRequests(this.getDrizzle(), tenantId, filter);
+    async list(tenantId: string, scope: InspectionScope, filter: ListFilter = {}) {
+        return listRequests(this.getDrizzle(), tenantId, scope, filter);
     }
 
     /**
@@ -86,22 +87,22 @@ export class InspectionRequestService {
      * Stays a method: `create`, `addSubInspection` and `update` all reload
      * through it, as does `getByInspectionId` below.
      */
-    async get(tenantId: string, id: string) {
-        return getRequest(this.getDrizzle(), tenantId, id);
+    async get(tenantId: string, id: string, scope: InspectionScope) {
+        return getRequest(this.getDrizzle(), tenantId, id, scope);
     }
 
     /**
      * Resolve the parent request (if any) for an inspection. Used by
      * inspection-edit and the sub-route shell to render the request switcher.
      */
-    async getByInspectionId(tenantId: string, inspectionId: string) {
+    async getByInspectionId(tenantId: string, inspectionId: string, scope: InspectionScope) {
         const db = this.getDrizzle();
         const insp = await db.select({ requestId: inspections.requestId })
             .from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!insp || !insp.requestId) return null;
-        return this.get(tenantId, insp.requestId);
+        return this.get(tenantId, insp.requestId, scope);
     }
 
     /**
@@ -222,7 +223,7 @@ export class InspectionRequestService {
 
         logger.info('inspection-request.created', { requestId, tenantId, subCount: subs.length });
 
-        const detail = await this.get(tenantId, requestId);
+        const detail = await this.get(tenantId, requestId, ALL_INSPECTIONS);
         if (!detail) throw Errors.Internal('Failed to load newly created request');
         return detail;
     }
@@ -296,7 +297,7 @@ export class InspectionRequestService {
             logger.error('inspection-people write from addSubInspection failed', { requestId, inspectionId: id }, err instanceof Error ? err : undefined);
         }
 
-        const detail = await this.get(tenantId, requestId);
+        const detail = await this.get(tenantId, requestId, ALL_INSPECTIONS);
         if (!detail) throw Errors.Internal('Failed to load updated request');
         return detail;
     }
@@ -330,7 +331,7 @@ export class InspectionRequestService {
             .set(update)
             .where(and(eq(inspectionRequests.id, id), eq(inspectionRequests.tenantId, tenantId)));
 
-        const detail = await this.get(tenantId, id);
+        const detail = await this.get(tenantId, id, ALL_INSPECTIONS);
         if (!detail) throw Errors.Internal('Failed to reload updated request');
         return detail;
     }

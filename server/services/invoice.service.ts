@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { invoices } from '../lib/db/schema/invoice';
 import { contacts } from '../lib/db/schema/contact';
 import { tenantConfigs } from '../lib/db/schema';
@@ -18,6 +18,7 @@ import type { OfflinePaymentInput, PaymentCorrectionInput } from './invoice-paym
 import * as refunds from './invoice/refund';
 import { applyHeldDepositsToInvoice } from './invoice/deposit-application';
 import { allocateInvoiceNumber } from './invoice-number';
+import { visibleInspectionIds, type InspectionScope } from '../lib/inspection/visibility';
 import type { PartialRefundInput } from './invoice/refund';
 
 function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null; voidedAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' | 'void' {
@@ -47,9 +48,14 @@ export class InvoiceService {
         return row?.n ?? 0;
     }
 
-    async listInvoices(tenantId: string) {
+    async listInvoices(tenantId: string, scope: InspectionScope) {
         const db = this.getDrizzle();
-        const rows = await db.select().from(invoices).where(eq(invoices.tenantId, tenantId)).orderBy(desc(invoices.createdAt)).all();
+        // A restricted caller sees the invoices of the inspections they can see; an invoice attached to
+        // no inspection is the administrator tier's.
+        const visibleIds = visibleInspectionIds(db, scope, tenantId);
+        const rows = await db.select().from(invoices)
+            .where(and(eq(invoices.tenantId, tenantId), visibleIds ? inArray(invoices.inspectionId, visibleIds) : undefined))
+            .orderBy(desc(invoices.createdAt)).all();
         return rows.map(r => ({
             ...r,
             status: getStatus(r),

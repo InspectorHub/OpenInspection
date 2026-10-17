@@ -17,6 +17,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT  = '00000000-0000-0000-0000-000000000001';
 const TENANT2 = '00000000-0000-0000-0000-000000000002';
@@ -114,8 +115,8 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
 
         await svc.update(TENANT, r1.id, { status: 'confirmed' });
 
-        const pending   = await svc.list(TENANT, { status: 'pending' });
-        const confirmed = await svc.list(TENANT, { status: 'confirmed' });
+        const pending   = await svc.list(TENANT, ALL_INSPECTIONS, { status: 'pending' });
+        const confirmed = await svc.list(TENANT, ALL_INSPECTIONS, { status: 'confirmed' });
         expect(pending.length).toBe(1);
         expect(confirmed.length).toBe(1);
         expect(confirmed[0].id).toBe(r1.id);
@@ -126,7 +127,7 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
             clientName: 'A', propertyAddress: '1 St', scheduledAt: '2026-06-15T09:00:00Z',
         }, [{ templateId: TPL1 }]);
 
-        const otherTenantList = await svc.list(TENANT2, {});
+        const otherTenantList = await svc.list(TENANT2, ALL_INSPECTIONS, {});
         expect(otherTenantList).toHaveLength(0);
     });
 
@@ -135,8 +136,8 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
             clientName: 'A', propertyAddress: '1 St', scheduledAt: '2026-06-15T09:00:00Z',
         }, [{ templateId: TPL1 }]);
 
-        const sameTenant  = await svc.get(TENANT,  created.id);
-        const otherTenant = await svc.get(TENANT2, created.id);
+        const sameTenant  = await svc.get(TENANT, created.id, ALL_INSPECTIONS);
+        const otherTenant = await svc.get(TENANT2, created.id, ALL_INSPECTIONS);
         expect(sameTenant).not.toBeNull();
         expect(otherTenant).toBeNull();
     });
@@ -147,7 +148,7 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
         }, [{ templateId: TPL1 }, { templateId: TPL2 }]);
 
         const subId = created.inspections[0].id;
-        const parent = await svc.getByInspectionId(TENANT, subId);
+        const parent = await svc.getByInspectionId(TENANT, subId, ALL_INSPECTIONS);
         expect(parent).not.toBeNull();
         expect(parent!.id).toBe(created.id);
         expect(parent!.inspections.length).toBe(2);
@@ -168,7 +169,7 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
             clientName: 'A', propertyAddress: '1 St', scheduledAt: '2026-06-15T09:00:00Z',
         }, [{ templateId: TPL1 }, { templateId: TPL2 }]);
 
-        const detail = await svc.get(TENANT, created.id);
+        const detail = await svc.get(TENANT, created.id, ALL_INSPECTIONS);
         expect(detail).not.toBeNull();
         const names = detail!.inspections.map(i => i.templateName).sort();
         expect(names).toEqual(['Radon', 'Residential']);
@@ -182,11 +183,11 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
         }, [{ templateId: TPL1 }]);
         const subId = created.inspections[0].id;
 
-        const listed = await svc.list(TENANT, {});
+        const listed = await svc.list(TENANT, ALL_INSPECTIONS, {});
         const subFromList = listed.find(r => r.id === created.id)?.inspections.find(s => s.id === subId);
         expect(subFromList?.clientName).toBe('Jane Smith');
 
-        const got = await svc.get(TENANT, created.id);
+        const got = await svc.get(TENANT, created.id, ALL_INSPECTIONS);
         const subFromGet = got?.inspections.find(s => s.id === subId);
         expect(subFromGet?.clientName).toBe('Jane Smith');
     });
@@ -211,12 +212,12 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
         await testDb.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.id, clientRow!.id));
         await testDb.delete(schema.contacts).where(eq(schema.contacts.id, clientRow!.contactId));
 
-        const listed = await svc.list(TENANT, {});
+        const listed = await svc.list(TENANT, ALL_INSPECTIONS, {});
         const subFromList = listed.find(r => r.id === created.id)?.inspections.find(s => s.id === subId);
         expect(subFromList?.clientName).toBeNull();
         expect(subFromList?.clientName).not.toBe('Leak Victim');
 
-        const got = await svc.get(TENANT, created.id);
+        const got = await svc.get(TENANT, created.id, ALL_INSPECTIONS);
         const subFromGet = got?.inspections.find(s => s.id === subId);
         expect(subFromGet?.clientName).toBeNull();
         expect(subFromGet?.clientName).not.toBe('Leak Victim');

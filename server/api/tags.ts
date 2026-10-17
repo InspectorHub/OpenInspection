@@ -23,6 +23,8 @@ import {
     TagUnlinkResponseSchema,
 } from '../lib/validations/tag.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { filterVisibleInspectionIds, resolveInspectionScope } from "../lib/inspection/visibility";
+import { getDrizzle } from "../lib/route-helpers";
 
 const IdParamSchema = z.object({ id: z.string().min(1).describe('Unique id of the tag.') });
 
@@ -156,7 +158,10 @@ const tagsRoutes = createApiRouter()
         // Tenant-scope guard via lookup — refuses cross-tenant ids.
         const tag = await c.var.services.tag.get(id, tenantId);
         if (!tag) throw Errors.NotFound('Tag not found');
-        const inspectionIds = await c.var.services.tag.listInspectionsByTag(tenantId, id);
+        const tagged = await c.var.services.tag.listInspectionsByTag(tenantId, id);
+        // Only the inspections the caller can see; for everyone else the list is unchanged.
+        const visible = await filterVisibleInspectionIds(getDrizzle(c), await resolveInspectionScope(c), tenantId, tagged);
+        const inspectionIds = tagged.filter((x) => visible.has(x));
         return c.json({ success: true as const, data: { inspectionIds } }, 200);
     })
     .openapi(deleteTagRoute, async (c) => {

@@ -54,23 +54,23 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/analytics/growth': E('scoped-service', 'counts visible inspections'),
     'GET /api/analytics/findings-heatmap': E('scoped-service', 'rated items of visible inspections'),
     'GET /api/metrics': E('scoped-service', 'a restricted caller gets the own-row view, never company totals'),
-    'GET /api/invoices': P('scoped-service', 'invoices of visible inspections'),
-    'GET /api/invoices/:id/payments': P('handler-assert', 'the invoice must belong to a visible inspection'),
-    'POST /api/invoices/:id/payments': P('handler-assert', 'the invoice must belong to a visible inspection'),
-    'POST /api/invoices/:id/payments/:paymentId/corrections': P('handler-assert', 'the invoice must belong to a visible inspection'),
-    'PUT /api/events/:id': P('handler-assert', 'the event row names an inspection that must be visible'),
+    'GET /api/invoices': E('scoped-service', 'invoices of visible inspections'),
+    'GET /api/invoices/:id/payments': E('handler-assert', 'the invoice must belong to a visible inspection'),
+    'POST /api/invoices/:id/payments': E('handler-assert', 'the invoice must belong to a visible inspection'),
+    'POST /api/invoices/:id/payments/:paymentId/corrections': E('handler-assert', 'the invoice must belong to a visible inspection'),
+    'PUT /api/events/:id': E('handler-assert', 'the event row names an inspection that must be visible'),
     'DELETE /api/events/:id': E('admin-only', 'requireRole(owner, manager)'),
-    'GET /api/inspection-requests': P('scoped-service', 'requests with at least one visible inspection'),
-    'GET /api/inspection-requests/:id': P('scoped-service', 'same rule as the list'),
-    'GET /api/inspection-requests/by-inspection/:inspectionId': P('handler-assert', 'the inspection must be visible'),
+    'GET /api/inspection-requests': E('scoped-service', 'requests with at least one visible inspection'),
+    'GET /api/inspection-requests/:id': E('scoped-service', 'same rule as the list'),
+    'GET /api/inspection-requests/by-inspection/:inspectionId': E('handler-assert', 'the inspection must be visible'),
     'POST /api/inspection-requests/:id/inspections': E('admin-only', 'requireRole(owner, manager)'),
     'GET /api/tags': E('company-open-staff', 'the tag vocabulary with a usage count per tag; no inspection ids'),
-    'GET /api/tags/:id/inspections': P('scoped-service', 'inspection ids reduced to the visible set'),
-    'GET /api/admin/sms/consent': P('handler-assert', 'the inspection must be visible'),
+    'GET /api/tags/:id/inspections': E('scoped-service', 'inspection ids reduced to the visible set'),
+    'GET /api/admin/sms/consent': E('handler-assert', 'the inspection must be visible'),
     'GET /api/team/members': P('projection', 'non-administrators get id, name and role (and email with scheduleOthers)'),
 
     // Calendar and schedule. Aligning these with the list belongs with the change that opens the write surface.
-    'GET /api/calendar/events': P('scoped-service', 'local inspections cut to the visible set'),
+    'GET /api/calendar/events': E('scoped-service', 'local inspections cut to the visible set'),
     'GET /api/calendar/items': P('self-only', 'forced to the caller for a non-administrator; reconciled with the list later'),
     'GET /api/calendar/dispatch': E('capability-gated', 'scheduleOthers, normalised off for a restricted inspector'),
     'GET /api/schedule/week-summary': P('self-only', 'forced to the caller for a non-administrator; reconciled with the list later'),
@@ -127,13 +127,13 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
     // The collection itself.
     'server/api/inspections/bulk.ts': E('scoped-service', 'list, counts and dashboard take the scope; bulk update and the inspector list are capability-gated'),
     // Staff-readable, outside the family.
-    'server/api/calendar-events.ts': P('scoped-service', 'GET / is cut to the visible set'),
+    'server/api/calendar-events.ts': E('scoped-service', 'GET / is cut to the visible set'),
     'server/api/calendar-items.ts': P('self-only', 'forced to the caller for a non-administrator; the dispatch board is capability-gated'),
-    'server/api/invoices.ts': P('scoped-service', 'the list is cut to visible inspections; mutations are owner/manager'),
+    'server/api/invoices.ts': E('scoped-service', 'the list is cut to visible inspections; mutations are owner/manager'),
     'server/api/metrics.ts': E('scoped-service', 'a restricted caller gets the own-row view'),
     'server/api/usage.ts': E('company-open-staff', 'lifetime capacity counters'),
     'server/api/ics.ts': E('self-only', 'a token resolves to one user and that user own roster'),
-    'server/api/sms.ts': P('handler-assert', 'public opt-in and webhooks are token-driven; GET /sms/consent asserts visibility; the rest is owner/manager'),
+    'server/api/sms.ts': E('handler-assert', 'public opt-in and webhooks are token-driven; GET /sms/consent asserts visibility; the rest is owner/manager'),
     'server/api/agent.ts': E('self-only', 'the agent portal is keyed to the signed-in agent account; the leaderboard is owner/manager'),
     // Admin-only.
     'server/api/admin/admin-esign.ts': E('admin-only', 'every route is requireRole(owner, manager)'),
@@ -150,6 +150,12 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
 /** Files allowed to name ALL_INSPECTIONS: where nobody narrowed to a person is acting. Anything new is reviewed here. */
 export const ALL_INSPECTIONS_AUDITED_USES: readonly string[] = [
     'server/lib/inspection/visibility.ts',
+    // Both are reached from owner/manager-only paths (mark-sent re-reads the list; the request service
+    // reloads a request it has just written), so the whole company is the intended answer.
+    'server/api/invoices.ts',
+    // The unread badge: the administrator tier is answered with everything, anyone else from the capabilities just resolved.
+    'server/api/session-context.ts',
+    'server/services/inspection-request.service.ts',
 ];
 
 /** Path prefixes whose GET routes read inspection-derived data; every such route must be in SET_READS. */

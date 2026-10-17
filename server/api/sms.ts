@@ -62,6 +62,7 @@ import { logger } from '../lib/logger';
 import { Hono, type Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
 import { getDrizzle, type AppDrizzle } from '../lib/route-helpers';
+import { requireVisibleInspection, resolveInspectionScope } from '../lib/inspection/visibility';
 
 // Re-export for the existing send-site import path (server/api/sms#recordSentStatus).
 export { recordSentStatus };
@@ -584,6 +585,8 @@ export const smsAdminRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const { inspectionId } = c.req.valid('query');
         const db = getDrizzle(c);
+        // A restricted caller learns nothing about an inspection they cannot see, including whether it exists.
+        await requireVisibleInspection(db, await resolveInspectionScope(c), tenantId, inspectionId);
         const insp = await db.select({ id: inspections.id }).from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).get();
         if (!insp) throw Errors.NotFound('Inspection not found.');

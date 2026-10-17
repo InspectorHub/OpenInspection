@@ -21,7 +21,7 @@
 import { and, eq, exists, inArray, isNull, notExists, or, sql, type SQL } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Context } from 'hono';
-import { inspections, inspectionInspectors, inspectionPeople, inspectionMessages } from '../db/schema';
+import { inspections, inspectionInspectors, inspectionPeople, inspectionMessages, invoices, inspectionEvents } from '../db/schema';
 import { contacts } from '../db/schema/contact';
 import { Errors } from '../errors';
 import { isAdminRole, isRole } from '../auth/roles';
@@ -94,6 +94,31 @@ export function visibleMessagesCondition(db: DB, scope: InspectionScope, tenantI
         inArray(inspectionMessages.inspectionId, visibleInspectionIds(db, scope, tenantId)!),
         and(isNull(inspectionMessages.inspectionId), eq(inspectionMessages.fromUserId, scope.userId)),
     ) as SQL;
+}
+
+/**
+ * Refuses with 404 when the invoice does not belong to a visible inspection (or does not exist),
+ * with the same answer for both. An invoice attached to no inspection is the administrator tier's.
+ */
+export async function requireVisibleInvoice(db: DB, scope: InspectionScope, tenantId: string, invoiceId: string): Promise<void> {
+    if (scope.kind === 'all') return;
+    const row = await db.select({ visible: sql<number>`(${assignedCondition(db, scope.userId, tenantId)})` })
+        .from(invoices)
+        .innerJoin(inspections, and(eq(inspections.id, invoices.inspectionId), eq(inspections.tenantId, invoices.tenantId)))
+        .where(and(eq(invoices.id, invoiceId), eq(invoices.tenantId, tenantId)))
+        .get();
+    if (!row || !row.visible) throw Errors.NotFound('Invoice not found');
+}
+
+/** The same for a scheduled visit (an inspection event): it is as visible as the inspection it belongs to. */
+export async function requireVisibleEvent(db: DB, scope: InspectionScope, tenantId: string, eventId: string): Promise<void> {
+    if (scope.kind === 'all') return;
+    const row = await db.select({ visible: sql<number>`(${assignedCondition(db, scope.userId, tenantId)})` })
+        .from(inspectionEvents)
+        .innerJoin(inspections, and(eq(inspections.id, inspectionEvents.inspectionId), eq(inspections.tenantId, inspectionEvents.tenantId)))
+        .where(and(eq(inspectionEvents.id, eventId), eq(inspectionEvents.tenantId, tenantId)))
+        .get();
+    if (!row || !row.visible) throw Errors.NotFound('Event not found');
 }
 
 /**

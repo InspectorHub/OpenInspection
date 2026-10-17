@@ -11,6 +11,8 @@ import {
 import { safeISODate } from '../../lib/date';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { qboPaymentKey } from '../../lib/qbo-payment-key';
+import { requireVisibleInvoice, resolveInspectionScope } from '../../lib/inspection/visibility';
+import { getDrizzle } from '../../lib/route-helpers';
 
 /**
  * The payment-ledger sub-resource of an invoice — everything under
@@ -121,6 +123,7 @@ const invoicePaymentRoutes = createApiRouter()
         // The recorder is the SESSION, never the body. A money entry nobody is
         // named on cannot be defended when the payment is later disputed.
         const recordedBy = c.get('user')?.sub as string;
+        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
 
         const appended = await c.var.services.invoice.recordOfflinePayment(tenantId, id, {
             amountCents: body.amountCents,
@@ -177,6 +180,7 @@ const invoicePaymentRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { correctedAmountCents, reason } = c.req.valid('json');
         const recordedBy = c.get('user')?.sub as string;
+        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
 
         // The service also re-syncs the report's payment gate: a correction can
         // take an invoice back OUT of paid, which is precisely the state the old
@@ -207,6 +211,7 @@ const invoicePaymentRoutes = createApiRouter()
     })
     .openapi(listInvoicePaymentsRoute, async (c) => {
         const id = c.req.valid('param').id as string;
+        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), id);
         const rows = await c.var.services.invoice.listPayments(c.get('tenantId'), id);
         return c.json({ success: true as const, data: rows }, 200);
     });

@@ -13,6 +13,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
 import { getCalendarEventStyle } from '../lib/calendar-event-style';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { resolveInspectionScope, visibleInspectionsCondition } from '../lib/inspection/visibility';
 
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -93,6 +94,8 @@ const calendarEventsRoutes = createApiRouter()
             eq(inspections.tenantId, tenantId),
             gte(inspections.date, startDate),
             lt(inspections.date, endDate),
+            // Only the inspections the caller can see, the same set as their inspection list.
+            visibleInspectionsCondition(db, await resolveInspectionScope(c), tenantId),
         ));
 
     const events: unknown[] = rows.map((r) => {
