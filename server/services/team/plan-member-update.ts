@@ -66,6 +66,20 @@ function withUnsettableKept(
     return Object.keys(out).length ? out : null;
 }
 
+/**
+ * A restriction on which inspections a person can see must never be lifted by accident. A request
+ * that carries a map replaces the stored one for every switch, but for `viewAllInspections` an
+ * absent key means "leave it": only an explicit true or false changes it (and the grant ceiling
+ * still decides who may). Without this, an API or MCP client that sends a partial map, or clears
+ * the overrides, would silently give a restricted inspector access to everything.
+ */
+function withScopeKept(requested: RequestedOverrides | null, current: PermissionOverrides | null): RequestedOverrides {
+    const out: RequestedOverrides = { ...(requested ?? {}) };
+    const stored = current?.viewAllInspections;
+    if (typeof out.viewAllInspections !== 'boolean' && typeof stored === 'boolean') out.viewAllInspections = stored;
+    return out;
+}
+
 export interface MemberUpdatePlan {
     nextRole: UserRole;
     /** What to store: only what differs from the (possibly new) role template. */
@@ -96,7 +110,9 @@ export function planMemberUpdate(args: {
     const currentOverrides = coerceOverrides(current.permissionOverrides);
     const permissionOverrides = withUnsettableKept(
         nextRole,
-        requested === undefined ? diffOverrides(nextRole, currentOverrides) : diffOverrides(nextRole, requested),
+        requested === undefined
+            ? diffOverrides(nextRole, currentOverrides)
+            : diffOverrides(nextRole, withScopeKept(requested, currentOverrides)),
         currentOverrides,
     );
 

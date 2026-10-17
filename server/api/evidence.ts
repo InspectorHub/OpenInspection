@@ -7,6 +7,8 @@ import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { r2Keys } from '../lib/r2-keys';
 import { deliverableHeaders } from '../lib/deliverable-headers';
+import { requireVisibleAgreementRequest, resolveInspectionScope } from '../lib/inspection/visibility';
+import { getDrizzle } from '../lib/route-helpers';
 
 /**
  * Pure download helpers exported for unit testing. The OpenAPIHono route
@@ -149,16 +151,22 @@ const evidenceRoutes = createApiRouter()
     .openapi(downloadAgreementRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;
+        // A signed agreement belongs to an inspection; one outside the caller's set is not found.
+        await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
         return downloadAgreementPdf(c.env.DB, c.env.PHOTOS, id, tenantId);
     })
     .openapi(downloadCertRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;
+        // A signed agreement belongs to an inspection; one outside the caller's set is not found.
+        await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
         return downloadCertPdf(c.env.DB, c.env.PHOTOS, id, tenantId);
     })
     .openapi(downloadEvidenceRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;
+        // A signed agreement belongs to an inspection; one outside the caller's set is not found.
+        await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
         return downloadEvidenceZip(c.env.DB, c.env.PHOTOS, id, tenantId);
     });
 

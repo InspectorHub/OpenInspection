@@ -11,7 +11,8 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { resolveTenantSlug } from '../../lib/url';
 import { lookupSenderSignature } from '../../lib/signature-helpers';
-import { getTenantId } from '../../lib/route-helpers';
+import { getTenantId, getDrizzle } from '../../lib/route-helpers';
+import { requireVisibleAgreementRequest, resolveInspectionScope } from '../../lib/inspection/visibility';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import {
@@ -338,6 +339,8 @@ const adminAgreementsRoutes = createApiRouter()
         const { signatureBase64 } = c.req.valid('json');
         const tenantId = c.get('tenantId') as string;
         const userId = c.get('user')?.sub ?? '';
+        // Pre-signing writes onto an inspection's agreement: one outside the caller's set is not found.
+        await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
         try {
             await applyInspectorPreSign(c.env.DB, tenantId, id, userId, signatureBase64);
         } catch (e) {

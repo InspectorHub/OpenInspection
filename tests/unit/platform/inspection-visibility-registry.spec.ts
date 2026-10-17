@@ -40,6 +40,9 @@ function scanApiFiles(): string[] {
             const re = /import\s*\{([^}]*)\}\s*from\s*'[^']*db\/schema[^']*'/g;
             let m: RegExpExecArray | null;
             let hit = false;
+            // `import * as schema from '.../db/schema'` reaches the same tables as `schema.invoices`.
+            const ns = /import\s*\*\s*as\s+(\w+)\s+from\s*'[^']*db\/schema[^']*'/.exec(src);
+            if (ns && new RegExp(`\\b${ns[1]}\\.(${[...TABLES].join('|')})\\b`).test(src)) hit = true;
             while ((m = re.exec(src))) {
                 for (const spec of m[1]!.split(',')) {
                     const name = spec.trim().split(/\s+as\s+/)[0]!.replace(/^type\s+/, '');
@@ -71,7 +74,7 @@ describe('inspection visibility registry', { timeout: 60_000 }, () => {
         const candidates = [...routeKeys()].filter((key) => {
             const [method, p] = [key.slice(0, key.indexOf(' ')), key.slice(key.indexOf(' ') + 1)];
             if (inFamily(p) || isPublic(p)) return false;
-            if (/:inspectionId|:inspection_id|by-inspection/.test(p)) return true;
+            if (/:inspectionId|:inspection_id|by-inspection|\/agreement-requests\/:/.test(p)) return true;
             if (method !== 'GET') return false;
             return READ_PREFIXES.some(x => p === x || p.startsWith(`${x}/`));
         });

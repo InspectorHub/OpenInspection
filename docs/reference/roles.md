@@ -201,7 +201,8 @@ When an inspector has it off, they see only inspections they are assigned to:
 - **Unassigned inspections** are visible to owners and managers only.
 - Everything derived from an inspection follows the same rule: the list, counts, dashboard,
   search, the calendar and its week summary, contacts and message threads of those inspections,
-  analytics and metrics, invoices, scheduled visits, inspection requests, the realtime editor and
+  analytics and metrics, invoices, signed agreements and their evidence downloads, AI summaries, scheduled visits,
+  inspection requests, the realtime editor and
   presence, bulk actions, the native client's sync and package import, and the remote tools.
   The company-wide presence roster still shows who is online, but withholds which inspection
   each colleague has open.
@@ -223,8 +224,9 @@ When an inspector has it off, they see only inspections they are assigned to:
 **Setting it.** On the Team page an administrator chooses "Inspections this person can see" in the
 invite and edit forms, or sends `viewAllInspections: false` in `permissionOverrides` on
 `POST /api/team/invite` and `PATCH /api/team/members/{id}`. A member edit that sends
-`permissionOverrides` replaces the whole map, as it does for every other switch, so restate the
-restriction to keep it. A change is recorded in the audit trail as a capability change that names
+`permissionOverrides` replaces the whole map for every other switch, but a stored
+`viewAllInspections` is kept unless the request states it, so a partial or empty map never lifts
+a restriction by accident; only an explicit `true` or `false` changes it. A change is recorded in the audit trail as a capability change that names
 `viewAllInspections`.
 
 **Company default for new inspectors.** `GET` and `PUT /api/team/defaults` carry

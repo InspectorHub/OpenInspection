@@ -64,11 +64,18 @@ describe('restricting an inspector through the team routes', () => {
             expect(await overridesOf(USERS.inspA)).toEqual(RESTRICT);
             expect(await listFor(USERS.inspA)).toEqual([...VISIBLE_TO_A].sort());
         });
-        it('a manager may do the same, and lifting it with an empty override map restores the whole company', async () => {
+        it('a manager may do the same; only an explicit true lifts it, an empty or partial map never does', async () => {
             const app = actAs(USERS.manager, 'manager');
             expect((await patch(app, USERS.inspA, { permissionOverrides: RESTRICT })).status).toBe(200);
             expect(await listFor(USERS.inspA)).toEqual([...VISIBLE_TO_A].sort());
+            // An API or MCP client that does not mention the scope must not lift it by accident.
             expect((await patch(app, USERS.inspA, { permissionOverrides: {} })).status).toBe(200);
+            expect(await overridesOf(USERS.inspA)).toEqual(RESTRICT);
+            expect((await patch(app, USERS.inspA, { permissionOverrides: { publish: false } })).status).toBe(200);
+            expect(await overridesOf(USERS.inspA)).toEqual({ ...RESTRICT, publish: false });
+            expect(await listFor(USERS.inspA)).toEqual([...VISIBLE_TO_A].sort());
+            // Control: saying it out loud does lift it, and the other switch is replaced as before.
+            expect((await patch(app, USERS.inspA, { permissionOverrides: { viewAllInspections: true } })).status).toBe(200);
             expect(await overridesOf(USERS.inspA)).toBeNull();
             expect(await listFor(USERS.inspA)).toEqual([...ALL_OF_TENANT].sort());
         });
