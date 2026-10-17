@@ -34,7 +34,7 @@ export async function toActionResult<I extends string>(
 }
 
 /** One recipient a send did not reach, as the send routes report it. */
-export interface SkippedRecipient {
+interface SkippedRecipient {
   /** The contact id (or address) that identified the recipient in the request. */
   recipient: string;
   /** The server's own words; the dialogs never show them, they map them (`deliveryReasonText`). */

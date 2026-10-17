@@ -340,7 +340,6 @@
   "inspections_hub_send_result_summary": "Reached {sent} of {total}.",
   "inspections_hub_send_result_none": "Nobody was reached.",
   "inspections_hub_send_result_not_reached": "Not reached",
-  "inspections_hub_send_result_back": "Back",
   "inspections_hub_send_result_done": "Done",
   "inspections_hub_send_result_someone": "A recipient"
 }

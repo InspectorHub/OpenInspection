@@ -135,7 +135,7 @@ export function SendReportModal({
         delivery ? (
           <>
             <Button variant="secondary" type="button" onClick={back}>
-              {m.inspections_hub_send_result_back()}
+              {m.common_back()}
             </Button>
             <Button variant="primary" type="button" onClick={onClose}>
               {m.inspections_hub_send_result_done()}

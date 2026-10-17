@@ -83,7 +83,7 @@ export function SendSmsModal({
         delivery ? (
           <div className="flex items-center justify-end gap-2">
             <Button variant="secondary" size="sm" type="button" onClick={back}>
-              {m.inspections_hub_send_result_back()}
+              {m.common_back()}
             </Button>
             <Button variant="primary" size="sm" type="button" onClick={onClose}>
               {m.inspections_hub_send_result_done()}
