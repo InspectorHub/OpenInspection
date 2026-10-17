@@ -5,6 +5,7 @@ import { tenantConfigs } from '../lib/db/schema';
 import { TeamDefaultsSchema } from '../lib/validations/admin.schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { getDrizzle } from '../lib/route-helpers';
+import { auditFromContext } from '../lib/audit';
 
 /**
  * `/api/team/defaults` — the team page's tenant-level toggles.
@@ -68,7 +69,15 @@ const teamDefaultsRoutes = createApiRouter()
         if (body.newInspectorsViewAll     !== undefined) update.newInspectorsViewAll     = body.newInspectorsViewAll;
 
         if (Object.keys(update).length > 0) {
+            // Read before the write so a save that changes nothing leaves no record.
+            const before = body.newInspectorsViewAll === undefined ? undefined : (await getDrizzle(c)
+                .select({ v: tenantConfigs.newInspectorsViewAll }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get())?.v ?? true;
             await c.var.services.branding.updateBranding(tenantId, update);
+            if (body.newInspectorsViewAll !== undefined && body.newInspectorsViewAll !== before) {
+                auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
+                    entityId: tenantId, metadata: { field: 'newInspectorsViewAll', enabled: body.newInspectorsViewAll },
+                });
+            }
         }
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });

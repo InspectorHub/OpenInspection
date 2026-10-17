@@ -14,11 +14,13 @@ import { BrandingService } from '../../../server/services/branding.service';
 import teamDefaultsRoutes from '../../../server/api/team-defaults';
 import { WRITABLE_TENANT_CONFIG_COLUMNS } from '../../../server/lib/tenant-config-write-policy';
 import { AppError } from '../../../server/lib/errors';
+import { makeExecutionContext } from '../helpers/exec-ctx';
 import type { HonoConfig } from '../../../server/types/hono';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 const TENANT = 'td-tenant';
+const { ctx, settle } = makeExecutionContext();
 
 describe('/api/team/defaults', () => {
     let db: ReturnType<typeof createTestDb>['db'];
@@ -51,7 +53,11 @@ describe('/api/team/defaults', () => {
     const put = (role: 'owner' | 'manager' | 'inspector', body: unknown) =>
         build(role).request('/api/team/defaults', {
             method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-        }, { DB: {} } as never);
+        }, { DB: {} } as never, ctx);
+    const audit = async () => {
+        await settle();
+        return (await db.select().from(schema.auditLogs).all()).filter((r) => r.action === 'config.tenant_config.patch');
+    };
     const stored = () => db.select().from(schema.tenantConfigs).where(eq(schema.tenantConfigs.tenantId, TENANT)).get();
 
     it('reports the defaults when the company has no config row yet: new inspectors can see everything', async () => {
@@ -78,6 +84,19 @@ describe('/api/team/defaults', () => {
         const refused = await put('inspector', { newInspectorsViewAll: true });
         expect(refused.status).toBe(403);
         expect((await get()).data.newInspectorsViewAll).toBe(false);
+    });
+    it('records a change of the new-inspector default, naming the field and the new value, and nothing for a save that changes nothing', async () => {
+        expect((await put('owner', { newInspectorsViewAll: false })).status).toBe(200);
+        const rows = await audit();
+        expect(rows).toHaveLength(1);
+        expect(rows[0]?.metadata).toEqual({ field: 'newInspectorsViewAll', enabled: false });
+        // The same value again, and another toggle on its own, are not changes to this default.
+        expect((await put('owner', { newInspectorsViewAll: false })).status).toBe(200);
+        expect((await put('owner', { teamModeDefault: true })).status).toBe(200);
+        expect(await audit()).toHaveLength(1);
+        // Turning it back on is a change.
+        expect((await put('manager', { newInspectorsViewAll: true })).status).toBe(200);
+        expect((await audit()).map((r) => (r.metadata as { enabled: boolean }).enabled)).toEqual([false, true]);
     });
     it('rejects a value that is not a boolean', async () => {
         expect((await put('owner', { newInspectorsViewAll: 'no' })).status).toBe(400);

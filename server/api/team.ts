@@ -7,6 +7,7 @@ import { requireCapability, capabilitiesFor } from '../lib/middleware/require-ca
 import { auditRefusedGrant, templateAuditMeta, updateMemberAudited } from './team-grant-audit';
 import { PermissionTemplateService } from '../services/team/permission-templates.service';
 import { applyTemplateToRequest } from '../services/team/apply-template';
+import { requestedWithCompanyDefault, inspectionScopeOf } from './team-invite-default';
 import teamPermissionTemplateRoutes from './team-permission-templates';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
@@ -279,7 +280,7 @@ const teamRoutes = createApiRouter()
         // switches sent alongside) are what the invite carries, and they go through
         // the same checks below as the same role and switches typed by hand.
         const applied = body.templateId ? await new PermissionTemplateService(c.env.DB).resolveRef(tenantId, body.templateId) : null;
-        const stamped = applyTemplateToRequest({ applied, requestedRole: body.role, requestedOverrides: body.permissionOverrides });
+        const stamped = applyTemplateToRequest({ applied, requestedRole: body.role, requestedOverrides: await requestedWithCompanyDefault(c, { applied, requestedRole: body.role, requested: body.permissionOverrides }) });
         const inviteRole = stamped.role ?? 'inspector';
 
         // The invited role is copied onto the new user at accept time, so
@@ -303,7 +304,7 @@ const teamRoutes = createApiRouter()
         // value shape at write time, so an address would be stripped anyway,
         // and the invite row already holds it.
         auditFromContext(c, 'user.invite', 'user', {
-            metadata: { role: inviteRole, ...templateAuditMeta(applied) },
+            metadata: { role: inviteRole, inspectionScope: inspectionScopeOf(inviteRole, stamped.overrides), ...templateAuditMeta(applied) },
         });
 
         const inviteLink = inviteAcceptUrl(c, token);
