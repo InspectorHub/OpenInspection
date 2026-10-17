@@ -417,7 +417,9 @@ describe("QboCredentialsForm - Check credentials", () => {
     });
     expect(await screen.findByText("Intuit accepted this Client ID and secret.")).toBeInTheDocument();
     expect(posted).toHaveLength(1);
-    // A later, separate press still goes through.
+    // A later, separate press still goes through, once the first check has settled: the button is inert while
+    // the fetcher is still loading, and the result text can appear a render before that ends.
+    await waitFor(() => expect(check()).not.toHaveAttribute("aria-disabled"));
     fireEvent.click(check());
     await waitFor(() => expect(posted).toHaveLength(2));
   });
