@@ -1,4 +1,4 @@
-import { getCapabilities, coerceOverrides, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from './capabilities';
+import { getCapabilities, coerceOverrides, TOGGLEABLE, SETTABLE_CAPABILITIES, type Capability, type CapabilitySet, type PermissionOverrides } from './capabilities';
 import { ROLE, type Role } from './roles';
 
 /**
@@ -90,7 +90,7 @@ export function diffAgainstRole(role: Role, overrides: PermissionOverrides | nul
     const base = getCapabilities(role, null);
     const effective = getCapabilities(role, overrides);
     const diff: PermissionOverrides = {};
-    for (const cap of TOGGLEABLE) {
+    for (const cap of SETTABLE_CAPABILITIES) {
         const wanted = overrides[cap];
         // A pinned switch resolves to the same value whatever is stored, so it differs from the base never.
         if (typeof wanted === 'boolean' && wanted !== base[cap] && effective[cap] === wanted) diff[cap] = wanted;
@@ -141,7 +141,7 @@ export function layerOverrides(
     explicit: Partial<Record<Capability, boolean | undefined>> | null | undefined,
 ): PermissionOverrides | null {
     const merged: PermissionOverrides = { ...(template ?? {}) };
-    if (explicit) for (const cap of TOGGLEABLE) {
+    if (explicit) for (const cap of SETTABLE_CAPABILITIES) {
         const v = explicit[cap];
         if (typeof v === 'boolean') merged[cap] = v;
     }

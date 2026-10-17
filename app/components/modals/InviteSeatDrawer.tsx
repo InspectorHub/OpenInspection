@@ -110,6 +110,7 @@ export const CAP_LABELS: Record<Capability, string> = {
  get templateImport() { return m.label_cap_template_import(); },
  get deleteInspection() { return m.label_cap_delete_inspection(); },
  get editReports() { return m.label_cap_edit_reports(); },
+ get viewAllInspections() { return m.label_cap_view_all_inspections(); },
 };
 
 /**

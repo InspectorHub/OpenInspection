@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TOGGLEABLE } from '../../../server/lib/auth/capabilities';
+import { TOGGLEABLE, SETTABLE_CAPABILITIES, VIEW_ALL_SETTABLE } from '../../../server/lib/auth/capabilities';
 import {
     InviteMemberSchema,
     UpdateMemberSchema,
@@ -24,26 +24,42 @@ import {
  */
 const everyCapability = Object.fromEntries(TOGGLEABLE.map((cap) => [cap, true]));
 const sorted = [...TOGGLEABLE].sort();
+const settableSorted = [...SETTABLE_CAPABILITIES].sort();
 
-describe('team request schemas accept exactly the TOGGLEABLE capability set', () => {
-    it('POST /api/team/invite keeps every declared capability', () => {
+describe('team request schemas accept exactly the settable capability set', () => {
+    it('POST /api/team/invite keeps every settable capability', () => {
         const parsed = InviteMemberSchema.parse({
             email: 'new-user@example.com',
             role: 'inspector',
             permissionOverrides: everyCapability,
         });
-        expect(Object.keys(parsed.permissionOverrides ?? {}).sort()).toEqual(sorted);
+        expect(Object.keys(parsed.permissionOverrides ?? {}).sort()).toEqual(settableSorted);
     });
 
-    it('PATCH /api/team/members/:id keeps every declared capability', () => {
+    it('PATCH /api/team/members/:id keeps every settable capability', () => {
         const parsed = UpdateMemberSchema.parse({
             role: 'manager',
             permissionOverrides: everyCapability,
         });
-        expect(Object.keys(parsed.permissionOverrides ?? {}).sort()).toEqual(sorted);
+        expect(Object.keys(parsed.permissionOverrides ?? {}).sort()).toEqual(settableSorted);
     });
 
-    it('the team response describes the same set it accepts', () => {
+    it('the only declared capability a request cannot write is the visibility scope, and only while it is not settable', () => {
+        const difference = TOGGLEABLE.filter((cap) => !SETTABLE_CAPABILITIES.includes(cap));
+        expect(difference).toEqual(VIEW_ALL_SETTABLE ? [] : ['viewAllInspections']);
+    });
+
+    it('an invite cannot carry the visibility scope while it is not settable (control: another switch survives)', () => {
+        const parsed = InviteMemberSchema.parse({
+            email: 'new-user@example.com',
+            role: 'inspector',
+            permissionOverrides: { viewAllInspections: false, publish: false },
+        });
+        expect(parsed.permissionOverrides?.publish).toBe(false);
+        expect(Object.keys(parsed.permissionOverrides ?? {}).includes('viewAllInspections')).toBe(VIEW_ALL_SETTABLE);
+    });
+
+    it('the team response describes everything that can be stored, including the visibility scope', () => {
         const parsed = TeamMembersResponseSchema.parse({
             success: true,
             data: {

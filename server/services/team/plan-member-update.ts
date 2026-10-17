@@ -9,6 +9,7 @@ import {
     coerceOverrides,
     getCapabilities,
     TOGGLEABLE,
+    SETTABLE_CAPABILITIES,
     type Capability,
     type PermissionOverrides,
 } from '../../lib/auth/capabilities';
@@ -32,11 +33,35 @@ export function diffOverrides(role: UserRole, requested?: RequestedOverrides | n
     if (!requested) return null;
     const template = getCapabilities(role, null);
     const diff: PermissionOverrides = {};
-    for (const cap of TOGGLEABLE) {
+    // Only what a request may write. A capability whose write surface is closed never lands
+    // in a stored map from here; `planMemberUpdate` carries an existing value across an edit.
+    for (const cap of SETTABLE_CAPABILITIES) {
         const value = requested[cap];
         if (typeof value === 'boolean' && value !== template[cap]) diff[cap] = value;
     }
     return Object.keys(diff).length ? diff : null;
+}
+
+/**
+ * Carry across an edit any stored switch whose write surface is closed. Without this, saving
+ * an unrelated change on a restricted inspector would rebuild their overrides from the
+ * settable switches only and silently lift the restriction. Kept only while it still takes
+ * effect for the (possibly new) role, so a role that pins the switch stores nothing for it.
+ */
+function withUnsettableKept(
+    role: UserRole,
+    diff: PermissionOverrides | null,
+    current: PermissionOverrides | null,
+): PermissionOverrides | null {
+    if (!current) return diff;
+    const out: PermissionOverrides = { ...(diff ?? {}) };
+    const base = getCapabilities(role, null);
+    for (const cap of TOGGLEABLE) {
+        if (SETTABLE_CAPABILITIES.includes(cap)) continue;
+        const value = current[cap];
+        if (typeof value === 'boolean' && value !== base[cap] && getCapabilities(role, { [cap]: value })[cap] === value) out[cap] = value;
+    }
+    return Object.keys(out).length ? out : null;
 }
 
 export interface MemberUpdatePlan {
@@ -67,9 +92,11 @@ export function planMemberUpdate(args: {
 }): MemberUpdatePlan {
     const { actor, isSelf, current, nextRole, requested } = args;
     const currentOverrides = coerceOverrides(current.permissionOverrides);
-    const permissionOverrides = requested === undefined
-        ? diffOverrides(nextRole, currentOverrides)
-        : diffOverrides(nextRole, requested);
+    const permissionOverrides = withUnsettableKept(
+        nextRole,
+        requested === undefined ? diffOverrides(nextRole, currentOverrides) : diffOverrides(nextRole, requested),
+        currentOverrides,
+    );
 
     // The ceiling: only what this change newly turns ON counts, so a manager
     // can still edit (or turn off) a member who already holds something the

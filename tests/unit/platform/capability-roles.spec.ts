@@ -27,6 +27,7 @@ const TABLE: Record<Capability, Record<Role, Cell>> = {
   templateImport:    { owner: TP, manager: T, inspector: T, staff: F, agent: FP },
   deleteInspection:  { owner: TP, manager: T, inspector: T, staff: F, agent: FP },
   editReports:       { owner: TP, manager: T, inspector: T, staff: FP, agent: FP },
+  viewAllInspections: { owner: TP, manager: TP, inspector: T, staff: TP, agent: FP },
 };
 
 describe('capability table', () => {
@@ -92,10 +93,10 @@ describe('pinnedCapabilities', () => {
     }
   });
 
-  it('leaves inspector and manager with nothing pinned, and pins exactly publish and editReports for staff', () => {
+  it('pins nothing for an inspector, only the visibility scope for a manager, and publish, editReports and the scope for staff', () => {
     expect(pinnedCapabilities('inspector')).toEqual([]);
-    expect(pinnedCapabilities('manager')).toEqual([]);
-    expect([...pinnedCapabilities('staff')].sort()).toEqual(['editReports', 'publish']);
+    expect(pinnedCapabilities('manager')).toEqual(['viewAllInspections']);
+    expect([...pinnedCapabilities('staff')].sort()).toEqual(['editReports', 'publish', 'viewAllInspections']);
   });
 
   it('staff publish is off by default and no override or template-style sheet turns it on, while their other bits still move', () => {

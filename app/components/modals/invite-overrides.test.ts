@@ -24,16 +24,17 @@ describe("CAP_LABELS — the advanced-permission toggles", () => {
         expect(CAP_LABELS.templateImport).toBe("Import templates");
         expect(CAP_LABELS.deleteInspection).toBe("Delete inspections");
         expect(CAP_LABELS.editReports).toBe("Edit report content");
+        expect(CAP_LABELS.viewAllInspections).toBe("See all inspections");
     });
 });
 
 describe("CAP_GROUPS — the grouping both drawers render", () => {
-    it("covers TOGGLEABLE exactly once", () => {
+    it("covers TOGGLEABLE exactly once, apart from the visibility scope that has no switch yet", () => {
         // A tenth capability added to TOGGLEABLE and forgotten here would simply
         // not render -- unsettable by anyone, in silence. That is #77 again, one
         // layer up.
         const flat = CAP_GROUPS.flatMap(g => g.caps);
-        expect([...flat].sort()).toEqual([...TOGGLEABLE].sort());
+        expect([...flat].sort()).toEqual(TOGGLEABLE.filter((cap) => cap !== "viewAllInspections").sort());
         expect(new Set(flat).size).toBe(flat.length);
     });
 
@@ -56,6 +57,8 @@ describe("the disclosure initial state reflects the role template", () => {
             // Deleting is on for everyone who could already do it.
             deleteInspection: true,
             editReports: true,
+            // Scope, not an action: on for every role unless a company narrows an inspector.
+            viewAllInspections: true,
         });
     });
     it("manager defaults: every capability on", () => {
@@ -64,6 +67,8 @@ describe("the disclosure initial state reflects the role template", () => {
             publish: true, scheduleOthers: true, inspectionFees: true, companyFinance: true, manageContacts: true, viewCommunication: true,
             templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true, deleteInspection: true,
             editReports: true,
+            // Scope, not an action: on for every role unless a company narrows an inspector.
+            viewAllInspections: true,
         });
     });
 });
@@ -122,13 +127,12 @@ describe("the role select offers staff", () => {
 });
 
 describe("fixed switches show as locked", () => {
-    it("locks nothing for inspector or manager (neither has a pinned switch)", () => {
-        for (const role of ["inspector", "manager"] as const) {
-            expect(TOGGLEABLE.filter((cap) => isCapabilityLocked(role, cap))).toEqual([]);
-        }
+    it("locks nothing for an inspector and only the visibility scope for a manager", () => {
+        expect(TOGGLEABLE.filter((cap) => isCapabilityLocked("inspector", cap))).toEqual([]);
+        expect(TOGGLEABLE.filter((cap) => isCapabilityLocked("manager", cap))).toEqual(["viewAllInspections"]);
     });
 
-    it("locks exactly publish and editReports for staff (always off for them), and no other switch", () => {
-        expect(TOGGLEABLE.filter((cap) => isCapabilityLocked("staff", cap))).toEqual(["publish", "editReports"]);
+    it("locks publish and editReports for staff (always off) and the visibility scope (always on), and no other switch", () => {
+        expect(TOGGLEABLE.filter((cap) => isCapabilityLocked("staff", cap))).toEqual(["publish", "editReports", "viewAllInspections"]);
     });
 });

@@ -23,6 +23,12 @@ export const TOGGLEABLE = [
   // affected, and neither is publishing. On by default for every role that could
   // already author; staff default to off.
   'editReports',
+  // Scope, not an action: which inspections a person can see at all. On for every role,
+  // so turning it on changes nothing; turned off for an inspector, only the inspections
+  // that person is assigned to (lead or helper) are visible, everything else answers
+  // "not found". Owner, manager and staff are pinned on: the administrator tier and the
+  // office tier manage the whole company. See lib/inspection/visibility.ts.
+  'viewAllInspections',
 ] as const;
 
 /** The declared shape of every staff bit. All boolean today; see capability-overrides.ts. */
@@ -35,16 +41,16 @@ export type PermissionOverrides = Partial<CapabilitySet>;
 const ROLE_DEFAULTS: Record<Role, CapabilitySet> = {
   owner:     { publish: true,  scheduleOthers: true,  inspectionFees: true,  companyFinance: true,  manageContacts: true,  viewCommunication: true,
                templateCreate: true,  templateEdit: true,  templateDelete: true,  templateImport: true, deleteInspection: true,
-               editReports: true },
+               editReports: true, viewAllInspections: true },
   manager:   { publish: true,  scheduleOthers: true,  inspectionFees: true,  companyFinance: true,  manageContacts: true,  viewCommunication: true,
                templateCreate: true,  templateEdit: true,  templateDelete: true,  templateImport: true, deleteInspection: true,
-               editReports: true },
+               editReports: true, viewAllInspections: true },
   // An inspector needs to know whether their own report reached the buyer's agent.
   // They also author the templates they inspect against, so create/edit/import
   // stay on; only DELETE is off, whose repair cost is rebuild-from-scratch.
   inspector: { publish: true,  scheduleOthers: false, inspectionFees: true,  companyFinance: false, manageContacts: false, viewCommunication: true,
                templateCreate: true,  templateEdit: true,  templateDelete: false, templateImport: true, deleteInspection: true,
-               editReports: true },
+               editReports: true, viewAllInspections: true },
   // Office user: runs the booking (creates, schedules, reassigns and cancels unpaid
   // jobs, edits the order fields), manages contacts and messages, sends a report
   // that is already published, and sees inspection prices. Does not write report
@@ -52,10 +58,10 @@ const ROLE_DEFAULTS: Record<Role, CapabilitySet> = {
   // see company finances. Everything else can be widened or narrowed per person.
   staff:     { publish: false, scheduleOthers: true,  inspectionFees: true,  companyFinance: false, manageContacts: true,  viewCommunication: true,
                templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
-               editReports: false },
+               editReports: false, viewAllInspections: true },
   agent:     { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
                templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
-               editReports: false },
+               editReports: false, viewAllInspections: false },
 };
 /** owner is never reducible by overrides; agent is never elevated by them; staff never publish or write report content.
  *  A capability MISSING from any entry silently opts out of that guarantee,
@@ -63,16 +69,21 @@ const ROLE_DEFAULTS: Record<Role, CapabilitySet> = {
 const FIXED: Partial<Record<Role, Partial<CapabilitySet>>> = {
   owner: { publish: true, scheduleOthers: true, inspectionFees: true, companyFinance: true, manageContacts: true, viewCommunication: true,
            templateCreate: true, templateEdit: true, templateDelete: true, templateImport: true, deleteInspection: true,
-           editReports: true },
+           editReports: true, viewAllInspections: true },
+  // The administrator tier is never narrowed to its own assignments. A company that wants
+  // someone who sees only their own inspections makes that person an inspector.
+  manager: { viewAllInspections: true },
   agent: { publish: false, scheduleOthers: false, inspectionFees: false, companyFinance: false, manageContacts: false, viewCommunication: false,
            templateCreate: false, templateEdit: false, templateDelete: false, templateImport: false, deleteInspection: false,
-           editReports: false },
+           editReports: false, viewAllInspections: false },
   // Publishing is signing (the report goes out under the inspector's name) and writing
   // report content is inspection work. Both are pinned off so no override or permission
   // template can hand them to an office user: staff hold no seat, and whoever authors or
   // publishes holds one. A company that wants someone to do either makes that person an
   // inspector or a manager. Every other staff capability stays adjustable.
-  staff: { publish: false, editReports: false },
+  // Office staff hold no inspections of their own, so a restriction to assigned work would
+  // leave them with nothing to book or answer; they see the whole company.
+  staff: { publish: false, editReports: false, viewAllInspections: true },
 };
 
 /** The capabilities an override cannot change for `role`. A form uses this to show those switches as fixed. */
@@ -90,7 +101,37 @@ export function getCapabilities(role: Role, overrides: PermissionOverrides | nul
   if (pinned) for (const cap of TOGGLEABLE) {
     if (typeof pinned[cap] === 'boolean') base[cap] = pinned[cap] as boolean;
   }
+  // Seeing every inspection is a precondition of scheduling for others: the dispatch
+  // board returns the whole team's inspections, so a restricted inspector granted
+  // scheduleOthers would walk straight around the restriction.
+  base.scheduleOthers = base.scheduleOthers && base.viewAllInspections;
   return base;
+}
+
+/**
+ * The write surface for `viewAllInspections` stays closed until every read path that
+ * can return inspection data applies the visibility scope, so nothing can be saved
+ * that looks like a restriction but is not enforced everywhere. The read surface
+ * (`getCapabilities`, `coerceOverrides`) still honours a stored value, which is what
+ * lets the tests exercise the real paths. The registry test in
+ * tests/unit/platform/inspection-visibility-registry.spec.ts refuses to let this flip
+ * while any read path is still marked pending.
+ */
+export const VIEW_ALL_SETTABLE = false;
+
+/** The capabilities a request body, an invite or an import may set. */
+export const SETTABLE_CAPABILITIES: readonly Capability[] =
+  TOGGLEABLE.filter((cap) => cap !== 'viewAllInspections' || VIEW_ALL_SETTABLE);
+
+/** An override map reduced to the capabilities that may be written; null when nothing is left. */
+export function pickSettable(overrides: PermissionOverrides | null | undefined): PermissionOverrides | null {
+  if (!overrides) return null;
+  const out: PermissionOverrides = {};
+  for (const cap of SETTABLE_CAPABILITIES) {
+    const value = overrides[cap];
+    if (typeof value === 'boolean') out[cap] = value;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /**

@@ -31,6 +31,7 @@ const CAPABILITY_LABELS: Record<Capability, string> = {
     templateImport: 'Import templates',
     deleteInspection: 'Delete inspections',
     editReports: 'Edit report content',
+    viewAllInspections: 'See all inspections',
 };
 
 export const capabilityLabel = (cap: Capability): string => CAPABILITY_LABELS[cap];
