@@ -45,10 +45,10 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/contacts': E('scoped-service', 'contacts of visible inspections, plus the ones the caller created'),
     'GET /api/contacts/:id': E('scoped-service', 'same rule as the list'),
     'GET /api/contacts/:id/access': E('scoped-service', 'same rule as the list'),
-    'GET /api/messages/threads': P('scoped-service', 'messages of visible inspections only'),
-    'GET /api/messages/threads/:contactId': P('scoped-service', 'messages of visible inspections only; marks only those read'),
-    'POST /api/messages/threads/:contactId': P('handler-assert', 'an inspection mention must be visible'),
-    'GET /api/messages/unread-count': P('scoped-service', 'same rule as the threads'),
+    'GET /api/messages/threads': E('scoped-service', 'messages of visible inspections only'),
+    'GET /api/messages/threads/:contactId': E('scoped-service', 'messages of visible inspections only; marks only those read'),
+    'POST /api/messages/threads/:contactId': E('handler-assert', 'an inspection mention must be visible'),
+    'GET /api/messages/unread-count': E('scoped-service', 'same rule as the threads'),
 
     // Analytics, money, events, requests.
     'GET /api/analytics/growth': P('scoped-service', 'counts visible inspections'),

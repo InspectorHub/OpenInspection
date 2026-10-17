@@ -18,10 +18,10 @@
  * system path) adds no condition. The scope is a REQUIRED parameter of the service methods that
  * return sets, so forgetting it is a compile error rather than a silent leak.
  */
-import { and, eq, exists, inArray, notExists, or, sql, type SQL } from 'drizzle-orm';
+import { and, eq, exists, inArray, isNull, notExists, or, sql, type SQL } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Context } from 'hono';
-import { inspections, inspectionInspectors, inspectionPeople } from '../db/schema';
+import { inspections, inspectionInspectors, inspectionPeople, inspectionMessages } from '../db/schema';
 import { contacts } from '../db/schema/contact';
 import { Errors } from '../errors';
 import { isAdminRole, isRole } from '../auth/roles';
@@ -81,6 +81,30 @@ export function visibleContactsCondition(db: DB, scope: InspectionScope, tenantI
         inArray(inspectionPeople.inspectionId, visibleInspectionIds(db, scope, tenantId)!),
     ));
     return or(inArray(contacts.id, onVisible), eq(contacts.createdByUserId, scope.userId)) as SQL;
+}
+
+/**
+ * Messages a restricted person can see: those on their visible inspections, and the outreach they
+ * wrote themselves that is attached to no inspection. Undefined for 'all'. The outer table must be
+ * the unaliased `inspection_messages`.
+ */
+export function visibleMessagesCondition(db: DB, scope: InspectionScope, tenantId: string): SQL | undefined {
+    if (scope.kind === 'all') return undefined;
+    return or(
+        inArray(inspectionMessages.inspectionId, visibleInspectionIds(db, scope, tenantId)!),
+        and(isNull(inspectionMessages.inspectionId), eq(inspectionMessages.fromUserId, scope.userId)),
+    ) as SQL;
+}
+
+/**
+ * Refuses with 404 when the contact is not one the scope can see (or does not exist), with the same
+ * answer for both. Use where a handler takes a contact id and would otherwise read around the scope.
+ */
+export async function requireVisibleContact(db: DB, scope: InspectionScope, tenantId: string, contactId: string): Promise<void> {
+    if (scope.kind === 'all') return;
+    const row = await db.select({ id: contacts.id }).from(contacts)
+        .where(and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId), visibleContactsCondition(db, scope, tenantId))).get();
+    if (!row) throw Errors.NotFound('Contact not found');
 }
 
 /**

@@ -37,6 +37,7 @@ import { getBaseUrl, resolveTenantSlug } from '../lib/url';
 import type { HonoConfig } from '../types/hono';
 import { r2Keys } from '../lib/r2-keys';
 import { messageThreadRoutes } from './messages-threads';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 import { r2Get } from '../lib/r2/objects';
 
 const AttachmentSchema = z.object({
@@ -292,7 +293,7 @@ export const inspectorMessageRoutes = createApiRouter()
 const messageRoutes = createApiRouter()
     .openapi(unreadRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const count = await c.var.services.message.unreadCountForTenant(tenantId);
+        const count = await c.var.services.message.unreadCountForTenant(tenantId, await resolveInspectionScope(c));
         return c.json({ success: true, data: { count } }, 200);
     })
     .route('/', messageThreadRoutes);
