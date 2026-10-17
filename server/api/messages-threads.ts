@@ -11,6 +11,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
+import { deniedNeedsPermission } from '../lib/permission-denied';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 
 // ── Company inbox routes (Track D, design §3.9) — mounted at /api/messages ────
@@ -108,7 +109,7 @@ export const messageThreadRoutes = createApiRouter()
         // Messaging a client is the assignee's act: the thread's contact must be on one of the
         // caller's inspections, or the caller holds scheduleOthers (or the contact has none yet).
         if (inspectionId ? !(await mayActOnInspection(c, inspectionId)) : !(await mayActOnContact(c, contactId))) {
-            throw Errors.Forbidden('Only an inspector assigned to this contact can message them');
+            throw deniedNeedsPermission(c, 'scheduleOthers', 'You are not assigned to this contact, so you cannot message them');
         }
         // A mention must name one of THIS tenant's inspections the contact is
         // actually seated on — reject a foreign or unknown id rather than

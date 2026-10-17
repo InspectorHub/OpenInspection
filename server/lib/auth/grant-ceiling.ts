@@ -1,4 +1,5 @@
 import { AppError, ErrorCode, Errors } from '../errors';
+import { deniedNeedsRole } from '../permission-denied';
 import type { Role } from './roles';
 import {
     coerceOverrides,
@@ -92,7 +93,7 @@ export function newlyGranted(change: GrantChange): Capability[] {
  */
 export function assertMayGrant(actor: GrantActor, change: GrantChange): void {
     if (actor.role === 'owner') return;
-    if (actor.role !== 'manager') throw Errors.Forbidden('Only an owner or a manager can change team access');
+    if (actor.role !== 'manager') throw deniedNeedsRole(actor.role, ['owner', 'manager'], 'Changing team access is an owner or manager action');
 
     if (!MANAGER_GRANTABLE_ROLES.includes(change.to.role)) {
         throw Errors.RoleCeiling(change.to.role);

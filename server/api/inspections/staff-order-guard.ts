@@ -11,8 +11,7 @@
  * status rules (never out of `completed`, order statuses only) are enforced here.
  */
 import type { Context } from 'hono';
-import { Errors } from '../../lib/errors';
-import { deniedNeedsPermission } from '../../lib/permission-denied';
+import { deniedByRule, deniedNeedsPermission } from '../../lib/permission-denied';
 import { auditFromContext } from '../../lib/audit';
 import { getDrizzle } from '../../lib/route-helpers';
 import { classifyStaffPatch, type StaffPatchRefusal } from '../../lib/inspection/order-fields';
@@ -45,7 +44,7 @@ export async function assertStaffMayPatch(c: Context<HonoConfig>, id: string, bo
         agreementRequired: !!inspection.agreementRequired,
         stored: inspection as Record<string, unknown>,
     });
-    if (!verdict.ok) throw Errors.Forbidden(`${REFUSAL_TEXT[verdict.reason]} (${verdict.keys.join(', ')})`);
+    if (!verdict.ok) throw deniedByRule(c, `${REFUSAL_TEXT[verdict.reason]} (${verdict.keys.join(', ')})`, 'An owner or manager');
 
     // The order fields below the schedule are written on a job one works, or with scheduleOthers.
     if (verdict.changed.some((key) => !SCHEDULE_KEYS.has(key))) {
@@ -75,6 +74,6 @@ export function auditStaffOrderEdit(c: Context<HonoConfig>, id: string, changed:
 export async function assertStaffMayMove(c: Context<HonoConfig>, ids: readonly string[]): Promise<void> {
     if (c.get('userRole') !== 'staff') return;
     if (await anyInspectionStarted(getDrizzle(c), c.get('tenantId'), ids)) {
-        throw Errors.Forbidden(REFUSAL_TEXT.started_locked);
+        throw deniedByRule(c, REFUSAL_TEXT.started_locked, 'An owner or manager');
     }
 }

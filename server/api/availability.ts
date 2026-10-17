@@ -3,7 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { eq, and } from 'drizzle-orm';
 import { availability, availabilityOverrides } from '../lib/db/schema';
 import { safeISODate } from '../lib/date';
-import { Errors } from '../lib/errors';
+import { deniedByRule } from '../lib/permission-denied';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import {
@@ -174,7 +174,7 @@ export const availabilityRoutes = createApiRouter()
         const { inspectorId: queryId } = c.req.valid('query');
 
         if (queryId && queryId !== user.sub && !isAdminRole(userRole)) {
-            throw Errors.Forbidden('Can only view your own availability');
+            throw deniedByRule(c, 'You can only view your own availability', 'An owner or manager');
         }
 
         const inspectorId = queryId || user.sub;
@@ -201,7 +201,7 @@ export const availabilityRoutes = createApiRouter()
         const inspectorId = body.inspectorId || user.sub;
 
         if (inspectorId !== user.sub && !isAdminRole(userRole)) {
-            throw Errors.Forbidden('Can only manage your own availability');
+            throw deniedByRule(c, 'You can only manage your own availability', 'An owner or manager');
         }
 
         const service = c.var.services.availability;
@@ -217,7 +217,7 @@ export const availabilityRoutes = createApiRouter()
         const { inspectorId: queryId } = c.req.valid('query');
 
         if (queryId && queryId !== user.sub && !isAdminRole(userRole)) {
-            throw Errors.Forbidden('Can only view your own availability');
+            throw deniedByRule(c, 'You can only view your own availability', 'An owner or manager');
         }
 
         const inspectorId = queryId || user.sub;
@@ -242,7 +242,7 @@ export const availabilityRoutes = createApiRouter()
 
         const inspectorId = body.inspectorId || user.sub;
         if (inspectorId !== user.sub && !isAdminRole(userRole)) {
-            throw Errors.Forbidden('Can only manage your own availability');
+            throw deniedByRule(c, 'You can only manage your own availability', 'An owner or manager');
         }
 
         const service = c.var.services.availability;

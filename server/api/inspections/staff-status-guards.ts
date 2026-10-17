@@ -10,8 +10,7 @@
  * Other roles pass straight through: nothing here changes what they can do.
  */
 import type { Context, Next } from 'hono';
-import { Errors } from '../../lib/errors';
-import { deniedNeedsPermission } from '../../lib/permission-denied';
+import { deniedByRule, deniedNeedsPermission } from '../../lib/permission-denied';
 import { getDrizzle } from '../../lib/route-helpers';
 import { mayActOnInspection } from '../../lib/inspection/assignment-access';
 import { loadInspectionStarted } from '../../lib/inspection/inspection-started';
@@ -34,7 +33,7 @@ export async function guardStaffConfirm(c: Context<HonoConfig>, next: Next) {
         const id = c.req.param('id') ?? '';
         const { inspection } = await c.var.services.inspection.getInspection(id, c.get('tenantId'));
         if (!staffMayConfirmFrom(inspection.status)) {
-            throw Errors.Forbidden('Office staff cannot change the status of a completed inspection');
+            throw deniedByRule(c, 'Office staff cannot change the status of a completed inspection', 'An owner or manager');
         }
         await assertWorksOrSchedulesOthers(c, id);
     }
@@ -54,9 +53,9 @@ export async function assertStaffMayCancel(c: Context<HonoConfig>, id: string, c
     const started = await loadInspectionStarted(getDrizzle(c), tenantId, { id, status: inspection.status, reportStatus });
     const moneyCollected = collectedCents > 0 || inspection.paymentStatus !== 'unpaid';
     if (staffMayCancelNow({ started, moneyCollected })) return;
-    throw Errors.Forbidden(started
+    throw deniedByRule(c, started
         ? 'Office staff cannot cancel an inspection that has started'
-        : 'A payment has been collected on this inspection, so an owner or manager has to cancel it');
+        : 'A payment has been collected on this inspection, so office staff cannot cancel it', 'An owner or manager');
 }
 
 /**
@@ -76,7 +75,7 @@ export async function guardStaffUncancel(c: Context<HonoConfig>, next: Next) {
         if (inspection.status === INSPECTION_STATUS.CANCELLED) {
             const before = await recordedStatusBeforeCancel(getDrizzle(c), tenantId, id);
             if (!staffMayRestoreFrom(before)) {
-                throw Errors.Forbidden('An owner or manager has to restore this inspection: it may have been completed before it was cancelled');
+                throw deniedByRule(c, 'Office staff cannot restore this inspection: it may have been completed before it was cancelled', 'An owner or manager');
             }
         }
     }

@@ -4,7 +4,7 @@
  * cannot be a single sentence that happens to fit one of them.
  */
 import { describe, it, expect } from 'vitest';
-import { deniedNeedsPermission, deniedNeedsRole, capabilityLabel } from '../../../server/lib/permission-denied';
+import { deniedByRule, deniedNeedsPermission, deniedNeedsRole, capabilityLabel } from '../../../server/lib/permission-denied';
 import { TOGGLEABLE } from '../../../server/lib/auth/capabilities';
 
 const ctx = (role: string | undefined) => ({ get: (k: string) => (k === 'userRole' ? role : undefined) }) as never;
@@ -71,5 +71,22 @@ describe('deniedNeedsRole', () => {
     it('tells an agent account that it only has the agent portal', () => {
         expect(deniedNeedsRole(ctx('agent'), ['owner', 'manager', 'inspector']).message)
             .toContain('Agent accounts can only use the agent portal.');
+    });
+});
+
+describe('deniedByRule and a bare role', () => {
+    it('names the rule, the caller and who can still do it', () => {
+        const e = deniedByRule(ctx('staff'), 'Office staff cannot cancel an inspection that has started', 'An owner or manager');
+        expect(e.status).toBe(403);
+        expect(e.message).toBe(
+            'Office staff cannot cancel an inspection that has started. You are signed in as an office staff member. An owner or manager can do this.',
+        );
+        expect(e.details).toMatchObject({ role: 'staff' });
+    });
+
+    it('accepts a role string where no request context is at hand, and describes an unknown one as such', () => {
+        expect(deniedNeedsRole('manager', ['owner'], 'Changing or removing an owner is an owner action').message)
+            .toContain('you are signed in as a Manager');
+        expect(deniedByRule(undefined, 'x', 'An owner').message).toContain('a user with no recognised role');
     });
 });

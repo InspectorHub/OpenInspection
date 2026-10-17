@@ -48,6 +48,14 @@ function whoIs(role: unknown): string {
     return typeof role === 'string' && isRole(role) ? WHO_IS[role] : 'a user with no recognised role';
 }
 
+/** The caller, as a request context or, where only the role is at hand, a role string. */
+type Viewer = Context<HonoConfig> | string | null | undefined;
+
+function roleOf(viewer: Viewer): string | undefined {
+    if (typeof viewer === 'string') return viewer;
+    return viewer ? (viewer.get('userRole') as string | undefined) : undefined;
+}
+
 const joinOr = (items: string[]) =>
     items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} or ${items[items.length - 1]}`;
 
@@ -77,8 +85,8 @@ export function deniedNeedsPermission(c: Context<HonoConfig>, cap: Capability, w
 }
 
 /** 403 for a role that is not on the list of roles allowed to do this. */
-export function deniedNeedsRole(c: Context<HonoConfig>, roles: readonly Role[], what?: string): AppError {
-    const role = c.get('userRole') as string | undefined;
+export function deniedNeedsRole(viewer: Viewer, roles: readonly Role[], what?: string): AppError {
+    const role = roleOf(viewer);
     const names = joinOr(roles.map((r) => ROLE_LABELS[r]));
     const ownerOnly = roles.length === 1 && roles[0] === ROLE.OWNER;
     const agentOnly = roles.length === 1 && roles[0] === ROLE.AGENT;
@@ -91,5 +99,17 @@ export function deniedNeedsRole(c: Context<HonoConfig>, roles: readonly Role[], 
     return Errors.Forbidden(
         `${sentence(what)}This needs the ${names} role, and you are signed in as ${whoIs(role)}. ${fix}`,
         { role: role ?? null, requiredRoles: [...roles] },
+    );
+}
+
+/**
+ * 403 for a rule about the state of the thing rather than a missing permission or role: "office staff cannot
+ * cancel a job that has started". `who` names the people who can still do it ("An owner or manager").
+ */
+export function deniedByRule(viewer: Viewer, what: string, who: string): AppError {
+    const role = roleOf(viewer);
+    return Errors.Forbidden(
+        `${sentence(what)}You are signed in as ${whoIs(role)}. ${who} can do this.`,
+        { role: role ?? null, rule: what },
     );
 }

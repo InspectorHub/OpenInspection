@@ -8,7 +8,7 @@ import { requireCapability, capabilitiesFor } from '../../lib/middleware/require
 import { auditFromContext } from '../../lib/audit';
 import { logger } from '../../lib/logger';
 import { Errors } from '../../lib/errors';
-import { deniedNeedsPermission } from '../../lib/permission-denied';
+import { deniedByRule, deniedNeedsPermission } from '../../lib/permission-denied';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import {
     InspectionListQuerySchema,
@@ -297,7 +297,7 @@ const bulkRoutes = createApiRouter()
         // Staff reassign (a schedule act, gated by scheduleOthers above) but do not
         // change the status of an inspection.
         if (c.get('userRole') === 'staff' && body.action !== 'assignInspector') {
-            throw Errors.Forbidden('Staff can reassign inspections but cannot change their status');
+            throw deniedByRule(c, 'Office staff can reassign inspections but cannot change their status', 'An owner or manager');
         }
 
         if (body.action === 'assignInspector') {
