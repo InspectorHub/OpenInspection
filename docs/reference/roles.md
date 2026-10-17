@@ -108,6 +108,8 @@ before loses that access.
 The AI helper routes (comment assist, auto summary, suggest comment, comment edit,
 reviews) need `editReports` on top of the role.
 
+Staff book jobs through the ordinary create route (`POST /api/inspections`, the one the New Inspection screen uses), which leaves the job unassigned because an office user cannot inspect. The four-step wizard route (`POST /api/inspections/wizard`, used by API and MCP clients; it carries services and team assignment in one call) is closed to staff.
+
 On the order side staff can still confirm an inspection that is not completed, manage
 agreement requests and client documents, send a published report, and request payment
 (below), each subject to `scheduleOthers` or a place on the job where the route says so.

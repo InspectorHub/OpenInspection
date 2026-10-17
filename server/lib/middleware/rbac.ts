@@ -35,8 +35,10 @@ export const requireRole = (...roles: Role[]) => {
 /**
  * Refuse `staff` on a route that `requireRole('owner', 'manager', 'inspector')`
  * would otherwise admit through the staff role's inspector tier. Staff is an
- * office role: it moves and reassigns jobs, but it does not create, copy or
- * delete them, and it does not edit their other fields. Put this AFTER
+ * office role: it books jobs through `POST /api/inspections` (which does not use
+ * this guard), moves and reassigns them, but it does not delete them, publish
+ * them, or use the 4-step wizard route (`POST /api/inspections/wizard`, which
+ * also carries the services and the team assignment). Put this AFTER
  * `requireRole` in a route's middleware list.
  */
 export const denyStaff = async (c: Context<HonoConfig>, next: Next) => {

@@ -22,6 +22,7 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { oauthProviderEnabled } from '../lib/mcp/flag';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
+import { deniedNeedsRole } from '../lib/permission-denied';
 import { claimsNative } from '../lib/auth/native-token';
 import type { McpGrant } from '../lib/validations/mcp.schema';
 import { McpGrantListResponseSchema } from '../lib/validations/mcp.schema';
@@ -151,7 +152,7 @@ const mcpGrantsRoutes = createApiRouter()
             // the self-revoke path on the same DELETE /grants/:id route.
             const userRole = c.get('userRole');
             if (userRole !== 'owner' && userRole !== 'manager') {
-                throw Errors.Forbidden('Admin role required for grant oversight');
+                throw deniedNeedsRole(c, ['owner', 'manager'], 'Reviewing or revoking other people\'s connected-app grants is an owner or manager action');
             }
 
             // Enumerate tenant members and their grants to find the target grant

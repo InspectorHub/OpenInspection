@@ -12,7 +12,7 @@ import type { Context } from 'hono';
 import { inspections, inspectionInspectors, inspectionPeople } from '../db/schema';
 import { isAdminRole, ROLE } from '../auth/roles';
 import { mayActOn } from './staff-rules';
-import { Errors } from '../errors';
+import { deniedNeedsPermission } from '../permission-denied';
 import { getDrizzle } from '../route-helpers';
 import { getInspectionRoster } from './roster';
 import { capabilitiesFor } from '../middleware/require-capability';
@@ -62,7 +62,7 @@ export async function mayDeleteInspection(c: Context<HonoConfig>, inspectionId: 
 
 export async function assertMayActOnInspection(c: Context<HonoConfig>, inspectionId: string, what: string): Promise<void> {
     if (!(await mayActOnInspection(c, inspectionId))) {
-        throw Errors.Forbidden(`Only an inspector assigned to this inspection can ${what}`);
+        throw deniedNeedsPermission(c, 'scheduleOthers', `You are not on this inspection, so you cannot ${what}`);
     }
 }
 

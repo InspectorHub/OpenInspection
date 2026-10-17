@@ -1,4 +1,4 @@
-import { Errors } from '../errors';
+import { deniedNeedsRole } from '../permission-denied';
 import type { UserRole } from '../../types/auth';
 
 /**
@@ -12,6 +12,6 @@ import type { UserRole } from '../../types/auth';
 export function assertMayTouchOwner(requesterRole: UserRole, fromRole: string, toRole: string): void {
     if (requesterRole === 'owner') return;
     if (fromRole === 'owner' || toRole === 'owner') {
-        throw Errors.Forbidden('Only an owner can change or remove an owner');
+        throw deniedNeedsRole(requesterRole, ['owner'], 'Changing or removing an owner is an owner action');
     }
 }
