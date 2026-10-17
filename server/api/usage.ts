@@ -16,6 +16,7 @@
  * doc comment in features/plan-quota/guard.ts), so the tier is looked up
  * directly rather than read off the context.
  */
+import { requireRole } from '../lib/middleware/rbac';
 import { createRoute } from '@hono/zod-openapi';
 import { count, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
@@ -31,6 +32,7 @@ import { FREE_TIER_CAPS } from '../features/plan-quota/policy';
 const summaryRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/summary',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     tags: ['metrics'],
     summary: "Get the current tenant's usage summary (inspections/sms/email/storage/seats + free-tier caps)",
     responses: {
@@ -38,7 +40,7 @@ const summaryRoute = createRoute(withMcpMetadata({
         401: { description: 'Unauthorized' },
     },
     operationId: 'getUsageSummary',
-    description: "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against."
+    description: "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
 const usageRoutes = createApiRouter()

@@ -90,6 +90,7 @@ const myRecommendationsRoute = createRoute(withMcpMetadata({
 const getLeaderboardRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/leaderboard',
+    middleware: [requireRole('owner', 'manager')] as const,
     tags: ["agents"],
     summary: "Leaderboard agent for current tenant",
     responses: {
@@ -305,8 +306,6 @@ const agentRoutes = createApiRouter()
         return c.json({ success: true, data: groups }, 200);
     })
     .openapi(getLeaderboardRoute, async (c) => {
-        await requireRole('owner', 'manager')(c, async () => {});
-
         const tenantId = c.get('tenantId');
         const db = getDrizzle(c);
 
