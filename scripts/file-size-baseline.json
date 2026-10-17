@@ -12,7 +12,7 @@
   "scripts/check-idempotency-coverage.mjs": 797,
   "server/services/inspection.service.ts": 761,
   "server/api/admin/admin-settings.ts": 752,
-  "server/index.ts": 754,
+  "server/index.ts": 757,
   "server/services/inspection/inspection-publish.service.ts": 746,
   "server/api/inspections/report-delivery.ts": 743,
   "scripts/check-messaging-rules.mjs": 735,

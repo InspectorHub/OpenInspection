@@ -38,7 +38,7 @@
  */
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { users } from '../../lib/db/schema';
+import { users, templates } from '../../lib/db/schema';
 import { visibleContactsCondition, type InspectionScope } from '../../lib/inspection/visibility';
 import { FIELD_ROLES } from '../../lib/auth/roles';
 import {
@@ -48,13 +48,14 @@ import {
 } from './cancel-write-path';
 
 export type PatchRefusal = CancelWritePathRefusal | {
-    code: 'INVALID_COVER_PHOTO' | 'INVALID_INSPECTOR' | 'INVALID_REFERRER';
+    code: 'INVALID_COVER_PHOTO' | 'INVALID_INSPECTOR' | 'INVALID_REFERRER' | 'INVALID_TEMPLATE';
     message: string;
 };
 
 /** Only the fields this checks; the rest of the body is none of its business. */
 interface GuardedPatch {
     coverPhotoId?: string | null | undefined;
+    templateId?: string | null | undefined;
     inspectorId?: string | null | undefined;
     referredByContactId?: string | null | undefined;
     status?: string | null | undefined;
@@ -115,6 +116,13 @@ export async function findPatchRefusal(
         if (!member) {
             return { code: 'INVALID_INSPECTOR', message: 'inspectorId is not a member of this tenant who can inspect' };
         }
+    }
+
+    // `templateId` names a template of THIS company; a foreign or unknown one is refused alike (null clears it).
+    if (typeof body.templateId === 'string') {
+        const tpl = await db.select({ id: templates.id }).from(templates)
+            .where(and(eq(templates.id, body.templateId), eq(templates.tenantId, tenantId))).get();
+        if (!tpl) return { code: 'INVALID_TEMPLATE', message: 'templateId is not a template of this workspace' };
     }
 
     // Task 8 — a referrer must be one of THIS tenant's contacts. Refuse a

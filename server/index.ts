@@ -21,6 +21,7 @@ import { checkRateLimit } from './lib/rate-limit';
 import { securityHeaders } from './lib/middleware/security-headers';
 import { AppError, ErrorCode } from './lib/errors';
 import { sendError } from './lib/response';
+import { isForeignKeyViolation, refuseUnknownReference } from './lib/db/foreign-key-violation';
 import type { HonoConfig } from './types/hono';
 import { logger } from './lib/logger';
 import { BUILD } from './generated/version';
@@ -194,6 +195,8 @@ app.onError((err: unknown, c: Context<HonoConfig>) => {
         const status = appErr.status as number;
         return sendError(c, appErr.message as string, appErr.code as string, status as 500, appErr.details as Record<string, unknown> | undefined);
     }
+
+    if (isForeignKeyViolation(err)) return refuseUnknownReference(c);
 
     // Strip the query string before logging so one-shot secrets in URLs (e.g. ?reset_token=…)
     // don't get captured by downstream log sinks.
