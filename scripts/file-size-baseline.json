@@ -27,7 +27,7 @@
   "server/api/public-report.ts": 628,
   "server/api/auth.ts": 621,
   "app/hooks/useInspection.ts": 600,
-  "server/services/concierge.service.ts": 596,
+  "server/services/concierge.service.ts": 599,
   "server/api/bookings/agreement.ts": 583,
   "scripts/check-agent-terms-classification.mjs": 580,
   "scripts/check-erasure-manifest.mjs": 572,

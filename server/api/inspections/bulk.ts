@@ -236,7 +236,7 @@ const bulkRoutes = createApiRouter()
         // approval so the dashboard's UPCOMING card can render the substate line.
         let conciergePending = 0;
         try {
-            const result = await c.var.services.concierge.listAwaitingInspector(tenantId);
+            const result = await c.var.services.concierge.listAwaitingInspector(tenantId, scope);
             conciergePending = result.count;
         } catch (err) {
             logger.warn('inspections.dashboard.concierge.failed', {
