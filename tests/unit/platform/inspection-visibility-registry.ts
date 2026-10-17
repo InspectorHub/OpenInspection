@@ -42,9 +42,9 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/inspections/templates/:id': E('company-open-staff', 'templates are company assets'),
 
     // Contacts and conversations.
-    'GET /api/contacts': P('scoped-service', 'contacts of visible inspections, plus the ones the caller created'),
-    'GET /api/contacts/:id': P('scoped-service', 'same rule as the list'),
-    'GET /api/contacts/:id/access': P('scoped-service', 'same rule as the list'),
+    'GET /api/contacts': E('scoped-service', 'contacts of visible inspections, plus the ones the caller created'),
+    'GET /api/contacts/:id': E('scoped-service', 'same rule as the list'),
+    'GET /api/contacts/:id/access': E('scoped-service', 'same rule as the list'),
     'GET /api/messages/threads': P('scoped-service', 'messages of visible inspections only'),
     'GET /api/messages/threads/:contactId': P('scoped-service', 'messages of visible inspections only; marks only those read'),
     'POST /api/messages/threads/:contactId': P('handler-assert', 'an inspection mention must be visible'),

@@ -34,6 +34,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
@@ -81,7 +82,7 @@ describe('F67 — per-contact revenue is attributed to the billed party only', (
     });
 
     it('credits the $450 to the contact it was billed to', async () => {
-        const detail = await svc.getContactDetail('marge', TENANT);
+        const detail = await svc.getContactDetail('marge', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
         expect(detail.stats.totalRevenueCents).toBe(45000);
         // Nothing on her record was billed elsewhere, so the second tile is absent.
@@ -89,7 +90,7 @@ describe('F67 — per-contact revenue is attributed to the billed party only', (
     });
 
     it('does not credit the same $450 to the agent standing on the same job', async () => {
-        const detail = await svc.getContactDetail('ned', TENANT);
+        const detail = await svc.getContactDetail('ned', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
         expect(detail.stats.totalRevenueCents).toBe(0);
         // The inspection is still his — only the money is not.
@@ -97,7 +98,7 @@ describe('F67 — per-contact revenue is attributed to the billed party only', (
     });
 
     it('reports the agent the money under a name that is true of it', async () => {
-        const detail = await svc.getContactDetail('ned', TENANT);
+        const detail = await svc.getContactDetail('ned', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
         expect(detail.stats.billedToOthersCents).toBe(45000);
     });
@@ -113,7 +114,7 @@ describe('F67 — per-contact revenue is attributed to the billed party only', (
         const everyContact = ['marge', 'ned'];
         let sum = 0;
         for (const id of everyContact) {
-            const d = await svc.getContactDetail(id, TENANT);
+            const d = await svc.getContactDetail(id, TENANT, ALL_INSPECTIONS);
             if (!d) throw new Error('unreachable');
             sum += d.stats.totalRevenueCents;
         }
@@ -138,7 +139,7 @@ describe('F67 — per-contact revenue is attributed to the billed party only', (
             paidAt: new Date(6000), createdAt: new Date(2000),
         });
 
-        const detail = await svc.getContactDetail('marge', TENANT);
+        const detail = await svc.getContactDetail('marge', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
         expect(detail.stats.totalRevenueCents).toBe(65000);
         expect(detail.stats.inspectionCount).toBe(2);
@@ -163,7 +164,7 @@ describe('F67 — per-contact revenue is attributed to the billed party only', (
             paidAt: new Date(7000), createdAt: new Date(3000),
         });
 
-        const detail = await svc.getContactDetail('ned', TENANT);
+        const detail = await svc.getContactDetail('ned', TENANT, ALL_INSPECTIONS);
         if (!detail) throw new Error('unreachable');
         expect(detail.stats.totalRevenueCents).toBe(30000);
         // And the referred job's money is still reported separately.
@@ -174,8 +175,8 @@ describe('F67 — per-contact revenue is attributed to the billed party only', (
     it('counts neither figure until the invoice is paid', async () => {
         await testDb.update(schema.invoices).set({ paidAt: null });
 
-        const marge = await svc.getContactDetail('marge', TENANT);
-        const ned = await svc.getContactDetail('ned', TENANT);
+        const marge = await svc.getContactDetail('marge', TENANT, ALL_INSPECTIONS);
+        const ned = await svc.getContactDetail('ned', TENANT, ALL_INSPECTIONS);
         if (!marge || !ned) throw new Error('unreachable');
         expect(marge.stats.totalRevenueCents).toBe(0);
         expect(ned.stats.billedToOthersCents).toBe(0);

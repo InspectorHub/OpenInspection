@@ -21,7 +21,8 @@
 import { and, eq, exists, inArray, notExists, or, sql, type SQL } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { Context } from 'hono';
-import { inspections, inspectionInspectors } from '../db/schema';
+import { inspections, inspectionInspectors, inspectionPeople } from '../db/schema';
+import { contacts } from '../db/schema/contact';
 import { Errors } from '../errors';
 import { isAdminRole, isRole } from '../auth/roles';
 import { capabilitiesFor } from '../middleware/require-capability';
@@ -66,6 +67,20 @@ export function visibleInspectionIds(db: DB, scope: InspectionScope, tenantId: s
     if (scope.kind === 'all') return undefined;
     return db.select({ id: inspections.id }).from(inspections)
         .where(and(eq(inspections.tenantId, tenantId), assignedCondition(db, scope.userId, tenantId)));
+}
+
+/**
+ * Contacts a restricted person can see: the people on their visible inspections, and the contacts
+ * they created themselves (so a contact made a moment ago, before it is attached to anything, does
+ * not vanish). Undefined for 'all'. The outer table must be the unaliased `contacts`.
+ */
+export function visibleContactsCondition(db: DB, scope: InspectionScope, tenantId: string): SQL | undefined {
+    if (scope.kind === 'all') return undefined;
+    const onVisible = db.select({ id: inspectionPeople.contactId }).from(inspectionPeople).where(and(
+        eq(inspectionPeople.tenantId, tenantId),
+        inArray(inspectionPeople.inspectionId, visibleInspectionIds(db, scope, tenantId)!),
+    ));
+    return or(inArray(contacts.id, onVisible), eq(contacts.createdByUserId, scope.userId)) as SQL;
 }
 
 /**

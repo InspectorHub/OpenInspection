@@ -3,6 +3,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { contacts, inspections, inspectionPeople, invoices } from '../lib/db/schema';
 import { getEffectivePriceCents } from '../lib/effective-price';
 import { safeISODate } from '../lib/date';
+import { visibleContactsCondition, visibleInspectionsCondition, type InspectionScope } from '../lib/inspection/visibility';
 
 /**
  * The contact detail payload (IA-18) — one contact, its inspection history, and
@@ -42,12 +43,11 @@ export async function buildContactDetail(
     db: DrizzleD1Database,
     id: string,
     tenantId: string,
+    scope: InspectionScope,
 ) {
-
-        
-
+        // A contact outside the caller's scope answers exactly like one that does not exist.
         const contact = await db.select().from(contacts)
-            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId), visibleContactsCondition(db, scope, tenantId))).get();
         if (!contact) return null;
 
         const rows = await db.select({
@@ -63,6 +63,9 @@ export async function buildContactDetail(
                 eq(inspections.tenantId, tenantId),
                 eq(inspectionPeople.tenantId, tenantId),
                 eq(inspectionPeople.contactId, id),
+                // History, stats and revenue below are all derived from this set, so a restricted
+                // caller sees them over their own inspections only.
+                visibleInspectionsCondition(db, scope, tenantId),
             ))
             .all();
 

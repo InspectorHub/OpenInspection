@@ -23,6 +23,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const T = '11111111-1111-1111-1111-111111111111';
 const CONTACT = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -67,7 +68,7 @@ describe('contact access (IA-100)', () => {
   });
 
   it('lists what the contact can still open, and nothing else', async () => {
-    const access = await svc.listAccess(CONTACT, T);
+    const access = await svc.listAccess(CONTACT, T, ALL_INSPECTIONS);
     const ids = (access ?? []).map((a) => a.inspectionId).sort();
 
     // t3 is revoked and must not appear. t2 has a FUTURE expiry and must.
@@ -78,7 +79,7 @@ describe('contact access (IA-100)', () => {
   it('counts a null expiry as live, not as expired', async () => {
     // The dangerous direction for a screen answering "who can still read this"
     // is under-reporting. A null expiry means open-by-policy, not lapsed.
-    const access = await svc.listAccess(CONTACT, T);
+    const access = await svc.listAccess(CONTACT, T, ALL_INSPECTIONS);
     expect(access?.some((a) => a.inspectionId === 'i1')).toBe(true);
   });
 
@@ -86,7 +87,7 @@ describe('contact access (IA-100)', () => {
     const n = await svc.revokeAccess(CONTACT, T, ['i1']);
     expect(n).toBe(1);
 
-    const left = (await svc.listAccess(CONTACT, T))?.map((a) => a.inspectionId);
+    const left = (await svc.listAccess(CONTACT, T, ALL_INSPECTIONS))?.map((a) => a.inspectionId);
     expect(left).toEqual(['i2']);
   });
 
@@ -94,7 +95,7 @@ describe('contact access (IA-100)', () => {
     const n = await svc.revokeAccess(CONTACT, T);
     expect(n).toBe(2); // i1 + i2; i3 was already revoked and is not re-counted
 
-    expect(await svc.listAccess(CONTACT, T)).toEqual([]);
+    expect(await svc.listAccess(CONTACT, T, ALL_INSPECTIONS)).toEqual([]);
   });
 
   it('reports what it actually revoked, not what was asked for', async () => {
@@ -107,12 +108,12 @@ describe('contact access (IA-100)', () => {
   it('distinguishes an unknown contact from one with no access', async () => {
     // Both would render as "nothing to see" but mean very different things,
     // so the route needs to be able to 404 rather than show an empty list.
-    expect(await svc.listAccess('99999999-9999-9999-9999-999999999999', T)).toBeNull();
+    expect(await svc.listAccess('99999999-9999-9999-9999-999999999999', T, ALL_INSPECTIONS)).toBeNull();
     expect(await svc.revokeAccess('99999999-9999-9999-9999-999999999999', T)).toBeNull();
   });
 
   it('will not reach across tenants', async () => {
-    expect(await svc.listAccess(CONTACT, '22222222-2222-2222-2222-222222222222')).toBeNull();
+    expect(await svc.listAccess(CONTACT, '22222222-2222-2222-2222-222222222222', ALL_INSPECTIONS)).toBeNull();
   });
 
   describe('role labels (IA-119)', () => {
@@ -135,7 +136,7 @@ describe('contact access (IA-100)', () => {
         .set({ role: 'buyer_agent' })
         .where(eq(schema.inspectionAccessTokens.id, 't1'));
 
-      const row = (await svc.listAccess(CONTACT, T))?.find((a) => a.inspectionId === 'i1');
+      const row = (await svc.listAccess(CONTACT, T, ALL_INSPECTIONS))?.find((a) => a.inspectionId === 'i1');
 
       // POSITIVE CONTROL: the key is still carried, so a change that dropped
       // the column instead of labelling it cannot pass.
@@ -151,7 +152,7 @@ describe('contact access (IA-100)', () => {
         .set({ role: 'listing_agent' })
         .where(eq(schema.inspectionAccessTokens.id, 't1'));
 
-      const row = (await svc.listAccess(CONTACT, T))?.find((a) => a.inspectionId === 'i1');
+      const row = (await svc.listAccess(CONTACT, T, ALL_INSPECTIONS))?.find((a) => a.inspectionId === 'i1');
       expect(row?.role).toBe('listing_agent');
       expect(row?.roleLabel).toBeNull();
     });
@@ -166,7 +167,7 @@ describe('contact access (IA-100)', () => {
         .set({ role: 'buyer_agent' })
         .where(eq(schema.inspectionAccessTokens.id, 't1'));
 
-      const row = (await svc.listAccess(CONTACT, T))?.find((a) => a.inspectionId === 'i1');
+      const row = (await svc.listAccess(CONTACT, T, ALL_INSPECTIONS))?.find((a) => a.inspectionId === 'i1');
       expect(row?.roleLabel).toBeNull();
     });
   });
@@ -193,14 +194,14 @@ describe('contact access (IA-100)', () => {
 
       const contact = await db.select().from(schema.contacts).where(eq(schema.contacts.id, CONTACT)).get();
       expect(contact?.archivedAt).toBeTruthy();
-      expect((await svc.listAccess(CONTACT, T))?.length).toBe(2);
+      expect((await svc.listAccess(CONTACT, T, ALL_INSPECTIONS))?.length).toBe(2);
     });
 
     it('revokes everything when the tenant opted in', async () => {
       await db.insert(schema.tenantConfigs).values({ tenantId: T, archiveRevokesAccess: true, updatedAt: new Date() } as never);
       await archive();
 
-      expect(await svc.listAccess(CONTACT, T)).toEqual([]);
+      expect(await svc.listAccess(CONTACT, T, ALL_INSPECTIONS)).toEqual([]);
     });
   });
 });

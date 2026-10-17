@@ -11,6 +11,7 @@ import {
 } from '../lib/validations/contact.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { moneyView } from "../lib/auth/money-access";
+import { resolveInspectionScope } from "../lib/inspection/visibility";
 
 /**
  * `contacts.id` is a TEXT column holding an opaque identifier. Every writer
@@ -224,7 +225,7 @@ const contactRoutes = createApiRouter()
             { limit: q.limit, offset: q.offset, archived: q.archived };
         if (q.type) opts.type = q.type;
         if (q.search) opts.search = q.search;
-        const rows = await c.var.services.contact.listContacts(tenantId, opts);
+        const rows = await c.var.services.contact.listContacts(tenantId, opts, await resolveInspectionScope(c));
         return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
     })
     .openapi(restoreContactRoute, async (c) => {
@@ -236,7 +237,7 @@ const contactRoutes = createApiRouter()
     .openapi(getContactDetailRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const detail = await c.var.services.contact.getContactDetail(id, tenantId);
+        const detail = await c.var.services.contact.getContactDetail(id, tenantId, await resolveInspectionScope(c));
         if (!detail) return c.json({ success: false, error: { message: 'Contact not found', code: 'NOT_FOUND' } }, 404);
         return c.json({ success: true as const, data: {
             ...detail,
@@ -297,7 +298,7 @@ const contactRoutes = createApiRouter()
     .openapi(listContactAccessRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const access = await c.var.services.contact.listAccess(id, tenantId);
+        const access = await c.var.services.contact.listAccess(id, tenantId, await resolveInspectionScope(c));
         if (access === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);
         return c.json({ success: true as const, data: { access } }, 200);
     })

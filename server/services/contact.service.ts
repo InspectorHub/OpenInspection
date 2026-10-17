@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, sql, isNull, isNotNull } from 'drizzle-orm';
+import { eq, and, like, sql, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { contacts, type ContactType } from '../lib/db/schema/contact';
 import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema/inspection/role-profiles';
 import { Errors } from '../lib/errors';
+import { visibleContactsCondition, visibleInspectionIds, filterVisibleInspectionIds, type InspectionScope } from '../lib/inspection/visibility';
 import { buildContactDetail } from './contact-detail';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
@@ -26,7 +27,7 @@ export class ContactService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private getDrizzle() { return drizzle(this.db as any); }
 
-    async listContacts(tenantId: string, opts: { type?: ContactType; search?: string; archived?: 'exclude' | 'only'; limit: number; offset: number }) {
+    async listContacts(tenantId: string, opts: { type?: ContactType; search?: string; archived?: 'exclude' | 'only'; limit: number; offset: number }, scope: InspectionScope) {
         const db = this.getDrizzle();
         // IA-120 — archived rows used to be unconditionally excluded here, which
         // is what made Archive a one-way door: written by the button, readable
@@ -37,6 +38,10 @@ export class ContactService {
         ];
         if (opts.type) conditions.push(eq(contacts.type, opts.type));
         if (opts.search) conditions.push(like(contacts.name, `%${escapeLikePattern(opts.search)}%`));
+        // The scope narrows the list; type, search and archive filters can only narrow it further.
+        const visible = visibleContactsCondition(db, scope, tenantId);
+        if (visible) conditions.push(visible);
+        const visibleIds = visibleInspectionIds(db, scope, tenantId);
 
         const rows = await db.select().from(contacts).where(and(...conditions)).limit(opts.limit).offset(opts.offset).all();
 
@@ -56,7 +61,13 @@ export class ContactService {
             })
                 .from(inspectionPeople)
                 .leftJoin(contactRoleProfiles, eq(contactRoleProfiles.id, inspectionPeople.roleProfileId))
-                .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.contactId, c.id)))
+                .where(and(
+                    eq(inspectionPeople.tenantId, tenantId),
+                    eq(inspectionPeople.contactId, c.id),
+                    // Counts are over the inspections the caller can see, so a contact does not
+                    // advertise inspections the caller cannot open.
+                    visibleIds ? inArray(inspectionPeople.inspectionId, visibleIds) : undefined,
+                ))
                 .get();
             return { ...c, inspectionCount: res?.count ?? 0, referralCount: res?.referralCount ?? 0 };
         }));
@@ -84,8 +95,8 @@ export class ContactService {
      * received. Inspections without a paid invoice contribute zero revenue but
      * still count toward inspectionCount.
      */
-    async getContactDetail(id: string, tenantId: string) {
-        return buildContactDetail(this.getDrizzle(), id, tenantId);
+    async getContactDetail(id: string, tenantId: string, scope: InspectionScope) {
+        return buildContactDetail(this.getDrizzle(), id, tenantId, scope);
     }
 
     async createContact(tenantId: string, data: { type: ContactType; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; locale?: string | null | undefined; createdByUserId?: string | null | undefined }) {
@@ -213,7 +224,7 @@ export class ContactService {
      * An empty array for a contact with no email is correct: a token is
      * addressed to an email, so there is nothing to hold.
      */
-    async listAccess(id: string, tenantId: string): Promise<Array<{
+    async listAccess(id: string, tenantId: string, scope: InspectionScope): Promise<Array<{
         inspectionId: string;
         propertyAddress: string | null;
         role: string;
@@ -222,10 +233,13 @@ export class ContactService {
     }> | null> {
         const db = this.getDrizzle();
         const row = await db.select({ email: contacts.email }).from(contacts)
-            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId), visibleContactsCondition(db, scope, tenantId))).get();
         if (!row) return null;
         if (!row.email || !this.portalAccess) return [];
-        const live = await this.portalAccess.listLiveAccessByRecipient(tenantId, row.email);
+        const allLive = await this.portalAccess.listLiveAccessByRecipient(tenantId, row.email);
+        // A link names an inspection; one the caller cannot open is not theirs to list.
+        const openable = await filterVisibleInspectionIds(db, scope, tenantId, allLive.map((a) => a.inspectionId));
+        const live = allLive.filter((a) => openable.has(a.inspectionId));
         const labelByKey = await this.roleLabels(tenantId);
         // IA-119 — `role` is a role-profile KEY. This panel is read by an
         // operator deciding what a live link grants, so it shows the tenant's
@@ -276,8 +290,8 @@ export class ContactService {
      * archive dialog's warning, so an operator is never asked to archive
      * someone without being told what that does or does not withdraw.
      */
-    async liveAccessCount(id: string, tenantId: string): Promise<number> {
-        return (await this.listAccess(id, tenantId))?.length ?? 0;
+    async liveAccessCount(id: string, tenantId: string, scope: InspectionScope): Promise<number> {
+        return (await this.listAccess(id, tenantId, scope))?.length ?? 0;
     }
 
     /**

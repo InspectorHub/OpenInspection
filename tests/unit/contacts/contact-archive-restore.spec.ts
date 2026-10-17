@@ -20,6 +20,7 @@ import { ContactService } from '../../../server/services/contact.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
@@ -51,7 +52,7 @@ describe('ContactService — archive / restore round trip', () => {
     });
 
     const list = (archived?: 'exclude' | 'only') =>
-        svc.listContacts(TENANT, { limit: 50, offset: 0, ...(archived ? { archived } : {}) });
+        svc.listContacts(TENANT, { limit: 50, offset: 0, ...(archived ? { archived } : {}) }, ALL_INSPECTIONS);
 
     it('hides archived contacts from the default list', async () => {
         const rows = await list();
