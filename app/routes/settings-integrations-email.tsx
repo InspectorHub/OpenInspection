@@ -22,6 +22,7 @@ import { SourceChoice, type SourceValue } from "~/components/settings/integratio
 import { sourceChangeError } from "~/lib/integration-source-intent.server";
 import { m } from "~/paraglide/messages";
 import type { SwitchableSourceRow } from "../../server/lib/integrations/source-change";
+import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 export function meta() {
   return [{ title: m.integrations_email_meta_title() }];
@@ -134,6 +135,7 @@ function EmailPage({ data }: { data: Exclude<Awaited<ReturnType<typeof loader>>,
   const nav = useNavigation();
   const emailValidateFetcher = useFetcher<typeof action>();
   const session = useSessionContext();
+  const pageOrigin = usePageOrigin();
   const [selected, setSelected] = useState<SourceValue>(() => initialChoice(row));
   const { fieldError, formError } = secretErrorReaders(actionData);
 
@@ -199,7 +201,7 @@ function EmailPage({ data }: { data: Exclude<Awaited<ReturnType<typeof loader>>,
             savingEmailSecrets={pendingIntent === "save-email-secrets"}
             emailValidateFetcher={emailValidateFetcher}
             initialProvider={emailByoProvider}
-            webhookBaseUrl={typeof window !== "undefined" ? window.location.origin : ""}
+            webhookBaseUrl={pageOrigin}
             tenantSlug={session?.branding.tenantSlug ?? ""}
             testResults={testResults}
           />

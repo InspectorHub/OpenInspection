@@ -21,6 +21,7 @@ import { RepairSharePanel } from "~/components/portal/sections/repair/RepairShar
 import { useChallengeOnRefusal } from "~/components/OutboundVerification";
 import { agentMayWriteRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";
 import { m } from "~/paraglide/messages";
+import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 export interface AgentRepairRow {
   inspectionId: string;
@@ -66,9 +67,10 @@ export function AgentRepairInspectionBlock({
   const [emailTo, setEmailTo] = useState("");
   const [emailMsg, setEmailMsg] = useState("");
 
+  const origin = usePageOrigin();
   const shareToken = shareFetcher.data?.shareToken ?? null;
   const shareUrl = shareToken
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/repair-request/${shareToken}`
+    ? `${origin}/repair-request/${shareToken}`
     : null;
 
   const share = () => {

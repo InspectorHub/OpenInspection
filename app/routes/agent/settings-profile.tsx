@@ -8,11 +8,11 @@ import { PageHeader, Input, Button, Select, Checkbox } from "@core/shared-ui";
 import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { NotificationSettings } from "~/components/notifications/NotificationSettings";
 import type { AlwaysSentItem, ChannelId, ChoiceRow } from "~/components/notifications/NotificationPreferences";
-import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezone-options";
 import type { SmsConsent } from "~/components/notifications/SmsConsentBlock";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
+import { useTimezoneOptions } from "~/hooks/useTimezoneOptions";
 
 export function meta() {
   return [{ title: m.agent_portal_settings_meta_title() }];
@@ -170,6 +170,7 @@ export default function AgentSettingsProfilePage() {
   const tzError = tzResult && !tzResult.ok ? tzResult.error : null;
   const tzSaved = tzResult?.ok === true;
   const [tz, setTz] = useState(agent.timezone ?? "");
+  const timezoneOptions = useTimezoneOptions(agent.timezone);
 
   function saveTimezone(next: string) {
     setTz(next);
@@ -325,7 +326,7 @@ export default function AgentSettingsProfilePage() {
           className="aria-disabled:opacity-50"
           options={[
             { value: "", label: m.agent_portal_settings_timezone_company_option() },
-            ...TIMEZONE_SELECT_OPTIONS,
+            ...timezoneOptions,
           ]}
         />
         <p className={`text-[12px] mt-2 ${tzError ? "text-ih-bad-fg" : "text-ih-fg-3"}`}>

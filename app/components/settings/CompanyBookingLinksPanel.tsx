@@ -1,6 +1,7 @@
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
 import { BookingClosedNotice, type BookingOpenState } from "~/components/settings/BookingClosedNotice";
 import { m } from "~/paraglide/messages";
+import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 const NO_BOOKING_STATE: BookingOpenState = { open: null, reason: null };
 
@@ -17,7 +18,7 @@ export function CompanyBookingLinksPanel({
   booking?: BookingOpenState;
 }) {
   const { copied: copiedField, copy } = useCopyClipboard();
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = usePageOrigin();
   const companyUrl = tenant ? `${origin}/book/${tenant}` : null;
 
   if (!companyUrl) return null;

@@ -32,6 +32,7 @@ import { resolveQuickPhrases, seedQuickPhrases } from "~/lib/repair-quick-phrase
 import { RepairIntroPanel } from "./repair/RepairIntroPanel";
 import { RepairSharePanel } from "./repair/RepairSharePanel";
 import { formatCents } from "~/lib/money";
+import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -291,9 +292,10 @@ function RepairBuilderUI({ defects, mine, token, quickPhrases, actionPath }: Rep
   }));
   const total = builderCreditTotal(creditItems);
 
+  const origin = usePageOrigin();
   const shareToken = existingList?.shareToken ?? null;
   const shareUrl = shareToken
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/repair-request/${shareToken}`
+    ? `${origin}/repair-request/${shareToken}`
     : null;
 
   const copyShareLink = async () => {

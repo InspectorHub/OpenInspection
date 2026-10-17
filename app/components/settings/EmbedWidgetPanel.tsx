@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
 import { m } from "~/paraglide/messages";
+import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined }) {
   const STYLES = [
@@ -10,6 +11,7 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
   ] as const;
   const [style, setStyle] = useState<"light" | "dark" | "branded">("light");
   const { copied, copy } = useCopyClipboard();
+  const origin = usePageOrigin();
 
   // Company-level embed: only requires tenant (slug not needed).
   // See Part 4c — we use company-only embed, no per-inspector variant in the snippet.
@@ -27,9 +29,6 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
     );
   }
 
-  // SSR produces "" for origin; client produces the real origin.
-  // Same pre-existing mismatch class as StatusAndLinks above.
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const embedUrl = `${origin}/embed/${tenant}?style=${style}`;
   const snippet = `<iframe src="${origin}/embed/${tenant}?style=${style}" style="width:100%;min-height:700px;border:none;" loading="lazy"></iframe>`;
 

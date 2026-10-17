@@ -1,6 +1,7 @@
 import { Banner } from "@core/shared-ui";
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
 import { m } from "~/paraglide/messages";
+import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 /**
  * Feed PATHS, not absolute URLs. The API is mounted in-process behind the RR
@@ -36,7 +37,7 @@ interface FeedRow {
  */
 export function IcsSubscribePanel({ links }: { links: IcsLinks }) {
   const { copied: copiedField, copy } = useCopyClipboard();
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const origin = usePageOrigin();
 
   const rows: FeedRow[] = [
     ...(links.companyPath

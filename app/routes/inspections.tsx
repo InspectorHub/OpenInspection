@@ -317,17 +317,15 @@ export default function InspectionsPage() {
   const isLoadMoreRef = useRef(false);
 
   /* ---- Columns (persisted in localStorage) ---- */
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    if (typeof window === "undefined") return DEFAULT_COLUMNS;
+  // The server cannot read localStorage, so the first render shows the defaults on both sides and the
+  // stored choice is applied right after hydration (reading it during render disagrees with the HTML).
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_COLUMNS);
+  useEffect(() => {
     try {
-      const raw = localStorage.getItem("oi.dashboard.columns");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
+      const parsed: unknown = JSON.parse(localStorage.getItem("oi.dashboard.columns") ?? "null");
+      if (Array.isArray(parsed)) setVisibleColumns(parsed);
     } catch { /* fallback */ }
-    return DEFAULT_COLUMNS;
-  });
+  }, []);
 
   // Two predicates, deliberately different: the popover offers what the user
   // chose, the rows draw what fits. See `useColumnPredicates` for why.

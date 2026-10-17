@@ -19,6 +19,7 @@ import { ManagedComplianceWizard, type ManagedComplianceData } from "~/component
 import { m } from "~/paraglide/messages";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 import type { SwitchableSourceRow } from "../../server/lib/integrations/source-change";
+import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 export function meta() {
   return [{ title: m.integrations_sms_meta_title() }];
@@ -164,7 +165,8 @@ function SmsPage({ data }: { data: Exclude<Awaited<ReturnType<typeof loader>>, {
   const pendingIntent = nav.state !== "idle" ? nav.formData?.get("intent") : null;
 
   const tenantSlug = session?.branding.tenantSlug ?? "";
-  const inboundUrl = typeof window !== "undefined" && tenantSlug ? `${window.location.origin}/webhooks/sms/inbound/${tenantSlug}` : "";
+  const pageOrigin = usePageOrigin();
+  const inboundUrl = tenantSlug ? `${pageOrigin}/webhooks/sms/inbound/${tenantSlug}` : "";
   const onboardingError = actionData && (actionData.intent === "sms-compliance-provision" || actionData.intent === "sms-compliance-resubmit") && !actionData.ok
     ? actionData.error : null;
 
