@@ -15,7 +15,7 @@ import {
     WeekSummaryResponseSchema,
 } from '../lib/validations/schedule-week-summary.schema';
 import { BookingService } from '../services/booking.service';
-import { isAdminRole } from '../lib/auth/roles';
+import { canViewOthersCalendar } from '../lib/calendar/view-others';
 import { getDrizzle } from '../lib/route-helpers';
 import scheduleDaySlotsRoutes from './schedule-day-slots';
 
@@ -44,10 +44,6 @@ function civilDayOfWeek(date: string): number {
     return new Date(civilUtcMs(date)).getUTCDay();
 }
 
-function isAdmin(role: string | undefined): boolean {
-    return isAdminRole(role);
-}
-
 const allowedRoles = requireRole('owner', 'manager', 'inspector');
 
 const weekSummaryRoute = createRoute(withMcpMetadata({
@@ -56,7 +52,7 @@ const weekSummaryRoute = createRoute(withMcpMetadata({
     operationId: 'getScheduleWeekSummary',
     tags: ['calendar'],
     summary: 'Summarize seven days of availability',
-    description: 'Returns one availability status per civil day for the week beginning at start, batching the shared per-week setup into a single call. Owners and managers may summarize any inspector via userId; inspectors are always summarized against themselves.',
+    description: 'Returns one availability status per civil day for the week beginning at start, batching the shared per-week setup into a single call. Owners, managers and anyone holding the scheduleOthers capability may summarize any inspector via userId; everyone else is always summarized against themselves.',
     middleware: [allowedRoles],
     request: {
         query: WeekSummaryQuerySchema,
@@ -77,12 +73,11 @@ const weekSummaryRoute = createRoute(withMcpMetadata({
 const scheduleWeekSummaryRoutes = createApiRouter()
     .openapi(weekSummaryRoute, async (c) => {
         const user = c.get('user');
-        const role = c.get('userRole');
         const tenantId = c.get('tenantId');
         const query = c.req.valid('query');
 
-        // Inspectors only ever see themselves, whatever userId they ask for.
-        const scopedUserId = isAdmin(role) ? query.userId : user.sub;
+        // Anyone who may not open other calendars is summarized against themselves, whatever userId they ask for.
+        const scopedUserId = await canViewOthersCalendar(c) ? query.userId : user.sub;
 
         const dates = Array.from(
             { length: WEEK_LENGTH },

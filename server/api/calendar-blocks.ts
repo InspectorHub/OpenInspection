@@ -7,6 +7,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { pushBlockAfterResponse, dropExternalAfterResponse } from '../lib/calendar/push-hooks';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { isAdminRole } from '../lib/auth/roles';
+import { canViewOthersCalendar } from '../lib/calendar/view-others';
 import { getDrizzle, type AppDrizzle } from '../lib/route-helpers';
 import {
     CalendarBlockErrorSchema,
@@ -61,7 +62,7 @@ const listBlocksRoute = createRoute(withMcpMetadata({
     operationId: 'listCalendarBlocks',
     tags: ['calendar'],
     summary: 'List calendar blocks in range',
-    description: 'Lists calendar blocks within an inclusive civil-date range. Inspectors can list their own blocks; owners and managers can select another user.',
+    description: 'Lists calendar blocks within an inclusive civil-date range. Inspectors can list their own blocks; owners, managers and anyone holding the scheduleOthers capability can select another user.',
     middleware: [allowedRoles],
     request: { query: ListCalendarBlocksQuerySchema },
     responses: {
@@ -186,11 +187,10 @@ const calendarBlockRoutes = createApiRouter()
     .openapi(listBlocksRoute, async (c) => {
         const user = c.get('user');
         const tenantId = c.get('tenantId');
-        const role = c.get('userRole');
         const query = c.req.valid('query');
         const targetUserId = query.userId ?? user.sub;
 
-        if (!isAdmin(role) && targetUserId !== user.sub) {
+        if (targetUserId !== user.sub && !await canViewOthersCalendar(c)) {
             return c.json(errorResponse('Inspectors can only list their own calendar blocks', 'FORBIDDEN'), 403);
         }
 

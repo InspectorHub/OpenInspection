@@ -7,6 +7,7 @@ import calendarItemsRoutes from '../../../server/api/calendar-items';
 import { listCalendarItems } from '../../../server/services/calendar-items.service';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 vi.mock('drizzle-orm/d1', () => ({
     drizzle: vi.fn(),
@@ -77,7 +78,7 @@ describe('calendar items — timezone-correct civil date bucketing', () => {
             end: '2026-07-19',
             userIds: [INSPECTOR],
             effectiveTz: 'Asia/Shanghai',
-        });
+        }, ALL_INSPECTIONS);
 
         const block = items.find((item) => item.kind === 'calendar_block');
         // The block was authored as 09:00 on 2026-07-17 in the inspector's own
@@ -139,7 +140,7 @@ describe('calendar items — timezone-correct civil date bucketing', () => {
             end: '2026-07-20',
             userIds: [INSPECTOR],
             effectiveTz: 'Asia/Shanghai',
-        });
+        }, ALL_INSPECTIONS);
 
         const event = items.find((item) => item.kind === 'inspection_event');
         // 2026-07-17T20:00Z is 2026-07-18 04:00 in Asia/Shanghai (UTC+8), so the
@@ -180,7 +181,7 @@ describe('calendar items — timezone-correct civil date bucketing', () => {
             end: '2026-07-19',
             userIds: [INSPECTOR],
             effectiveTz: 'Asia/Shanghai',
-        });
+        }, ALL_INSPECTIONS);
 
         expect(items.find((item) => item.kind === 'inspection')).toMatchObject({
             civilDate: '2026-07-15',
@@ -321,7 +322,7 @@ describe('calendar items — timezone-correct civil date bucketing', () => {
             end: '2027-03-16',
             userIds: [INSPECTOR],
             effectiveTz: 'America/New_York',
-        });
+        }, ALL_INSPECTIONS);
         return items.find((item) => item.kind === 'inspection_event');
     }
 

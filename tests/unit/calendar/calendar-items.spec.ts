@@ -7,6 +7,7 @@ import calendarItemsRoutes from '../../../server/api/calendar-items';
 import { listCalendarItems } from '../../../server/services/calendar-items.service';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 vi.mock('drizzle-orm/d1', () => ({
     drizzle: vi.fn(),
@@ -178,7 +179,7 @@ describe('calendar items feed', () => {
         const items = await listCalendarItems({} as D1Database, TENANT, {
             start: '2026-08-01',
             end: '2026-08-05',
-        });
+        }, ALL_INSPECTIONS);
 
         expect(items.filter((item) => item.kind === 'inspection')).toMatchObject([
             {
@@ -207,7 +208,7 @@ describe('calendar items feed', () => {
             start: '2026-08-01',
             end: '2026-08-05',
             userIds: [OTHER_INSPECTOR],
-        });
+        }, ALL_INSPECTIONS);
 
         expect(items.filter((item) => item.kind === 'inspection').map((item) => item.id))
             .toEqual(['inspection-two']);
@@ -277,7 +278,7 @@ describe('calendar items feed', () => {
             start: '2026-08-01',
             end: '2026-08-05',
             userIds: [INSPECTOR],
-        });
+        }, ALL_INSPECTIONS);
 
         expect(items.map((item) => item.kind)).toEqual([
             'inspection',
