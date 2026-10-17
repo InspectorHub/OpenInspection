@@ -50,6 +50,8 @@ export interface CreatePipelineInput {
     inspectionId: string;
     templateId: string | null;
     inspectorId: string | null;
+    /** Joins the roster as a helper beside the lead; set when the creator would otherwise be left off what they made. */
+    helperInspectorIds: string[];
     createdAt: Date;
     clientName: string;
     clientEmail: string | null;
@@ -67,6 +69,7 @@ export interface CreatePipelineInput {
 /** The create request, as far as the pipeline reads it. */
 export interface CreateRequestFields {
     templateId?: string | undefined;
+    creatorOnRosterId?: string | undefined;
     clientName?: string | undefined;
     clientEmail?: string | null | undefined;
     clientPhone?: string | null | undefined;
@@ -85,6 +88,7 @@ export function pipelineInputFrom(
         inspectionId: inspection.id,
         templateId: data.templateId ?? null,
         inspectorId: inspection.inspectorId,
+        helperInspectorIds: data.creatorOnRosterId ? [data.creatorOnRosterId] : [],
         createdAt: inspection.createdAt,
         clientName: data.clientName || ANONYMOUS_CLIENT,
         clientEmail: data.clientEmail || null,
@@ -182,7 +186,7 @@ export async function runCreatePipeline(
     // assigned to yet, so it can never undo a later reassignment.
     await step(strict, 'inspection.assignment-sync.failed', id, async () => {
         if (input.inspectorId && (opts.fresh || !(await isAssigned(db, tenantId, id)))) {
-            await syncInspectionAssignments(db, tenantId, id, { inspectorId: input.inspectorId });
+            await syncInspectionAssignments(db, tenantId, id, { inspectorId: input.inspectorId, helperInspectorIds: input.helperInspectorIds });
         }
     });
     // Who receives a notice is read from the people links, so WHEN it fires decides the recipients. A

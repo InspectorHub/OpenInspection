@@ -118,7 +118,7 @@ export class InspectionService {
     }
 
     /** Creates a new inspection. */
-    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
+    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string; creatorOnRosterId?: string | undefined }): Promise<Inspection> {
         return this.core.createInspection(tenantId, data);
     }
 

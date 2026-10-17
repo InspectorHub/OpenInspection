@@ -1,11 +1,13 @@
 /**
  * A creator who can see only their own assignments stays on the roster of what
  * they create (team mode could otherwise leave them off it, and the inspection
- * would answer "not found" on the next request), and a client-generated id may
+ * would answer "not found" on the next request) -- in the wizard and in the plain create alike --
+ * and a client-generated id may
  * not take the name of a route.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
+import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
@@ -13,6 +15,9 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { CreateInspectionFromWizardInput } from '../../../server/lib/validations/wizard.schema';
 import { CreateInspectionSchema } from '../../../server/lib/validations/inspection/crud';
+import { asScopedDbSource } from '../helpers/test-db';
+import { resolveCreateInput } from '../../../server/api/inspections/create-support';
+import type { HonoConfig } from '../../../server/types/hono';
 import { RESERVED_INSPECTION_SEGMENTS } from '../../../server/lib/middleware/inspection-scope';
 import { ALL_INSPECTIONS, type InspectionScope } from '../../../server/lib/inspection/visibility';
 
@@ -93,5 +98,54 @@ describe('a client-generated id cannot take the name of a route', () => {
     it('accepts an ordinary id and a missing id (control)', () => {
         expect(CreateInspectionSchema.safeParse(body('550e8400-e29b-41d4-a716-446655440000')).success).toBe(true);
         expect(CreateInspectionSchema.safeParse(base).success).toBe(true);
+    });
+});
+
+describe('the plain create keeps a restricted creator on the roster', () => {
+    const body = { propertyAddress: '9 Plain Street', date: '2026-09-02', inspectorId: U.lead } as never;
+
+    /** Runs resolveCreateInput the way the route does: as the given user, with their stored capabilities. */
+    async function resolve(userId: string, input: unknown) {
+        const app = new OpenAPIHono<HonoConfig>();
+        app.use('*', async (c, next) => {
+            c.set('userRole', 'inspector');
+            c.set('user', { sub: userId, role: 'inspector', tenantId: TENANT } as never);
+            c.set('tenantId', TENANT);
+            c.set('sdb', new ScopedDB(asScopedDbSource(db), TENANT));
+            c.set('services', { contact: {} } as never);
+            await next();
+        });
+        app.post('/resolve', async (c) => c.json(await resolveCreateInput(c, input as never)));
+        const res = await app.request('/resolve', { method: 'POST' }, { DB: {} } as never);
+        const text = await res.text();
+        expect(res.status, text).toBe(200);
+        return JSON.parse(text) as { inspectorId?: string; creatorOnRosterId?: string };
+    }
+    const restrict = (id: string) =>
+        db.update(schema.users).set({ permissionOverrides: { viewAllInspections: false } }).where(eq(schema.users.id, id));
+
+    it('names another inspector: the creator joins as a helper, the lead stays the lead, and the creator can list it', async () => {
+        await restrict(U.me);
+        const input = await resolve(U.me, body);
+        expect(input).toMatchObject({ inspectorId: U.lead, creatorOnRosterId: U.me });
+        const { inspection } = await svc.createInspectionOnce(TENANT, input as never);
+        expect(await rosterOf(inspection.id)).toEqual([`helper:${U.me}`, `lead:${U.lead}`].sort());
+        const list = await svc.listInspections(TENANT, { limit: 10 }, RESTRICTED);
+        expect(list.inspections.map(i => i.id)).toContain(inspection.id);
+    });
+    it('control: an unrestricted creator who names someone else is not added', async () => {
+        const input = await resolve(U.me, body);
+        expect(input.creatorOnRosterId).toBeUndefined();
+        const { inspection } = await svc.createInspectionOnce(TENANT, input as never);
+        expect(await rosterOf(inspection.id)).toEqual([`lead:${U.lead}`]);
+    });
+    it('control: a restricted creator who names no one, or themselves, leads it alone', async () => {
+        await restrict(U.me);
+        for (const named of [undefined, U.me]) {
+            const input = await resolve(U.me, { propertyAddress: '10 Plain Street', date: '2026-09-02', ...(named ? { inspectorId: named } : {}) });
+            expect(input.creatorOnRosterId).toBeUndefined();
+            const { inspection } = await svc.createInspectionOnce(TENANT, input as never);
+            expect(await rosterOf(inspection.id)).toEqual([`lead:${U.me}`]);
+        }
     });
 });

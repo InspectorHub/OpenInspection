@@ -17,6 +17,7 @@ import type { HonoConfig } from '../../types/hono';
 import { isFieldRole } from '../../lib/auth/roles';
 import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
 import { getDrizzle } from '../../lib/route-helpers';
+import { resolveInspectionScope } from '../../lib/inspection/visibility';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -78,7 +79,7 @@ function inspectorFor(c: Context<HonoConfig>, named: string | null | undefined):
 export async function resolveCreateInput(
     c: Context<HonoConfig>,
     body: CreateInspectionData,
-): Promise<CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string }> {
+): Promise<CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string; creatorOnRosterId?: string | undefined }> {
     const tenantId = c.get('tenantId');
     const contactService = c.var.services.contact;
     // A named inspector must work in the field and belong to this company; nothing after this looks at the id again.
@@ -115,9 +116,18 @@ export async function resolveCreateInput(
         resolvedAgentId = body.agentContactId;
     }
 
+    // A creator who can see only their own assignments stays on the roster of what they create: naming someone
+    // else as the inspector would leave them off it, and the inspection would answer "not found" on the very next
+    // request. They join as a helper, so the inspector they named stays the lead (the wizard does the same).
+    const scope = await resolveInspectionScope(c);
+    const lead = inspectorFor(c, body.inspectorId).inspectorId;
+    const creatorOnRosterId = scope.kind === 'assigned' && lead && lead !== scope.userId && isFieldRole(c.get('userRole'))
+        ? scope.userId : undefined;
+
     return {
         ...body,
         ...clientFields,
+        ...(creatorOnRosterId ? { creatorOnRosterId } : {}),
         // The creator leads the job only when they can inspect; an office user
         // (staff) who books one leaves it unassigned for someone to be scheduled.
         ...inspectorFor(c, body.inspectorId),

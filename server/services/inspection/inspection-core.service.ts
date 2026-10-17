@@ -205,7 +205,7 @@ export class InspectionCoreService extends InspectionSubService {
     async completeInterruptedCreate(
         tenantId: string,
         inspection: Inspection,
-        data: CreateInspectionData & { clientContactId?: string },
+        data: CreateInspectionData & { clientContactId?: string; creatorOnRosterId?: string | undefined },
         hooks?: CreateInspectionHooks,
     ): Promise<void> {
         await this.assertContactsBelongToTenant(tenantId, [data.referredByAgentId, data.sellingAgentId, data.clientContactId]);
@@ -215,7 +215,7 @@ export class InspectionCoreService extends InspectionSubService {
     }
 
     /** Creates a new inspection. See `createInspectionOnce` for the replay semantics. */
-    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string }): Promise<Inspection> {
+    async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string; creatorOnRosterId?: string | undefined }): Promise<Inspection> {
         return (await this.createInspectionOnce(tenantId, data)).inspection;
     }
 
@@ -227,7 +227,7 @@ export class InspectionCoreService extends InspectionSubService {
      */
     async createInspectionOnce(
         tenantId: string,
-        data: CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string },
+        data: CreateInspectionData & { inspectorId?: string | undefined; clientContactId?: string; creatorOnRosterId?: string | undefined },
         hooks?: CreateInspectionHooks,
     ): Promise<{ inspection: Inspection; created: boolean }> {
         if (!this.sdb) throw new Error('ScopedDB session missing');
