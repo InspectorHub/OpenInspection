@@ -1710,7 +1710,7 @@
       }
     },
     "summary": "Create contact for current tenant",
-    "description": "Creates a contact (client, agent or other party). Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the contact is also pushed to QuickBooks as a customer in the background. Returns the created contact."
+    "description": "Creates a contact (client, agent or other party). Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the contact is also pushed to QuickBooks as a customer in the background. Returns the created contact, or 409 when an active contact already holds the email; the refusal does not describe that contact."
   },
   {
     "operationId": "createContractorType",
@@ -5905,7 +5905,7 @@
       "body": null
     },
     "summary": "Delete contact for current tenant",
-    "description": "Removes a contact. A contact that no inspection references is deleted permanently; one that appears on any inspection is archived instead (restorable via the restore route) so past inspections keep their history. Archiving may also revoke that contact's live report links, if the company's archive-revokes-access setting is on. Requires the manageContacts capability."
+    "description": "Removes a contact. A contact that no inspection references is deleted permanently; one that appears on any inspection is archived instead (restorable via the restore route) so past inspections keep their history. Archiving may also revoke that contact's live report links, if the company's archive-revokes-access setting is on. Requires the manageContacts capability. For a caller whose access is limited to the inspections assigned to them, a contact outside that set is answered as not found."
   },
   {
     "operationId": "deleteContractorType",
@@ -9523,7 +9523,7 @@
       "body": null
     },
     "summary": "Summarize seven days of availability",
-    "description": "Returns one availability status per civil day for the week beginning at start, batching the shared per-week setup into a single call. Owners and managers may summarize any inspector via userId; inspectors are always summarized against themselves."
+    "description": "Returns one availability status per civil day for the week beginning at start, batching the shared per-week setup into a single call. Owners, managers and anyone holding the scheduleOthers capability may summarize any inspector via userId; everyone else is always summarized against themselves."
   },
   {
     "operationId": "getServiceInspectors",
@@ -9656,7 +9656,7 @@
       "body": null
     },
     "summary": "Get tenant team-page default toggles",
-    "description": "Returns the boolean toggles that govern the team page: teamModeDefault. Used to drive UI state."
+    "description": "Returns the boolean toggles that govern the team page: teamModeDefault, and newInspectorsViewAll (whether an inspector invited from now on can see every inspection in the company, true unless a company has restricted new inspectors to the ones assigned to them). Used to drive UI state."
   },
   {
     "operationId": "getTenantAgreementsRequest",
@@ -10556,7 +10556,7 @@
       "body": null
     },
     "summary": "List availability override entries",
-    "description": "Returns availability override entries (blocked dates and custom slots) for an inspector. Used by the calendar UI to render day-level adjustments."
+    "description": "Returns availability override entries (blocked dates and custom slots) for an inspector. Used by the calendar UI to render day-level adjustments. The entries of another inspector need an owner or manager role or the scheduleOthers capability."
   },
   {
     "operationId": "listBillingSummary",
@@ -10682,7 +10682,7 @@
       "body": null
     },
     "summary": "List calendar blocks in range",
-    "description": "Lists calendar blocks within an inclusive civil-date range. Inspectors can list their own blocks; owners and managers can select another user."
+    "description": "Lists calendar blocks within an inclusive civil-date range. Inspectors can list their own blocks; owners, managers and anyone holding the scheduleOthers capability can select another user."
   },
   {
     "operationId": "listCalendarEvents",
@@ -10802,7 +10802,7 @@
       "body": null
     },
     "summary": "List unified calendar items",
-    "description": "Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers may select multiple users; inspectors are restricted to themselves."
+    "description": "Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers, and anyone holding the scheduleOthers capability, may select other users; everyone else is restricted to themselves. Inspections and scheduled visits are limited to the inspections the caller can see in the inspection list."
   },
   {
     "operationId": "listComplianceAiAssurance",
@@ -12506,7 +12506,7 @@
       "body": null
     },
     "summary": "List recurring weekly availability",
-    "description": "Returns the recurring weekly availability slots for an inspector. Defaults to the caller; admins can query any inspector via the inspectorId query parameter."
+    "description": "Returns the recurring weekly availability slots for an inspector. Defaults to the caller; owners, managers and anyone holding the scheduleOthers capability can query any inspector via the inspectorId query parameter."
   },
   {
     "operationId": "listRoleProfiles",
@@ -17597,7 +17597,7 @@
       }
     },
     "summary": "Replace contact for current tenant",
-    "description": "Update a contact's details. Despite the PUT verb this is a partial update: only fields present in the body are written, and sending a nullable field (email, phone, agency, notes, locale) as null clears it. The email of an agent contact is frozen and a new value is silently ignored, because it identifies the agent across companies; to change it, archive the contact and create a new one. Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the change is also pushed to QuickBooks in the background. Returns the updated contact, or 404 when the id is not in this company. Idempotent."
+    "description": "Update a contact's details. Despite the PUT verb this is a partial update: only fields present in the body are written, and sending a nullable field (email, phone, agency, notes, locale) as null clears it. The email of an agent contact is frozen and a new value is silently ignored, because it identifies the agent across companies; to change it, archive the contact and create a new one. Requires the manageContacts capability and the owner, manager or inspector role. Does not email the contact. When the QuickBooks integration is configured, the change is also pushed to QuickBooks in the background. Returns the updated contact, or 404 when the id is not in this company or, for a caller whose access is limited to the inspections assigned to them, not one they can see. Idempotent."
   },
   {
     "operationId": "replaceInspectionRequest",
@@ -18229,7 +18229,7 @@
       "body": null
     },
     "summary": "Restore an archived contact",
-    "description": "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued."
+    "description": "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued. For a caller whose access is limited to the inspections assigned to them, a contact outside that set is answered as not found."
   },
   {
     "operationId": "resubmitSmsCompliance",
@@ -18422,7 +18422,7 @@
       }
     },
     "summary": "Revoke a contact's report links",
-    "description": "Revokes the named inspections' links for this contact, or every live link when inspectionIds is omitted. Returns the number actually revoked, which can be lower than requested if some were already gone."
+    "description": "Revokes the named inspections' links for this contact, or every live link when inspectionIds is omitted. Returns the number actually revoked, which can be lower than requested if some were already gone. For a caller whose access is limited to the inspections assigned to them, only links to inspections they can open are withdrawn, and a contact outside their set is answered as not found."
   },
   {
     "operationId": "revokeMcpGrant",
@@ -23079,13 +23079,17 @@
           "teamModeDefault": {
             "type": "boolean",
             "description": "Company-wide default for team mode, the setting that enables a lead inspector plus helpers on inspections. Stored on the team page defaults; it is read and written there, and sending nothing leaves it unchanged."
+          },
+          "newInspectorsViewAll": {
+            "type": "boolean",
+            "description": "Whether an inspector invited from now on can see every inspection in the company (true, the default) or only the inspections assigned to them (false). It is applied when an invite is created, only if the invite does not say otherwise; existing members and pending invites keep what they have, and sending nothing leaves it unchanged."
           }
         },
         "description": "The team-page toggles to change; toggles left out keep their stored value."
       }
     },
     "summary": "Update tenant team-page default toggles",
-    "description": "Patches any subset of the team-page toggles (teamModeDefault). Missing keys leave existing values unchanged."
+    "description": "Patches any subset of the team-page toggles (teamModeDefault, newInspectorsViewAll). Missing keys leave existing values unchanged. newInspectorsViewAll applies to inspectors invited afterwards; existing members and pending invites keep their current setting."
   },
   {
     "operationId": "updateTeamMember",

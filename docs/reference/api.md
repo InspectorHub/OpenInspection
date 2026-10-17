@@ -305,7 +305,7 @@ List all inspections for the tenant.
 
 **Roles:** any authenticated user
 
-**Visibility:** a caller whose access is limited to the inspections assigned to them (lead or helper) receives only those. The counts, the dashboard, contacts, message threads, analytics, metrics, invoices, inspection requests and the calendar's local events follow the same rule, and a request for a single inspection outside that set answers `404`, the same answer as for an id that does not exist.
+**Visibility:** a caller whose access is limited to the inspections assigned to them (lead or helper) receives only those. The counts, the dashboard, contacts (reads and writes), message threads, analytics, metrics, invoices, inspection requests, scheduled visits, the calendar feed and week summary, the company presence roster, bulk updates and the offline package import follow the same rule, and a request for a single inspection outside that set answers `404`, the same answer as for an id that does not exist.
 
 **Response:**
 ```json
@@ -791,6 +791,9 @@ Archive a company template: it can no longer be applied and its name can be used
 **Roles:** `owner`, `manager`
 
 ---
+
+#### `viewAllInspections` and the new-inspector default
+`permissionOverrides` on `POST /api/team/invite` and `PATCH /api/team/members/{id}` accepts `viewAllInspections`. `false` limits an inspector to the inspections assigned to them; owners, managers and staff keep seeing everything whatever is sent, and the request stores nothing for them. A member edit that sends `permissionOverrides` replaces the whole map. `GET /api/team/defaults` and `PUT /api/team/defaults` carry `newInspectorsViewAll` (default `true`): when `false`, an inspector invite that does not mention `viewAllInspections` is stamped with `viewAllInspections: false`. An explicit value wins, and changing the default never reaches existing invites or members. See [Roles and capabilities](roles.md#inspection-visibility).
 
 #### `POST /api/team/invite` and `PATCH /api/team/members/{id}` with `templateId`
 Both accept an optional `templateId` (a built-in key or a company template id). Its role and switches are copied onto the invite or the member; any `permissionOverrides` sent alongside are applied on top. On the invite, `role` becomes optional (it must match the template's role if sent, and defaults to `inspector` when neither is given). An unknown id, or another company's, is `404`. The ceiling applies to the result exactly as to the same role and switches sent by hand.
