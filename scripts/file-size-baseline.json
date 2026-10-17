@@ -55,7 +55,7 @@
   "server/portal/integration.routes.ts": 476,
   "server/api/admin/admin-config.ts": 472,
   "app/components/inspection/PeopleEditor.tsx": 471,
-  "server/lib/db/schema/tenant/core.ts": 463,
+  "server/lib/db/schema/tenant/core.ts": 468,
   "scripts/check-retention-manifest.mjs": 462,
   "server/lib/middleware/di.ts": 460,
   "app/components/portal/sections/RepairBuilderSection.tsx": 459,

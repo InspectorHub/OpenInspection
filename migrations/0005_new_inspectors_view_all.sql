@@ -1,0 +1,1 @@
+ALTER TABLE `tenant_configs` ADD `is_new_inspectors_view_all` integer DEFAULT true NOT NULL;

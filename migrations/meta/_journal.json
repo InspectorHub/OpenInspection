@@ -36,6 +36,13 @@
       "when": 1792207487427,
       "tag": "0004_permission_templates",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1792224709852,
+      "tag": "0005_new_inspectors_view_all",
+      "breakpoints": true
     }
   ]
 }
