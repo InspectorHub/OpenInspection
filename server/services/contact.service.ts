@@ -3,6 +3,7 @@ import { eq, and, like, sql, isNull, isNotNull, inArray } from 'drizzle-orm';
 import { contacts, type ContactType } from '../lib/db/schema/contact';
 import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema/inspection/role-profiles';
 import { Errors } from '../lib/errors';
+import { isUniqueViolation } from '../lib/db/unique-violation';
 import { visibleContactsCondition, visibleInspectionIds, filterVisibleInspectionIds, type InspectionScope } from '../lib/inspection/visibility';
 import { buildContactDetail } from './contact-detail';
 import { escapeLikePattern } from '../lib/db/like-escape';
@@ -117,7 +118,14 @@ export class ContactService {
             createdByUserId: data.createdByUserId ?? null,
         };
         const row = { id: crypto.randomUUID(), tenantId, createdAt: new Date(), type: data.type, name: data.name, ...normalized };
-        await db.insert(contacts).values(row);
+        try {
+            await db.insert(contacts).values(row);
+        } catch (err) {
+            // The same answer whoever holds the address: the caller may not be allowed to see that contact, so
+            // the refusal carries nothing about it (no id, no name, no address).
+            if (data.email && isUniqueViolation(err, 'contacts.email')) throw Errors.Conflict('A contact with this email already exists');
+            throw err;
+        }
         return { ...row, createdAt: safeISODate(row.createdAt), inspectionCount: 0 };
     }
 
@@ -274,13 +282,20 @@ export class ContactService {
      * real number matters: "revoked 3" when one was already dead would teach
      * an operator to trust a count that is not measuring anything.
      */
-    async revokeAccess(id: string, tenantId: string, inspectionIds?: string[]): Promise<number | null> {
+    async revokeAccess(id: string, tenantId: string, scope: InspectionScope, inspectionIds?: string[]): Promise<number | null> {
         const db = this.getDrizzle();
         const row = await db.select({ email: contacts.email }).from(contacts)
-            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId), visibleContactsCondition(db, scope, tenantId))).get();
         if (!row) return null;
         if (!row.email || !this.portalAccess) return 0;
-        const n = await this.portalAccess.revokeAccessForRecipient(tenantId, row.email, inspectionIds);
+        // A link names an inspection; one the caller cannot open is not theirs to withdraw, whether named or swept up by 'all'.
+        let targets = inspectionIds;
+        if (scope.kind !== 'all') {
+            const live = await this.portalAccess.listLiveAccessByRecipient(tenantId, row.email);
+            const openable = await filterVisibleInspectionIds(db, scope, tenantId, live.map((a) => a.inspectionId));
+            targets = (inspectionIds ?? live.map((a) => a.inspectionId)).filter((i) => openable.has(i));
+        }
+        const n = await this.portalAccess.revokeAccessForRecipient(tenantId, row.email, targets);
         if (n > 0) logger.info('contact.access.revoked', { tenantId, contactId: id, revoked: n });
         return n;
     }
