@@ -15,6 +15,7 @@ import { mayActOn } from './staff-rules';
 import { deniedNeedsPermission } from '../permission-denied';
 import { getDrizzle } from '../route-helpers';
 import { getInspectionRoster } from './roster';
+import { requireVisibleInspection, resolveInspectionScope } from './visibility';
 import { capabilitiesFor } from '../middleware/require-capability';
 import type { HonoConfig } from '../../types/hono';
 
@@ -61,6 +62,8 @@ export async function mayDeleteInspection(c: Context<HonoConfig>, inspectionId: 
 }
 
 export async function assertMayActOnInspection(c: Context<HonoConfig>, inspectionId: string, what: string): Promise<void> {
+    // Visibility first, so a restricted caller cannot tell a hidden inspection from a missing one by the refusal.
+    await requireVisibleInspection(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), inspectionId);
     if (!(await mayActOnInspection(c, inspectionId))) {
         throw deniedNeedsPermission(c, 'scheduleOthers', `You are not on this inspection, so you cannot ${what}`);
     }

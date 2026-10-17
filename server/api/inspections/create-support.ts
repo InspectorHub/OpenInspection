@@ -17,7 +17,7 @@ import type { HonoConfig } from '../../types/hono';
 import { isFieldRole } from '../../lib/auth/roles';
 import { assertFieldRoleMembers } from '../../lib/inspection/field-role-members';
 import { getDrizzle } from '../../lib/route-helpers';
-import { resolveInspectionScope } from '../../lib/inspection/visibility';
+import { requireVisibleContact, resolveInspectionScope } from '../../lib/inspection/visibility';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -84,6 +84,11 @@ export async function resolveCreateInput(
     const contactService = c.var.services.contact;
     // A named inspector must work in the field and belong to this company; nothing after this looks at the id again.
     await assertFieldRoleMembers(getDrizzle(c), tenantId, [body.inspectorId]);
+    // A contact the caller cannot see answers like one that does not exist, and is never linked: linking it to the
+    // inspection being created would make it visible to them.
+    for (const contactId of [body.referredByAgentId, body.sellingAgentId, body.agentContactId]) {
+        if (contactId) await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, contactId);
+    }
 
     // IA-1: Resolve client contact before creating the inspection.
     let clientContactId: string | undefined;

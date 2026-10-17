@@ -13,7 +13,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
 import { deniedNeedsPermission } from '../lib/permission-denied';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { assertInspectionVisible, requireVisibleContact, resolveInspectionScope } from '../lib/inspection/visibility';
+import { requireVisibleInspection, requireVisibleContact, resolveInspectionScope } from '../lib/inspection/visibility';
 import { getDrizzle } from '../lib/route-helpers';
 
 // ── Company inbox routes (Track D, design §3.9) — mounted at /api/messages ────
@@ -112,7 +112,7 @@ export const messageThreadRoutes = createApiRouter()
         const scope = await resolveInspectionScope(c);
         await requireVisibleContact(getDrizzle(c), scope, tenantId, contactId);
         // A mentioned inspection the caller cannot see is not found, however the rest of the request reads.
-        if (inspectionId) await assertInspectionVisible(getDrizzle(c), scope, tenantId, inspectionId);
+        if (inspectionId) await requireVisibleInspection(getDrizzle(c), scope, tenantId, inspectionId);
         const contact = await svc.contactById(tenantId, contactId);
         if (!contact) throw Errors.NotFound('Contact not found');
         // Messaging a client is the assignee's act: the thread's contact must be on one of the

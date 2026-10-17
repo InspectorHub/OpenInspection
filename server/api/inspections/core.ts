@@ -236,7 +236,7 @@ const coreRoutes = createApiRouter()
         const refusal = await findPatchRefusal(
             db, tenantId, id, body,
             (i, t, key) => c.var.services.inspection.isInspectionPhotoKey(i, t, key),
-            inspection.status,
+            inspection.status, await resolveInspectionScope(c),
         );
         if (refusal) return c.json({ success: false as const, error: refusal }, 400);
 
