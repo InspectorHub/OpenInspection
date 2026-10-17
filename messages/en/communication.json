@@ -115,5 +115,14 @@
   "comm_report_delivery_opened_many": "Opened {count} times · first {first} · last {last}",
   "comm_report_delivery_objected": "This recipient asked not to be counted, so opens are no longer recorded for them.",
   "comm_report_delivery_caveat": "Opens are recorded on our side when the report page loads. A mail-security scanner can trip one, so treat this as a signal, not proof of reading.",
-  "comm_report_delivery_norole": "Recipient"
+  "comm_report_delivery_norole": "Recipient",
+  "comm_reason_not_on_inspection": "Not sent — this person is no longer on the inspection in that role.",
+  "comm_reason_no_phone": "Not sent — there is no phone number on file.",
+  "comm_reason_no_email": "Not sent — there is no email address on file.",
+  "comm_reason_express_consent": "Not sent — written consent to receive texts is required where this person is.",
+  "comm_reason_no_rule": "Not sent — texting isn't set up for the place this person is in.",
+  "comm_reason_recipient_muted": "Not sent — this person switched these messages off.",
+  "comm_reason_managed_quota": "Not sent — this month's text allowance has been used.",
+  "comm_reason_skipped_generic": "Not sent — a sending rule stopped it.",
+  "comm_reason_failed_generic": "Not delivered — the sending service refused or couldn't deliver it. Try again later."
 }

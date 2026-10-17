@@ -173,7 +173,7 @@ describe('POST /api/inspections/:id/send-report-pdf — multi-recipient, role-ke
         const body = (await res.json()) as { data: { sentTo: string[]; skipped?: Array<{ recipient: string; reason: string }> } };
         expect(body.data.sentTo).toEqual(['jane@example.com']);
         expect(body.data.skipped).toHaveLength(1);
-        expect(body.data.skipped?.[0]).toMatchObject({ recipient: NO_EMAIL_CONTACT });
+        expect(body.data.skipped?.[0]).toMatchObject({ recipient: NO_EMAIL_CONTACT, outcome: 'skipped' });
         expect(sendInspectionReportPdf).toHaveBeenCalledTimes(1);
     });
 

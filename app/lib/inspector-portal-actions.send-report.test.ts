@@ -30,26 +30,29 @@ describe("sendReportActionResult", () => {
   });
 });
 
-describe("a send that reached nobody is not a success", () => {
-  const delivered = (sentTo: string[], skipped?: Array<{ recipient: string; reason: string }>) =>
+describe("a send that did not reach everyone is not a plain success", () => {
+  const delivered = (sentTo: string[], skipped?: Array<{ recipient: string; reason: string; outcome?: string }>) =>
     res(200, { success: true, data: { sentTo, ...(skipped ? { skipped } : {}) } });
 
-  it("send-report: every recipient skipped reports the reason instead of closing the dialog", async () => {
-    const out = await sendReportActionResult(delivered([], [{ recipient: "c1", reason: "No email on file" }]));
-    expect(out).toMatchObject({ ok: false, intent: "send-report" });
-    expect(out.error).toContain("No email on file");
+  it("send-report: nobody reached carries who was skipped, with no message string of its own", async () => {
+    const out = await sendReportActionResult(delivered([], [{ recipient: "c1", reason: "No email on file", outcome: "skipped" }]));
+    expect(out).toMatchObject({ ok: false, intent: "send-report", error: undefined });
+    expect(out.delivery).toEqual({ sent: 0, skipped: [{ recipient: "c1", reason: "No email on file", outcome: "skipped" }] });
   });
 
-  it("send-sms: every recipient skipped reports the reason", async () => {
-    const out = await deliveryActionResult(delivered([], [{ recipient: "c1", reason: "no sms consent" }, { recipient: "c2", reason: "sms not configured" }]), "send-sms", "failed");
+  it("send-sms: some reached and some not is not ok either, and counts who was reached", async () => {
+    const out = await deliveryActionResult(delivered(["+15555550100"], [{ recipient: "c2", reason: "no sms consent", outcome: "skipped" }]), "send-sms", "failed");
     expect(out).toMatchObject({ ok: false, intent: "send-sms" });
-    expect(out.error).toContain("no sms consent");
-    expect(out.error).toContain("sms not configured");
+    expect(out.delivery?.sent).toBe(1);
+    expect(out.delivery?.skipped).toHaveLength(1);
   });
 
-  it("control: someone reached (even with others skipped) and an empty skipped list are successes", async () => {
-    expect((await sendReportActionResult(delivered(["a@x.test"], [{ recipient: "c2", reason: "No email on file" }]))).ok).toBe(true);
-    expect((await deliveryActionResult(delivered(["+15555550100"]), "send-sms", "failed")).ok).toBe(true);
+  it("control: everyone reached, and an answer with no skipped list, are plain successes", async () => {
+    expect(await deliveryActionResult(delivered(["+15555550100"]), "send-sms", "failed")).toEqual({ ok: true, intent: "send-sms", error: undefined });
     expect((await deliveryActionResult(res(200, { success: true }), "send-sms", "failed")).ok).toBe(true);
+  });
+
+  it("control: a refused request keeps its message", async () => {
+    expect((await deliveryActionResult(res(404, { error: { message: "Inspection not found" } }), "send-sms", "failed")).error).toBe("Inspection not found");
   });
 });

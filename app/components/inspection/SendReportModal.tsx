@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useFetcherResult } from "~/hooks/useFetcherResult";
+import { useDeliveryResult } from "~/hooks/useDeliveryResult";
+import { SendDeliveryResult } from "./SendDeliveryResult";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox } from "@core/shared-ui";
@@ -116,6 +118,8 @@ export function SendReportModal({
     if (d.intent === "send-report" && "ok" in d && d.ok) onClose();
   });
 
+  const { delivery, back } = useDeliveryResult(fetcher, "send-report");
+
   const groups = ROLE_KINDS.map((kind) => ({
     kind,
     rows: people.filter((p) => p.kind === kind),
@@ -128,6 +132,16 @@ export function SendReportModal({
       title={m.inspections_hub_send_report_title()}
       size="lg"
       footer={
+        delivery ? (
+          <>
+            <Button variant="secondary" type="button" onClick={back}>
+              {m.inspections_hub_send_result_back()}
+            </Button>
+            <Button variant="primary" type="button" onClick={onClose}>
+              {m.inspections_hub_send_result_done()}
+            </Button>
+          </>
+        ) : (
         <>
           <Button variant="secondary" type="button" onClick={onClose}>
             {m.common_cancel()}
@@ -142,8 +156,10 @@ export function SendReportModal({
             {submitting ? m.inspections_hub_send_report_sending() : m.inspections_hub_send_report_submit()}
           </Button>
         </>
+        )
       }
     >
+      {delivery ? <SendDeliveryResult delivery={delivery} people={people} /> : (
       <fetcher.Form
         id={FORM_ID}
         method="post"
@@ -235,6 +251,7 @@ export function SendReportModal({
 
         {error && <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>}
       </fetcher.Form>
+      )}
     </Modal>
   );
 }

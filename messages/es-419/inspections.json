@@ -336,5 +336,11 @@
   "inspections_repair_log_list_empty": "Esta lista se creó y no se le agregó nada.",
   "inspections_repair_log_ask_heading": "Solicitó",
   "inspections_list_empty_restricted_title": "Aún no tiene inspecciones asignadas",
-  "inspections_list_empty_restricted_desc": "Un gerente puede asignarle una."
+  "inspections_list_empty_restricted_desc": "Un gerente puede asignarle una.",
+  "inspections_hub_send_result_summary": "Se alcanzó a {sent} de {total}.",
+  "inspections_hub_send_result_none": "No se alcanzó a nadie.",
+  "inspections_hub_send_result_not_reached": "No alcanzados",
+  "inspections_hub_send_result_back": "Volver",
+  "inspections_hub_send_result_done": "Listo",
+  "inspections_hub_send_result_someone": "Un destinatario"
 }

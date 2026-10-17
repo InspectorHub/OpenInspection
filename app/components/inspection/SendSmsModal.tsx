@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcherResult } from "~/hooks/useFetcherResult";
+import { useDeliveryResult } from "~/hooks/useDeliveryResult";
+import { SendDeliveryResult } from "./SendDeliveryResult";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
@@ -56,6 +58,8 @@ export function SendSmsModal({
     if (d.intent === "send-sms" && "ok" in d && d.ok) onClose();
   });
 
+  const { delivery, back } = useDeliveryResult(fetcher, "send-sms");
+
   const byKind = ROLE_KINDS.map((kind) => ({
     kind,
     rows: people.filter((p) => p.kind === kind),
@@ -76,6 +80,16 @@ export function SendSmsModal({
       title={m.inspections_hub_send_sms_title()}
       size="md"
       footer={
+        delivery ? (
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="secondary" size="sm" type="button" onClick={back}>
+              {m.inspections_hub_send_result_back()}
+            </Button>
+            <Button variant="primary" size="sm" type="button" onClick={onClose}>
+              {m.inspections_hub_send_result_done()}
+            </Button>
+          </div>
+        ) : (
         <div className="flex items-center justify-end gap-2">
           <Button variant="secondary" size="sm" type="button" onClick={onClose} pending={submitting}>
             {m.common_cancel()}
@@ -91,8 +105,10 @@ export function SendSmsModal({
             {submitting ? m.inspections_hub_send_sms_sending() : m.inspections_hub_send_sms_submit()}
           </Button>
         </div>
+        )
       }
     >
+      {delivery ? <SendDeliveryResult delivery={delivery} people={people} /> : (
       <fetcher.Form
         method="post"
         id={FORM_ID}
@@ -148,6 +164,7 @@ export function SendSmsModal({
         ))}
         {error && <p className="text-[12px] text-ih-bad-fg" role="alert">{error}</p>}
       </fetcher.Form>
+      )}
     </Modal>
   );
 }

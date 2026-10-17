@@ -19,6 +19,7 @@ export const SendSmsSchema = z.object({
 const SendSmsSkippedSchema = z.object({
     recipient: z.string().describe('contactId that identified the recipient.'),
     reason:    z.string().describe('Why this recipient was skipped or failed.'),
+    outcome:   z.enum(['skipped', 'failed']).optional().describe('skipped: a rule or missing detail stopped the text before it went out. failed: it was handed to the provider and not delivered.'),
 });
 
 export const SendSmsResponseDataSchema = z.object({

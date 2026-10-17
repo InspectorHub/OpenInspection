@@ -15,7 +15,7 @@ import {
   bucketMessages,
   dayKeyInZone,
   groupDeliveries,
-  reasonText,
+  reasonText, deliveryReasonText,
   type DeliveryRow,
   type MessageRow,
 } from "./communication-view";
@@ -190,5 +190,31 @@ describe("dayKeyInZone", () => {
     const ms = Date.UTC(2026, 6, 29, 22, 30);
     expect(dayKeyInZone(ms, "Asia/Tokyo")).toBe("2026-07-30");
     expect(dayKeyInZone(ms, "America/New_York")).toBe("2026-07-29");
+  });
+});
+
+describe("deliveryReasonText — what a send dialog says about someone it did not reach", () => {
+  it.each([
+    "no sms consent", "sms opt-out", "sms not configured", "managed_not_approved", "managed_quota_exceeded",
+    "recipient switched this off", "Person is not on this inspection with that role",
+    "No phone on file for this recipient", "No email on file for this recipient",
+    "express written consent required in US-CA", "no messaging rule for US-XX",
+  ])("maps %s to a sentence and never echoes the raw string", (raw) => {
+    const text = deliveryReasonText(raw, "skipped");
+    expect(text).not.toContain(raw);
+    expect(text.length).toBeGreaterThan(10);
+  });
+
+  it("an unknown reason gets the generic sentence for its outcome, not the server's words", () => {
+    const skipped = deliveryReasonText("auth account AC123 does not exist", "skipped");
+    const failed = deliveryReasonText("auth account AC123 does not exist", "failed");
+    expect(skipped).not.toContain("AC123");
+    expect(failed).not.toContain("AC123");
+    expect(skipped).not.toBe(failed);
+    expect(deliveryReasonText("something new", undefined)).not.toContain("something new");
+  });
+
+  it("matches without regard to case and surrounding space", () => {
+    expect(deliveryReasonText("  No SMS Consent ", "skipped")).toBe(deliveryReasonText("no sms consent", "skipped"));
   });
 });

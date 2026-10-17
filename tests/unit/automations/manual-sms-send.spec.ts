@@ -164,9 +164,10 @@ describe('manual SMS send (A3.4/A3.5)', () => {
             recipients: [{ contactId: CLIENT, roleKey: 'client' }],
         }), ENV, CTX);
         expect(res.status).toBe(200);
-        const body = await res.json() as { data: { sentTo: string[]; skipped?: Array<{ reason: string }> } };
+        const body = await res.json() as { data: { sentTo: string[]; skipped?: Array<{ reason: string; outcome?: string }> } };
         expect(body.data.sentTo).toEqual([]);
         expect(body.data.skipped?.[0]?.reason).toMatch(/consent/i);
+        expect(body.data.skipped?.[0]?.outcome).toBe('skipped');
         expect(sendMessage).not.toHaveBeenCalled();
 
         const rows = await manualSmsRows();
@@ -204,6 +205,20 @@ describe('manual SMS send (A3.4/A3.5)', () => {
         const rows = await manualSmsRows();
         expect(rows[0].status).toBe('sent');
         expect(rows[0].channel).toBe('sms');
+    });
+
+    it('a provider that rejects the text is reported as failed, next to a recipient that was reached', async () => {
+        sendMessage.mockResolvedValueOnce({ ok: true, id: 'SM-ok' }).mockResolvedValueOnce({ ok: false, error: 'provider says no' });
+        const consent = new SmsConsentService({} as D1Database);
+        await consent.publishDisclosure('d');
+        await consent.record(TENANT, CLIENT, 'granted', 'admin', {});
+        const res = await buildApp().fetch(post({
+            recipients: [{ contactId: AGENT, roleKey: 'buyer_agent' }, { contactId: CLIENT, roleKey: 'client' }],
+        }), ENV, CTX);
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: { sentTo: string[]; skipped?: Array<{ recipient: string; outcome?: string }> } };
+        expect(body.data.sentTo).toEqual(['+15551110003']);
+        expect(body.data.skipped).toEqual([expect.objectContaining({ recipient: CLIENT, outcome: 'failed' })]);
     });
 
     it('agent (implied consent) with phone → sent without a ledger grant', async () => {
@@ -261,8 +276,9 @@ describe('manual SMS send (A3.4/A3.5)', () => {
             recipients: [{ contactId: NO_PHONE, roleKey: 'client' }],
         }), ENV, CTX);
         expect(res.status).toBe(200);
-        const body = await res.json() as { data: { skipped?: Array<{ reason: string }> } };
+        const body = await res.json() as { data: { skipped?: Array<{ reason: string; outcome?: string }> } };
         expect(body.data.skipped?.[0]?.reason).toMatch(/phone/i);
+        expect(body.data.skipped?.[0]?.outcome).toBe('skipped');
         expect(await manualSmsRows()).toHaveLength(0);
         expect(sendMessage).not.toHaveBeenCalled();
     });

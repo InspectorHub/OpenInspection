@@ -139,13 +139,8 @@ export function groupDeliveries(rows: DeliveryRow[]): NoticeGroup[] {
 /*  Reason mapping — raw stored string → words                         */
 /* ------------------------------------------------------------------ */
 
-/**
- * The raw `error` strings the send paths write today, mapped to sentences.
- * The fallback keeps the RAW value visible inside a sentence — never render a
- * bare machine string, and never render nothing.
- */
-export function reasonText(reasonCode: string | null): string | null {
-  if (!reasonCode) return null;
+/** The reasons a send path writes that this module can put into words, or null when it cannot. */
+function knownReasonText(reasonCode: string): string | null {
   const norm = reasonCode.trim().toLowerCase();
   switch (norm) {
     case "no sms consent":          return m.comm_reason_no_sms_consent();
@@ -159,6 +154,12 @@ export function reasonText(reasonCode: string | null): string | null {
     case "no sms template":         return m.comm_reason_no_sms_template();
     case "no email template":       return m.comm_reason_no_email_template();
     case "managed_not_approved":    return m.comm_reason_managed_not_approved();
+    case "managed_quota_exceeded":  return m.comm_reason_managed_quota();
+    case "recipient switched this off": return m.comm_reason_recipient_muted();
+    // The manual-send routes' own reasons.
+    case "person is not on this inspection with that role": return m.comm_reason_not_on_inspection();
+    case "no phone on file for this recipient": return m.comm_reason_no_phone();
+    case "no email on file for this recipient": return m.comm_reason_no_email();
     // The only reason here that is NOT a skip. The row is still pending and
     // still owed, so the fallback's "Skipped — " prefix would be a plain
     // untruth about a message that is going to arrive. The instant it arrives
@@ -174,8 +175,34 @@ export function reasonText(reasonCode: string | null): string | null {
       return m.comm_reason_provider_daily_quota();
     case "monthly email sending limit reached at the email provider; this message was not sent":
       return m.comm_reason_provider_monthly_quota();
-    default:                        return m.comm_reason_fallback({ raw: reasonCode });
   }
+  // Reasons that carry a place after a fixed opening.
+  if (norm.startsWith("express written consent required in")) return m.comm_reason_express_consent();
+  if (norm.startsWith("no messaging rule for")) return m.comm_reason_no_rule();
+  return null;
+}
+
+/**
+ * The raw `error` strings the send paths write today, mapped to sentences.
+ * The fallback keeps the RAW value visible inside a sentence — never render a
+ * bare machine string, and never render nothing. This is the outbox, which staff
+ * read to diagnose; a send dialog uses `deliveryReasonText` and never shows it.
+ */
+export function reasonText(reasonCode: string | null): string | null {
+  if (!reasonCode) return null;
+  return knownReasonText(reasonCode) ?? m.comm_reason_fallback({ raw: reasonCode });
+}
+
+/**
+ * What a send dialog says about a recipient it did not reach. A reason this module does not know is
+ * never echoed (it can be a provider's own wording, an account id, a statement from the database); the
+ * outcome picks a generic sentence instead: "skipped" is a rule or a missing detail, "failed" means the
+ * message was handed on and not delivered.
+ */
+export function deliveryReasonText(reason: string | null | undefined, outcome: "skipped" | "failed" | undefined): string {
+  const known = reason ? knownReasonText(reason) : null;
+  if (known) return known;
+  return outcome === "failed" ? m.comm_reason_failed_generic() : m.comm_reason_skipped_generic();
 }
 
 /* ------------------------------------------------------------------ */

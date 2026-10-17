@@ -101,7 +101,7 @@ const sendSmsRoutes = createApiRouter()
         const appName = c.env.APP_NAME || 'OpenInspection';
         const appHost = getBaseUrl(c);
         const sentTo: string[] = [];
-        const skipped: Array<{ recipient: string; reason: string }> = [];
+        const skipped: Array<{ recipient: string; reason: string; outcome: 'skipped' | 'failed' }> = [];
 
         // Shared sendAt so the Outbox collapses the batch (same as A2 email).
         const batchSendAt = new Date();
@@ -127,12 +127,12 @@ const sendSmsRoutes = createApiRouter()
 
                 if (!seated) {
                     const reason = 'Person is not on this inspection with that role';
-                    skipped.push({ recipient: label, reason });
+                    skipped.push({ recipient: label, reason, outcome: 'skipped' });
                     continue;
                 }
                 if (!seated.phone) {
                     const reason = 'No phone on file for this recipient';
-                    skipped.push({ recipient: label, reason });
+                    skipped.push({ recipient: label, reason, outcome: 'skipped' });
                     continue;
                 }
 
@@ -191,6 +191,7 @@ const sendSmsRoutes = createApiRouter()
                     skipped.push({
                         recipient: label,
                         reason: after?.error ?? after?.status ?? 'Send failed',
+                        outcome: after?.status === 'failed' ? 'failed' : 'skipped',
                     });
                 }
             } catch (err) {
@@ -198,6 +199,7 @@ const sendSmsRoutes = createApiRouter()
                 skipped.push({
                     recipient: label,
                     reason: err instanceof Error ? err.message : 'Send failed',
+                    outcome: 'failed',
                 });
             }
         }

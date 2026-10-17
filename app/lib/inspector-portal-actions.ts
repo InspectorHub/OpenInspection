@@ -33,24 +33,36 @@ export async function toActionResult<I extends string>(
   return { ok: true, intent, error: undefined };
 }
 
+/** One recipient a send did not reach, as the send routes report it. */
+export interface SkippedRecipient {
+  /** The contact id (or address) that identified the recipient in the request. */
+  recipient: string;
+  /** The server's own words; the dialogs never show them, they map them (`deliveryReasonText`). */
+  reason: string;
+  outcome?: "skipped" | "failed";
+}
+
+/** Who a send reached and who it did not. Present only when at least one recipient was not reached. */
+export interface DeliveryOutcome {
+  sent: number;
+  skipped: SkippedRecipient[];
+}
+
 /**
- * Result of a send that answers 200 with per-recipient outcomes (`data.sentTo`, `data.skipped`). When nobody was
- * reached and at least one recipient was skipped, the request did not do what the person asked, so the dialog must
- * stay open and say why; closing it as a success would leave them believing the message went out. Someone reached
- * (even with others skipped) stays a success.
+ * Result of a send that answers 200 with per-recipient outcomes (`data.sentTo`, `data.skipped`). Everyone
+ * reached is a success. When anyone was skipped or failed the result is not ok and carries the outcome, so
+ * the dialog can stay open and say who was reached and who was not instead of closing as if all went out.
  */
 export async function deliveryActionResult<I extends string>(
   res: { ok: boolean; json: () => Promise<unknown> },
   intent: I,
   fallbackError: string,
-): Promise<{ ok: boolean; intent: I; error: string | undefined }> {
+): Promise<{ ok: boolean; intent: I; error: string | undefined; delivery?: DeliveryOutcome }> {
   if (!res.ok) return toActionResult(res, intent, fallbackError);
-  const body = (await res.json().catch(() => null)) as { data?: { sentTo?: unknown[]; skipped?: Array<{ reason?: string }> } } | null;
-  const sent = body?.data?.sentTo?.length ?? 0;
+  const body = (await res.json().catch(() => null)) as { data?: { sentTo?: unknown[]; skipped?: SkippedRecipient[] } } | null;
   const skipped = body?.data?.skipped ?? [];
-  if (sent === 0 && skipped.length > 0) {
-    const reasons = [...new Set(skipped.map((s) => s.reason).filter((r): r is string => Boolean(r)))];
-    return { ok: false, intent, error: reasons.length ? reasons.join("; ") : fallbackError };
+  if (skipped.length > 0) {
+    return { ok: false, intent, error: undefined, delivery: { sent: body?.data?.sentTo?.length ?? 0, skipped } };
   }
   return { ok: true, intent, error: undefined };
 }
@@ -63,7 +75,7 @@ export async function deliveryActionResult<I extends string>(
  */
 export async function sendReportActionResult(
   res: { ok: boolean; status?: number; json: () => Promise<unknown> },
-): Promise<{ ok: boolean; intent: "send-report"; error: string | undefined }> {
+): Promise<{ ok: boolean; intent: "send-report"; error: string | undefined; delivery?: DeliveryOutcome }> {
   if (!res.ok) {
     if (res.status === 409) return { ok: false, intent: "send-report", error: m.inspections_hub_error_send_report_not_published() };
     if (res.status === 429) return { ok: false, intent: "send-report", error: m.inspections_hub_error_send_report_rate_limited() };

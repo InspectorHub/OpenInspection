@@ -22,6 +22,7 @@ export const SendReportSchema = z.object({
 const SendReportSkippedSchema = z.object({
     recipient: z.string().describe('The contactId or email that identified the recipient in the request.'),
     reason:    z.string().describe('Why this recipient was skipped (no resolvable email, unknown roleKey, send failure, ...).'),
+    outcome:   z.enum(['skipped', 'failed']).optional().describe('skipped: a missing detail stopped the email before it was attempted. failed: sending it threw.'),
 });
 
 export const SendReportResponseDataSchema = z.object({
