@@ -21,7 +21,7 @@ const STAFF_TIERS: ReadonlySet<string> = new Set([ROLE.OWNER, ROLE.MANAGER, ROLE
  * whole family, so a route added later is protected by default instead of having to
  * remember to wear a guard of its own.
  */
-export function inspectionScopeGuard() {
+function inspectionScopeGuard() {
     const handler = async (c: Context<HonoConfig>, next: Next) => {
         const role = c.get('userRole');
         if (!role) {
