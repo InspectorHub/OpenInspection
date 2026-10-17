@@ -64,11 +64,21 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/inspection-requests/:id': E('scoped-service', 'same rule as the list'),
     'GET /api/inspection-requests/by-inspection/:inspectionId': E('handler-assert', 'the inspection must be visible'),
     'POST /api/inspection-requests/:id/inspections': E('admin-only', 'requireRole(owner, manager)'),
-    'GET /api/tags': E('company-open-staff', 'the tag vocabulary with a usage count per tag; no inspection ids'),
+    'GET /api/tags': E('company-open-staff', 'the tag vocabulary (name, colour, seed flag); no inspection ids and no usage counts'),
     'GET /api/tags/:id/inspections': E('scoped-service', 'inspection ids reduced to the visible set'),
     'GET /api/admin/sms/consent': E('handler-assert', 'the inspection must be visible'),
     'GET /api/team/members': E('projection', 'non-administrators get id, name and role (and email with scheduleOthers)'),
 
+    // Writes that answer with the row they touched. They need manageContacts (off by default for an inspector), so
+    // today only a person explicitly granted it can reach them; the flip must wait until each asserts visibility.
+    'POST /api/contacts': P('capability-gated', 'manageContacts; a plain create is not a read, but a duplicate-email answer can name an existing contact outside the visible set'),
+    'PUT /api/contacts/:id': P('capability-gated', 'manageContacts; updates and returns a contact that may be outside the visible set'),
+    'DELETE /api/contacts/:id': P('capability-gated', 'manageContacts; archives a contact that may be outside the visible set'),
+    'POST /api/contacts/:id/restore': P('capability-gated', 'manageContacts; restores and returns a contact that may be outside the visible set'),
+    'POST /api/contacts/:id/access/revoke': P('capability-gated', 'manageContacts; acts on links of a contact that may be outside the visible set'),
+    'POST /api/contacts/import': P('capability-gated', 'manageContacts; the report back can name existing contacts outside the visible set'),
+    // A plain create that names another inspector leaves the creator off the roster (the wizard keeps them on it).
+    'POST /api/inspections': P('handler-assert', 'plain create naming another inspector: the creator cannot open what they just made'),
     // Calendar and schedule. Aligning these with the list belongs with the change that opens the write surface.
     'GET /api/calendar/events': E('scoped-service', 'local inspections cut to the visible set'),
     'GET /api/calendar/items': P('self-only', 'forced to the caller for a non-administrator; reconciled with the list later'),
