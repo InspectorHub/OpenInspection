@@ -86,7 +86,7 @@ const inviteMemberRoute = createRoute(withMcpMetadata({
         403: { description: 'Only an owner can invite someone as an owner' },
     },
     operationId: "inviteTenant",
-    description: "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify and permissionOverrides, but this route does not apply either: it always sends the email and grants the plain role. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
+    description: "Invite a person to join the company team. Creates a pending invite that expires after 7 days and emails the recipient the accept link (the email is sent in the background; if it is refused or fails, the invite still exists and the call still succeeds, so deliver the returned inviteLink yourself when in doubt). Only an owner may invite someone as an owner (403 otherwise). The body also lists notify, permissionOverrides and templateId, but this route does not apply any of them: it always sends the email and grants the plain role (inspector when none is given). Use POST /api/team/invite to start from a permission template. Each call creates a new invite; repeating an email creates another. Restricted to owners and managers."
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
@@ -277,7 +277,7 @@ const adminDataRoutes = createApiRouter()
         const body = c.req.valid('json');
 
         const adminService = c.var.services.admin;
-        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role, c.get('userRole'), await capabilitiesFor(c));
+        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role ?? 'inspector', c.get('userRole'), await capabilitiesFor(c));
 
         const inviteLink = inviteAcceptUrl(c, inviteId);
 

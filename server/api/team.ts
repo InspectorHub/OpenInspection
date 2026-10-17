@@ -4,7 +4,10 @@ import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import { requireCapability, capabilitiesFor } from '../lib/middleware/require-capability';
-import { auditRefusedGrant, updateMemberAudited } from './team-grant-audit';
+import { auditRefusedGrant, templateAuditMeta, updateMemberAudited } from './team-grant-audit';
+import { PermissionTemplateService } from '../services/team/permission-templates.service';
+import { applyTemplateToRequest } from '../services/team/apply-template';
+import teamPermissionTemplateRoutes from './team-permission-templates';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
 import { requireSeatAvailable } from '../features/seat-quota';
@@ -110,7 +113,7 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
         403: { description: 'Only an owner can invite someone as an owner' },
     },
     operationId: "inviteTeam",
-    description: "Invite a person to join the team. Creates a pending invite that expires after 7 days and returns its accept link and expiry. The invitation email is sent unless notify is false, in which case nothing is sent and the caller must deliver the returned inviteLink. Role and the optional permissionOverrides are stored on the invite and applied when it is accepted; only an owner may invite someone as an owner (403). Returns 409 when the email already belongs to an active member and is refused when no seat is free under the seat limit, when one applies. Writes a user.invite audit entry. Each call creates another invite. Restricted to owners and managers."
+    description: "Invite a person to join the team. Creates a pending invite that expires after 7 days and returns its accept link and expiry. The invitation email is sent unless notify is false, in which case nothing is sent and the caller must deliver the returned inviteLink. Pass templateId (a built-in template key or a company template id from GET /api/team/permission-templates) to start from a permission template: its role and switches are copied onto the invite, and a permissionOverrides map sent alongside is applied on top (404 for an unknown template, 400 when role names a different role than the template). Role and the optional permissionOverrides are stored on the invite and applied when it is accepted; only an owner may invite someone as an owner (403). Returns 409 when the email already belongs to an active member and is refused when no seat is free under the seat limit, when one applies. Writes a user.invite audit entry. Each call creates another invite. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -123,7 +126,7 @@ const updateTeamMemberRoute = createRoute(withMcpMetadata({
     path: '/members/{id}',
     tags: ["team"],
     summary: 'Update a team member\'s role or permissions',
-    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Only an owner may change an owner or promote anyone to owner. Moving a staff member to a role that holds a seat is refused (402) when no seat is free under the seat limit.',
+    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats). Pass templateId to apply a permission template: its role and switches replace the member\'s current ones (a copy; the member is not linked to the template afterwards). Only an owner may change an owner or promote anyone to owner. Moving a staff member to a role that holds a seat is refused (402) when no seat is free under the seat limit.',
     middleware: [requireRole('manager', 'owner')],
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('The member\'s user id.') }),
@@ -231,6 +234,8 @@ const resendInviteRoute = createRoute(withMcpMetadata({
 const teamRoutes = createApiRouter()
     // `/defaults` lives in its own file — see team-defaults.ts for why.
     .route('/', teamDefaultsRoutes)
+    // Built-in and company permission templates; applying one is `templateId` below.
+    .route('/', teamPermissionTemplateRoutes)
     // Account recovery, mounted here so the path stays /api/team/members/... .
     .route('/', teamTwoFactorRoutes)
     .openapi(listTeamMembersRoute, async (c) => {
@@ -262,14 +267,21 @@ const teamRoutes = createApiRouter()
         const body = c.req.valid('json');
         const teamService = c.var.services.team;
 
+        // A template, when named, is copied in first: its role and switches (then any
+        // switches sent alongside) are what the invite carries, and they go through
+        // the same checks below as the same role and switches typed by hand.
+        const applied = body.templateId ? await new PermissionTemplateService(c.env.DB).resolveRef(tenantId, body.templateId) : null;
+        const stamped = applyTemplateToRequest({ applied, requestedRole: body.role, requestedOverrides: body.permissionOverrides });
+        const inviteRole = stamped.role ?? 'inspector';
+
         // The invited role is copied onto the new user at accept time, so
         // inviting as owner is minting an owner. Same rule as update/remove.
-        assertMayTouchOwner(c.get('userRole'), 'inspector', body.role);
+        assertMayTouchOwner(c.get('userRole'), 'inspector', inviteRole);
 
         // The inviter's own resolved capabilities are the ceiling for the invite.
         const actor = { role: c.get('userRole'), capabilities: await capabilitiesFor(c) };
-        const { token, expiresAt } = await auditRefusedGrant(c, 'invite', body.role, () => teamService.createInvite({
-            tenantId, email: body.email, role: body.role, permissionOverrides: body.permissionOverrides ?? null, actor,
+        const { token, expiresAt } = await auditRefusedGrant(c, 'invite', inviteRole, () => teamService.createInvite({
+            tenantId, email: body.email, role: inviteRole, permissionOverrides: stamped.overrides ?? null, actor,
         }));
 
         // Who added whom to this company, on the durable record. The
@@ -283,7 +295,7 @@ const teamRoutes = createApiRouter()
         // value shape at write time, so an address would be stripped anyway,
         // and the invite row already holds it.
         auditFromContext(c, 'user.invite', 'user', {
-            metadata: { role: body.role },
+            metadata: { role: inviteRole, ...templateAuditMeta(applied) },
         });
 
         const inviteLink = inviteAcceptUrl(c, token);

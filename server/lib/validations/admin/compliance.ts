@@ -24,7 +24,7 @@ const INVITABLE_ROLES = ROLES.filter((r): r is Exclude<typeof r, 'agent'> => r !
  * Parity with `TOGGLEABLE` is asserted by
  * `tests/unit/platform/capability-schema-parity.spec.ts`.
  */
-function capabilityToggleMap() {
+export function capabilityToggleMap() {
     return z.object(
         Object.fromEntries(TOGGLEABLE.map((cap) => [cap, z.boolean().optional()])) as {
             [K in Capability]: z.ZodOptional<z.ZodBoolean>;
@@ -87,8 +87,12 @@ export const InviteMemberSchema = z.object({
     // Not `agent`: agents are granted access per inspection and are never team
     // members (TeamService.updateMember refuses the same role for the same
     // reason). Offering it here would be a second, contradictory way in.
+    // Optional so a permission template can supply it. Without a template the
+    // handler uses inspector, which is what the default here used to be.
     role: z.enum(INVITABLE_ROLES)
-        .default('inspector').openapi({ example: 'inspector' }).describe('Role the new member gets: owner, manager, inspector or staff (default inspector). Only an owner may invite an owner. Agents are never invited as team members'),
+        .optional().openapi({ example: 'inspector' }).describe('Role the new member gets: owner, manager, inspector or staff (inspector when neither a role nor a templateId is given). Only an owner may invite an owner. Agents are never invited as team members. With a templateId it must be left out or match the template\'s base role'),
+    templateId: z.string().trim().min(1).max(100).optional().openapi({ example: 'inspector_trainee' })
+        .describe('A permission template to start from: the key of a built-in template or the id of a company template, as listed by GET /api/team/permission-templates. Its role and switches are copied onto the invite; permissionOverrides, when also sent, are applied on top. Later changes to the template do not reach this invite'),
     // Role permission-template overrides (2026-06-13). Optional sparse map of
     // every toggleable capability. Only differing-from-template keys are sent;
     // TeamService stores the diff (or null when nothing differs) and it is
@@ -120,6 +124,8 @@ export const InviteMemberSchema = z.object({
 export const UpdateMemberSchema = z.object({
     role: z.enum(ROLES).optional().openapi({ example: 'manager' }).describe('New role for this member. Omit to leave unchanged.'),
     permissionOverrides: capabilityToggleMap().nullable().optional().openapi({ example: { companyFinance: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
+    templateId: z.string().trim().min(1).max(100).optional().openapi({ example: 'inspector_trainee' })
+        .describe('A permission template to apply: the key of a built-in template or the id of a company template. Its role and switches replace the member\'s current ones (permissionOverrides, when also sent, are applied on top of the template). The member keeps nothing that links them to the template afterwards'),
 }).openapi('UpdateMember');
 
 /**

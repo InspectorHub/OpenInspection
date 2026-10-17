@@ -201,6 +201,12 @@ export type AuditAction =
     // Metadata carries the previous token's HASH; the plaintext is never logged.
     | 'portal_access.rotated'
     | 'portal_access.revoked'
+    // A company's own permission template (a "custom role") saved, changed or
+    // archived. Applying one is recorded on the invite or member update that used
+    // it, not here. Metadata carries the template's name and base role.
+    | 'permission_template.create'
+    | 'permission_template.update'
+    | 'permission_template.archive'
     // Two-layer role model — a role profile's capability overrides changed.
     // Metadata carries the RESOLVED before/after sets, so "who widened this,
     // and when" is answerable without replaying kind baselines by hand.
