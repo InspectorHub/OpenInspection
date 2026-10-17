@@ -27,6 +27,7 @@ import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import { moneyView } from '../../lib/auth/money-access';
+import { resolveInspectionScope } from '../../lib/inspection/visibility';
 import { safeISODate } from '../../lib/date';
 import { assertStaffMayMove } from './staff-order-guard';
 
@@ -229,7 +230,8 @@ const scheduleConflictsRoute = createRoute(withMcpMetadata({
 const bulkRoutes = createApiRouter()
     .openapi(dashboardRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const buckets  = await c.var.services.inspection.getDashboardBuckets(tenantId);
+        const scope    = await resolveInspectionScope(c);
+        const buckets  = await c.var.services.inspection.getDashboardBuckets(tenantId, scope);
         // Agent Accounts A3 — count concierge bookings awaiting this inspector's
         // approval so the dashboard's UPCOMING card can render the substate line.
         let conciergePending = 0;
@@ -266,12 +268,13 @@ const bulkRoutes = createApiRouter()
             Object.entries(params).filter(([_, v]) => v !== undefined)
         ) as typeof params;
 
-        const result = await service.listInspections(tenantId, serviceParams);
+        const scope = await resolveInspectionScope(c);
+        const result = await service.listInspections(tenantId, serviceParams, scope);
 
         // Add stats on the first page
         let counts;
         if (!params.cursor) {
-            counts = await service.getStats(tenantId);
+            counts = await service.getStats(tenantId, scope);
         }
 
         return c.json({
@@ -369,7 +372,7 @@ const bulkRoutes = createApiRouter()
     })
     .openapi(getCountsRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const counts = await c.var.services.inspection.getCounts(tenantId);
+        const counts = await c.var.services.inspection.getCounts(tenantId, await resolveInspectionScope(c));
         return c.json({ success: true, data: counts });
     })
     // IA-6 — advisory schedule conflict check; placed before /{id} to prevent

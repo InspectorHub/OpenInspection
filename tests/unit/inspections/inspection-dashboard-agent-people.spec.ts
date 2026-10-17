@@ -18,6 +18,7 @@ import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
@@ -91,21 +92,21 @@ describe('InspectionAnalyticsService.getDashboardBuckets — agent attribution v
     });
 
     it('resolves agentName from the listing_agent inspection_people row', async () => {
-        const buckets = await svc.getDashboardBuckets(TENANT);
+        const buckets = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
         const row = buckets.today.find(r => r.id === INSP_LISTING);
         expect(row).toBeDefined();
         expect(row!.agentName).toBe('Lisa Listing');
     });
 
     it('resolves agentName from the buyer_agent inspection_people row when no listing_agent is present', async () => {
-        const buckets = await svc.getDashboardBuckets(TENANT);
+        const buckets = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
         const row = buckets.today.find(r => r.id === INSP_BUYER);
         expect(row).toBeDefined();
         expect(row!.agentName).toBe('Bob Buyer');
     });
 
     it('reports agentName as null — key PRESENT — when no inspection_people agent row exists', async () => {
-        const buckets = await svc.getDashboardBuckets(TENANT);
+        const buckets = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
         const row = buckets.today.find(r => r.id === INSP_NONE);
         expect(row).toBeDefined();
         // The key must EXIST. It used to be omitted via a conditional spread,

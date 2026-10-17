@@ -20,6 +20,7 @@ import { InspectionAnalyticsService } from '../../../server/services/inspection/
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
@@ -72,7 +73,7 @@ describe('dashboard rows — P-4 effective price (IA-131)', () => {
             createdAt: new Date(),
         } as never);
 
-        const row = allRows(await svc.getDashboardBuckets(TENANT)).find(r => r.id === 'i-inv');
+        const row = allRows(await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS)).find(r => r.id === 'i-inv');
         expect(row?.price).toBe(45_000);
     });
 
@@ -83,7 +84,7 @@ describe('dashboard rows — P-4 effective price (IA-131)', () => {
             { id: 's2', tenantId: TENANT, inspectionId: 'i-svc', serviceId: 'svc-cat', nameSnapshot: 'B', priceSnapshot: 5_000, priceOverride: null },
         ] as never);
 
-        const row = allRows(await svc.getDashboardBuckets(TENANT)).find(r => r.id === 'i-svc');
+        const row = allRows(await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS)).find(r => r.id === 'i-svc');
         expect(row?.price).toBe(17_500);
     });
 
@@ -100,7 +101,7 @@ describe('dashboard rows — P-4 effective price (IA-131)', () => {
             nameSnapshot: 'C', priceSnapshot: 8_000, priceOverride: null,
         } as never);
 
-        const row = allRows(await svc.getDashboardBuckets(TENANT)).find(r => r.id === 'i-void');
+        const row = allRows(await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS)).find(r => r.id === 'i-void');
         expect(row?.price).toBe(8_000);
     });
 
@@ -113,7 +114,7 @@ describe('dashboard rows — P-4 effective price (IA-131)', () => {
             price: 33_300, agreementRequired: false, paymentRequired: true, createdAt: new Date(),
         });
 
-        const row = allRows(await svc.getDashboardBuckets(TENANT)).find(r => r.id === 'i-cache');
+        const row = allRows(await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS)).find(r => r.id === 'i-cache');
         expect(row?.price).toBe(33_300);
     });
 });

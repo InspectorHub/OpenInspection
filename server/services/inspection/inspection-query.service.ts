@@ -7,6 +7,7 @@ import { escapeLikePattern } from '../../lib/db/like-escape';
 import { safeISODate, safeTimestamp } from '../../lib/date';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
+import { visibleInspectionsCondition, type InspectionScope } from '../../lib/inspection/visibility';
 import type { Inspection, InspectionListParams } from './shared';
 import { InspectionSubService } from './base';
 
@@ -30,9 +31,13 @@ export class InspectionQueryService extends InspectionSubService {
     /**
      * Lists inspections with pagination and filtering.
      */
-    async listInspections(tenantId: string, params: InspectionListParams) {
+    async listInspections(tenantId: string, params: InspectionListParams, scope: InspectionScope) {
         const db = this.getDrizzle();
         const conditions = [eq(inspections.tenantId, tenantId)];
+        // The scope is a REQUIRED parameter: a caller that forgets it does not compile. Every filter
+        // below narrows further; none can widen it.
+        const visible = visibleInspectionsCondition(db, scope, tenantId);
+        if (visible) conditions.push(visible);
 
         if (params.status) conditions.push(eq(inspections.status, params.status));
         if (params.inspectorId) conditions.push(eq(inspections.inspectorId, params.inspectorId));
@@ -159,11 +164,11 @@ export class InspectionQueryService extends InspectionSubService {
     /**
      * Fetches counts for the dashboard.
      */
-    async getStats(tenantId: string) {
+    async getStats(tenantId: string, scope: InspectionScope) {
         const db = this.getDrizzle();
         const counts = await db.select({ status: inspections.status, count: sql<number>`count(*)` })
             .from(inspections)
-            .where(eq(inspections.tenantId, tenantId))
+            .where(and(eq(inspections.tenantId, tenantId), visibleInspectionsCondition(db, scope, tenantId)))
             .groupBy(inspections.status);
 
         const stats = { total: 0, requested: 0, completed: 0, published: 0 };

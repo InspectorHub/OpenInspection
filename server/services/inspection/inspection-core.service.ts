@@ -9,6 +9,7 @@ import { AppError, ErrorCode, Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
 import { computePreflightFromData } from '../../lib/preflight';
 import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
+import type { InspectionScope } from '../../lib/inspection/visibility';
 import type { Inspection, InspectionListParams, CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
 import { ServiceService } from '../service.service';
@@ -102,13 +103,13 @@ export class InspectionCoreService extends InspectionSubService {
     }
 
     /** Lists inspections with pagination and filtering. Body in `./inspection-query.service`. */
-    async listInspections(tenantId: string, params: InspectionListParams) {
-        return this.query.listInspections(tenantId, params);
+    async listInspections(tenantId: string, params: InspectionListParams, scope: InspectionScope) {
+        return this.query.listInspections(tenantId, params, scope);
     }
 
     /** Fetches counts for the dashboard. Body in `./inspection-query.service`. */
-    async getStats(tenantId: string) {
-        return this.query.getStats(tenantId);
+    async getStats(tenantId: string, scope: InspectionScope) {
+        return this.query.getStats(tenantId, scope);
     }
 
     /**

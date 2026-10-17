@@ -6,6 +6,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -56,7 +57,7 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
             makeInspection({ id: 'insp-today-1', date: todayStr(), status: 'confirmed' }),
         ]);
 
-        const buckets = await svc.getDashboardBuckets(TENANT);
+        const buckets = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
 
         expect(buckets.today.length).toBe(1);
         expect(buckets.today[0].id).toBe('insp-today-1');
@@ -69,7 +70,7 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
             makeInspection({ id: 'insp-attention-1', date: daysFromNow(1), status: 'scheduled' }),
         ]);
 
-        const buckets = await svc.getDashboardBuckets(TENANT);
+        const buckets = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
 
         expect(buckets.needsAttention.length).toBe(1);
         expect(buckets.needsAttention[0].id).toBe('insp-attention-1');
@@ -166,7 +167,7 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
             makeInspection({ id: ins2, date: daysFromNow(-2), status: 'completed', reportStatus: 'in_progress', templateSnapshot: snap as any, createdAt: new Date(Date.now() - 5 * 86400 * 1000) }),
         ]);
 
-        const buckets = await svc.getDashboardBuckets(TENANT);
+        const buckets = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
 
         expect(buckets.defectAggregate).toBeDefined();
         // ins1 has 2 default-on canned defects (1 safety + 1 recommendation)
@@ -188,7 +189,7 @@ describe('InspectionService.getDashboardBuckets (Spec 3A)', () => {
         );
         await testDb.insert(schema.inspections).values(rows);
 
-        const buckets = await svc.getDashboardBuckets(TENANT);
+        const buckets = await svc.getDashboardBuckets(TENANT, ALL_INSPECTIONS);
 
         expect(buckets.laterTotal).toBe(55);
         expect(buckets.later.length).toBe(50);

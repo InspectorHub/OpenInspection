@@ -17,6 +17,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 import { TENANT_ID, INSP_ID, AGR_ID } from '../helpers/inspection-sign-unification-setup';
+import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 describe('signedByClient + dashboard truth read from the envelope (Track I-a Task 5)', () => {
     let db: BetterSQLite3Database<typeof schema>;
@@ -85,12 +86,12 @@ describe('signedByClient + dashboard truth read from the envelope (Track I-a Tas
             clientEmail: 'jane@test.com', clientName: 'Jane', token: crypto.randomUUID(),
             status: 'sent', completionPolicy: 'all', createdAt: new Date(),
         } as any);
-        const before = await svc.getDashboardBuckets(TENANT_ID) as Record<string, any>;
+        const before = await svc.getDashboardBuckets(TENANT_ID, ALL_INSPECTIONS) as Record<string, any>;
         expect(before.needsAttention.some((r: any) => r.id === INSP_ID)).toBe(true);
 
         await db.update(schema.agreementRequests).set({ status: 'signed' })
             .where(eq(schema.agreementRequests.id, 'req-sent-2'));
-        const after = await svc.getDashboardBuckets(TENANT_ID) as Record<string, any>;
+        const after = await svc.getDashboardBuckets(TENANT_ID, ALL_INSPECTIONS) as Record<string, any>;
         expect(after.needsAttention.some((r: any) => r.id === INSP_ID)).toBe(false);
         expect(after.today.some((r: any) => r.id === INSP_ID)).toBe(true);
     });

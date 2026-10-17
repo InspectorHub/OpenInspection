@@ -7,6 +7,7 @@ import { RECOMMENDATION_CATEGORY_LABELS } from '../../lib/recommendation-categor
 import { DEFECT_TRADE_LABELS, isDefectTrade } from '../../types/defect-fields';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../../lib/status/report-status';
+import { visibleInspectionsCondition, type InspectionScope } from '../../lib/inspection/visibility';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
 
@@ -280,7 +281,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
      * Returns tab counts for the inspection list UI.
      * Single query with 6 conditional aggregates to avoid N+1.
      */
-    async getCounts(tenantId: string): Promise<{
+    async getCounts(tenantId: string, scope: InspectionScope): Promise<{
         all: number; today: number; upcoming: number;
         past: number; needsConfirmation: number; awaitingReport: number;
     }> {
@@ -296,7 +297,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
             // its filter can never disagree about what they count.
             needsConfirmation: sql<number>`sum(case when ${inspections.status} in (${INSPECTION_STATUS.SCHEDULED}, ${INSPECTION_STATUS.REQUESTED}) then 1 else 0 end)`,
             awaitingReport:    sql<number>`sum(case when ${inspections.status} = ${INSPECTION_STATUS.COMPLETED} and ${inspections.reportStatus} <> ${REPORT_STATUS.PUBLISHED} then 1 else 0 end)`,
-        }).from(inspections).where(eq(inspections.tenantId, tenantId));
+        }).from(inspections).where(and(eq(inspections.tenantId, tenantId), visibleInspectionsCondition(db, scope, tenantId)));
 
         const row = result[0] ?? {};
         return {
@@ -420,10 +421,14 @@ export class InspectionAnalyticsService extends InspectionSubService {
      * All filtering is done in-process from a single tenant query.
      * Note: uses the `date` column (TEXT "YYYY-MM-DD") for scheduling logic.
      */
-    async getDashboardBuckets(tenantId: string) {
+    async getDashboardBuckets(tenantId: string, scope: InspectionScope) {
         const db  = this.getDrizzle();
+        // Every bucket is cut from this one set, so scoping it scopes them all. The company-wide
+        // lookups below (signed agreements, overdue invoices, invoice amounts, service lines) only
+        // answer "does this inspection have one": they are keyed by inspection id and no row of
+        // them reaches the response unless its inspection is in `all`.
         const all = await db.select().from(inspections)
-            .where(eq(inspections.tenantId, tenantId));
+            .where(and(eq(inspections.tenantId, tenantId), visibleInspectionsCondition(db, scope, tenantId)));
 
         // handoff-decisions §1 — pull the configurable report-unpublished
         // threshold. Falls back to 24h when the row is missing (legacy tenants
