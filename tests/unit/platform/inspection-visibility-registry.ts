@@ -75,6 +75,7 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/calendar/dispatch': E('capability-gated', 'scheduleOthers, normalised off for a restricted inspector'),
     'GET /api/schedule/week-summary': P('self-only', 'forced to the caller for a non-administrator; reconciled with the list later'),
     'GET /api/schedule/day-slots': E('capability-gated', 'scheduleOthers, normalised off for a restricted inspector'),
+    'GET /api/tenant/presence/ws': P('scoped-service', 'the company-wide presence socket names the inspection each colleague has open; the room is not filtered per person yet'),
     'GET /api/calendar/blocks': E('no-inspection-data', 'personal time blocks'),
     'GET /api/calendar/ics-links': E('self-only', 'the caller own feed links'),
     'GET /api/calendar/status': E('no-inspection-data', 'calendar connection state'),
