@@ -62,7 +62,7 @@ describe('contact id param accepts any opaque id', () => {
         );
 
         expect(res.status).toBe(200);
-        expect(revokeAccess).toHaveBeenCalledWith(OPAQUE_ID, 't1');
+        expect(revokeAccess).toHaveBeenCalledWith(OPAQUE_ID, 't1', expect.objectContaining({ kind: 'all' }));
     });
 
     it('GET /{id} and GET /{id}/access agree — one id contract, not two', async () => {
