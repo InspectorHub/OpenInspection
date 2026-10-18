@@ -7,6 +7,9 @@ const res = (status: number, body: unknown = {}) => ({
   json: async () => body,
 });
 
+const delivered = (sentTo: string[], skipped?: Array<{ recipient: string; reason: string; outcome?: string }>) =>
+  res(200, { success: true, data: { sentTo, ...(skipped ? { skipped } : {}) } });
+
 describe("sendReportActionResult", () => {
   it("says the report is not published on 409", async () => {
     const out = await sendReportActionResult(res(409, { error: { message: "This report is not published." } }));
@@ -26,14 +29,11 @@ describe("sendReportActionResult", () => {
 
   it("passes any other 400 message through, and success through untouched", async () => {
     expect((await sendReportActionResult(res(400, { error: { message: "No recipients" } }))).error).toBe("No recipients");
-    expect(await sendReportActionResult(res(200))).toEqual({ ok: true, intent: "send-report", error: undefined });
+    expect(await sendReportActionResult(delivered(["a@example.com"]))).toEqual({ ok: true, intent: "send-report", error: undefined });
   });
 });
 
 describe("a send that did not reach everyone is not a plain success", () => {
-  const delivered = (sentTo: string[], skipped?: Array<{ recipient: string; reason: string; outcome?: string }>) =>
-    res(200, { success: true, data: { sentTo, ...(skipped ? { skipped } : {}) } });
-
   it("send-report: nobody reached carries who was skipped, with no message string of its own", async () => {
     const out = await sendReportActionResult(delivered([], [{ recipient: "c1", reason: "No email on file", outcome: "skipped" }]));
     expect(out).toMatchObject({ ok: false, intent: "send-report", error: undefined });
@@ -49,7 +49,22 @@ describe("a send that did not reach everyone is not a plain success", () => {
 
   it("control: everyone reached, and an answer with no skipped list, are plain successes", async () => {
     expect(await deliveryActionResult(delivered(["+15555550100"]), "send-sms", "failed")).toEqual({ ok: true, intent: "send-sms", error: undefined });
-    expect((await deliveryActionResult(res(200, { success: true }), "send-sms", "failed")).ok).toBe(true);
+  });
+
+  it("an answer that cannot confirm anyone was reached is not a success: unparsable, empty and bodiless answers say so", async () => {
+    const unparsable = { ok: true, status: 200, json: async () => { throw new SyntaxError("Unexpected token"); } };
+    for (const [label, answer] of [
+      ["unparsable body", unparsable],
+      ["no data", res(200, { success: true })],
+      ["nobody sent, nobody skipped", delivered([])],
+      ["sentTo missing", res(200, { success: true, data: {} })],
+    ] as const) {
+      const out = await deliveryActionResult(answer, "send-sms", "failed");
+      expect(out.ok, label).toBe(false);
+      expect(out.error, label).toMatch(/could not confirm/i);
+      expect(out.delivery, label).toBeUndefined();
+    }
+    expect((await sendReportActionResult(res(200))).ok).toBe(false);
   });
 
   it("control: a refused request keeps its message", async () => {

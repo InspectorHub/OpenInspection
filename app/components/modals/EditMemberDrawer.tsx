@@ -217,6 +217,7 @@ export function EditMemberDrawer({ open, onClose, member, actor, templates = NO_
                     {CAP_LABELS[cap]}
                     {!isCapabilityLocked(role, cap) && isCapabilityBeyondActor(actor, cap, held) && <span className="text-xs text-ih-fg-3">{m.modal_invite_cap_owner_only()}</span>}
                     {isCapabilityScopeLocked(caps, cap) && <span className="text-xs text-ih-fg-3">{m.team_scope_requires_all()}</span>}
+                    {isCapabilityLocked(role, cap) && <span className="text-xs text-ih-fg-3">{m.modal_invite_cap_pinned_read_only()}</span>}
                   </label>
                 ))}
               </div>

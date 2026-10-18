@@ -18,6 +18,12 @@ describe('seat-guard pure helpers', () => {
         expect(computeSeatsUsed(withStaff.filter((u) => u.role !== 'staff'))).toBe(1);
     });
 
+    it('a role this build does not know holds a seat, so an unrecognised value can never shrink the count; staff and agents still do not', () => {
+        const people = [{ id: 'a', role: 'owner' }, { id: 'b', role: 'janitor' }, { id: 'c', role: '' }, { id: 'd', role: 'staff' }, { id: 'e', role: 'agent' }];
+        expect(computeSeatsUsed(people)).toBe(3);
+        expect(computeSeatsHeld(people, [{ id: 'i', role: 'janitor' }, { id: 'j', role: 'staff' }])).toBe(4);
+    });
+
     it('computeSeatsHeld applies the same rule to outstanding invites', () => {
         const members = [{ id: 'a', role: 'owner' }, { id: 'b', role: 'staff' }] as const;
         const invites = [{ id: 'i1', role: 'staff' }, { id: 'i2', role: 'inspector' }, { id: 'i3', role: 'manager' }] as const;

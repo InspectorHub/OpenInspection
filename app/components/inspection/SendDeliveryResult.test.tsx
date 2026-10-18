@@ -87,6 +87,37 @@ describe.each([
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("Back after a partial send keeps only the people who were not reached ticked, so a second Send cannot repeat the first", () => {
+    const { rerender } = render(ui(fetcherWith(undefined), vi.fn()));
+    const box = (id: string) => document.querySelector<HTMLInputElement>(`[data-testid="${intent}-person-${id}"]`)!;
+    for (const id of ["p1", "p2"]) if (!box(id).checked) fireEvent.click(box(id));
+    expect([box("p1").checked, box("p2").checked]).toEqual([true, true]);
+    rerender(ui(fetcherWith(withIntent(PARTIAL)), vi.fn()));
+    fireEvent.click(screen.getByText("Back"));
+    // Alice (c1) was skipped, Bob (c2) was reached
+    expect(box("p1").checked).toBe(true);
+    expect(box("p2").checked).toBe(false);
+    const sent = JSON.parse(document.querySelector<HTMLInputElement>('input[name="recipients"]')!.value) as Array<{ contactId: string }>;
+    expect(sent.map((r) => r.contactId)).toEqual(["c1"]);
+  });
+
+  it("control: when nobody was reached, Back keeps everybody ticked for the retry", () => {
+    const { rerender } = render(ui(fetcherWith(undefined), vi.fn()));
+    const box = (id: string) => document.querySelector<HTMLInputElement>(`[data-testid="${intent}-person-${id}"]`)!;
+    for (const id of ["p1", "p2"]) if (!box(id).checked) fireEvent.click(box(id));
+    rerender(ui(fetcherWith(withIntent(NONE)), vi.fn()));
+    fireEvent.click(screen.getByText("Back"));
+    expect([box("p1").checked, box("p2").checked]).toEqual([true, true]);
+  });
+
+  it("an error already on the fetcher when the dialog opens is not shown; one that arrives while it is open is", () => {
+    const failed = withIntent({ ok: false, error: "Last time's failure text." });
+    const { rerender } = render(ui(fetcherWith(failed), vi.fn()));
+    expect(document.body.textContent).not.toContain("Last time's failure text.");
+    rerender(ui(fetcherWith(withIntent({ ok: false, error: "This time's failure text." })), vi.fn()));
+    expect(document.body.textContent).toContain("This time's failure text.");
+  });
+
   it("a result already on the fetcher when the dialog opens is not shown", () => {
     render(ui(fetcherWith(withIntent(PARTIAL)), vi.fn()));
     expect(screen.queryByText("Reached 1 of 2.")).toBeNull();

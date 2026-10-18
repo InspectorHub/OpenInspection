@@ -36,7 +36,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveRoleEmailTemplate } from '../../lib/people/role-template';
 import { interpolate } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
-import { hubPayUrl } from '../../lib/inspection/hub-pay-url';
+import { hubPayLink } from '../../lib/inspection/hub-pay-url';
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -509,8 +509,8 @@ const reportDeliveryRoutes = createApiRouter()
         // IA-95 — two kinds of money, projected field by field: price lines (`inspectionFees`), invoice block (`companyFinance`).
         const caps = await capabilitiesFor(c);
         // The pay link is a live credential: a caller without `companyFinance` is not shown the invoice, so none is minted.
-        const payUrl = caps.companyFinance ? await hubPayUrl(c, tenantId, id, data.invoice) : null;
-        const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl } : null };
+        const payLink = caps.companyFinance ? await hubPayLink(c, tenantId, id, data.invoice) : { url: null, unavailable: null };
+        const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl: payLink.url, payUrlUnavailable: payLink.unavailable } : null };
         const { invoice, ...rest } = hub;
         const lifecycle = await hubLifecycle(getDrizzle(c), tenantId, data.inspection); // yes/no and a status, never an amount
         return c.json({ success: true, data: { ...redactMoney(rest, caps, 'inspectionFees'), invoice: redactMoney(invoice, caps, 'companyFinance'), lifecycle } }, 200);

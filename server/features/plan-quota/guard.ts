@@ -137,6 +137,17 @@ export class PlanQuotaGuard {
     }
   }
 
+  /** Read-only twin of `consumeInspection` for the checks that must pass BEFORE anything is written (a create that
+   *  also upserts contacts): throws QuotaExhausted when `count` more inspections would not fit, changes nothing. It is a
+   *  pre-check, not a claim; `consumeInspection` stays the authority at the insert, so a race between the two is refused
+   *  there exactly as before. */
+  async assertInspectionRoom(tenantId: string, count = 1): Promise<void> {
+    if (!this.opts.enforced || (await readTenantTier(this.db, tenantId)) !== 'free') return;
+    const cap = FREE_TIER_CAPS.inspections;
+    const row = await this.db.prepare('SELECT COUNT(*) AS n FROM inspections WHERE tenant_id = ?1').bind(tenantId).first<{ n: number }>();
+    if ((row?.n ?? 0) + count > cap) throw Errors.QuotaExhausted({ metric: 'inspections', used: cap, cap, billingPortalUrl: this.opts.billingPortalUrl });
+  }
+
   /** Give back what a `consumeInspection` took when the row it was for was never
    *  created (the insert lost a same-id race, or the id belongs to another
    *  workspace). Other tiers / standalone: undo the analytics increment. Free+

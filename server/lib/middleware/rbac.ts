@@ -1,6 +1,6 @@
 import type { Context, Next } from 'hono';
 import { Errors } from '../errors';
-import { deniedNeedsRole } from '../permission-denied';
+import { deniedByRule, deniedNeedsRole } from '../permission-denied';
 import { ROLE_TIER, type Role } from '../auth/roles';
 import type { HonoConfig } from '../../types/hono';
 
@@ -43,7 +43,7 @@ export const requireRole = (...roles: Role[]) => {
  */
 export const denyStaff = async (c: Context<HonoConfig>, next: Next) => {
   if (c.get('userRole') === 'staff') {
-    throw deniedNeedsRole(c, ['owner', 'manager', 'inspector'], 'Office staff accounts do not create, copy or delete inspections or change their other fields');
+    throw deniedByRule(c, 'Office staff accounts do not create, copy or delete inspections or change their other fields', 'An owner, manager or inspector');
   }
   return next();
 };

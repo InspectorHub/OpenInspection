@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { useFetcherResult } from "~/hooks/useFetcherResult";
+import { useFetcherResult, useResultSinceMount } from "~/hooks/useFetcherResult";
+import { keepNotReached } from "~/lib/send-delivery";
 import { useDeliveryResult } from "~/hooks/useDeliveryResult";
 import { SendDeliveryResult } from "./SendDeliveryResult";
 import type { useFetcher } from "react-router";
@@ -48,9 +49,11 @@ export function SendSmsModal({
   useEffect(() => {
     if (!submitting) inFlight.current = false;
   }, [submitting]);
+  // Only an answer that arrived while this dialog is open: the fetcher outlives it (see useResultSinceMount).
+  const result = useResultSinceMount(fetcher.data);
   const error =
-    fetcher.data?.intent === "send-sms" && "ok" in fetcher.data && !fetcher.data.ok
-      ? fetcher.data.error
+    result?.intent === "send-sms" && "ok" in result && !result.ok
+      ? result.error
       : undefined;
 
   // The fetcher belongs to the parent and outlives this modal: only a result delivered while it is open acts.
@@ -82,7 +85,8 @@ export function SendSmsModal({
       footer={
         delivery ? (
           <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" size="sm" type="button" onClick={back}>
+            {/* Back drops the people the send reached, so a second Send does not repeat it to them. */}
+            <Button variant="secondary" size="sm" type="button" onClick={() => { setSelectedIds((prev) => keepNotReached(prev, delivery, people)); back(); }}>
               {m.common_back()}
             </Button>
             <Button variant="primary" size="sm" type="button" onClick={onClose}>

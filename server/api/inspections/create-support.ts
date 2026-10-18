@@ -9,7 +9,10 @@ import type { Context } from 'hono';
 import { auditFromContextAwaited } from '../../lib/audit';
 import { logger } from '../../lib/logger';
 import { MeteringService } from '../../services/metering.service';
-import { readTenantTier } from '../../features/plan-quota/guard';
+import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
+import { templates } from '../../lib/db/schema';
+import { and, eq } from 'drizzle-orm';
+import { Errors } from '../../lib/errors';
 import { noticeFor } from '../../features/plan-quota/notice';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import type { CreateInspectionData } from '../../services/inspection/shared';
@@ -69,6 +72,31 @@ export function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: strin
 function inspectorFor(c: Context<HonoConfig>, named: string | null | undefined): { inspectorId?: string } {
     const inspectorId = named || (isFieldRole(c.get('userRole')) ? c.get('user').sub : undefined);
     return inspectorId ? { inspectorId } : {};
+}
+
+/**
+ * Everything a create can refuse for without writing anything: the template must be this company's, and a company on
+ * a capped plan must have room. It runs before `resolveCreateInput` upserts the contacts the request names, so a
+ * refused create leaves no contact behind and fills nothing forward on a matched one. The service repeats the checks
+ * it needs at the insert (the quota claim is atomic there); this is the read-only look ahead of it.
+ */
+export async function assertCanCreate(
+    c: Context<HonoConfig>,
+    body: { templateId?: string | undefined; client?: unknown; newAgent?: unknown; clientName?: string | undefined },
+): Promise<void> {
+    // Only a request that will upsert contacts ahead of the insert has anything to protect. A create that names none
+    // (the offline import's, among them) skips the look ahead, which would otherwise cost every one of them reads.
+    if (!body.client && !body.newAgent && (!body.clientName || body.clientName === ANONYMOUS_CLIENT)) return;
+    const tenantId = c.get('tenantId');
+    if (body.templateId) {
+        const tpl = await getDrizzle(c).select({ id: templates.id }).from(templates)
+            .where(and(eq(templates.id, body.templateId), eq(templates.tenantId, tenantId))).get();
+        // Unknown and another company's template answer alike.
+        if (!tpl) throw Errors.BadRequest('Unknown template for this workspace');
+    }
+    if (c.var.profile.hasUsageQuota) {
+        await new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl }).assertInspectionRoom(tenantId);
+    }
 }
 
 /**

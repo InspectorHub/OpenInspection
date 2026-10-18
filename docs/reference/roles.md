@@ -78,7 +78,7 @@ Thirteen, flippable per person on top of the role default
 | `templateDelete` | ✅ | ✅ | ❌ | ❌ | ❌ |
 | `templateImport` | ✅ | ✅ | ✅ | ❌ | ❌ |
 | `deleteInspection` — permanently delete an inspection (an inspector only one they lead) | ✅ | ✅ | ✅ | ❌ | ❌ |
-| `editReports` — write report content: results, media, units, compliance and statutory inputs, cost items | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `editReports` — write report content: results, media, units, compliance and statutory inputs, cost items | ✅ | ✅ | ✅ | ❌ (fixed) | ❌ |
 | `viewAllInspections` — see every inspection in the company, not only the ones assigned to you | ✅ (fixed) | ✅ (fixed) | ✅ | ✅ (fixed) | ❌ |
 
 `editReports` is enforced by one path-scoped guard (`server/lib/inspection/report-authoring-guard.ts`)
@@ -98,7 +98,7 @@ withdrawn, are refused all of these.
 
 Staff cannot publish, unpublish or return a report to draft, and cannot write report
 content: `publish` and `editReports` are pinned off for staff and no per-person
-override or permission template can turn either on. A person who needs to do that work
+override or permission template can turn either on. The Team page shows these switches as fixed for staff ("This permission is fixed for this role."), and a request that tries to turn one on for staff is accepted but stores nothing, the same way any other pinned switch is dropped; a value stored before the pin is cleared by the next edit of that member. A person who needs to do that work
 is an inspector or a manager, who holds a seat; staff hold none.
 Publishing with the auto-signature stamps the inspector's stored signature only when
 the publisher is that inspector or an owner or manager, and the stored record names
@@ -217,6 +217,23 @@ When an inspector has it off, they see only inspections they are assigned to:
   `scheduleOthers` sees colleagues' calendars, which the list does not show them.
 - A person who creates an inspection naming another inspector stays on its roster as a helper, so
   they can open what they just made.
+- A person who can see only their assignments creates inspections under three extra rules, so that a create can neither
+  reach a contact outside their set nor leave one behind. A client or agent named **by name alone** (no address) matches
+  only a contact that same person created and that carries no address; any other contact of that name, visible or not, is
+  a different person and a new contact is made. A contact matched **by address** is linked as it is: nothing on it is
+  changed (editing a contact needs `manageContacts`). And every check that can refuse the create (the template, the plan's
+  room, the contacts named by id or address) runs before any contact is written, so a refused create adds no contact and
+  changes none.
+- An id in a request body or a query behaves like an id that does not exist: a hidden inspection or contact id answers
+  exactly as a missing one does, on every route a restricted inspector can reach (the partner-agent link list and revoke
+  included). Two properties remain by design and are stated here so nobody reads them as leaks. An **address** that already
+  belongs to a contact outside the caller's set answers `409`, as creating that contact directly does, so an address can be
+  tested for existence. A **client-chosen inspection id** in a create (or a package import's create step) that already exists
+  is refused, while an unused id is accepted, so an id can be tested for existence by someone who could guess it. Neither
+  reveals what the record contains.
+- Acting on an inspection asks for visibility first: a person narrowed to their assignments who names another inspector's
+  job gets `404` (the answer for an id that does not exist), never the `403` that explains the on-the-job rule, even when
+  they were granted `scheduleOthers`.
 - Data a device has already synced is not wiped remotely when someone is narrowed. It is bounded by
   the offline period, after which the device locks. An editor connection that is already open is
   not closed.

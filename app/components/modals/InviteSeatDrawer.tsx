@@ -262,6 +262,8 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
  // Only a result delivered while mounted acts (see useFetcherResult): the fetcher keeps its last
  // success after the drawer closes, and `onClose` is a new function on every parent render.
  useFetcherResult(inviteFetcher, (d) => {
+  // An answer that lands after the drawer closed belongs to a form that no longer exists.
+  if (!open) return;
   if (!d.ok) {
    setError(d.error ?? m.modal_invite_error_failed());
    return;
@@ -375,7 +377,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen, actor, templa
  onChange={(e) => setCaps((prev) => ({ ...prev, [cap]: e.target.checked }))}
  />
  {CAP_LABELS[cap]}
- {!isCapabilityLocked(role, cap) && isCapabilityBeyondActor(actor, cap, null) && <span className="text-xs text-ih-fg-3">{m.modal_invite_cap_owner_only()}</span>}
+ {(isCapabilityLocked(role, cap) || isCapabilityBeyondActor(actor, cap, null)) && <span className="text-xs text-ih-fg-3">{isCapabilityLocked(role, cap) ? m.modal_invite_cap_pinned_read_only() : m.modal_invite_cap_owner_only()}</span>}
  {isCapabilityScopeLocked(caps, cap) && <span className="text-xs text-ih-fg-3">{m.team_scope_requires_all()}</span>}
  </label>
  ))}

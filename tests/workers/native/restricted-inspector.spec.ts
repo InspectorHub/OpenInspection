@@ -195,4 +195,25 @@ describe('a restricted inspector over the native and MCP credentials', () => {
             expect(await listedIds(t)).toEqual([mine.id]);
         });
     });
+
+    // Last on purpose: the fresh inspection it creates would otherwise appear in the lists the earlier cases compare.
+    it('a create op that names the id of a hidden inspection is refused and writes nothing; a fresh id in the same shape is created (the id-exists property, accepted)', async () => {
+        const createPackage = (id: string) => buildPackage({
+            tenantId: TENANT, exportedBy: restricted.id, inspections: [{ id, reportId: 'device-report' }],
+            yjs: { [id]: Y.encodeStateAsUpdate((() => { const d = new Y.Doc(); seedResultsDoc(d, [{ findingKey: KEY }]); return d; })()) },
+            outbox: [{ idempotencyKey: fresh('k'), op: 'inspection.create', payload: { id, propertyAddress: '9 Probe Road, Town', templateId: TEMPLATE } }],
+        });
+        const before = await b.DB.prepare('SELECT property_address AS a, inspector_id AS i FROM inspections WHERE id = ?').bind(theirs.id).first<{ a: string; i: string | null }>();
+        const refused = await importPackage(restricted.token, createPackage(theirs.id));
+        
+        expect(refused.status).toBe(404);
+        // nothing about the hidden inspection changed, and its details are not in the answer
+        expect(await b.DB.prepare('SELECT property_address AS a, inspector_id AS i FROM inspections WHERE id = ?').bind(theirs.id).first()).toEqual(before);
+        expect(await refused.text()).not.toContain(before!.a);
+        // control: the same shape with an id nobody holds creates the inspection
+        const freshId = fresh('insp-probe');
+        const created = await importPackage(restricted.token, createPackage(freshId));
+        expect(created.status, await created.clone().text()).toBe(200);
+        expect(await b.DB.prepare('SELECT COUNT(*) AS n FROM inspections WHERE id = ?').bind(freshId).first<{ n: number }>()).toEqual({ n: 1 });
+    });
 });

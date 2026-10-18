@@ -199,7 +199,7 @@ export const Errors = {
         new AppError(
             402,
             ErrorCode.QUOTA_EXHAUSTED,
-            'Your company is on the Free plan, which does not include text messages sent from a platform number. '
+            'Your company is on the Free plan, which does not include text messages sent on a number registered for you. '
             + 'To send texts, connect your own Twilio or Telnyx account in Settings > Integrations > SMS, or subscribe to a paid plan.',
             { metric: 'sms', used: 0, cap: 0, billingPortalUrl: details.billingPortalUrl },
         ),

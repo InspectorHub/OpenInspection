@@ -2,7 +2,7 @@
  * Who may act on an inspection that is not theirs.
  *
  * One rule, asked in several places (delete, send the report, message the
- * client): owner and manager always; an inspector when they work the inspection
+ * client): the owner always; anyone else when they work the inspection
  * (on its roster as lead or helper, or named in `inspections.inspector_id`, the
  * fallback for rows that predate the roster), or when they hold `scheduleOthers`,
  * the capability that already means "act on other people's bookings".
@@ -10,7 +10,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { inspections, inspectionInspectors, inspectionPeople } from '../db/schema';
-import { isAdminRole, ROLE } from '../auth/roles';
+import { ROLE } from '../auth/roles';
 import { mayActOn } from './staff-rules';
 import { deniedNeedsPermission } from '../permission-denied';
 import { getDrizzle } from '../route-helpers';
@@ -32,8 +32,6 @@ async function rosterRoleOf(c: Context<HonoConfig>, inspectionId: string): Promi
     return roster.helpers.some((h) => h.id === userId) ? 'helper' : null;
 }
 
-const isElevated = (c: Context<HonoConfig>) => isAdminRole(c.get('userRole'));
-
 export async function mayActOnInspection(c: Context<HonoConfig>, inspectionId: string): Promise<boolean> {
     // The owner's `scheduleOthers` is pinned on, so no lookup. A manager has it by default but is NOT shortcut here:
     // one whose scheduleOthers was switched off is treated like an inspector (the rule in ./staff-rules `mayActOn`).
@@ -54,9 +52,12 @@ export async function mayChangeSchedule(c: Context<HonoConfig>, inspectionId: st
     return !reassigns && (await rosterRoleOf(c, inspectionId)) !== null;
 }
 
-/** Deleting: the lead (not a helper), or `scheduleOthers`. Owner and manager always. */
+/**
+ * Deleting: the lead (not a helper), or `scheduleOthers`. The owner's is pinned on; a manager has it by default
+ * but is not shortcut, so one whose `scheduleOthers` was switched off is held to the same rule as an inspector.
+ */
 export async function mayDeleteInspection(c: Context<HonoConfig>, inspectionId: string): Promise<boolean> {
-    if (isElevated(c)) return true;
+    if (c.get('userRole') === ROLE.OWNER) return true;
     if ((await rosterRoleOf(c, inspectionId)) === 'lead') return true;
     return (await capabilitiesFor(c)).scheduleOthers;
 }
@@ -75,8 +76,8 @@ export async function assertMayActOnInspection(c: Context<HonoConfig>, inspectio
  * contact is on no inspection yet (pre-booking outreach belongs to nobody).
  */
 export async function mayActOnContact(c: Context<HonoConfig>, contactId: string): Promise<boolean> {
-    const role = c.get('userRole') ?? '';
-    if (isAdminRole(role)) return true;
+    // Same rule as `mayActOnInspection`: the owner's scheduleOthers is pinned on, a manager's can be switched off.
+    if (c.get('userRole') === ROLE.OWNER) return true;
     const tenantId = c.get('tenantId');
     const userId = c.get('user').sub;
     const db = getDrizzle(c);

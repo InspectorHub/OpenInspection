@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useFetcherResult } from "~/hooks/useFetcherResult";
+import { useFetcherResult, useResultSinceMount } from "~/hooks/useFetcherResult";
+import { keepNotReached } from "~/lib/send-delivery";
 import { useDeliveryResult } from "~/hooks/useDeliveryResult";
 import { SendDeliveryResult } from "./SendDeliveryResult";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
@@ -107,9 +108,11 @@ export function SendReportModal({
   const recipients: Recipient[] = peopleRecipients;
 
   const submitting = fetcher.state !== "idle";
+  // Only an answer that arrived while this dialog is open: the fetcher outlives it (see useResultSinceMount).
+  const result = useResultSinceMount(fetcher.data);
   const error =
-    fetcher.data?.intent === "send-report" && "ok" in fetcher.data && !fetcher.data.ok
-      ? fetcher.data.error
+    result?.intent === "send-report" && "ok" in result && !result.ok
+      ? result.error
       : undefined;
 
   // Auto-close on a successful send. The fetcher belongs to the parent and outlives this modal, so only a
@@ -134,7 +137,8 @@ export function SendReportModal({
       footer={
         delivery ? (
           <>
-            <Button variant="secondary" type="button" onClick={back}>
+            {/* Back drops the people the send reached, so a second Send does not repeat it to them. */}
+            <Button variant="secondary" type="button" onClick={() => { setSelectedIds((prev) => keepNotReached(prev, delivery, people)); back(); }}>
               {m.common_back()}
             </Button>
             <Button variant="primary" type="button" onClick={onClose}>

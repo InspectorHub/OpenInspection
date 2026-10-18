@@ -135,6 +135,7 @@ const HubInvoiceSchema = HubInvoiceCoreSchema.extend({
   // URL the emailed link carries; null when no primary client email exists to
   // bind a token to (the UI hides the action rather than copy a dead link).
   payUrl:     z.string().nullable().describe('Tokenized public pay link, or null when unavailable'),
+  payUrlUnavailable: z.enum(['no_client_email', 'link_error']).nullable().optional().describe('Why payUrl is null when a link was due: the primary client has no email, or minting it failed. Null when a link is present or none is due. Only set for callers who hold companyFinance.'),
 });
 
 // Issue #111 — single aggregate payload for the `/inspections/:id` hub page.

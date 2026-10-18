@@ -10,7 +10,7 @@ import type { RenderResult } from '../../lib/email-templates/types';
 import { ResendProvider } from '../../lib/email/providers/resend';
 import type { EmailProvider } from '../../lib/email/provider';
 import type { EmailDedupePort } from '../../lib/email/dedupe';
-import type { OutboundCoolingPort } from '../../lib/email/outbound-cooling-window';
+import { isAccountEmailClass, type OutboundCoolingPort } from '../../lib/email/outbound-cooling-window';
 import { deliverWithUnsubscribe, type UnsubscribeLinkPort } from '../../lib/notifications/unsubscribe-footer';
 import { escapeHtml, appendSignature, arrayBufferToBase64 } from './html-helpers';
 
@@ -256,10 +256,10 @@ export class EmailBaseService {
         // both false and un-actionable. The more specific refusal goes first.
         await this.cooling?.check(opts?.classId);
 
-        // Free-tier pre-flight quota gate — runs BEFORE any provider request is
-        // built. A quota block throws here, so no provider HTTP call is made
-        // and no meter record happens for a send that never went out.
-        await this.quota?.preflight();
+        // Free-tier pre-flight quota gate, before any provider request is built: a block throws, nothing is sent or
+        // metered. Account and statutory mail (`ACCOUNT_EMAIL_CLASSES`: password reset, invitation, quota notices,
+        // data-request answers) is not part of the allowance, so a company at its cap can still sign in; it is still metered.
+        if (!isAccountEmailClass(opts?.classId)) await this.quota?.preflight();
 
         if (!this.apiKey || this.apiKey.includes('your_api_key')) {
             logger.warn(`[email] Skipping delivery (API Key missing) to: ${to.join(', ')}`);

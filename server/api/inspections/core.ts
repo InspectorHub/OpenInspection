@@ -29,7 +29,7 @@ import { patchRevisionReport } from './patch-revision-report';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
 import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
-import { fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
+import { assertCanCreate, fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
 import { isFieldRole } from '../../lib/auth/roles';
 import { resolveInspectionScope } from '../../lib/inspection/visibility';
 
@@ -321,7 +321,7 @@ const coreRoutes = createApiRouter()
             }
         }
 
-        // The audit row is written inside the create, ahead of the primary report (./create-support).
+        await assertCanCreate(c, body); // refusals that need no write, before any contact is upserted; the audit row is written inside the create (./create-support)
         const { inspection, created } = await service.createInspectionOnce(tenantId, await resolveCreateInput(c, body), {
             beforeReport: (id) => recordCreateAudit(c, id, body.propertyAddress),
         });

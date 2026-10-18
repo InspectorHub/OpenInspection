@@ -26,6 +26,7 @@ export function InvoiceCard({
     paid,
     sent,
     payUrl,
+    payUrlUnavailable,
     hasServiceLines,
     paymentRequired,
     basePriceCents,
@@ -43,6 +44,8 @@ export function InvoiceCard({
     paid: boolean;
     sent: boolean;
     payUrl: string | null | undefined;
+    /** Why `payUrl` is null when a link was due; undefined/null when it is present, not due, or the viewer is not told. */
+    payUrlUnavailable?: 'no_client_email' | 'link_error' | null | undefined;
     hasServiceLines: boolean;
     paymentRequired: boolean;
     /** IA-95 — undefined when money is redacted. */
@@ -124,6 +127,11 @@ export function InvoiceCard({
                         server built, never a bare `/invoice/:id` (which now 401s). No
                         link when no primary client email exists to bind a token to. */}
                     {sent && payUrl && <CopyLinkButton url={payUrl} />}
+                    {sent && !payUrl && payUrlUnavailable && (
+                        <p className="text-[12px] text-ih-fg-3" data-testid="hub-pay-link-unavailable">
+                            {payUrlUnavailable === 'no_client_email' ? m.inspections_hub_invoice_pay_link_no_email() : m.inspections_hub_invoice_pay_link_error()}
+                        </p>
+                    )}
                     {basePriceEditable && (
                         <Button variant="secondary" size="sm" onClick={() => setPriceOpen(true)}>
                             {m.inspections_hub_invoice_set_amount()}

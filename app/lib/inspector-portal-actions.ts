@@ -52,6 +52,9 @@ export interface DeliveryOutcome {
  * Result of a send that answers 200 with per-recipient outcomes (`data.sentTo`, `data.skipped`). Everyone
  * reached is a success. When anyone was skipped or failed the result is not ok and carries the outcome, so
  * the dialog can stay open and say who was reached and who was not instead of closing as if all went out.
+ *
+ * A 200 that does not say who was reached (an unparsable body, no `sentTo` list, or nobody sent and nobody
+ * skipped) is NOT a success either: the dialog must not claim delivery it cannot confirm.
  */
 export async function deliveryActionResult<I extends string>(
   res: { ok: boolean; json: () => Promise<unknown> },
@@ -60,9 +63,13 @@ export async function deliveryActionResult<I extends string>(
 ): Promise<{ ok: boolean; intent: I; error: string | undefined; delivery?: DeliveryOutcome }> {
   if (!res.ok) return toActionResult(res, intent, fallbackError);
   const body = (await res.json().catch(() => null)) as { data?: { sentTo?: unknown[]; skipped?: SkippedRecipient[] } } | null;
+  const sentTo = body?.data?.sentTo;
   const skipped = body?.data?.skipped ?? [];
   if (skipped.length > 0) {
-    return { ok: false, intent, error: undefined, delivery: { sent: body?.data?.sentTo?.length ?? 0, skipped } };
+    return { ok: false, intent, error: undefined, delivery: { sent: Array.isArray(sentTo) ? sentTo.length : 0, skipped } };
+  }
+  if (!Array.isArray(sentTo) || sentTo.length === 0) {
+    return { ok: false, intent, error: m.inspections_hub_delivery_unconfirmed() };
   }
   return { ok: true, intent, error: undefined };
 }

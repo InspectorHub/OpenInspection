@@ -83,7 +83,7 @@ const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET: 'tes
 
 async function get(app: OpenAPIHono<HonoConfig>) {
     const res = await app.request(`/api/inspections/${INSP_ID}/hub`, { method: 'GET' }, ENV);
-    return { status: res.status, body: await res.json() as { data?: { invoice?: { payUrl?: string | null } | null } } };
+    return { status: res.status, body: await res.json() as { data?: { invoice?: { payUrl?: string | null; payUrlUnavailable?: string | null } | null } } };
 }
 
 describe('GET /api/inspections/:id/hub — tokenized pay link (IA-34 follow-up)', () => {
@@ -122,6 +122,18 @@ describe('GET /api/inspections/:id/hub — tokenized pay link (IA-34 follow-up)'
 
         expect(body.data?.invoice?.payUrl).toBeNull();
         expect(issueToken).not.toHaveBeenCalled();
+    });
+
+    it('says why there is no link: no client email, a failed mint, and nothing for a caller without companyFinance', async () => {
+        expect((await get(buildApp({ id: 'inv-1', status: 'sent' }, { email: null }))).body.data?.invoice?.payUrlUnavailable).toBe('no_client_email');
+        const failing = buildApp({ id: 'inv-1', status: 'sent' }, { email: 'jane@example.com' });
+        issueToken.mockRejectedValueOnce(new Error('db down'));
+        expect((await get(failing)).body.data?.invoice?.payUrlUnavailable).toBe('link_error');
+        // no link due (a draft) and a link present: no reason to give
+        expect((await get(buildApp({ id: 'inv-1', status: 'draft' }, { email: 'jane@example.com' }))).body.data?.invoice?.payUrlUnavailable).toBeNull();
+        expect((await get(buildApp({ id: 'inv-1', status: 'sent' }, { email: 'jane@example.com' }))).body.data?.invoice?.payUrlUnavailable).toBeNull();
+        // an inspector without companyFinance is not told anything about a link they were never going to see
+        expect((await get(buildApp({ id: 'inv-1', status: 'sent' }, { email: null }, 'inspector'))).body.data?.invoice?.payUrlUnavailable ?? null).toBeNull();
     });
 
     it('returns null payUrl when the inspection has no primary client at all', async () => {
