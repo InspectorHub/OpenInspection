@@ -14,7 +14,10 @@
  * - send-report-pdf additionally: at most MAX_RECIPIENTS recipients, each one a
  *   person already on the inspection (by contact id, or by that person's email),
  *   and the same recipient is sent the same inspection at most MAX_PER_HOUR times
- *   per hour.
+ *   per hour. The allowance counts reports DELIVERED: it is reserved before the
+ *   send (so simultaneous requests cannot all pass the check) and given back for
+ *   every recipient the send did not reach, or all of them when the request was
+ *   refused (cooling window, plan cap) or failed.
  */
 import type { Context, Next } from 'hono';
 import { and, eq } from 'drizzle-orm';
@@ -56,12 +59,40 @@ async function assertUnderLimit(c: Context<HonoConfig>, inspectionId: string, wh
     if (used >= MAX_PER_HOUR) throw Errors.RateLimited(message);
 }
 
-/** Spends one send of this inspection on this recipient (an address, or `sms:<contact id>`). */
-async function spendSend(c: Context<HonoConfig>, inspectionId: string, who: string): Promise<void> {
+/** Moves one recipient's counter by `delta` (an address, or `sms:<contact id>`); never below zero. */
+async function adjustSend(c: Context<HonoConfig>, inspectionId: string, who: string, delta: number): Promise<void> {
     const kv = c.env.TENANT_CACHE;
     const key = sendKey(c, inspectionId, who);
     const used = Number(await kv.get(key) ?? '0');
-    await kv.put(key, String(used + 1), { expirationTtl: 3600 });
+    const next = Math.max(0, used + delta);
+    if (next === 0) await kv.delete(key);
+    else await kv.put(key, String(next), { expirationTtl: 3600 });
+}
+
+/** Spends one send of this inspection on this recipient (an address, or `sms:<contact id>`). */
+const spendSend = (c: Context<HonoConfig>, inspectionId: string, who: string) => adjustSend(c, inspectionId, who, 1);
+
+/**
+ * Serialises the check-then-write on one inspection's counters within this isolate. KV has no
+ * atomic increment, so without this two requests in flight (a double-click) both read the same
+ * count, both pass the check and both write count + 1. Across isolates the counter stays
+ * best-effort, as KV reads are eventually consistent; the ceiling is a courtesy limit, not a
+ * security boundary.
+ */
+const counterLocks = new Map<string, Promise<void>>();
+async function withCounterLock<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const previous = counterLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const mine = new Promise<void>((resolve) => { release = resolve; });
+    const tail = previous.then(() => mine);
+    counterLocks.set(key, tail);
+    await previous;
+    try {
+        return await work();
+    } finally {
+        release();
+        if (counterLocks.get(key) === tail) counterLocks.delete(key);
+    }
 }
 
 /**
@@ -119,11 +150,61 @@ export async function guardSendReport(c: Context<HonoConfig>, next: Next) {
         seen.add(person.contactId);
         if (person.email) emails.push(person.email.toLowerCase());
     }
-    // Quota is spent only once the whole request has passed every check above.
-    // Check every recipient first so a request refused for one of them has spent nothing for the others.
-    for (const email of emails) await assertUnderLimit(c, id, email, REPORT_LIMIT_MESSAGE);
-    for (const email of emails) await spendSend(c, id, email);
-    return next();
+    // Reserve the allowance only once the whole request has passed every check above. Check every
+    // recipient first so a request refused for one of them has reserved nothing for the others, and
+    // do check and reservation under one lock so two simultaneous requests cannot both pass.
+    const lockKey = `${c.get('tenantId')}:${id}`;
+    await withCounterLock(lockKey, async () => {
+        for (const email of emails) await assertUnderLimit(c, id, email, REPORT_LIMIT_MESSAGE);
+        for (const email of emails) await spendSend(c, id, email);
+    });
+    // The reservation is only a hold until the send is known. Give back what was not delivered.
+    let delivered: Map<string, number> | 'all';
+    try {
+        await next();
+        delivered = await deliveredByAddress(c);
+    } catch (err) {
+        await releaseUndelivered(c, id, lockKey, emails, new Map());
+        throw err;
+    }
+    await releaseUndelivered(c, id, lockKey, emails, delivered);
+}
+
+/**
+ * The addresses (lower-cased, with how many times each) the handler reports as delivered. A
+ * refusal (the handler threw, or answered 4xx/5xx) delivered nothing. A success body the guard
+ * cannot read is treated as delivered, so an unreadable answer never hands allowance back.
+ */
+async function deliveredByAddress(c: Context<HonoConfig>): Promise<Map<string, number> | 'all'> {
+    const out = new Map<string, number>();
+    if (c.error || c.res.status >= 400) return out;
+    try {
+        const body = await c.res.clone().json() as { data?: { sentTo?: unknown } };
+        const sentTo = body?.data?.sentTo;
+        if (!Array.isArray(sentTo)) return 'all';
+        for (const a of sentTo) if (typeof a === 'string') out.set(a.toLowerCase(), (out.get(a.toLowerCase()) ?? 0) + 1);
+        return out;
+    } catch {
+        return 'all';
+    }
+}
+
+async function releaseUndelivered(
+    c: Context<HonoConfig>, inspectionId: string, lockKey: string, reserved: string[], delivered: Map<string, number> | 'all',
+): Promise<void> {
+    if (delivered === 'all') return;
+    const remaining = new Map(delivered);
+    const refunds: string[] = [];
+    for (const email of reserved) {
+        const left = remaining.get(email) ?? 0;
+        if (left > 0) remaining.set(email, left - 1);
+        else refunds.push(email);
+    }
+    if (refunds.length === 0) return;
+    // A failed refund must never turn a finished send into an error; the hold simply expires with its hour.
+    await withCounterLock(lockKey, async () => {
+        for (const email of refunds) await adjustSend(c, inspectionId, email, -1).catch(() => {});
+    }).catch(() => {});
 }
 
 /** report-link-expiry on one inspection: assigned or `scheduleOthers`, publish state irrelevant. */
