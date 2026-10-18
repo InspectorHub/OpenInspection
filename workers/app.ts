@@ -30,6 +30,8 @@ import { withResolvedUiLocale } from "../server/lib/i18n/ui-locale";
 import type { WorkerEnv } from "./env";
 import { cloudflareContext } from "../app/lib/load-context";
 import { withHumanToken } from "./human-token";
+// Imports nothing, like the three above: safe at the top level.
+import { sessionMarkerFromCookie } from "../server/lib/session-marker";
 
 /** Hono context for this worker, so handlers need no `any`. */
 type Ctx = Context<{ Bindings: WorkerEnv }>;
@@ -59,7 +61,7 @@ const requestHandler = createRequestHandler(
 // loaders/actions' `createApi()` call the API app DIRECTLY (its createApi prefers
 // env.API_WORKER.fetch) instead of an HTTP loopback to this same worker — no
 // extra network hop, no API_URL needed.
-const ssr = (c: Ctx) => {
+const ssr = async (c: Ctx) => {
   // One scope per OUTER request, shared by every in-process API call this
   // render fans out. Built once here rather than per call: the 15 calls must
   // see the SAME scope or nothing is shared. `toApi` — the entry for real
@@ -91,10 +93,29 @@ const ssr = (c: Ctx) => {
   // language instead of English-then-Spanish. It returns the SAME request
   // object once the cookie already agrees, which is every request after the
   // first — the steady-state cost here is one header read.
-  return paraglideMiddleware(withResolvedUiLocale(c.req.raw), ({ request }: { request: Request }) =>
+  const rendered = await paraglideMiddleware(withResolvedUiLocale(c.req.raw), ({ request }: { request: Request }) =>
     requestHandler(request, context),
   );
+  return withSessionMarker(rendered, c.req.header("cookie"));
 };
+
+/**
+ * Tell the browser's service worker whose page this is.
+ *
+ * A document rendered for a session carries `x-oi-session`, an opaque marker of that user. The worker
+ * keeps offline copies per user and drops them when the marker changes, so a landing page (SSO, an
+ * invite link, a bookmark) switches the cache to the right user before any script runs. A response
+ * with no session gets no header, which the worker reads as "not told", never as "signed out".
+ * Only HTML documents are stamped; data responses and redirects pass through untouched.
+ */
+async function withSessionMarker(response: Response, cookie: string | undefined): Promise<Response> {
+  if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
+  const marker = await sessionMarkerFromCookie(cookie);
+  if (!marker) return response;
+  const stamped = new Response(response.body, response);
+  stamped.headers.set("x-oi-session", marker);
+  return stamped;
+}
 
 // Delegate to the FULL API app (all its global `app.use('*')` middleware — CSRF,
 // tenant routing, DI, branding, … — runs INSIDE this call). By routing only

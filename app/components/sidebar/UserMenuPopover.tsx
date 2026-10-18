@@ -4,14 +4,17 @@ import { IC } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { LocaleSwitcher } from "~/components/LocaleSwitcher";
 import { m } from "~/paraglide/messages";
+import { clearUserCacheOnSignOut } from "~/lib/sw-user-cache";
 import { useLayer } from "@core/shared-ui";
 
 // ─── User Menu popover (desktop sidebar) ─────────────────────────────────────
 interface UserMenuPopoverProps {
   open: boolean;
   onClose: () => void;
-  companyName: string;
-  tenantSlug: string;
+  userName: string;
+  /** Shown under the name; null when the name already is the email. */
+  userEmail?: string | null;
+  /** The translated role name. */
   userRole?: string | null;
   showSwitchWorkspace: boolean;
   portalBaseUrl?: string | null;
@@ -21,8 +24,8 @@ interface UserMenuPopoverProps {
 export function UserMenuPopover({
   open,
   onClose,
-  companyName,
-  tenantSlug,
+  userName,
+  userEmail,
   userRole,
   showSwitchWorkspace,
   portalBaseUrl,
@@ -54,13 +57,11 @@ export function UserMenuPopover({
       aria-label={m.nav_user_menu_aria()}
       className="absolute bottom-full left-0 mb-2 w-[220px] bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover z-50 py-1.5 overflow-hidden"
     >
-      {/* Workspace card */}
-      <div className="px-3 py-2 mb-0.5">
-        <div className="text-[12px] font-bold text-ih-fg-1 truncate">{companyName}</div>
-        <div className="text-[10px] font-[var(--font-ih-mono)] text-ih-fg-3 truncate">{tenantSlug}</div>
-        {userRole && (
-          <div className="text-[10px] text-ih-fg-3 capitalize mt-0.5">{userRole}</div>
-        )}
+      {/* Who is signed in. The company is already named at the top of the sidebar, so it is not repeated here. */}
+      <div className="px-3 py-2 mb-0.5" data-testid="user-menu-identity">
+        <div className="text-[12px] font-bold text-ih-fg-1 break-words">{userName}</div>
+        {userEmail && <div className="text-[11px] text-ih-fg-3 break-all">{userEmail}</div>}
+        {userRole && <div className="text-[10px] text-ih-fg-3 mt-0.5">{userRole}</div>}
       </div>
 
       {/* Switch workspace — SaaS only */}
@@ -134,7 +135,7 @@ export function UserMenuPopover({
         role="menuitem"
         data-testid="user-menu-logout"
         className="flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium text-ih-bad-fg hover:bg-ih-bad-bg transition-colors focus:outline-none focus:bg-ih-bad-bg"
-        onClick={onClose}
+        onClick={() => { clearUserCacheOnSignOut(); onClose(); }}
       >
         <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
         <span>{m.nav_user_logout()}</span>

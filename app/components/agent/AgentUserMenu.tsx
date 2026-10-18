@@ -3,6 +3,7 @@ import { NavLink } from "react-router";
 import { Avatar, Pill, Popover } from "@core/shared-ui";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { m } from "~/paraglide/messages";
+import { clearUserCacheOnSignOut } from "~/lib/sw-user-cache";
 
 /** The signed-in agent, as `GET /api/agent/profile` answered it. */
 export interface AgentPortalAccount {
@@ -134,6 +135,7 @@ export function AgentUserMenu({ account }: { account: AgentPortalAccount | null 
           {/* ds-allow: compact menu row rhythm (7px), no semantic spacing token */}
           <a
             href="/agent-logout"
+            onClick={clearUserCacheOnSignOut}
             data-testid="agent-user-menu-logout"
             className="flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium text-ih-bad-fg hover:bg-ih-bad-bg transition-colors focus:outline-none focus:bg-ih-bad-bg"
           >

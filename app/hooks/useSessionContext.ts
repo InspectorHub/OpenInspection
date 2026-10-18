@@ -50,6 +50,8 @@ export interface SessionContext {
     timeFormat: TimeFormat;
   };
   user: {
+    /** Opaque marker of this user for the service worker's per-user cache. */
+    sessionMarker?: string;
     name: string | null;
     email: string | null;
     role: string;
