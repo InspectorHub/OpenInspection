@@ -8,6 +8,7 @@ import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
 import { MobileHeader } from "~/components/sidebar/MobileHeader";
 import { useCommandPalette } from "~/components/CommandPalette";
 import { StaffNoticeBell } from "~/components/notices/StaffNoticeBell";
+import { userIdentity, roleLabel } from "~/components/sidebar/user-identity";
 import { Avatar } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -36,9 +37,11 @@ export function Sidebar() {
   // asserting a role they do not hold, in the one place they look to confirm
   // who they are signed in as. "Unnamed" matches what the Team page already
   // shows for the same user.
-  const userName = ctx?.user?.name || ctx?.user?.email || m.settings_team_member_unnamed();
-  const userSubline = ctx?.branding?.tenantSlug || "openinspection.dev";
-  const userRole = ctx?.user?.role || null;
+  // The company is named once, at the top of the sidebar. The identity row says who is signed in
+  // and in what role, never the company again.
+  const identity = userIdentity(ctx?.user, m.settings_team_member_unnamed());
+  const userRole = roleLabel(ctx?.user?.role);
+  const userSubline = userRole ?? identity.secondary;
   const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;
   const privacyUrl = ctx?.branding?.privacyUrl ?? null;
 
@@ -103,8 +106,11 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Nav */}
-      <nav className="flex-1 px-2 py-1 overflow-y-auto">
+      {/* Nav. The collapse tab sits on the sidebar's right edge in the empty space between Library and
+          Settings, always visible. It must stay inside the edge: the aside clips overflow, and the
+          old hover-only handle hung outside it and never showed. */}
+      <div className="flex-1 min-h-0 flex flex-col">
+      <nav className="min-h-0 px-2 py-1 overflow-y-auto">
         <SidebarGroup label={m.nav_section_workspace()} items={visibleNavItems(WORKSPACE_ITEMS, capabilities, ctx?.user?.role).map((i) => (i.to === "/messages" ? { ...i, badge: unreadMessages } : i))} collapsed={collapsed} />
         {/* ds-allow: compact sidebar nav rhythm (10/7/14px), no semantic spacing token */}
         <div className="mb-[14px]">
@@ -122,24 +128,26 @@ export function Sidebar() {
           </NavLink>
         </div>
       </nav>
+      <div className="relative flex-1 min-h-[3.5rem]">
+        <button
+          type="button"
+          data-testid="sidebar-collapse-toggle"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? m.nav_action_expand_sidebar() : m.nav_action_collapse_sidebar()}
+          aria-expanded={!collapsed}
+          title={collapsed ? m.nav_action_expand() : m.nav_action_collapse()}
+          className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-10 flex items-center justify-center rounded-l-[6px] bg-ih-bg-card border border-r-0 border-ih-border text-ih-fg-3 hover:text-ih-primary-text hover:bg-ih-bg-muted focus:outline-none focus:shadow-ih-focus transition-colors"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={collapsed ? "M9 5l7 7-7 7" : "M15 19l-7-7 7-7"} />
+          </svg>
+        </button>
+      </div>
+      </div>
 
       {/* Footer — two rows: Settings + avatar identity row */}
       {/* ds-allow: compact sidebar nav rhythm (2px row gap), no semantic spacing token */}
       <div className="relative mt-auto px-2 py-2.5 border-t border-ih-border space-y-[2px]">
-        {/* Collapse handle — slim chevron on the sidebar right edge */}
-        <button
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? m.nav_action_expand_sidebar() : m.nav_action_collapse_sidebar()}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-10 flex items-center justify-center rounded-r-[6px] bg-ih-bg-card border border-l-0 border-ih-border text-ih-fg-4 opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity z-10 hover:text-ih-primary-text focus:outline-none focus:text-ih-primary-text"
-          title={collapsed ? m.nav_action_expand() : m.nav_action_collapse()}
-        >
-          {collapsed ? (
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-          ) : (
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          )}
-        </button>
-
         {/* Row 1: Settings */}
         {/* ds-allow: compact sidebar nav rhythm (10/7px), no semantic spacing token */}
         <NavLink
@@ -160,8 +168,8 @@ export function Sidebar() {
           <UserMenuPopover
             open={userMenuOpen}
             onClose={() => setUserMenuOpen(false)}
-            companyName={companyName}
-            tenantSlug={userSubline}
+            userName={identity.primary}
+            userEmail={identity.secondary}
             userRole={userRole}
             showSwitchWorkspace={!!showSwitchWorkspace}
             portalBaseUrl={ctx?.branding?.portalBaseUrl}
@@ -173,15 +181,16 @@ export function Sidebar() {
             aria-haspopup="menu"
             aria-expanded={userMenuOpen}
             onClick={() => setUserMenuOpen((v) => !v)}
+            title={[identity.primary, identity.secondary, userRole].filter(Boolean).join(" · ")}
             className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-ih-button hover:bg-ih-bg-muted transition-all focus:outline-none focus:shadow-ih-focus ${collapsed ? "justify-center" : ""}`}
           >
             {/* Avatar initials circle */}
-            <Avatar name={ctx?.user?.name || ""} size={32} variant="self" fallbackIcon="OI" />
+            <Avatar name={ctx?.user?.name || ctx?.user?.email || ""} size={32} variant="self" fallbackIcon="OI" />
             {!collapsed && (
               <>
                 <div className="flex-1 min-w-0 text-left">
-                  <div className="text-[12px] font-bold text-ih-fg-1 truncate">{userName}</div>
-                  <div className="text-[10px] text-ih-fg-3 font-[var(--font-ih-mono)] truncate">{userSubline}</div>
+                  <div className="text-[12px] font-bold text-ih-fg-1 truncate">{identity.primary}</div>
+                  {userSubline && <div className="text-[10px] text-ih-fg-3 truncate">{userSubline}</div>}
                 </div>
                 {/* Small chevron indicator */}
                 <svg

@@ -7,6 +7,7 @@ import { LocaleSwitcher } from "~/components/LocaleSwitcher";
 import { Avatar, Icon, useDialogBehavior } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { clearUserCacheOnSignOut } from "~/lib/sw-user-cache";
+import { userIdentity, roleLabel } from "~/components/sidebar/user-identity";
 
 /** Tailwind `lg` (64rem), the breakpoint at which the panel's `lg:hidden` hides it. */
 const DRAWER_HIDDEN_QUERY = "(min-width: 1024px)";
@@ -18,10 +19,9 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
   const companyName = ctx?.branding?.companyName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
-  const tenantSlug = ctx?.branding?.tenantSlug || "openinspection.dev";
   // See Sidebar.tsx — never fall back to a ROLE name.
-  const userName = ctx?.user?.name || ctx?.user?.email || m.settings_team_member_unnamed();
-  const userRole = ctx?.user?.role || null;
+  const identity = userIdentity(ctx?.user, m.settings_team_member_unnamed());
+  const userRole = roleLabel(ctx?.user?.role);
   const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;
   const privacyUrl = ctx?.branding?.privacyUrl ?? null;
 
@@ -92,13 +92,6 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
           {/* Bottom section — flat (no popover on mobile) */}
           <div className="pt-3 mt-1 border-t border-ih-border">
-            {/* Workspace identity card */}
-            <div className="px-3 py-2 mb-1 rounded-ih-button bg-ih-bg-muted/60">
-              <div className="text-[11px] font-bold text-ih-fg-1 truncate">{companyName}</div>
-              <div className="text-[10px] font-[var(--font-ih-mono)] text-ih-fg-3 truncate">{tenantSlug}</div>
-              {userRole && <div className="text-[10px] text-ih-fg-3 capitalize">{userRole}</div>}
-            </div>
-
             <NavLink to="/settings" onClick={onClose} className="flex items-center gap-3 px-3 py-2 rounded-ih-button text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary-text transition-all">
               <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
               <span>{m.nav_item_settings()}</span>
@@ -139,9 +132,11 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             <LocaleSwitcher className="w-full" />
           </div>
           <div className="flex items-center gap-2.5 px-2 py-1">
-            <Avatar name={ctx?.user?.name || ""} size={28} variant="self" fallbackIcon="OI" />
+            <Avatar name={ctx?.user?.name || ctx?.user?.email || ""} size={28} variant="self" fallbackIcon="OI" />
             <div className="flex-1 min-w-0">
-              <div className="text-[12px] font-bold text-ih-fg-1 truncate">{userName}</div>
+              <div className="text-[12px] font-bold text-ih-fg-1 truncate">{identity.primary}</div>
+              {identity.secondary && <div className="text-[11px] text-ih-fg-3 truncate">{identity.secondary}</div>}
+              {userRole && <div className="text-[10px] text-ih-fg-3">{userRole}</div>}
             </div>
           </div>
           <a href="/logout" onClick={clearUserCacheOnSignOut} className="w-full flex items-center gap-3 px-3 py-2 rounded-ih-button text-ih-bad-fg hover:bg-ih-bad-bg transition-all font-medium text-[13px]">

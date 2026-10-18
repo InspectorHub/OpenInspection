@@ -48,7 +48,7 @@ describe("Escape on layer-backed overlays", () => {
         {
           id: "root",
           path: "/",
-          element: <UserMenuPopover open={open} onClose={onClose} companyName="Acme" tenantSlug="acme" showSwitchWorkspace={false} />,
+          element: <UserMenuPopover open={open} onClose={onClose} userName="Dana Lee" showSwitchWorkspace={false} />,
         },
       ],
       { hydrationData: { loaderData: { root: null } } },
