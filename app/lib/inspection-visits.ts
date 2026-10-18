@@ -57,22 +57,20 @@ export async function loadVisits(
     const visitsGet = api.events?.inspections?.[":inspectionId"]?.events?.$get as unknown as
         | ((args: { param: { inspectionId: string } }) => Promise<Response>)
         | undefined;
-    const visitsRes = visitsGet
-        ? await visitsGet({ param: { inspectionId } }).catch(() => null)
-        : null;
-    const visits: VisitRowData[] =
-        visitsRes && visitsRes.ok
-            ? (((await visitsRes.json()) as { data?: VisitRowData[] }).data ?? [])
-            : [];
-
     const typesGet = api.events?.["event-types"]?.$get as unknown as
         | ((args?: unknown) => Promise<Response>)
         | undefined;
-    const typesRes = typesGet ? await typesGet({}).catch(() => null) : null;
-    const visitTypes: VisitTypeOption[] =
-        typesRes && typesRes.ok
-            ? (((await typesRes.json()) as { data?: VisitTypeOption[] }).data ?? [])
-            : [];
+    // Both reads start together; each keeps its own failure handling.
+    const [visits, visitTypes] = await Promise.all([
+        (async (): Promise<VisitRowData[]> => {
+            const res = visitsGet ? await visitsGet({ param: { inspectionId } }).catch(() => null) : null;
+            return res && res.ok ? (((await res.json()) as { data?: VisitRowData[] }).data ?? []) : [];
+        })(),
+        (async (): Promise<VisitTypeOption[]> => {
+            const res = typesGet ? await typesGet({}).catch(() => null) : null;
+            return res && res.ok ? (((await res.json()) as { data?: VisitTypeOption[] }).data ?? []) : [];
+        })(),
+    ]);
 
     // Which visit types THIS order's services imply. Resolved from slugs, and a
     // slug with no surviving event type is silently dropped — the same rule
