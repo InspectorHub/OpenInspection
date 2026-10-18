@@ -49,6 +49,12 @@ describe('page timing wiring in workers/app.ts', () => {
         expect(importsOfBuild).toHaveLength(1);
     });
 
+    it('marks only the page-render env as a page-render call; the offline import never does', () => {
+        expect(SRC).toMatch(/\[PAGE_RENDER_CALL\]\s*:\s*true/);
+        const outbox = readFileSync(new URL('../../../server/services/offline-import-outbox.ts', import.meta.url), 'utf8');
+        expect(outbox).not.toMatch(/PAGE_RENDER_CALL/);
+    });
+
     it('keeps the entry import graph small: the helper is a plain top-level import of a leaf module', () => {
         expect(SRC).toMatch(/from "\.\.\/server\/lib\/page-timing"/);
         const helper = readFileSync(new URL('../../../server/lib/page-timing.ts', import.meta.url), 'utf8');

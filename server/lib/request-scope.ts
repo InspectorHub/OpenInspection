@@ -17,6 +17,15 @@
 /** Env key carrying the scope. Not a Worker binding — injected at the seam. */
 export const REQUEST_SCOPE = '__requestScope' as const;
 
+/**
+ * Env key marking an in-process call made by a PAGE RENDER's loaders and actions.
+ * Set only by `workers/app.ts` on the env it gives the page-render self-binding.
+ * Deliberately separate from REQUEST_SCOPE: the offline import also attaches a
+ * (credential-only) scope to its replays, and those are real writes whose
+ * outcome must stay in the request log.
+ */
+export const PAGE_RENDER_CALL = '__pageRenderCall' as const;
+
 export interface RequestScope {
     once<T>(key: string, fn: () => Promise<T>): Promise<T>;
 }
@@ -76,9 +85,19 @@ export function memoOnce<T>(env: unknown, key: string, fn: () => Promise<T>): Pr
 /**
  * True when this request reached the API through the worker's in-process
  * self-binding (the web app's own loaders and actions), false for external HTTP.
- * Unforgeable for the same reason the scope is: only `workers/app.ts` puts the
- * key on the env, and external traffic is handed the plain env.
+ * Unforgeable for the same reason the scope is: server code puts the key on the
+ * env (`workers/app.ts`, and the offline import for its replays), and external
+ * traffic is handed the plain env.
  */
 export function isInProcessRequest(env: unknown): boolean {
     return !!(env as Record<string, unknown> | undefined)?.[REQUEST_SCOPE];
+}
+
+/**
+ * True only for an in-process call made by a page render (see PAGE_RENDER_CALL).
+ * An offline-import replay is in-process too (`isInProcessRequest`) but is NOT a
+ * page-render call.
+ */
+export function isPageRenderCall(env: unknown): boolean {
+    return (env as Record<string, unknown> | undefined)?.[PAGE_RENDER_CALL] === true;
 }

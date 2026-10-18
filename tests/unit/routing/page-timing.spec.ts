@@ -130,7 +130,11 @@ describe('finishPage', () => {
         const getReader = vi.spyOn(stream, 'getReader');
         const tee = vi.spyOn(stream, 'tee');
         const inner = new Response(stream, { headers: { 'Content-Type': 'text/html' } });
+        const innerBody = inner.body;
         const out = run(m, { res: inner });
+        // The very same stream object: a res.clone() would hand back a tee'd branch instead.
+        expect(out.body).toBe(innerBody);
+        expect(inner.bodyUsed).toBe(false);
         // Returning at all (instead of waiting for the stream) proves nothing was buffered.
         expect(out.headers.has('Server-Timing')).toBe(true);
         expect(getReader).not.toHaveBeenCalled();
@@ -323,5 +327,34 @@ describe('cookie name', () => {
     it('is the one the session code writes', async () => {
         const m = await fresh();
         expect(m.PAGE_TIMING_SESSION_COOKIE).toBe(AUTH_COOKIE_NAME);
+    });
+});
+
+describe('real route table', () => {
+    it('resolves known paths against app/routes.ts rather than a hand-written fixture', async () => {
+        const routes = (await import('../../../app/routes')).default as unknown as Array<{
+            id?: string;
+            path?: string;
+            index?: boolean;
+            file: string;
+            children?: unknown[];
+        }>;
+        const manifest: ServerRoutes = {};
+        let n = 0;
+        const walk = (list: typeof routes, parentId: string | undefined) => {
+            for (const r of list) {
+                const id = r.id ?? `r${n++}`;
+                manifest[id] = { id, parentId, path: r.path, index: r.index };
+                if (r.children) walk(r.children as typeof routes, id);
+            }
+        };
+        walk(routes, undefined);
+        expect(Object.keys(manifest).length).toBeGreaterThan(50);
+        const resolve = (await fresh()).createRoutePatternResolver(manifest);
+        expect(resolve('/')).toBe('/');
+        expect(resolve('/login')).toBe('/login');
+        expect(resolve('/inspections/0b1c2d3e-secret/edit')).toBe('/inspections/:id/edit');
+        expect(resolve('/book/acme-inspections')).toBe('/book/:tenant');
+        expect(resolve('/report/acme/0b1c2d3e-secret')).toBe('/report/:tenant/:id');
     });
 });

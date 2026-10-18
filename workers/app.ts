@@ -13,7 +13,7 @@ import { getDeploymentProfile } from "../server/lib/deployment-profile";
 // Same top-level exemption as `deployment-profile.ts` above, for the same
 // reason: `request-scope.ts` imports nothing at all, so it cannot drag the API
 // graph in behind it.
-import { createRequestScope, REQUEST_SCOPE } from "../server/lib/request-scope";
+import { createRequestScope, PAGE_RENDER_CALL, REQUEST_SCOPE } from "../server/lib/request-scope";
 // Five string constants, no imports — safe at the top level for the same reason
 // as the two above, and what lets /status answer without importing the API graph.
 import { BUILD } from "../server/generated/version";
@@ -74,7 +74,7 @@ const ssr = async (c: Ctx) => {
   // external HTTP traffic — keeps passing the raw `c.env`, so memoisation is
   // unreachable from outside by construction rather than by a flag.
   const scope = createRequestScope();
-  const innerEnv = { ...c.env, [REQUEST_SCOPE]: scope };
+  const innerEnv = { ...c.env, [REQUEST_SCOPE]: scope, [PAGE_RENDER_CALL]: true };
   const env: WorkerEnv = {
     ...c.env,
     API_WORKER: {
