@@ -134,8 +134,7 @@ export function Sidebar() {
           data-testid="sidebar-collapse-toggle"
           onClick={toggleCollapsed}
           aria-label={collapsed ? m.nav_action_expand_sidebar() : m.nav_action_collapse_sidebar()}
-          aria-expanded={!collapsed}
-          title={collapsed ? m.nav_action_expand() : m.nav_action_collapse()}
+            title={collapsed ? m.nav_action_expand() : m.nav_action_collapse()}
           className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-10 flex items-center justify-center rounded-l-[6px] bg-ih-bg-card border border-r-0 border-ih-border text-ih-fg-3 hover:text-ih-primary-text hover:bg-ih-bg-muted focus:outline-none focus:shadow-ih-focus transition-colors"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

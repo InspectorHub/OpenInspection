@@ -186,6 +186,16 @@ async function putForUser(request, response, marker) {
   await cache.put(request, stamped);
 }
 
+// Store for this user if they are still the one signed in. A failed write (storage quota, a response
+// the Cache API refuses) must never cost the caller a response the network already delivered.
+async function storeIfStillCurrent(request, response, marker) {
+  try {
+    if ((await readMarker()) === marker) await putForUser(request, response, marker);
+  } catch {
+    // Not cached; the live response is still returned by the caller.
+  }
+}
+
 // A cached entry for exactly this user, or null. An entry stamped for anyone else is removed.
 async function cachedForUser(request, marker) {
   const cache = await caches.open(USER_CACHE);
@@ -214,7 +224,7 @@ async function userCacheFirst(event, request) {
     const copy = response.ok && response.status === 200 ? response.clone() : null;
     if (copy) {
       // Sign-out or a different user may have happened while this was in flight.
-      if ((await readMarker()) === marker) await putForUser(request, copy, marker);
+      await storeIfStillCurrent(request, copy, marker);
     } else if (response.status === 401 || response.status === 403 || response.status === 404) {
       // The server no longer lets this user read it: forget our copy.
       const cache = await caches.open(USER_CACHE);
@@ -242,9 +252,13 @@ async function navigate(request, url) {
     // runs. No header means "not told", not "signed out": nothing changes and the page is not stored.
     // Sign-out is announced by the page (set-user null) and by /logout above.
     const marker = response.headers.get(SESSION_HEADER);
-    if (marker && response.status >= 200 && response.status < 300 && type.includes('text/html')) {
-      await setUser(marker);
-      if ((await readMarker()) === marker) await putForUser(request, response.clone(), marker);
+    if (marker && response.status === 200 && type.includes('text/html')) {
+      try {
+        await setUser(marker);
+      } catch {
+        // The marker could not be saved: nothing is stored below either, since the check reads it back.
+      }
+      await storeIfStillCurrent(request, response.clone(), marker);
     }
     return response;
   } catch {

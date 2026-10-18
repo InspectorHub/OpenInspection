@@ -82,11 +82,13 @@ describe('Sidebar collapse toggle', () => {
     const after = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     expect(after(library, btn) || after(btn, library)).toBe(true);
     expect(after(btn, settings)).toBe(true);
-    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    // The label names the action, so it flips with the state; no aria-expanded on top of it (it would be read twice).
+    expect(btn.getAttribute('aria-label')).toBe('Collapse sidebar');
+    expect(btn.hasAttribute('aria-expanded')).toBe(false);
     fireEvent.click(btn);
-    expect(btn.getAttribute('aria-expanded')).toBe('false');
+    expect(btn.getAttribute('aria-label')).toBe('Expand sidebar');
     expect(screen.queryByText('WORKSPACE')).toBeNull();
     fireEvent.click(btn);
-    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    expect(btn.getAttribute('aria-label')).toBe('Collapse sidebar');
   });
 });

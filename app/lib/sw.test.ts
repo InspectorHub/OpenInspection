@@ -13,6 +13,7 @@ import { RESERVED_INSPECTION_SEGMENTS } from '../../server/lib/inspection/reserv
 const SW_SOURCE = readFileSync(path.resolve(__dirname, '../../public/sw.js'), 'utf8');
 const ORIGIN = 'https://app.test';
 const ID = '3f2b8c1e-9a4d-4e6b-8c11-0a1b2c3d4e5f';
+const SW_VERSION = /const SW_VERSION\s*=\s*'([^']+)'/.exec(SW_SOURCE)![1];
 
 type Listener = (event: Record<string, unknown>) => void;
 
@@ -22,6 +23,8 @@ function makeHarness(opts: { network?: (req: { url: string }) => Promise<Respons
     const listeners = new Map<string, Listener[]>();
     const store = new Map<string, Map<string, Response>>();
     let network = opts.network ?? (async () => new Response('net', { status: 200 }));
+    // Names of caches whose writes throw, like a full disk (QuotaExceededError).
+    const failingWrites = new Set<string>();
     const fakeCaches = {
         async open(name: string) {
             if (!store.has(name)) store.set(name, new Map());
@@ -32,6 +35,7 @@ function makeHarness(opts: { network?: (req: { url: string }) => Promise<Respons
                     return hit ? hit.clone() : undefined;
                 },
                 async put(req: { url: string } | string, res: Response) {
+                    if (failingWrites.has(name)) throw new Error('QuotaExceededError');
                     m.set(typeof req === 'string' ? new URL(req, ORIGIN).href : req.url, res.clone());
                 },
                 async add(req: string) {
@@ -90,6 +94,9 @@ function makeHarness(opts: { network?: (req: { url: string }) => Promise<Respons
     return {
         store,
         setNetwork(fn: (req: { url: string }) => Promise<Response>) { network = fn; },
+        failWritesTo(substr: string) {
+            for (const n of ['static', 'user', 'meta']) if (n.includes(substr)) failingWrites.add(`openinspection-${n}-${SW_VERSION}`);
+        },
         get: (p: string, mode = 'cors') => dispatch('fetch', { request: { method: 'GET', url: ORIGIN + p, mode } }),
         message: (data: unknown) => dispatch('message', { data }),
         activate: () => dispatch('activate', {}),
@@ -296,6 +303,37 @@ describe('sw.js: pages (HTML) are per user too', () => {
         await h.get(`/api/inspections/${ID}`);
         h.setNetwork(html());
         await h.get('/logout', 'navigate');
+        expect(h.allUserPaths()).toEqual([]);
+    });
+});
+
+describe('sw.js: a failed cache write never costs the user a live response', () => {
+    it('returns the network answer for an inspection read when the cache write throws', async () => {
+        const h = makeHarness({ network: reply('fresh') });
+        await h.message({ type: 'set-user', marker: 'user-a' });
+        h.failWritesTo('user');
+        const out = await h.get(`/api/inspections/${ID}`);
+        expect(await body(out.response)).toBe('fresh');
+    });
+
+    it('returns the live page for a navigation when the cache write throws, not the offline text', async () => {
+        const h = makeHarness({
+            network: async () => new Response('<html>live</html>', {
+                status: 200,
+                headers: { 'content-type': 'text/html; charset=utf-8', 'x-oi-session': 'user-a' },
+            }),
+        });
+        h.failWritesTo('user');
+        const out = await h.get('/inspections', 'navigate');
+        expect(out.response?.status).toBe(200);
+        expect(await body(out.response)).toBe('<html>live</html>');
+    });
+
+    it('does not store a 204 page (the Cache API refuses it)', async () => {
+        const h = makeHarness({
+            network: async () => new Response(null, { status: 204, headers: { 'content-type': 'text/html', 'x-oi-session': 'user-a' } }),
+        });
+        await h.get('/inspections', 'navigate');
         expect(h.allUserPaths()).toEqual([]);
     });
 });
