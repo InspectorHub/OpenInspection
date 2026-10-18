@@ -15,6 +15,9 @@
  *                      use anything the first produced. They can run together. Decided by
  *                      data flow (does the second statement name a binding the first
  *                      declared?), not by textual adjacency.
+ *  - helper-in-loop / helper-serial: the same two shapes when the call is hidden behind a helper
+ *                      that is handed the client (`await loadX(api, id)`). A helper that
+ *                      takes `api` is assumed to call it.
  *  - hand-built-response: `new Response(JSON.stringify(...))`. A loader returns data; the
  *                      router serialises it.
  *  - allow-without-reason: a `loader-budget-allow:` marker with no reason after it.
@@ -25,8 +28,9 @@
  *
  * "API call" means a call whose callee chain starts at an identifier named `api` (the
  * result of createApi), or whose final member is a typed-client verb (`$get`, `$post`, ...).
- * Calls hidden behind a helper that takes `api` are not seen; that is a known limit, not a
- * claim that they are fine.
+ * A call that passes the identifier `api` as an argument (a helper) is tracked as its own kind,
+ * so the baseline says honestly how much of it is direct and how much is behind helpers. A
+ * helper that reaches the client some other way (a closure, a context) is not seen.
  */
 import ts from 'typescript';
 
@@ -57,6 +61,23 @@ function isApiCall(node) {
     return ts.isPropertyAccessExpression(callee) && /^\$(get|post|put|patch|delete)$/.test(callee.name.text);
 }
 
+/** A call that hands the `api` client to a helper: `loadX(api, ...)`. Not itself an `api.` call. */
+function isHelperCall(node) {
+    if (!ts.isCallExpression(node) || isApiCall(node)) return false;
+    return node.arguments.some((a) => ts.isIdentifier(a) && a.text === 'api');
+}
+
+function containsHelperCall(node) {
+    let found = false;
+    const visit = (n) => {
+        if (found) return;
+        if (isHelperCall(n)) { found = true; return; }
+        ts.forEachChild(n, visit);
+    };
+    visit(node);
+    return found;
+}
+
 function containsApiCall(node) {
     let found = false;
     const visit = (n) => {
@@ -74,7 +95,7 @@ function bindingNames(name, out = new Set()) {
     return out;
 }
 
-/** `const x = await api...;` or `await api...;` -> the names it declares, else null. */
+/** `const x = await api...;` or `await api...;` (or `await helper(api, ...)`) -> its kind and the names it declares, else null. */
 function awaitedApiStatement(stmt) {
     let init = null;
     let names = new Set();
@@ -86,7 +107,10 @@ function awaitedApiStatement(stmt) {
         init = stmt.expression;
     }
     if (!init || !ts.isAwaitExpression(init)) return null;
-    return rootIdentifier(init.expression) === 'api' ? { names } : null;
+    if (rootIdentifier(init.expression) === 'api') return { names, kind: 'direct' };
+    return containsHelperCall(init.expression) && ts.isCallExpression(init.expression) && isHelperCall(init.expression)
+        ? { names, kind: 'helper' }
+        : null;
 }
 
 function referencesAny(node, names) {
@@ -175,16 +199,26 @@ export function detectLoaderBudget(src, fileName = 'route.tsx') {
                     report(node, 'fanout', `Promise.${callee.name.text} over ${arg.elements.length} reads (limit ${MAX_FANOUT}); load what the first paint needs, defer the rest`);
                 }
             }
-            if (!inLoop && ts.isPropertyAccessExpression(callee) && LOOP_METHODS.has(callee.name.text)
-                && node.arguments.some((a) => (ts.isArrowFunction(a) || ts.isFunctionExpression(a)) && containsApiCall(a.body))) {
-                report(node, 'call-in-loop', `an API call inside .${callee.name.text}(): one call per item`);
-                inLoop = true;
+            if (!inLoop && ts.isPropertyAccessExpression(callee) && LOOP_METHODS.has(callee.name.text)) {
+                const fns = node.arguments.filter((a) => ts.isArrowFunction(a) || ts.isFunctionExpression(a));
+                if (fns.some((a) => containsApiCall(a.body))) {
+                    report(node, 'call-in-loop', `an API call inside .${callee.name.text}(): one call per item`);
+                    inLoop = true;
+                } else if (fns.some((a) => containsHelperCall(a.body))) {
+                    report(node, 'helper-in-loop', `a helper that is handed the API client, inside .${callee.name.text}(): one call per item`);
+                    inLoop = true;
+                }
             }
         }
         if (!inLoop && (ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node)
-            || ts.isWhileStatement(node) || ts.isDoStatement(node)) && containsApiCall(node)) {
-            report(node, 'call-in-loop', 'an API call inside a loop: one call per iteration');
-            inLoop = true;
+            || ts.isWhileStatement(node) || ts.isDoStatement(node))) {
+            if (containsApiCall(node)) {
+                report(node, 'call-in-loop', 'an API call inside a loop: one call per iteration');
+                inLoop = true;
+            } else if (containsHelperCall(node)) {
+                report(node, 'helper-in-loop', 'a helper that is handed the API client, inside a loop: one call per iteration');
+                inLoop = true;
+            }
         }
         if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'Response') {
             const first = node.arguments?.[0];
@@ -204,7 +238,7 @@ export function detectLoaderBudget(src, fileName = 'route.tsx') {
             const b = awaitedApiStatement(statements[i]);
             if (!a || !b) continue;
             if (referencesAny(statements[i], a.names)) continue;
-            report(statements[i], 'serial-independent',
+            report(statements[i], a.kind === 'direct' && b.kind === 'direct' ? 'serial-independent' : 'helper-serial',
                 'awaits an API call that does not use the previous await\'s result; start both before awaiting (Promise.all)', statements[i]);
         }
     };

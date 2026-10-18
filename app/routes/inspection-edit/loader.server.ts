@@ -72,6 +72,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const inspP = api.inspections[":id"].$get({ param: { id } });
  const inspBodyP = inspP.then(async (r) => (r.ok ? await r.json() : {}));
  const optionalP = inspBodyP.then((body) => readOptional(api, id, body as Record<string, unknown>));
+ // loader-budget-allow: six independent reads plus two derivations of the inspection read (its parsed body and the optional reads started from it), which add no calls of their own
  const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, inspBody, optional] = await Promise.all([
  inspP,
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common

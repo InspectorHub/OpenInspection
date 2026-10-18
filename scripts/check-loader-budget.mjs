@@ -5,8 +5,9 @@
  * Scans the exported `loader` / `clientLoader` of every non-test file under app/routes
  * (TypeScript AST, not regex) and reports, per file, the shapes listed in
  * scripts/lib/loader-budget-detect.mjs: a Promise.all wider than six, an API call
- * per item in a map or loop, two adjacent awaits that could run together, and a
- * hand-built Response.
+ * per item in a map or loop, two adjacent awaits that could run together (also when
+ * the call is hidden behind a helper that is handed the client), and a hand-built
+ * Response.
  *
  * Existing violations are frozen in scripts/loader-budget-baseline.json ({ path: count });
  * a file may only get better. An intentional exception is
@@ -36,6 +37,8 @@ export const CONTROLS = [
     { rule: 'fanout', src: 'export async function loader() { const r = await Promise.all([a(), b(), c(), d(), e(), f(), g()]); return r; }' },
     { rule: 'call-in-loop', src: 'export async function loader() { const api = createApi(); return Promise.all(ids.map((id) => api.x.$get({ param: { id } }))); }' },
     { rule: 'serial-independent', src: 'export async function loader() { const api = createApi(); const a = await api.a.$get(); const b = await api.b.$get(); return [a, b]; }' },
+    { rule: 'helper-serial', src: 'export async function loader() { const api = createApi(); const a = await loadA(api); const b = await loadB(api); return [a, b]; }' },
+    { rule: 'helper-in-loop', src: 'export async function loader() { const api = createApi(); return Promise.all(ids.map((id) => loadOne(api, id))); }' },
     { rule: 'hand-built-response', src: 'export async function loader() { return new Response(JSON.stringify({ ok: true })); }' },
     { rule: 'allow-without-reason', src: ['export async function loader() {', '  const api = createApi();', '  const a = await api.a.$get();', '  // loader-budget-allow:', '  const b = await api.b.$get();', '  return [a, b];', '}'].join(String.fromCharCode(10)) },
 ];

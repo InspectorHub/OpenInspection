@@ -87,6 +87,34 @@ describe('loader-budget detector', () => {
         });
     });
 
+    describe('helpers that receive the api client', () => {
+        it('flags two adjacent awaited helpers that take api and do not depend on each other', () => {
+            expect(rules(loader('  const a = await loadA(api, id);', '  const b = await loadB(api, id);', '  return [a, b];'))).toEqual(['helper-serial']);
+        });
+        it('flags a helper that takes api next to a direct api call', () => {
+            expect(rules(loader('  const a = await api.a.$get();', '  const b = await loadB(api, id);', '  return [a, b];'))).toEqual(['helper-serial']);
+        });
+        it('does not flag when the second helper uses the first result', () => {
+            expect(rules(loader('  const a = await loadA(api, id);', '  const b = await loadB(api, a.next);', '  return [a, b];'))).toEqual([]);
+        });
+        it('does not flag an await of a function that never receives api', () => {
+            expect(rules(loader('  const a = await loadA(api, id);', '  const b = await somethingElse(id);', '  return [a, b];'))).toEqual([]);
+        });
+        it('flags a helper that takes api inside .map and inside a loop', () => {
+            expect(rules(loader('  return Promise.all(ids.map((id) => loadOne(api, id)));'))).toEqual(['helper-in-loop']);
+            expect(rules(loader('  for (const id of ids) { await loadOne(api, id); }'))).toEqual(['helper-in-loop']);
+        });
+        it('does not flag a helper in .map that does not take api', () => {
+            expect(rules(loader('  return ids.map((id) => format(id));'))).toEqual([]);
+        });
+        it('honours the allow comment with a reason, and rejects one without', () => {
+            const ok = loader('  const a = await loadA(api, id);', '  // loader-budget-allow: loadB reads what loadA writes through a cookie', '  const b = await loadB(api, id);', '  return [a, b];');
+            expect(rules(ok)).toEqual([]);
+            const bad = loader('  const a = await loadA(api, id);', '  // loader-budget-allow:', '  const b = await loadB(api, id);', '  return [a, b];');
+            expect(rules(bad)).toEqual(['allow-without-reason']);
+        });
+    });
+
     describe('hand-built-response', () => {
         it('flags new Response(JSON.stringify(...))', () => {
             expect(rules('export async function loader() { return new Response(JSON.stringify({ ok: true })); }')).toEqual(['hand-built-response']);
@@ -120,12 +148,12 @@ describe('loader-budget detector', () => {
 
     describe('the gate\'s own controls', () => {
         it('every rule has a planted control and each fires', () => {
-            expect(CONTROLS.map((c: { rule: string }) => c.rule).sort()).toEqual(['allow-without-reason', 'call-in-loop', 'fanout', 'hand-built-response', 'serial-independent']);
+            expect(CONTROLS.map((c: { rule: string }) => c.rule).sort()).toEqual(['allow-without-reason', 'call-in-loop', 'fanout', 'hand-built-response', 'helper-in-loop', 'helper-serial', 'serial-independent']);
             expect(missedControls()).toEqual([]);
         });
         it('reports the rules a blind detector misses', () => {
             const blind = () => ({ sites: 0, violations: [] });
-            expect(missedControls(blind).sort()).toEqual(['allow-without-reason', 'call-in-loop', 'fanout', 'hand-built-response', 'serial-independent']);
+            expect(missedControls(blind).sort()).toEqual(['allow-without-reason', 'call-in-loop', 'fanout', 'hand-built-response', 'helper-in-loop', 'helper-serial', 'serial-independent']);
         });
     });
 });
