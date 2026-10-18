@@ -319,6 +319,16 @@ Two clicks (or Enter twice) can land in the same frame, before React renders any
 - **When a repeat is genuinely harmless** (idempotent write, read-only POST), put `// busy-controls-allow: <the reason, verified in the server handler>` above the statement or form. A reason you have not checked is not a reason. The baseline stays empty.
 - Tests for a latch put two triggers in ONE `act()` with native `.click()` or `dispatchEvent` (`fireEvent` flushes between calls and hides the bug), add a control that a later trigger still goes through, and are proven red with the guard removed.
 
+## Loader budget
+
+A route loader runs before the page can render, and each in-process API call it makes is a full trip through the API's middleware chain. Keep the blocking part small: load what the first paint needs, and give everything else its own route (`app/routes/resources/*`) or leave it out.
+
+- **Gate: `npm run lint:loader-budget`** (push rung, so pre-push and CI). It parses the exported `loader` / `clientLoader` of every non-test file under `app/routes` (TypeScript AST) and reports: a `Promise.all` / `allSettled` over more than six reads; an API call inside `.map` / `.forEach` / a loop (one call per item); two adjacent `await api...` statements where the second does not use the first's result (decided by data flow, not textual adjacency); a hand-built `new Response(JSON.stringify(...))`.
+- **Ratchet:** existing hits are frozen per file in `scripts/loader-budget-baseline.json` and may only shrink (`node scripts/check-loader-budget.mjs --write-baseline` lowers it). Do not raise it.
+- **A genuine exception** is `// loader-budget-allow: <reason>` on the line above the statement. The reason is mandatory and exempts only that statement.
+- **Helpers:** `mapLimit` and `settled` in `app/lib/concurrency.ts`. `mapLimit(items, limit, fn)` is `Promise.all(items.map(fn))` with a bound. `settled(fn, { fallback, label, timeoutMs })` turns a rejection, a synchronous throw or a timeout into a fallback; the timeout only stops waiting, it does not cancel the underlying D1 query or API call. A typed-client call can throw before it returns a promise, which is why `settled` invokes it inside its own `try`.
+- Call-count tests (a counting fake `createApi`) are the way to pin a loader's budget; see `app/routes/inspections-loader-calls.test.ts` and `app/routes/inspection-edit/loader-calls.test.ts`.
+
 ## Comment Rules
 
 Migration sequence numbers are an unstable, positional ordering token — squash/consolidation renumbers them, leaving comments dangling at files that no longer exist (the `0000_baseline.sql` consolidation made every `migration 00NN` comment point to nothing). Annotate the durable artifact, not the transient migration.
