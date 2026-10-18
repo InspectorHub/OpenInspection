@@ -53,11 +53,24 @@ function inspectionScopeGuard() {
     return Object.assign(handler, { inspectionScopeGuard: true as const });
 }
 
+/** `Cache-Control: private, no-store` on a GET of the list or of a reserved static route, unless the route chose its own. */
+async function aggregateNoStore(c: Context<HonoConfig>, next: Next) {
+    await next();
+    if (c.req.method !== 'GET') return;
+    const segment = c.req.param('id');
+    if (segment !== undefined && !RESERVED_INSPECTION_SEGMENTS.has(segment)) return;
+    if (!c.res.headers.has('Cache-Control')) c.res.headers.set('Cache-Control', 'private, no-store');
+}
+
 /**
  * Must run before any route is mounted: Hono applies middleware only to handlers
  * registered after it. A route-table test pins the order.
  */
 export function registerInspectionScopeGuards(app: OpenAPIHono<HonoConfig>): void {
+    // The list and every static route under it (counts, dashboard, templates, ...) answer for whatever
+    // the caller may see, so no cache may keep them. Detail, results and files keep their own headers.
+    app.use('/api/inspections', aggregateNoStore);
+    app.use('/api/inspections/:id', aggregateNoStore);
     const guard = inspectionScopeGuard();
     app.use('/api/inspections/:id', guard);
     app.use('/api/inspections/:id/*', guard);

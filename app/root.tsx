@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Links,
   Meta,
@@ -6,6 +6,7 @@ import {
   Scripts,
   ScrollRestoration,
   isRouteErrorResponse,
+  useLocation,
   useRouteLoaderData,
 } from "react-router";
 import type { Route } from "./+types/root";
@@ -20,6 +21,7 @@ import {
   bootstrapServiceWorker,
   type SWRegistrarLike,
 } from "~/lib/sw-bootstrap";
+import { isPublicPage, shouldSyncOnNavigation, syncServiceWorkerUser } from "~/lib/sw-user-cache";
 import { ErrorState } from "~/components/ErrorState";
 import { isNetworkFailure } from "~/lib/network-error";
 import { NavProgress } from "~/components/NavProgress";
@@ -142,6 +144,34 @@ export default function Root() {
       window.location.search,
       window.localStorage,
     );
+  }, []);
+
+  // Tell the service worker who is signed in, so the offline copies it keeps are only ever shown to
+  // the user they belong to. On load, when the worker takes control, when the tab returns to the
+  // foreground (another tab may have signed in or out), and when a client-side navigation crosses a
+  // sign-in or sign-out page (login, invite acceptance, password reset do not reload the document).
+  const { pathname } = useLocation();
+  const previousPath = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
+    const sw = navigator.serviceWorker;
+    const from = previousPath.current;
+    previousPath.current = pathname;
+    if ((from === null && !isPublicPage(pathname)) || (from !== null && shouldSyncOnNavigation(from, pathname))) {
+      void syncServiceWorkerUser(sw);
+    }
+  }, [pathname]);
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.serviceWorker) return;
+    const sw = navigator.serviceWorker;
+    const sync = () => void syncServiceWorkerUser(sw);
+    const onVisible = () => { if (document.visibilityState === "visible" && !isPublicPage(window.location.pathname)) sync(); };
+    sw.addEventListener("controllerchange", sync);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      sw.removeEventListener("controllerchange", sync);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
   return (
     <>

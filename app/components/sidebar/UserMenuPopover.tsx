@@ -4,6 +4,7 @@ import { IC } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { LocaleSwitcher } from "~/components/LocaleSwitcher";
 import { m } from "~/paraglide/messages";
+import { clearUserCacheOnSignOut } from "~/lib/sw-user-cache";
 import { useLayer } from "@core/shared-ui";
 
 // ─── User Menu popover (desktop sidebar) ─────────────────────────────────────
@@ -134,7 +135,7 @@ export function UserMenuPopover({
         role="menuitem"
         data-testid="user-menu-logout"
         className="flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium text-ih-bad-fg hover:bg-ih-bad-bg transition-colors focus:outline-none focus:bg-ih-bad-bg"
-        onClick={onClose}
+        onClick={() => { clearUserCacheOnSignOut(); onClose(); }}
       >
         <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
         <span>{m.nav_user_logout()}</span>
