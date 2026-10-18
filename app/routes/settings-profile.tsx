@@ -22,7 +22,7 @@ import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { bulkNotificationChoice, grantNotificationSms, loadNotificationScreen, saveNotificationChoice } from "~/lib/settings-notifications.server";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { m } from "~/paraglide/messages";
-import { mapLimit } from "~/lib/concurrency";
+import { reorderCredentials } from "~/lib/settings/credential-reorder.server";
 import { useTimezoneOptions } from "~/hooks/useTimezoneOptions";
 
 // F68 — with no `meta` this page's browser tab reads only "OpenInspection".
@@ -197,8 +197,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "credential-reorder") {
     const ids = String(fd.get("ids") ?? "").split(",").filter(Boolean);
     if (!ids.length) return { success: false, error: m.settings_profile_error_reorder_failed(), intent };
-    const results = await mapLimit(ids, 4, (id, i) => api.credentials[":id"].$patch({ param: { id }, json: { sortOrder: i } }));
-    const failed = results.find((r) => !r.ok);
+    const { failed } = await reorderCredentials(api, ids);
+    if (failed === "threw") return { success: false, error: m.settings_profile_error_reorder_failed(), intent };
     return failed ? credentialResult(failed, intent) : { success: true, error: null, intent };
   }
   if (intent === "credential-delete") {
