@@ -325,6 +325,21 @@ describe('permission template routes', () => {
                 expect((await userRow(INSPECTOR))?.permissionOverrides).toEqual({ viewAllInspections: false });
             });
 
+            it('a manager within the grant ceiling can lift it beside a template', async () => {
+                await restricted();
+                const res = await send(await build('manager'), 'PATCH', `/api/team/members/${INSPECTOR}`, { templateId: 'inspector_standard', permissionOverrides: { viewAllInspections: true } });
+                expect(res.status).toBe(200);
+                expect((await userRow(INSPECTOR))?.permissionOverrides).toBeNull();
+            });
+
+            it('an explicit false beside a template for a role that always sees everything stores nothing', async () => {
+                const res = await patch({ templateId: 'office_scheduler', permissionOverrides: { viewAllInspections: false } });
+                expect(res.status).toBe(200);
+                const row = await userRow(INSPECTOR);
+                expect(row?.role).toBe('staff');
+                expect(row?.permissionOverrides ?? null).toBeNull();
+            });
+
             it('control: the same statement without a template lifts it too (the path that already worked)', async () => {
                 await restricted();
                 expect((await patch({ role: 'inspector', permissionOverrides: { viewAllInspections: true } })).status).toBe(200);
