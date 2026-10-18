@@ -243,9 +243,7 @@ export async function createSessionWithToken(
  */
 function chainedSignOutUrl(context: LoadContext, request: Request): string | null {
   if (loginPathFor(request) !== "/login") return null;
-  const base = getDeploymentProfile(getCloudflareEnv(context)).loginRedirectBase;
-  if (!base) return null;
-  return `${base}/api/account/logout?returnTo=${encodeURIComponent("/login?loggedout=1")}`;
+  return getDeploymentProfile(getCloudflareEnv(context)).identitySignOutUrl;
 }
 
 /**

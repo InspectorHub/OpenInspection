@@ -44,6 +44,15 @@ describe('getDeploymentProfile — derivations', () => {
         expect(p.billingPortalUrl).toBe('https://portal.example');
     });
 
+    it('derives the identity sign-out url from the base plus constants, null without a base or in standalone', () => {
+        const p = getDeploymentProfile({ APP_MODE: 'saas', PORTAL_API_URL: 'https://portal.example/' });
+        expect(p.identitySignOutUrl).toBe('https://portal.example/api/account/logout?returnTo=%2Flogin%3Floggedout%3D1');
+        expect(getDeploymentProfile({ APP_MODE: 'saas' }).identitySignOutUrl).toBeNull();
+        expect(getDeploymentProfile({ PORTAL_API_URL: 'https://portal.example' }).identitySignOutUrl).toBeNull();
+        expect(STANDALONE_PROFILE.identitySignOutUrl).toBeNull();
+        expect(SAAS_PROFILE.identitySignOutUrl).toBeNull();
+    });
+
     it('leaves both urls null in saas when no portal base is configured', () => {
         const p = getDeploymentProfile({ APP_MODE: 'saas' });
         expect(p.loginRedirectBase).toBeNull();

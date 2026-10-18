@@ -191,7 +191,7 @@ describe('the deployment payload carries every capability the chrome gates on', 
         // everything" passes — and that would put `fixedTenantId` and the portal
         // URLs in a payload the browser can read.
         const shipped = Object.keys(deploymentPayload(SAAS_PROFILE, {}));
-        for (const serverOnly of ['fixedTenantId', 'billingPortalUrl', 'loginRedirectBase']) {
+        for (const serverOnly of ['fixedTenantId', 'billingPortalUrl', 'loginRedirectBase', 'identitySignOutUrl']) {
             expect(shipped, `${serverOnly} must not reach the browser`).not.toContain(serverOnly);
         }
     });

@@ -31,14 +31,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   if (!token) {
-    return { valid: false, error: m.auth_join_error_missing_token(), invite: null, token: "", showExistingAccountNote };
+    return { valid: false, error: m.auth_join_error_missing_token(), invite: null, token: "", askForNew: true, showExistingAccountNote };
   }
 
   try {
     const api = createApi(context);
     const res = await api.auth["invite-info"].$get({ query: { token } });
     if (!res.ok) {
-      return { valid: false, error: m.auth_join_error_invalid(), invite: null, token, showExistingAccountNote };
+      return { valid: false, error: m.auth_join_error_invalid(), invite: null, token, askForNew: true, showExistingAccountNote };
     }
     const body = await res.json();
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
@@ -50,7 +50,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       showExistingAccountNote,
     };
   } catch {
-    return { valid: false, error: m.auth_join_error_unavailable(), invite: null, token: "", showExistingAccountNote };
+    return { valid: false, error: m.auth_join_error_unavailable(), invite: null, token: "", askForNew: false, showExistingAccountNote };
   }
 }
 
@@ -99,7 +99,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function JoinPage() {
-  const { valid, error: loaderError, invite, token, showExistingAccountNote } = useLoaderData<typeof loader>();
+  const { valid, error: loaderError, invite, token, showExistingAccountNote, askForNew } = useLoaderData<typeof loader>();
   const lastResult = useActionData<typeof action>();
   const navigation = useNavigation();
   const latch = useSubmitLatch();
@@ -122,7 +122,7 @@ export default function JoinPage() {
             {m.auth_join_invalid_heading()}
           </h1>
           <p className="text-sm text-ih-fg-3">{loaderError}</p>
-          <p className="text-sm text-ih-fg-3 mt-1">{m.auth_join_invalid_ask_for_new()}</p>
+          {askForNew && <p className="text-sm text-ih-fg-3 mt-1">{m.auth_join_invalid_ask_for_new()}</p>}
           <a href="/login" className="inline-block mt-4 text-sm font-bold text-ih-primary-text hover:underline">
             {m.auth_join_invalid_login_link()}
           </a>

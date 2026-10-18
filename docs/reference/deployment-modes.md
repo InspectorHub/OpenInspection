@@ -42,6 +42,7 @@ that way.
 | `hasUsageQuota` | no | yes | Metered usage is capped by a plan. |
 | `billingPortalUrl` | none | derived from `PORTAL_API_URL` | Where the browser is sent to manage a subscription. |
 | `loginRedirectBase` | none — local login form | derived from `PORTAL_API_URL` | Where the browser is sent to sign in. Standalone serves its own login form; saas bounces to the portal and `POST /api/auth/login` returns 410. |
+| `identitySignOutUrl` | none — sign-out ends at the local login form | derived from `PORTAL_API_URL` | Where an explicit staff sign-out is sent so the identity service ends its own session too. Null without a base. Server-only. |
 | `hasSetupWizard` | yes | no | `/setup` exists, gated on the `SETUP_CODE` secret, to create the first account. |
 | `aiDevMockFallback` | yes | no | AI calls may fall back to a local mock when no credential resolves. |
 | `hasManagedAi` | no | yes | A platform-provided AI credential can ever be resolved. Standalone has no platform, so the managed path is absent rather than disabled — use your own key in Settings → Advanced → AI. |

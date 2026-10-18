@@ -8,18 +8,19 @@ import { describe, it, expect } from "vitest";
 import { loader as logoutLoader } from "~/routes/logout";
 import { requireToken } from "~/lib/session.server";
 import { createLoadContext } from "~/lib/load-context";
-import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
 type LoaderArgs = Parameters<typeof logoutLoader>[0];
 
 const PORTAL = "https://portal.example.test";
 const SAAS_ENV = { APP_MODE: "saas", PORTAL_API_URL: PORTAL } as const;
 
-// The authority: the chain target is the deployment profile's base plus the
-// portal's documented helper path, with the post-logout page URL-encoded.
+// The contract with the identity service's chained sign-out helper, written
+// out literally on purpose: it must change together with that service, and a
+// helper that mirrors the implementation could not catch a wrong path.
+const SIGN_OUT_CONTRACT = "https://portal.example.test/api/account/logout?returnTo=%2Flogin%3Floggedout%3D1";
 function expectedChain(env: Record<string, string>): string {
-  const base = getDeploymentProfile(env as never).loginRedirectBase;
-  return `${base}/api/account/logout?returnTo=${encodeURIComponent("/login?loggedout=1")}`;
+  expect(env.PORTAL_API_URL.replace(/\/$/, "")).toBe(PORTAL);
+  return SIGN_OUT_CONTRACT;
 }
 
 function req(url: string, headers: Record<string, string> = {}): Request {

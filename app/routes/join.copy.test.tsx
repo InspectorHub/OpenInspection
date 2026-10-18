@@ -38,10 +38,36 @@ const VALID = {
 
 describe("join page - invalid invitation", () => {
     it("offers a log-in link and tells the person to ask for a new invitation", async () => {
-        renderJoin({ valid: false, error: m.auth_join_error_invalid(), invite: null, token: "t", showExistingAccountNote: false });
+        renderJoin({ valid: false, error: m.auth_join_error_invalid(), invite: null, token: "t", askForNew: true, showExistingAccountNote: false });
         const link = await screen.findByRole("link", { name: m.auth_join_invalid_login_link() });
         expect(link.getAttribute("href")).toBe("/login");
         expect(screen.getByText(m.auth_join_invalid_ask_for_new())).toBeTruthy();
+    });
+});
+
+describe("join page - unavailable service", () => {
+    it("shows its message and the log-in link but does not send the person to the inviter", async () => {
+        renderJoin({ valid: false, error: m.auth_join_error_unavailable(), invite: null, token: "", askForNew: false, showExistingAccountNote: false });
+        await screen.findByText(m.auth_join_error_unavailable());
+        expect(screen.queryByText(m.auth_join_invalid_ask_for_new())).toBeNull();
+        expect(screen.getByRole("link", { name: m.auth_join_invalid_login_link() })).toBeTruthy();
+    });
+});
+
+describe("join loader - which failures ask for a new invitation", () => {
+    const call = (url: string) => loader({
+        request: { url }, context: createLoadContext({}), params: {},
+    } as unknown as LoaderArgs);
+
+    it("missing token and rejected token: yes", async () => {
+        expect(await call("http://app.example.com/join")).toMatchObject({ valid: false, askForNew: true });
+        inviteInfo.mockResolvedValue({ ok: false });
+        expect(await call("http://app.example.com/join?token=t")).toMatchObject({ valid: false, askForNew: true });
+    });
+
+    it("a thrown lookup (transient outage): no", async () => {
+        inviteInfo.mockRejectedValue(new Error("down"));
+        expect(await call("http://app.example.com/join?token=t")).toMatchObject({ valid: false, askForNew: false });
     });
 });
 

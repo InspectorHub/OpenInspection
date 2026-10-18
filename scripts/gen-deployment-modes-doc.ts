@@ -41,6 +41,8 @@ const DESCRIPTIONS: Record<keyof DeploymentProfile, string> = {
     billingPortalUrl: 'Where the browser is sent to manage a subscription.',
     loginRedirectBase:
         'Where the browser is sent to sign in. Standalone serves its own login form; saas bounces to the portal and `POST /api/auth/login` returns 410.',
+    identitySignOutUrl:
+        'Where an explicit staff sign-out is sent so the identity service ends its own session too. Null without a base. Server-only.',
     hasSetupWizard:
         '`/setup` exists, gated on the `SETUP_CODE` secret, to create the first account.',
     aiDevMockFallback: 'AI calls may fall back to a local mock when no credential resolves.',
@@ -85,6 +87,7 @@ const DERIVED: Partial<Record<keyof DeploymentProfile, { standalone?: string; sa
     },
     billingPortalUrl: { standalone: 'none', saas: 'derived from `PORTAL_API_URL`' },
     loginRedirectBase: { standalone: 'none — local login form', saas: 'derived from `PORTAL_API_URL`' },
+    identitySignOutUrl: { standalone: 'none — sign-out ends at the local login form', saas: 'derived from `PORTAL_API_URL`' },
 };
 
 function cell(value: unknown): string {
