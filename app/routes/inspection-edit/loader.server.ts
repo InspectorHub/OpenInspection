@@ -10,13 +10,17 @@ import type { CompliancePanelData } from "~/components/inspection-edit/Complianc
 import { getCloudflareEnv } from "~/lib/load-context";
 import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
 import { isReportPublished } from "~/lib/status";
+import { resolveReportTier } from "../../../server/lib/report-tier";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes, statutoryCoverageRes] = await Promise.all([
+ // WAVE 1 — what every inspection needs. The optional reads (units, compliance,
+ // statutory answers) wait for the inspection row, because whether they exist
+ // depends on it; see WAVE 2 below.
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
  // scope. The editor opens at activeUnitId = null (the '_default' scope), so
@@ -36,52 +40,6 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // name/id → color lookup and thread it into every canned-defect chip,
  // instead of resolving color per-defect.
  api.defectCategories["defect-categories"].$get().catch(() => null),
- // Commercial PCA Phase U (Batch C2b) — the inspection's unit rows (scope
- // switcher + units manager) and the server-computed per-unit progress
- // summary (completion dots). Both default to empty when absent (residential
- // inspections with no units render exactly as today). Tolerant .catch so a
- // per-unit endpoint hiccup never 500s the whole editor.
- api.inspections[":id"].units.$get({ param: { id } }).catch(() => null),
- api.inspections[":id"]["unit-progress"].$get({ param: { id } }).catch(() => null),
- // Commercial PCA Phase M Task 10 — sign-off/PSQ/doc-review/conformance for
- // the CompliancePanel. Fetched unconditionally (cheap, same shape as
- // units/unit-progress above) even though the panel only renders at
- // reportTier === 'full_pca' — mirrors the existing loader convention of not
- // conditioning the parallel fetch list on client-only gates.
- api.inspections[":id"].compliance.$get({ param: { id } }).catch(() => null),
- // The inspection-level answers a statutory form asks for. This endpoint 404s
- // for every ordinary inspection — that is its ANSWER, not a failure — so the
- // null it leaves behind is what decides whether the panel renders at all.
- // Same trap as the coverage call below, and the same fix. It has been written
- // `.catch()` here since it was added; nothing had exercised the absent-link
- // path, which is exactly how a latent synchronous throw stays latent.
- (async () => {
-   try {
-     return await api.inspections[":id"]["statutory-details"].$get({ param: { id } });
-   } catch (cause) {
-     console.error("[statutory-details] could not be requested at all", cause);
-     return null;
-   }
- })(),
- // Which required boxes are still empty. Fetched HERE rather than on demand
- // because the whole point is that an inspector sees it without asking: the
- // information existed all along and only ever arrived after publish.
- // A failure leaves null, which renders as no panel rather than as "nothing is
- // missing" — see the type's own note.
- // ⚠️ try/catch, NOT `.catch()`. `inspector-portal.tsx` already wrote this
- // down and I made the mistake anyway: `.catch()` handles a REJECTED promise,
- // while the typed-client chain throws SYNCHRONOUSLY the moment any link in
- // `inspections[":id"]["statutory-form"].coverage.$get` is absent — an older
- // build, or a test stub. That throw escapes Promise.all and 500s the whole
- // editor, so a best-effort panel would take the page down with it.
- (async () => {
-   try {
-     return await api.inspections[":id"]["statutory-form"].coverage.$get({ param: { id } });
-   } catch (cause) {
-     console.error("[statutory-coverage] could not be requested at all", cause);
-     return null;
-   }
- })(),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -238,6 +196,39 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // TemplateSchemaV2 object. The `schema` field above is NORMALIZED (overlaid
  // with report-data) and must NOT be PATCHed to the template-snapshot endpoint.
  const templateSnapshot = ((typeof rawSchema === 'string' ? JSON.parse(rawSchema) : rawSchema) ?? { schemaVersion: 2, sections: [] }) as { schemaVersion: 2; sections: unknown[] };
+
+ // WAVE 2 — reads that exist only for some inspections. Each endpoint used to be
+ // called for every inspection and answered empty or 404 for most; a null here is
+ // the same value that answer left behind, so the editor reads it identically.
+ // The row fields are read defensively: an unreadable inspection (see the
+ // placeholder above) has none of them and falls through to the defaults.
+ const row = inspection as { propertyType?: string | null; reportTier?: "light_commercial" | "full_pca" | null; unitInspectionMode?: string };
+ // Units belong to multi-unit and commercial jobs, and to any per-unit job. An
+ // inspection with no recorded property type is legacy (unclassified), not a
+ // house, so it is still read.
+ const mayHaveUnits = row.propertyType !== "single_family" || row.unitInspectionMode === "per_unit";
+ // The compliance artifacts are a full PCA report's; the endpoint refuses any other tier.
+ const wantsCompliance = resolveReportTier({ propertyType: row.propertyType, storedTier: row.reportTier }) === "full_pca";
+ // The statutory endpoints answer 404 unless the snapshot declares a form.
+ const declaresStatutoryForm = !!(templateSnapshot as { statutoryForm?: unknown } | null)?.statutoryForm;
+ const settledNull = async <R,>(call: () => Promise<R>, label: string): Promise<R | null> => {
+   try {
+     return await call();
+   } catch (cause) {
+     // try/catch, NOT `.catch()`: the typed-client chain throws SYNCHRONOUSLY the
+     // moment any link in it is absent (an older build, a test stub), and that
+     // throw would 500 the whole editor for a best-effort panel.
+     console.error(`[${label}] could not be requested at all`, cause);
+     return null;
+   }
+ };
+ const [unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes, statutoryCoverageRes] = await Promise.all([
+ mayHaveUnits ? settledNull(() => api.inspections[":id"].units.$get({ param: { id } }), "units") : null,
+ mayHaveUnits ? settledNull(() => api.inspections[":id"]["unit-progress"].$get({ param: { id } }), "unit-progress") : null,
+ wantsCompliance ? settledNull(() => api.inspections[":id"].compliance.$get({ param: { id } }), "compliance") : null,
+ declaresStatutoryForm ? settledNull(() => api.inspections[":id"]["statutory-details"].$get({ param: { id } }), "statutory-details") : null,
+ declaresStatutoryForm ? settledNull(() => api.inspections[":id"]["statutory-form"].coverage.$get({ param: { id } }), "statutory-coverage") : null,
+ ]);
 
  // Which revision of the authority's form governs this inspection, decided
  // HERE and never in the browser. It is a comparison of date windows, and a
