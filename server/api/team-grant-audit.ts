@@ -60,10 +60,19 @@ export async function updateMemberAudited(
     const applied = body.templateId ? await new PermissionTemplateService(c.env.DB).resolveRef(tenantId, body.templateId) : null;
     const stamped = applyTemplateToRequest({ applied, requestedRole: body.role, requestedOverrides: body.permissionOverrides });
     const nextRole = stamped.role;
+    // Layering a template reduces the stamped switches to what differs from the role, and "see every
+    // inspection" is the role's own default, so stating it vanishes into null. The member-update plan
+    // reads a null as "no statement about scope" and keeps a stored restriction, so an edit that chose
+    // "all inspections" beside a template was answered 200 and changed nothing. A scope the request
+    // states outright is restated here, after the layering, so the plan still sees it.
+    const statedScope = body.permissionOverrides?.viewAllInspections;
+    const overrides = typeof statedScope === 'boolean' && stamped.overrides !== undefined
+        ? { ...(stamped.overrides ?? {}), viewAllInspections: statedScope }
+        : stamped.overrides;
     const result = await auditRefusedGrant(c, 'update', nextRole ?? null, () => c.var.services.team.updateMember({
         tenantId, userId: memberId, requesterId: c.get('user')?.sub as string, requesterRole: c.get('userRole'), requesterCapabilities,
         ...(nextRole ? { role: nextRole } : {}),
-        ...(stamped.overrides !== undefined ? { permissionOverrides: stamped.overrides } : {}),
+        ...(overrides !== undefined ? { permissionOverrides: overrides } : {}),
         beforeWrite: async () => {
             if (!nextRole) return;
             await assertSeatForRoleChange({
