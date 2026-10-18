@@ -55,7 +55,11 @@ const CHROME_EXAMPLE = 'Chrome: /inspections — list renders, light and dark ch
 const EXAMPLE_REPO = 'InspectorHub/OpenInspection';
 
 // ── UI file detection ───────────────────────────────────────────────────────
-const TEST_PATH = /(^|\/)(tests?|__tests__)\/|\.(spec|test)\.[^/]*$|\.spec-d\.[^/]*$/;
+// Paths that never render: tests, mocks, stories, generated output and data fixtures.
+// tailwind/vite config are deliberately NOT here: they restyle or rebuild every
+// screen, so a change there is a UI change (the safe direction).
+const TEST_PATH =
+    /(^|\/)(tests?|__tests__|__mocks__)\/|\.(spec|test|stories)\.[^/]*$|\.spec-d\.[^/]*$|^server\/(generated|data)\//;
 const NOT_UI_JSON = /(^|\/)(package(-lock)?|tsconfig[^/]*|knip)\.json$/;
 const ASSET = /\.(tsx|css|html|svg|png|jpe?g|webp|gif|ico|woff2?|json)$/i;
 const ROOT_UI = /^(index\.html|(tailwind|vite)\.config\.[cm]?[jt]s)$/;
@@ -85,8 +89,20 @@ export function expandPaths(files) {
 // ── parsing helpers ─────────────────────────────────────────────────────────
 const SEP = '(?:--|[-\\u2014\\u2013\\u2212])';
 const SELF_TOKENS = new Set(['self', 'myself', 'author', 'me', 'own', 'same']);
-const DENY =
-    /\b(?:did\s*not|didn['’]?t|have\s*not|haven['’]?t|could\s*not|couldn['’]?t|unable\s+to|never|not)\s+(?:\w+\s+)?(?:check|checked|test|tested|verify|verified|view|viewed|look|looked|see|seen|run|ran)\b|\bskipp?ed\b|\bnot\s+(?:yet\s+)?done\b/i;
+// An explicit denial of the WHOLE check, at the start of the observation. A
+// narrowing word after the verb ("not tested on mobile") makes it honest.
+const DENY_START =
+    /^(?:i\s+|we\s+)?(?:(?:did\s*not|didn['’]?t|could\s*not|couldn['’]?t|have\s*not|haven['’]?t|has\s*not|hasn['’]?t|was\s*not|wasn['’]?t|never|not|unable\s+to)\s+(?:be\s+)?(?:check|checked|test|tested|verify|verified|view|viewed|look|looked|see|seen)\b(?!\s+(?:on|for|in|at|the|any|with|against|beyond|every)\b)|no\s+(?:browser|chrome|manual|visual)\s+(?:check|test|verification)\b)/i;
+
+/** True when `word` appears as a positive observation: not within three words after not/no/never/without/n't. */
+export function positiveWord(text, word) {
+    const present = new RegExp(`\\b${word}\\b`, 'i');
+    if (!present.test(text)) return false;
+    const negated = new RegExp(`(?:\\bnot|\\bno|\\bnever|\\bwithout|n['’]t)\\s+(?:\\w+\\s+){0,2}${word}\\b`, 'gi');
+    const all = [...text.matchAll(new RegExp(`\\b${word}\\b`, 'gi'))].length;
+    const neg = [...text.matchAll(negated)].length;
+    return all > neg;
+}
 const TEMPLATE_TOKEN = /<(?:reviewer|n|route|who\b[^<>\n]*|what\b[^<>\n]*)>/gi;
 
 /** Section body under `## Verification`; comments, unclosed comments and fenced code are dropped first. */
@@ -96,8 +112,15 @@ export function extractVerification(body) {
         prev = text;
         text = text.replace(/<!--[\s\S]*?-->/g, '');
     }
-    const open = text.indexOf('<!--');
-    if (open !== -1) text = text.slice(0, open);
+    // Only an unclosed opener that is NOT inside a code span swallows the rest.
+    for (let at = text.indexOf('<!--'); at !== -1; at = text.indexOf('<!--', at + 1)) {
+        const lineStart = text.lastIndexOf('\n', at) + 1;
+        const ticks = (text.slice(lineStart, at).match(/`/g) ?? []).length;
+        if (ticks % 2 === 0) {
+            text = text.slice(0, at);
+            break;
+        }
+    }
     const kept = [];
     let fence = null;
     for (const line of text.split('\n')) {
@@ -157,14 +180,21 @@ function reviewLine(text) {
     if (words.length < 3) return { ok: false, detail: `reviewer must be at least 3 words (got "${who}")` };
     if (new Set(words.map((w) => w.toLowerCase())).size < 2) return { ok: false, detail: `reviewer text repeats one word ("${who}")` };
     const selfWord = tokens.find((t) => SELF_TOKENS.has(t));
-    if (selfWord) return { ok: false, detail: `reviewer "${who}" contains "${selfWord}": this must be an independent review, not a self-check` };
-    if (!/^0\)?(?:\s*\([^)]*\))?\.?$/.test(rest)) return { ok: false, detail: `open findings must be exactly 0 (got "${rest}")` };
+    if (selfWord)
+        return {
+            ok: false,
+            detail: `reviewer "${who}" contains the word "${selfWord}", which reads as a self-check. This is an honour check on the words, not on the person: if the review was independent, say so with a clarifying word such as the tool or team name (e.g. "independent reviewer agent pass 2")`,
+        };
+    const par = /^0\)?(?:\s*\(([^)]*)\))?\.?$/.exec(rest);
+    if (!par || (par[1] !== undefined && (/\d/.test(par[1]) || /\b(?:open|unresolved|pending|remaining|blocking)\b/i.test(par[1]))))
+        return { ok: false, detail: `open findings must be exactly 0, with at most a parenthetical without numbers or words like open/unresolved/pending (got "${rest}")` };
     return { ok: true, detail: `${who} — open findings: 0` };
 }
 
-function chromeLine(r, uiFiles) {
+function chromeLine(r, uiFiles, noFiles = false) {
     const uiNote = uiFiles.length ? ` (UI files changed: ${uiFiles.slice(0, 3).join(', ')}${uiFiles.length > 3 ? ', ...' : ''})` : '';
     if (/^n\/a\b/i.test(r)) {
+        if (noFiles) return { ok: false, deny: true, detail: 'Chrome claims n/a but the PR reports ZERO changed files; the claim cannot be verified (empty file list or API answer?)' };
         if (uiFiles.length) return { ok: false, deny: true, detail: `Chrome claims n/a but UI files changed${uiNote}` };
         if (!/no ui files changed/i.test(r)) return { ok: false, detail: 'n/a form must read: Chrome: n/a — no UI files changed' };
         return { ok: true, detail: 'n/a, verified against the file list (no UI files changed)' };
@@ -172,7 +202,7 @@ function chromeLine(r, uiFiles) {
     const m = new RegExp(`^(\\/\\S*?)\\s*(?:${SEP}|:)\\s+(.*)$`).exec(r);
     if (!m) return { ok: false, detail: 'line must read: Chrome: /<route> — <what was seen>' };
     const seen = m[2].trim();
-    if (DENY.test(seen)) return { ok: false, deny: true, detail: `observation says the check was not done ("${seen}")` };
+    if (DENY_START.test(seen)) return { ok: false, deny: true, detail: `observation says the check was not done ("${seen}")` };
     if (seen.length < 15) return { ok: false, detail: `observation after the dash must be at least 15 characters (got ${seen.length})` };
     if (/^(looks fine|lgtm)\.?$/i.test(seen)) return { ok: false, detail: 'observation must say what was seen, not "looks fine"' };
     for (const t of THEMES) {
@@ -183,7 +213,8 @@ function chromeLine(r, uiFiles) {
                 continue;
             }
         }
-        if (!new RegExp(`\\b${t}\\b`, 'i').test(seen)) return { ok: false, detail: `must state that ${t} mode was checked${t === 'dark' ? ', or "dark: n/a" plus a reason' : ''}` };
+        if (!positiveWord(seen, t))
+            return { ok: false, detail: `must state that ${t} mode was checked ("${t}" as a positive observation, not "not ${t}")${t === 'dark' ? ', or "dark: n/a" plus a reason' : ''}` };
     }
     return { ok: true, detail: `${m[1]} — ${seen}` };
 }
@@ -196,7 +227,8 @@ function chromeLine(r, uiFiles) {
  * `skipDraft` is for an already-merged PR (the draft rule is moot).
  */
 export function checkPrReadiness({ body, isDraft, files, skipDraft = false }) {
-    const uiFiles = expandPaths(files).filter(isUiFile);
+    const allPaths = expandPaths(files);
+    const uiFiles = allPaths.filter(isUiFile);
     const section = extractVerification(body);
     const rules = [];
 
@@ -236,7 +268,7 @@ export function checkPrReadiness({ body, isDraft, files, skipDraft = false }) {
         if (!lines.length) {
             detail = uiFiles.length ? `UI files changed but no "Chrome: /<route> — <what was seen>" line${uiNote}` : 'no "Chrome:" line (use "Chrome: n/a — no UI files changed" when true)';
         } else {
-            const checked = lines.map((l) => chromeLine(l, uiFiles));
+            const checked = lines.map((l) => chromeLine(l, uiFiles, allPaths.length === 0));
             const denied = checked.find((c) => c.deny);
             const good = checked.find((c) => c.ok);
             ok = !denied && !!good;
@@ -285,9 +317,16 @@ export const defaultGh = (args) =>
 const repoSlug = (repo) => repo ?? '{owner}/{repo}';
 
 /** Changed paths of a PR, new path and (for renames) the old path. */
+export const FILES_JQ = '.[] | {filename, previous_filename} | tojson';
+
+/** One JSON object per line (from FILES_JQ) to the list of every changed path, old names of renames included. */
+export function parseFilesNdjson(text) {
+    const objs = String(text ?? '').split('\n').map((l) => l.trim()).filter(Boolean).map((l) => JSON.parse(l));
+    return expandPaths(objs);
+}
+
 export function fetchPrFiles(repo, number, gh = defaultGh) {
-    const out = gh(['api', `repos/${repoSlug(repo)}/pulls/${number}/files`, '--paginate', '--jq', '.[] | .filename, (.previous_filename // empty)']);
-    return out.split('\n').map((s) => s.trim()).filter(Boolean);
+    return parseFilesNdjson(gh(['api', `repos/${repoSlug(repo)}/pulls/${number}/files`, '--paginate', '--jq', FILES_JQ]));
 }
 
 export function fetchPr(repo, number, gh = defaultGh) {

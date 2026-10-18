@@ -1,5 +1,7 @@
 // @ts-expect-error -- plain .mjs helper, no types alongside it (same as the other tooling specs).
 import * as mod from '../../../scripts/pr-readiness.mjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 type Rule = { id: string; ok: boolean; detail: string; example?: string };
@@ -9,6 +11,10 @@ const extractVerification = mod.extractVerification as (b: string) => string | n
 const isUiFile = mod.isUiFile as (f: string) => boolean;
 const expandPaths = mod.expandPaths as (f: unknown[]) => string[];
 const formatReport = mod.formatReport as (r: Res) => string;
+const parseFilesNdjson = mod.parseFilesNdjson as (t: string) => string[];
+const fetchPrFiles = mod.fetchPrFiles as (repo: string, n: number, gh: (a: string[]) => string) => string[];
+const FILES_JQ = mod.FILES_JQ as string;
+const positiveWord = mod.positiveWord as (t: string, w: string) => boolean;
 
 const THEME_TEXT = 'light and dark checked';
 const GOOD_REVIEW = 'Code review: independent reviewer agent pass 2 — open findings: 0';
@@ -72,6 +78,14 @@ describe('formatting tolerance (M3)', () => {
 });
 
 describe('rule a: Verification section', () => {
+    it('an inline <!-- inside backticks before the heading does not truncate the body (L5)', () => {
+        const b = 'Notes: the `<!--` opener is escaped here.\n## Verification\n' + GOOD_REVIEW + '\n' + NA;
+        expect(extractVerification(b)).toContain('Code review');
+        expect(run(b).ok).toBe(true);
+    });
+    it('a real unclosed opener still drops the rest', () => {
+        expect(extractVerification('text <!-- oops\n## Verification\nx')).toBeNull();
+    });
     it('fails without the heading and names the exact heading', () => {
         const r = run('## Summary\nnothing');
         expect(failedIds(r)).toContain('verification-section');
@@ -116,6 +130,23 @@ describe('rule b: code review line', () => {
             expect(failedIds(run(body(`Code review: ${who} — open findings: 0`, NA)))).toEqual(['code-review']);
         },
     );
+    it.each(['(3 unresolved)', '(2 blocking)', '(pending)', '(remaining work)', '(open: 1)', '(2 of them)', '(see item 4)', '(unresolved)', '(blocking)'])('rejects a contradicting parenthetical %s', (p) => {
+        expect(failedIds(run(body(`Code review: independent reviewer agent pass — open findings: 0 ${p}`, NA)))).toEqual(['code-review']);
+    });
+    it.each(['(none)', '(zero)', '(nothing left)'])('accepts the parenthetical %s', (p) => {
+        expect(failedIds(run(body(`Code review: independent reviewer agent pass — open findings: 0 ${p}`, NA)))).toEqual([]);
+    });
+    it.each(['self', 'myself', 'author', 'me', 'own', 'same'])('rejects the self word "%s" on its own (mutation control)', (t) => {
+        expect(failedIds(run(body(`Code review: independent ${t} pass — open findings: 0`, NA)))).toEqual(['code-review']);
+    });
+    it.each(['Homer', 'Owen', 'sameness', 'selfie', 'authority', 'mess'])('does not reject the look-alike word "%s"', (t) => {
+        expect(failedIds(run(body(`Code review: independent ${t} pass — open findings: 0`, NA)))).toEqual([]);
+    });
+    it('the self-word message tells the author how to fix it', () => {
+        const r = run(body('Code review: Same Day Review Bot — open findings: 0', NA));
+        expect(failedIds(r)).toEqual(['code-review']);
+        expect(r.rules.find((x) => x.id === 'code-review')?.detail).toContain('clarifying word');
+    });
     it('rejects two different numbers on one line (L1)', () => {
         const r = run(body('Code review: Jane Doe Smith — open findings: 3 — open findings: 0', NA));
         expect(failedIds(r)).toEqual(['code-review']);
@@ -148,12 +179,34 @@ describe('rule c: Chrome', () => {
         expect(failedIds(run(body(GOOD_REVIEW, 'Chrome: /team — dialog renders and submits fine'), UI))).toEqual(['chrome']);
         expect(failedIds(run(body(GOOD_REVIEW, 'Chrome: /team — lightbox renders and submits fine dark ok'), UI))).toEqual(['chrome']);
     });
-    it.each(['did not check', 'not tested', "didn't verify", 'skipped the browser pass'])('rejects an observation that denies the check: %s', (d) => {
-        const r = run(body(GOOD_REVIEW, `Chrome: /team — renders in light mode, ${d}`), UI);
-        expect(failedIds(r)).toEqual(['chrome']);
+    it.each(['did not check in a browser', 'not tested', 'could not verify anything', 'no browser check was done', 'unable to test this page', "didn't check anything"])(
+        'rejects an observation that denies the WHOLE check: %s',
+        (d) => {
+            expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /team — ${d}`), UI))).toEqual(['chrome']);
+        },
+    );
+    it.each([
+        'skipped the empty state, checked light and dark',
+        'checked light and dark; no layout shift, nothing skipped',
+        'did not run into errors; light and dark ok',
+        'not tested on mobile but light and dark render fine',
+        'not looked at tablet; light and dark render fine',
+        'light and dark checked, not yet done on mobile',
+        'Not seen any problem in light and dark',
+        'light ok dark ok skipped nothing',
+    ])('accepts the honest observation: %s', (o) => {
+        expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /team — ${o}`), UI))).toEqual([]);
+    });
+    it('positiveWord ignores negated mentions but not distant negations', () => {
+        expect(positiveWord('light ok; not dark', 'dark')).toBe(false);
+        expect(positiveWord('light ok, did not check dark', 'dark')).toBe(false);
+        expect(positiveWord('without dark', 'dark')).toBe(false);
+        expect(positiveWord('no dark mode', 'dark')).toBe(false);
+        expect(positiveWord('dark ok but not light', 'dark')).toBe(true);
+        expect(positiveWord('Not seen any problem in light and dark', 'dark')).toBe(true);
     });
     it('evaluates every Chrome line: a denying line fails even beside a good one (L2)', () => {
-        const r = run(body(GOOD_REVIEW, GOOD_CHROME, 'Chrome: /other — not tested at all, sorry'), UI);
+        const r = run(body(GOOD_REVIEW, GOOD_CHROME, 'Chrome: /other — did not check anything here'), UI);
         expect(failedIds(r)).toEqual(['chrome']);
     });
     it('a second, malformed Chrome line does not hide a good one', () => {
@@ -166,6 +219,9 @@ describe('rule c: Chrome', () => {
         expect(eng('Chrome: /inspections — list renders in light; dark: n/a no styling change')).toBe(true);
         expect(eng('Chrome: /inspections — list renders in light; dark: n/a')).toBe(false);
         expect(eng('Chrome: /inspections — renders light ok, did not check dark')).toBe(false);
+        expect(eng('Chrome: /inspections — light ok; not dark')).toBe(false);
+        expect(eng('Chrome: /inspections — light fine, without dark')).toBe(false);
+        expect(eng('Chrome: /inspections — light ok and no dark mode check')).toBe(false);
         expect(eng('Chrome: /inspections — renders light ok, darkness ahead lol')).toBe(false);
     });
 });
@@ -181,6 +237,33 @@ describe('UI file detection (H1)', () => {
         'server/lib/foo.ts', 'server/api/x.ts', 'package.json', 'packages/api-types/package.json', 'tsconfig.json',
         'app/routes/x.test.tsx', 'app/components/__tests__/y.tsx', 'tests/e2e/a.spec.ts', 'tests/unit/ui/b.tsx', 'docs/readme.md',
     ])('not UI: %s', (f) => expect(isUiFile(f)).toBe(false));
+    it.each(['__mocks__/x.tsx', 'app/components/Button.stories.tsx', 'server/data/seed.json', 'server/generated/api.json', 'app/routes/__mocks__/y.ts'])(
+        'clearly non-UI path: %s',
+        (f) => expect(isUiFile(f)).toBe(false),
+    );
+    it('tailwind and vite config stay UI (they restyle or rebuild every screen)', () => {
+        expect(isUiFile('tailwind.config.ts')).toBe(true);
+        expect(isUiFile('vite.config.ts')).toBe(true);
+    });
+    it('a PR with ZERO changed files cannot claim Chrome n/a (L7)', () => {
+        const r = run(body(GOOD_REVIEW, NA), []);
+        expect(failedIds(r)).toEqual(['chrome']);
+        expect(r.rules.find((x) => x.id === 'chrome')?.detail).toContain('ZERO');
+    });
+    it('parseFilesNdjson / fetchPrFiles keep the old path of a rename (previous_filename)', () => {
+        const nd = [JSON.stringify({ filename: 'docs/new.md', previous_filename: 'app/routes/old.tsx' }), JSON.stringify({ filename: 'a.ts', previous_filename: null })].join('\n');
+        expect(parseFilesNdjson(nd)).toEqual(['docs/new.md', 'app/routes/old.tsx', 'a.ts']);
+        let seen: string[] = [];
+        const paths = fetchPrFiles('o/r', 9, (args) => {
+            seen = args;
+            return nd;
+        });
+        expect(paths).toContain('app/routes/old.tsx');
+        expect(seen.join(' ')).toContain('pulls/9/files');
+        expect(FILES_JQ).toContain('previous_filename');
+        expect(FILES_JQ).toContain('tojson');
+        expect(parseFilesNdjson('')).toEqual([]);
+    });
     it('a rename OUT of a UI path counts: the old path is a changed path', () => {
         expect(expandPaths([{ filename: 'server/lib/foo.ts', previous_filename: 'app/routes/old.tsx' }])).toEqual(['server/lib/foo.ts', 'app/routes/old.tsx']);
         const r = run(body(GOOD_REVIEW, NA), [{ filename: 'server/lib/foo.ts', previous_filename: 'app/routes/old.tsx' }]);
@@ -206,6 +289,21 @@ describe('rule d: placeholders', () => {
         const r = run(body('Code review: <reviewer> — open findings: <n>', 'Chrome: /<route> — <what was seen, light and dark>'), UI);
         expect(r.ok).toBe(false);
         expect(failedIds(r)).toEqual(expect.arrayContaining(['code-review', 'placeholders']));
+    });
+});
+
+describe('the real PR template', () => {
+    const TEMPLATE = '.github/PULL_REQUEST_TEMPLATE.md';
+    const text = readFileSync(join(process.cwd(), TEMPLATE), 'utf8');
+    it('fails verbatim, so an unedited template cannot merge', () => {
+        const r = run(text, UI);
+        expect(r.ok).toBe(false);
+        expect(failedIds(r)).toEqual(expect.arrayContaining(['code-review', 'placeholders']));
+        expect(run(text, NO_UI).ok).toBe(false);
+    });
+    it('passes once the two placeholder lines are filled in', () => {
+        const filled = text.replace(/^Code review:.*$/m, GOOD_REVIEW).replace(/^Chrome:.*$/m, GOOD_CHROME);
+        expect(failedIds(run(filled, UI))).toEqual([]);
     });
 });
 
