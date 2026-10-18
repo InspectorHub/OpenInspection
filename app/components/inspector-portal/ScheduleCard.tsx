@@ -64,6 +64,7 @@ export function ScheduleCard({
     const { fetcher, submit, busy: saving } = useGuardedSubmit<typeof action>();
 
     const membersReady = membersStatus === "ready";
+    const statusId = `hub-schedule-members-status-${inspectionId}`;
 
     const save = (form: HTMLFormElement) => {
         // Enter in the date field submits the form whatever the buttons say.
@@ -150,6 +151,7 @@ export function ScheduleCard({
                             name="inspectorId"
                             defaultValue={inspectorId ?? ""}
                             disabled={!membersReady}
+                            aria-describedby={membersReady ? undefined : statusId}
                             className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[14px] font-medium focus:border-ih-primary focus:shadow-ih-focus outline-none disabled:opacity-60"
                             data-testid="hub-schedule-inspector"
                         >
@@ -160,25 +162,27 @@ export function ScheduleCard({
                                         {u.name || u.email}
                                     </option>
                                 ))
-                                : inspectorId && (
-                                    <option value={inspectorId}>{inspectorName ?? inspectorId}</option>
-                                )}
+                                : null}
+                            {/* The current inspector stays selectable when the list lacks them
+                                (a deactivated user, or the list not in yet), or saving would
+                                silently unassign them. */}
+                            {inspectorId && !(membersReady && members.some((u) => u.id === inspectorId)) && (
+                                <option value={inspectorId}>{inspectorName ?? inspectorId}</option>
+                            )}
                         </select>
                     </label>
-                    {!membersReady && (
-                        <div className="flex items-center gap-2 text-[12px]" data-testid="hub-schedule-members-status">
-                            {membersStatus === "error" ? (
-                                <>
-                                    <span className="text-ih-bad-fg">{m.inspections_hub_pickers_error()}</span>
-                                    <Button variant="secondary" size="sm" type="button" onClick={() => onRetryMembers?.()}>
-                                        {m.inspections_hub_pickers_retry()}
-                                    </Button>
-                                </>
-                            ) : (
-                                <span className="text-ih-fg-3">{m.common_loading()}</span>
-                            )}
-                        </div>
-                    )}
+                    <div id={statusId} role="status" aria-live="polite" className="text-[12px]" data-testid="hub-schedule-members-status">
+                        {!membersReady && (membersStatus === "error" ? (
+                            <span className="flex items-center gap-2">
+                                <span className="text-ih-bad-fg">{m.inspections_hub_pickers_error()}</span>
+                                <Button variant="secondary" size="sm" type="button" onClick={() => onRetryMembers?.()}>
+                                    {m.inspections_hub_pickers_retry()}
+                                </Button>
+                            </span>
+                        ) : (
+                            <span className="text-ih-fg-3">{m.common_loading()}</span>
+                        ))}
+                    </div>
                     <div className="flex items-center justify-end gap-2 pt-1">
                         <Button variant="secondary" size="sm" type="button" onClick={() => setOpen(false)}>
                             {m.common_cancel()}

@@ -304,11 +304,10 @@ export function AddPersonModal({
             { value: "", label: m.inspections_hub_people_role_placeholder(), disabled: true },
             ...activeRoles.map((r) => ({ value: r.id, label: r.label })),
           ]}
+          {...(rolesReady ? {} : { "aria-describedby": "role-list-status" })}
           hint={
             !rolesReady
-              ? rolesStatus === "error"
-                ? m.inspections_hub_pickers_error()
-                : m.common_loading()
+              ? undefined
               : activeRoles.length === 0
               ? isAdmin
                 ? m.inspections_hub_people_no_roles_admin()
@@ -317,10 +316,19 @@ export function AddPersonModal({
           }
         />
 
-        {rolesStatus === "error" && (
-          <Button variant="secondary" size="sm" type="button" onClick={() => onRetryRoles?.()}>
-            {m.inspections_hub_pickers_retry()}
-          </Button>
+        {!rolesReady && (
+          <div id="role-list-status" role="status" aria-live="polite" className="flex items-center gap-2 text-[11px] text-ih-fg-3">
+            {rolesStatus === "error" ? (
+              <>
+                <span>{m.inspections_hub_pickers_error()}</span>
+                <Button variant="secondary" size="sm" type="button" onClick={() => onRetryRoles?.()}>
+                  {m.inspections_hub_pickers_retry()}
+                </Button>
+              </>
+            ) : (
+              <span>{m.common_loading()}</span>
+            )}
+          </div>
         )}
 
         {/* IA-102 — adding someone here is an AUTHORIZATION act wearing the

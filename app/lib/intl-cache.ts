@@ -17,7 +17,8 @@ const MAX_ENTRIES = 256;
 
 function stableKey(locale: string | undefined, options: object | undefined): string {
   const entries = options ? Object.entries(options).filter(([, v]) => v !== undefined).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)) : [];
-  return `${locale ?? ""}|${JSON.stringify(entries)}`;
+  // An absent locale (the runtime default) and an empty string (an invalid tag that throws) must not share a key.
+  return `${locale === undefined ? "\u0000" : locale}|${JSON.stringify(entries)}`;
 }
 
 class FormatterCache<T> {

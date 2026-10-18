@@ -75,6 +75,13 @@ describe("intl cache", () => {
     expect(cachedRelativeTimeFormat("es-419", { numeric: "auto", style: "long" }).format(-3, "day")).toBe(new Intl.RelativeTimeFormat("es-419", { numeric: "auto", style: "long" }).format(-3, "day"));
   });
 
+  it("distinguishes an absent locale from an empty one, so a locale that throws is never answered from the cache", () => {
+    const fallback = cachedDateTimeFormat(undefined as unknown as string, { timeZone: "UTC" });
+    expect(fallback.format(0)).toBeTruthy();
+    expect(() => cachedDateTimeFormat("", { timeZone: "UTC" })).toThrow(RangeError);
+    expect(() => new RealDTF("", { timeZone: "UTC" })).toThrow(RangeError);
+  });
+
   it("stays bounded", () => {
     for (let i = 0; i < 2000; i++) cachedDateTimeFormat("en-US", { timeZone: "UTC", fractionalSecondDigits: ((i % 3) + 1) as 1 | 2 | 3, hour: "numeric", minute: String(i) === "x" ? "numeric" : "2-digit", second: i % 2 ? "numeric" : "2-digit" });
     // No assertion on size beyond not throwing and still being correct afterwards.

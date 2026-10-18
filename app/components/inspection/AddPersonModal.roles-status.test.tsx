@@ -81,4 +81,16 @@ describe("AddPersonModal role list status", () => {
       unmount();
     }
   });
+
+  it("the loading and error text is a polite live region that the disabled picker points at", async () => {
+    for (const status of ["loading", "error"] as const) {
+      const { findByLabelText, unmount } = renderModal({ rolesStatus: status });
+      const select = asSelect(await findByLabelText(/role/i), "the role picker");
+      const region = document.getElementById(select.getAttribute("aria-describedby") ?? "none");
+      expect(region?.getAttribute("role")).toBe("status");
+      expect(region?.getAttribute("aria-live")).toBe("polite");
+      expect(region?.textContent ?? "").toMatch(status === "loading" ? /loading/i : /could not load this list/i);
+      unmount();
+    }
+  });
 });

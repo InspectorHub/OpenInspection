@@ -141,4 +141,33 @@ describe("ScheduleCard inspector picker while its list is not loaded", () => {
     expect(select.disabled).toBe(false);
     expect(saveButton().disabled).toBe(false);
   });
+
+  it("ready, but the current inspector is not in the list (deactivated): they stay selectable so Save cannot unassign them", async () => {
+    mount({ status: "ready", members: [{ id: "u-ann", name: "Ann Inspector", email: "ann@example.com" }] });
+    const select = await openEditor();
+    expect([...select.options].map((o) => o.value)).toEqual(["", "u-ann", "u-bob"]);
+    expect(select.value).toBe("u-bob");
+    fireEvent.submit(document.getElementById("schedule-form-insp-1") as HTMLFormElement);
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(JSON.parse(String(posted[0]!.payload)).inspectorId).toBe("u-bob");
+  });
+
+  it("does not duplicate the current inspector when the list already has them", async () => {
+    mount({ status: "ready", members: MEMBERS });
+    const select = await openEditor();
+    expect([...select.options].filter((o) => o.value === "u-bob")).toHaveLength(1);
+  });
+
+  it("the status text is a polite live region, the disabled picker points at it, and retry shows Loading again", async () => {
+    const onRetry = vi.fn();
+    const h = mount({ status: "error", onRetry });
+    const select = await openEditor();
+    const status = screen.getByTestId("hub-schedule-members-status");
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(select.getAttribute("aria-describedby")).toBe(status.id);
+    await h.rerenderWith({ status: "loading", onRetry });
+    expect(screen.getByTestId("hub-schedule-members-status").textContent).toMatch(/loading/i);
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
 });
