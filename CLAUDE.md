@@ -264,6 +264,17 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - **Error signature**: `logger.error(message, data?, error?)` — second arg is `Record<string, unknown>`, third is optional `Error`. Do NOT pass raw Error as second arg.
 - **No sensitive data in logs**: Never log JWT tokens, passwords, API keys, or full request bodies. Log only error messages, status codes, and non-sensitive identifiers.
 
+### Page timing (`page_timing`)
+
+Per-route timing for HTML pages lives in `server/lib/page-timing.ts`, wired in `workers/app.ts` on the page-render branch only.
+
+- **One line per sampled page**: `logger.info('page_timing', …)` with the fields `kind` (`page`), `route` (the matched React Router PATTERN such as `/inspections/:id/edit`, never the raw path; special values `unmatched`, `pending`, `unknown`), `status`, `wall_ms`, `cold` (0/1, the first page this isolate served), `req_n` (pages served by this isolate), `authed` (0/1, cookie presence only, never verified), `sample` (`error` | `slow` | `cold` | `n`) and `inproc_calls` (in-process API calls the render made through the `API_WORKER` binding so far). Every field is a number or a low-cardinality string; never add an id, slug, email, token, query string, cookie value, IP or user agent.
+- **Sampling** (named constants): always log status >= 500 (`error`), `wall_ms` > `PAGE_TIMING_SLOW_MS` (1500, `slow`) and the isolate's first page (`cold`); otherwise every `PAGE_TIMING_SAMPLE_EVERY`th (5) page (`n`). The counter is page-scoped: API calls, probes, `/status` and redirects never advance it. Only `sample: "n"` lines are an unbiased subset of page traffic; the other reasons are over-represented.
+- **`wall_ms` is time-to-headers**, not time-to-last-byte: the body streams after the Response is returned. `Date.now()` in Workers advances only at I/O boundaries, so this is wall time, not CPU time.
+- **`Server-Timing: app;dur=<wall_ms>`** is added to every HTML page response on a NEW Response built from the same body stream and a copy of the headers. The body is never read, cloned or buffered. Redirects, 204/304 and non-HTML responses are returned untouched.
+- **The instrument never loads a module.** The route table is read only after the renderer itself has loaded the server build (`createServerBuildTracker` wraps the loader and only observes it); before that the route is `pending`. Do not `import()` the build or the API graph from the timing code, and keep its imports to `react-router` and the logger.
+- **"Request processed"** (`server/lib/middleware/request-log.ts`) is written for requests from outside only. In-process calls (`isInProcessRequest`) log it only for 5xx, so a page render yields one `page_timing` line instead of one line per loader call.
+
 ## Multi-tenant Security Rules
 
 - **Mandatory tenantId**: Every new database table MUST include `tenantId: text('tenant_id').notNull()` to ensure physical isolation.

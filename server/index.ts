@@ -24,6 +24,7 @@ import { sendError } from './lib/response';
 import { foreignKeyResponse } from './lib/db/foreign-key-violation';
 import type { HonoConfig } from './types/hono';
 import { logger } from './lib/logger';
+import { requestLog } from './lib/middleware/request-log';
 import { BUILD } from './generated/version';
 import { r2Keys } from './lib/r2-keys';
 
@@ -153,19 +154,8 @@ const app = new OpenAPIHono<HonoConfig>({
 // The policy lives in lib/native/cors-origins.ts; the native app origins get extra headers there.
 app.use('/api/*', apiCors);
 
-// Global request logger
-app.use('*', async (c, next) => {
-    const start = Date.now();
-    await next();
-    const duration = Date.now() - start;
-    logger.info('Request processed', {
-        method: c.req.method,
-        path: c.req.path,
-        status: c.res.status,
-        duration: `${duration}ms`,
-        tenantId: c.get('tenantId'), // Might be unset but that's okay
-    });
-});
+// Global request logger (in-process page-render calls are suppressed; see the middleware)
+app.use('*', requestLog);
 
 // Health check
 app.get('/status', (c) => c.json({
