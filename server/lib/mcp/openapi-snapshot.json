@@ -12582,7 +12582,7 @@
       "body": null
     },
     "summary": "List inspector restrictions for many services",
-    "description": "Returns the inspector restriction list of each requested service in one call (ids is a comma-separated list of at most 100). Same answer as the per-service restriction read, for each service of the company: an empty list means all non-agent staff are qualified. An id that is not a service of the company is left out of the answer. Admin or owner only."
+    "description": "Returns the inspector restriction list of each requested service in one call (ids is a comma-separated list of at most 90). Same answer as the per-service restriction read, for each service of the company: an empty list means all non-agent staff are qualified. An id that is not a service of the company is left out of the answer. Admin or owner only."
   },
   {
     "operationId": "listServicePayRules",
@@ -12637,7 +12637,7 @@
       "body": null
     },
     "summary": "List pay rules for many services",
-    "description": "Returns the pay rules of each requested service in one call (ids is a comma-separated list of at most 100). Same answer as the per-service pay rule list, for each service of the company: the service default first, then per-inspector rules, and an empty list where pay splits are off. An id that is not a service of the company is left out of the answer. Restricted to owners and managers holding the company-finance capability."
+    "description": "Returns the pay rules of each requested service in one call (ids is a comma-separated list of at most 90). Same answer as the per-service pay rule list, for each service of the company: the service default first, then per-inspector rules, and an empty list where pay splits are off. An id that is not a service of the company is left out of the answer. Restricted to owners and managers holding the company-finance capability."
   },
   {
     "operationId": "listServices",

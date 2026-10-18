@@ -128,8 +128,8 @@ export const ServiceInspectorListResponseSchema = createApiResponseSchema(z.obje
     userIds: z.array(z.string()).describe('Restricted inspector user IDs; empty = all staff qualified'),
 }));
 
-/** Ids per bulk read. One request carries at most this many (D1 binds at most 100 parameters per statement). */
-export const MAX_BULK_SERVICE_IDS = 100;
+/** Ids per bulk read. Each statement also binds the tenant id, and D1 binds at most 100 parameters per statement, so the cap leaves headroom. */
+export const MAX_BULK_SERVICE_IDS = 90;
 
 export const BulkServiceIdsQuerySchema = z.object({
     ids: z.string().default('')

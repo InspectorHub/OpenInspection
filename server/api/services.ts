@@ -137,7 +137,7 @@ export const servicesRoutes = createApiRouter()
             200: { content: { 'application/json': { schema: ServiceInspectorMapResponseSchema } }, description: 'OK - service id to restricted inspector user ids' },
         },
         operationId: "listServiceInspectorsBulk",
-        description: "Returns the inspector restriction list of each requested service in one call (ids is a comma-separated list of at most 100). Same answer as the per-service restriction read, for each service of the company: an empty list means all non-agent staff are qualified. An id that is not a service of the company is left out of the answer. Admin or owner only.",
+        description: "Returns the inspector restriction list of each requested service in one call (ids is a comma-separated list of at most 90). Same answer as the per-service restriction read, for each service of the company: an empty list means all non-agent staff are qualified. An id that is not a service of the company is left out of the answer. Admin or owner only.",
     }, { scopes: ['read'], tier: 'excluded' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { ids } = c.req.valid('query');
@@ -153,7 +153,7 @@ export const servicesRoutes = createApiRouter()
             200: { content: { 'application/json': { schema: PayRuleMapResponseSchema } }, description: 'OK - service id to its pay rules, the service default first' },
         },
         operationId: "listServicePayRulesBulk",
-        description: "Returns the pay rules of each requested service in one call (ids is a comma-separated list of at most 100). Same answer as the per-service pay rule list, for each service of the company: the service default first, then per-inspector rules, and an empty list where pay splits are off. An id that is not a service of the company is left out of the answer. Restricted to owners and managers holding the company-finance capability.",
+        description: "Returns the pay rules of each requested service in one call (ids is a comma-separated list of at most 90). Same answer as the per-service pay rule list, for each service of the company: the service default first, then per-inspector rules, and an empty list where pay splits are off. An id that is not a service of the company is left out of the answer. Restricted to owners and managers holding the company-finance capability.",
     }, { scopes: ['read'], tier: 'excluded', capability: 'companyFinance' })), async (c) => {
         const tenantId = c.get('tenantId');
         const { ids } = c.req.valid('query');

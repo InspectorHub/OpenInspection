@@ -32,7 +32,7 @@ const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
 let db: DrizzleD1Database;
 let selects = 0;
 
-function buildApp(role: 'owner' | 'manager' | 'inspector' = 'manager') {
+function buildApp(role: 'owner' | 'manager' | 'inspector' = 'manager', overrides: Record<string, boolean> | null = null) {
     const counting = new Proxy(db as object, {
         get(target, prop, receiver) {
             if (prop === 'select') {
@@ -56,7 +56,7 @@ function buildApp(role: 'owner' | 'manager' | 'inspector' = 'manager') {
         c.set('tenantId', T);
         c.set('userRole', role);
         c.set('user', { sub: 'mgr', role, tenantId: T });
-        c.set('sdb', { getById: async () => ({ permissionOverrides: null }) } as unknown as HonoConfig['Variables']['sdb']);
+        c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as unknown as HonoConfig['Variables']['sdb']);
         c.set('services', { service: new ServiceService({} as D1Database) } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
@@ -152,7 +152,7 @@ describe('GET /inspectors-by-service', () => {
     });
 
     it('refuses more ids than one request may carry', async () => {
-        const ids = Array.from({ length: 101 }, (_, i) => `s${i}`).join(',');
+        const ids = Array.from({ length: 91 }, (_, i) => `s${i}`).join(',');
         expect((await get(buildApp(), `/inspectors-by-service?ids=${ids}`)).status).toBe(400);
     });
 });
@@ -188,6 +188,14 @@ describe('GET /pay-rules-by-service', () => {
         selects = 0;
         await get(app, '/pay-rules-by-service?ids=s1,s2,s3,foreign');
         expect(selects).toBe(one);
+    });
+
+    it('a manager whose company-finance capability was taken away is refused, as on the per-service route', async () => {
+        const app = buildApp('manager', { companyFinance: false });
+        expect((await get(app, '/pay-rules-by-service?ids=s1')).status).toBe(403);
+        expect((await get(app, '/s1/pay-rules')).status).toBe(403);
+        // The inspector restriction read needs no finance capability.
+        expect((await get(app, '/inspectors-by-service?ids=s1')).status).toBe(200);
     });
 
     it('keeps the per-service route\'s gates: an inspector is refused', async () => {
