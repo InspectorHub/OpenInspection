@@ -3,7 +3,7 @@ import { useLayoutEffect, useRef } from "react";
 /**
  * How long a result's actions ignore clicks after the result appears: the OS double-click interval.
  */
-export const RESULT_SETTLE_MS = 450;
+const RESULT_SETTLE_MS = 450;
 
 /**
  * A guard for the buttons of a result that replaces a form in the same spot.
