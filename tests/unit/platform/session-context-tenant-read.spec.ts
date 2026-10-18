@@ -1,6 +1,6 @@
 /**
- * The session context needs the tenant row for two answers on a hosted
- * deployment: the video provider (plan tier and status) and the cooling-window
+ * The session context needs the tenant row for two answers on the saas
+ * profile: the video provider (plan tier and status) and the cooling-window
  * anchor (created-at). It reads that primary-key row ONCE and shares it.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

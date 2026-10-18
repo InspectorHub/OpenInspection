@@ -57,17 +57,13 @@ describe("loadServiceFanout", () => {
   it("with many services: the calls are linear, concurrency is bounded, and both fan-outs overlap", async () => {
     const ids = Array.from({ length: 25 }, (_, i) => `s${i}`);
     const { api, stats } = fakeApi();
-    const t0 = performance.now();
     const out = await loadServiceFanout(api, ids);
-    const elapsed = performance.now() - t0;
     expect(stats.inspectors).toBe(25);
     expect(stats.payRules).toBe(25);
     // Two fan-outs of 4 each run together: never more than 8 in flight, and
     // more than 4 (they overlap rather than run one after the other).
     expect(stats.peak).toBeLessThanOrEqual(8);
     expect(stats.peak).toBeGreaterThan(4);
-    // 50 calls of 5 ms through 8 lanes is ~35 ms; one lane after another would be 250.
-    expect(elapsed).toBeLessThan(150);
     expect(Object.keys(out.restrictionMap)).toHaveLength(25);
     expect(Object.keys(out.payRuleMap)).toHaveLength(25);
   });

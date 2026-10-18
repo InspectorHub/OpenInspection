@@ -16,7 +16,7 @@
  * scanned nothing, when its file listing disagrees with an independent count, or when a rule
  * misses its own planted control (an empty result must not read as a clean one).
  *
- * Rung: PUSH. It parses ~280 route files, which is more than a commit should pay, and
+ * Rung: PUSH. It parses ~150 route files, which is more than a commit should pay, and
  * the violations that matter are the sum over a branch rather than one keystroke.
  *
  * Usage: node scripts/check-loader-budget.mjs [--write-baseline]

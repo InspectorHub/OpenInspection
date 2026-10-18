@@ -259,7 +259,7 @@ const sessionContextRoutes = createApiRouter()
             coerceOverrides(permissionOverridesRaw),
         );
 
-        // The tenant row serves two answers on a hosted deployment: the video
+        // The tenant row serves two answers on a saas-profile deployment: the video
         // provider (tier/status) and the cooling-window anchor (createdAt). It
         // is one primary-key read, started once and shared by both. Where
         // neither question exists (standalone) nothing is read.
@@ -303,7 +303,7 @@ const sessionContextRoutes = createApiRouter()
                     return 'r2';
                 }
             })(),
-            // Portal #98 item 3 -- the open outbound cooling window, so the chrome can
+            // The open outbound cooling window, so the chrome can
             // say so before anyone presses Send. Only where a window can exist at all
             // (saas); standalone pays nothing. Fail-open, matching the send gate: an
             // unreadable anchor leaves this null, so a D1 blip never puts a banner in
