@@ -14,6 +14,8 @@ import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
+const SSO_FAILURES = ["expired", "invalid", "unavailable"] as const;
+
 export function meta() {
   return [{ title: m.auth_login_meta_title() }];
 }
@@ -30,7 +32,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // workers/env.ts:53-62 gives: the gate matches the literal, comments too.)
   const profile = getDeploymentProfile(getCloudflareEnv(context));
   if (profile.loginRedirectBase) {
-    return redirect(`${profile.loginRedirectBase}/login`);
+    // A failed `/sso?code=` hand-off lands here with the reason. Forward it so
+    // the person sees an explanation on the sign-in page they end up on. Only
+    // the three values the hand-off can produce pass; the query is rebuilt from
+    // that allowlist, never echoed.
+    const sso = new URL(request.url).searchParams.get("sso");
+    const reason = SSO_FAILURES.find((v) => v === sso);
+    return redirect(`${profile.loginRedirectBase}/login${reason ? `?sso=${reason}` : ""}`);
   }
 
   // Preserve a post-login destination (e.g. the OAuth consent loader bounces

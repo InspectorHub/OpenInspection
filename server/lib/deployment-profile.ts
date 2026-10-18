@@ -66,6 +66,11 @@ export interface DeploymentProfile {
     /** Base URL the browser is sent to for saas login-bounce + "Switch workspace".
      *  Derived from PORTAL_API_URL (trailing slash stripped); null in standalone. */
     loginRedirectBase: string | null;
+    /** Where an explicit sign-out is sent so the identity service ends its own
+     *  session too (it clears its cookie, then returns to its sign-in page with
+     *  a signed-out notice). Built from `loginRedirectBase` plus constants;
+     *  null when there is no identity service. Server-only. */
+    identitySignOutUrl: string | null;
 
     hasSetupWizard: boolean;
 
@@ -215,6 +220,7 @@ export const STANDALONE_PROFILE: DeploymentProfile = {
     fixedTenantId: FIXED_TENANT_FALLBACK,
     hasBilling: false, hasSeatQuota: false, hasUsageQuota: false, billingPortalUrl: null,
     loginRedirectBase: null,
+    identitySignOutUrl: null,
     hasSetupWizard: true,
     aiDevMockFallback: true,
     hasManagedAi: false,
@@ -238,6 +244,7 @@ export const SAAS_PROFILE: DeploymentProfile = {
     fixedTenantId: null,
     hasBilling: true, hasSeatQuota: true, hasUsageQuota: true, billingPortalUrl: null,
     loginRedirectBase: null,
+    identitySignOutUrl: null,
     hasSetupWizard: false,
     aiDevMockFallback: false,
     hasManagedAi: true,
@@ -290,11 +297,20 @@ function withImportLimits(base: DeploymentProfile, env: ProfileEnv): DeploymentP
     };
 }
 
+/** The identity service's chained sign-out helper, and the page it returns to. */
+const IDENTITY_SIGN_OUT_PATH = '/api/account/logout';
+const SIGNED_OUT_LANDING = '/login?loggedout=1';
+
 export function getDeploymentProfile(env: ProfileEnv): DeploymentProfile {
     if (env.APP_MODE === 'saas') {
         const base = env.PORTAL_API_URL ? env.PORTAL_API_URL.replace(/\/$/, '') : null;
         return withImportLimits(
-            { ...SAAS_PROFILE, billingPortalUrl: base, loginRedirectBase: base },
+            {
+                ...SAAS_PROFILE,
+                billingPortalUrl: base,
+                loginRedirectBase: base,
+                identitySignOutUrl: base ? `${base}${IDENTITY_SIGN_OUT_PATH}?returnTo=${encodeURIComponent(SIGNED_OUT_LANDING)}` : null,
+            },
             env,
         );
     }

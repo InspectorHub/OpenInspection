@@ -84,3 +84,34 @@ describe('login loader — returnTo (B3)', () => {
         expect((res as Response).headers.get('Location')).toBe('/inspections');
     });
 });
+
+describe('login loader — SaaS bounce carries a known SSO failure reason', () => {
+    const saas = { APP_MODE: 'saas', PORTAL_API_URL: 'https://inspectorhub.io' };
+    const at = (qs: string) => {
+        const a = args(saas);
+        (a.request as unknown as { url: string }).url = `http://app.example.com/login${qs}`;
+        return a;
+    };
+
+    it.each(['expired', 'invalid', 'unavailable'])('forwards sso=%s', async (v) => {
+        const res = await loader(at(`?sso=${v}`));
+        expect((res as Response).headers.get('Location')).toBe(`https://inspectorhub.io/login?sso=${v}`);
+    });
+
+    it('drops an unknown value and never echoes arbitrary input', async () => {
+        for (const qs of ['?sso=https://evil.test', '?sso=expired%26x%3D1', '?sso=', '?sso=EXPIRED', '?x=1&sso=bogus']) {
+            const res = await loader(at(qs));
+            expect((res as Response).headers.get('Location'), qs).toBe('https://inspectorhub.io/login');
+        }
+    });
+
+    it('forwards nothing but sso (returnTo and others are not echoed)', async () => {
+        const res = await loader(at('?sso=expired&returnTo=https://evil.test&x=1'));
+        expect((res as Response).headers.get('Location')).toBe('https://inspectorhub.io/login?sso=expired');
+    });
+
+    it('standalone is unchanged: sso is ignored', async () => {
+        const res = await loader(args({ PORTAL_API_URL: 'https://inspectorhub.io' }));
+        expect(res).toEqual({ returnTo: null, app: false });
+    });
+});
