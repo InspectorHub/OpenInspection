@@ -132,7 +132,7 @@ Chrome: /<route> — <what was seen, light and dark>
 ```
 
 - The reviewer must be independent (not "self" or "author") and open findings must be exactly `0`.
-- If a file under `app/` (.ts/.tsx/.css), `messages/` or `public/` changed, a `Chrome:` line with a route and at least 15 characters of observation is required, and it must say `light` and `dark` (or `dark: n/a` plus a reason). With no UI file changed, write `Chrome: n/a — no UI files changed`; the checker compares that claim with the PR's real file list and fails if UI files changed.
+- If a UI file changed (anything under `app/`, `public/`, `messages/`, `packages/shared-ui/`; `.tsx/.css/.html/.svg/.png/.json/.ico/.woff*` under `server/` or `packages/`; `index.html`; the tailwind and vite config), a `Chrome:` line with a route and at least 15 characters of observation is required, and it must name `light` and `dark` as words (or `dark: n/a` plus a reason). An observation that says the check was not done ("did not check", "not tested", "skipped") fails. Test files and `tests/` do not count. For a renamed file the OLD path counts as changed too. With no UI file changed, write `Chrome: n/a — no UI files changed`; the checker compares that claim with the PR's real file list and fails if UI files changed.
 - No `TBD`, `TODO`, `<...>` leftovers, or a bare "looks fine" / "lgtm".
 - **A PR stays a draft until the block is true.** A draft always fails the check, by design.
 
@@ -146,7 +146,11 @@ It prints PASS/FAIL per rule and `N rules checked, M failed`, and exits 1 on any
 
 The check is only a gate once it is required: **add `pr-readiness` to the required status checks in the repository ruleset** (Settings, Rules, the `main` ruleset, Require status checks). A workflow that is not required is advisory.
 
-What it cannot do: the record is self-attested text. It makes a missing record loud and verifies the UI-vs-n/a claim against the file list; it cannot prove a review or a browser check actually happened. The commit-message `Chrome:` record (`lint:chrome-record`) is a separate, earlier rung.
+Formatting is forgiving (bold, backticks, `-`/`*`/numbered/`>` prefixes, `--` or `:` as the separator, a trailing dot or a parenthetical after the number). Only the template tokens `<reviewer>`, `<n>`, `<route>`, `<who...>` and `<what was seen...>`, plus `TBD` and `TODO`, count as unfilled placeholders. Every `Code review:` line must pass; a `Chrome:` line that denies the check fails the rule even next to a good one. A failing rule prints a worked example.
+
+**What it cannot do.** The record is self-attested text. The reviewer rule is an honour check: it rejects the words self, myself, author, me, own and same in the reviewer text, but cannot know who reviewed. It makes a missing record loud and verifies the UI-vs-n/a claim against the file list; it cannot prove a review or a browser check actually happened. The commit-message `Chrome:` record (`lint:chrome-record`) is a separate, earlier rung.
+
+**Who judges the checker.** The workflow runs on `pull_request_target` and checks out only the base branch, so a PR cannot edit `scripts/pr-readiness.mjs` and pass its own check; it also means changes to `scripts/pr-readiness.mjs` and `.github/workflows/pr-readiness.yml` take effect only after merge and need a human diff review. The repository has no CODEOWNERS file, so this is a review convention, not an enforced one.
 
 ## Key files
 
