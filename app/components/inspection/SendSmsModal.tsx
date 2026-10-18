@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useFetcherResult, useResultSinceMount } from "~/hooks/useFetcherResult";
 import { keepNotReached } from "~/lib/send-delivery";
 import { useDeliveryResult } from "~/hooks/useDeliveryResult";
-import { SendDeliveryResult } from "./SendDeliveryResult";
+import { useSettledAfterShown } from "~/hooks/useSettledAfterShown";
+import { SendDeliveryResult, DeliveryAnnouncement } from "./SendDeliveryResult";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
@@ -62,6 +63,8 @@ export function SendSmsModal({
   });
 
   const { delivery, back } = useDeliveryResult(fetcher, "send-sms");
+  // The result appears where Send was: a second click of a double click must not land on Back or Done.
+  const { settled, waiting } = useSettledAfterShown(delivery !== null);
 
   const byKind = ROLE_KINDS.map((kind) => ({
     kind,
@@ -86,10 +89,10 @@ export function SendSmsModal({
         delivery ? (
           <div className="flex items-center justify-end gap-2">
             {/* Back drops the people the send reached, so a second Send does not repeat it to them. */}
-            <Button variant="secondary" size="sm" type="button" onClick={() => { setSelectedIds((prev) => keepNotReached(prev, delivery, people)); back(); }}>
+            <Button variant="secondary" size="sm" type="button" aria-disabled={waiting || undefined} onClick={() => { if (!settled()) return; setSelectedIds((prev) => keepNotReached(prev, delivery, people, (p) => !!p.phone)); back(); }}>
               {m.common_back()}
             </Button>
-            <Button variant="primary" size="sm" type="button" onClick={onClose}>
+            <Button variant="primary" size="sm" type="button" aria-disabled={waiting || undefined} onClick={() => { if (settled()) onClose(); }}>
               {m.inspections_hub_send_result_done()}
             </Button>
           </div>
@@ -112,6 +115,7 @@ export function SendSmsModal({
         )
       }
     >
+      <DeliveryAnnouncement delivery={delivery} />
       {delivery ? <SendDeliveryResult delivery={delivery} people={people} /> : (
       <fetcher.Form
         method="post"

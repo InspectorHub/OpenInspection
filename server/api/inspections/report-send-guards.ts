@@ -14,7 +14,10 @@
  * - send-report-pdf additionally: at most MAX_RECIPIENTS recipients, each one a
  *   person already on the inspection (by contact id, or by that person's email),
  *   and the same recipient is sent the same inspection at most MAX_PER_HOUR times
- *   per hour.
+ *   per hour. The allowance counts reports DELIVERED: it is reserved before the
+ *   send (so simultaneous requests cannot all pass the check) and given back for
+ *   every recipient the send did not reach, or all of them when the request was
+ *   refused (cooling window, plan cap) or failed.
  */
 import type { Context, Next } from 'hono';
 import { and, eq } from 'drizzle-orm';
@@ -50,18 +53,89 @@ const MAX_CONTACT_ID_LENGTH = 128;
 const sendKey = (c: Context<HonoConfig>, inspectionId: string, who: string) =>
     `sendlimit:${c.get('tenantId')}:${inspectionId}:${who.toLowerCase()}`;
 
+/**
+ * A counter is stored as `<count>|<expiry epoch ms>`: the expiry travels with the count so a refund can
+ * put the count back down WITHOUT moving the window of the sends that really happened. (Rewriting the
+ * key with a fresh TTL would keep an earlier delivery counted for longer than the hour it is owed.) The
+ * window opens with the first send and does not slide: three sends in an hour is a ceiling on that hour.
+ * A plain number is the older format; it reads as a count whose window ends an hour from now. A counter
+ * whose window has passed reads as zero, whether or not the store has dropped the key yet.
+ */
+function readCounter(raw: string | null, nowMs: number): { count: number; expiresAtMs: number } {
+    if (!raw) return { count: 0, expiresAtMs: nowMs + 3_600_000 };
+    const [count, expiry] = raw.split('|');
+    const parsed = Number(expiry);
+    const expiresAtMs = Number.isFinite(parsed) && expiry ? parsed : nowMs + 3_600_000;
+    if (expiresAtMs <= nowMs) return { count: 0, expiresAtMs: nowMs + 3_600_000 };
+    return { count: Number(count) || 0, expiresAtMs };
+}
+
 /** Refuses when this recipient is already at the hourly ceiling for this inspection. Spends nothing. */
 async function assertUnderLimit(c: Context<HonoConfig>, inspectionId: string, who: string, message: string): Promise<void> {
-    const used = Number(await c.env.TENANT_CACHE.get(sendKey(c, inspectionId, who)) ?? '0');
-    if (used >= MAX_PER_HOUR) throw Errors.RateLimited(message);
+    const { count } = readCounter(await c.env.TENANT_CACHE.get(sendKey(c, inspectionId, who)), Date.now());
+    if (count >= MAX_PER_HOUR) throw Errors.RateLimited(message);
+}
+
+/**
+ * Moves one recipient's counter by `delta` (an address, or `sms:<contact id>`); never below zero. The
+ * first spend opens the hour; later spends and refunds keep the expiry the counter already has.
+ */
+async function adjustSend(c: Context<HonoConfig>, inspectionId: string, who: string, delta: number): Promise<void> {
+    const kv = c.env.TENANT_CACHE;
+    const key = sendKey(c, inspectionId, who);
+    const now = Date.now();
+    const current = readCounter(await kv.get(key), now);
+    const count = Math.max(0, current.count + delta);
+    if (count === 0) {
+        await kv.delete(key);
+        return;
+    }
+    const expiresAtMs = current.expiresAtMs;
+    // KV refuses an expiry less than a minute away; a window that short is simply held that long.
+    await kv.put(key, `${count}|${expiresAtMs}`, { expiration: Math.max(Math.ceil(expiresAtMs / 1000), Math.ceil(now / 1000) + 60) });
 }
 
 /** Spends one send of this inspection on this recipient (an address, or `sms:<contact id>`). */
-async function spendSend(c: Context<HonoConfig>, inspectionId: string, who: string): Promise<void> {
-    const kv = c.env.TENANT_CACHE;
-    const key = sendKey(c, inspectionId, who);
-    const used = Number(await kv.get(key) ?? '0');
-    await kv.put(key, String(used + 1), { expirationTtl: 3600 });
+const spendSend = (c: Context<HonoConfig>, inspectionId: string, who: string) => adjustSend(c, inspectionId, who, 1);
+
+/**
+ * Which addresses a request really delivered to, noted by the handler as it goes. It is kept per
+ * request so the guard knows what was delivered even when the handler then throws (a refusal that
+ * applies to the whole batch aborts it after earlier recipients were already sent).
+ */
+const deliveredByRequest = new WeakMap<Request, string[]>();
+
+/**
+ * Called by the send-report handler for each address a report actually went to. It must run BEFORE anything
+ * after the send that can throw (the audit write): the report is in the inbox, so the allowance keeps counting it.
+ */
+export function noteReportDelivered(c: Context<HonoConfig>, email: string): void {
+    const list = deliveredByRequest.get(c.req.raw) ?? [];
+    list.push(email.toLowerCase());
+    deliveredByRequest.set(c.req.raw, list);
+}
+
+/**
+ * Serialises the check-then-write on one inspection's counters within this isolate. KV has no
+ * atomic increment, so without this two requests in flight (a double-click) both read the same
+ * count, both pass the check and both write count + 1. Across isolates the counter stays
+ * best-effort, as KV reads are eventually consistent; the ceiling is a courtesy limit, not a
+ * security boundary.
+ */
+const counterLocks = new Map<string, Promise<void>>();
+async function withCounterLock<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const previous = counterLocks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const mine = new Promise<void>((resolve) => { release = resolve; });
+    const tail = previous.then(() => mine);
+    counterLocks.set(key, tail);
+    await previous;
+    try {
+        return await work();
+    } finally {
+        release();
+        if (counterLocks.get(key) === tail) counterLocks.delete(key);
+    }
 }
 
 /**
@@ -119,11 +193,39 @@ export async function guardSendReport(c: Context<HonoConfig>, next: Next) {
         seen.add(person.contactId);
         if (person.email) emails.push(person.email.toLowerCase());
     }
-    // Quota is spent only once the whole request has passed every check above.
-    // Check every recipient first so a request refused for one of them has spent nothing for the others.
-    for (const email of emails) await assertUnderLimit(c, id, email, REPORT_LIMIT_MESSAGE);
-    for (const email of emails) await spendSend(c, id, email);
-    return next();
+    // Reserve the allowance only once the whole request has passed every check above. Check every
+    // recipient first so a request refused for one of them has reserved nothing for the others, and
+    // do check and reservation under one lock so two simultaneous requests cannot both pass.
+    const lockKey = `${c.get('tenantId')}:${id}`;
+    await withCounterLock(lockKey, async () => {
+        for (const email of emails) await assertUnderLimit(c, id, email, REPORT_LIMIT_MESSAGE);
+        for (const email of emails) await spendSend(c, id, email);
+    });
+    // The reservation is only a hold until the send is known. Whatever happens next (an answer, a
+    // thrown refusal), give back exactly the recipients the handler did not deliver to.
+    try {
+        await next();
+    } finally {
+        await releaseUndelivered(c, id, lockKey, emails, deliveredByRequest.get(c.req.raw) ?? []);
+    }
+}
+
+async function releaseUndelivered(
+    c: Context<HonoConfig>, inspectionId: string, lockKey: string, reserved: string[], delivered: string[],
+): Promise<void> {
+    const remaining = new Map<string, number>();
+    for (const email of delivered) remaining.set(email, (remaining.get(email) ?? 0) + 1);
+    const refunds: string[] = [];
+    for (const email of reserved) {
+        const left = remaining.get(email) ?? 0;
+        if (left > 0) remaining.set(email, left - 1);
+        else refunds.push(email);
+    }
+    if (refunds.length === 0) return;
+    // A failed refund must never turn a finished send into an error; the hold simply expires with its hour.
+    await withCounterLock(lockKey, async () => {
+        for (const email of refunds) await adjustSend(c, inspectionId, email, -1).catch(() => {});
+    }).catch(() => {});
 }
 
 /** report-link-expiry on one inspection: assigned or `scheduleOthers`, publish state irrelevant. */

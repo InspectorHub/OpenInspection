@@ -147,7 +147,11 @@ export class ContactService {
         // correction back to "not stated". Normalizing on the way in keeps the
         // column's contract — every stored value is one the resolver returns.
         if ('locale' in patch) patch.locale = normalizeLocale(patch.locale);
-        await db.update(contacts).set(patch).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+        // Nothing left to write (an agent's frozen email was the only field sent): drizzle refuses an
+        // empty SET, and there is nothing to change anyway.
+        if (Object.keys(patch).length > 0) {
+            await db.update(contacts).set(patch).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+        }
         return { ...existing, ...patch, createdAt: safeISODate(existing.createdAt) };
     }
 

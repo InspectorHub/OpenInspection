@@ -299,6 +299,54 @@ describe('permission template routes', () => {
             expect((await userRow(INSPECTOR))?.role).toBe('staff');
         });
 
+        describe('which inspections the member sees, stated beside a template', () => {
+            // The edit drawer applies a template it still shows exactly AND states the scope beside it. Choosing
+            // "all inspections" is the role's own default, so it diffs to nothing; it must still LIFT a stored
+            // restriction rather than be mistaken for "no statement" and leave the member restricted.
+            const restricted = () => db.update(schema.users).set({ permissionOverrides: { viewAllInspections: false } }).where(eq(schema.users.id, INSPECTOR));
+            const patch = async (body: Record<string, unknown>) => send(await build('owner'), 'PATCH', `/api/team/members/${INSPECTOR}`, body);
+
+            it('"all inspections" beside a template lifts a stored restriction', async () => {
+                await restricted();
+                const res = await patch({ templateId: 'inspector_standard', permissionOverrides: { viewAllInspections: true } });
+                expect(res.status).toBe(200);
+                expect((await userRow(INSPECTOR))?.permissionOverrides).toBeNull();
+            });
+
+            it('"only assigned" beside a template sets the restriction', async () => {
+                const res = await patch({ templateId: 'inspector_standard', permissionOverrides: { viewAllInspections: false } });
+                expect(res.status).toBe(200);
+                expect((await userRow(INSPECTOR))?.permissionOverrides).toEqual({ viewAllInspections: false });
+            });
+
+            it('control: a template with no statement about scope leaves a stored restriction alone', async () => {
+                await restricted();
+                expect((await patch({ templateId: 'inspector_standard' })).status).toBe(200);
+                expect((await userRow(INSPECTOR))?.permissionOverrides).toEqual({ viewAllInspections: false });
+            });
+
+            it('a manager within the grant ceiling can lift it beside a template', async () => {
+                await restricted();
+                const res = await send(await build('manager'), 'PATCH', `/api/team/members/${INSPECTOR}`, { templateId: 'inspector_standard', permissionOverrides: { viewAllInspections: true } });
+                expect(res.status).toBe(200);
+                expect((await userRow(INSPECTOR))?.permissionOverrides).toBeNull();
+            });
+
+            it('an explicit false beside a template for a role that always sees everything stores nothing', async () => {
+                const res = await patch({ templateId: 'office_scheduler', permissionOverrides: { viewAllInspections: false } });
+                expect(res.status).toBe(200);
+                const row = await userRow(INSPECTOR);
+                expect(row?.role).toBe('staff');
+                expect(row?.permissionOverrides ?? null).toBeNull();
+            });
+
+            it('control: the same statement without a template lifts it too (the path that already worked)', async () => {
+                await restricted();
+                expect((await patch({ role: 'inspector', permissionOverrides: { viewAllInspections: true } })).status).toBe(200);
+                expect((await userRow(INSPECTOR))?.permissionOverrides).toBeNull();
+            });
+        });
+
         it('an unknown template is a 404 and leaves the member alone', async () => {
             const res = await send(await build('owner'), 'PATCH', `/api/team/members/${INSPECTOR}`, { templateId: 'nope' });
             expect(res.status).toBe(404);

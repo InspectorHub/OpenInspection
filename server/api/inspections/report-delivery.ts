@@ -5,7 +5,7 @@
 // signing envelope lives in ./agreements.ts.
 // Extracted from inspections.ts, then fixed in place: not a copy of anything,
 // the only definition of these routes.
-import { guardSendReport, guardReportLink } from './report-send-guards';
+import { guardSendReport, guardReportLink, noteReportDelivered } from './report-send-guards';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -62,7 +62,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
     operationId: "createInspectionSendReportPdf",
-    description: "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request. Available to owner and manager roles, and to inspectors assigned to the inspection or granted the scheduleOthers capability. The report must be published (409 NOT_PUBLISHED otherwise). At most 10 recipients per request, each a person already on the inspection (matched by contact id, or by that person's email); anything else is refused with 400. The same recipient is sent the same inspection at most 3 times per hour (429 after that)."
+    description: "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request. Available to owner and manager roles, and to inspectors assigned to the inspection or granted the scheduleOthers capability. The report must be published (409 NOT_PUBLISHED otherwise). At most 10 recipients per request, each a person already on the inspection (matched by contact id, or by that person's email); anything else is refused with 400. The same recipient is sent the same inspection at most 3 times per hour (429 after that); only reports that were actually delivered count, so a request refused or failed for that recipient does not use up the allowance."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -445,6 +445,7 @@ const reportDeliveryRoutes = createApiRouter()
                 } else {
                     await c.var.services.email.sendReportReady(recipientEmail, address, linkUrl, sigInspector, sigHost);
                 }
+                noteReportDelivered(c, recipientEmail);
                 auditFromContext(c, 'inspection.send_pdf', 'inspection', {
                     entityId: id,
                     metadata: { recipient: recipientEmail, roleKey: recipient.roleKey },

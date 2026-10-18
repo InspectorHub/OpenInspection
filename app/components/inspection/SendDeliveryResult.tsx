@@ -28,3 +28,16 @@ export function SendDeliveryResult({ delivery, people }: { delivery: DeliveryOut
     </div>
   );
 }
+
+/**
+ * The spoken half of the result. A live region only announces what changes INSIDE a region that was
+ * already on the page, so this one is rendered permanently (empty) and gets its text when the result
+ * arrives; mounting a status region together with its content is announced unreliably. The visible
+ * result is not a live region, so nothing is announced twice.
+ */
+export function DeliveryAnnouncement({ delivery }: { delivery: DeliveryOutcome | null }) {
+  const text = !delivery ? "" : delivery.sent === 0
+    ? m.inspections_hub_send_result_none()
+    : m.inspections_hub_send_result_summary({ sent: delivery.sent, total: delivery.sent + delivery.skipped.length });
+  return <div role="status" className="sr-only" data-testid="delivery-announcement">{text}</div>;
+}
