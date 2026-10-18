@@ -80,7 +80,13 @@ function inspectorFor(c: Context<HonoConfig>, named: string | null | undefined):
  * refused create leaves no contact behind and fills nothing forward on a matched one. The service repeats the checks
  * it needs at the insert (the quota claim is atomic there); this is the read-only look ahead of it.
  */
-export async function assertCanCreate(c: Context<HonoConfig>, body: { templateId?: string | undefined }): Promise<void> {
+export async function assertCanCreate(
+    c: Context<HonoConfig>,
+    body: { templateId?: string | undefined; client?: unknown; newAgent?: unknown; clientName?: string | undefined },
+): Promise<void> {
+    // Only a request that will upsert contacts ahead of the insert has anything to protect. A create that names none
+    // (the offline import's, among them) skips the look ahead, which would otherwise cost every one of them reads.
+    if (!body.client && !body.newAgent && (!body.clientName || body.clientName === ANONYMOUS_CLIENT)) return;
     const tenantId = c.get('tenantId');
     if (body.templateId) {
         const tpl = await getDrizzle(c).select({ id: templates.id }).from(templates)
