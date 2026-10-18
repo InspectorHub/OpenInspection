@@ -1,7 +1,22 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Runs `handler` once for each NEW result a fetcher delivers, after it has settled to idle.
+ * The fetcher's data, but only a result that arrived after this component mounted. A fetcher owned by the page keeps
+ * its last result after a dialog closes, so reading `fetcher.data` straight on the next open shows the previous send's
+ * answer (its error, say) on a form that has not sent anything yet.
+ */
+export function useResultSinceMount<T>(data: T | undefined): T | undefined {
+    const atMount = useRef(data);
+    return data !== undefined && data !== atMount.current ? data : undefined;
+}
+
+/**
+ * Runs `handler` once for each NEW result a fetcher delivers, as soon as the action has answered.
+ *
+ * That is not waiting for `idle`: after an action the router revalidates the page's loaders and the fetcher
+ * stays in `loading` until they finish. A slow or failing revalidation would otherwise leave a drawer open
+ * after a save that already succeeded, inviting a second submit. Only `submitting` holds the handler back, and
+ * because a result is acted on once, the later `idle` does not repeat it.
  *
  * A fetcher keeps its last result after the component that read it closes, and a parent usually hands
  * `onClose` down as an inline arrow, so an effect keyed on `[fetcher.data, onClose]` re-runs on every
@@ -22,7 +37,7 @@ export function useFetcherResult<T>(
         latest.current = handler;
     });
     useEffect(() => {
-        if (state !== "idle" || data === undefined || data === handled.current) return;
+        if (state === "submitting" || data === undefined || data === handled.current) return;
         handled.current = data;
         latest.current(data);
     }, [state, data]);

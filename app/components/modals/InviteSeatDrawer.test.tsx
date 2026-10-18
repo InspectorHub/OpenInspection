@@ -179,3 +179,71 @@ describe("InviteSeatDrawer form after a send", () => {
         expect(emailInput()?.value).toBe("keep@example.test");
     });
 });
+
+describe("InviteSeatDrawer stale results and fixed switches", () => {
+    type Result = { ok: boolean; intent?: string | null; error: string | null; url: string | null };
+    const fetcherState = { state: "idle" as "idle" | "submitting" | "loading", data: undefined as Result | undefined, submit: vi.fn() };
+
+    beforeEach(() => {
+        fetcherState.state = "idle";
+        fetcherState.data = undefined;
+        fetcherState.submit.mockReset();
+        vi.mocked(useFetcher).mockImplementation(
+            () => ({ state: fetcherState.state, data: fetcherState.data, submit: fetcherState.submit, load: vi.fn() }) as unknown as ReturnType<typeof useFetcher>,
+        );
+    });
+    afterEach(cleanup);
+
+    it("an error that arrives after the drawer was closed is not shown when it opens again", () => {
+        const ui = (open: boolean) => <InviteSeatDrawer actor={OWNER} open={open} onClose={() => {}} />;
+        const { rerender, queryByText } = render(ui(true));
+        fetcherState.state = "submitting";
+        rerender(ui(true));
+        rerender(ui(false)); // the person closes the drawer while the invite is in flight
+        fetcherState.state = "idle";
+        fetcherState.data = { ok: false, intent: "invite", error: "That address is already a member.", url: null };
+        rerender(ui(false)); // the answer arrives against a closed drawer
+        rerender(ui(true));
+        expect(queryByText("That address is already a member.")).toBeNull();
+    });
+
+    it("control: an error that arrives while the drawer is open is shown", () => {
+        const ui = () => <InviteSeatDrawer actor={OWNER} open onClose={() => {}} />;
+        const { rerender, queryByText } = render(ui());
+        fetcherState.state = "submitting";
+        rerender(ui());
+        fetcherState.state = "idle";
+        fetcherState.data = { ok: false, intent: "invite", error: "That address is already a member.", url: null };
+        rerender(ui());
+        expect(queryByText("That address is already a member.")).toBeTruthy();
+    });
+
+    it("closes on a saved invite while the page is still revalidating", () => {
+        const onClose = vi.fn();
+        const ui = () => <InviteSeatDrawer actor={OWNER} open onClose={onClose} />;
+        const { rerender } = render(ui());
+        fetcherState.state = "submitting";
+        rerender(ui());
+        fetcherState.state = "loading";
+        fetcherState.data = { ok: true, intent: "invite", error: null, url: null };
+        rerender(ui());
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("says in words which switches the role fixes, for staff", () => {
+        const { getByText, getAllByText, container } = render(<InviteSeatDrawer actor={OWNER} open onClose={() => {}} />);
+        const select = container.ownerDocument.querySelector("select");
+        const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+        act(() => { set?.call(select, "staff"); select?.dispatchEvent(new Event("change", { bubbles: true })); });
+        act(() => { getByText("Advanced permissions").click(); });
+        const note = "This permission is fixed for this role.";
+        const row = getByText("Edit report content").closest("label");
+        expect(row?.textContent).toContain(note);
+        expect(row?.querySelector("input")?.disabled).toBe(true);
+        // control: a switch staff can hold has no such note and stays editable
+        const free = getByText("Manage contacts").closest("label");
+        expect(free?.textContent).not.toContain(note);
+        expect(free?.querySelector("input")?.disabled).toBe(false);
+        expect(getAllByText(note).length).toBeGreaterThan(0);
+    });
+});

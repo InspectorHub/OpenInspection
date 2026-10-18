@@ -246,7 +246,8 @@ describe("SendReportModal", () => {
 
   it("does not close when the fetcher settles idle with a failed send-report result, and shows the error", () => {
     const onClose = vi.fn();
-    render(
+    const { rerender } = render(<SendReportModal people={people} fetcher={makeFetcher({ state: "submitting", data: undefined })} onClose={onClose} />);
+    rerender(
       <SendReportModal
         people={people}
         fetcher={makeFetcher({

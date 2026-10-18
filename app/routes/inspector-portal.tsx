@@ -1240,6 +1240,7 @@ export default function InspectionHubPage() {
           paid={invoicePaid}
           sent={invoiceSent}
           payUrl={hub.invoice?.payUrl}
+          payUrlUnavailable={hub.invoice?.payUrlUnavailable}
           hasServiceLines={services.length > 0}
           paymentRequired={inspection.paymentRequired}
           basePriceCents={inspection.price}

@@ -118,3 +118,46 @@ describe("InvoiceCard payment-required switch", () => {
         expect(renderWithGate(true).container.querySelector('[data-testid="hub-gate-payment"]')).not.toBeNull();
     });
 });
+
+describe("InvoiceCard pay link", () => {
+    function renderSent(payUrl: string | null, payUrlUnavailable?: "no_client_email" | "link_error" | null) {
+        const Stub = createRoutesStub([
+            {
+                path: "/",
+                Component: () => (
+                    <InvoiceCard
+                        pill={{ tone: "monitor", label: "Sent" }}
+                        amountCents={45000}
+                        currency="USD"
+                        paid={false}
+                        sent
+                        payUrl={payUrl}
+                        payUrlUnavailable={payUrlUnavailable}
+                        hasServiceLines={false}
+                        paymentRequired={false}
+                        basePriceCents={45000}
+                        canManagePrice={false}
+                        onRequestPayment={() => {}}
+                    />
+                ),
+            },
+        ]);
+        return render(<Stub initialEntries={["/"]} />);
+    }
+
+    it("says why there is no link instead of hiding it", () => {
+        const { unmount } = renderSent(null, "no_client_email");
+        expect(screen.getByTestId("hub-pay-link-unavailable").textContent).toMatch(/no email/i);
+        unmount();
+        renderSent(null, "link_error");
+        expect(screen.getByTestId("hub-pay-link-unavailable").textContent).toMatch(/could not be created/i);
+    });
+
+    it("control: with a link there is no explanation, and a viewer who is told nothing sees nothing", () => {
+        const { unmount } = renderSent("https://example.test/invoice/1?token=t", "link_error");
+        expect(screen.queryByTestId("hub-pay-link-unavailable")).toBeNull();
+        unmount();
+        renderSent(null, null);
+        expect(screen.queryByTestId("hub-pay-link-unavailable")).toBeNull();
+    });
+});
