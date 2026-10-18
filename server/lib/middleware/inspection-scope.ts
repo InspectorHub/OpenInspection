@@ -67,11 +67,12 @@ async function aggregateNoStore(c: Context<HonoConfig>, next: Next) {
  * registered after it. A route-table test pins the order.
  */
 export function registerInspectionScopeGuards(app: OpenAPIHono<HonoConfig>): void {
+    const guard = inspectionScopeGuard();
+    app.use('/api/inspections/:id', guard);
+    app.use('/api/inspections/:id/*', guard);
+
     // The list and every static route under it (counts, dashboard, templates, ...) answer for whatever
     // the caller may see, so no cache may keep them. Detail, results and files keep their own headers.
     app.use('/api/inspections', aggregateNoStore);
     app.use('/api/inspections/:id', aggregateNoStore);
-    const guard = inspectionScopeGuard();
-    app.use('/api/inspections/:id', guard);
-    app.use('/api/inspections/:id/*', guard);
 }
