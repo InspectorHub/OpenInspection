@@ -109,11 +109,14 @@ function AccessLine({
 export function PeopleEditor({
   people,
   roleProfiles,
+  roleList,
   isAdmin,
   openAddSignal = 0,
 }: {
   people: PersonRow[];
   roleProfiles: RoleProfile[];
+  /** Loading state of `roleProfiles` (loaded on first open); omitted means already loaded. See AddPersonModal. */
+  roleList?: { status: "idle" | "loading" | "ready" | "error"; onRequest: () => void; onRetry: () => void };
   isAdmin: boolean;
   /** The page bumps this to ask for the add-person dialog (the Send report dialog's hand-off). 0 means nobody asked. */
   openAddSignal?: number;
@@ -376,6 +379,7 @@ export function PeopleEditor({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         roleProfiles={roleProfiles}
+        {...(roleList ? { rolesStatus: roleList.status, onRequestRoles: roleList.onRequest, onRetryRoles: roleList.onRetry } : {})}
         isAdmin={isAdmin}
         fetcher={addFetcher}
         submit={submitAdd}

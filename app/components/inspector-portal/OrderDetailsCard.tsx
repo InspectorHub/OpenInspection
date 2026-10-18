@@ -25,6 +25,7 @@ export function OrderDetailsCard({
     referenceNumber,
     referralSource,
     referralSources,
+    onRequestSources,
     referredByContactId,
     referredByName,
     canEdit = true,
@@ -33,6 +34,8 @@ export function OrderDetailsCard({
     referenceNumber: string | null;
     referralSource: string | null;
     referralSources: string[];
+    /** Called when the editor opens, so the referral list (loaded on first use) can start loading. */
+    onRequestSources?: () => void;
     referredByContactId: string | null;
     referredByName: string | null;
     /** False for a viewer the API refuses these fields (an office user): the facts show, the Edit button does not. */
@@ -109,7 +112,7 @@ export function OrderDetailsCard({
             </dl>
             {error && <p className="text-[12px] text-ih-bad-fg mb-2">{error}</p>}
             {canEdit && (
-                <Button variant="secondary" size="sm" onClick={() => setOpen(true)} pending={saving}>
+                <Button variant="secondary" size="sm" onClick={() => { setOpen(true); onRequestSources?.(); }} pending={saving}>
                     {m.inspections_hub_details_edit()}
                 </Button>
             )}

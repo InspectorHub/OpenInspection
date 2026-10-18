@@ -54,7 +54,7 @@
   "server/services/report-export-consumer.ts": 482,
   "server/portal/integration.routes.ts": 476,
   "server/api/admin/admin-config.ts": 472,
-  "app/components/inspection/PeopleEditor.tsx": 471,
+  "app/components/inspection/PeopleEditor.tsx": 475,
   "server/lib/db/schema/tenant/core.ts": 468,
   "scripts/check-retention-manifest.mjs": 462,
   "server/lib/middleware/di.ts": 460,

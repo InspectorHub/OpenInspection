@@ -37,7 +37,6 @@ import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEdit
 import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import { SendSmsModal } from "~/components/inspection/SendSmsModal";
-import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { COURTESY_TRANSLATION_LOCALE } from "~/lib/courtesy-locale";
 import {
   toActionResult, sendReportActionResult, deliveryActionResult, reinspectionDay,
@@ -60,7 +59,7 @@ import {
   handleReportDelete,
   handleReportTranslation,
 } from "~/lib/inspection-order-actions";
-import { ScheduleCard, type TeamMember } from "~/components/inspector-portal/ScheduleCard";
+import { ScheduleCard } from "~/components/inspector-portal/ScheduleCard";
 import { ServicesCard, type CatalogService } from "~/components/inspector-portal/ServicesCard";
 import { ReportsCard, type ReportRow } from "~/components/inspector-portal/ReportsCard";
 import { VisitsCard } from "~/components/inspector-portal/VisitsCard";
@@ -70,7 +69,7 @@ import { InvoiceCard } from "~/components/inspector-portal/InvoiceCard";
 import { GateToggle } from "~/components/inspector-portal/GateToggle";
 import { ReportGateUnlock } from "~/components/inspector-portal/ReportGateUnlock";
 import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
-import { resolveReferralSources } from "../../server/lib/referral-sources";
+import { useHubPickers } from "~/hooks/useHubPickers";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
 import type { RestorableStatus } from "../../server/lib/inspection/cancel-restore";
 import { canSendReportFor, hubAccess, mayActOnThisInspection, meAccessFromBody } from "~/lib/hub-access";
@@ -211,12 +210,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   })();
 
   // Plan 1B Task 5 — editable People section: every contact/role pairing on
-  // the inspection via inspection_people (Task 3), plus the tenant's role
-  // profiles for the "add person" role picker (Task 2). Both best-effort:
-  // `people` degrades to [] on failure (the card still renders, just empty);
-  // `roleProfiles` is admin-gated server-side (owner/manager) — a non-admin
-  // viewer (inspector) degrades to an empty list, same graceful pattern as
-  // contacts.tsx's Roles tab. Optional-chained (mirrors the `meGet` lookup
+  // the inspection via inspection_people (Task 3). Best-effort: `people`
+  // degrades to [] on failure (the card still renders, just empty). The role
+  // profiles for the "add person" picker load on first use (resources/hub-pickers).
+  // Optional-chained (mirrors the `meGet` lookup
   // above) so a narrower mocked api-client in unit tests degrades cleanly
   // instead of throwing on a missing property.
   const peopleP = (async (): Promise<PersonRow[]> => {
@@ -225,12 +222,6 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       | undefined;
     const r = peopleGet ? await peopleGet({ param: { id } }).catch(() => null) : null;
     return r && r.ok ? (((await r.json()) as { data?: PersonRow[] }).data ?? []) : [];
-  })();
-
-  const roleProfilesP = (async (): Promise<RoleProfile[]> => {
-    const g = api.roleProfiles?.index?.$get as unknown as (() => Promise<Response>) | undefined;
-    const r = g ? await g().catch(() => null) : null;
-    return r && r.ok ? (((await r.json()) as { data?: RoleProfile[] }).data ?? []) : [];
   })();
 
   // Inspector documents (unified portal section ⑦). The inspector document
@@ -254,27 +245,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     return [];
   })();
 
-  // Order-fact editors on the hub (IA-87 + the settings merge). All three are
-  // best-effort: each degrades to an empty list, which disables the affected
-  // picker rather than breaking the page.
-  //  - `members`  → the Schedule card's inspector picker
-  //  - `catalog`  → the Services card's "Add service" picker
-  //  - `referralSources` → the Order-details referral dropdown, which the
-  //    editor's settings sheet rendered but never populated (its own caller
-  //    never passed the prop), so the field was unsettable from anywhere.
-  // Optional-chained like the `meGet` / `peopleGet` lookups above: a narrower
-  // mocked api-client in a unit test degrades to an empty list instead of
-  // throwing on a missing property.
-  const membersP = (async (): Promise<TeamMember[]> => {
-    // The assignee list the schedule routes themselves use: it is open to the same people who may reassign.
-    const g = api.inspections?.inspectors?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
-    const r = g ? await g({}).catch(() => null) : null;
-    return r && r.ok
-      ? (((await r.json()) as { data?: Array<{ id: string; name?: string | null; email?: string | null }> })
-          .data ?? []).map((u) => ({ id: u.id, name: u.name ?? "", email: u.email ?? "" }))
-      : [];
-  })();
-
+  // The Services card's "Add service" picker and the visit suggestions read the
+  // service catalogue, so it stays here. The other three lists that only feed
+  // pickers (the Schedule card's inspectors, the add-person dialog's role
+  // profiles, Order details' referral sources) load on first use through
+  // `useHubPickers` / resources/hub-pickers.
   // `defaultEventTypeSlugs` rides along: it is what makes the Visits card's add
   // picker propose a radon test's drop-off AND its pickup instead of asking the
   // user to remember that a radon job is two visits.
@@ -286,14 +261,6 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
           data?: Array<{ id: string; name: string; price: number; active?: boolean; defaultEventTypeSlugs?: string[] | null }>;
         }).data ?? []).filter((sv) => sv.active !== false)
       : [];
-  })();
-
-  const brandingP = (async (): Promise<string[]> => {
-    const g = api.adminBranding?.branding?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
-    const r = g ? await g({}).catch(() => null) : null;
-    if (!r || !r.ok) return [];
-    const b = (await r.json().catch(() => ({}))) as { data?: { branding?: { customReferralSources?: string[] } } };
-    return b.data?.branding?.customReferralSources ?? [];
   })();
 
   // IA-40 — published report versions for the Report card's Versions list.
@@ -353,14 +320,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const hub = ((body as Record<string, unknown>).data ?? {}) as unknown as HubData;
 
   const [
-    smsConsent, me, people, roleProfiles, documents, members, catalogRows, customReferralSources, versions, statutoryForm,
+    smsConsent, me, people, documents, catalogRows, versions, statutoryForm,
   ] = await Promise.all([
-    consentP, meP, peopleP, roleProfilesP, documentsP, membersP, catalogP, brandingP, versionsP, statutoryP,
+    consentP, meP, peopleP, documentsP, catalogP, versionsP, statutoryP,
   ]);
 
   const { canPublishCap, canViewCommunication, scheduleOthers, userId, role, isAdmin } = me;
   const serviceCatalog: CatalogService[] = catalogRows.map((sv) => ({ id: sv.id, name: sv.name, price: sv.price }));
-  const referralSources = resolveReferralSources(customReferralSources);
 
   // ── SECOND WAVE ─────────────────────────────────────────────────────────
   // The only three reads that genuinely need something from the first: two
@@ -413,8 +379,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const { visits, visitTypes, suggestedTypeIds } = visitData;
 
   return {
-    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, scheduleOthers, userId, documents, people, roleProfiles, isAdmin, versions,
-    members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, scheduleOthers, userId, documents, people, isAdmin, versions,
+    serviceCatalog, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   };
 }
 
@@ -632,9 +598,12 @@ export function reportActions(
 
 export default function InspectionHubPage() {
   const {
-    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, scheduleOthers, userId, documents, people, roleProfiles, isAdmin, versions,
-    members, serviceCatalog, referralSources, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
+    hub, smsConsent, reinspectCandidates, canPublishCap, canViewCommunication, scheduleOthers, userId, documents, people, isAdmin, versions,
+    serviceCatalog, visits, visitTypes, suggestedTypeIds, role, statutoryForm,
   } = useLoaderData<typeof loader>();
+  // The picker lists (inspectors, role profiles, referral sources) load on first
+  // use of the control that needs them, not with the page.
+  const pickers = useHubPickers();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
   // inspector — still used for the header meta line + modal default emails);
   // `people` (destructured above) is the Task 3 editable inspection_people
@@ -930,7 +899,10 @@ export default function InspectionHubPage() {
           date={inspection.date}
           inspectorId={inspection.inspectorId}
           inspectorName={peopleCard.inspector?.name ?? peopleCard.inspector?.email ?? null}
-          members={members}
+          members={pickers.members.data}
+          membersStatus={pickers.members.status}
+          onRequestMembers={pickers.request}
+          onRetryMembers={pickers.retry}
           displayTz={displayTz}
           canEdit={access.canChangeSchedule}
         />
@@ -944,7 +916,8 @@ export default function InspectionHubPage() {
         <div className="space-y-4">
           <PeopleEditor
             people={people}
-            roleProfiles={roleProfiles}
+            roleProfiles={pickers.roleProfiles.data}
+            roleList={{ status: pickers.roleProfiles.status, onRequest: pickers.request, onRetry: pickers.retry }}
             isAdmin={isAdmin}
             openAddSignal={addPersonSignal}
           />
@@ -1256,7 +1229,8 @@ export default function InspectionHubPage() {
           closingDate={inspection.closingDate}
           referenceNumber={inspection.referenceNumber}
           referralSource={inspection.referralSource}
-          referralSources={referralSources}
+          referralSources={pickers.referralSources.data}
+          onRequestSources={pickers.request}
           referredByContactId={inspection.referredByContactId ?? null}
           referredByName={inspection.referredByName ?? null}
           canEdit={canEditOrder}
