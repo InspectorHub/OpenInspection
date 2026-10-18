@@ -28,6 +28,7 @@ import {
 } from '../../../server/lib/email/build-email-service';
 import { MeteringService } from '../../../server/services/metering.service';
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
+import { ACCOUNT_EMAIL_CLASSES } from '../../../server/lib/email/outbound-cooling-window';
 
 const baseEnv: EmailServiceEnv = {
   DB: {} as never,
@@ -136,5 +137,27 @@ describe('free-tier pre-flight cap (platform-mode only)', () => {
 
     expect(result).toEqual({ delivered: true });
     expect(vi.mocked(fetch)).toHaveBeenCalled();
+  });
+
+  it('a free tenant at the cap still gets account and statutory mail, and nothing else', async () => {
+    const m = new MeteringService(testD1);
+    await m.record('tenant-capped', 'email', '2026-06', 50);
+    const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
+    const env: EmailServiceEnv = { ...baseEnv, DB: testD1 };
+    const svc = assembleTenantEmailService(env, platformCfg, 'tenant-capped', guard, 'free');
+
+    // the named exemption list, read from the authority the cooling window already keeps
+    expect([...ACCOUNT_EMAIL_CLASSES].sort()).toEqual([
+      'password-reset', 'subject-erasure-confirmed', 'subject-export-ready',
+      'usage-quota-reached', 'usage-quota-warning', 'workspace-invitation',
+    ]);
+    for (const classId of ACCOUNT_EMAIL_CLASSES) {
+      const res = await svc.sendEmail(['recipient@test.com'], 'Subj', '<p>hi</p>', undefined, { classId });
+      expect(res, classId).toEqual({ delivered: true });
+    }
+    // controls: an unclassified send and an ordinary client email are still stopped at the cap
+    for (const opts of [undefined, { classId: 'report-ready' }, { classId: 'agent-login-link' }]) {
+      await expect(svc.sendEmail(['recipient@test.com'], 'Subj', '<p>hi</p>', undefined, opts)).rejects.toMatchObject({ code: 'QUOTA_EXHAUSTED' });
+    }
   });
 });

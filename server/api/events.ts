@@ -4,7 +4,7 @@ import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
-import { deniedNeedsRole } from '../lib/permission-denied';
+import { deniedByRule, deniedNeedsRole } from '../lib/permission-denied';
 import { moneyView, guardMoneyWrite } from '../lib/auth/money-access';
 import { requireVisibleEvent, resolveInspectionScope } from '../lib/inspection/visibility';
 import { getDrizzle } from '../lib/route-helpers';
@@ -85,7 +85,7 @@ const eventsRoutes = createApiRouter()
         // Staff are the office: they schedule visits but never change a visit's
         // status (completing or cancelling one moves the job), whatever the value.
         if (c.get('userRole') === 'staff') {
-            throw deniedNeedsRole(c, ['owner', 'manager', 'inspector'], "Office staff accounts schedule visits but cannot change a visit's status");
+            throw deniedByRule(c, "Office staff accounts schedule visits but cannot change a visit's status", 'An owner, manager or inspector');
         }
         if (parsed.data.status === 'results_received' && !isAdminRole(c.get('userRole'))) {
             throw deniedNeedsRole(c, ['owner', 'manager'], 'Marking results as received is an owner or manager action');

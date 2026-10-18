@@ -4,7 +4,7 @@
  * cannot be a single sentence that happens to fit one of them.
  */
 import { describe, it, expect } from 'vitest';
-import { deniedByRule, deniedNeedsPermission, deniedNeedsRole, capabilityLabel } from '../../../server/lib/permission-denied';
+import { deniedByRule, deniedNeedsPermission, deniedNeedsRole, capabilityLabel, DENIED_BY_RULE } from '../../../server/lib/permission-denied';
 import { TOGGLEABLE } from '../../../server/lib/auth/capabilities';
 
 const ctx = (role: string | undefined) => ({ get: (k: string) => (k === 'userRole' ? role : undefined) }) as never;
@@ -88,5 +88,42 @@ describe('deniedByRule and a bare role', () => {
         expect(deniedNeedsRole('manager', ['owner'], 'Changing or removing an owner is an owner action').message)
             .toContain('you are signed in as a Manager');
         expect(deniedByRule(undefined, 'x', 'An owner').message).toContain('a user with no recognised role');
+    });
+});
+
+describe('advice that fits the caller (review round 1)', () => {
+    it('never tells an agent to ask for a role change on the Team page', () => {
+        const e = deniedNeedsPermission(ctx('agent'), 'scheduleOthers', 'You cannot do this');
+        expect(e.message).toContain('Agent accounts can only use the agent portal.');
+        expect(e.message).not.toContain('Team page');
+        expect(e.message).not.toContain('Inspector or Manager');
+        expect(e.details).toMatchObject({ role: 'agent', requiredCapability: 'scheduleOthers' });
+        // control: an inspector still gets the grant advice
+        expect(deniedNeedsPermission(ctx('inspector'), 'scheduleOthers').message).toContain('Team page');
+    });
+
+    it('a staff refusal built with deniedByRule says who can do it and does not ask staff to change role', async () => {
+        const { denyStaff } = await import('../../../server/lib/middleware/rbac');
+        const e = await denyStaff(
+            { get: (k: string) => (k === 'userRole' ? 'staff' : undefined) } as never,
+            (async () => undefined) as never,
+        ).then(() => null, (err: unknown) => err as { status: number; message: string; details: Record<string, unknown> });
+        expect(e).not.toBeNull();
+        expect(e!.status).toBe(403);
+        expect(e!.message).toContain('An owner, manager or inspector can do this.');
+        expect(e!.message).not.toContain('change your role');
+        expect(e!.message).not.toContain('This needs the');
+        // control: a role that really is missing from a list still reads as a role refusal
+        expect(deniedNeedsRole(ctx('staff'), ['owner', 'manager']).message).toContain('change your role');
+    });
+
+    it('deniedByRule carries a stable machine value in details.rule, not the human sentence', () => {
+        const what = 'Office staff cannot cancel an inspection that has started';
+        const e = deniedByRule(ctx('staff'), what, 'An owner or manager');
+        expect(e.details).toMatchObject({ role: 'staff', rule: DENIED_BY_RULE });
+        expect(JSON.stringify(e.details)).not.toContain('cancel');
+        expect(e.message).toContain(what);
+        // two different rules share the same machine value; the human text lives only in the message
+        expect((deniedByRule(ctx('staff'), 'Something else', 'An owner').details as { rule: string }).rule).toBe(DENIED_BY_RULE);
     });
 });

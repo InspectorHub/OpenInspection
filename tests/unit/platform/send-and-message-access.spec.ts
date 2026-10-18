@@ -269,3 +269,32 @@ describe('A (review). request shape, duplicates, quota burn, and send-sms', () =
         } finally { h.close(); }
     });
 });
+
+describe('E. one rule for owners and managers: scheduleOthers decides, on every act', () => {
+    const msg = { body: 'hi', attachments: [], contactId: CLIENT };
+
+    it('a manager whose scheduleOthers is off cannot message the client or delete a job they are not on', async () => {
+        const { h, call } = await setup();
+        try {
+            await h.db.update(schema.users).set({ permissionOverrides: { scheduleOthers: false } as never }).where(eq(schema.users.id, MANAGER_ID));
+            expect((await call('manager', 'POST', `/api/inspections/${THEIRS}/messages`, msg)).status).toBe(403);
+            expect((await call('manager', 'POST', `/api/messages/threads/${CLIENT}`, { body: 'hi', inspectionId: THEIRS })).status).toBe(403);
+            expect((await call('manager', 'DELETE', `/api/inspections/${THEIRS}`)).status).toBe(403);
+            expect(h.sent).toHaveLength(0);
+            expect(await h.db.select().from(schema.inspections).where(eq(schema.inspections.id, THEIRS)).get()).toBeTruthy();
+        } finally { h.close(); }
+    });
+
+    it('controls: the same manager acts on a job they work, and a manager with the default set acts on anyone\'s', async () => {
+        const { h, call } = await setup();
+        try {
+            await h.db.insert(schema.inspectionInspectors).values({ inspectionId: THEIRS, userId: MANAGER_ID, tenantId: TENANT_ID, role: 'helper', createdAt: new Date() });
+            await h.db.update(schema.users).set({ permissionOverrides: { scheduleOthers: false } as never }).where(eq(schema.users.id, MANAGER_ID));
+            // on the roster: a helper may message; delete is the lead's, so a helper manager is still refused
+            expect((await call('manager', 'POST', `/api/inspections/${THEIRS}/messages`, msg)).status).toBe(201);
+            expect((await call('manager', 'DELETE', `/api/inspections/${THEIRS}`)).status).toBe(403);
+            await h.db.update(schema.users).set({ permissionOverrides: null as never }).where(eq(schema.users.id, MANAGER_ID));
+            expect((await call('manager', 'DELETE', `/api/inspections/${THEIRS}`)).status).toBe(200);
+        } finally { h.close(); }
+    });
+});

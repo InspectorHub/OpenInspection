@@ -76,12 +76,15 @@ export function deniedNeedsPermission(c: Context<HonoConfig>, cap: Capability, w
     const fixedForRole = typeof role === 'string' && isRole(role) && pinnedCapabilities(role as Role).includes(cap);
     // A manager cannot change their own permissions, so for them the only person who can is an owner.
     const grantor = role === ROLE.MANAGER ? 'an owner' : 'an owner or manager';
-    const fix = fixedForRole
+    // An agent account is a separate kind of login; no switch or Team-page role change gives it company permissions.
+    const fix = role === ROLE.AGENT
+        ? 'Agent accounts can only use the agent portal.'
+        : fixedForRole
         ? `That permission cannot be given to ${ROLE_LABELS[role as Role]} accounts. To do this, ask an owner to change your role to Inspector or Manager on the Team page.`
         : `Ask ${grantor} to turn on "${label}" for you on the Team page.`;
     return Errors.Forbidden(
         `${sentence(what)}You are signed in as ${whoIs(role)}, which does not have the "${label}" permission. ${fix}`,
-        { role: role ?? null, requiredCapability: cap, fix: fixedForRole ? 'change_role' : 'grant_permission' },
+        { role: role ?? null, requiredCapability: cap, fix: role === ROLE.AGENT ? 'none' : fixedForRole ? 'change_role' : 'grant_permission' },
     );
 }
 
@@ -103,6 +106,9 @@ export function deniedNeedsRole(viewer: Viewer, roles: readonly Role[], what?: s
     );
 }
 
+/** The `details.rule` of every `deniedByRule` refusal: a stable value to match on; the sentence is in `message`. */
+export const DENIED_BY_RULE = 'denied_by_rule';
+
 /**
  * 403 for a rule about the state of the thing rather than a missing permission or role: "office staff cannot
  * cancel a job that has started". `who` names the people who can still do it ("An owner or manager").
@@ -111,6 +117,6 @@ export function deniedByRule(viewer: Viewer, what: string, who: string): AppErro
     const role = roleOf(viewer);
     return Errors.Forbidden(
         `${sentence(what)}You are signed in as ${whoIs(role)}. ${who} can do this.`,
-        { role: role ?? null, rule: what },
+        { role: role ?? null, rule: DENIED_BY_RULE },
     );
 }
