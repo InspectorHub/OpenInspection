@@ -66,9 +66,16 @@ OpenInspection follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.
 
 1. Fork → branch off `master` → make your changes
 2. Run `npm run type-check && npm run lint && npm run test:unit` (all green)
-3. Manual smoke for any UI change at 1440 px AND 375 px
+3. Check any UI change by hand (see "What reviewers look for" below)
 4. Open PR using the template — describe **what + why** (not how)
 5. Maintainers aim to review within 7 days
+
+### What reviewers look for
+
+- Tests that prove the change: a regression test for a fix, a spec for a feature.
+- `npm run type-check && npm run lint && npm run test:unit` all green.
+- UI changes checked in both the light and the dark theme, at a narrow (375 px) and a wide (1440 px) width, with screenshots of what changed.
+- English only in code, comments, docs and user-facing strings.
 
 ## What gets fast-tracked
 

@@ -118,40 +118,6 @@ and two running at once can exhaust a developer machine. The cap does not preven
 that — **serialising the commits does.** If you are running more than one working
 copy of this repository, commit in one at a time.
 
-## The PR verification record (`pr-readiness`)
-
-CI-green is not a review. Every pull request body carries a `## Verification`
-block, and a separate check (`.github/workflows/pr-readiness.yml`, job
-`pr-readiness`) reads it. The PR template pre-fills the block with
-placeholders the check rejects until you edit them.
-
-```
-## Verification
-Code review: <who or what reviewed, 3+ words> — open findings: 0
-Chrome: /<route> — light: ok, dark: ok — <what was seen>
-```
-
-- The reviewer must be independent (not "self" or "author") and open findings must be exactly `0`.
-- If a UI file changed (anything under `app/` (plus `public/`, `messages/` and `packages/shared-ui/` in the engine; `app/content/` and `public/` in the portal); `.tsx/.css/.html/.svg/.png/.json/.ico/.woff*` under `server/` or `packages/`; `index.html`; the tailwind and vite config. Tests, `__mocks__/`, `*.stories.*`, `server/data/` and `server/generated/` do not count; for a renamed file the OLD path counts too), a `Chrome:` line is required: `Chrome: /route — light: ok, dark: ok — <what was seen>`. The route starts with `/`; the literal tokens `light: ok` and `dark: ok` (any case, any order, separated by comma, semicolon or space) must both be there; the observation after the first dash that follows the tokens needs at least 10 letters or digits (dashes inside the observation are fine). Any other value (`not checked`, `skipped`, `pending`, anything) fails. `dark: n/a` is accepted only with a reason of at least 4 words in parentheses, e.g. `dark: n/a (this view has no dark theme styling at all)`. With no UI file changed, write `Chrome: n/a — no UI files changed`; the checker compares that claim with the PR's real file list and fails if UI files changed. The tokens are a written assertion by the author: the check makes a missing or evasive record impossible, not a false one. A line that carries `light: ok` and also says in words that it was not checked is outside what a text check can police.
-- No `TBD`, `TODO`, `<...>` leftovers, or a bare "looks fine" / "lgtm".
-- **A PR stays a draft until the block is true.** A draft always fails the check, by design.
-
-Run it locally before merging:
-
-```bash
-npm run pr:merge-check -- --pr <number> --repo InspectorHub/OpenInspection
-```
-
-It prints PASS/FAIL per rule and `N rules checked, M failed`, and exits 1 on any failure.
-
-The check is only a gate once it is required: **add `pr-readiness` to the required status checks in the repository ruleset** (Settings, Rules, the `main` ruleset, Require status checks). A workflow that is not required is advisory.
-
-Formatting is forgiving (bold, backticks, list/quote/number prefixes, `--` or `:` as the route separator). Only the template tokens `<reviewer>`, `<n>`, `<route>`, `<who...>`, `<what was seen...>`, plus `TBD` and `TODO`, count as unfilled placeholders. Every `Code review:` and every `Chrome:` line must be valid. After `open findings: 0` only `(none)`, `(zero)`, `(all fixed)` or `(nothing left)` may follow. A failing rule prints a worked example. A quoted or indented `Code review:` line is accepted: the checker reads text, so formatting cannot make the record more or less true. A PR that reports zero changed files cannot claim `Chrome: n/a`.
-
-**What it cannot do.** The record is self-attested text. The reviewer rule is an honour check: it rejects the words self, myself, author, me, own and same in the reviewer text, but cannot know who reviewed. It makes a missing record loud and verifies the UI-vs-n/a claim against the file list; it cannot prove a review or a browser check actually happened. The commit-message `Chrome:` record (`lint:chrome-record`) is a separate, earlier rung.
-
-**Who judges the checker.** The workflow runs on `pull_request_target` and checks out only the base branch, so a PR cannot edit `scripts/pr-readiness.mjs` and pass its own check; it also means changes to `scripts/pr-readiness.mjs` and `.github/workflows/pr-readiness.yml` take effect only after merge and need a human diff review. The repository has no CODEOWNERS file, so this is a review convention, not an enforced one.
-
 ## Key files
 
 | file | what it is |
@@ -161,4 +127,3 @@ Formatting is forgiving (bold, backticks, list/quote/number prefixes, `--` or `:
 | `scripts/check-gate-registry.mjs` | fails when a `lint:*` script is registered nowhere |
 | `scripts/lib/gate-stamp.mjs` | input-hash caching |
 | `.githooks/pre-commit` | the pre-commit rung |
-| `scripts/pr-readiness.mjs` | the PR verification-record check (workflow and `npm run pr:merge-check`) |
