@@ -2,6 +2,7 @@ import { createCookieSessionStorage, redirect } from "react-router";
 import type { SessionStorage } from "react-router";
 import { getCloudflareEnv, type LoadContext } from "~/lib/load-context";
 import { deriveSessionSecret } from "~/lib/session-secret";
+import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
 /** Fields stored in the React Router `__session` cookie. */
 type AppSessionData = { token: string };
@@ -224,7 +225,39 @@ export async function createSessionWithToken(
   return redirect(redirectTo, { headers });
 }
 
-export async function destroyUserSession(context: LoadContext, request: Request) {
+/**
+ * Where a staff member's EXPLICIT sign-out ends up.
+ *
+ * Where sign-in lives on a separate identity service (the deployment profile has
+ * a `loginRedirectBase`), clearing only this app's cookies is not a sign-out:
+ * the login page it lands on sees the identity service's still-live session and
+ * signs the person straight back in. The identity service therefore offers a
+ * logout hop that clears its own cookie and then redirects to a path on its own
+ * origin; this is the URL of that hop.
+ *
+ * Built ONLY from the deployment profile (server configuration). Nothing from
+ * the request (query, Host, forwarded headers) reaches the result, so a crafted
+ * link cannot send a signed-out person to another site. Null when there is no
+ * such service (standalone) or the session is an agent's, whose sign-in is this
+ * app's own `/agent-login`.
+ */
+function chainedSignOutUrl(context: LoadContext, request: Request): string | null {
+  if (loginPathFor(request) !== "/login") return null;
+  const base = getDeploymentProfile(getCloudflareEnv(context)).loginRedirectBase;
+  if (!base) return null;
+  return `${base}/api/account/logout?returnTo=${encodeURIComponent("/login?loggedout=1")}`;
+}
+
+/**
+ * Tears the session down. `explicit` marks a person choosing to sign out (the
+ * logout route), as opposed to `requireToken` clearing a session that expired:
+ * only the former chains to the identity service's logout.
+ */
+export async function destroyUserSession(
+  context: LoadContext,
+  request: Request,
+  opts: { explicit?: boolean } = {},
+) {
   const session = await getSession(context, request);
   const headers = new Headers();
   // Logging out must work even when no signing secret is configured — the point
@@ -244,5 +277,6 @@ export async function destroyUserSession(context: LoadContext, request: Request)
     "Set-Cookie",
     "__Host-inspector_token=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
   );
-  return redirect(loginPathFor(request), { headers });
+  const chained = opts.explicit ? chainedSignOutUrl(context, request) : null;
+  return redirect(chained ?? loginPathFor(request), { headers });
 }
