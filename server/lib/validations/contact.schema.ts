@@ -5,8 +5,12 @@ import { createApiResponseSchema } from './shared.schema';
 // widened select can never meet a narrower validator.
 import { ROLE_KINDS } from '../people/role-kinds';
 
-export const CreateContactSchema = z.object({
-    type: z.enum(ROLE_KINDS).default('client').openapi({ example: 'agent' }).describe('Kind of party: client, agent or other (attorney, coordinator and similar). Defaults to client.'),
+// The fields shared by create and update, with NO default on any of them. The update schema is
+// `.partial()` of THIS object: `.partial()` keeps a `.default()`, so a default declared here would
+// arrive on every update and overwrite the stored value (a PUT that only cleared a phone turned
+// agents into clients). Create-only defaults are added in `CreateContactSchema` below.
+const ContactFieldsSchema = z.object({
+    type: z.enum(ROLE_KINDS).openapi({ example: 'agent' }).describe('Kind of party: client, agent or other (attorney, coordinator and similar). Defaults to client on create; an update that omits it leaves it unchanged.'),
     name: z.string().min(1).max(100).openapi({ example: 'Jane Smith' }).describe('Contact\'s full name, 1-100 characters.'),
     email: z.string().email().optional().nullable().openapi({ example: 'jane@realty.com' }).describe('Email address. Report links are addressed to it, and for agents it identifies the agent across companies and cannot be edited later.'),
     phone: z.string().max(30).optional().nullable().openapi({ example: '(555) 987-6543' }).describe('Phone number as free text, up to 30 characters.'),
@@ -25,9 +29,13 @@ export const CreateContactSchema = z.object({
     // A free BCP-47 tag rather than an enum, matching the booking payload; the
     // service reduces it to a locale we have messages for, or to NULL.
     locale: z.string().trim().min(2).max(35).optional().nullable().openapi({ example: 'es-419' }).describe("Contact's preferred language as a BCP-47 tag; reduced server-side to a supported locale, or stored as null when unsupported."),
+});
+
+export const CreateContactSchema = ContactFieldsSchema.extend({
+    type: ContactFieldsSchema.shape.type.default('client'),
 }).openapi('CreateContact');
 
-export const UpdateContactSchema = CreateContactSchema.partial().openapi('UpdateContact');
+export const UpdateContactSchema = ContactFieldsSchema.partial().openapi('UpdateContact');
 
 export const ContactResponseSchema = z.object({
     id: z.string().trim().min(1),
