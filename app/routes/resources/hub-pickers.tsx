@@ -9,7 +9,9 @@
  *
  * It answers plain JSON to a same-origin `fetch` (not a router fetcher: a fetcher
  * whose request fails hands the error to the nearest error boundary, which would
- * replace the whole page and any unsaved edits). Each list answers for itself: an array when the read worked (possibly empty,
+ * replace the whole page and any unsaved edits).
+ *
+ * Each list answers for itself: an array when the read worked (possibly empty,
  * which then means "there are none"), `null` when it could not be read. Callers
  * must treat null as "unavailable", never as an empty list.
  */
@@ -85,4 +87,3 @@ async function readPickers(request: Request, context: Route.LoaderArgs["context"
     ]);
     return { members, roleProfiles, referralSources };
 }
-

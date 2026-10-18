@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { loadServiceFanout } from "./service-fanout.server";
 
 /** A fake typed client for the two bulk reads; it records every call. */
-function fakeApi(opts: { failInspectors?: boolean; failPay?: "nonok" | "throw"; failPerService?: boolean } = {}) {
+function fakeApi(opts: { failInspectors?: boolean; failPay?: "nonok" | "throw" | "forbidden"; failPerService?: boolean } = {}) {
   const calls = { inspectors: [] as string[][], payRules: [] as string[][], singleInspectors: [] as string[], singlePay: [] as string[] };
   const idsOf = (query: { ids: string }) => query.ids.split(",").filter(Boolean);
   const api = {
@@ -36,7 +36,8 @@ function fakeApi(opts: { failInspectors?: boolean; failPay?: "nonok" | "throw"; 
           const ids = idsOf(query);
           calls.payRules.push(ids);
           if (opts.failPay === "throw") throw new Error("sync failure");
-          if (opts.failPay === "nonok") return { ok: false, json: async () => ({}) };
+          if (opts.failPay === "nonok") return { ok: false, status: 500, json: async () => ({}) };
+          if (opts.failPay === "forbidden") return { ok: false, status: 403, json: async () => ({}) };
           return { ok: true, json: async () => ({ data: Object.fromEntries(ids.map((id) => [id, [{ id: `r-${id}` }]])) }) };
         },
       },
@@ -137,5 +138,20 @@ describe("loadServiceFanout", () => {
     } as never;
     const out = await loadServiceFanout(api, ["gone"]);
     expect(out).toEqual({ restrictionMap: { gone: [] }, payRuleMap: { gone: [] } });
+  });
+
+  it("a refused bulk read (403, e.g. no company-finance capability) is a denial, not a failure: no per-service calls, empty lists", async () => {
+    const { api, calls } = fakeApi({ failPay: "forbidden" });
+    const out = await loadServiceFanout(api, ["a", "b", "c"]);
+    expect(calls.singlePay).toEqual([]);
+    expect(out.payRuleMap).toEqual({ a: [], b: [], c: [] });
+    // The other read is unaffected.
+    expect(out.restrictionMap).toEqual({ a: ["u-a"], b: ["u-b"], c: ["u-c"] });
+  });
+
+  it("a server error (5xx) still falls back to the per-service reads", async () => {
+    const { api, calls } = fakeApi({ failPay: "nonok" });
+    await loadServiceFanout(api, ["a", "b"]);
+    expect(calls.singlePay.sort()).toEqual(["a", "b"]);
   });
 });

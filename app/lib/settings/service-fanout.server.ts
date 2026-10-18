@@ -30,7 +30,7 @@ const chunk = <T,>(items: T[], size: number): T[][] => {
   return out;
 };
 
-type Res = { ok: boolean; json: () => Promise<unknown> };
+type Res = { ok: boolean; status?: number; json: () => Promise<unknown> };
 
 /**
  * One map from the bulk read. A chunk whose bulk read fails is NOT turned into
@@ -53,6 +53,9 @@ async function readBulk<T>(
         for (const id of part) out[id] = body.data?.[id] ?? [];
         return;
       }
+      // A refusal (no access, e.g. no company-finance capability) is an answer, not a
+      // failure: the per-service routes would refuse too, so no extra calls.
+      if ((res.status as number | undefined) === 403) return;
     } catch {
       // fall through to the per-service reads
     }
