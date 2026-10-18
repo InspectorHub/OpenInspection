@@ -67,15 +67,20 @@ export async function resolveVideoProvider(
     c: Context<HonoConfig>,
     tenantId: string,
     db: DrizzleD1Database,
+    opts: { tenantRow?: PromiseLike<{ tier: string | null; status: string | null } | undefined> | null } = {},
 ): Promise<ResolvedVideoProvider> {
     const streamBindingPresent = !!c.env.STREAM;
 
     if (c.var.profile.videoBackendManaged) {
-        const tenantRow = await db
-            .select({ tier: tenants.tier, status: tenants.status })
-            .from(tenants)
-            .where(eq(tenants.id, tenantId))
-            .get();
+        // A caller that already holds (or is reading) this tenant row passes it
+        // in rather than paying for a second primary-key lookup.
+        const tenantRow = opts.tenantRow
+            ? await opts.tenantRow
+            : await db
+                .select({ tier: tenants.tier, status: tenants.status })
+                .from(tenants)
+                .where(eq(tenants.id, tenantId))
+                .get();
 
         const tier = tenantRow?.tier ?? 'free';
         const status = tenantRow?.status ?? 'pending';

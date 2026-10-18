@@ -251,71 +251,86 @@ const sessionContextRoutes = createApiRouter()
             ? userName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
             : 'OI';
 
-        // Seat usage (only for profiles that enforce seat quotas)
-        let seatUsage: { used: number; limit: number } | null = null;
-        if (profile.hasSeatQuota && tenantId) {
-            try {
-                const usage = await getSeatUsage(tenantId, c.env.DB);
-                if (usage.max !== null) {
-                    seatUsage = { used: usage.used, limit: usage.max };
+        // An unknown role resolves as an inspector rather than throwing: the
+        // chrome must still render, and inspector is the least-privileged tier.
+        const roleForCaps = isRole(user.role) ? user.role : 'inspector';
+        const capabilities: CapabilitySet = getCapabilities(
+            roleForCaps,
+            coerceOverrides(permissionOverridesRaw),
+        );
+
+        // The tenant row serves two answers on a hosted deployment: the video
+        // provider (tier/status) and the cooling-window anchor (createdAt). It
+        // is one primary-key read, started once and shared by both. Where
+        // neither question exists (standalone) nothing is read.
+        const needsTenantRow = !!tenantId && (profile.mode === 'saas' || !!profile.videoBackendManaged);
+        // Wrapped in a real Promise: a drizzle query is a lazy thenable that
+        // would run once per consumer.
+        const tenantRow = needsTenantRow
+            ? Promise.resolve(getDrizzle(c)
+                .select({ tier: tenants.tier, status: tenants.status, createdAt: tenants.createdAt })
+                .from(tenants)
+                .where(eq(tenants.id, tenantId))
+                .get())
+            : null;
+
+        // ONE wave. These four answers do not depend on each other (the unread
+        // count needs the capabilities resolved just above, not any other read),
+        // and each degrades on its own failure, so a slow or failing one never
+        // delays or breaks the rest.
+        const [seatUsage, videoProvider, outboundCoolingWindow, unreadMessages] = await Promise.all([
+            // Seat usage (only for profiles that enforce seat quotas)
+            (async (): Promise<{ used: number; limit: number } | null> => {
+                if (!profile.hasSeatQuota || !tenantId) return null;
+                try {
+                    const usage = await getSeatUsage(tenantId, c.env.DB);
+                    return usage.max !== null ? { used: usage.used, limit: usage.max } : null;
+                } catch (e) {
+                    logger.warn('[session-context] seat usage lookup failed', { error: (e as Error).message });
+                    return null;
                 }
-            } catch (e) {
-                logger.warn('[session-context] seat usage lookup failed', { error: (e as Error).message });
-            }
-        }
-
-        // Resolve the video backend provider for this tenant. Used by the
-        // inspection editor to render the correct VideoCapture/VideoPlayer branch.
-        //
-        // Calls the same resolver the media-studio API uses. This used to be a
-        // 40-line copy annotated "Mirror resolveVideoBackend" — which it did not:
-        // on a misconfigured stream tenant the copy reported 'r2' while the API
-        // threw 503, so the editor offered a capture path every upload refused.
-        let videoProvider: 'r2' | 'stream' = 'r2';
-        if (tenantId) {
-            try {
-                const resolved = await resolveVideoProvider(c, tenantId, getDrizzle(c));
-                videoProvider = videoStreamServiceable(resolved) ? 'stream' : 'r2';
-            } catch (e) {
-                logger.warn('[session-context] videoProvider resolution failed', { error: (e as Error).message });
-            }
-        }
-
-        // Portal #98 item 3 — the open outbound cooling window, so the chrome can
-        // say so before anyone presses Send.
-        //
-        // This is its OWN read of `tenants`, and that is not an oversight. The
-        // plan for this feature assumed the block above still selected the tenant
-        // row here and that `createdAt` could ride along for free; it does not —
-        // that read now lives inside `resolveVideoProvider`, which fetches
-        // tier/status only on the managed branch and owns the video question, not
-        // this one. Widening a video resolver's return type to carry an email
-        // anchor would couple two unrelated concerns to save one primary-key
-        // lookup. So: one indexed read by primary key, and only where a window
-        // can exist at all — standalone pays nothing.
-        //
-        // Fail-open, matching the send gate: an unreadable anchor leaves this
-        // null, so a D1 blip never puts a banner in front of someone whose sends
-        // work fine.
-        let outboundCoolingWindow: { unlockAtMs: number; turnstileSiteKey: string | null } | null = null;
-        if (tenantId && profile.mode === 'saas') {
-            try {
-                const tenantRow = await getDrizzle(c)
-                    .select({ createdAt: tenants.createdAt })
-                    .from(tenants)
-                    .where(eq(tenants.id, tenantId))
-                    .get();
-                const open = resolveCoolingWindowForSession({
-                    mode: profile.mode, createdAt: tenantRow?.createdAt, nowMs: Date.now(),
-                });
-                // The site key rides along so the web app can ask for the
-                // challenge before a send, matched to the secret the API verifies with.
-                outboundCoolingWindow = open ? { ...open, turnstileSiteKey: resolveTurnstileSiteKey(c.env) } : null;
-            } catch (e) {
-                logger.warn('[session-context] cooling-window anchor read failed', { error: (e as Error).message });
-            }
-        }
-
+            })(),
+            // The video provider the editor renders (VideoCapture/VideoPlayer). It calls
+            // the same resolver the media-studio API uses; a hand-kept copy once said 'r2'
+            // where the API threw 503, so the editor offered a path every upload refused.
+            (async (): Promise<'r2' | 'stream'> => {
+                if (!tenantId) return 'r2';
+                try {
+                    const resolved = await resolveVideoProvider(c, tenantId, getDrizzle(c), { tenantRow });
+                    return videoStreamServiceable(resolved) ? 'stream' : 'r2';
+                } catch (e) {
+                    logger.warn('[session-context] videoProvider resolution failed', { error: (e as Error).message });
+                    return 'r2';
+                }
+            })(),
+            // Portal #98 item 3 -- the open outbound cooling window, so the chrome can
+            // say so before anyone presses Send. Only where a window can exist at all
+            // (saas); standalone pays nothing. Fail-open, matching the send gate: an
+            // unreadable anchor leaves this null, so a D1 blip never puts a banner in
+            // front of someone whose sends work fine.
+            (async (): Promise<{ unlockAtMs: number; turnstileSiteKey: string | null } | null> => {
+                if (!tenantId || profile.mode !== 'saas' || !tenantRow) return null;
+                try {
+                    const row = await tenantRow;
+                    const open = resolveCoolingWindowForSession({
+                        mode: profile.mode, createdAt: row?.createdAt, nowMs: Date.now(),
+                    });
+                    // The site key rides along so the web app can ask for the
+                    // challenge before a send, matched to the secret the API verifies with.
+                    return open ? { ...open, turnstileSiteKey: resolveTurnstileSiteKey(c.env) } : null;
+                } catch (e) {
+                    logger.warn('[session-context] cooling-window anchor read failed', { error: (e as Error).message });
+                    return null;
+                }
+            })(),
+            // Counted over what this caller can see, from the capabilities just resolved.
+            (async (): Promise<number> => {
+                try {
+                    const scope = isAdminRole(roleForCaps) ? ALL_INSPECTIONS : scopeFromCapabilities(user.sub, capabilities);
+                    return await c.var.services.message.unreadCountForTenant(tenantId, scope);
+                } catch { return 0; /* badge degrades to 0; the layout must never fail on it */ }
+            })(),
+        ]);
 
         const tenantSlug = branding?.tenantSlug?.trim() || null;
         let privacyUrl: string | null = null;
@@ -325,21 +340,6 @@ const sessionContextRoutes = createApiRouter()
             privacyUrl = links.privacyUrl;
             termsUrl = links.termsUrl;
         }
-
-        // An unknown role resolves as an inspector rather than throwing: the
-        // chrome must still render, and inspector is the least-privileged tier.
-        const roleForCaps = isRole(user.role) ? user.role : 'inspector';
-        const capabilities: CapabilitySet = getCapabilities(
-            roleForCaps,
-            coerceOverrides(permissionOverridesRaw),
-        );
-
-        // Counted over what this caller can see, from the capabilities just resolved.
-        let unreadMessages = 0;
-        try {
-            const scope = isAdminRole(roleForCaps) ? ALL_INSPECTIONS : scopeFromCapabilities(user.sub, capabilities);
-            unreadMessages = await c.var.services.message.unreadCountForTenant(tenantId, scope);
-        } catch { /* badge degrades to 0; the layout must never fail on it */ }
 
         return c.json({
             success: true,
