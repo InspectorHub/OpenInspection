@@ -9,6 +9,18 @@ Thanks for sending a PR! Before you submit:
 
 <!-- 1–3 sentences: what changes, what user pain it addresses. -->
 
+## Verification
+
+<!-- Edit every line below: the pr-readiness check rejects the placeholders until you do.
+     Keep the PR a draft until these lines are true. -->
+Code review: <reviewer> — open findings: <n>
+Chrome: /<route> — light: ok, dark: ok — <what was seen>
+
+- [ ] CI is green
+- [ ] Review findings are closed (open findings: 0)
+- [ ] Chrome check done (light and dark), or "Chrome: n/a — no UI files changed" is true
+- [ ] Migration, if any, is noted (file, expand/contract step)
+
 ## Type of change
 
 - [ ] Bug fix (non-breaking change which fixes an issue)

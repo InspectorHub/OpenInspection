@@ -1,0 +1,49 @@
+name: PR readiness
+
+# A separate, tiny workflow on purpose: editing a PR body must not re-run the
+# heavy CI. It checks the written review / Chrome record in the PR body (see
+# scripts/pr-readiness.mjs). A draft PR fails by design.
+#
+# WHY pull_request_target, AND WHY IT IS SAFE HERE
+# A plain `pull_request` run executes the script from the PR's merge ref, so a
+# PR could edit scripts/pr-readiness.mjs and pass its own check. This workflow
+# runs from the BASE branch instead: it checks out only the base ref (never the
+# PR head), never installs or executes anything from the PR, and reads the PR
+# body, draft flag and file list through the GitHub API. Nothing from the PR
+# (title, body, branch name) is interpolated into a shell command: the PR number
+# is an integer passed through an environment variable. The token is read-only.
+# Consequence: changes to this file and to scripts/pr-readiness.mjs only take
+# effect once merged, and they need a human diff review.
+#
+# Add `pr-readiness` to the required status checks in the repository ruleset,
+# otherwise it is advisory. Locally: npm run pr:merge-check -- --pr <n> --repo InspectorHub/OpenInspection
+#
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review, converted_to_draft]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-readiness-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-readiness:
+    name: pr-readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Base ref ONLY. Never check out github.event.pull_request.head.*.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x }
+      - run: node scripts/pr-readiness.mjs --pr "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
