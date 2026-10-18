@@ -80,7 +80,7 @@
   "inspections_hub_people_phone_ph": "(555) 123-4567",
   "inspections_hub_people_agency_label": "Agencia",
   "inspections_hub_people_agency_ph": "Empresa o agencia",
-  "inspections_hub_pickers_error": "No se pudo cargar esta lista. Revisa tu conexión e inténtalo de nuevo.",
+  "inspections_hub_pickers_error": "No se pudo cargar esta lista. Compruebe su conexión e inténtelo de nuevo.",
   "inspections_hub_pickers_retry": "Reintentar",
   "inspections_hub_people_role_label": "Rol",
   "inspections_hub_people_role_placeholder": "Seleccione un rol…",

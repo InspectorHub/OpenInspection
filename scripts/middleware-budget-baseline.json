@@ -6,7 +6,7 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 156,
+    "files": 160,
     "dollarMethods": 588,
     "apiWorker": 9
   },
@@ -32,6 +32,10 @@
       "apiWorker": 0
     },
     "app/lib/create-landing.ts": {
+      "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/lib/dashboard-setup.server.ts": {
       "dollarMethods": 2,
       "apiWorker": 0
     },
@@ -95,7 +99,15 @@
       "dollarMethods": 8,
       "apiWorker": 0
     },
+    "app/lib/settings/credential-reorder.server.ts": {
+      "dollarMethods": 1,
+      "apiWorker": 0
+    },
     "app/lib/settings/pay-rules.server.ts": {
+      "dollarMethods": 3,
+      "apiWorker": 0
+    },
+    "app/lib/settings/service-fanout.server.ts": {
       "dollarMethods": 4,
       "apiWorker": 0
     },
@@ -200,7 +212,7 @@
       "apiWorker": 0
     },
     "app/routes/inspection-edit/loader.server.ts": {
-      "dollarMethods": 12,
+      "dollarMethods": 11,
       "apiWorker": 0
     },
     "app/routes/inspection-repair-requests.tsx": {
@@ -212,11 +224,11 @@
       "apiWorker": 0
     },
     "app/routes/inspections.tsx": {
-      "dollarMethods": 11,
+      "dollarMethods": 8,
       "apiWorker": 0
     },
     "app/routes/inspector-portal.tsx": {
-      "dollarMethods": 27,
+      "dollarMethods": 24,
       "apiWorker": 1
     },
     "app/routes/invoices.tsx": {
@@ -403,6 +415,10 @@
       "dollarMethods": 2,
       "apiWorker": 0
     },
+    "app/routes/resources/hub-pickers.tsx": {
+      "dollarMethods": 3,
+      "apiWorker": 0
+    },
     "app/routes/resources/inspection-cancellation.tsx": {
       "dollarMethods": 2,
       "apiWorker": 0
@@ -568,7 +584,7 @@
       "apiWorker": 0
     },
     "app/routes/settings-profile.tsx": {
-      "dollarMethods": 15,
+      "dollarMethods": 14,
       "apiWorker": 0
     },
     "app/routes/settings-schedule.tsx": {
@@ -580,7 +596,7 @@
       "apiWorker": 0
     },
     "app/routes/settings-services.tsx": {
-      "dollarMethods": 12,
+      "dollarMethods": 11,
       "apiWorker": 0
     },
     "app/routes/settings-statutory-forms.tsx": {

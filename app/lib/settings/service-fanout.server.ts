@@ -19,7 +19,7 @@ type Api = ReturnType<typeof createApi>;
  * Mirrors MAX_BULK_SERVICE_IDS on the server: each statement also binds the
  * tenant id, and D1 binds at most 100 parameters per statement.
  */
-export const MAX_IDS_PER_CALL = 90;
+const MAX_IDS_PER_CALL = 90;
 
 /** In-flight per-service reads when a bulk read has to be replaced by them. */
 const FALLBACK_LANES = 4;

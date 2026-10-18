@@ -91,11 +91,19 @@
     "kind": "wire-shape",
     "reason": "The stored bundle's version discriminator, written by all three adapters. Nothing branches on it because there is one version so far, which is what it exists to make possible."
   },
-  "server/lib/preflight.ts#PreflightResult.propertyFactsComplete": {
+  "server/lib/page-timing.ts#PageTimingFields.wall_ms": {
     "kind": "wire-shape",
-    "reason": "Returned whole: `GET` on the results preflight route does `c.json({ data: out })` with the `PreflightResult` from `services.inspection.computePreflight`. Every field ships. Whether a surface RENDERS the checklist is a different question from whether the field is read."
+    "reason": "A field of the structured `page_timing` log line (see the Page timing section of CLAUDE.md). It is written into the log and read by the log aggregator and its dashboards, which live outside this repository; nothing in the app reads it back, by design."
   },
-  "server/lib/preflight.ts#PreflightResult.coverPhotoSet": {
+  "server/lib/page-timing.ts#PageTimingFields.cold": {
+    "kind": "wire-shape",
+    "reason": "A field of the structured `page_timing` log line (see the Page timing section of CLAUDE.md). It is written into the log and read by the log aggregator and its dashboards, which live outside this repository; nothing in the app reads it back, by design."
+  },
+  "server/lib/page-timing.ts#PageTimingFields.req_n": {
+    "kind": "wire-shape",
+    "reason": "A field of the structured `page_timing` log line (see the Page timing section of CLAUDE.md). It is written into the log and read by the log aggregator and its dashboards, which live outside this repository; nothing in the app reads it back, by design."
+  },
+  "server/lib/preflight.ts#PreflightResult.propertyFactsComplete": {
     "kind": "wire-shape",
     "reason": "Returned whole: `GET` on the results preflight route does `c.json({ data: out })` with the `PreflightResult` from `services.inspection.computePreflight`. Every field ships. Whether a surface RENDERS the checklist is a different question from whether the field is read."
   },

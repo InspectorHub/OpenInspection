@@ -3,7 +3,7 @@ import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import type { TeamMember } from "~/components/inspector-portal/ScheduleCard";
 import type { HubPickers } from "~/routes/resources/hub-pickers";
 
-export type PickerStatus = "idle" | "loading" | "ready" | "error";
+type PickerStatus = "idle" | "loading" | "ready" | "error";
 export interface PickerList<T> { status: PickerStatus; data: T[] }
 
 const EMPTY: never[] = [];

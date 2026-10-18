@@ -75,8 +75,6 @@ describe("hub-pickers loader", () => {
     });
 
     it("a successful but genuinely empty list stays an empty array", async () => {
-        const mod = await import("~/routes/resources/hub-pickers");
-        expect(mod.loader).toBeTypeOf("function");
         seam.branding = "fail";
         expect((await run()).referralSources).toBeNull();
     });

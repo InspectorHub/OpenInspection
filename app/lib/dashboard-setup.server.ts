@@ -18,7 +18,7 @@ import { getScheduleSet } from "~/lib/schedule-onboarding.server";
 type Api = ReturnType<typeof createApi>;
 
 /** How long the dashboard waits for these before rendering without them. */
-export const CHECKLIST_INPUT_TIMEOUT_MS = 2000;
+const CHECKLIST_INPUT_TIMEOUT_MS = 2000;
 
 export interface ChecklistInputs {
   templateCount: number;
