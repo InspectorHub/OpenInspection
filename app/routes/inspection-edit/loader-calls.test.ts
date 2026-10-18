@@ -14,9 +14,10 @@ import { RouterContextProvider } from "react-router";
 const seam = vi.hoisted(() => ({
     calls: [] as string[],
     inspection: {} as Record<string, unknown>,
+    hangReport: false,
 }));
 
-const ok = (data: unknown) => Promise.resolve({ ok: true, json: async () => ({ data }) });
+const ok = (data: unknown) => (data instanceof Promise ? data : Promise.resolve({ ok: true, json: async () => ({ data }) }));
 const rec = (name: string, data: () => unknown) => (..._a: unknown[]) => {
     seam.calls.push(name);
     return ok(data());
@@ -29,7 +30,7 @@ vi.mock("~/lib/api-client.server", () => ({
             ":id": {
                 $get: rec("inspection", () => ({ inspection: seam.inspection })),
                 results: { $get: rec("results", () => ({ results: {}, resultId: "r1" })) },
-                "report-data": { $get: rec("report-data", () => ({ sections: [], ratingLevels: [] })) },
+                "report-data": { $get: rec("report-data", () => (seam.hangReport ? new Promise(() => {}) as never : { sections: [], ratingLevels: [] })) },
                 units: { $get: rec("units", () => ({ units: [{ id: "u1", name: "Unit 1", kind: "unit", type: "unit", parentUnitId: null, sortOrder: 0 }] })) },
                 "unit-progress": { $get: rec("unit-progress", () => ({ units: [{ unitId: "u1", rated: 1, total: 2 }], commonRated: 0, total: 2 })) },
                 compliance: { $get: rec("compliance", () => ({ reportSignoffs: [{ id: "s" }], psq: null, documentReview: [], conformance: { standard: "E2018-24", conforms: true } })) },
@@ -56,6 +57,7 @@ type Out = {
 
 beforeEach(() => {
     seam.calls.length = 0;
+    seam.hangReport = false;
     seam.inspection = { id: "i1", status: "draft", propertyAddress: "1 Main", date: "2026-10-18T10:00:00Z", templateSnapshot: { schemaVersion: 2, sections: [] } };
 });
 
@@ -120,5 +122,14 @@ describe("editor loader reads", () => {
         seam.inspection = {};
         await expect(run()).resolves.toBeTruthy();
         expect(seam.calls.length).toBeLessThanOrEqual(COMMON.length + 2);
+    });
+
+    it("starts the optional reads as soon as the inspection row arrives, without waiting for the slowest common read", async () => {
+        seam.inspection.propertyType = "commercial";
+        seam.inspection.reportTier = "full_pca";
+        seam.hangReport = true;
+        void run();
+        await new Promise((r) => setTimeout(r, 30));
+        expect(seam.calls).toEqual(expect.arrayContaining(["units", "unit-progress", "compliance"]));
     });
 });

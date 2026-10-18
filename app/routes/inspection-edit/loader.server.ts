@@ -12,16 +12,68 @@ import { revisionStatusForInspection } from "../../../server/lib/statutory/revis
 import { isReportPublished } from "~/lib/status";
 import { resolveReportTier } from "../../../server/lib/report-tier";
 
+type Api = ReturnType<typeof createApi>;
+
+/**
+ * Reads that exist only for some inspections. Each endpoint used to be called
+ * for every inspection and answered empty or 404 for most; a null here is the
+ * same value that answer left behind, so the editor reads it identically. The
+ * row fields are read defensively: an unreadable inspection has none of them
+ * and falls through to the defaults.
+ */
+function readOptional(api: Api, id: string, body: Record<string, unknown>) {
+ const data = (body.data ?? {}) as Record<string, unknown>;
+ const row = (data.inspection ?? {}) as { propertyType?: string | null; reportTier?: "light_commercial" | "full_pca" | null; unitInspectionMode?: string; templateSnapshot?: unknown };
+ // Units belong to multi-unit and commercial jobs, and to any per-unit job. An
+ // inspection with no recorded property type is legacy (unclassified), not a
+ // house, so it is still read.
+ const mayHaveUnits = row.propertyType !== "single_family" || row.unitInspectionMode === "per_unit";
+ // The compliance artifacts are a full PCA report's; the endpoint refuses any other tier.
+ const wantsCompliance = resolveReportTier({ propertyType: row.propertyType, storedTier: row.reportTier }) === "full_pca";
+ // The statutory endpoints answer 404 unless the snapshot declares a form. Same
+ // snapshot choice as the loader below; an unparseable one declares nothing here
+ // (the loader itself reports that failure).
+ let declaresStatutoryForm = false;
+ try {
+  const raw = row.templateSnapshot || data.templateSnapshot || (data.template as { schema?: unknown } | undefined)?.schema;
+  const snap = (typeof raw === "string" ? JSON.parse(raw) : raw) as { statutoryForm?: unknown } | null | undefined;
+  declaresStatutoryForm = !!snap?.statutoryForm;
+ } catch { /* handled where the snapshot is parsed for real */ }
+ const settledNull = async <R,>(call: () => Promise<R>, label: string): Promise<R | null> => {
+  try {
+   return await call();
+  } catch (cause) {
+   // try/catch, NOT `.catch()`: the typed-client chain throws SYNCHRONOUSLY the
+   // moment any link in it is absent (an older build, a test stub), and that
+   // throw would 500 the whole editor for a best-effort panel.
+   console.error(`[${label}] could not be requested at all`, cause);
+   return null;
+  }
+ };
+ return Promise.all([
+  mayHaveUnits ? settledNull(() => api.inspections[":id"].units.$get({ param: { id } }), "units") : null,
+  mayHaveUnits ? settledNull(() => api.inspections[":id"]["unit-progress"].$get({ param: { id } }), "unit-progress") : null,
+  wantsCompliance ? settledNull(() => api.inspections[":id"].compliance.$get({ param: { id } }), "compliance") : null,
+  declaresStatutoryForm ? settledNull(() => api.inspections[":id"]["statutory-details"].$get({ param: { id } }), "statutory-details") : null,
+  declaresStatutoryForm ? settledNull(() => api.inspections[":id"]["statutory-form"].coverage.$get({ param: { id } }), "statutory-coverage") : null,
+ ] as const);
+}
+
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
  const id = params.id;
 
  const api = createApi(context, { token });
- // WAVE 1 — what every inspection needs. The optional reads (units, compliance,
- // statutory answers) wait for the inspection row, because whether they exist
- // depends on it; see WAVE 2 below.
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes] = await Promise.all([
- api.inspections[":id"].$get({ param: { id } }),
+ // What every inspection needs starts at once. The optional reads (units,
+ // compliance, statutory answers) depend on the inspection row, so they start
+ // the moment that row arrives (`optionalP` below) and overlap the other reads
+ // instead of running as a second wave after all of them. Their start still waits
+ // for the row itself: unmeasured, but one inspection read ahead of them at most.
+ const inspP = api.inspections[":id"].$get({ param: { id } });
+ const inspBodyP = inspP.then(async (r) => (r.ok ? await r.json() : {}));
+ const optionalP = inspBodyP.then((body) => readOptional(api, id, body as Record<string, unknown>));
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, inspBody, optional] = await Promise.all([
+ inspP,
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
  // scope. The editor opens at activeUnitId = null (the '_default' scope), so
  // we fetch just that slice: for a `tagged` inspection '_default' IS the whole
@@ -40,9 +92,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // name/id → color lookup and thread it into every canned-defect chip,
  // instead of resolving color per-defect.
  api.defectCategories["defect-categories"].$get().catch(() => null),
+ inspBodyP,
+ optionalP,
  ]);
-
- const inspBody = inspRes.ok ? await inspRes.json() : {};
+ void inspRes;
  const resultsBody = resultsRes.ok ? await resultsRes.json() : {};
  const reportBody = reportRes.ok ? await reportRes.json() : {};
 
@@ -197,38 +250,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // with report-data) and must NOT be PATCHed to the template-snapshot endpoint.
  const templateSnapshot = ((typeof rawSchema === 'string' ? JSON.parse(rawSchema) : rawSchema) ?? { schemaVersion: 2, sections: [] }) as { schemaVersion: 2; sections: unknown[] };
 
- // WAVE 2 — reads that exist only for some inspections. Each endpoint used to be
- // called for every inspection and answered empty or 404 for most; a null here is
- // the same value that answer left behind, so the editor reads it identically.
- // The row fields are read defensively: an unreadable inspection (see the
- // placeholder above) has none of them and falls through to the defaults.
- const row = inspection as { propertyType?: string | null; reportTier?: "light_commercial" | "full_pca" | null; unitInspectionMode?: string };
- // Units belong to multi-unit and commercial jobs, and to any per-unit job. An
- // inspection with no recorded property type is legacy (unclassified), not a
- // house, so it is still read.
- const mayHaveUnits = row.propertyType !== "single_family" || row.unitInspectionMode === "per_unit";
- // The compliance artifacts are a full PCA report's; the endpoint refuses any other tier.
- const wantsCompliance = resolveReportTier({ propertyType: row.propertyType, storedTier: row.reportTier }) === "full_pca";
- // The statutory endpoints answer 404 unless the snapshot declares a form.
- const declaresStatutoryForm = !!(templateSnapshot as { statutoryForm?: unknown } | null)?.statutoryForm;
- const settledNull = async <R,>(call: () => Promise<R>, label: string): Promise<R | null> => {
-   try {
-     return await call();
-   } catch (cause) {
-     // try/catch, NOT `.catch()`: the typed-client chain throws SYNCHRONOUSLY the
-     // moment any link in it is absent (an older build, a test stub), and that
-     // throw would 500 the whole editor for a best-effort panel.
-     console.error(`[${label}] could not be requested at all`, cause);
-     return null;
-   }
- };
- const [unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes, statutoryCoverageRes] = await Promise.all([
- mayHaveUnits ? settledNull(() => api.inspections[":id"].units.$get({ param: { id } }), "units") : null,
- mayHaveUnits ? settledNull(() => api.inspections[":id"]["unit-progress"].$get({ param: { id } }), "unit-progress") : null,
- wantsCompliance ? settledNull(() => api.inspections[":id"].compliance.$get({ param: { id } }), "compliance") : null,
- declaresStatutoryForm ? settledNull(() => api.inspections[":id"]["statutory-details"].$get({ param: { id } }), "statutory-details") : null,
- declaresStatutoryForm ? settledNull(() => api.inspections[":id"]["statutory-form"].coverage.$get({ param: { id } }), "statutory-coverage") : null,
- ]);
+ const [unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes, statutoryCoverageRes] = optional;
 
  // Which revision of the authority's form governs this inspection, decided
  // HERE and never in the browser. It is a comparison of date windows, and a
