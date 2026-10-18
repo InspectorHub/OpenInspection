@@ -53,10 +53,13 @@ export async function assertEmailsNotHidden(
  *     A match outside `scope` is refused (see refuseHiddenMatch) before anything is touched.
  *   - Not found: INSERT a new row. Returns {id, created:true}.
  * - Email absent, unrestricted scope: always INSERT a name-only row. Returns {id, created:true}.
- * - Email absent, scope limited to assignments: the name is looked up among ACTIVE contacts of the same type the
- *   scope can see, and nowhere else. None: INSERT. One: reuse it. Several: reuse the most recently created.
- *   A contact outside the scope is never matched, touched or hinted at, so a name only a hidden contact carries
- *   simply creates a new row. Nothing is filled forward on a name match; the caller gave no address to trust.
+ * - Email absent, scope limited to assignments: a name is not an identity, so it only ever matches a contact this
+ *   caller CREATED themselves and that carries no address (their own half-entered client, entered again for the
+ *   next job). Anything else with that name, visible or not, is a different person who happens to share it, and
+ *   linking it could send this client's notices to that person's address; a new row is made instead. Several of the
+ *   caller's own: the most recently created. Nothing is filled forward on a name match.
+ * - Email present and matched, scope limited to assignments: the contact is linked as it is. Nothing on it is
+ *   changed (no fill-forward, no locale), because that is editing a contact, which needs `manageContacts`.
  * - Archived rows with matching email are NOT matched (the partial unique allows a fresh active row).
  */
 export async function upsertContactByEmail(
@@ -74,6 +77,9 @@ export async function upsertContactByEmail(
 
         if (existing) {
             await refuseHiddenMatch(db, tenantId, existing.id, scope);
+            // A caller limited to their assignments links the contact and changes nothing on it: filling in a name or
+            // phone, or replacing a locale, is editing a contact, which needs `manageContacts`.
+            if (scope.kind !== 'all') return { id: existing.id, created: false };
             // Fill-forward: only update name/phone if currently null/empty.
             const updates: Partial<{ name: string; phone: string; locale: string }> = {};
             if ((!existing.name || existing.name.trim() === '') && input.name) {
@@ -108,6 +114,7 @@ export async function upsertContactByEmail(
         const name = input.name.trim();
         const reuse = name ? await db.select({ id: contacts.id }).from(contacts).where(and(
             eq(contacts.tenantId, tenantId), eq(contacts.type, input.type), eq(contacts.name, name), isNull(contacts.archivedAt),
+            eq(contacts.createdByUserId, scope.userId), isNull(contacts.email),
             visibleContactsCondition(db, scope, tenantId),
         )).orderBy(desc(contacts.createdAt), desc(contacts.id)).get() : undefined;
         if (reuse) return { id: reuse.id, created: false };

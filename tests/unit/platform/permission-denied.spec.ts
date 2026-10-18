@@ -127,3 +127,18 @@ describe('advice that fits the caller (review round 1)', () => {
         expect((deniedByRule(ctx('staff'), 'Something else', 'An owner').details as { rule: string }).rule).toBe(DENIED_BY_RULE);
     });
 });
+
+describe('role strings and unknown roles (review round 1)', () => {
+    it('a viewer given as a role string is described by that role, for every role the product has', () => {
+        for (const [role, who] of [['owner', 'an Owner'], ['manager', 'a Manager'], ['inspector', 'an Inspector'], ['staff', 'an office staff member'], ['agent', 'an Agent']] as const) {
+            expect(deniedNeedsRole(role, ['owner'], 'Only an owner can do this').message, role).toContain(`you are signed in as ${who}`);
+            expect(deniedByRule(role, 'x', 'An owner').message, role).toContain(`You are signed in as ${who}.`);
+        }
+    });
+
+    it('a role string this build does not know is described as unrecognised, in both builders', () => {
+        expect(deniedNeedsRole('janitor', ['owner']).message).toContain('a user with no recognised role');
+        expect(deniedByRule('janitor', 'x', 'An owner').message).toContain('a user with no recognised role');
+        expect(deniedNeedsRole('janitor', ['owner']).details).toMatchObject({ role: 'janitor' });
+    });
+});

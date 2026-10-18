@@ -66,6 +66,8 @@ beforeEach(async () => {
     await db.insert(schema.users).values({
         id: 'u1', tenantId: T, email: 'u1@acme.test', passwordHash: 'x', name: 'U1', role: 'inspector', createdAt: now,
     });
+    // The create looks the template up before it writes anything, so the create cases below need a real one to get past it.
+    await db.insert(schema.templates).values({ id: 't1', tenantId: T, name: 'Standard', schema: { sections: [] }, version: 1, createdAt: now } as never);
     await db.insert(schema.inspections).values({
         id: 'i1', tenantId: T, propertyAddress: '1 Oak St', date: '2099-01-01', status: 'confirmed',
         paymentStatus: 'unpaid', price: 45000, depositRequiredCents: 9000, depositOverridden: true,

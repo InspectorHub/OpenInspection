@@ -292,4 +292,45 @@ describe('ids in a request body, for a restricted inspector', () => {
             expect([403, 404]).toContain((await send(owner, fresh('insp-ghost'))).status);
         });
     });
+    describe('GET /api/agents/links and POST /api/agents/:linkId/revoke', () => {
+        const linkedAgent = async (onInspection: string | null, createdBy: string | null): Promise<string> => {
+            const id = await addContact(createdBy, onInspection);
+            await b.DB.prepare('UPDATE contacts SET type = ?, agent_user_id = ?, agent_linked_at = ? WHERE id = ?').bind('agent', fresh('agent-user'), Date.now(), id).run();
+            return id;
+        };
+        const links = async (m: Member): Promise<string[]> => {
+            const res = await call('/api/agents/links', m.token);
+            expect(res.status, await res.clone().text()).toBe(200);
+            return ((await res.json()) as { data: { links: Array<{ id: string }> } }).data.links.map((l) => l.id);
+        };
+        const revoke = (m: Member, id: string) => call(`/api/agents/${id}/revoke`, m.token, { method: 'POST' });
+        const revokedAt = async (id: string) => (await b.DB.prepare('SELECT agent_revoked_at AS r FROM contacts WHERE id = ?').bind(id).first<{ r: number | null }>())?.r ?? null;
+
+        it('the list holds only the partner agents the caller can see, and the owner sees all (control)', async () => {
+            const visibleAgent = await linkedAgent(mine, null);
+            const hiddenAgent = await linkedAgent(theirs, owner.id);
+            const seen = await links(restricted);
+            expect(seen).toContain(visibleAgent);
+            expect(seen).not.toContain(hiddenAgent);
+            const all = await links(owner);
+            expect(all).toEqual(expect.arrayContaining([visibleAgent, hiddenAgent]));
+        });
+        it('revoking a hidden link answers like a contact that does not exist, and revokes nothing', async () => {
+            const hiddenAgent = await linkedAgent(theirs, owner.id);
+            const ghost = fresh('link-ghost');
+            const hidden = await shape(await revoke(restricted, hiddenAgent), hiddenAgent);
+            const absent = await shape(await revoke(restricted, ghost), ghost);
+            expect(absent.status).toBe(404);
+            expect(hidden).toEqual(absent);
+            expect(await revokedAt(hiddenAgent)).toBeNull();
+        });
+        it('controls: a visible link is revoked by the restricted caller, and an owner may revoke any', async () => {
+            const visibleAgent = await linkedAgent(mine, null);
+            expect((await revoke(restricted, visibleAgent)).status).toBe(200);
+            expect(await revokedAt(visibleAgent)).not.toBeNull();
+            const elsewhere = await linkedAgent(theirs, owner.id);
+            expect((await revoke(owner, elsewhere)).status).toBe(200);
+            expect(await revokedAt(elsewhere)).not.toBeNull();
+        });
+    });
 });

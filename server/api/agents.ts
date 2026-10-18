@@ -7,6 +7,7 @@ import { users } from '../lib/db/schema/tenant';
 import { contacts } from '../lib/db/schema/contact';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
+import { resolveInspectionScope, visibleContactsCondition } from '../lib/inspection/visibility';
 
 /**
  * Inspector-side partner-agent links. The (existing) /api/agent routes
@@ -121,7 +122,8 @@ const agentsRoutes = createApiRouter()
             })
             .from(contacts)
             .leftJoin(users, eq(users.id, contacts.agentUserId))
-            .where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.agentUserId)))
+            // A caller who sees only their assignments sees only the agents on those inspections (or ones they added).
+            .where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.agentUserId), visibleContactsCondition(db, await resolveInspectionScope(c), tenantId)))
             .orderBy(desc(contacts.agentLinkedAt))
             .all();
         const links = rows.map((r) => {
@@ -146,6 +148,10 @@ const agentsRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized();
         const { linkId } = c.req.valid('param');
+        // A link outside the caller's set answers exactly like an id that is not a contact here.
+        const inSet = await getDrizzle(c).select({ id: contacts.id }).from(contacts)
+            .where(and(eq(contacts.id, linkId), eq(contacts.tenantId, tenantId), visibleContactsCondition(getDrizzle(c), await resolveInspectionScope(c), tenantId))).get();
+        if (!inSet) throw Errors.NotFound('Link not found');
         await c.var.services.agent.revokeLink(linkId, tenantId);
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });

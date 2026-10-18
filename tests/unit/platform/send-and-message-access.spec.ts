@@ -298,3 +298,24 @@ describe('E. one rule for owners and managers: scheduleOthers decides, on every 
         } finally { h.close(); }
     });
 });
+
+describe('F. visibility is asked before the on-the-job rule (contract of assertMayActOnInspection)', () => {
+    it('a narrowed inspector gets 404, not 403, for a hidden job even with scheduleOthers granted; unnarrowed, the same grant is allowed', async () => {
+        const { h, call } = await setup();
+        try {
+            const message = async (res: Response) => ((await res.json()) as { error: { message: string } }).error.message;
+            const probe = (id: string) => call('inspector', 'POST', `/api/inspections/${id}/agent-token`);
+            await h.db.update(schema.users).set({ permissionOverrides: { scheduleOthers: true, viewAllInspections: false } as never }).where(eq(schema.users.id, INSPECTOR_ID));
+            const hidden = await probe(THEIRS);
+            const absent = await probe('44444444-0000-4000-8000-0000000000ff');
+            expect(hidden.status).toBe(404);
+            expect(absent.status).toBe(404);
+            expect(await message(hidden)).toBe(await message(absent));
+            // controls: someone who can see everything keeps the specific 403 without the grant, and is allowed with it
+            await h.db.update(schema.users).set({ permissionOverrides: null as never }).where(eq(schema.users.id, INSPECTOR_ID));
+            expect((await probe(THEIRS)).status).toBe(403);
+            await h.db.update(schema.users).set({ permissionOverrides: { scheduleOthers: true } as never }).where(eq(schema.users.id, INSPECTOR_ID));
+            expect((await probe(THEIRS)).status).toBe(200);
+        } finally { h.close(); }
+    });
+});
