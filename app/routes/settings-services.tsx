@@ -15,7 +15,8 @@ import { ServicesCatalogPanel } from "~/components/settings/services/ServicesCat
 import { ServiceFields } from "~/components/settings/services/ServiceFields";
 import { ServiceEditForm } from "~/components/settings/services/ServiceEditForm";
 import { DiscountCodesPanel } from "~/components/settings/services/DiscountCodesPanel";
-import { loadPayRuleMap, savePayRule, deletePayRule } from "~/lib/settings/pay-rules.server";
+import { savePayRule, deletePayRule } from "~/lib/settings/pay-rules.server";
+import { loadServiceFanout } from "~/lib/settings/service-fanout.server";
 import type { PayRule } from "~/components/settings/services/PayRuleWidget";
 import { parseDepositPolicy } from "~/lib/deposit-policy-form";
 import type { DepositPolicy } from "../../server/lib/billing/deposit-policy";
@@ -87,28 +88,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const discountBody = discountRes?.ok ? ((await discountRes.json()) as Record<string, unknown>) : {};
     const rawDiscounts = (Array.isArray(discountBody.data) ? discountBody.data : []) as Discount[];
 
-    // Fetch qualification restrictions for all services in parallel (one GET per service).
-    // Acceptable at realistic service counts; add a bulk endpoint if this grows.
-    const restrictionResults = await Promise.all(
-      rawServices.map(async (svc) => {
-        try {
-          const res = await api.services[":id"].inspectors.$get({ param: { id: svc.id } });
-          if (!res.ok) return { serviceId: svc.id, userIds: [] as string[] };
-          const rb = (await res.json()) as Record<string, unknown>;
-          const rd = (rb.data ?? {}) as Record<string, unknown>;
-          return { serviceId: svc.id, userIds: (Array.isArray(rd.userIds) ? rd.userIds : []) as string[] };
-        } catch {
-          return { serviceId: svc.id, userIds: [] as string[] };
-        }
-      }),
-    );
-    const restrictionMap: Record<string, string[]> = {};
-    for (const r of restrictionResults) restrictionMap[r.serviceId] = r.userIds;
-
-    // #278 — what inspectors earn on each service. Without at least one rule,
-    // pay splits populate nothing, so this map is also the feature's on/off
-    // state as far as the admin can see it.
-    const payRuleMap = await loadPayRuleMap(api, rawServices.map((s) => s.id));
+    // Qualification restrictions and pay rules (#278: what inspectors earn on
+    // each service; without a rule, pay splits populate nothing, so the map is
+    // also the feature's on/off state). One bounded wave, 2S calls for S services.
+    const { restrictionMap, payRuleMap } = await loadServiceFanout(api, rawServices.map((s) => s.id));
 
     let members: Member[] = [];
     if (membersRes?.ok) {

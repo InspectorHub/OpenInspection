@@ -16,6 +16,7 @@
 import type { createApi } from "~/lib/api-client.server";
 import type { PayRule } from "~/components/settings/services/PayRuleWidget";
 import { m } from "~/paraglide/messages";
+import { mapLimit } from "~/lib/concurrency";
 
 type Api = ReturnType<typeof createApi>;
 
@@ -27,24 +28,23 @@ export interface PayRuleActionResult {
 }
 
 /**
- * One GET per service, matching how `restrictionMap` is already built on this
- * page. A tenant has a handful of catalogue services; a bulk endpoint is the
- * fix if that ever stops being true, for both maps at once.
+ * One GET per service, at most four in flight (see `service-fanout.server.ts`,
+ * which runs this beside the restriction reads). A tenant has a handful of
+ * catalogue services; a bulk endpoint is the fix if that ever stops being true,
+ * for both maps at once.
  */
 export async function loadPayRuleMap(api: Api, serviceIds: string[]): Promise<Record<string, PayRule[]>> {
-    const results = await Promise.all(
-        serviceIds.map(async (id) => {
-            try {
-                const res = await api.services[":id"]["pay-rules"].$get({ param: { id } });
-                if (!res.ok) return [id, [] as PayRule[]] as const;
-                const body = (await res.json()) as { data?: PayRule[] };
-                return [id, body.data ?? []] as const;
-            } catch {
-                // A pay-rule read failing must not take down the services page.
-                return [id, [] as PayRule[]] as const;
-            }
-        }),
-    );
+    const results = await mapLimit(serviceIds, 4, async (id) => {
+        try {
+            const res = await api.services[":id"]["pay-rules"].$get({ param: { id } });
+            if (!res.ok) return [id, [] as PayRule[]] as const;
+            const body = (await res.json()) as { data?: PayRule[] };
+            return [id, body.data ?? []] as const;
+        } catch {
+            // A pay-rule read failing must not take down the services page.
+            return [id, [] as PayRule[]] as const;
+        }
+    });
     return Object.fromEntries(results);
 }
 
