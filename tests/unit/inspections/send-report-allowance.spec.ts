@@ -32,6 +32,7 @@ import type { MockKV } from '../mocks';
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const CLIENT = 'contact-client-1';
 const CO_CLIENT = 'contact-client-2';
+const THIRD = 'contact-client-3';
 const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 let db: BetterSQLite3Database<typeof schema>;
@@ -80,7 +81,8 @@ function send(recipients: Array<{ contactId: string; roleKey: string }>) {
 }
 const one = () => send([{ contactId: CLIENT, roleKey: 'client' }]);
 const both = () => send([{ contactId: CLIENT, roleKey: 'client' }, { contactId: CO_CLIENT, roleKey: 'co_client' }]);
-const counter = async (email: string) => Number(await kv.get(`sendlimit:${TENANT}:${INSP_ID}:${email}`) ?? '0');
+// Stored as `<count>@<expiry epoch ms>`; the count is what these tests assert on.
+const counter = async (email: string) => Number(String(await kv.get(`sendlimit:${TENANT}:${INSP_ID}:${email}`) ?? '0').split('@')[0]);
 
 describe('send-report-pdf hourly allowance', () => {
     beforeEach(async () => {
@@ -95,10 +97,12 @@ describe('send-report-pdf hourly allowance', () => {
         await db.insert(schema.contacts).values([
             { id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@example.com', createdAt: new Date() },
             { id: CO_CLIENT, tenantId: TENANT, type: 'client', name: 'Joe', email: 'joe@example.com', createdAt: new Date() },
+            { id: THIRD, tenantId: TENANT, type: 'client', name: 'Kim', email: 'kim@example.com', createdAt: new Date() },
         ]);
         await seedSendGuardFixture(db, TENANT, INSP_ID, [
             { contactId: CLIENT, roleKey: 'client' },
             { contactId: CO_CLIENT, roleKey: 'co_client' },
+            { contactId: THIRD, roleKey: 'co_client' },
         ]);
         kv = guardKv() as unknown as MockKV;
         sendPdf = vi.fn().mockResolvedValue(true);
@@ -169,5 +173,89 @@ describe('send-report-pdf hourly allowance', () => {
         expect(statuses.filter((s) => s === 429)).toHaveLength(3);
         expect(sendPdf).toHaveBeenCalledTimes(3);
         expect(await counter('jane@example.com')).toBe(3);
+    });
+
+    describe('a refusal that aborts the batch after earlier recipients were delivered', () => {
+        // The handler rethrows any platform refusal (cooling window, plan cap, unverified domain) and
+        // stops: recipients before it are already in the inbox and must stay counted.
+        const sendsThenRefuses = (refusal: () => Error) => {
+            sendPdf.mockImplementation(async (to: string) => {
+                if (to === 'joe@example.com') throw refusal();
+                return true;
+            });
+        };
+
+        it.each([
+            ['plan cap (402)', () => new AppError(402, ErrorCode.QUOTA_EXHAUSTED, 'cap')],
+            ['cooling window (403)', () => new AppError(403, ErrorCode.FORBIDDEN, 'cooling')],
+        ])('%s: the delivered recipient stays counted, the refused one is refunded', async (_label, refusal) => {
+            sendsThenRefuses(refusal);
+            const res = await both();
+            expect([402, 403]).toContain(res.status);
+            expect(await counter('jane@example.com')).toBe(1);
+            expect(await counter('joe@example.com')).toBe(0);
+        });
+
+        it('repeating the aborted request cannot send to the delivered recipient more than three times an hour', async () => {
+            sendsThenRefuses(() => new AppError(402, ErrorCode.QUOTA_EXHAUSTED, 'cap'));
+            for (let i = 0; i < 3; i++) expect((await both()).status).toBe(402);
+            expect(await counter('jane@example.com')).toBe(3);
+            expect(await counter('joe@example.com')).toBe(0);
+            // Jane has had three reports: a fourth request is refused for her before anything is sent.
+            const sentBefore = sendPdf.mock.calls.length;
+            expect((await both()).status).toBe(429);
+            expect(sendPdf.mock.calls.length).toBe(sentBefore);
+        });
+
+        it('two delivered, then a failure for the third: the two stay counted, the third is refunded', async () => {
+            sendPdf.mockImplementation(async (to: string) => {
+                if (to === 'kim@example.com') throw new Error('provider down');
+                return true;
+            });
+            const res = await send([
+                { contactId: CLIENT, roleKey: 'client' },
+                { contactId: CO_CLIENT, roleKey: 'co_client' },
+                { contactId: THIRD, roleKey: 'co_client' },
+            ]);
+            expect(res.status).toBe(200);
+            expect(await counter('jane@example.com')).toBe(1);
+            expect(await counter('joe@example.com')).toBe(1);
+            expect(await counter('kim@example.com')).toBe(0);
+        });
+    });
+
+    describe('the hour belongs to the sends that happened', () => {
+        const writes = (key: string) => kv.put.mock.calls.filter((c) => c[0] === key);
+        const KEY = () => `sendlimit:${TENANT}:${INSP_ID}:jane@example.com`;
+
+        it('a refund puts the count back down without moving the expiry of the earlier delivery', async () => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            try {
+                expect((await one()).status).toBe(200);
+                const firstExpiry = (writes(KEY()).at(-1)![2] as { expiration: number }).expiration;
+                vi.advanceTimersByTime(10 * 60 * 1000);
+                // a second request for Jane is refused downstream: reserved, then refunded
+                sendPdf.mockRejectedValue(new AppError(402, ErrorCode.QUOTA_EXHAUSTED, 'cap'));
+                expect((await one()).status).toBe(402);
+                expect(await counter('jane@example.com')).toBe(1);
+                for (const call of writes(KEY())) expect((call[2] as { expiration: number }).expiration).toBe(firstExpiry);
+            } finally { vi.useRealTimers(); }
+        });
+
+        it('the window does not slide: three sends spread over the hour still count against that hour, and a new hour starts clean', async () => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            try {
+                for (let i = 0; i < 3; i++) {
+                    expect((await one()).status).toBe(200);
+                    vi.advanceTimersByTime(15 * 60 * 1000);
+                }
+                // 45 minutes in: refused (3 delivered in the window)
+                expect((await one()).status).toBe(429);
+                // past the hour that opened with the first send: the allowance is back
+                vi.advanceTimersByTime(16 * 60 * 1000);
+                expect((await one()).status).toBe(200);
+                expect(await counter('jane@example.com')).toBe(1);
+            } finally { vi.useRealTimers(); }
+        });
     });
 });

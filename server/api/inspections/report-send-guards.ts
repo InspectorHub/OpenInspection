@@ -53,24 +53,64 @@ const MAX_CONTACT_ID_LENGTH = 128;
 const sendKey = (c: Context<HonoConfig>, inspectionId: string, who: string) =>
     `sendlimit:${c.get('tenantId')}:${inspectionId}:${who.toLowerCase()}`;
 
-/** Refuses when this recipient is already at the hourly ceiling for this inspection. Spends nothing. */
-async function assertUnderLimit(c: Context<HonoConfig>, inspectionId: string, who: string, message: string): Promise<void> {
-    const used = Number(await c.env.TENANT_CACHE.get(sendKey(c, inspectionId, who)) ?? '0');
-    if (used >= MAX_PER_HOUR) throw Errors.RateLimited(message);
+/**
+ * A counter is stored as `<count>@<expiry epoch ms>`: the expiry travels with the count so a refund can
+ * put the count back down WITHOUT moving the window of the sends that really happened. (Rewriting the
+ * key with a fresh TTL would keep an earlier delivery counted for longer than the hour it is owed.) The
+ * window opens with the first send and does not slide: three sends in an hour is a ceiling on that hour.
+ * A plain number is the older format; it reads as a count whose window ends an hour from now. A counter
+ * whose window has passed reads as zero, whether or not the store has dropped the key yet.
+ */
+function readCounter(raw: string | null, nowMs: number): { count: number; expiresAtMs: number } {
+    if (!raw) return { count: 0, expiresAtMs: nowMs + 3_600_000 };
+    const [count, expiry] = raw.split('@');
+    const parsed = Number(expiry);
+    const expiresAtMs = Number.isFinite(parsed) && expiry ? parsed : nowMs + 3_600_000;
+    if (expiresAtMs <= nowMs) return { count: 0, expiresAtMs: nowMs + 3_600_000 };
+    return { count: Number(count) || 0, expiresAtMs };
 }
 
-/** Moves one recipient's counter by `delta` (an address, or `sms:<contact id>`); never below zero. */
+/** Refuses when this recipient is already at the hourly ceiling for this inspection. Spends nothing. */
+async function assertUnderLimit(c: Context<HonoConfig>, inspectionId: string, who: string, message: string): Promise<void> {
+    const { count } = readCounter(await c.env.TENANT_CACHE.get(sendKey(c, inspectionId, who)), Date.now());
+    if (count >= MAX_PER_HOUR) throw Errors.RateLimited(message);
+}
+
+/**
+ * Moves one recipient's counter by `delta` (an address, or `sms:<contact id>`); never below zero. The
+ * first spend opens the hour; later spends and refunds keep the expiry the counter already has.
+ */
 async function adjustSend(c: Context<HonoConfig>, inspectionId: string, who: string, delta: number): Promise<void> {
     const kv = c.env.TENANT_CACHE;
     const key = sendKey(c, inspectionId, who);
-    const used = Number(await kv.get(key) ?? '0');
-    const next = Math.max(0, used + delta);
-    if (next === 0) await kv.delete(key);
-    else await kv.put(key, String(next), { expirationTtl: 3600 });
+    const now = Date.now();
+    const current = readCounter(await kv.get(key), now);
+    const count = Math.max(0, current.count + delta);
+    if (count === 0) {
+        await kv.delete(key);
+        return;
+    }
+    const expiresAtMs = current.expiresAtMs;
+    // KV refuses an expiry less than a minute away; a window that short is simply held that long.
+    await kv.put(key, `${count}@${expiresAtMs}`, { expiration: Math.max(Math.ceil(expiresAtMs / 1000), Math.ceil(now / 1000) + 60) });
 }
 
 /** Spends one send of this inspection on this recipient (an address, or `sms:<contact id>`). */
 const spendSend = (c: Context<HonoConfig>, inspectionId: string, who: string) => adjustSend(c, inspectionId, who, 1);
+
+/**
+ * Which addresses a request really delivered to, noted by the handler as it goes. It is kept per
+ * request so the guard knows what was delivered even when the handler then throws (a refusal that
+ * applies to the whole batch aborts it after earlier recipients were already sent).
+ */
+const deliveredByRequest = new WeakMap<Request, string[]>();
+
+/** Called by the send-report handler for each address a report actually went to. */
+export function noteReportDelivered(c: Context<HonoConfig>, email: string): void {
+    const list = deliveredByRequest.get(c.req.raw) ?? [];
+    list.push(email.toLowerCase());
+    deliveredByRequest.set(c.req.raw, list);
+}
 
 /**
  * Serialises the check-then-write on one inspection's counters within this isolate. KV has no
@@ -158,42 +198,20 @@ export async function guardSendReport(c: Context<HonoConfig>, next: Next) {
         for (const email of emails) await assertUnderLimit(c, id, email, REPORT_LIMIT_MESSAGE);
         for (const email of emails) await spendSend(c, id, email);
     });
-    // The reservation is only a hold until the send is known. Give back what was not delivered.
-    let delivered: Map<string, number> | 'all';
+    // The reservation is only a hold until the send is known. Whatever happens next (an answer, a
+    // thrown refusal), give back exactly the recipients the handler did not deliver to.
     try {
         await next();
-        delivered = await deliveredByAddress(c);
-    } catch (err) {
-        await releaseUndelivered(c, id, lockKey, emails, new Map());
-        throw err;
-    }
-    await releaseUndelivered(c, id, lockKey, emails, delivered);
-}
-
-/**
- * The addresses (lower-cased, with how many times each) the handler reports as delivered. A
- * refusal (the handler threw, or answered 4xx/5xx) delivered nothing. A success body the guard
- * cannot read is treated as delivered, so an unreadable answer never hands allowance back.
- */
-async function deliveredByAddress(c: Context<HonoConfig>): Promise<Map<string, number> | 'all'> {
-    const out = new Map<string, number>();
-    if (c.error || c.res.status >= 400) return out;
-    try {
-        const body = await c.res.clone().json() as { data?: { sentTo?: unknown } };
-        const sentTo = body?.data?.sentTo;
-        if (!Array.isArray(sentTo)) return 'all';
-        for (const a of sentTo) if (typeof a === 'string') out.set(a.toLowerCase(), (out.get(a.toLowerCase()) ?? 0) + 1);
-        return out;
-    } catch {
-        return 'all';
+    } finally {
+        await releaseUndelivered(c, id, lockKey, emails, deliveredByRequest.get(c.req.raw) ?? []);
     }
 }
 
 async function releaseUndelivered(
-    c: Context<HonoConfig>, inspectionId: string, lockKey: string, reserved: string[], delivered: Map<string, number> | 'all',
+    c: Context<HonoConfig>, inspectionId: string, lockKey: string, reserved: string[], delivered: string[],
 ): Promise<void> {
-    if (delivered === 'all') return;
-    const remaining = new Map(delivered);
+    const remaining = new Map<string, number>();
+    for (const email of delivered) remaining.set(email, (remaining.get(email) ?? 0) + 1);
     const refunds: string[] = [];
     for (const email of reserved) {
         const left = remaining.get(email) ?? 0;

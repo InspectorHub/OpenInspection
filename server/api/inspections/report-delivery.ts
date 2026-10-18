@@ -5,7 +5,7 @@
 // signing envelope lives in ./agreements.ts.
 // Extracted from inspections.ts, then fixed in place: not a copy of anything,
 // the only definition of these routes.
-import { guardSendReport, guardReportLink } from './report-send-guards';
+import { guardSendReport, guardReportLink, noteReportDelivered } from './report-send-guards';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -450,6 +450,7 @@ const reportDeliveryRoutes = createApiRouter()
                     metadata: { recipient: recipientEmail, roleKey: recipient.roleKey },
                 });
                 sentTo.push(recipientEmail);
+                noteReportDelivered(c, recipientEmail);
                 await logManualSend({ recipient: recipientEmail, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'sent' });
             } catch (err) {
                 // Platform-level refusals (cooling window, quota exhausted, domain
