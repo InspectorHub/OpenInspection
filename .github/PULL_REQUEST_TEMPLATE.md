@@ -14,7 +14,7 @@ Thanks for sending a PR! Before you submit:
 <!-- Edit every line below: the pr-readiness check rejects the placeholders until you do.
      Keep the PR a draft until these lines are true. -->
 Code review: <reviewer> — open findings: <n>
-Chrome: /<route> — <what was seen, light and dark>
+Chrome: /<route> — light: ok, dark: ok — <what was seen>
 
 - [ ] CI is green
 - [ ] Review findings are closed (open findings: 0)

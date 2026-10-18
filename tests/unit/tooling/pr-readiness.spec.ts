@@ -14,11 +14,12 @@ const formatReport = mod.formatReport as (r: Res) => string;
 const parseFilesNdjson = mod.parseFilesNdjson as (t: string) => string[];
 const fetchPrFiles = mod.fetchPrFiles as (repo: string, n: number, gh: (a: string[]) => string) => string[];
 const FILES_JQ = mod.FILES_JQ as string;
-const positiveWord = mod.positiveWord as (t: string, w: string) => boolean;
 
-const THEME_TEXT = 'light and dark checked';
+const TOKENS = 'light: ok, dark: ok';
 const GOOD_REVIEW = 'Code review: independent reviewer agent pass 2 — open findings: 0';
-const GOOD_CHROME = `Chrome: /company/acme/team — invite dialog renders, ${THEME_TEXT}`;
+const GOOD_CHROME = `Chrome: /company/acme/team — ${TOKENS} — invite dialog renders and submits`;
+const THEMES_FOR_TEST = (tok: string) => tok;
+const chrome = (tok: string, seen = 'renders the invite dialog fine') => `Chrome: /team — ${tok} — ${seen}`;
 const NA = 'Chrome: n/a — no UI files changed';
 const UI = ['app/routes/team.tsx'];
 const NO_UI = ['server/lib/foo.ts', 'docs/x.md'];
@@ -56,23 +57,23 @@ describe('formatting tolerance (M3)', () => {
         ['blockquote', '> Code review: independent reviewer agent pass — open findings: 0'],
         ['numbered', '1. Code review: independent reviewer agent pass — open findings: 0'],
         ['trailing dot', 'Code review: independent reviewer agent pass — open findings: 0.'],
-        ['parenthetical', 'Code review: independent reviewer agent pass — open findings: 0 (none left)'],
+        ['parenthetical', 'Code review: independent reviewer agent pass — open findings: 0 (none)'],
         ['backticked', '`Code review:` independent reviewer agent pass — open findings: 0'],
     ])('review line: %s', (_n, line) => {
         expect(failedIds(run(body(line, NA)))).toEqual([]);
     });
     it('chrome line with bold, backticked route and blockquote', () => {
-        expect(run(body(GOOD_REVIEW, `> **Chrome:** \`/inspections\` — list renders, ${THEME_TEXT}`), UI).ok).toBe(true);
+        expect(run(body(GOOD_REVIEW, `> **Chrome:** \`/inspections\` — ${TOKENS} — list renders and filters`), UI).ok).toBe(true);
     });
     it('chrome line with a colon separator', () => {
-        expect(run(body(GOOD_REVIEW, `Chrome: /inspections: list renders, ${THEME_TEXT}`), UI).ok).toBe(true);
+        expect(run(body(GOOD_REVIEW, `Chrome: /inspections: ${TOKENS} — list renders and filters`), UI).ok).toBe(true);
     });
     it('CRLF bodies and a trailing lone CR', () => {
         const crlf = body(GOOD_REVIEW, NA).replace(/\n/g, '\r\n') + '\r';
         expect(run(crlf).ok).toBe(true);
     });
     it('does not reject <details>, <br>, Array<string> or /inspections/<id> as placeholders', () => {
-        const r = run(body(GOOD_REVIEW, `Chrome: /inspections/<id> — page renders for Array<string> items, ${THEME_TEXT}`, '<details><summary>log</summary>ok<br></details>'), UI);
+        const r = run(body(GOOD_REVIEW, `Chrome: /inspections/<id> — ${TOKENS} — page renders for Array<string> items`, '<details><summary>log</summary>ok<br></details>'), UI);
         expect(failedIds(r)).toEqual([]);
     });
 });
@@ -130,10 +131,10 @@ describe('rule b: code review line', () => {
             expect(failedIds(run(body(`Code review: ${who} — open findings: 0`, NA)))).toEqual(['code-review']);
         },
     );
-    it.each(['(3 unresolved)', '(2 blocking)', '(pending)', '(remaining work)', '(open: 1)', '(2 of them)', '(see item 4)', '(unresolved)', '(blocking)'])('rejects a contradicting parenthetical %s', (p) => {
+    it.each(['(3 unresolved)', '(2 blocking)', '(pending)', '(remaining work)', '(open: 1)', '(2 of them)', '(see item 4)', '(nine)', '(see below: three issues)', '(a few)'])('rejects a contradicting parenthetical %s', (p) => {
         expect(failedIds(run(body(`Code review: independent reviewer agent pass — open findings: 0 ${p}`, NA)))).toEqual(['code-review']);
     });
-    it.each(['(none)', '(zero)', '(nothing left)'])('accepts the parenthetical %s', (p) => {
+    it.each(['(none)', '(zero)', '(all fixed)', '(nothing left)', '(NONE)'])('accepts the parenthetical %s', (p) => {
         expect(failedIds(run(body(`Code review: independent reviewer agent pass — open findings: 0 ${p}`, NA)))).toEqual([]);
     });
     it.each(['self', 'myself', 'author', 'me', 'own', 'same'])('rejects the self word "%s" on its own (mutation control)', (t) => {
@@ -172,57 +173,73 @@ describe('rule c: Chrome', () => {
     it('accepts n/a only with the standard wording', () => {
         expect(failedIds(run(body(GOOD_REVIEW, 'Chrome: n/a — because')))).toEqual(['chrome']);
     });
-    it('fails an observation shorter than 15 characters', () => {
-        expect(failedIds(run(body(GOOD_REVIEW, 'Chrome: /team — light ok'), UI))).toEqual(['chrome']);
+    it('passes the token form', () => {
+        expect(run(body(GOOD_REVIEW, GOOD_CHROME), UI).ok).toBe(true);
     });
-    it('requires light to be named, as a word', () => {
-        expect(failedIds(run(body(GOOD_REVIEW, 'Chrome: /team — dialog renders and submits fine'), UI))).toEqual(['chrome']);
-        expect(failedIds(run(body(GOOD_REVIEW, 'Chrome: /team — lightbox renders and submits fine dark ok'), UI))).toEqual(['chrome']);
+    it('fails an observation shorter than 15 characters after the last dash', () => {
+        expect(failedIds(run(body(GOOD_REVIEW, chrome(TOKENS, 'ok fine')), UI))).toEqual(['chrome']);
+        expect(run(body(GOOD_REVIEW, chrome(TOKENS, 'exactly fifteen!')), UI).ok).toBe(true);
     });
-    it.each(['did not check in a browser', 'not tested', 'could not verify anything', 'no browser check was done', 'unable to test this page', "didn't check anything"])(
-        'rejects an observation that denies the WHOLE check: %s',
-        (d) => {
-            expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /team — ${d}`), UI))).toEqual(['chrome']);
+    it('the route must start with a slash', () => {
+        expect(failedIds(run(body(GOOD_REVIEW, `Chrome: team — ${TOKENS} — renders the invite dialog fine`), UI))).toEqual(['chrome']);
+    });
+    it('fails "looks fine" as the observation', () => {
+        expect(failedIds(run(body(GOOD_REVIEW, chrome(TOKENS, 'looks fine')), UI))).toEqual(['chrome']);
+    });
+    it('a failing line shows the required form', () => {
+        const r = run(body(GOOD_REVIEW, 'Chrome: /team — it works in the browser'), UI);
+        expect(r.rules.find((x) => x.id === 'chrome')?.detail).toContain('light: ok');
+    });
+    it('tokens are case-insensitive, in any order, separated by comma, semicolon or space', () => {
+        for (const tok of ['LIGHT: OK, DARK: OK', 'dark: ok light: ok', 'light:ok; dark:ok', 'dark: ok, light: ok.'])
+            expect(run(body(GOOD_REVIEW, chrome(THEMES_FOR_TEST(tok))), UI).ok).toBe(true);
+    });
+    it.each(['light: not checked', 'light: skipped', 'light: pending', 'light: untested', 'light: no', 'lightbox: ok', 'dark: ok'])(
+        'a bad light value fails: %s',
+        (tok) => {
+            expect(failedIds(run(body(GOOD_REVIEW, chrome(tok)), UI))).toEqual(['chrome']);
         },
     );
+    it('evaluates EVERY Chrome line: one bad line fails the rule even beside a good one', () => {
+        expect(failedIds(run(body(GOOD_REVIEW, GOOD_CHROME, 'Chrome: see above'), UI))).toEqual(['chrome']);
+        expect(failedIds(run(body(GOOD_REVIEW, GOOD_CHROME, chrome('light: skipped')), UI))).toEqual(['chrome']);
+        expect(run(body(GOOD_REVIEW, GOOD_CHROME, GOOD_CHROME), UI).ok).toBe(true);
+    });
     it.each([
+        'light ok; not dark',
+        'light ok, dark not checked',
+        'dark mode untested',
+        'light ok; dark skipped',
+        'dark n/a',
+        'light and dark not verified yet',
+        'unverified: light and dark',
         'skipped the empty state, checked light and dark',
         'checked light and dark; no layout shift, nothing skipped',
-        'did not run into errors; light and dark ok',
-        'not tested on mobile but light and dark render fine',
-        'not looked at tablet; light and dark render fine',
-        'light and dark checked, not yet done on mobile',
         'Not seen any problem in light and dark',
-        'light ok dark ok skipped nothing',
-    ])('accepts the honest observation: %s', (o) => {
-        expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /team — ${o}`), UI))).toEqual([]);
+        'light and dark checked',
+        'did not check',
+        'pending',
+        'to be tested',
+        'will test later',
+    ])('free text without the tokens fails: %s', (txt) => {
+        expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /team — ${txt} — renders the invite dialog fine`), UI))).toEqual(['chrome']);
+        expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /team — ${txt}`), UI))).toEqual(['chrome']);
     });
-    it('positiveWord ignores negated mentions but not distant negations', () => {
-        expect(positiveWord('light ok; not dark', 'dark')).toBe(false);
-        expect(positiveWord('light ok, did not check dark', 'dark')).toBe(false);
-        expect(positiveWord('without dark', 'dark')).toBe(false);
-        expect(positiveWord('no dark mode', 'dark')).toBe(false);
-        expect(positiveWord('dark ok but not light', 'dark')).toBe(true);
-        expect(positiveWord('Not seen any problem in light and dark', 'dark')).toBe(true);
-    });
-    it('evaluates every Chrome line: a denying line fails even beside a good one (L2)', () => {
-        const r = run(body(GOOD_REVIEW, GOOD_CHROME, 'Chrome: /other — did not check anything here'), UI);
-        expect(failedIds(r)).toEqual(['chrome']);
-    });
-    it('a second, malformed Chrome line does not hide a good one', () => {
-        expect(run(body(GOOD_REVIEW, GOOD_CHROME, 'Chrome: see above'), UI).ok).toBe(true);
-    });
-    it('requires dark as a word unless "dark: n/a" has a reason', () => {
-        const eng = (c: string) => run(body(GOOD_REVIEW, c), UI).ok;
-        expect(eng('Chrome: /inspections — list renders, light checked')).toBe(false);
-        expect(eng('Chrome: /inspections — list renders, light and dark checked')).toBe(true);
-        expect(eng('Chrome: /inspections — list renders in light; dark: n/a no styling change')).toBe(true);
-        expect(eng('Chrome: /inspections — list renders in light; dark: n/a')).toBe(false);
-        expect(eng('Chrome: /inspections — renders light ok, did not check dark')).toBe(false);
-        expect(eng('Chrome: /inspections — light ok; not dark')).toBe(false);
-        expect(eng('Chrome: /inspections — light fine, without dark')).toBe(false);
-        expect(eng('Chrome: /inspections — light ok and no dark mode check')).toBe(false);
-        expect(eng('Chrome: /inspections — renders light ok, darkness ahead lol')).toBe(false);
+    it.each(['light: ok, dark: not checked', 'light: ok, dark: skipped', 'light: ok, dark: pending', 'light: ok, dark: untested', 'light: ok, dark: no', 'light: ok', 'dark: ok, light: skipped'])(
+        'engine: fails %s',
+        (tok) => {
+            expect(failedIds(run(body(GOOD_REVIEW, chrome(tok)), UI))).toEqual(['chrome']);
+        },
+    );
+    it('engine: dark: n/a needs a reason of at least 4 words in parentheses', () => {
+        const eng = (tok: string) => run(body(GOOD_REVIEW, chrome(tok)), UI).ok;
+        expect(eng('light: ok, dark: ok')).toBe(true);
+        expect(eng('light: ok, dark: n/a (this view has no dark theme styling at all)')).toBe(true);
+        expect(eng('dark: n/a (this view has no dark theme styling), light: ok')).toBe(true);
+        expect(eng('light: ok, dark: n/a')).toBe(false);
+        expect(eng('light: ok, dark: n/a (no styles)')).toBe(false);
+        expect(eng('light: ok, dark: n/a no dark styling because plain page')).toBe(false);
+        expect(eng('light: ok, dark: n/a (this view has no dark theme styling), dark: skipped')).toBe(false);
     });
 });
 
@@ -286,7 +303,7 @@ describe('rule d: placeholders', () => {
         expect(failedIds(run(body(GOOD_REVIEW, 'Chrome: /team — looks fine'), UI))).toContain('chrome');
     });
     it('rejects the unedited template', () => {
-        const r = run(body('Code review: <reviewer> — open findings: <n>', 'Chrome: /<route> — <what was seen, light and dark>'), UI);
+        const r = run(body('Code review: <reviewer> — open findings: <n>', 'Chrome: /<route> — light: ok, dark: ok — <what was seen>'), UI);
         expect(r.ok).toBe(false);
         expect(failedIds(r)).toEqual(expect.arrayContaining(['code-review', 'placeholders']));
     });

@@ -9,7 +9,9 @@
  * It reads text. A body that says `Code review: Jane Doe, senior reviewer —
  * open findings: 0` passes whether or not Jane exists, and the "not self" rule
  * is an honour check (it rejects the words self, myself, author, me, own, same
- * in the reviewer text; it cannot know who the reviewer really was). It makes
+ * in the reviewer text; it cannot know who the reviewer really was). The
+ * Chrome tokens (`light: ok`, `dark: ok`) are a written assertion by the author:
+ * the check makes a missing or evasive record impossible, not a false one. It makes
  * the record consistent and makes a MISSING record loud. The only thing it
  * verifies against reality is the UI-vs-n/a claim, which is compared with the
  * PR's real file list (renames count: the old path is a changed path too).
@@ -23,7 +25,7 @@
  * ---------------------------------------------------------------------------
  *   ## Verification
  *   Code review: <who or what reviewed, 3+ words> — open findings: 0
- *   Chrome: /<route> — <what was seen, light and dark>
+ *   Chrome: /<route> — light: ok, dark: ok — <what was seen>     (the portal has no dark mode: light: ok only)
  *   (or, when no UI file changed)  Chrome: n/a — no UI files changed
  *
  * The PR must also not be a draft (draft = not verified yet).
@@ -51,7 +53,8 @@ import { pathToFileURL } from 'node:url';
 export const REPO_KIND = 'engine';
 const KIND_UI = (f) => /^messages\//.test(f) || /^packages\/shared-ui\//.test(f);
 const THEMES = ['light', 'dark'];
-const CHROME_EXAMPLE = 'Chrome: /inspections — list renders, light and dark checked';
+const CHROME_FORM = 'Chrome: /route — light: ok, dark: ok — <what was seen>';
+const CHROME_EXAMPLE = 'Chrome: /inspections — light: ok, dark: ok — list renders and filters work';
 const EXAMPLE_REPO = 'InspectorHub/OpenInspection';
 
 // ── UI file detection ───────────────────────────────────────────────────────
@@ -89,20 +92,6 @@ export function expandPaths(files) {
 // ── parsing helpers ─────────────────────────────────────────────────────────
 const SEP = '(?:--|[-\\u2014\\u2013\\u2212])';
 const SELF_TOKENS = new Set(['self', 'myself', 'author', 'me', 'own', 'same']);
-// An explicit denial of the WHOLE check, at the start of the observation. A
-// narrowing word after the verb ("not tested on mobile") makes it honest.
-const DENY_START =
-    /^(?:i\s+|we\s+)?(?:(?:did\s*not|didn['’]?t|could\s*not|couldn['’]?t|have\s*not|haven['’]?t|has\s*not|hasn['’]?t|was\s*not|wasn['’]?t|never|not|unable\s+to)\s+(?:be\s+)?(?:check|checked|test|tested|verify|verified|view|viewed|look|looked|see|seen)\b(?!\s+(?:on|for|in|at|the|any|with|against|beyond|every)\b)|no\s+(?:browser|chrome|manual|visual)\s+(?:check|test|verification)\b)/i;
-
-/** True when `word` appears as a positive observation: not within three words after not/no/never/without/n't. */
-export function positiveWord(text, word) {
-    const present = new RegExp(`\\b${word}\\b`, 'i');
-    if (!present.test(text)) return false;
-    const negated = new RegExp(`(?:\\bnot|\\bno|\\bnever|\\bwithout|n['’]t)\\s+(?:\\w+\\s+){0,2}${word}\\b`, 'gi');
-    const all = [...text.matchAll(new RegExp(`\\b${word}\\b`, 'gi'))].length;
-    const neg = [...text.matchAll(negated)].length;
-    return all > neg;
-}
 const TEMPLATE_TOKEN = /<(?:reviewer|n|route|who\b[^<>\n]*|what\b[^<>\n]*)>/gi;
 
 /** Section body under `## Verification`; comments, unclosed comments and fenced code are dropped first. */
@@ -185,38 +174,47 @@ function reviewLine(text) {
             ok: false,
             detail: `reviewer "${who}" contains the word "${selfWord}", which reads as a self-check. This is an honour check on the words, not on the person: if the review was independent, say so with a clarifying word such as the tool or team name (e.g. "independent reviewer agent pass 2")`,
         };
-    const par = /^0\)?(?:\s*\(([^)]*)\))?\.?$/.exec(rest);
-    if (!par || (par[1] !== undefined && (/\d/.test(par[1]) || /\b(?:open|unresolved|pending|remaining|blocking)\b/i.test(par[1]))))
-        return { ok: false, detail: `open findings must be exactly 0, with at most a parenthetical without numbers or words like open/unresolved/pending (got "${rest}")` };
+    if (!/^0\)?(?:\s*\((?:none|zero|all fixed|nothing left)\))?\.?$/i.test(rest))
+        return { ok: false, detail: `open findings must be exactly 0, optionally followed by (none), (zero), (all fixed) or (nothing left) (got "${rest}")` };
     return { ok: true, detail: `${who} — open findings: 0` };
 }
 
 function chromeLine(r, uiFiles, noFiles = false) {
     const uiNote = uiFiles.length ? ` (UI files changed: ${uiFiles.slice(0, 3).join(', ')}${uiFiles.length > 3 ? ', ...' : ''})` : '';
     if (/^n\/a\b/i.test(r)) {
-        if (noFiles) return { ok: false, deny: true, detail: 'Chrome claims n/a but the PR reports ZERO changed files; the claim cannot be verified (empty file list or API answer?)' };
-        if (uiFiles.length) return { ok: false, deny: true, detail: `Chrome claims n/a but UI files changed${uiNote}` };
+        if (noFiles) return { ok: false, detail: 'Chrome claims n/a but the PR reports ZERO changed files; the claim cannot be verified (empty file list or API answer?)' };
+        if (uiFiles.length) return { ok: false, detail: `Chrome claims n/a but UI files changed${uiNote}` };
         if (!/no ui files changed/i.test(r)) return { ok: false, detail: 'n/a form must read: Chrome: n/a — no UI files changed' };
         return { ok: true, detail: 'n/a, verified against the file list (no UI files changed)' };
     }
     const m = new RegExp(`^(\\/\\S*?)\\s*(?:${SEP}|:)\\s+(.*)$`).exec(r);
-    if (!m) return { ok: false, detail: 'line must read: Chrome: /<route> — <what was seen>' };
-    const seen = m[2].trim();
-    if (DENY_START.test(seen)) return { ok: false, deny: true, detail: `observation says the check was not done ("${seen}")` };
-    if (seen.length < 15) return { ok: false, detail: `observation after the dash must be at least 15 characters (got ${seen.length})` };
+    if (!m) return { ok: false, detail: `line must read: ${CHROME_FORM}` };
+    // The observation is what follows the LAST dash; the theme tokens sit before it.
+    let cut = -1;
+    let cutEnd = -1;
+    for (const d of m[2].matchAll(new RegExp(`\\s${SEP}\\s`, 'g'))) {
+        cut = d.index;
+        cutEnd = d.index + d[0].length;
+    }
+    if (cut === -1) return { ok: false, detail: `the theme tokens and the observation are separated by a dash; line must read: ${CHROME_FORM}` };
+    const tokens = m[2].slice(0, cut);
+    const seen = m[2].slice(cutEnd).trim();
+    if (seen.length < 15) return { ok: false, detail: `observation after the last dash must be at least 15 characters (got ${seen.length}); line must read: ${CHROME_FORM}` };
     if (/^(looks fine|lgtm)\.?$/i.test(seen)) return { ok: false, detail: 'observation must say what was seen, not "looks fine"' };
     for (const t of THEMES) {
-        if (t === 'dark') {
-            const na = /dark:\s*n\/a(.*)$/i.exec(seen);
-            if (na) {
-                if (na[1].replace(/[\s,;.:()-]/g, '').length < 3) return { ok: false, detail: '"dark: n/a" needs a reason' };
-                continue;
+        const values = [...tokens.matchAll(new RegExp(`\\b${t}\\s*:\\s*([^\\s,;]+)`, 'gi'))].map((x) => x[1].replace(/[.)]+$/, '').toLowerCase());
+        if (!values.length) return { ok: false, detail: `missing the literal token "${t}: ok"; line must read: ${CHROME_FORM}` };
+        for (const v of values) {
+            if (v === 'ok') continue;
+            if (t === 'dark' && v === 'n/a') {
+                const reason = /\bdark\s*:\s*n\/a\s*\(([^)]*)\)/i.exec(tokens);
+                if (reason && reason[1].trim().split(/\s+/).length >= 4) continue;
+                return { ok: false, detail: '"dark: n/a" needs a reason of at least 4 words in parentheses, e.g. "dark: n/a (this view has no dark theme styling at all)"' };
             }
+            return { ok: false, detail: `"${t}: ${v}" is not accepted: the value must be "ok"${t === 'dark' ? ' (or "n/a" with a reason)' : ''}; line must read: ${CHROME_FORM}` };
         }
-        if (!positiveWord(seen, t))
-            return { ok: false, detail: `must state that ${t} mode was checked ("${t}" as a positive observation, not "not ${t}")${t === 'dark' ? ', or "dark: n/a" plus a reason' : ''}` };
     }
-    return { ok: true, detail: `${m[1]} — ${seen}` };
+    return { ok: true, detail: `${m[1]} — ${tokens.trim()} — ${seen}` };
 }
 
 // ── rules ───────────────────────────────────────────────────────────────────
@@ -266,13 +264,12 @@ export function checkPrReadiness({ body, isDraft, files, skipDraft = false }) {
         let detail;
         const uiNote = uiFiles.length ? ` (UI files changed: ${uiFiles.slice(0, 3).join(', ')}${uiFiles.length > 3 ? ', ...' : ''})` : '';
         if (!lines.length) {
-            detail = uiFiles.length ? `UI files changed but no "Chrome: /<route> — <what was seen>" line${uiNote}` : 'no "Chrome:" line (use "Chrome: n/a — no UI files changed" when true)';
+            detail = uiFiles.length ? `UI files changed but no "${CHROME_FORM}" line${uiNote}` : 'no "Chrome:" line (use "Chrome: n/a — no UI files changed" when true)';
         } else {
             const checked = lines.map((l) => chromeLine(l, uiFiles, allPaths.length === 0));
-            const denied = checked.find((c) => c.deny);
-            const good = checked.find((c) => c.ok);
-            ok = !denied && !!good;
-            detail = denied ? denied.detail : good ? good.detail : checked[0].detail;
+            const bad = checked.find((c) => !c.ok);
+            ok = !bad;
+            detail = bad ? bad.detail : checked[0].detail;
         }
         rules.push(result('chrome', 'Browser verification recorded (or UI-free claim is true)', ok, detail,
             uiFiles.length ? CHROME_EXAMPLE : 'Chrome: n/a — no UI files changed'));
