@@ -118,6 +118,36 @@ and two running at once can exhaust a developer machine. The cap does not preven
 that — **serialising the commits does.** If you are running more than one working
 copy of this repository, commit in one at a time.
 
+## The PR verification record (`pr-readiness`)
+
+CI-green is not a review. Every pull request body carries a `## Verification`
+block, and a separate check (`.github/workflows/pr-readiness.yml`, job
+`pr-readiness`) reads it. The PR template pre-fills the block with
+placeholders the check rejects until you edit them.
+
+```
+## Verification
+Code review: <who or what reviewed, 3+ words> — open findings: 0
+Chrome: /<route> — <what was seen, light and dark>
+```
+
+- The reviewer must be independent (not "self" or "author") and open findings must be exactly `0`.
+- If a file under `app/` (.ts/.tsx/.css), `messages/` or `public/` changed, a `Chrome:` line with a route and at least 15 characters of observation is required, and it must say `light` and `dark` (or `dark: n/a` plus a reason). With no UI file changed, write `Chrome: n/a — no UI files changed`; the checker compares that claim with the PR's real file list and fails if UI files changed.
+- No `TBD`, `TODO`, `<...>` leftovers, or a bare "looks fine" / "lgtm".
+- **A PR stays a draft until the block is true.** A draft always fails the check, by design.
+
+Run it locally before merging:
+
+```bash
+npm run pr:merge-check -- --pr <number> --repo InspectorHub/OpenInspection
+```
+
+It prints PASS/FAIL per rule and `N rules checked, M failed`, and exits 1 on any failure.
+
+The check is only a gate once it is required: **add `pr-readiness` to the required status checks in the repository ruleset** (Settings, Rules, the `main` ruleset, Require status checks). A workflow that is not required is advisory.
+
+What it cannot do: the record is self-attested text. It makes a missing record loud and verifies the UI-vs-n/a claim against the file list; it cannot prove a review or a browser check actually happened. The commit-message `Chrome:` record (`lint:chrome-record`) is a separate, earlier rung.
+
 ## Key files
 
 | file | what it is |
@@ -127,3 +157,4 @@ copy of this repository, commit in one at a time.
 | `scripts/check-gate-registry.mjs` | fails when a `lint:*` script is registered nowhere |
 | `scripts/lib/gate-stamp.mjs` | input-hash caching |
 | `.githooks/pre-commit` | the pre-commit rung |
+| `scripts/pr-readiness.mjs` | the PR verification-record check (workflow and `npm run pr:merge-check`) |

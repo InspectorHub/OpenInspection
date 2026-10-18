@@ -1,0 +1,33 @@
+name: PR readiness
+
+# A separate, tiny workflow on purpose: editing a PR body must not re-run the
+# heavy CI (e2e, builds). It checks the written review / Chrome record in the PR
+# body (see scripts/pr-readiness.mjs). A draft PR fails by design.
+#
+# Make `pr-readiness` a required status check in the repository ruleset so a PR
+# cannot merge without a recorded review and Chrome verification. Locally:
+# `npm run pr:merge-check -- --pr <n> --repo InspectorHub/OpenInspection`.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review, converted_to_draft]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-readiness-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  pr-readiness:
+    name: pr-readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x }
+      - run: node scripts/pr-readiness.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
