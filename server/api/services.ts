@@ -11,6 +11,7 @@ import {
     DiscountCodeListResponseSchema, DiscountCodeResponseSchema,
     ServiceInspectorListResponseSchema, SetServiceInspectorsSchema, SetServiceInspectorsResponseSchema,
     CreatePayRuleSchema, UpdatePayRuleSchema, PayRuleResponseSchema, PayRuleListResponseSchema,
+    BulkServiceIdsQuerySchema, ServiceInspectorMapResponseSchema, PayRuleMapResponseSchema,
 } from '../lib/validations/service.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -124,6 +125,39 @@ export const servicesRoutes = createApiRouter()
         const data = c.req.valid('json');
         const row = await c.var.services.service.createService(tenantId, data);
         return c.json({ success: true, data: row }, 201);
+    })
+    // GET /api/services/inspectors-by-service — the restriction lists of many services at once.
+    // Registered before the /{id}/... routes so no service id can shadow it.
+    .openapi(createRoute(withMcpMetadata({
+        method: 'get', path: '/inspectors-by-service',
+        tags: ["services"], summary: "List inspector restrictions for many services",
+        middleware: [requireRole('owner', 'manager')] as const,
+        request: { query: BulkServiceIdsQuerySchema },
+        responses: {
+            200: { content: { 'application/json': { schema: ServiceInspectorMapResponseSchema } }, description: 'OK - service id to restricted inspector user ids' },
+        },
+        operationId: "listServiceInspectorsBulk",
+        description: "Returns the inspector restriction list of each requested service in one call (ids is a comma-separated list of at most 100). Same answer as the per-service restriction read, for each service of the company: an empty list means all non-agent staff are qualified. An id that is not a service of the company is left out of the answer. Admin or owner only.",
+    }, { scopes: ['read'], tier: 'excluded' })), async (c) => {
+        const tenantId = c.get('tenantId');
+        const { ids } = c.req.valid('query');
+        return c.json({ success: true, data: await c.var.services.service.getServiceInspectorsBulk(tenantId, ids) });
+    })
+    // GET /api/services/pay-rules-by-service — the pay rules of many services at once.
+    .openapi(createRoute(withMcpMetadata({
+        method: 'get', path: '/pay-rules-by-service',
+        tags: ["services"], summary: "List pay rules for many services",
+        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+        request: { query: BulkServiceIdsQuerySchema },
+        responses: {
+            200: { content: { 'application/json': { schema: PayRuleMapResponseSchema } }, description: 'OK - service id to its pay rules, the service default first' },
+        },
+        operationId: "listServicePayRulesBulk",
+        description: "Returns the pay rules of each requested service in one call (ids is a comma-separated list of at most 100). Same answer as the per-service pay rule list, for each service of the company: the service default first, then per-inspector rules, and an empty list where pay splits are off. An id that is not a service of the company is left out of the answer. Restricted to owners and managers holding the company-finance capability.",
+    }, { scopes: ['read'], tier: 'excluded', capability: 'companyFinance' })), async (c) => {
+        const tenantId = c.get('tenantId');
+        const { ids } = c.req.valid('query');
+        return c.json({ success: true, data: await c.var.services.service.listPayRulesBulk(tenantId, ids) });
     })
     // GET /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
     .openapi(createRoute(withMcpMetadata({

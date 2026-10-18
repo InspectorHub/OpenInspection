@@ -93,3 +93,27 @@ export async function setServiceInspectors(db: Db, tenantId: string, serviceId: 
 
         return userIds.length;
     }
+
+/**
+ * The inspector restriction lists of many services in two statements, for the
+ * Settings -> Services page (one request instead of one per service). Only
+ * services owned by `tenantId` appear in the result, so an unknown or foreign
+ * id is simply absent rather than an error; an owned service with no rows maps
+ * to [] ("all staff qualified"), exactly what the per-service read returns.
+ */
+export async function getServiceInspectorsBulk(db: Db, tenantId: string, serviceIds: string[]): Promise<Record<string, string[]>> {
+    const wanted = [...new Set(serviceIds)];
+    if (wanted.length === 0) return {};
+    const owned: Array<{ id: string }> = await db.select({ id: services.id }).from(services)
+        .where(and(eq(services.tenantId, tenantId), inArray(services.id, wanted)))
+        .all();
+    const out: Record<string, string[]> = Object.fromEntries(owned.map((s) => [s.id, [] as string[]]));
+    if (owned.length === 0) return out;
+    const rows: Array<{ serviceId: string; userId: string }> = await db
+        .select({ serviceId: serviceInspectors.serviceId, userId: serviceInspectors.userId })
+        .from(serviceInspectors)
+        .where(and(eq(serviceInspectors.tenantId, tenantId), inArray(serviceInspectors.serviceId, owned.map((s) => s.id))))
+        .all();
+    for (const r of rows) out[r.serviceId]?.push(r.userId);
+    return out;
+}

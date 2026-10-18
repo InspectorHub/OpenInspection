@@ -128,6 +128,20 @@ export const ServiceInspectorListResponseSchema = createApiResponseSchema(z.obje
     userIds: z.array(z.string()).describe('Restricted inspector user IDs; empty = all staff qualified'),
 }));
 
+/** Ids per bulk read. One request carries at most this many (D1 binds at most 100 parameters per statement). */
+export const MAX_BULK_SERVICE_IDS = 100;
+
+export const BulkServiceIdsQuerySchema = z.object({
+    ids: z.string().default('')
+        .transform((v) => v.split(',').map((x) => x.trim()).filter((x) => x !== ''))
+        .refine((a) => a.length <= MAX_BULK_SERVICE_IDS, `At most ${MAX_BULK_SERVICE_IDS} service ids per request`)
+        .describe('Comma-separated service ids. Ids that are not a service of the company are left out of the answer.'),
+});
+
+export const ServiceInspectorMapResponseSchema = createApiResponseSchema(
+    z.record(z.string(), z.array(z.string())).describe('Service id to its restricted inspector user ids; an empty list means all staff are qualified.'),
+);
+
 export const SetServiceInspectorsSchema = z.object({
     userIds: z.array(z.string())
         .transform(a => [...new Set(a)])
@@ -284,3 +298,7 @@ const PayRuleSchema = z.object({
 
 export const PayRuleResponseSchema     = createApiResponseSchema(PayRuleSchema);
 export const PayRuleListResponseSchema = createApiResponseSchema(z.array(PayRuleSchema));
+
+export const PayRuleMapResponseSchema = createApiResponseSchema(
+    z.record(z.string(), z.array(PayRuleSchema)).describe('Service id to its pay rules, the service default first; an empty list means pay splits are off for that service.'),
+);

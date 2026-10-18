@@ -12557,6 +12557,34 @@
     "description": "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
   },
   {
+    "operationId": "listServiceInspectorsBulk",
+    "method": "GET",
+    "pathTemplate": "/api/services/inspectors-by-service",
+    "scopes": [
+      "read"
+    ],
+    "tag": "services",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "ids",
+          "in": "query",
+          "required": false,
+          "description": "Comma-separated service ids. Ids that are not a service of the company are left out of the answer. Defaults to \"\".",
+          "schema": {
+            "type": "string",
+            "default": "",
+            "description": "Comma-separated service ids. Ids that are not a service of the company are left out of the answer. Defaults to \"\"."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List inspector restrictions for many services",
+    "description": "Returns the inspector restriction list of each requested service in one call (ids is a comma-separated list of at most 100). Same answer as the per-service restriction read, for each service of the company: an empty list means all non-agent staff are qualified. An id that is not a service of the company is left out of the answer. Admin or owner only."
+  },
+  {
     "operationId": "listServicePayRules",
     "method": "GET",
     "pathTemplate": "/api/services/{id}/pay-rules",
@@ -12582,6 +12610,34 @@
     },
     "summary": "List pay rules for a service",
     "description": "Returns what inspectors earn on this catalogue service. A rule with a null userId is the service default, applied to any inspector without one of their own. An empty list means pay splits are OFF for this service: nothing is populated when an inspection is assigned."
+  },
+  {
+    "operationId": "listServicePayRulesBulk",
+    "method": "GET",
+    "pathTemplate": "/api/services/pay-rules-by-service",
+    "scopes": [
+      "read"
+    ],
+    "tag": "services",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "ids",
+          "in": "query",
+          "required": false,
+          "description": "Comma-separated service ids. Ids that are not a service of the company are left out of the answer. Defaults to \"\".",
+          "schema": {
+            "type": "string",
+            "default": "",
+            "description": "Comma-separated service ids. Ids that are not a service of the company are left out of the answer. Defaults to \"\"."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List pay rules for many services",
+    "description": "Returns the pay rules of each requested service in one call (ids is a comma-separated list of at most 100). Same answer as the per-service pay rule list, for each service of the company: the service default first, then per-inspector rules, and an empty list where pay splits are off. An id that is not a service of the company is left out of the answer. Restricted to owners and managers holding the company-finance capability."
   },
   {
     "operationId": "listServices",
