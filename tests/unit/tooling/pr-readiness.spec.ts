@@ -176,9 +176,25 @@ describe('rule c: Chrome', () => {
     it('passes the token form', () => {
         expect(run(body(GOOD_REVIEW, GOOD_CHROME), UI).ok).toBe(true);
     });
-    it('fails an observation shorter than 15 characters after the last dash', () => {
+    it('a dash inside the observation is fine (L-1)', () => {
+        expect(run(body(GOOD_REVIEW, `Chrome: /inspections — ${TOKENS} — list renders — filters work`), UI).ok).toBe(true);
+        expect(run(body(GOOD_REVIEW, `Chrome: /inspections — ${TOKENS} — list renders and form - save works`), UI).ok).toBe(true);
+        expect(run(body(GOOD_REVIEW, `Chrome: /inspections -- ${TOKENS} -- re-opened the drawer, well-formed rows`), UI).ok).toBe(true);
+    });
+    it('a dash inside a dark n/a reason does not end the token region', () => {
+        expect(run(body(GOOD_REVIEW, 'Chrome: /x — light: ok, dark: n/a (this view - no dark styling at all) — list renders and saves'), UI).ok).toBe(true);
+    });
+    it('filler punctuation is not an observation (L-1)', () => {
+        expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /x — ${TOKENS} — ...............`), UI))).toEqual(['chrome']);
+        expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /x — ${TOKENS} — - - - - - - - - - - - -`), UI))).toEqual(['chrome']);
+    });
+    it('a missing dash between tokens and observation fails', () => {
+        expect(failedIds(run(body(GOOD_REVIEW, `Chrome: /x — ${TOKENS} list renders and filters work`), UI))).toEqual(['chrome']);
+    });
+    it('fails an observation with fewer than 10 letters or digits after the tokens', () => {
         expect(failedIds(run(body(GOOD_REVIEW, chrome(TOKENS, 'ok fine')), UI))).toEqual(['chrome']);
-        expect(run(body(GOOD_REVIEW, chrome(TOKENS, 'exactly fifteen!')), UI).ok).toBe(true);
+        expect(run(body(GOOD_REVIEW, chrome(TOKENS, 'ten chars ok')), UI).ok).toBe(true);
+        expect(failedIds(run(body(GOOD_REVIEW, chrome(TOKENS, 'nine char')), UI))).toEqual(['chrome']);
     });
     it('the route must start with a slash', () => {
         expect(failedIds(run(body(GOOD_REVIEW, `Chrome: team — ${TOKENS} — renders the invite dialog fine`), UI))).toEqual(['chrome']);
@@ -240,6 +256,7 @@ describe('rule c: Chrome', () => {
         expect(eng('light: ok, dark: n/a (no styles)')).toBe(false);
         expect(eng('light: ok, dark: n/a no dark styling because plain page')).toBe(false);
         expect(eng('light: ok, dark: n/a (this view has no dark theme styling), dark: skipped')).toBe(false);
+        expect(eng('light: ok, dark: n/a (this view - no dark styling at all)')).toBe(true);
     });
 });
 

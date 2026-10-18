@@ -189,18 +189,24 @@ function chromeLine(r, uiFiles, noFiles = false) {
     }
     const m = new RegExp(`^(\\/\\S*?)\\s*(?:${SEP}|:)\\s+(.*)$`).exec(r);
     if (!m) return { ok: false, detail: `line must read: ${CHROME_FORM}` };
-    // The observation is what follows the LAST dash; the theme tokens sit before it.
-    let cut = -1;
-    let cutEnd = -1;
-    for (const d of m[2].matchAll(new RegExp(`\\s${SEP}\\s`, 'g'))) {
-        cut = d.index;
-        cutEnd = d.index + d[0].length;
+    // The theme tokens come first; the observation is everything after the first
+    // separator that follows the LAST token (a dash inside the observation, or
+    // inside a "dark: n/a (reason)" parenthetical, is therefore harmless).
+    const rest = m[2];
+    let end = 0;
+    for (const t of ['light', 'dark']) {
+        for (const x of rest.matchAll(new RegExp(`\\b${t}\\s*:\\s*([^\\s,;]+)`, 'gi'))) {
+            let e = x.index + x[0].length;
+            if (t === 'dark' && x[1].toLowerCase() === 'n/a') {
+                const par = /^\s*\([^)]*\)/.exec(rest.slice(e));
+                if (par) e += par[0].length;
+            }
+            end = Math.max(end, e);
+        }
     }
-    if (cut === -1) return { ok: false, detail: `the theme tokens and the observation are separated by a dash; line must read: ${CHROME_FORM}` };
-    const tokens = m[2].slice(0, cut);
-    const seen = m[2].slice(cutEnd).trim();
-    if (seen.length < 15) return { ok: false, detail: `observation after the last dash must be at least 15 characters (got ${seen.length}); line must read: ${CHROME_FORM}` };
-    if (/^(looks fine|lgtm)\.?$/i.test(seen)) return { ok: false, detail: 'observation must say what was seen, not "looks fine"' };
+    const tokens = rest.slice(0, end);
+    const sep = new RegExp(`^[\\s,;.]*${SEP}\\s+`).exec(rest.slice(end));
+    const seen = (sep ? rest.slice(end + sep[0].length) : '').trim();
     for (const t of THEMES) {
         const values = [...tokens.matchAll(new RegExp(`\\b${t}\\s*:\\s*([^\\s,;]+)`, 'gi'))].map((x) => x[1].replace(/[.)]+$/, '').toLowerCase());
         if (!values.length) return { ok: false, detail: `missing the literal token "${t}: ok"; line must read: ${CHROME_FORM}` };
@@ -214,6 +220,10 @@ function chromeLine(r, uiFiles, noFiles = false) {
             return { ok: false, detail: `"${t}: ${v}" is not accepted: the value must be "ok"${t === 'dark' ? ' (or "n/a" with a reason)' : ''}; line must read: ${CHROME_FORM}` };
         }
     }
+    if (!sep) return { ok: false, detail: `a dash must separate the theme tokens from the observation; line must read: ${CHROME_FORM}` };
+    const letters = (seen.match(/[\p{L}\p{N}]/gu) ?? []).length;
+    if (letters < 10) return { ok: false, detail: `the observation after the tokens needs at least 10 letters or digits (got ${letters}); line must read: ${CHROME_FORM}` };
+    if (/^(looks fine|lgtm)\.?$/i.test(seen)) return { ok: false, detail: 'observation must say what was seen, not "looks fine"' };
     return { ok: true, detail: `${m[1]} — ${tokens.trim()} — ${seen}` };
 }
 
