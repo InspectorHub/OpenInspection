@@ -4,7 +4,7 @@
  * otherwise stay open and say who was reached, who was not, and why, in words rather than server strings.
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, cleanup, fireEvent, screen, act } from "@testing-library/react";
+import { render, cleanup, fireEvent, screen, act, within } from "@testing-library/react";
 import { createElement } from "react";
 import type { useFetcher } from "react-router";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
@@ -58,7 +58,7 @@ describe.each([
     const { rerender } = render(ui(fetcherWith(undefined), onClose));
     rerender(ui(fetcherWith(withIntent(PARTIAL)), onClose));
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByText("Reached 1 of 2.")).toBeTruthy();
+    expect(within(screen.getByTestId("send-delivery-result")).getByText("Reached 1 of 2.")).toBeTruthy();
     expect(screen.getByText("Alice Buyer")).toBeTruthy();
     expect(document.body.textContent).not.toContain("no sms consent");
     expect(document.body.textContent).toMatch(/hasn't agreed to receive texts/);
@@ -71,7 +71,7 @@ describe.each([
     const { rerender } = render(ui(fetcherWith(undefined), onClose));
     rerender(ui(fetcherWith(withIntent(NONE)), onClose));
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByText("Nobody was reached.")).toBeTruthy();
+    expect(within(screen.getByTestId("send-delivery-result")).getByText("Nobody was reached.")).toBeTruthy();
     expect(screen.getByText("Alice Buyer")).toBeTruthy();
     expect(screen.getByText("Bob Agent")).toBeTruthy();
     expect(document.body.textContent).not.toContain("AC999");
@@ -147,7 +147,7 @@ describe.each([
     // two clicks in ONE act, native click() as the repo's busy-control tests do
     act(() => { done.click(); back.click(); done.click(); });
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByText("Reached 1 of 2.")).toBeTruthy();
+    expect(screen.queryByTestId("send-delivery-result")).toBeTruthy();
     expect(document.querySelector("form")).toBeNull();
     // control: once the moment has passed the same buttons work
     settle();
@@ -159,9 +159,16 @@ describe.each([
     vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
     const onClose = vi.fn();
     const { rerender } = render(ui(fetcherWith(undefined), onClose));
+    // the live region is already on the page, empty, before any result exists
+    expect(screen.getByTestId("delivery-announcement").textContent).toBe("");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
     rerender(ui(fetcherWith(withIntent(PARTIAL)), onClose));
-    const region = screen.getByTestId("send-delivery-result");
-    expect(region.getAttribute("role")).toBe("status");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    const announcement = screen.getByTestId("delivery-announcement");
+    expect(announcement.getAttribute("role")).toBe("status");
+    expect(announcement.textContent).toBe("Reached 1 of 2.");
+    // the visible result is not a second live region
+    expect(screen.getByTestId("send-delivery-result").getAttribute("role")).toBeNull();
     const done = () => screen.getByText("Done").closest("button")!;
     const back = () => screen.getByText("Back").closest("button")!;
     expect(done().getAttribute("aria-disabled")).toBe("true");

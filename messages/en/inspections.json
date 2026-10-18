@@ -256,7 +256,7 @@
   "inspections_hub_error_plan_email_limit": "The email limit has been reached ({used} of {cap} used). Try again once it resets, or raise the limit.",
   "inspections_hub_error_plan_sms_limit": "The text message limit has been reached ({used} of {cap} used). Try again once it resets, or raise the limit.",
   "inspections_hub_error_plan_sms_not_included": "Texts on a number registered for your company are not available here. Connect your own Twilio or Telnyx account in Settings → Integrations to send texts.",
-  "inspections_hub_error_plan_limit": "The limit for this has been reached. Try again once it resets, or raise the limit.",
+  "inspections_hub_error_plan_limit": "The plan limit has been reached. Try again once it resets, or raise the limit.",
   "inspections_hub_error_email_quota_exhausted": "The email sending quota is used up. Wait for it to reset or raise it, then try again.",
   "inspections_hub_report_send": "Send report",
   "inspections_hub_report_send_sms": "Send text",

@@ -115,7 +115,7 @@ describe("a plan refusal is worded by the page, in the viewer's language, never 
   it("an email or text refusal that sent no counts falls back to the generic translated sentence", async () => {
     overwriteGetLocale(() => "es-419");
     const out = await sendReportActionResult(res(402, { error: { code: "QUOTA_EXHAUSTED", message: "Limit reached", details: { metric: "email" } } }));
-    expect(out.error).toBe("Se alcanzó el límite de esto. Inténtelo de nuevo cuando se restablezca, o aumente el límite.");
+    expect(out.error).toBe("Se alcanzó el límite del plan. Inténtelo de nuevo cuando se restablezca, o aumente el límite.");
   });
 
   it("any other metric keeps the server's own message in both languages (create-inspection at its cap, for one)", async () => {

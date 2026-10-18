@@ -3,7 +3,7 @@ import { useFetcherResult, useResultSinceMount } from "~/hooks/useFetcherResult"
 import { keepNotReached } from "~/lib/send-delivery";
 import { useDeliveryResult } from "~/hooks/useDeliveryResult";
 import { useSettledAfterShown } from "~/hooks/useSettledAfterShown";
-import { SendDeliveryResult } from "./SendDeliveryResult";
+import { SendDeliveryResult, DeliveryAnnouncement } from "./SendDeliveryResult";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox } from "@core/shared-ui";
 import type { action } from "~/routes/inspector-portal";
@@ -115,6 +115,7 @@ export function SendSmsModal({
         )
       }
     >
+      <DeliveryAnnouncement delivery={delivery} />
       {delivery ? <SendDeliveryResult delivery={delivery} people={people} /> : (
       <fetcher.Form
         method="post"

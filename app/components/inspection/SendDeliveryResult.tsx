@@ -12,8 +12,7 @@ export function SendDeliveryResult({ delivery, people }: { delivery: DeliveryOut
   const nameOf = (recipient: string) =>
     people.find((p) => p.contactId === recipient || p.email === recipient)?.name ?? m.inspections_hub_send_result_someone();
   return (
-    // role="status" is a polite live region: the result replaces the form, so it is announced without moving focus.
-    <div className="space-y-3" role="status" data-testid="send-delivery-result">
+    <div className="space-y-3" data-testid="send-delivery-result">
       <p className="text-[13px] font-semibold text-ih-fg-1">
         {delivery.sent === 0 ? m.inspections_hub_send_result_none() : m.inspections_hub_send_result_summary({ sent: delivery.sent, total: delivery.sent + delivery.skipped.length })}
       </p>
@@ -28,4 +27,17 @@ export function SendDeliveryResult({ delivery, people }: { delivery: DeliveryOut
       </ul>
     </div>
   );
+}
+
+/**
+ * The spoken half of the result. A live region only announces what changes INSIDE a region that was
+ * already on the page, so this one is rendered permanently (empty) and gets its text when the result
+ * arrives; mounting a status region together with its content is announced unreliably. The visible
+ * result is not a live region, so nothing is announced twice.
+ */
+export function DeliveryAnnouncement({ delivery }: { delivery: DeliveryOutcome | null }) {
+  const text = !delivery ? "" : delivery.sent === 0
+    ? m.inspections_hub_send_result_none()
+    : m.inspections_hub_send_result_summary({ sent: delivery.sent, total: delivery.sent + delivery.skipped.length });
+  return <div role="status" className="sr-only" data-testid="delivery-announcement">{text}</div>;
 }

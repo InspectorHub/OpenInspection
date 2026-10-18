@@ -3,7 +3,7 @@ import { useFetcherResult, useResultSinceMount } from "~/hooks/useFetcherResult"
 import { keepNotReached } from "~/lib/send-delivery";
 import { useDeliveryResult } from "~/hooks/useDeliveryResult";
 import { useSettledAfterShown } from "~/hooks/useSettledAfterShown";
-import { SendDeliveryResult } from "./SendDeliveryResult";
+import { SendDeliveryResult, DeliveryAnnouncement } from "./SendDeliveryResult";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox } from "@core/shared-ui";
@@ -166,6 +166,7 @@ export function SendReportModal({
         )
       }
     >
+      <DeliveryAnnouncement delivery={delivery} />
       {delivery ? <SendDeliveryResult delivery={delivery} people={people} /> : (
       <fetcher.Form
         id={FORM_ID}
