@@ -8,6 +8,8 @@ import { AuthShell } from "~/components/AuthShell";
 import { Input, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
+import { getCloudflareEnv } from "~/lib/load-context";
+import { getDeploymentProfile } from "../../server/lib/deployment-profile";
 
 export function meta() {
   return [{ title: m.auth_join_meta_title() }];
@@ -16,6 +18,10 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") || "";
+  // Where sign-in lives on a separate identity service (the capability seam, not
+  // a named variable), the invited email may already have an account there, and
+  // that account's password is the one that keeps working.
+  const showExistingAccountNote = !!getDeploymentProfile(getCloudflareEnv(context)).loginRedirectBase;
 
   const pathToken = /^\/join\/([^/]+)\/?$/.exec(url.pathname)?.[1];
   if (pathToken) {
@@ -25,14 +31,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   if (!token) {
-    return { valid: false, error: m.auth_join_error_missing_token(), invite: null, token: "" };
+    return { valid: false, error: m.auth_join_error_missing_token(), invite: null, token: "", showExistingAccountNote };
   }
 
   try {
     const api = createApi(context);
     const res = await api.auth["invite-info"].$get({ query: { token } });
     if (!res.ok) {
-      return { valid: false, error: m.auth_join_error_invalid(), invite: null, token };
+      return { valid: false, error: m.auth_join_error_invalid(), invite: null, token, showExistingAccountNote };
     }
     const body = await res.json();
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
@@ -41,9 +47,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       error: null,
       invite: (Object.keys(d).length > 0 ? d : null) as { email: string; workspaceName: string } | null,
       token,
+      showExistingAccountNote,
     };
   } catch {
-    return { valid: false, error: m.auth_join_error_unavailable(), invite: null, token: "" };
+    return { valid: false, error: m.auth_join_error_unavailable(), invite: null, token: "", showExistingAccountNote };
   }
 }
 
@@ -92,7 +99,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function JoinPage() {
-  const { valid, error: loaderError, invite, token } = useLoaderData<typeof loader>();
+  const { valid, error: loaderError, invite, token, showExistingAccountNote } = useLoaderData<typeof loader>();
   const lastResult = useActionData<typeof action>();
   const navigation = useNavigation();
   const latch = useSubmitLatch();
@@ -115,6 +122,10 @@ export default function JoinPage() {
             {m.auth_join_invalid_heading()}
           </h1>
           <p className="text-sm text-ih-fg-3">{loaderError}</p>
+          <p className="text-sm text-ih-fg-3 mt-1">{m.auth_join_invalid_ask_for_new()}</p>
+          <a href="/login" className="inline-block mt-4 text-sm font-bold text-ih-primary-text hover:underline">
+            {m.auth_join_invalid_login_link()}
+          </a>
         </div>
       </div>
     );
@@ -149,6 +160,10 @@ export default function JoinPage() {
             error={fields.password.errors?.[0]}
             reserveErrorSpace
           />
+
+          {showExistingAccountNote && (
+            <p className="text-xs text-ih-fg-3">{m.auth_join_existing_account_note()}</p>
+          )}
 
           {form.errors && (
             <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
