@@ -1,3 +1,4 @@
+import { cachedDateTimeFormat } from "./intl-cache";
 /** IANA timezone ids for the settings pickers. Runtime built-in — no library.
  *  `supportedValuesOf` exists in the Workers/V8 runtime and modern browsers;
  *  the fallback keeps SSR safe if it is ever unavailable. */
@@ -16,7 +17,7 @@ export const TIMEZONE_OPTIONS: string[] = (() => {
  *  Reads the runtime `longOffset` name (e.g. "GMT+08:00", "GMT-05:00", "GMT"). */
 export function timeZoneOffsetMinutes(tz: string, at: Date = new Date()): number {
   try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
+    const parts = cachedDateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
       .formatToParts(at);
     const raw = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
     const m = /GMT([+-])(\d{2}):(\d{2})/.exec(raw);

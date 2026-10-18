@@ -1,3 +1,4 @@
+import { cachedDateTimeFormat } from "~/lib/intl-cache";
 /**
  * What counts as a bookable date, and how it is said out loud.
  *
@@ -95,7 +96,7 @@ export function validateBookingDate(
 export function formatBookingDate(date: string, locale: string): string {
     if (!CIVIL.test(date)) return date;
     const [y, m, d] = date.split("-").map(Number);
-    return new Intl.DateTimeFormat(locale || "en-US", {
+    return cachedDateTimeFormat(locale || "en-US", {
         weekday: "long",
         year: "numeric",
         month: "long",

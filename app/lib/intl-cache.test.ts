@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cachedDateTimeFormat, cachedNumberFormat, cachedRelativeTimeFormat, resetIntlCacheForTests } from "./intl-cache";
 import { formatDate, formatDateTime, formatNumber, formatCurrency, formatRelativeTime, formatTime } from "./format";
 import { formatInspectionDateTime, formatShapedDate, formatShapedDateTime } from "./format-date";
+import { formatBookingDate } from "~/components/booking/booking-date-rules";
+import { civilToday, formatRange } from "./metrics-range";
+import { dayKeyInZone, dayLabel } from "./communication-view";
+import { timeZoneOffsetMinutes } from "./timezones";
 
 const RealDTF = Intl.DateTimeFormat;
 
@@ -101,5 +105,29 @@ describe("format helpers construct each formatter once", () => {
       }
     });
     expect(n).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("component and view helpers reuse their formatters", () => {
+  it("formats many values with a small constant number of constructions, and the same text as before", () => {
+    const before = {
+      booking: new RealDTF("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }).format(Date.UTC(2026, 9, 18, 12)),
+      range: `${new RealDTF("en-US", { timeZone: "UTC", month: "short", day: "numeric" }).format(Date.UTC(2026, 3, 29, 12))} – ${new RealDTF("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }).format(Date.UTC(2026, 6, 29, 12))}`,
+    };
+    let booking = "";
+    let range = "";
+    const n = countConstructions(() => {
+      for (let i = 0; i < 50; i++) {
+        booking = formatBookingDate("2026-10-18", "en-US");
+        range = formatRange({ from: "2026-04-29", to: "2026-07-29" }, "en-US");
+        civilToday("America/New_York", new Date(Date.UTC(2026, 9, 18, 3)));
+        dayKeyInZone(Date.UTC(2026, 9, 18, 3), "Asia/Tokyo");
+        dayLabel("2026-10-01", "2026-10-18", "2026-10-17", "en-US");
+        timeZoneOffsetMinutes("America/New_York", new Date(Date.UTC(2026, 9, 18)));
+      }
+    });
+    expect(n).toBeLessThanOrEqual(10);
+    expect(booking).toBe(before.booking);
+    expect(range).toBe(before.range);
   });
 });

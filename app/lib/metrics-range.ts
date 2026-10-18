@@ -1,3 +1,4 @@
+import { cachedDateTimeFormat } from "./intl-cache";
 /**
  * The date range behind /metrics — presets, arithmetic, and URL round-tripping.
  *
@@ -74,7 +75,7 @@ function addMonths(date: string, months: number): string {
 export function civilToday(timeZone: string, now: Date = new Date()): string {
   try {
     // i18n-lint-ok: machine-readable parts, never displayed
-    const parts = new Intl.DateTimeFormat("en-CA", {
+    const parts = cachedDateTimeFormat("en-CA", {
       timeZone: timeZone || "UTC",
       year: "numeric",
       month: "2-digit",
@@ -157,7 +158,7 @@ export function formatRange(range: MetricsRange, locale: string): string {
   if (start === null || end === null) return `${range.from} – ${range.to}`;
   const sameYear = range.from.slice(0, 4) === range.to.slice(0, 4);
   const opts: Intl.DateTimeFormatOptions = { timeZone: "UTC", month: "short", day: "numeric" };
-  const startText = new Intl.DateTimeFormat(locale, sameYear ? opts : { ...opts, year: "numeric" }).format(start);
-  const endText = new Intl.DateTimeFormat(locale, { ...opts, year: "numeric" }).format(end);
+  const startText = cachedDateTimeFormat(locale, sameYear ? opts : { ...opts, year: "numeric" }).format(start);
+  const endText = cachedDateTimeFormat(locale, { ...opts, year: "numeric" }).format(end);
   return `${startText} – ${endText}`;
 }
