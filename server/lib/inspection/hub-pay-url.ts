@@ -26,7 +26,7 @@ import type { HonoConfig } from '../../types/hono';
  * every owner and manager, on any inspection whose invoice had been sent.
  */
 /** Why the hub has no pay link to show, when it has none for a reason the viewer could act on. */
-export type HubPayLinkGap = 'no_client_email' | 'link_error';
+type HubPayLinkGap = 'no_client_email' | 'link_error';
 export interface HubPayLink {
     url: string | null;
     /** Null when a link was produced, or none was due (a draft, no invoice). */
