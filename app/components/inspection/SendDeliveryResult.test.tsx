@@ -3,8 +3,8 @@
  * What the report and text dialogs do with the answer of a send: close only when everyone was reached,
  * otherwise stay open and say who was reached, who was not, and why, in words rather than server strings.
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, fireEvent, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { render, cleanup, fireEvent, screen, act } from "@testing-library/react";
 import { createElement } from "react";
 import type { useFetcher } from "react-router";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
@@ -12,7 +12,7 @@ import { SendSmsModal } from "~/components/inspection/SendSmsModal";
 import type { PersonRow } from "~/components/inspection/PeopleEditor";
 import type { action } from "~/routes/inspector-portal";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 type Fetcher = ReturnType<typeof useFetcher<typeof action>>;
 const Form = ({ children, ...props }: { children?: React.ReactNode; [k: string]: unknown }) => createElement("form", props, children);
@@ -42,6 +42,9 @@ describe.each([
   ["SendReportModal", "send-report", (f: Fetcher, onClose: () => void) => <SendReportModal people={people} fetcher={f} onClose={onClose} />],
 ] as const)("%s", (_name, intent, ui) => {
   const withIntent = (d: Record<string, unknown>) => ({ ...d, intent });
+  // The result's actions ignore clicks for a moment (a double click's second click); only the clock is faked.
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); });
+  const settle = () => act(() => { vi.advanceTimersByTime(500); });
 
   it("closes when everyone was reached", () => {
     const onClose = vi.fn();
@@ -79,10 +82,12 @@ describe.each([
     const onClose = vi.fn();
     const { rerender } = render(ui(fetcherWith(undefined), onClose));
     rerender(ui(fetcherWith(withIntent(PARTIAL)), onClose));
+    settle();
     fireEvent.click(screen.getByText("Back"));
     expect(document.querySelector("form")).toBeTruthy();
     expect(screen.queryByText("Reached 1 of 2.")).toBeNull();
     rerender(ui(fetcherWith(withIntent(PARTIAL)), onClose));
+    settle();
     fireEvent.click(screen.getByText("Done"));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -93,6 +98,7 @@ describe.each([
     for (const id of ["p1", "p2"]) if (!box(id).checked) fireEvent.click(box(id));
     expect([box("p1").checked, box("p2").checked]).toEqual([true, true]);
     rerender(ui(fetcherWith(withIntent(PARTIAL)), vi.fn()));
+    settle();
     fireEvent.click(screen.getByText("Back"));
     // Alice (c1) was skipped, Bob (c2) was reached
     expect(box("p1").checked).toBe(true);
@@ -106,6 +112,7 @@ describe.each([
     const box = (id: string) => document.querySelector<HTMLInputElement>(`[data-testid="${intent}-person-${id}"]`)!;
     for (const id of ["p1", "p2"]) if (!box(id).checked) fireEvent.click(box(id));
     rerender(ui(fetcherWith(withIntent(NONE)), vi.fn()));
+    settle();
     fireEvent.click(screen.getByText("Back"));
     expect([box("p1").checked, box("p2").checked]).toEqual([true, true]);
   });
@@ -129,5 +136,44 @@ describe.each([
     rerender(ui(fetcherWith(withIntent({ ok: false, error: "This report is not published." })), vi.fn()));
     expect(document.body.textContent).toContain("not published");
     expect(document.querySelector("form")).toBeTruthy();
+  });
+
+  it("a double click on Send cannot land its second click on Done or Back: both ignore clicks as the result appears", () => {
+    const onClose = vi.fn();
+    const { rerender } = render(ui(fetcherWith(undefined), onClose));
+    rerender(ui(fetcherWith(withIntent(PARTIAL)), onClose));
+    const done = screen.getByText("Done");
+    const back = screen.getByText("Back");
+    // two clicks in ONE act, native click() as the repo's busy-control tests do
+    act(() => { done.click(); back.click(); done.click(); });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByText("Reached 1 of 2.")).toBeTruthy();
+    expect(document.querySelector("form")).toBeNull();
+    // control: once the moment has passed the same buttons work
+    settle();
+    act(() => { screen.getByText("Done").click(); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("a skipped person who can no longer be sent to is not left ticked and greyed out after Back", () => {
+    const detail = intent === "send-sms" ? "phone" : "email";
+    const { rerender } = render(ui(fetcherWith(undefined), vi.fn()));
+    const box = (id: string) => document.querySelector<HTMLInputElement>(`[data-testid="${intent}-person-${id}"]`)!;
+    for (const id of ["p1", "p2"]) if (!box(id).checked) fireEvent.click(box(id));
+    // the send skipped Alice (c1) because her detail went missing; the page then reloaded without it
+    const reloaded = [person({ [detail]: null }), people[1]!];
+    const skipped = { ok: false, intent, error: undefined, delivery: { sent: 0, skipped: [{ recipient: "c1", reason: "No email on file for this recipient", outcome: "skipped" }, { recipient: "c2", reason: "boom", outcome: "failed" }] } };
+    const reloadedUi = (f: Fetcher) => intent === "send-sms"
+      ? <SendSmsModal people={reloaded} fetcher={f} onClose={vi.fn()} />
+      : <SendReportModal people={reloaded} fetcher={f} onClose={vi.fn()} />;
+    rerender(reloadedUi(fetcherWith(skipped)));
+    settle();
+    fireEvent.click(screen.getByText("Back"));
+    expect(box("p1").checked).toBe(false);
+    expect(box("p1").disabled).toBe(true);
+    // control: the person who could receive it stays ticked for the retry
+    expect(box("p2").checked).toBe(true);
+    const sent = JSON.parse(document.querySelector<HTMLInputElement>('input[name="recipients"]')!.value) as Array<{ contactId: string }>;
+    expect(sent.map((r) => r.contactId)).toEqual(["c2"]);
   });
 });

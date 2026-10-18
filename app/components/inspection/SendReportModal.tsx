@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useFetcherResult, useResultSinceMount } from "~/hooks/useFetcherResult";
 import { keepNotReached } from "~/lib/send-delivery";
 import { useDeliveryResult } from "~/hooks/useDeliveryResult";
+import { useSettledAfterShown } from "~/hooks/useSettledAfterShown";
 import { SendDeliveryResult } from "./SendDeliveryResult";
 import { useHumanGatedSubmit } from "~/components/OutboundVerification";
 import type { useFetcher } from "react-router";
@@ -122,6 +123,8 @@ export function SendReportModal({
   });
 
   const { delivery, back } = useDeliveryResult(fetcher, "send-report");
+  // The result appears where Send was: a second click of a double click must not land on Back or Done.
+  const settled = useSettledAfterShown(delivery !== null);
 
   const groups = ROLE_KINDS.map((kind) => ({
     kind,
@@ -138,10 +141,10 @@ export function SendReportModal({
         delivery ? (
           <>
             {/* Back drops the people the send reached, so a second Send does not repeat it to them. */}
-            <Button variant="secondary" type="button" onClick={() => { setSelectedIds((prev) => keepNotReached(prev, delivery, people)); back(); }}>
+            <Button variant="secondary" type="button" onClick={() => { if (!settled()) return; setSelectedIds((prev) => keepNotReached(prev, delivery, people, (p) => !!p.email)); back(); }}>
               {m.common_back()}
             </Button>
-            <Button variant="primary" type="button" onClick={onClose}>
+            <Button variant="primary" type="button" onClick={() => { if (settled()) onClose(); }}>
               {m.inspections_hub_send_result_done()}
             </Button>
           </>

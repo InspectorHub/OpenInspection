@@ -23,14 +23,45 @@ export async function toActionResult<I extends string>(
   fallbackError: string,
 ): Promise<{ ok: boolean; intent: I; error: string | undefined }> {
   if (!res.ok) {
-    const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    const err = (await res.json().catch(() => null)) as ServerErrorBody | null;
     return {
       ok: false,
       intent,
-      error: err?.error?.message ?? fallbackError,
+      error: knownServerErrorText(err) ?? err?.error?.message ?? fallbackError,
     };
   }
   return { ok: true, intent, error: undefined };
+}
+
+interface ServerErrorBody {
+  error?: { message?: string; code?: string; details?: { metric?: unknown; used?: unknown; cap?: unknown } };
+}
+
+/**
+ * The sentence for a server error code the UI knows, in the viewer's language; null for any other
+ * code. The server's own wording for these is English and carries numbers and advice that belong to
+ * the page, so a known code is never shown as the server wrote it. Add a code here, with its two
+ * catalogue entries, rather than surfacing its message.
+ *
+ * QUOTA_EXHAUSTED: a plan allowance for this kind of message is spent (email or text), or the plan
+ * has no allowance of the kind at all (a text sent on a registered number, reported with a cap of 0).
+ * Any other metric gets the generic limit sentence; the counts are shown only when the server sent them.
+ */
+export function knownServerErrorText(body: ServerErrorBody | null): string | null {
+  const error = body?.error;
+  if (error?.code === "QUOTA_EXHAUSTED") {
+    const { metric, used, cap } = error.details ?? {};
+    const counts = typeof used === "number" && typeof cap === "number" ? { used, cap } : null;
+    if (metric === "sms") {
+      if (cap === 0) return m.inspections_hub_error_plan_sms_not_included();
+      return counts ? m.inspections_hub_error_plan_sms_limit(counts) : m.inspections_hub_error_plan_limit();
+    }
+    // A cap of 0 on email is the sending service's own quota running out, which carries no count of ours.
+    if (metric === "email" && cap === 0) return m.inspections_hub_error_email_quota_exhausted();
+    if (metric === "email" && counts) return m.inspections_hub_error_plan_email_limit(counts);
+    return m.inspections_hub_error_plan_limit();
+  }
+  return null;
 }
 
 /** One recipient a send did not reach, as the send routes report it. */
