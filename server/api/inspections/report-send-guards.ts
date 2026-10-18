@@ -105,7 +105,10 @@ const spendSend = (c: Context<HonoConfig>, inspectionId: string, who: string) =>
  */
 const deliveredByRequest = new WeakMap<Request, string[]>();
 
-/** Called by the send-report handler for each address a report actually went to. */
+/**
+ * Called by the send-report handler for each address a report actually went to. It must run BEFORE anything
+ * after the send that can throw (the audit write): the report is in the inbox, so the allowance keeps counting it.
+ */
 export function noteReportDelivered(c: Context<HonoConfig>, email: string): void {
     const list = deliveredByRequest.get(c.req.raw) ?? [];
     list.push(email.toLowerCase());

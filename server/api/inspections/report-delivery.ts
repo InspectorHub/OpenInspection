@@ -445,12 +445,12 @@ const reportDeliveryRoutes = createApiRouter()
                 } else {
                     await c.var.services.email.sendReportReady(recipientEmail, address, linkUrl, sigInspector, sigHost);
                 }
+                noteReportDelivered(c, recipientEmail);
                 auditFromContext(c, 'inspection.send_pdf', 'inspection', {
                     entityId: id,
                     metadata: { recipient: recipientEmail, roleKey: recipient.roleKey },
                 });
                 sentTo.push(recipientEmail);
-                noteReportDelivered(c, recipientEmail);
                 await logManualSend({ recipient: recipientEmail, contactId: recipient.contactId ?? null, roleKey: recipient.roleKey, status: 'sent' });
             } catch (err) {
                 // Platform-level refusals (cooling window, quota exhausted, domain

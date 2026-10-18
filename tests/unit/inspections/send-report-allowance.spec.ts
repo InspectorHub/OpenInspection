@@ -19,6 +19,15 @@ import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profil
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+// The audit write can fail after a report was already delivered; a test flips this to make it.
+const auditFails = vi.hoisted(() => ({ on: false }));
+vi.mock('../../../server/lib/audit', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../../server/lib/audit')>();
+    return { ...actual, auditFromContext: (...args: Parameters<typeof actual.auditFromContext>) => {
+        if (auditFails.on) throw new Error('audit write failed');
+        return actual.auditFromContext(...args);
+    } };
+});
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { inspectionsRoutes } from '../../../server/api/inspections';
@@ -106,6 +115,7 @@ describe('send-report-pdf hourly allowance', () => {
         ]);
         kv = guardKv() as unknown as MockKV;
         sendPdf = vi.fn().mockResolvedValue(true);
+        auditFails.on = false;
     });
 
     it('positive control: delivered sends are counted and the 4th is refused with 429', async () => {
@@ -222,6 +232,15 @@ describe('send-report-pdf hourly allowance', () => {
             expect(await counter('joe@example.com')).toBe(1);
             expect(await counter('kim@example.com')).toBe(0);
         });
+    });
+
+    it('a failing audit write after a delivered send does not refund that recipient', async () => {
+        auditFails.on = true;
+        const res = await one();
+        expect(res.status).toBe(200);
+        // the report went out, so the allowance keeps counting it
+        expect(sendPdf).toHaveBeenCalledTimes(1);
+        expect(await counter('jane@example.com')).toBe(1);
     });
 
     describe('the hour belongs to the sends that happened', () => {
