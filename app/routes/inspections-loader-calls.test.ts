@@ -6,8 +6,9 @@
  * loader, so the template, service and member lists this loader used to fetch
  * were never read. What the dashboard needs: the buckets, the tag filter, the
  * caller's onboarding state, and the usage banner. The onboarding checklist's
- * extra inputs (schedule, template and service counts) are read only while the
- * checklist is still showing.
+ * extra inputs (schedule, template and service counts) are read too, because even
+ * a dismissed checklist shows its progress; they start together with the first
+ * wave rather than after it.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
@@ -15,6 +16,7 @@ const seam = vi.hoisted(() => ({
     calls: [] as string[],
     dismissed: false,
     hang: false,
+    hangDashboard: false,
 }));
 const templateQueries: unknown[] = [];
 
@@ -29,7 +31,7 @@ vi.mock("~/lib/session.server", () => ({ requireToken: vi.fn().mockResolvedValue
 vi.mock("~/lib/api-client.server", () => ({
     createApi: () => ({
         inspections: {
-            dashboard: { $get: rec("dashboard", () => json({ today: [], conciergePending: 0 })) },
+            dashboard: { $get: rec("dashboard", () => (seam.hangDashboard ? new Promise(() => {}) : json({ today: [], conciergePending: 0 }))) },
             templates: { $get: (args: { query?: unknown }) => { templateQueries.push(args?.query); return rec("templates", () => json([{ id: "t1", name: "T", itemCount: 3 }], { meta: { total: 7 } }))(); } },
             index: { $post: vi.fn() },
         },
@@ -56,6 +58,7 @@ beforeEach(() => {
     templateQueries.length = 0;
     seam.dismissed = false;
     seam.hang = false;
+    seam.hangDashboard = false;
 });
 afterEach(() => vi.useRealTimers());
 
@@ -80,6 +83,15 @@ describe("/inspections loader", () => {
         const out = await run() as { checklistDismissed: boolean; templateCount: number };
         expect(out.checklistDismissed).toBe(true);
         expect(out.templateCount).toBe(7);
+    });
+
+    it("starts the checklist reads together with the first wave, not after it", async () => {
+        // The dashboard read never answers; if the checklist inputs waited for the first
+        // wave they would not have been requested at all by the time we look.
+        seam.hangDashboard = true;
+        void run();
+        await new Promise((r) => setTimeout(r, 20));
+        expect(seam.calls).toEqual(expect.arrayContaining(["dashboard", "tags", "me", "usage", "templates", "services", "availability", "calendarStatus"]));
     });
 
     it("returns even when a checklist input never settles", async () => {

@@ -68,6 +68,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // The TODO(C-10) cast is the house pattern for this seam — hono/client collapses
     // the typed union; assertion is localized here and does not affect safety.
     const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
+    // The checklist's own inputs start with the first wave so they overlap it. A
+    // dismissed checklist still shows its progress in one collapsed row, so they
+    // are read either way. Never rejects (best-effort, bounded).
+    const checklistP = loadChecklistInputs(api);
     const [dashRes, tagsRes, meRes, usageRes] = await Promise.all([
       api.inspections.dashboard.$get(),
       api.tags.index.$get().catch(() => null),
@@ -93,9 +97,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       };
       checklistDismissed = meBody.data?.user?.onboardingState?.checklistDismissed === true;
     }
-    // The checklist's own inputs. A dismissed checklist still shows its
-    // progress in one collapsed row, so these are read either way.
-    const checklist = await loadChecklistInputs(api);
+    const checklist = await checklistP;
     let quotaCaps: { inspections: number; email: number } | null = null;
     let quotaUsage: { inspections: number; email: number } | null = null;
     if (usageRes && usageRes.ok) {
