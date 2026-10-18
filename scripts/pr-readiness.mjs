@@ -59,7 +59,12 @@ const SELF_WORDS = new Set([
 
 /** The `## Verification` section: heading to the next `## ` heading or the end. HTML comments are dropped. */
 export function extractVerification(body) {
-    const text = String(body ?? '').replace(/<!--[\s\S]*?-->/g, '');
+    // Repeat until stable so a nested `<!<!-- -->--` cannot rebuild a comment opener.
+    let text = String(body ?? '');
+    for (let prev = ''; prev !== text; ) {
+        prev = text;
+        text = text.replace(/<!--[\s\S]*?-->/g, '');
+    }
     const lines = text.split(/\r?\n/);
     const start = lines.findIndex((l) => /^##\s+Verification\s*$/i.test(l.trim()));
     if (start === -1) return null;
@@ -97,7 +102,7 @@ export function checkPrReadiness({ body, isDraft, files, repoKind, skipDraft = f
     // e) draft
     rules.push(
         skipDraft
-            ? result('not-draft', 'PR is not a draft', true, 'skipped (merged PR)')
+            ? result('not-draft', 'PR is not a draft', true, 'skipped (record check only)')
             : result(
                   'not-draft',
                   'PR is not a draft',
