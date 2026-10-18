@@ -81,8 +81,8 @@ function send(recipients: Array<{ contactId: string; roleKey: string }>) {
 }
 const one = () => send([{ contactId: CLIENT, roleKey: 'client' }]);
 const both = () => send([{ contactId: CLIENT, roleKey: 'client' }, { contactId: CO_CLIENT, roleKey: 'co_client' }]);
-// Stored as `<count>@<expiry epoch ms>`; the count is what these tests assert on.
-const counter = async (email: string) => Number(String(await kv.get(`sendlimit:${TENANT}:${INSP_ID}:${email}`) ?? '0').split('@')[0]);
+// Stored as `<count>|<expiry epoch ms>`; the count is what these tests assert on.
+const counter = async (email: string) => Number(String(await kv.get(`sendlimit:${TENANT}:${INSP_ID}:${email}`) ?? '0').split('|')[0]);
 
 describe('send-report-pdf hourly allowance', () => {
     beforeEach(async () => {

@@ -54,7 +54,7 @@ const sendKey = (c: Context<HonoConfig>, inspectionId: string, who: string) =>
     `sendlimit:${c.get('tenantId')}:${inspectionId}:${who.toLowerCase()}`;
 
 /**
- * A counter is stored as `<count>@<expiry epoch ms>`: the expiry travels with the count so a refund can
+ * A counter is stored as `<count>|<expiry epoch ms>`: the expiry travels with the count so a refund can
  * put the count back down WITHOUT moving the window of the sends that really happened. (Rewriting the
  * key with a fresh TTL would keep an earlier delivery counted for longer than the hour it is owed.) The
  * window opens with the first send and does not slide: three sends in an hour is a ceiling on that hour.
@@ -63,7 +63,7 @@ const sendKey = (c: Context<HonoConfig>, inspectionId: string, who: string) =>
  */
 function readCounter(raw: string | null, nowMs: number): { count: number; expiresAtMs: number } {
     if (!raw) return { count: 0, expiresAtMs: nowMs + 3_600_000 };
-    const [count, expiry] = raw.split('@');
+    const [count, expiry] = raw.split('|');
     const parsed = Number(expiry);
     const expiresAtMs = Number.isFinite(parsed) && expiry ? parsed : nowMs + 3_600_000;
     if (expiresAtMs <= nowMs) return { count: 0, expiresAtMs: nowMs + 3_600_000 };
@@ -92,7 +92,7 @@ async function adjustSend(c: Context<HonoConfig>, inspectionId: string, who: str
     }
     const expiresAtMs = current.expiresAtMs;
     // KV refuses an expiry less than a minute away; a window that short is simply held that long.
-    await kv.put(key, `${count}@${expiresAtMs}`, { expiration: Math.max(Math.ceil(expiresAtMs / 1000), Math.ceil(now / 1000) + 60) });
+    await kv.put(key, `${count}|${expiresAtMs}`, { expiration: Math.max(Math.ceil(expiresAtMs / 1000), Math.ceil(now / 1000) + 60) });
 }
 
 /** Spends one send of this inspection on this recipient (an address, or `sms:<contact id>`). */

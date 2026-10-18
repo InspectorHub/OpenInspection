@@ -153,8 +153,8 @@ describe('send-sms send ceiling', () => {
         for (let i = 0; i < 3; i += 1) expect((await send(agent())).status).toBe(200);
     });
 
-    // The stored value is `<count>@<expiry>`; these assertions are about the count.
-    const counter = (contactId: string) => kv.get(`sendlimit:${TENANT}:${INSP_ID}:sms:${contactId}`)?.split('@')[0];
+    // The stored value is `<count>|<expiry>`; these assertions are about the count.
+    const counter = (contactId: string) => kv.get(`sendlimit:${TENANT}:${INSP_ID}:sms:${contactId}`)?.split('|')[0];
 
     it('spends allowance only for texts actually sent: a consent-skipped recipient spends nothing', async () => {
         await new SmsConsentService({} as D1Database).record(TENANT, AGENT_2, 'revoked', 'admin', {});
