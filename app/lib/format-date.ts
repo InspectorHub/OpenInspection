@@ -1,4 +1,5 @@
 import { formatTime } from './format';
+import { cachedDateTimeFormat } from './intl-cache';
 import {
     DEFAULT_DISPLAY_PREFS,
     type DateFormat,
@@ -33,7 +34,7 @@ export interface InspectionDateTimeFormat {
 /** Numeric date parts read in the target timezone, as strings. */
 function numericParts(d: Date, timeZone: string): { year: string; month: string; day: string } {
     // 'en-CA' is used only as a stable NUMERIC source here — never for wording.
-    const parts = new Intl.DateTimeFormat('en-CA', {
+    const parts = cachedDateTimeFormat('en-CA', {
         year: 'numeric', month: '2-digit', day: '2-digit', timeZone,
     }).formatToParts(d);
     const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
@@ -62,7 +63,7 @@ function formatDatePart(
         // neither ISO nor unambiguous, so `showYear` does not apply here.
         return `${year}-${month}-${day}`;
     }
-    const monthWord = new Intl.DateTimeFormat(locale, { month: 'short', timeZone }).format(d);
+    const monthWord = cachedDateTimeFormat(locale, { month: 'short', timeZone }).format(d);
     const dayNum = String(Number(day));
     return dateFormat === 'eu'
         ? `${dayNum} ${monthWord}${showYear ? ` ${year}` : ''}`
