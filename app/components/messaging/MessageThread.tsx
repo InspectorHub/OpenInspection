@@ -28,6 +28,7 @@ import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { bucketMessages, dayKeyInZone, dayLabel, type MessageRow } from "~/lib/communication-view";
 import { VerificationCancelledError } from "~/lib/verification-cancelled";
+import { cachedDateTimeFormat } from "~/lib/intl-cache";
 
 export interface ThreadMessage extends MessageRow {
   /** Local-only: an optimistic send not yet confirmed, or one that failed. */
@@ -158,7 +159,7 @@ export function MessageThread({
                       <span className="text-ih-fg-4"> · {roleLabel(first.fromRole)}</span>
                     )}
                     <span className="text-ih-fg-4">
-                      {" "}· {new Intl.DateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(first.createdAt))}
+                      {" "}· {cachedDateTimeFormat(locale, { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(first.createdAt))}
                     </span>
                   </div>
                   <div className="space-y-1.5">

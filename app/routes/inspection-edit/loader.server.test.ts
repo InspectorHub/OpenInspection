@@ -213,6 +213,10 @@ describe('editor loader — the statutory details the panel switches on', () => 
         // Without this the assertion above passes for a loader that never reads
         // the response at all.
         statutoryDetailsResponse = json({ inspectorSignatureDate: '2026-05-02', ownerName: 'Dana Whitfield' });
+        // The endpoint is only asked when the snapshot declares a statutory form.
+        inspectionGet.mockResolvedValue(json({
+            inspection: { id: 'insp-1', date: '2026-05-01', templateSnapshot: { ...SNAPSHOT, statutoryForm: { formId: 'f' } } },
+        }));
         const details = (await loadAll()).statutoryDetails;
         expect(details).not.toBeNull();
         expect(details?.inspectorSignatureDate).toBe('2026-05-02');

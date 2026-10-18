@@ -153,6 +153,26 @@ export async function listPayRules(db: Db, tenantId: string, serviceId: string):
     return ordered(rows as ServicePayRule[]).map(toWire);
 }
 
+/**
+ * The pay rules of many services in two statements, in the per-service order
+ * and wire shape (see `listPayRules`). Only services owned by `tenantId`
+ * appear; an owned service with no rules maps to [].
+ */
+export async function listPayRulesBulk(db: Db, tenantId: string, serviceIds: string[]): Promise<Record<string, PayRuleWire[]>> {
+    const wanted = [...new Set(serviceIds)];
+    if (wanted.length === 0) return {};
+    const owned: Array<{ id: string }> = await db.select({ id: services.id }).from(services)
+        .where(and(eq(services.tenantId, tenantId), inArray(services.id, wanted)))
+        .all();
+    const out: Record<string, PayRuleWire[]> = {};
+    if (owned.length === 0) return out;
+    const rows = await db.select().from(servicePayRules)
+        .where(and(eq(servicePayRules.tenantId, tenantId), inArray(servicePayRules.serviceId, owned.map((s) => s.id))))
+        .all() as ServicePayRule[];
+    for (const s of owned) out[s.id] = ordered(rows.filter((r) => r.serviceId === s.id)).map(toWire);
+    return out;
+}
+
 export async function createPayRule(
     db: Db, tenantId: string, serviceId: string, input: CreatePayRuleInput,
 ): Promise<PayRuleWire> {

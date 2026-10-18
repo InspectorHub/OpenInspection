@@ -14,7 +14,6 @@
  * of them gets applied twice.
  */
 import type { createApi } from "~/lib/api-client.server";
-import type { PayRule } from "~/components/settings/services/PayRuleWidget";
 import { m } from "~/paraglide/messages";
 
 type Api = ReturnType<typeof createApi>;
@@ -24,28 +23,6 @@ export interface PayRuleActionResult {
     intent: "pay-rule-save" | "pay-rule-delete";
     serviceId: string;
     message?: string;
-}
-
-/**
- * One GET per service, matching how `restrictionMap` is already built on this
- * page. A tenant has a handful of catalogue services; a bulk endpoint is the
- * fix if that ever stops being true, for both maps at once.
- */
-export async function loadPayRuleMap(api: Api, serviceIds: string[]): Promise<Record<string, PayRule[]>> {
-    const results = await Promise.all(
-        serviceIds.map(async (id) => {
-            try {
-                const res = await api.services[":id"]["pay-rules"].$get({ param: { id } });
-                if (!res.ok) return [id, [] as PayRule[]] as const;
-                const body = (await res.json()) as { data?: PayRule[] };
-                return [id, body.data ?? []] as const;
-            } catch {
-                // A pay-rule read failing must not take down the services page.
-                return [id, [] as PayRule[]] as const;
-            }
-        }),
-    );
-    return Object.fromEntries(results);
 }
 
 /** The rate half of the body, keyed by type so the wrong unit name cannot be sent. */

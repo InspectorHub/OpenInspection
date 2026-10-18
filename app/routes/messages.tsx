@@ -26,6 +26,7 @@ import { VerificationCancelledError } from "~/lib/verification-cancelled";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
+import { cachedDateTimeFormat } from "~/lib/intl-cache";
 
 export function meta() {
   return [{ title: m.messages_meta_title() }];
@@ -138,7 +139,7 @@ function threadTime(ms: number, locale: string, timeZone: string): string {
   const d = new Date(ms);
   const now = Date.now();
   const sameDay = now - ms < 86_400_000 && d.getDate() === new Date(now).getDate();
-  return new Intl.DateTimeFormat(locale, sameDay
+  return cachedDateTimeFormat(locale, sameDay
     ? { timeZone, hour: "numeric", minute: "2-digit" }
     : { timeZone, month: "short", day: "numeric" }).format(d);
 }

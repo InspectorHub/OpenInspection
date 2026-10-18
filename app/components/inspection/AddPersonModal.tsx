@@ -28,6 +28,9 @@ export function AddPersonModal({
   onClose,
   alreadyPresent = false,
   roleProfiles,
+  rolesStatus = "ready",
+  onRequestRoles,
+  onRetryRoles,
   isAdmin,
   fetcher,
   submit,
@@ -36,6 +39,16 @@ export function AddPersonModal({
   open: boolean;
   onClose: () => void;
   roleProfiles: RoleProfile[];
+  /**
+   * Whether `roleProfiles` has arrived. It loads when the dialog is first opened;
+   * until it is `ready` the role picker is off and nothing can be submitted, and
+   * the dialog does not say there are no roles (a late or failed read is not
+   * evidence of that). Defaults to ready for callers that already hold the list.
+   */
+  rolesStatus?: "idle" | "loading" | "ready" | "error";
+  /** Called when the dialog opens, so the list can start loading. */
+  onRequestRoles?: () => void;
+  onRetryRoles?: () => void;
   isAdmin: boolean;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   /**
@@ -68,6 +81,11 @@ export function AddPersonModal({
   const [roleProfileId, setRoleProfileId] = useState("");
 
   const activeRoles = roleProfiles.filter((r) => r.active);
+
+  useEffect(() => {
+    if (open) onRequestRoles?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire on open only; the callback is idempotent
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -124,8 +142,9 @@ export function AddPersonModal({
   // kind passes straight through; the fallback only covers an unresolved role.
   const newContactType = roleKind ?? "client";
 
+  const rolesReady = rolesStatus === "ready";
   const canSubmit =
-    roleProfileId.length > 0 && (createMode ? newName.trim().length > 0 : selectedContact !== null);
+    rolesReady && roleProfileId.length > 0 && (createMode ? newName.trim().length > 0 : selectedContact !== null);
 
   function handleSubmit() {
     if (!canSubmit) return;
@@ -280,18 +299,37 @@ export function AddPersonModal({
           label={m.inspections_hub_people_role_label()}
           value={roleProfileId}
           onChange={(e) => setRoleProfileId(e.target.value)}
+          disabled={!rolesReady}
           options={[
             { value: "", label: m.inspections_hub_people_role_placeholder(), disabled: true },
             ...activeRoles.map((r) => ({ value: r.id, label: r.label })),
           ]}
+          {...(rolesReady ? {} : { "aria-describedby": "role-list-status" })}
           hint={
-            activeRoles.length === 0
+            !rolesReady
+              ? undefined
+              : activeRoles.length === 0
               ? isAdmin
                 ? m.inspections_hub_people_no_roles_admin()
                 : m.inspections_hub_people_no_roles_non_admin()
               : undefined
           }
         />
+
+        {!rolesReady && (
+          <div id="role-list-status" role="status" aria-live="polite" className="flex items-center gap-2 text-[11px] text-ih-fg-3">
+            {rolesStatus === "error" ? (
+              <>
+                <span>{m.inspections_hub_pickers_error()}</span>
+                <Button variant="secondary" size="sm" type="button" onClick={() => onRetryRoles?.()}>
+                  {m.inspections_hub_pickers_retry()}
+                </Button>
+              </>
+            ) : (
+              <span>{m.common_loading()}</span>
+            )}
+          </div>
+        )}
 
         {/* IA-102 — adding someone here is an AUTHORIZATION act wearing the
             clothes of a data-entry one. Every role kind has receivesReport, so

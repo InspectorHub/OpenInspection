@@ -2,8 +2,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc, inArray } from 'drizzle-orm';
 import { services, inspectionServices, inspections, eventTypes, reports, templates, agreements } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
-import { getServiceInspectors, setServiceInspectors } from './service/qualification';
-import { listPayRules, createPayRule, updatePayRule, deletePayRule } from './service/pay-rules';
+import { getServiceInspectors, getServiceInspectorsBulk, setServiceInspectors } from './service/qualification';
+import { listPayRules, listPayRulesBulk, createPayRule, updatePayRule, deletePayRule } from './service/pay-rules';
 import * as discounts from './service/discount-codes';
 import type { CreatePayRuleInput, UpdatePayRuleInput } from './service/pay-rules';
 import { syncSplitsQuietly } from './pay-split.service';
@@ -303,6 +303,10 @@ export class ServiceService {
         return getServiceInspectors(this.getDrizzle(), tenantId, serviceId);
     }
 
+    async getServiceInspectorsBulk(tenantId: string, serviceIds: string[]): Promise<Record<string, string[]>> {
+        return getServiceInspectorsBulk(this.getDrizzle(), tenantId, serviceIds);
+    }
+
     async setServiceInspectors(tenantId: string, serviceId: string, userIds: string[]): Promise<number> {
         return setServiceInspectors(this.getDrizzle(), tenantId, serviceId, userIds);
     }
@@ -311,6 +315,10 @@ export class ServiceService {
     // dual-unit boundary and the 409 for the two partial unique indexes.
     async listPayRules(tenantId: string, serviceId: string) {
         return listPayRules(this.getDrizzle(), tenantId, serviceId);
+    }
+
+    async listPayRulesBulk(tenantId: string, serviceIds: string[]) {
+        return listPayRulesBulk(this.getDrizzle(), tenantId, serviceIds);
     }
 
     async createPayRule(tenantId: string, serviceId: string, input: CreatePayRuleInput) {

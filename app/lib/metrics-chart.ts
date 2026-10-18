@@ -20,6 +20,7 @@
  * a percentage is unfalsifiable there; a px value is the same number the browser
  * would use, and a test can read it.
  */
+import { cachedDateTimeFormat } from "./intl-cache";
 
 /** Height of the bar TRACK, in px. Mirrors the `h-40` (10rem) row in metrics.tsx. */
 export const BAR_TRACK_PX = 160;
@@ -79,9 +80,9 @@ export function monthLabel(month: string, locale: string): string {
         ? { month: "short", year: "numeric", timeZone: "UTC" }
         : { month: "short", timeZone: "UTC" };
     try {
-        return new Intl.DateTimeFormat(locale, parts).format(at);
+        return cachedDateTimeFormat(locale, parts).format(at);
     } catch {
         // An unusable locale tag must not blank the axis.
-        return new Intl.DateTimeFormat("en", parts).format(at);
+        return cachedDateTimeFormat("en", parts).format(at);
     }
 }

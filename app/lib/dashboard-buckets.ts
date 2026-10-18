@@ -14,8 +14,7 @@
  * attention is worth surfacing over its date, work that is finished is a report
  * rather than a plan, and a cancelled visit is last because it is not work.
  */
-import type { Inspection, Tag, TemplateOption, ServiceOption } from "~/lib/dashboard-schema";
-import type { WizardTeamMember } from "~/components/NewInspectionWizard";
+import type { Inspection, Tag } from "~/lib/dashboard-schema";
 import { m } from "~/paraglide/messages";
 
 export const BUCKET_PRIORITY = [
@@ -86,9 +85,6 @@ export function emptyDashboard(loadFailed = false) {
         conciergePending: 0,
         greeting: m.inspections_list_greeting_morning(),
         tags: [] as Tag[],
-        templates: [] as TemplateOption[],
-        services: [] as ServiceOption[],
-        teamMembers: [] as WizardTeamMember[],
         checklistDismissed: false,
         templateCount: 0,
         serviceCount: 0,

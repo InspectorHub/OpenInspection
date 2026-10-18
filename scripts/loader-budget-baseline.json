@@ -1,0 +1,8 @@
+{
+  "app/routes/inspector-portal.tsx": 1,
+  "app/routes/public/portal-inspection.tsx": 1,
+  "app/routes/settings-automations.tsx": 1,
+  "app/routes/settings-booking.tsx": 1,
+  "app/routes/settings-integrations-sms.tsx": 1,
+  "app/routes/settings-schedule.tsx": 1
+}

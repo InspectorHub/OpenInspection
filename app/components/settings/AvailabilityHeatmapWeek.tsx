@@ -1,4 +1,5 @@
 import { m } from "~/paraglide/messages";
+import { cachedDateTimeFormat } from "~/lib/intl-cache";
 
 export type HeatmapStatus = "open" | "full" | "closed" | "unconfigured";
 
@@ -35,8 +36,8 @@ function statusLabel(status: HeatmapStatus): string {
 function civilParts(date: string, locale: string): { weekday: string; day: string } {
   const anchored = new Date(`${date}T00:00:00.000Z`); // tz-lint-ok: civil date read back in UTC below
   return {
-    weekday: new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(anchored),
-    day: new Intl.DateTimeFormat(locale, { day: "numeric", timeZone: "UTC" }).format(anchored),
+    weekday: cachedDateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(anchored),
+    day: cachedDateTimeFormat(locale, { day: "numeric", timeZone: "UTC" }).format(anchored),
   };
 }
 

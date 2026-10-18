@@ -3,6 +3,7 @@
  * fetch — unit-testable shaping of the two payload arrays.
  */
 import { m } from "~/paraglide/messages";
+import { cachedDateTimeFormat } from "./intl-cache";
 
 export interface DeliveryRow {
   id: string;
@@ -220,7 +221,7 @@ export interface MessageDay<T extends MessageRow = MessageRow> {
 export function dayKeyInZone(epochMs: number, timeZone: string): string {
   try {
     // i18n-lint-ok: machine-readable parts, never displayed
-    const parts = new Intl.DateTimeFormat("en-CA", {
+    const parts = cachedDateTimeFormat("en-CA", {
       timeZone: timeZone || "UTC",
       year: "numeric", month: "2-digit", day: "2-digit",
     }).formatToParts(new Date(epochMs));
@@ -263,6 +264,6 @@ export function dayLabel(dayKey: string, today: string, yesterday: string, local
   if (dayKey === today) return m.comm_day_today();
   if (dayKey === yesterday) return m.comm_day_yesterday();
   const [y, mo, d] = dayKey.split("-").map(Number);
-  return new Intl.DateTimeFormat(locale, { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })
+  return cachedDateTimeFormat(locale, { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" })
     .format(new Date(Date.UTC(y, mo - 1, d, 12)));
 }

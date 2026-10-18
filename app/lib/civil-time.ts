@@ -1,3 +1,4 @@
+import { cachedDateTimeFormat } from "./intl-cache";
 /**
  * Civil (wall-clock) date + time → the UTC instant it names in a given zone.
  *
@@ -22,7 +23,7 @@ function civilFieldsAsUtcMs(instantMs: number, timeZone: string): number {
     // actively wrong here: numbering systems such as ar-EG render Arabic-Indic
     // digits, and every field would come back NaN.
     // i18n-lint-ok: machine-readable parts, never displayed
-    const parts = new Intl.DateTimeFormat('en-US', {
+    const parts = cachedDateTimeFormat('en-US', {
         timeZone,
         year: 'numeric',
         month: '2-digit',
@@ -43,7 +44,7 @@ function isUsableZone(timeZone: string): boolean {
     if (!timeZone) return false;
     try {
         // i18n-lint-ok: a validity probe for the zone; its output is discarded
-        new Intl.DateTimeFormat('en-US', { timeZone }).format(0);
+        cachedDateTimeFormat('en-US', { timeZone }).format(0);
         return true;
     } catch {
         return false;

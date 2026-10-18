@@ -71,6 +71,7 @@
     "lint:filesize": "node scripts/check-file-size.mjs",
     "lint:overlays": "node scripts/check-overlay-primitives.mjs",
     "lint:busy-controls": "node scripts/check-busy-controls.mjs",
+    "lint:loader-budget": "node scripts/check-loader-budget.mjs",
     "lint:hidden-focusable": "node scripts/check-hidden-focusable.mjs",
     "lint:item-key-parity": "node scripts/check-item-key-parity.mjs",
     "lint:columns": "node scripts/check-column-ceiling.mjs",

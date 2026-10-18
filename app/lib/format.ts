@@ -7,6 +7,8 @@
  * the edge — workerd ships full ICU (see tests/workers/intl-icu-locale-data).
  */
 
+import { cachedDateTimeFormat, cachedNumberFormat, cachedRelativeTimeFormat } from "./intl-cache";
+
 export type DateInput = string | number | Date | null | undefined;
 
 /** Normalize input to a Date. Bare YYYY-MM-DD is anchored at UTC midnight (a
@@ -24,7 +26,7 @@ export function formatDate(
 ): string {
   const d = toDate(value);
   if (!d) return "";
-  return new Intl.DateTimeFormat(opts.locale, {
+  return cachedDateTimeFormat(opts.locale, {
     year: "numeric",
     month: opts.month ?? "short",
     day: "numeric",
@@ -52,7 +54,7 @@ export function formatRelativeTime(
   const d = toDate(value);
   if (!d) return "";
   const diffMs = d.getTime() - (opts.now ?? Date.now());
-  const fmt = new Intl.RelativeTimeFormat(opts.locale, {
+  const fmt = cachedRelativeTimeFormat(opts.locale, {
     numeric: "auto",
     style: opts.style ?? "long",
   });
@@ -79,7 +81,7 @@ export function formatTime(
 ): string {
   const d = toDate(value);
   if (!d) return "";
-  return new Intl.DateTimeFormat(opts.locale, {
+  return cachedDateTimeFormat(opts.locale, {
     hour: opts.hourCycle === "h23" ? "2-digit" : "numeric",
     minute: "2-digit",
     ...(opts.hourCycle ? { hourCycle: opts.hourCycle } : {}),
@@ -92,7 +94,7 @@ export function formatTime(
 export function formatDateTime(value: DateInput, opts: { locale: string; timeZone?: string }): string {
   const d = toDate(value);
   if (!d) return "";
-  return new Intl.DateTimeFormat(opts.locale, {
+  return cachedDateTimeFormat(opts.locale, {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -103,12 +105,12 @@ export function formatDateTime(value: DateInput, opts: { locale: string; timeZon
 }
 
 export function formatNumber(n: number, opts: { locale: string }): string {
-  return new Intl.NumberFormat(opts.locale).format(n);
+  return cachedNumberFormat(opts.locale).format(n);
 }
 
 /** Integer cents -> localized currency string, symbol form (`$1,234.50`). */
 export function formatCurrency(cents: number, opts: { locale: string; currency: string }): string {
-  return new Intl.NumberFormat(opts.locale, {
+  return cachedNumberFormat(opts.locale, {
     style: "currency",
     currency: opts.currency,
     currencyDisplay: "narrowSymbol",

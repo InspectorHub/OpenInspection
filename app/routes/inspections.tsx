@@ -7,13 +7,12 @@ import { createApi } from "~/lib/api-client.server";
 import { buildCreateInspectionJson } from "~/lib/inspection-create";
 import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
 import { searchContactsForTypeahead } from "~/lib/contact-search.server";
-import type { WizardTeamMember } from "~/components/NewInspectionWizard";
 import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
 import { SeatBanner } from "~/components/SeatBanner";
 import { QuotaBanner } from "~/components/QuotaBanner";
 import { useSessionContext, useDisplayTimeZone, useCapability } from "~/hooks/useSessionContext";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
-import { getScheduleSet } from "~/lib/schedule-onboarding.server";
+import { loadChecklistInputs } from "~/lib/dashboard-setup.server";
 import { PageHeader, TabStrip, Pill, Card, Button, Icon } from "@core/shared-ui";
 import {
   DEFAULT_COLUMNS,
@@ -24,8 +23,6 @@ import {
   PAGE_SIZE,
   type Inspection,
   type Tag,
-  type TemplateOption,
-  type ServiceOption,
   type DashboardData,
   type FilterId,
   type TabKey,
@@ -44,7 +41,7 @@ import { InspectionsFocusBar } from "~/components/dashboard/InspectionsFocusBar"
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useColumnPredicates } from "~/lib/dashboard-visible-columns";
 import { m } from "~/paraglide/messages";
-import { isFieldRole, isStaffRole } from "~/lib/access";
+import { isStaffRole } from "~/lib/access";
 import { createLandingPath } from "~/lib/create-landing";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
@@ -63,25 +60,26 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
     const api = createApi(context, { token });
-    // Templates + services power the New Inspection wizard (B-6 picker + B-8
-    // service linking). They are best-effort: a failure must not break the
-    // dashboard, so each falls back to an empty list.
+    // What the dashboard renders: the buckets, the tag filter, the caller's
+    // onboarding state and the usage banner. The New Inspection wizard is its
+    // own route (/inspections/new) and loads its template, service and member
+    // lists itself, so this loader no longer fetches them.
     // meRes: best-effort fetch for onboardingState.checklistDismissed (IA-12).
     // The TODO(C-10) cast is the house pattern for this seam — hono/client collapses
     // the typed union; assertion is localized here and does not affect safety.
     const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
-    const [dashRes, tagsRes, templatesRes, servicesRes, meRes, membersRes, usageRes, scheduleSet] = await Promise.all([
+    // The checklist's own inputs start with the first wave so they overlap it. A
+    // dismissed checklist still shows its progress in one collapsed row, so they
+    // are read either way. Never rejects (best-effort, bounded).
+    const checklistP = loadChecklistInputs(api);
+    const [dashRes, tagsRes, meRes, usageRes] = await Promise.all([
       api.inspections.dashboard.$get(),
       api.tags.index.$get().catch(() => null),
-      api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
-      api.services.index.$get().catch(() => null),
       meGet().catch(() => null),
-      api.admin.members.$get().catch(() => null),
       // Free-tier quota banner — best-effort, same pattern as the other
       // Promise.all entries above. `caps` comes back null for non-free
       // tenants and for standalone deploys, so QuotaBanner renders nothing.
       api.usage.summary.$get().catch(() => null),
-      getScheduleSet(api),
     ]);
     const json = dashRes.ok ? ((await dashRes.json()) as Record<string, unknown>) : {};
     const d = (json.data ?? {}) as unknown as DashboardData | undefined;
@@ -89,24 +87,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (tagsRes && tagsRes.ok) {
       const tj = (await tagsRes.json()) as Record<string, unknown>;
       tags = (tj.data ?? []) as Tag[];
-    }
-    let templates: TemplateOption[] = [];
-    if (templatesRes && templatesRes.ok) {
-      const tj = (await templatesRes.json()) as { data?: TemplateOption[] };
-      templates = (tj.data ?? []).map((t) => ({ id: t.id, name: t.name, itemCount: t.itemCount }));
-    }
-    let svcOptions: ServiceOption[] = [];
-    if (servicesRes && servicesRes.ok) {
-      const sj = (await servicesRes.json()) as { data?: ServiceOption[] };
-      svcOptions = (sj.data ?? []).map((s) => ({ id: s.id, name: s.name, price: s.price }));
-    }
-    // B-21 team step — non-admins get 403 → null → []; team step hidden for them.
-    let teamMembers: WizardTeamMember[] = [];
-    if (membersRes?.ok) {
-      const mb = (await membersRes.json()) as { data?: Array<{ id: string; email: string; role: string; name?: string | null }> };
-      teamMembers = (mb.data ?? [])
-        .filter((m) => isFieldRole(m.role))
-        .map((m) => ({ id: m.id, name: m.name ?? m.email }));
     }
     // IA-12: read checklistDismissed from onboardingState. Best-effort: if the
     // call fails we show the checklist (safe default — the user can dismiss again).
@@ -117,6 +97,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       };
       checklistDismissed = meBody.data?.user?.onboardingState?.checklistDismissed === true;
     }
+    const checklist = await checklistP;
     let quotaCaps: { inspections: number; email: number } | null = null;
     let quotaUsage: { inspections: number; email: number } | null = null;
     if (usageRes && usageRes.ok) {
@@ -146,14 +127,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       conciergePending: d?.conciergePending ?? 0,
       greeting: m.inspections_list_greeting_morning(),
       tags,
-      templates,
-      services: svcOptions,
-      teamMembers,
       checklistDismissed,
       // Raw counts/flags for the onboarding checklist.
-      templateCount: templates.length,
-      serviceCount: svcOptions.length,
-      scheduleSet,
+      ...checklist,
       quotaCaps,
       quotaUsage,
       loadFailed: false,

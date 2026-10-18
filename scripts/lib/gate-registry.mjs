@@ -212,6 +212,12 @@ export const SCRIPT_GATES = [
     // script applies the narrowly scoped compatibility patch and fails closed
     // if Wrangler's bundle no longer matches the expected shape.
     { key: 'wranglerpatch', label: 'Wrangler compatibility patch present', script: 'check-wrangler-patch.mjs', fix: 'npm run lint:wrangler-patch', rung: PUSH },
+    // PUSH, not PRECOMMIT. It parses the TypeScript of every route file (~150 files, a few
+    // hundred milliseconds of AST work), which is more than every commit should pay, and what
+    // it catches is the sum over a branch -- a loader that has grown wide or started calling
+    // the API once per item -- rather than one keystroke. Existing violations are frozen in
+    // scripts/loader-budget-baseline.json and may only shrink.
+    { key: 'loaderbudget', label: 'lint:loader-budget', script: 'check-loader-budget.mjs', fix: 'npm run lint:loader-budget', rung: PUSH },
     { key: 'unwired', label: 'lint:unwired', script: 'check-unwired.mjs', fix: 'npm run lint:unwired', rung: PUSH },
     // `unwired` one level down: a field, not a module. See that script's header.
     { key: 'unreadfields', label: 'lint:unread-fields', script: 'check-unread-fields.mjs', fix: 'npm run lint:unread-fields', rung: PUSH },

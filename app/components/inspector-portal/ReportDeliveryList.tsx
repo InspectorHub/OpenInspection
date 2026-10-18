@@ -45,6 +45,7 @@
  */
 import { m } from "~/paraglide/messages";
 import type { ReportLinkRow } from "~/lib/communication-view";
+import { cachedDateTimeFormat } from "~/lib/intl-cache";
 
 export function ReportDeliveryList({
   rows,
@@ -58,7 +59,7 @@ export function ReportDeliveryList({
   if (rows.length === 0) return null;
 
   const when = (ms: number) =>
-    new Intl.DateTimeFormat(locale, {
+    cachedDateTimeFormat(locale, {
       timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
     }).format(new Date(ms));
 

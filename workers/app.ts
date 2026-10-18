@@ -13,7 +13,7 @@ import { getDeploymentProfile } from "../server/lib/deployment-profile";
 // Same top-level exemption as `deployment-profile.ts` above, for the same
 // reason: `request-scope.ts` imports nothing at all, so it cannot drag the API
 // graph in behind it.
-import { createRequestScope, REQUEST_SCOPE } from "../server/lib/request-scope";
+import { createRequestScope, PAGE_RENDER_CALL, REQUEST_SCOPE } from "../server/lib/request-scope";
 // Five string constants, no imports — safe at the top level for the same reason
 // as the two above, and what lets /status answer without importing the API graph.
 import { BUILD } from "../server/generated/version";
@@ -32,6 +32,8 @@ import { cloudflareContext } from "../app/lib/load-context";
 import { withHumanToken } from "./human-token";
 // Imports nothing, like the three above: safe at the top level.
 import { sessionMarkerFromCookie } from "../server/lib/session-marker";
+// Imports only react-router (already above) and the logger, which imports nothing.
+import { createServerBuildTracker, finishPage } from "../server/lib/page-timing";
 
 /** Hono context for this worker, so handlers need no `any`. */
 type Ctx = Context<{ Bindings: WorkerEnv }>;
@@ -52,28 +54,34 @@ type ApiModule = typeof import("../server/index");
 let apiModule: Promise<ApiModule> | undefined;
 const getApi = () => (apiModule ??= import("../server/index"));
 
-const requestHandler = createRequestHandler(
-  () => import("virtual:react-router/server-build"),
-  import.meta.env.MODE,
-);
+// The tracker only OBSERVES this load (it records the route table once the
+// renderer has imported the build); page timing never triggers it.
+const serverBuild = createServerBuildTracker(() => import("virtual:react-router/server-build"));
+const requestHandler = createRequestHandler(serverBuild.load, import.meta.env.MODE);
 
 // React Router SSR. We inject an in-process `API_WORKER` self-binding so that
 // loaders/actions' `createApi()` call the API app DIRECTLY (its createApi prefers
 // env.API_WORKER.fetch) instead of an HTTP loopback to this same worker — no
 // extra network hop, no API_URL needed.
 const ssr = async (c: Ctx) => {
+  // Page-timing clock and in-process call counter. Allocated only here, on the
+  // page-render branch; API, probe and status branches never reach this function.
+  const startedAt = Date.now();
+  let inprocCalls = 0;
   // One scope per OUTER request, shared by every in-process API call this
   // render fans out. Built once here rather than per call: the 15 calls must
   // see the SAME scope or nothing is shared. `toApi` — the entry for real
   // external HTTP traffic — keeps passing the raw `c.env`, so memoisation is
   // unreachable from outside by construction rather than by a flag.
   const scope = createRequestScope();
-  const innerEnv = { ...c.env, [REQUEST_SCOPE]: scope };
+  const innerEnv = { ...c.env, [REQUEST_SCOPE]: scope, [PAGE_RENDER_CALL]: true };
   const env: WorkerEnv = {
     ...c.env,
     API_WORKER: {
-      fetch: async (req: Request) =>
-        (await getApi()).app.fetch(withHumanToken(req, c.req.header("cookie")), innerEnv, c.executionCtx),
+      fetch: async (req: Request) => {
+        inprocCalls += 1;
+        return (await getApi()).app.fetch(withHumanToken(req, c.req.header("cookie")), innerEnv, c.executionCtx);
+      },
     },
   };
   const context = new RouterContextProvider();
@@ -96,7 +104,25 @@ const ssr = async (c: Ctx) => {
   const rendered = await paraglideMiddleware(withResolvedUiLocale(c.req.raw), ({ request }: { request: Request }) =>
     requestHandler(request, context),
   );
-  return withSessionMarker(rendered, c.req.header("cookie"));
+  // One new Response carries both the session marker and Server-Timing, so the
+  // body stream is re-wrapped once, by reference, and never read.
+  const marker = await sessionMarkerForPage(rendered, c.req.header("cookie"));
+  const finished = finishPage({
+    request: c.req.raw,
+    res: rendered,
+    startedAt,
+    inprocCalls: () => inprocCalls,
+    getRoutes: serverBuild.getRoutes,
+    extraHeaders: marker ? { "x-oi-session": marker } : undefined,
+  });
+  // finishPage leaves a redirect or an empty HTML answer untouched (not a page),
+  // but the session marker was always stamped on any HTML response: keep that.
+  if (finished === rendered && marker) {
+    const stamped = new Response(rendered.body, rendered);
+    stamped.headers.set("x-oi-session", marker);
+    return stamped;
+  }
+  return finished;
 };
 
 /**
@@ -108,13 +134,9 @@ const ssr = async (c: Ctx) => {
  * with no session gets no header, which the worker reads as "not told", never as "signed out".
  * Only HTML documents are stamped; data responses and redirects pass through untouched.
  */
-async function withSessionMarker(response: Response, cookie: string | undefined): Promise<Response> {
-  if (!(response.headers.get("content-type") ?? "").includes("text/html")) return response;
-  const marker = await sessionMarkerFromCookie(cookie);
-  if (!marker) return response;
-  const stamped = new Response(response.body, response);
-  stamped.headers.set("x-oi-session", marker);
-  return stamped;
+async function sessionMarkerForPage(response: Response, cookie: string | undefined): Promise<string | null> {
+  if (!(response.headers.get("content-type") ?? "").includes("text/html")) return null;
+  return sessionMarkerFromCookie(cookie);
 }
 
 // Delegate to the FULL API app (all its global `app.use('*')` middleware — CSRF,

@@ -22,6 +22,7 @@ import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { reasonText, type NoticeGroup, type NoticeChannel, type DeliveryRow } from "~/lib/communication-view";
+import { cachedDateTimeFormat } from "~/lib/intl-cache";
 
 function channelIcon(channel: string) {
   // Known channels get a glyph; anything else gets a neutral dot. The LABEL
@@ -82,7 +83,7 @@ export function OutboxList({
   const locale = useDisplayLocale();
 
   const when = (ms: number) =>
-    new Intl.DateTimeFormat(locale, { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+    cachedDateTimeFormat(locale, { timeZone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
       .format(new Date(ms));
 
   return (

@@ -264,6 +264,18 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - **Error signature**: `logger.error(message, data?, error?)` — second arg is `Record<string, unknown>`, third is optional `Error`. Do NOT pass raw Error as second arg.
 - **No sensitive data in logs**: Never log JWT tokens, passwords, API keys, or full request bodies. Log only error messages, status codes, and non-sensitive identifiers.
 
+### Page timing (`page_timing`)
+
+Per-route timing for HTML document requests (React Router `.data` single-fetch requests are not timed) lives in `server/lib/page-timing.ts`, wired in `workers/app.ts` on the page-render branch only.
+
+- **One line per sampled page**: `logger.info('page_timing', …)` with the fields `kind` (`page`), `route` (the matched React Router PATTERN such as `/inspections/:id/edit`, never the raw path; special values `unmatched`, `pending`, `unknown`), `status`, `wall_ms`, `cold` (0/1, the first PAGE this isolate served, not the isolate's start), `req_n` (pages served by this isolate), `authed` (0/1, cookie presence only, never verified), `sample` (`error` | `slow` | `cold` | `n`) and `inproc_calls` (in-process API calls the render made through the `API_WORKER` binding so far). Every field is a number or a low-cardinality string; never add an id, slug, email, token, query string, cookie value, IP or user agent.
+- **Sampling** (named constants): always log status >= 500 (`error`), `wall_ms` > `PAGE_TIMING_SLOW_MS` (1500, `slow`) and the isolate's first page (`cold`); otherwise every `PAGE_TIMING_SAMPLE_EVERY`th (5) page (`n`). The counter is page-scoped: API calls, probes, `/status` and redirects never advance it. Only `sample: "n"` lines are an unbiased subset of page traffic; the other reasons are over-represented.
+- **`wall_ms` is time-to-headers**, not time-to-last-byte: the body streams after the Response is returned. `Date.now()` in Workers advances only at I/O boundaries, so this is wall time, not CPU time.
+- **`Server-Timing: app;dur=<wall_ms>`** is added to every HTML page response on a NEW Response built from the same body stream and a copy of the headers. The body is never read, cloned or buffered. Redirects, 204/304 and non-HTML responses are returned untouched.
+- **The instrument never loads a module.** The route table is read only after the renderer itself has loaded the server build (`createServerBuildTracker` wraps the loader and only observes it); before that the route is `pending`. Do not `import()` the build or the API graph from the timing code, and keep its imports to `react-router` and the logger.
+- **A render that throws** produces no `page_timing` line (the clock is read only when a Response exists); the error path logs it.
+- **"Request processed"** (`server/lib/middleware/request-log.ts`) is written for external requests and for offline-import replays. Only in-process calls made by a PAGE RENDER (`isPageRenderCall`: `workers/app.ts` sets `PAGE_RENDER_CALL` on the env it gives the self-binding) are suppressed unless they return 5xx, so a render yields one `page_timing` line instead of one line per loader call. Consequence: a loader call answered 401/403/404 is no longer logged per call. Do not set `PAGE_RENDER_CALL` anywhere else; `isInProcessRequest` (the request scope) is a wider set that includes the offline import's replays.
+
 ## Multi-tenant Security Rules
 
 - **Mandatory tenantId**: Every new database table MUST include `tenantId: text('tenant_id').notNull()` to ensure physical isolation.
@@ -306,6 +318,16 @@ Two clicks (or Enter twice) can land in the same frame, before React renders any
 - **Gate: `npm run lint:busy-controls`** (precommit rung). It checks, per form, that a guard is reachable from that form's own `onSubmit`, and that a `fetcher.submit(` or `fetch(` that writes sits in a function that reaches one. A GET or method-less call is a read and is not flagged. It scans untracked files too. It is not a data-flow proof: a guard named anywhere in the same small function counts, and a guard in another file is invisible.
 - **When a repeat is genuinely harmless** (idempotent write, read-only POST), put `// busy-controls-allow: <the reason, verified in the server handler>` above the statement or form. A reason you have not checked is not a reason. The baseline stays empty.
 - Tests for a latch put two triggers in ONE `act()` with native `.click()` or `dispatchEvent` (`fireEvent` flushes between calls and hides the bug), add a control that a later trigger still goes through, and are proven red with the guard removed.
+
+## Loader budget
+
+A route loader runs before the page can render, and each in-process API call it makes is a full trip through the API's middleware chain. Keep the blocking part small: load what the first paint needs, and give everything else its own route (`app/routes/resources/*`) or leave it out.
+
+- **Gate: `npm run lint:loader-budget`** (push rung, so pre-push and CI). It parses the exported `loader` / `clientLoader` of every non-test file under `app/routes` (TypeScript AST) and reports: a `Promise.all` / `allSettled` over more than six reads; an API call inside `.map` / `.forEach` / a loop (one call per item); two adjacent `await api...` statements where the second does not use the first's result (decided by data flow, not textual adjacency); a hand-built `new Response(JSON.stringify(...))`. The loop and adjacent-await shapes are also reported when the call is hidden behind a helper that is handed the client (`await loadX(api, id)`, rules `helper-in-loop` and `helper-serial`); a helper that reaches the client some other way is not seen.
+- **Ratchet:** existing hits are frozen per file in `scripts/loader-budget-baseline.json` and may only shrink (`node scripts/check-loader-budget.mjs --write-baseline` lowers it). Do not raise it.
+- **A genuine exception** is `// loader-budget-allow: <reason>` on the line above the statement. The reason is mandatory and exempts only that statement.
+- **Helpers:** `mapLimit` and `settled` in `app/lib/concurrency.ts`. `mapLimit(items, limit, fn)` is `Promise.all(items.map(fn))` with a bound. `settled(fn, { fallback, label, timeoutMs })` turns a rejection, a synchronous throw or a timeout into a fallback; the timeout only stops waiting, it does not cancel the underlying D1 query or API call. A typed-client call can throw before it returns a promise, which is why `settled` invokes it inside its own `try`.
+- Call-count tests (a counting fake `createApi`) are the way to pin a loader's budget; see `app/routes/inspections-loader-calls.test.ts` and `app/routes/inspection-edit/loader-calls.test.ts`.
 
 ## Comment Rules
 

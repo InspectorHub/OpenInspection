@@ -80,6 +80,8 @@
   "inspections_hub_people_phone_ph": "(555) 123-4567",
   "inspections_hub_people_agency_label": "Agency",
   "inspections_hub_people_agency_ph": "Company or agency",
+  "inspections_hub_pickers_error": "Could not load this list. Check your connection and try again.",
+  "inspections_hub_pickers_retry": "Try again",
   "inspections_hub_people_role_label": "Role",
   "inspections_hub_people_role_placeholder": "Select a role…",
   "inspections_hub_people_access_notice": "Adding someone in this role lets them open this inspection from a link — no sign-up needed, and before the report is published.",
