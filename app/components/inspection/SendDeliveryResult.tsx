@@ -12,7 +12,8 @@ export function SendDeliveryResult({ delivery, people }: { delivery: DeliveryOut
   const nameOf = (recipient: string) =>
     people.find((p) => p.contactId === recipient || p.email === recipient)?.name ?? m.inspections_hub_send_result_someone();
   return (
-    <div className="space-y-3" data-testid="send-delivery-result">
+    // role="status" is a polite live region: the result replaces the form, so it is announced without moving focus.
+    <div className="space-y-3" role="status" data-testid="send-delivery-result">
       <p className="text-[13px] font-semibold text-ih-fg-1">
         {delivery.sent === 0 ? m.inspections_hub_send_result_none() : m.inspections_hub_send_result_summary({ sent: delivery.sent, total: delivery.sent + delivery.skipped.length })}
       </p>

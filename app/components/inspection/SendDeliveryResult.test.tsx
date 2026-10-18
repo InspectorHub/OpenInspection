@@ -155,6 +155,26 @@ describe.each([
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("the result is announced (a polite live region) and Back and Done say they are not ready until the settle moment has passed", () => {
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    const onClose = vi.fn();
+    const { rerender } = render(ui(fetcherWith(undefined), onClose));
+    rerender(ui(fetcherWith(withIntent(PARTIAL)), onClose));
+    const region = screen.getByTestId("send-delivery-result");
+    expect(region.getAttribute("role")).toBe("status");
+    const done = () => screen.getByText("Done").closest("button")!;
+    const back = () => screen.getByText("Back").closest("button")!;
+    expect(done().getAttribute("aria-disabled")).toBe("true");
+    expect(back().getAttribute("aria-disabled")).toBe("true");
+    act(() => { done().click(); });
+    expect(onClose).not.toHaveBeenCalled();
+    settle();
+    expect(done().getAttribute("aria-disabled")).toBeNull();
+    expect(back().getAttribute("aria-disabled")).toBeNull();
+    act(() => { done().click(); });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("a skipped person who can no longer be sent to is not left ticked and greyed out after Back", () => {
     const detail = intent === "send-sms" ? "phone" : "email";
     const { rerender } = render(ui(fetcherWith(undefined), vi.fn()));

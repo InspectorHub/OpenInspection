@@ -43,14 +43,17 @@ interface ServerErrorBody {
  * the page, so a known code is never shown as the server wrote it. Add a code here, with its two
  * catalogue entries, rather than surfacing its message.
  *
- * QUOTA_EXHAUSTED: a plan allowance for this kind of message is spent (email or text), or the plan
- * has no allowance of the kind at all (a text sent on a registered number, reported with a cap of 0).
- * Any other metric gets the generic limit sentence; the counts are shown only when the server sent them.
+ * QUOTA_EXHAUSTED is mapped for the two metrics the send paths report, email and sms: an allowance for
+ * that kind of message is spent, or there is none of that kind at all (reported with a cap of 0). It is
+ * NOT mapped for any other metric: creating an inspection at its cap, for one, keeps the server's own
+ * message, which names the metric and the counts, and every caller of this helper sees that unchanged.
+ * Counts are shown only when the server sent them.
  */
 function knownServerErrorText(body: ServerErrorBody | null): string | null {
   const error = body?.error;
   if (error?.code === "QUOTA_EXHAUSTED") {
     const { metric, used, cap } = error.details ?? {};
+    if (metric !== "email" && metric !== "sms") return null;
     const counts = typeof used === "number" && typeof cap === "number" ? { used, cap } : null;
     if (metric === "sms") {
       if (cap === 0) return m.inspections_hub_error_plan_sms_not_included();

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { overwriteGetLocale } from "~/paraglide/runtime";
-import { sendReportActionResult, deliveryActionResult } from "~/lib/inspector-portal-actions";
+import { sendReportActionResult, deliveryActionResult, toActionResult } from "~/lib/inspector-portal-actions";
 
 const res = (status: number, body: unknown = {}) => ({
   ok: status < 400,
@@ -84,6 +84,7 @@ describe("a plan refusal is worded by the page, in the viewer's language, never 
   it("english: the email plan cap names the numbers, and is not the server's sentence", async () => {
     const out = await sendReportActionResult(res(402, QUOTA_EMAIL));
     expect(out.error).toContain("54 of 50");
+    expect(out.error).not.toMatch(/subscribe|free plan/i);
     expect(out.error).not.toContain("Free plan limit reached: 54/50");
   });
 
@@ -92,14 +93,15 @@ describe("a plan refusal is worded by the page, in the viewer's language, never 
     const out = await sendReportActionResult(res(402, QUOTA_EMAIL));
     expect(out.error).toContain("54 de 50");
     expect(out.error).toMatch(/límite de correos electrónicos/);
+    expect(out.error).not.toMatch(/plan|suscr/i);
     expect(out.error).not.toMatch(/Free plan|Subscribe/);
   });
 
   it("es-419: the text message refusals (not in the plan, allowance spent) are in Spanish", async () => {
     overwriteGetLocale(() => "es-419");
     const notIn = await deliveryActionResult(res(402, NOT_IN_PLAN), "send-sms", "failed");
-    expect(notIn.error).toMatch(/no incluye mensajes de texto/);
-    expect(notIn.error).not.toMatch(/Free plan|company is/);
+    expect(notIn.error).toMatch(/no están disponibles aquí/);
+    expect(notIn.error).not.toMatch(/Free plan|company is|suscr/i);
     const spent = await deliveryActionResult(res(402, SMS_SPENT), "send-sms", "failed");
     expect(spent.error).toContain("20 de 20");
   });
@@ -110,10 +112,20 @@ describe("a plan refusal is worded by the page, in the viewer's language, never 
     expect(out.error).toMatch(/quota/i);
   });
 
-  it("a QUOTA_EXHAUSTED with an unknown metric or no details falls back to the generic translated sentence", async () => {
+  it("an email or text refusal that sent no counts falls back to the generic translated sentence", async () => {
     overwriteGetLocale(() => "es-419");
-    const out = await sendReportActionResult(res(402, { error: { code: "QUOTA_EXHAUSTED", message: "Free plan limit reached: ?" } }));
-    expect(out.error).toBe("Se alcanzó el límite de su plan. Suscríbase para continuar.");
+    const out = await sendReportActionResult(res(402, { error: { code: "QUOTA_EXHAUSTED", message: "Limit reached", details: { metric: "email" } } }));
+    expect(out.error).toBe("Se alcanzó el límite de esto. Inténtelo de nuevo cuando se restablezca, o aumente el límite.");
+  });
+
+  it("any other metric keeps the server's own message in both languages (create-inspection at its cap, for one)", async () => {
+    const SERVER = "Free plan limit reached: 50/50 inspections. Subscribe to continue.";
+    const inspections = { error: { code: "QUOTA_EXHAUSTED", message: SERVER, details: { metric: "inspections", used: 50, cap: 50, billingPortalUrl: null } } };
+    expect((await toActionResult(res(402, inspections), "create", "fallback")).error).toBe(SERVER);
+    overwriteGetLocale(() => "es-419");
+    expect((await toActionResult(res(402, inspections), "create", "fallback")).error).toBe(SERVER);
+    // no details at all: the server message, not a guessed sentence
+    expect((await toActionResult(res(402, { error: { code: "QUOTA_EXHAUSTED", message: SERVER } }), "create", "fallback")).error).toBe(SERVER);
   });
 
   it("control: a code the page does not know still shows the server's message, and a bare 402 the fallback", async () => {
