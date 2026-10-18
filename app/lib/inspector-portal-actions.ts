@@ -47,7 +47,7 @@ interface ServerErrorBody {
  * has no allowance of the kind at all (a text sent on a registered number, reported with a cap of 0).
  * Any other metric gets the generic limit sentence; the counts are shown only when the server sent them.
  */
-export function knownServerErrorText(body: ServerErrorBody | null): string | null {
+function knownServerErrorText(body: ServerErrorBody | null): string | null {
   const error = body?.error;
   if (error?.code === "QUOTA_EXHAUSTED") {
     const { metric, used, cap } = error.details ?? {};
