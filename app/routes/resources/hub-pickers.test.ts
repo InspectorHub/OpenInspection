@@ -32,11 +32,15 @@ vi.mock("~/lib/api-client.server", () => ({
 
 import { loader } from "~/routes/resources/hub-pickers";
 
-const run = () => loader({ request: new Request("http://localhost/resources/hub-pickers"), context: {}, params: {} } as never) as Promise<{
-    members: Array<{ id: string; name: string; email: string }> | null;
-    roleProfiles: unknown[] | null;
-    referralSources: string[] | null;
-}>;
+const run = async () => {
+    const res = (await loader({ request: new Request("http://localhost/resources/hub-pickers"), context: {}, params: {} } as never)) as Response;
+    expect(res.headers.get("cache-control")).toMatch(/no-store/);
+    return (await res.json()) as {
+        members: Array<{ id: string; name: string; email: string }> | null;
+        roleProfiles: unknown[] | null;
+        referralSources: string[] | null;
+    };
+};
 
 beforeEach(() => {
     seam.members = seam.roles = seam.branding = "ok";

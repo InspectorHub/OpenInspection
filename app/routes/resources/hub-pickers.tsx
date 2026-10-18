@@ -7,7 +7,9 @@
  * render. They are read here instead, in one request, the first time one of
  * those controls is opened (see useHubPickers).
  *
- * Each list answers for itself: an array when the read worked (possibly empty,
+ * It answers plain JSON to a same-origin `fetch` (not a router fetcher: a fetcher
+ * whose request fails hands the error to the nearest error boundary, which would
+ * replace the whole page and any unsaved edits). Each list answers for itself: an array when the read worked (possibly empty,
  * which then means "there are none"), `null` when it could not be read. Callers
  * must treat null as "unavailable", never as an empty list.
  */
@@ -26,15 +28,16 @@ export interface HubPickers {
 const UNAVAILABLE: HubPickers = { members: null, roleProfiles: null, referralSources: null };
 
 /**
- * Never throws: a fetcher whose route throws replaces the page with its error
- * boundary, and these lists are optional extras of a page that rendered fine.
+ * Never throws: these lists are optional extras of a page that rendered fine.
  */
-export async function loader({ request, context }: Route.LoaderArgs): Promise<HubPickers> {
+export async function loader({ request, context }: Route.LoaderArgs): Promise<Response> {
+    let body: HubPickers;
     try {
-        return await readPickers(request, context);
+        body = await readPickers(request, context);
     } catch {
-        return UNAVAILABLE;
+        body = UNAVAILABLE;
     }
+    return Response.json(body, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 async function readPickers(request: Request, context: Route.LoaderArgs["context"]): Promise<HubPickers> {
@@ -82,3 +85,4 @@ async function readPickers(request: Request, context: Route.LoaderArgs["context"
     ]);
     return { members, roleProfiles, referralSources };
 }
+

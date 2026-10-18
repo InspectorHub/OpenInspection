@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
-import { createRoutesStub } from "react-router";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { useHubPickers } from "~/hooks/useHubPickers";
 
 type Payload = { members: unknown[] | null; roleProfiles: unknown[] | null; referralSources: string[] | null };
-let replies: Array<() => Promise<Payload> | Payload> = [];
+let replies: Array<() => Promise<Response> | Response> = [];
 let loads = 0;
+const json = (p: Payload) => new Response(JSON.stringify(p), { status: 200, headers: { "content-type": "application/json" } });
 
 function Probe() {
   const p = useHubPickers();
@@ -21,45 +21,37 @@ function Probe() {
   );
 }
 
-function mount() {
-  const Stub = createRoutesStub([
-    { path: "/", Component: Probe },
-    {
-      path: "/resources/hub-pickers",
-      loader: async () => {
-        const reply = replies[Math.min(loads, replies.length - 1)]!;
-        loads += 1;
-        return await reply();
-      },
-    },
-  ]);
-  return render(<Stub initialEntries={["/"]} />);
-}
-
+const realFetch = globalThis.fetch;
 beforeEach(() => {
   loads = 0;
   replies = [];
+  globalThis.fetch = vi.fn(async () => {
+    const reply = replies[Math.min(loads, replies.length - 1)]!;
+    loads += 1;
+    return await reply();
+  }) as never;
 });
+afterEach(() => { globalThis.fetch = realFetch; });
 
 const text = (id: string) => screen.getByTestId(id).textContent;
 
 describe("useHubPickers", () => {
   it("reads nothing until a picker is asked for", async () => {
-    replies = [() => ({ members: [{ id: "u" }], roleProfiles: [], referralSources: ["Realtor"] })];
-    mount();
-    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    replies = [() => json({ members: [{ id: "u" }], roleProfiles: [], referralSources: ["Realtor"] })];
+    render(<Probe />);
+    await new Promise((r) => setTimeout(r, 30));
     expect(loads).toBe(0);
     expect(text("members")).toBe("idle:0");
   });
 
   it("loads once on the first request, shows loading, then ready with the data", async () => {
-    let release: (p: Payload) => void = () => {};
-    replies = [() => new Promise<Payload>((res) => { release = res; })];
-    mount();
+    let release: (r: Response) => void = () => {};
+    replies = [() => new Promise<Response>((res) => { release = res; })];
+    render(<Probe />);
     fireEvent.click(screen.getByText("request"));
     fireEvent.click(screen.getByText("request"));
     await waitFor(() => expect(text("members")).toBe("loading:0"));
-    release({ members: [{ id: "u" }], roleProfiles: [{ id: "r" }, { id: "s" }], referralSources: ["Realtor"] });
+    release(json({ members: [{ id: "u" }], roleProfiles: [{ id: "r" }, { id: "s" }], referralSources: ["Realtor"] }));
     await waitFor(() => expect(text("members")).toBe("ready:1"));
     expect(text("roles")).toBe("ready:2");
     expect(text("referrals")).toBe("ready:1");
@@ -67,22 +59,42 @@ describe("useHubPickers", () => {
   });
 
   it("a list that failed is an error, not an empty ready list, and the others stay usable", async () => {
-    replies = [() => ({ members: null, roleProfiles: [], referralSources: ["Realtor"] })];
-    mount();
+    replies = [() => json({ members: null, roleProfiles: [], referralSources: ["Realtor"] })];
+    render(<Probe />);
     fireEvent.click(screen.getByText("request"));
     await waitFor(() => expect(text("members")).toBe("error:0"));
     expect(text("roles")).toBe("ready:0");
     expect(text("referrals")).toBe("ready:1");
   });
 
-  it("retry asks again after a list failed, and the new answer replaces the error", async () => {
-    replies = [() => ({ members: null, roleProfiles: null, referralSources: null }), () => ({ members: [{ id: "u" }], roleProfiles: [], referralSources: [] })];
-    mount();
+  it("a request that fails outright (network error, non-OK, non-JSON) is an error, never a thrown error; retry recovers", async () => {
+    for (const bad of [
+      () => { throw new TypeError("network down"); },
+      () => new Response("nope", { status: 500 }),
+      () => new Response("<html>not json</html>", { status: 200 }),
+    ]) {
+      loads = 0;
+      replies = [bad, () => json({ members: [{ id: "u" }], roleProfiles: [], referralSources: [] })];
+      const { unmount } = render(<Probe />);
+      fireEvent.click(screen.getByText("request"));
+      await waitFor(() => expect(text("members")).toBe("error:0"));
+      expect(text("roles")).toBe("error:0");
+      fireEvent.click(screen.getByText("retry"));
+      await waitFor(() => expect(text("members")).toBe("ready:1"));
+      expect(loads).toBe(2);
+      unmount();
+    }
+  });
+
+  it("an older request that answers after a retry does not overwrite the newer answer", async () => {
+    let releaseFirst: (r: Response) => void = () => {};
+    replies = [() => new Promise<Response>((res) => { releaseFirst = res; }), () => json({ members: [{ id: "new" }], roleProfiles: [], referralSources: [] })];
+    render(<Probe />);
     fireEvent.click(screen.getByText("request"));
-    await waitFor(() => expect(text("members")).toBe("error:0"));
-    expect(text("roles")).toBe("error:0");
     fireEvent.click(screen.getByText("retry"));
     await waitFor(() => expect(text("members")).toBe("ready:1"));
-    expect(loads).toBe(2);
+    releaseFirst(json({ members: [{ id: "a" }, { id: "b" }, { id: "c" }], roleProfiles: [], referralSources: [] }));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(text("members")).toBe("ready:1");
   });
 });
