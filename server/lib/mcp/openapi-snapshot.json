@@ -6925,11 +6925,26 @@
     "tag": "calendar",
     "tier": "extended",
     "inputSchema": {
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "provider",
+          "in": "query",
+          "required": false,
+          "description": "Disconnect only this provider. Omit to disconnect every provider. One of: google, apple.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "google",
+              "apple"
+            ],
+            "description": "Disconnect only this provider. Omit to disconnect every provider. One of: google, apple."
+          }
+        }
+      ],
       "body": null
     },
-    "summary": "Disconnect Google Calendar integration",
-    "description": "Deletes the encrypted calendar_connections row for the current inspector. Future syncs fail until they reconnect."
+    "summary": "Disconnect a calendar integration",
+    "description": "Disconnects the calling user calendar and removes what it synced, in one atomic batch scoped to the caller and their company: the connection, the busy blocks imported from it (date overrides with that source), the read-calendar choices and the links to events on the calendar. Hand-entered overrides are never touched, and events in the external calendar are not changed. The optional provider limits the disconnect to google or apple; omitted, every provider the caller is connected to is disconnected. An unknown provider is a 400."
   },
   {
     "operationId": "dismissOnboardingChecklist",
