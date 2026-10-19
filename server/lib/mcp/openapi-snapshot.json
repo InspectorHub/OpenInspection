@@ -1535,7 +1535,7 @@
       }
     },
     "summary": "Create an availability override",
-    "description": "Adds a single availability override (block a date, add an unusual slot). Admins may create overrides for any inspector; others only for themselves."
+    "description": "Adds a single availability override (block a date, add an unusual slot). The response lists any booked inspections a blocking override covers under conflicts; that is information only, nothing is refused. Admins may create overrides for any inspector; others only for themselves."
   },
   {
     "operationId": "createBookingAgreementsSign",
@@ -5502,7 +5502,9 @@
               "agent",
               "agreement_request",
               "audit_log",
+              "availability_override",
               "bulk_export",
+              "calendar_connection",
               "client",
               "comment",
               "contact",
@@ -5849,7 +5851,7 @@
       "body": null
     },
     "summary": "Delete an availability override",
-    "description": "Removes the specified availability override entry, restoring the default recurring schedule for that date."
+    "description": "Removes a manual availability override, restoring the default recurring schedule for that date. Owners and managers may remove any; an inspector only their own (403 otherwise). An entry synced from a connected calendar is managed by that connection and is refused with 409. The removal is written to the audit log."
   },
   {
     "operationId": "deleteCalendarBlock",
@@ -6924,11 +6926,26 @@
     "tag": "calendar",
     "tier": "extended",
     "inputSchema": {
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "provider",
+          "in": "query",
+          "required": false,
+          "description": "Disconnect only this provider. Omit to disconnect every provider. One of: google, apple.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "google",
+              "apple"
+            ],
+            "description": "Disconnect only this provider. Omit to disconnect every provider. One of: google, apple."
+          }
+        }
+      ],
       "body": null
     },
-    "summary": "Disconnect Google Calendar integration",
-    "description": "Deletes the encrypted calendar_connections row for the current inspector. Future syncs fail until they reconnect."
+    "summary": "Disconnect a calendar integration",
+    "description": "Disconnects the calling user calendar and removes what it synced, in one atomic batch scoped to the caller and their company: the connection, the busy blocks imported from it (date overrides with that source), the read-calendar choices and the links to events on the calendar. Hand-entered overrides are never touched, and events in the external calendar are not changed. The optional provider limits the disconnect to google or apple; omitted, every provider the caller is connected to is disconnected. An unknown provider is a 400."
   },
   {
     "operationId": "dismissOnboardingChecklist",
@@ -9791,12 +9808,29 @@
             "example": "78701",
             "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run. 3-10 characters."
           }
+        },
+        {
+          "name": "timeSlot",
+          "in": "query",
+          "required": false,
+          "description": "The window the customer will book (the same values POST /api/public/book takes). A slot is then offered only when a booking of that window fits it, which is what the booking is judged on, and morning or afternoon offer only starts inside that window. Omitted, a start is offered only when it fits every window (the longest one), so it never turns into a refusal whichever window is chosen. One of: morning, afternoon, all-day, custom.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "morning",
+              "afternoon",
+              "all-day",
+              "custom"
+            ],
+            "example": "morning",
+            "description": "The window the customer will book (the same values POST /api/public/book takes). A slot is then offered only when a booking of that window fits it, which is what the booking is judged on, and morning or afternoon offer only starts inside that window. Omitted, a start is offered only when it fits every window (the longest one), so it never turns into a refusal whichever window is chosen. One of: morning, afternoon, all-day, custom."
+          }
         }
       ],
       "body": null
     },
     "summary": "Company-level bookable time slots for a date",
-    "description": "Returns the union of qualified inspectors' bookable 30-minute slots for the given date (IA-26 aggregation). When inspectorId is supplied the result is restricted to that inspector (deep-link / client-choice flow). Free-inspector identities are never exposed on this public surface."
+    "description": "Returns the union of qualified inspectors' bookable 30-minute slots for the given date (IA-26 aggregation). When inspectorId is supplied the result is restricted to that inspector (deep-link / client-choice flow). Free-inspector identities are never exposed on this public surface. Pass timeSlot (the window the booking will carry): a slot is then judged over that window. Without timeSlot the list is judged over the longest window (all-day, 540 minutes when no service has a duration), so it can be much shorter than what a given window would allow; callers that know the window should always pass it."
   },
   {
     "operationId": "getTenantConfig",
@@ -16836,6 +16870,81 @@
     },
     "summary": "Save integration secrets (POST alias)",
     "description": "POST alias for PUT /secrets. Accepts the same body."
+  },
+  {
+    "operationId": "previewCalendarBlockConflicts",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/blocks/conflicts",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "userId",
+          "in": "query",
+          "required": false,
+          "description": "Whose calendar to check. Defaults to the caller; others need owner, manager or scheduleOthers.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Whose calendar to check. Defaults to the caller; others need owner, manager or scheduleOthers."
+          }
+        },
+        {
+          "name": "date",
+          "in": "query",
+          "required": true,
+          "description": "Civil date in YYYY-MM-DD format",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date in YYYY-MM-DD format"
+          }
+        },
+        {
+          "name": "allDay",
+          "in": "query",
+          "required": false,
+          "description": "true to cover the whole day. One of: true, false.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ],
+            "description": "true to cover the whole day. One of: true, false."
+          }
+        },
+        {
+          "name": "startTime",
+          "in": "query",
+          "required": false,
+          "description": "Start time of a timed block",
+          "schema": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "Start time of a timed block"
+          }
+        },
+        {
+          "name": "endTime",
+          "in": "query",
+          "required": false,
+          "description": "End time of a timed block",
+          "schema": {
+            "type": "string",
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "End time of a timed block"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Preview the booked inspections a block would cover",
+    "description": "Answers, before anything is saved, which booked inspections (not cancelled) a block of time off on a civil date would cover: an id, a date and a time window each, nothing else. Informational only; creating the block never requires it. Inspectors can ask about themselves; owners, managers and anyone holding the scheduleOthers capability about another user."
   },
   {
     "operationId": "previewContactImport",

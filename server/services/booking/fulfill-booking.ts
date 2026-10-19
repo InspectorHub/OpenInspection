@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { bookingWindowMin } from '../../lib/booking/booking-window';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, inArray } from 'drizzle-orm';
 import { inspections, inspectionRequests, services as servicesTable } from '../../lib/db/schema';
@@ -26,6 +27,24 @@ import type { z } from '@hono/zod-openapi';
 export interface FulfillBookingDeps {
     d1: D1Database;
     planQuota?: PlanQuotaGuard | undefined;
+}
+
+/**
+ * A booking that lost the race (or whose slot was taken off the table meanwhile) is
+ * retracted whole: its rows are deleted AND the inspection allowance it consumed is
+ * given back. The rows go first; for a company on the capped plan the allowance is
+ * counted from rows, and for the others the usage counter is decremented, so a lost
+ * booking no longer leaves the counter one (or N, for a multi-service booking) too high.
+ */
+export async function retractLostBooking(
+    deps: Pick<FulfillBookingDeps, 'planQuota'>,
+    service: { revokeBooking(tenantId: string, requestId: string): Promise<void> },
+    tenantId: string,
+    requestId: string,
+    inspectionCount: number,
+): Promise<void> {
+    await service.revokeBooking(tenantId, requestId);
+    await deps.planQuota?.releaseInspection(tenantId, inspectionCount);
 }
 
 /**
@@ -64,6 +83,16 @@ export async function fulfillBooking(
     // creates a one-inspection request implicitly so dashboards can group
     // every booking the same way.
     const startIso = `${body.date}T${requestedTime}:00Z`;
+    // The booking's length and precise instants are written IN the insert, never after it: a row must
+    // never be visible without them, or a racer reading it would judge it by the older start-time rule
+    // while its owner, a moment later, wins by the window rule. The length is the same rule the slot grid
+    // and admission used (booking-window.ts), and the zone comes from the CLAIM admission already
+    // refused the booking over, so it cannot degrade to the UTC sentinel here.
+    const scheduleFor = (serviceMin: number | null) => {
+        const durationMin = bookingWindowMin(serviceMin, body.timeSlot);
+        const startMs = wallClockToEpochMs(body.date, requestedTime, tenantTz);
+        return { durationMin, scheduledStartMs: new Date(startMs), scheduledEndMs: new Date(startMs + durationMin * 60000) };
+    };
     const inspectionRequestService = c.var.services.inspectionRequest;
     let createdRequestId: string;
     let primaryInspectionId: string;
@@ -73,9 +102,6 @@ export async function fulfillBooking(
     // routes through InspectionRequestService.create, which owns its
     // own inspection_people write for the inspections it creates.
     let directInsertInspectionId: string | null = null;
-    // Booked duration from the chosen service(s); NULL when the legacy path
-    // carries no explicit service (falls back to the time-slot window below).
-    let bookedServiceDurationMin: number | null = null;
 
     if (body.services && body.services.length > 0) {
         const serviceIds = body.services.map(s => s.serviceId);
@@ -85,10 +111,9 @@ export async function fulfillBooking(
         if (svcRows.length !== serviceIds.length) {
             throw Errors.BadRequest('One or more services were not found.');
         }
-        // Total booked minutes across the selected services (back-to-back);
-        // NULL when none carry a duration, so the time-slot window is used.
-        bookedServiceDurationMin =
-            svcRows.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0) || null;
+        // Total booked minutes across the selected services (back-to-back); NULL when none carries a
+        // duration, so the window the customer picked is used.
+        const bookedServiceDurationMin = svcRows.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0) || null;
         const subs = svcRows.map(s => {
             const sub: { templateId: string; price: number } = {
                 templateId: s.templateId ?? '',
@@ -104,6 +129,7 @@ export async function fulfillBooking(
             scheduledAt:     startIso,
             inspectorId,
             referredByAgentId: resolvedAgentContactId,
+            schedule:        scheduleFor(bookedServiceDurationMin),
         }, subs);
         createdRequestId = created.id;
         allInspectionIds = created.inspections.map(i => i.id);
@@ -150,7 +176,8 @@ export async function fulfillBooking(
             paymentStatus: 'unpaid',
             price: 0,
             requestId: createdRequestId,
-            createdAt: now
+            createdAt: now,
+            ...scheduleFor(null),
         });
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — the link table is a denormalized mirror; a sync failure
@@ -175,7 +202,7 @@ export async function fulfillBooking(
         tenantId, inspectorId, body.date, requestedTime, createdRequestId,
     );
     if (verdict === 'lose') {
-        await service.revokeBooking(tenantId, createdRequestId);
+        await retractLostBooking(deps, service, tenantId, createdRequestId, allInspectionIds.length);
         throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
     }
 
@@ -236,44 +263,6 @@ export async function fulfillBooking(
                 inspectorId,
             },
         }));
-    }
-
-    // A-polish 9b — stamp the precise scheduled instant on every inspection
-    // this booking created. The wall-clock slot time is interpreted in the
-    // TENANT tz (not the naive :00Z of the startIso busy-check key), so
-    // downstream conflict detection, Google push, and the ICS feed reason
-    // about real instants. inspections.date is deliberately left untouched —
-    // it still keys the HH:MM busy-checks via slice(11,16). Non-fatal: the
-    // inspection rows already committed, so a stamp failure must not 500 the
-    // booker (conflict detection just falls back to the hour-bucket).
-    //
-    // The zone comes from the CLAIM, not from a second read of tenant_configs.
-    // It is the same value admission already refused the booking over, so this
-    // line cannot silently degrade to the UTC sentinel the way it used to — and
-    // there is no second place left where that degradation could reappear.
-    const scheduledStartMs = wallClockToEpochMs(body.date, requestedTime, tenantTz);
-    const slotWindowMin =
-        body.timeSlot === 'all-day' ? 540
-        : body.timeSlot === 'morning' || body.timeSlot === 'afternoon' ? 240
-        : 180;
-    const durationMin = bookedServiceDurationMin ?? slotWindowMin;
-    const scheduledEndMs = scheduledStartMs + durationMin * 60000;
-    try {
-        await db.update(inspections)
-            .set({
-                scheduledStartMs: new Date(scheduledStartMs),
-                scheduledEndMs: new Date(scheduledEndMs),
-                durationMin,
-            })
-            .where(and(
-                inArray(inspections.id, allInspectionIds),
-                eq(inspections.tenantId, tenantId),
-            ));
-    } catch (e) {
-        logger.warn('booking.scheduled-instant.stamp.failed', {
-            inspectionIds: allInspectionIds,
-            error: e instanceof Error ? e.message : String(e),
-        });
     }
 
     // The deposit is resolved and FROZEN here, after the booking has survived

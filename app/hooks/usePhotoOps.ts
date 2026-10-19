@@ -18,6 +18,10 @@ import {
   setPhotoAnnotation as bindingSetPhotoAnnotation,
   markPhotoPending as bindingMarkPhotoPending,
 } from "~/lib/collab/results-binding";
+import { pushToast } from "~/hooks/useToast";
+import { freeVideoMedia, videoEntryIdentity } from "~/lib/video-media-delete";
+import { removeMediaBy as bindingRemoveMediaBy } from "../../server/lib/collab/results-doc-media";
+import { m } from "~/paraglide/messages";
 import { enqueueMedia } from "~/lib/collab/media-upload-queue";
 import { getPendingMedia } from "~/lib/collab/media-pending-store";
 import type { PhotoEntry } from "../../server/lib/collab/results-doc.types";
@@ -413,22 +417,18 @@ export function usePhotoOps(ctx: {
           return;
         }
         if (action === "delete") {
-          patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
-          // Remove the doc entry (the Y.Doc owns results.data). Separately, free
-          // the Stream/R2 backing object via the binary media DELETE — that is a
-          // network op, not the retired CAS results write. DELETE
-          // /{id}/media/video/{ref} accepts a Stream UID or an R2 mediaId and
-          // resolves the backend per provider.
-          const videoRef = photo.provider === "r2" ? photo.mediaId : photo.streamUid;
-          const docKey = photo.originalKey || photo.key;
-          if (collabDoc) {
-            const fk = docFindingKey(itemId, sectionId);
-            if (fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
-          }
-          if (videoRef) {
-            void fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(videoRef)}`, {
-              method: "DELETE",
-              credentials: "include",
+          const { videoRef, docKey, idField, isIt } = videoEntryIdentity(photo, idx);
+          const removeEntry = () => {
+            patchItemPhotos(itemId, (photos) => photos.filter((p, i) => !isIt(p, i)));
+            const fk = collabDoc ? docFindingKey(itemId, sectionId) : null;
+            if (collabDoc && fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
+            else if (collabDoc && fk && videoRef) bindingRemoveMediaBy(collabDoc, fk, idField, videoRef);
+          };
+          if (!videoRef) removeEntry();
+          else {
+            void freeVideoMedia(state.inspection.id, videoRef).then((freed) => {
+              if (freed) removeEntry();
+              else if (freed === false) pushToast({ message: m.editor_video_delete_failed(), variant: "error", durationMs: 6000 });
             });
           }
           return;

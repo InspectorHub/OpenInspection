@@ -9,9 +9,13 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { isAdminRole } from '../lib/auth/roles';
 import { canViewOthersCalendar } from '../lib/calendar/view-others';
 import { getDrizzle, type AppDrizzle } from '../lib/route-helpers';
+import { findTimeOffConflicts } from '../lib/schedule-conflicts';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 import {
     CalendarBlockErrorSchema,
     CalendarBlockListResponseSchema,
+    ConflictsQuerySchema,
+    ConflictsResponseSchema,
     CalendarBlockParamsSchema,
     CalendarBlockResponseSchema,
     CreateCalendarBlockSchema,
@@ -55,6 +59,25 @@ const createBlockRoute = createRoute(withMcpMetadata({
     },
     security: [{ bearerAuth: [] }],
 }, { scopes: ['write'], tier: 'primary' }));
+
+const blockConflictsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/blocks/conflicts',
+    operationId: 'previewCalendarBlockConflicts',
+    tags: ['calendar'],
+    summary: 'Preview the booked inspections a block would cover',
+    description: 'Answers, before anything is saved, which booked inspections (not cancelled) a block of time off on a civil date would cover: an id, a date and a time window each, nothing else. Informational only; creating the block never requires it. Inspectors can ask about themselves; owners, managers and anyone holding the scheduleOthers capability about another user.',
+    middleware: [allowedRoles],
+    request: { query: ConflictsQuerySchema },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: ConflictsResponseSchema } },
+            description: 'The covered inspections, possibly none',
+        },
+        ...errorResponses,
+    },
+    security: [{ bearerAuth: [] }],
+}, { scopes: ['read'], tier: 'extended' }));
 
 const listBlocksRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -182,7 +205,21 @@ const calendarBlockRoutes = createApiRouter()
         }).returning().get();
 
         pushBlockAfterResponse(c, tenantId, block.id);
-        return c.json({ success: true as const, data: { block: serializeBlock(block) } }, 201);
+        const conflicts = await findTimeOffConflicts(db, tenantId, targetUserId, await resolveInspectionScope(c), block);
+        return c.json({ success: true as const, data: { block: serializeBlock(block), conflicts } }, 201);
+    })
+    .openapi(blockConflictsRoute, async (c) => {
+        const user = c.get('user');
+        const tenantId = c.get('tenantId');
+        const query = c.req.valid('query');
+        const targetUserId = query.userId ?? user.sub;
+        if (targetUserId !== user.sub && !await canViewOthersCalendar(c)) {
+            return c.json(errorResponse('Inspectors can only check their own calendar', 'FORBIDDEN'), 403);
+        }
+        const conflicts = await findTimeOffConflicts(getDrizzle(c), tenantId, targetUserId, await resolveInspectionScope(c), {
+            date: query.date, allDay: query.allDay === 'true', startTime: query.startTime, endTime: query.endTime,
+        });
+        return c.json({ success: true as const, data: { conflicts } }, 200);
     })
     .openapi(listBlocksRoute, async (c) => {
         const user = c.get('user');
@@ -259,7 +296,8 @@ const calendarBlockRoutes = createApiRouter()
             .get();
 
         pushBlockAfterResponse(c, tenantId, block.id);
-        return c.json({ success: true as const, data: { block: serializeBlock(block) } }, 200);
+        const conflicts = await findTimeOffConflicts(db, tenantId, block.userId, await resolveInspectionScope(c), block);
+        return c.json({ success: true as const, data: { block: serializeBlock(block), conflicts } }, 200);
     })
     .openapi(deleteBlockRoute, async (c) => {
         const user = c.get('user');

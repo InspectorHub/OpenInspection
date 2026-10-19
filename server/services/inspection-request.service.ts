@@ -39,6 +39,11 @@ export interface CreateRequestInput {
     // `?ref=<agentSlug>` to a contacts.id; copied onto every child
     // inspection so dashboards + emails can credit the agent.
     referredByAgentId?: string | null;
+    /**
+     * The booked length and precise instants, written in the same insert as the rows so a row is
+     * never visible without them (the public booking's arbitration compares recorded windows).
+     */
+    schedule?: { durationMin: number; scheduledStartMs: Date; scheduledEndMs: Date };
 }
 
 export interface CreateSubInspectionInput {
@@ -171,6 +176,7 @@ export class InspectionRequestService {
                 price:                    s.price ?? 0,
                 requestId,
                 createdAt:                now,
+                ...(input.schedule ?? {}),
             };
         });
 

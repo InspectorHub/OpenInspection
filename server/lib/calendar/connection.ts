@@ -205,20 +205,6 @@ export async function markCalendarSyncFailed(
         ));
 }
 
-export async function deleteCalendarConnection(
-    db: D1Database,
-    tenantId: string,
-    userId: string,
-    provider?: CalendarProviderId,
-): Promise<void> {
-    const drizzleDb = drizzle(db);
-    await drizzleDb.delete(calendarConnections).where(and(
-        eq(calendarConnections.tenantId, tenantId),
-        eq(calendarConnections.userId, userId),
-        ...(provider ? [eq(calendarConnections.provider, provider)] : []),
-    ));
-}
-
 export async function userHasCalendarConnection(
     db: D1Database,
     tenantId: string,

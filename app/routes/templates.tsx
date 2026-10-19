@@ -6,6 +6,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { Pagination, PageHeader, Icon } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { usePagination } from "~/hooks/usePagination";
 import type { SortKey, Template } from "~/components/templates/types";
 import { TemplatesListView } from "~/components/templates/TemplatesListView";
@@ -218,6 +219,7 @@ export default function TemplatesPage() {
   return (
     <div className="space-y-ih-list">
       <Breadcrumb items={[{ label: m.templates_breadcrumb_library(), href: "/library" }, { label: m.templates_breadcrumb_current() }]} />
+      <ActionFailureAlert result={fetcher.data as { ok?: boolean; intent?: string } | undefined} intents={["delete"]} busy={writing}>{m.common_delete_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.templates_list_heading()}
         meta={metaParts.join(" · ")}

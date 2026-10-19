@@ -12,6 +12,7 @@ import { ContactModal } from "~/components/contacts/ContactModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { ROLE_KINDS, type RoleKind } from "../../server/lib/people/role-kinds";
 import { m } from "~/paraglide/messages";
 
@@ -114,7 +115,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "delete") {
     const id = form.get("id") as string;
     const res = await api.contacts[":id"].$delete({ param: { id } });
-    return { ok: res.ok };
+    return { ok: res.ok, intent: "delete" };
   }
 
   if (intent === "restore") {
@@ -156,7 +157,7 @@ export default function ContactsPage() {
   // #106 - archiving a contact can revoke every report they can still open,
   // and restore puts it back. One guard: both fire from row controls that
   // are disabled while it is busy.
-  const { submit: submitArchive, busy: archiveBusy } = useGuardedSubmit<{ ok?: boolean }>();
+  const { fetcher: archiveFetcher, submit: submitArchive, busy: archiveBusy } = useGuardedSubmit<{ ok?: boolean; intent?: string }>();
   // IA-100 — how many reports this person can still open, fetched only for the
   // contact actually being archived, plus whether this tenant treats archiving
   // as revoking.
@@ -199,6 +200,7 @@ export default function ContactsPage() {
 
   return (
     <div className="space-y-ih-list">
+      <ActionFailureAlert result={archiveFetcher.data} intents={["delete"]} busy={archiveBusy}>{m.common_archive_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.contacts_label_contacts()}
         meta={metaLine}

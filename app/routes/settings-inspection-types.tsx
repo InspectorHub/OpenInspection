@@ -87,6 +87,8 @@ export default function SettingsInspectionTypes() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  // A write the server refused (or that never reached it); shown until the next attempt.
+  const [writeFailed, setWriteFailed] = useState(false);
   // Two clicks inside one frame both run before `saving` renders.
   const saveInFlight = useRef(false);
   useEffect(() => { if (!saving) saveInFlight.current = false; }, [saving]);
@@ -97,12 +99,14 @@ export default function SettingsInspectionTypes() {
   function openAdd() {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setWriteFailed(false);
     setModalOpen(true);
   }
 
   function openEdit(ot: OrgSubtype) {
     setEditingId(ot.id);
     setForm({ name: ot.name, basedOn: ot.basedOn, description: ot.description });
+    setWriteFailed(false);
     setModalOpen(true);
   }
 
@@ -118,13 +122,15 @@ export default function SettingsInspectionTypes() {
     const url = editingId
       ? `/api/admin/inspection-types/${editingId}`
       : "/api/admin/inspection-types";
+    setWriteFailed(false);
     const res = await fetch(url, {
       method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify(body),
-    });
-    if (res.ok) {
+    }).catch(() => null);
+    if (!res?.ok) setWriteFailed(true);
+    else {
       if (editingId) {
         const id = editingId;
         setOrgSubtypes((prev) =>
@@ -148,14 +154,16 @@ export default function SettingsInspectionTypes() {
 
   async function toggleOrg(ot: OrgSubtype) {
     const next = !ot.enabled;
+    setWriteFailed(false);
     // busy-controls-allow: both clicks in one frame read the same ot.enabled and send the same explicit { enabled: next }; PUT /api/admin/inspection-types/:id applies that value with a tenant-scoped UPDATE (no toggle on the server), so a repeat rewrites the same value
     const res = await fetch(`/api/admin/inspection-types/${ot.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify({ enabled: next }),
-    });
-    if (res.ok) {
+    }).catch(() => null);
+    if (!res?.ok) setWriteFailed(true);
+    else {
       const id = ot.id;
       setOrgSubtypes((prev) =>
         prev.map((o) => (o.id === id ? { ...o, enabled: next } : o)),
@@ -166,6 +174,8 @@ export default function SettingsInspectionTypes() {
   return (
     <div className="space-y-ih-list">
       <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_inspection_types_crumb() }]} />
+
+      {!modalOpen && writeFailed && <p role="alert" className="text-[12px] font-medium text-ih-bad-fg">{m.settings_inspection_types_write_failed()}</p>}
 
       {/* Platform subtypes */}
       <section className="space-y-3">
@@ -311,6 +321,7 @@ export default function SettingsInspectionTypes() {
         }
       >
         <div className="space-y-3">
+              {modalOpen && writeFailed && <p role="alert" className="text-[12px] font-medium text-ih-bad-fg">{m.settings_inspection_types_write_failed()}</p>}
               <div>
                 <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                   {m.settings_inspection_types_name_label()}

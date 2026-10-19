@@ -131,5 +131,10 @@
   "settings_event_types_followup_hours": "{hours} h",
   "settings_event_types_followup_immediate": "De inmediato",
   "settings_event_types_followup_label": "Retraso del seguimiento (horas)",
-  "settings_event_types_followup_hint": "Horas que pasan desde que se completa una visita hasta que sale su seguimiento. 0 lo envía de inmediato."
+  "settings_event_types_followup_hint": "Horas que pasan desde que se completa una visita hasta que sale su seguimiento. 0 lo envía de inmediato.",
+  "settings_event_types_delete_failed": "No se pudo eliminar el tipo de evento. Inténtelo de nuevo.",
+  "settings_inspection_types_write_failed": "No se pudo guardar el cambio. No se modificó nada; inténtelo de nuevo.",
+  "settings_event_types_delete_title": "¿Eliminar este tipo de evento?",
+  "settings_event_types_delete_message_inactive": "¿Eliminar \"{name}\"? Ya está desactivado. Si hay visitas que lo usan, permanece en ellas; si ninguna visita lo usa, se elimina de forma definitiva. Esta acción no se puede deshacer.",
+  "settings_event_types_delete_message": "¿Eliminar \"{name}\"? Si ya hay visitas que lo usan, se desactiva en su lugar: permanece en esas visitas, pero ya no se puede elegir para visitas nuevas. Si ninguna visita lo usa, se elimina de forma definitiva. Esta acción no se puede deshacer."
 }

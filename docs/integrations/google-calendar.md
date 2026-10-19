@@ -47,6 +47,44 @@ The trade is stated rather than hidden: a push that fails is logged, not
 surfaced as an error on the save that triggered it. If an event is missing from
 someone's calendar, the sync status on their profile is the place to look.
 
+## Disconnecting, and entries left behind
+
+Busy time imported from a calendar is stored as date overrides that carry the
+calendar they came from (`availability_overrides.source`). Disconnecting a
+calendar (`DELETE /api/calendar/disconnect`, optionally `?provider=google` or
+`?provider=apple`) removes, in one atomic batch scoped to the caller and their
+company: the connection, the overrides imported from it, the read-calendar
+choices and the links to events on the calendar. Without `provider` every
+provider the caller is connected to is disconnected. Hand-entered overrides are
+never touched, and events in the external calendar are not changed.
+
+The scope of each delete is chosen inside the statement itself, so a reconnect
+that lands while a disconnect is running is cleaned too rather than left with
+orphaned read-calendar rows. A sync that was already in flight cannot put the
+imported rows back: it writes only while the person is connected, and removes
+what it wrote if the connection went away meanwhile. Each disconnect that
+removed anything is recorded in the audit log as `calendar.disconnect`, with the
+provider and how many connections, imported busy blocks, read-calendar choices
+and event links were removed (counts only).
+
+Entries imported by older releases could outlive their connection, because
+disconnecting used to delete only the connection row. A daily job
+(`calendar-orphan-sweep`) removes imported overrides that have no connection for
+the same company, user and provider, up to 200 per run and idempotently; it
+reaches those leftovers on its own, so no manual step is needed. To see whether a
+deployment has any, run this read-only query:
+
+```sql
+SELECT ao.source, COUNT(*) AS orphans
+FROM availability_overrides ao
+WHERE ao.source IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM calendar_connections cc
+    WHERE cc.tenant_id = ao.tenant_id AND cc.user_id = ao.inspector_id AND cc.provider = ao.source
+  )
+GROUP BY ao.source;
+```
+
 ## When it is not configured
 
 The Calendar section shows nothing to connect, and inspectors schedule entirely
@@ -61,6 +99,7 @@ dentist appointment in someone's personal calendar.
 - `server/lib/calendar/push-hooks.ts` — the detached write seam
 - `server/lib/calendar/registry.ts` — provider lookup by id
 - `server/lib/calendar/sync-engine.ts`, `sync-sweep.ts` — reconciliation
+- `server/lib/calendar/disconnect.ts`, `orphan-sweep.ts` — what disconnecting removes, and the daily cleanup of what older releases left
 
 `CalendarProviderId` also declares `'microsoft'`. There is no implementation:
 the registry holds `google` and `apple` only, and `getCalendarProvider` throws

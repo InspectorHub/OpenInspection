@@ -30,12 +30,12 @@ export async function action({ request, context }: Route.ActionArgs): Promise<Ag
   const headers = { "x-token-relay": "1" };
   try {
     if (intent === "notice-mark-all-read") {
-      await api.agentNotices.notices["mark-read"].$post({ json: {} }, { headers });
-      return { ok: true, intent };
+      const res = await api.agentNotices.notices["mark-read"].$post({ json: {} }, { headers });
+      return res.ok ? { ok: true, intent } : { ok: false, intent };
     }
     if (intent === "notice-dismiss" && noticeId) {
-      await api.agentNotices.notices[":id"].$delete({ param: { id: noticeId } }, { headers });
-      return { ok: true, intent };
+      const res = await api.agentNotices.notices[":id"].$delete({ param: { id: noticeId } }, { headers });
+      return res.ok ? { ok: true, intent } : { ok: false, intent };
     }
     if (intent === "notice-optin-link" && noticeId) {
       const res = await api.agentNotices.notices[":id"]["optin-link"].$get({ param: { id: noticeId } }, { headers });

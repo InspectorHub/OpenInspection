@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { removeMediaBy } from '../../../server/lib/collab/results-doc-media';
 import * as Y from 'yjs';
 import {
   seedResultsDoc,
@@ -8,6 +9,7 @@ import {
   appendPhoto,
   updatePhoto,
   removePhoto,
+  pushPendingPhoto,
   revertPhoto,
   replacePhoto,
   reorderPhotos,
@@ -472,6 +474,22 @@ describe('results-doc', () => {
     removePhoto(doc, FK, 'p1');
 
     expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key)).toEqual(['p2']);
+  });
+
+  it('removeMediaBy deletes a keyless video by its stream uid or media id, and only that one', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    // Keyless entries: appendPhoto would merge them by key, so they are pushed by their own id.
+    pushPendingPhoto(doc, FK, { key: '', pendingId: 'a', mediaType: 'video', provider: 'stream', streamUid: 'u1' });
+    appendPhoto(doc, FK, { key: 'p1' });
+    pushPendingPhoto(doc, FK, { key: '', pendingId: 'b', mediaType: 'video', provider: 'r2', mediaId: 'm2' });
+    pushPendingPhoto(doc, FK, { key: '', pendingId: 'c', mediaType: 'video', provider: 'stream', streamUid: 'u3' });
+
+    removeMediaBy(doc, FK, 'streamUid', 'u1');
+    removeMediaBy(doc, FK, 'mediaId', 'm2');
+    removeMediaBy(doc, FK, 'streamUid', 'absent');
+
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key + '|' + (p.streamUid ?? ''))).toEqual(['p1|', '|u3']);
   });
 
   it('#181 PR-G a pending PhotoEntry round-trips through projectResults/loadResultsProjection', () => {

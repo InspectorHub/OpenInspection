@@ -6,6 +6,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { DefectCategoryEditor, type EditorDefectCategory } from "~/components/DefectCategoryEditor";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
@@ -75,6 +76,7 @@ export default function DefectCategoriesPage() {
       {loadFailed && <LoadFailedNotice />}
 
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_defect_heading() }]} />
+      <ActionFailureAlert result={deleteFetcher.data} intents={["delete"]} busy={deleting}>{m.common_delete_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.library_defect_heading()}
         meta={categories.length === 1 ? m.library_defect_meta_one({ count: categories.length }) : m.library_defect_meta_other({ count: categories.length })}

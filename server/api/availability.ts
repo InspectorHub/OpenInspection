@@ -17,6 +17,9 @@ import {
 import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { getDrizzle } from '../lib/route-helpers';
+import { auditFromContext } from '../lib/audit';
+import { findTimeOffConflicts } from '../lib/schedule-conflicts';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 
 /**
  * GET /api/availability
@@ -117,7 +120,7 @@ const createOverrideRoute = createRoute(withMcpMetadata({
     operationId: 'createAvailabilityOverride',
     tags: ['bookings'],
     summary: 'Create an availability override',
-    description: 'Adds a single availability override (block a date, add an unusual slot). Admins may create overrides for any inspector; others only for themselves.',
+    description: 'Adds a single availability override (block a date, add an unusual slot). The response lists any booked inspections a blocking override covers under conflicts; that is information only, nothing is refused. Admins may create overrides for any inspector; others only for themselves.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         body: {
@@ -149,7 +152,7 @@ const deleteOverrideRoute = createRoute(withMcpMetadata({
     operationId: 'deleteAvailabilityOverride',
     tags: ['bookings'],
     summary: 'Delete an availability override',
-    description: 'Removes the specified availability override entry, restoring the default recurring schedule for that date.',
+    description: 'Removes a manual availability override, restoring the default recurring schedule for that date. Owners and managers may remove any; an inspector only their own (403 otherwise). An entry synced from a connected calendar is managed by that connection and is refused with 409. The removal is written to the audit log.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('UUID of the availability override entry to delete.') }),
@@ -163,6 +166,9 @@ const deleteOverrideRoute = createRoute(withMcpMetadata({
             },
             description: 'Success',
         },
+        403: { description: 'An inspector tried to remove an override that belongs to another inspector' },
+        404: { description: 'No such override in this company' },
+        409: { description: 'The entry is synced from a connected calendar and cannot be removed here' },
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
@@ -255,13 +261,30 @@ export const availabilityRoutes = createApiRouter()
             inspectorId
         });
 
-        return c.json({ success: true, data: { override: override } }, 201);
+        // Information only, never a condition: a blocking override over booked inspections is
+        // allowed, and the caller is told which they are. Extra hours cover nothing.
+        const conflicts = override.isAvailable
+            ? []
+            : await findTimeOffConflicts(getDrizzle(c), tenantId, inspectorId, await resolveInspectionScope(c), {
+                date: override.date, allDay: !override.startTime || !override.endTime, startTime: override.startTime, endTime: override.endTime,
+            });
+        return c.json({ success: true, data: { override: override, conflicts } }, 201);
     })
     .openapi(deleteOverrideRoute, async (c) => {
         const tenantId = c.get('tenantId');
+        const user = c.get('user');
         const { id } = c.req.valid('param');
         const service = c.var.services.availability;
+        // The same rule as creating one: an owner or manager for anyone, an inspector for their own.
+        const existing = await service.getOverride(tenantId, id);
+        if (existing.inspectorId !== user.sub && !isAdminRole(c.get('userRole'))) {
+            throw deniedByRule(c, 'You can only manage your own availability', 'An owner or manager');
+        }
         await service.deleteOverride(tenantId, id);
+        auditFromContext(c, 'availability.override.delete', 'availability_override', {
+            entityId: id,
+            metadata: { date: existing.date, kind: existing.isAvailable ? 'extra-hours' : 'manual', inspectorId: existing.inspectorId },
+        });
         return c.json({ success: true }, 200);
     });
 

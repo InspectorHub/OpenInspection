@@ -260,7 +260,7 @@ const INVENTORY = [
             + "a repair cost and not a negotiation amount — the same category as the deposit." },
     { kind: "control", id: "app/components/settings/services/ServiceFields.tsx", disposition: "allowed",
       reason: "Service catalogue: the tenant's list price." },
-    { kind: "control", id: "app/routes/settings-event-types.tsx", disposition: "allowed",
+    { kind: "control", id: "app/components/settings/EventTypeFields.tsx", disposition: "allowed",
       reason: "Booking: default fee per event type." },
     { kind: "control", id: "app/components/MoneyInput.test.tsx", disposition: "allowed",
       reason: "The control's own test." },

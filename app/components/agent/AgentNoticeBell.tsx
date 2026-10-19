@@ -62,6 +62,7 @@ export function AgentNoticeBell({ notices, unread }: { notices: NoticeRowData[];
       onDismiss={(id) => submit("notice-dismiss", id)}
       onRemedy={onRemedy}
       busy={busy}
+      error={fetcher.data?.ok === false ? (fetcher.data.intent === "notice-optin-link" ? m.notice_optin_failed() : m.notice_write_failed()) : undefined}
     />
   );
 }

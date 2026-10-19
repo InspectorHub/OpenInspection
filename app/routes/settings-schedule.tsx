@@ -39,6 +39,7 @@ interface DateOverride {
   isAvailable: boolean;
   startTime: string | null;
   endTime: string | null;
+  source: "google" | "apple" | null;
 }
 
 function civilToday(): string {
@@ -221,7 +222,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.availability.overrides[":id"].$delete({
       param: { id: String(form.get("id")) },
     });
-    return { ok: res.ok, intent };
+    if (res.ok) return { ok: true, intent };
+    // 403 (a colleague's row) and 409 (a synced row) carry a reason the person can act on; anything else stays generic.
+    const body = res.status === 403 || res.status === 409
+      ? ((await res.json().catch(() => null)) as { error?: { message?: string } } | null)
+      : null;
+    return { ok: false, intent, message: body?.error?.message ?? null };
   }
 
   if (intent === "calendar-sync") {
@@ -238,7 +244,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "calendar-disconnect") {
-    const res = await api.calendar.disconnect.$delete();
+    const provider = form.get("provider");
+    const res = await api.calendar.disconnect.$delete({ query: provider === "google" || provider === "apple" ? { provider } : {} });
     const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
     return {
       ok: res.ok,
@@ -317,6 +324,7 @@ export default function SettingsSchedulePage() {
         <CalendarConnectPanel
           connected={data.calendar.connected}
           capability={data.calendar.capability}
+          provider={data.calendar.provider}
           oauthConfigured={data.calendar.oauthConfigured}
           lastSyncError={data.calendar.lastSyncError}
           disabled={data.managedInspectorId !== null}

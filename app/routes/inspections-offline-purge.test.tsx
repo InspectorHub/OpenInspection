@@ -82,7 +82,9 @@ function renderDashboard(deleteOk: boolean) {
                 quotaUsage: null,
                 loadFailed: false,
             }),
-            action: () => ({ ok: deleteOk, intent: "delete" }),
+            action: () => (deleteOk
+                ? { ok: true, intent: "delete-many", deleted: ["insp-55"], failed: [] }
+                : { ok: false, intent: "delete-many", deleted: [], failed: [{ id: "insp-55", error: "refused" }] }),
         },
         ],
       },

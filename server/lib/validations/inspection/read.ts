@@ -234,7 +234,8 @@ export const InspectionHubSchema = z.object({
   lifecycle: z.object({
     moneyCollected: z.boolean().describe('Whether any payment has been collected (on the invoice or as a held deposit). A yes or no, never an amount; office staff cannot cancel once it is true.'),
     statusBeforeCancel: z.enum(['requested', 'scheduled', 'confirmed', 'completed']).nullable().describe('For a cancelled inspection, the status it had before it was cancelled; null when it is not cancelled or the cancellation recorded none.'),
-  }).describe('Facts the hub uses to stop offering a cancel or a restore the API would refuse.'),
+    mayDelete: z.boolean().describe('Whether the caller may delete this inspection: the deleteInspection capability, and being its lead inspector or holding scheduleOthers (an owner always may). The delete route enforces the same rule; this only keeps the page from offering what it would refuse.'),
+  }).describe('Facts the hub uses to stop offering a cancel, a restore or a delete the API would refuse.'),
 }).openapi('InspectionHub');
 
 export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHubSchema).openapi('InspectionHubResponse');

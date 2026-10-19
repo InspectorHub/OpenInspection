@@ -19,7 +19,6 @@ import { getCalendarProvider } from '../lib/calendar/registry';
 import {
     CALENDAR_OAUTH_TTL_SEC,
     calendarOAuthKvKey,
-    deleteCalendarConnection,
     getCalendarConnection,
     loadOpenCalendarConnection,
     markCalendarSynced,
@@ -31,6 +30,7 @@ import {
     resolveGoogleOAuthCredentials,
 } from '../lib/calendar/resolve-google-oauth';
 import { getGoogleCalendarStatus } from '../lib/calendar/status';
+import { disconnectAndAudit, DisconnectQuerySchema, DISCONNECT_DESCRIPTION } from '../lib/calendar/disconnect';
 import {
     CALENDAR_OAUTH_MESSAGE,
     renderCalendarOAuthPopupLanding,
@@ -55,17 +55,15 @@ function oauthConnectedLanding(c: Context<HonoConfig>) {
     }), 200);
 }
 
-/**
- * DELETE /api/calendar/disconnect
- * Removes stored calendar connection for the current user.
- */
+/** DELETE /api/calendar/disconnect: disconnects the user's calendar and what it synced. */
 const disconnectRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path: '/disconnect',
     operationId: 'disconnectGoogleCalendar',
     tags: ['calendar'],
-    summary: 'Disconnect Google Calendar integration',
-    description: 'Deletes the encrypted calendar_connections row for the current inspector. Future syncs fail until they reconnect.',
+    summary: 'Disconnect a calendar integration',
+    description: DISCONNECT_DESCRIPTION,
+    request: { query: DisconnectQuerySchema },
     responses: {
         200: {
             content: {
@@ -116,7 +114,7 @@ const calendarRoutes = createApiRouter()
         if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
 
         const tenantId = c.get('tenantId') as string;
-        await deleteCalendarConnection(c.env.DB, tenantId, user.sub);
+        await disconnectAndAudit(c, tenantId, user.sub, c.req.valid('query').provider);
         return c.json({ success: true }, 200);
     })
     .openapi(syncRoute, async (c) => {

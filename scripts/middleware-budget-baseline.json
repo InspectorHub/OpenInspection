@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 160,
-    "dollarMethods": 588,
+    "files": 162,
+    "dollarMethods": 590,
     "apiWorker": 9
   },
   "fanOut": {
@@ -36,6 +36,10 @@
       "apiWorker": 0
     },
     "app/lib/dashboard-setup.server.ts": {
+      "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/lib/inspection-delete.server.ts": {
       "dollarMethods": 2,
       "apiWorker": 0
     },
@@ -224,7 +228,7 @@
       "apiWorker": 0
     },
     "app/routes/inspections.tsx": {
-      "dollarMethods": 8,
+      "dollarMethods": 7,
       "apiWorker": 0
     },
     "app/routes/inspector-portal.tsx": {
@@ -373,6 +377,10 @@
     },
     "app/routes/resources/ai-assist.tsx": {
       "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/routes/resources/block-conflicts.ts": {
+      "dollarMethods": 1,
       "apiWorker": 0
     },
     "app/routes/resources/comments-library.tsx": {

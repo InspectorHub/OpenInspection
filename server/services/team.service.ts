@@ -14,6 +14,7 @@ import { revokeAllUserGrants } from '../lib/mcp/grants';
 import { CREDENTIAL_MARKER_TTL_S } from '../lib/auth/credential-marker';
 import { resetMemberTwoFactor } from './team/reset-two-factor';
 import { planReassignment, runAtomically, type RemovalChoice } from './team/open-assignments';
+import { calendarCleanupWrites } from '../lib/calendar/disconnect';
 
 export class TeamService {
     /**
@@ -374,7 +375,10 @@ export class TeamService {
         // batch, so there is no state with half the inspections moved.
         const softDelete = db.update(users).set({ deletedAt: new Date() })
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-        await runAtomically(db, [...plan.statements, softDelete]);
+        // Their calendar goes in the same batch: a connection left behind keeps syncing, and the busy
+        // blocks it imported keep hiding days from customers.
+        const calendar = calendarCleanupWrites(db, tenantId, userId);
+        await runAtomically(db, [...plan.statements, ...calendar, softDelete]);
 
         // Invalidate the removed member's live sessions immediately, and do
         // it BEFORE the (unguarded) outbox append below. jwtAuthMiddleware

@@ -60,6 +60,7 @@
   "booking_date_error_past": "That date has already passed. Please pick today or a later date.",
   "booking_date_error_too_far": "That date is more than a year away. Please pick a date within the next 12 months.",
   "booking_date_error_invalid": "Please pick a valid date.",
+  "booking_window_none_left": "No {window} times are left on {date}. Try {others}, or pick another date.",
   "booking_date_none_available": "{company} has no times available on {date}. Please pick another date.",
   "booking_field_time_window_label": "Time window",
   "booking_schedule_custom_time_suffix": "on selected date",

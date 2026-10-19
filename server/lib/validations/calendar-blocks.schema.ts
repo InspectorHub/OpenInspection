@@ -69,9 +69,36 @@ const CalendarBlockSchema = z.object({
     updatedAt: z.string().datetime().describe('ISO timestamp when the block was last updated'),
 });
 
+/**
+ * A booked inspection that the time off covers. Non-blocking information: the id, the
+ * civil date and the time window, and nothing about the people or the property.
+ */
+export const TimeOffConflictSchema = z.object({
+    id: z.string().describe('Inspection id'),
+    date: CivilDateSchema,
+    startTime: z.string().nullable().describe('Start HH:mm, or null when the inspection has no time of day'),
+    endTime: z.string().nullable().describe('End HH:mm, or null when the inspection has no time of day'),
+});
+
 export const CalendarBlockResponseSchema = z.object({
     success: z.literal(true),
-    data: z.object({ block: CalendarBlockSchema }),
+    data: z.object({
+        block: CalendarBlockSchema,
+        conflicts: z.array(TimeOffConflictSchema).describe('Booked inspections this block covers. Never required to proceed; shown so the person can decide.'),
+    }),
+});
+
+export const ConflictsQuerySchema = z.object({
+    userId: z.string().min(1).optional().describe('Whose calendar to check. Defaults to the caller; others need owner, manager or scheduleOthers.'),
+    date: CivilDateSchema,
+    allDay: z.enum(['true', 'false']).optional().describe('true to cover the whole day'),
+    startTime: CivilTimeSchema.optional().describe('Start time of a timed block'),
+    endTime: CivilTimeSchema.optional().describe('End time of a timed block'),
+});
+
+export const ConflictsResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({ conflicts: z.array(TimeOffConflictSchema) }),
 });
 
 export const CalendarBlockListResponseSchema = z.object({

@@ -75,6 +75,7 @@ function buildApp(
             hasAnyHours: bookingStubs.hasAnyHours ?? vi.fn().mockResolvedValue(true),
             getQualifiedInspectorIds: bookingStubs.getQualifiedInspectorIds ?? vi.fn().mockResolvedValue([]),
             getTenantSlots: bookingStubs.getTenantSlots ?? vi.fn().mockResolvedValue({ slots: [] }),
+            serviceTotalMinutes: vi.fn().mockResolvedValue(null),
         };
         c.set('services', { booking: fakeBooking } as unknown as HonoConfig['Variables']['services']);
         await next();
@@ -377,7 +378,7 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
         // undefined is deliberate at the call site: the service distinguishes
         // "no ZIP was supplied" from "the caller has not been updated", and
         // reports the former as `geoSkipped: 'property_zip_unknown'`.
-        expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, [], undefined, null);
+        expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, [], undefined, null, 540);
         // inspectorIds must NOT be in the response (private field).
         expect(body.data.slots[0]).not.toHaveProperty('inspectorIds');
     });
@@ -387,7 +388,18 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
         const app = buildApp(db, { getTenantSlots });
         const res = await app.request(`/slots?tenant=${TENANT_SLUG}&date=${TEST_DATE}&serviceIds=svc-1,svc-2`, {}, FAKE_ENV);
         expect(res.status).toBe(200);
-        expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, ['svc-1', 'svc-2'], undefined, null);
+        expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, ['svc-1', 'svc-2'], undefined, null, 540);
+    });
+
+    it('judges slots over the window of the named time slot, and over the widest one when none is named', async () => {
+        const getTenantSlots = vi.fn().mockResolvedValue({ slots: [] });
+        const app = buildApp(db, { getTenantSlots });
+        for (const [timeSlot, min] of [['morning', 240], ['afternoon', 240], ['all-day', 540], ['custom', 180]] as const) {
+            getTenantSlots.mockClear();
+            expect((await app.request(`/slots?tenant=${TENANT_SLUG}&date=${TEST_DATE}&timeSlot=${timeSlot}`, {}, FAKE_ENV)).status).toBe(200);
+            expect(getTenantSlots).toHaveBeenCalledWith(TENANT_ID, TEST_DATE, [], undefined, null, min);
+        }
+        expect((await app.request(`/slots?tenant=${TENANT_SLUG}&date=${TEST_DATE}&timeSlot=evening`, {}, FAKE_ENV)).status).toBe(400);
     });
 
     it('filters slots by inspectorId when provided (client-choice flow)', async () => {

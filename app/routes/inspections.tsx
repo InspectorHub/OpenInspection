@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useLoaderData, useFetcher, useSearchParams, useNavigate, redirect } from "react-router";
+import { useLoaderData, useFetcher, useSearchParams, useNavigate, redirect, data, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { InspectionSearchItem } from "~/routes/resources/inspection-search";
 import type { Route } from "./+types/inspections";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { deleteInspectionsViaApi } from "~/lib/inspection-delete.server";
 import { buildCreateInspectionJson } from "~/lib/inspection-create";
 import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
 import { searchContactsForTypeahead } from "~/lib/contact-search.server";
@@ -29,7 +30,8 @@ import {
 } from "~/lib/dashboard-schema";
 import { matchesFilter, matchesWorkflow, tabMatches, statFocusIds, isStatFocus, shouldShowListControls, type StatFocus } from "~/lib/dashboard-filters";
 import { dedupeBucketMembership, emptyDashboard } from "~/lib/dashboard-buckets";
-import { useOfflinePurgeOnDelete } from "~/hooks/useOfflinePurgeOnDelete";
+import { useBatchDelete } from "~/hooks/useBatchDelete";
+import { BatchDeleteFailures } from "~/components/dashboard/BatchDeleteFailures";
 import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
 import { FiltersDrawer } from "~/components/dashboard/FiltersDrawer";
 import { ColumnsPopover } from "~/components/dashboard/ColumnsPopover";
@@ -151,6 +153,12 @@ function getGreeting() {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
+// A chunk with more behind it (`more=1`) does not re-read the list; the last one does.
+export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  const midBatch = formData?.get("intent") === "delete-many" && formData.get("more") === "1";
+  return midBatch ? false : defaultShouldRevalidate;
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const formData = await request.formData();
@@ -211,10 +219,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await dismissPost().catch(() => null);
     return { ok: res?.ok ?? false, intent: "dismiss-checklist" as const };
   }
-  if (intent === "delete") {
-    const id = formData.get("id") as string;
-    const res = await api.inspections[":id"].$delete({ param: { id } });
-    return { ok: res.ok, intent: "delete" };
+  if (intent === "delete-many") {
+    // ONE request for the whole selection: several submits on one fetcher cancel
+    // each other, and only the last would be seen.
+    const result = await deleteInspectionsViaApi(api, String(formData.get("ids") ?? "").split(","));
+    // More ids than one request may carry: refused whole, nothing deleted.
+    return result.tooMany ? data(result, { status: 400 }) : result;
   }
   if (intent === "status") {
     const id = formData.get("id") as string;
@@ -238,7 +248,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function InspectionsPage() {
-  const { buckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage, loadFailed } = useLoaderData<typeof loader>();
+  const { buckets: loadedBuckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage, loadFailed } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   // Scheduled times render in the viewer's effective zone, resolved once here
   // rather than per row (and never left to the browser — see format-date).
@@ -248,13 +258,28 @@ export default function InspectionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const fetcher = useFetcher();
+  const presentIds = useMemo(() => new Set(Object.values(loadedBuckets).flatMap((items) => (items as Inspection[]).map((i) => i.id))), [loadedBuckets]);
+  const { deleteMany, busy: deleting, hiddenIds, failures: deleteFailures, dismissFailures } = useBatchDelete(
+    presentIds,
+    (failedIds) => setSelectedIds((prev) => new Set([...prev].filter((id) => failedIds.has(id)))),
+  );
+  const addressOf = useMemo(
+    () => new Map(Object.values(loadedBuckets).flatMap((items) => (items as Inspection[]).map((i) => [i.id, i.address || i.propertyAddress || null] as const))),
+    [loadedBuckets],
+  );
+  const buckets = useMemo(() => {
+    if (hiddenIds.size === 0) return loadedBuckets;
+    return Object.fromEntries(
+      Object.entries(loadedBuckets).map(([key, items]) => [key, (items as Inspection[]).filter((i) => !hiddenIds.has(i.id))]),
+    ) as typeof loadedBuckets;
+  }, [loadedBuckets, hiddenIds]);
 
   /* ---- IA-12 Onboarding checklist ---- */
   // Optimistic dismiss: hide immediately on click, persist via BFF.
   const [checklistDismissedOptimistic, setChecklistDismissedOptimistic] = useState(false);
   // #106 - dismissing the checklist is a per-user write. The generic
-  // `fetcher` above stays raw: it is the batch-delete loop, which submits
-  // once per selected id and is exempt for that reason.
+  // `fetcher` above stays raw: it carries the batch delete (one request for the
+  // whole selection) and the status change, both exempt for the reasons at their sites.
   // The card hides itself optimistically on the same click, so there is no
   // control left on screen to leave pending.
   // submit-guard-allow-no-busy: the control this fires is unmounted by the click.
@@ -286,11 +311,19 @@ export default function InspectionsPage() {
 
   /* ---- Server-side search (fetcher + state) ---- */
   const searchFetcher = useFetcher<{ inspections: InspectionSearchItem[]; hasMore: boolean; nextCursor: string | null }>();
-  const [serverResults, setServerResults] = useState<InspectionSearchItem[]>([]);
+  // Pages already fetched, each keyed by the cursor that fetched it (null = the first page). After a
+  // write the router re-reads the URL the fetcher last loaded, which is only the LAST page; that
+  // answer replaces its own page here and leaves the earlier ones alone.
+  const [serverPages, setServerPages] = useState<Array<{ cursor: string | null; items: InspectionSearchItem[] }>>([]);
+  const serverResults = useMemo(
+    () => serverPages.flatMap((p) => p.items).filter((i) => !hiddenIds.has(i.id)),
+    [serverPages, hiddenIds],
+  );
   const [serverCursor, setServerCursor] = useState<string | null>(null);
   const [serverHasMore, setServerHasMore] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isLoadMoreRef = useRef(false);
+  /** The cursor of the page last requested (null for a fresh search). */
+  const requestedCursorRef = useRef<string | null>(null);
 
   /* ---- Columns (persisted in localStorage) ---- */
   // The server cannot read localStorage, so the first render shows the defaults on both sides and the
@@ -420,30 +453,31 @@ export default function InspectionsPage() {
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     if (!searchQuery.trim()) {
-      setServerResults([]);
+      setServerPages([]);
       setServerCursor(null);
       setServerHasMore(false);
       return;
     }
     searchDebounceRef.current = setTimeout(() => {
-      isLoadMoreRef.current = false;
-      setServerResults([]);
+      requestedCursorRef.current = null;
+      setServerPages([]);
       setServerCursor(null);
       searchFetcher.load(`/resources/inspection-search?q=${encodeURIComponent(searchQuery.trim())}`);
     }, 300);
     return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
   }, [searchQuery]); // searchFetcher.load is stable; omitting it avoids infinite loop
 
-  // Apply searchFetcher results (fresh search or load-more append)
+  // Apply searchFetcher results (fresh search, load-more page, or a re-read of the last page)
   useEffect(() => {
     if (searchFetcher.state !== "idle" || !searchFetcher.data) return;
     const d = searchFetcher.data;
-    if (isLoadMoreRef.current) {
-      setServerResults(prev => [...prev, ...d.inspections]);
-      isLoadMoreRef.current = false;
-    } else {
-      setServerResults(d.inspections);
-    }
+    const cursor = requestedCursorRef.current;
+    setServerPages((prev) => {
+      if (cursor === null) return [{ cursor, items: d.inspections }];
+      return prev.some((p) => p.cursor === cursor)
+        ? prev.map((p) => (p.cursor === cursor ? { cursor, items: d.inspections } : p))
+        : [...prev, { cursor, items: d.inspections }];
+    });
     setServerHasMore(d.hasMore ?? false);
     setServerCursor(d.nextCursor ?? null);
   }, [searchFetcher.state, searchFetcher.data]);
@@ -520,23 +554,13 @@ export default function InspectionsPage() {
   /* ---- Batch actions ---- */
   // F55 — a deleted inspection's field data used to survive on the device
   // indefinitely; the hook clears it once the server confirms the delete.
-  const purgeOfflineData = useOfflinePurgeOnDelete(fetcher);
   const canDelete = useCapability("deleteInspection");
   const canScheduleOthers = useCapability("scheduleOthers");
   // Staff book jobs and set the booking's status; they have no setup checklist, no completed visits, and no editor.
   const isStaff = sessionCtx !== null && isStaffRole(sessionCtx.user.role);
   const canOpenEditor = useCapability("editReports");
 
-  const batchDelete = () => {
-    if (selectedIds.size === 0) return;
-    const ids = [...selectedIds];
-    for (const id of ids) {
-      // busy-controls-allow: DELETE /api/inspections/:id resolves the row through getInspection first, which answers 404 once the cascade has removed it, so a repeat writes nothing
-      fetcher.submit({ intent: "delete", id }, { method: "post" });
-    }
-    purgeOfflineData(ids);
-    clearSelection();
-  };
+  const batchDelete = () => { deleteMany([...selectedIds]); };
 
   /* ---- CSV export ---- */
   const exportCsv = useCallback(() => {
@@ -573,7 +597,7 @@ export default function InspectionsPage() {
   /* ---- Server search load-more ---- */
   const handleSearchLoadMore = () => {
     if (!serverHasMore || !serverCursor || !searchQuery.trim()) return;
-    isLoadMoreRef.current = true;
+    requestedCursorRef.current = serverCursor;
     searchFetcher.load(`/resources/inspection-search?q=${encodeURIComponent(searchQuery.trim())}&cursor=${encodeURIComponent(serverCursor)}`);
   };
 
@@ -651,7 +675,7 @@ export default function InspectionsPage() {
       tenantSlug={tenantSlug}
       selectedIds={selectedIds}
       isColumnVisible={isColumnRendered}
-      toggleSelect={toggleSelect}
+      toggleSelect={deleting ? () => {} : toggleSelect}
       transitionStatus={transitionStatus}
       timeZone={displayTz}
       orderStatusesOnly={isStaff} canChangeStatus={!isStaff || canScheduleOthers} canRestore={canScheduleOthers}
@@ -778,15 +802,17 @@ export default function InspectionsPage() {
       />
       </>)}
 
+      <BatchDeleteFailures failures={deleteFailures} addressOf={addressOf} onDismiss={dismissFailures} />
+
       {/* Batch actions bar */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-ih-primary-tint rounded-lg border border-ih-border">
           <span className="text-[13px] font-bold text-ih-primary-text">
             {m.inspections_list_batch_selected({ count: selectedIds.size })}
           </span>
-          {canDelete && <Button variant="danger" size="sm" onClick={batchDelete}>{m.common_delete()}</Button>}
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>{m.inspections_list_batch_select_all()}</Button>
-          <Button variant="ghost" size="sm" onClick={clearSelection}>{m.common_clear()}</Button>
+          {canDelete && <Button variant="danger" size="sm" pending={deleting} onClick={batchDelete}>{m.common_delete()}</Button>}
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => { if (!deleting) selectAll(); }}>{m.inspections_list_batch_select_all()}</Button>
+          <Button variant="ghost" size="sm" onClick={() => { if (!deleting) clearSelection(); }}>{m.common_clear()}</Button>
         </div>
       )}
 

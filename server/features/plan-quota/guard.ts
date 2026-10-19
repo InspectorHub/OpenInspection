@@ -151,8 +151,9 @@ export class PlanQuotaGuard {
   /** Give back what a `consumeInspection` took when the row it was for was never
    *  created (the insert lost a same-id race, or the id belongs to another
    *  workspace). Other tiers / standalone: undo the analytics increment. Free+
-   *  enforced: the counter is a cache of the row count, so re-measure it. */
-  async releaseInspection(tenantId: string): Promise<void> {
+   *  enforced: the counter is a cache of the row count, so re-measure it.
+   *  `quantity` is how many were consumed (a multi-service booking consumes one per service). */
+  async releaseInspection(tenantId: string, quantity = 1): Promise<void> {
     // Runs inside the caller's catch block, where the error that matters is the
     // insert's. A failure here must not replace it, so it is logged and dropped:
     // the counter is a cache that the next create re-measures, and a leftover
@@ -161,7 +162,7 @@ export class PlanQuotaGuard {
       const metering = new MeteringService(this.db);
       const tier = await readTenantTier(this.db, tenantId);
       if (!this.opts.enforced || tier !== 'free') {
-        await metering.record(tenantId, 'inspections', STOCK_PERIOD, -1);
+        await metering.record(tenantId, 'inspections', STOCK_PERIOD, -quantity);
         return;
       }
       const row = await drizzle(this.db).select({ n: count() }).from(inspections).where(eq(inspections.tenantId, tenantId)).get();

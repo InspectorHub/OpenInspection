@@ -13,6 +13,12 @@
  * compile, and `scripts/check-audit-registry.mjs` walks the other direction.
  */
 export type AuditAction =
+    // A manual date override removed from an inspector's availability. Records the date,
+    // whether it blocked the day or added hours, and whose it was; never a name or address.
+    | 'availability.override.delete'
+    // A user disconnected their calendar. Records the provider ('all' when none was named) and how
+    // many connections, imported busy blocks, read-calendar choices and event links were removed.
+    | 'calendar.disconnect'
     | 'inspection.create'
     | 'inspection.delete'
     | 'inspection.status_change'

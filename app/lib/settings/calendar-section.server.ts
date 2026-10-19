@@ -17,6 +17,8 @@ interface ReadableRes {
 export interface CalendarSection {
   connected: boolean;
   capability: CalendarCapability | null;
+  /** The provider of the connection, so a disconnect names it. Never microsoft: nothing implements it. */
+  provider: "google" | "apple" | null;
   oauthConfigured: boolean;
   lastSyncError: string | null;
   picker: CalendarPickerData | null;
@@ -48,6 +50,7 @@ export async function loadCalendarSection(
         data?: {
           connected?: boolean;
           capability?: CalendarCapability | null;
+          provider?: string | null;
           oauthConfigured?: boolean;
           lastSyncError?: string | null;
         };
@@ -86,6 +89,7 @@ export async function loadCalendarSection(
     calendar: {
       connected: status?.connected ?? false,
       capability: status?.capability ?? null,
+      provider: status?.provider === "google" || status?.provider === "apple" ? status.provider : null,
       oauthConfigured: status?.oauthConfigured ?? false,
       lastSyncError: status?.lastSyncError ?? null,
       picker,

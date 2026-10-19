@@ -75,6 +75,8 @@ describe('importBusyForConnection', () => {
             id: USER, tenantId: TENANT, email: 'i@t.com', role: 'inspector',
             passwordHash: 'x', createdAt: new Date(),
         });
+        // The import only writes for a user who is connected.
+        await db.insert(schema.calendarConnections).values(connection as never);
         listBusy.mockReset();
     });
 

@@ -12,12 +12,15 @@ export function MediaViewerToolbar({
   kind,
   edited,
   on,
+  hide,
 }: {
   kind: "photo" | "video";
   edited: boolean;
   on: (a: MediaAction) => void;
+  /** Actions the parent does not handle; they are left out rather than shown dead. */
+  hide?: readonly MediaAction[];
 }) {
-  const btn = (a: MediaAction, label: string) => (
+  const btn = (a: MediaAction, label: string) => hide?.includes(a) ? null : (
     <button
       key={a}
       type="button"
@@ -61,8 +64,10 @@ export interface MediaViewerProps {
   streamCustomerSubdomain?: string | null;
   /** Plan 7 — inspection id, used to build r2-object URLs for R2 videos. */
   inspectionId?: string;
+  /** Toolbar actions the parent does not handle; they are not offered. */
+  hideActions?: readonly MediaAction[];
 }
-export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSubdomain, inspectionId }: MediaViewerProps) {
+export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSubdomain, inspectionId, hideActions }: MediaViewerProps) {
   const viewed = index !== null ? photos[index] : undefined;
   const kind = viewed ? resolveMediaType(viewed) : "photo";
 
@@ -72,6 +77,7 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
           key="tb"
           kind={kind}
           edited={!!viewed.annotated}
+          hide={hideActions}
           on={(a) => {
             onClose();
             onAction(a, viewed);

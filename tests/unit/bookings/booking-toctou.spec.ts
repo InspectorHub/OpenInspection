@@ -240,6 +240,20 @@ describe('B-28 booking TOCTOU', () => {
         }, FAKE_ENV, FAKE_EXEC_CTX);
     }
 
+    it('the booking row carries its length and instants from the INSERT, never from a later update', async () => {
+        // Any update that would stamp a duration onto a row that had none is refused, so a pass proves the
+        // values were written with the row. (A stamp after the insert would leave a window in which a racer
+        // reads the row unstamped and judges it by the older start-time rule.)
+        sqlite.exec(`CREATE TRIGGER no_late_stamp BEFORE UPDATE OF duration_min ON inspections WHEN OLD.duration_min IS NULL BEGIN SELECT RAISE(ABORT, 'late stamp'); END;`);
+        const app = buildApp();
+        const res = await postBook(app, bookingBody({ timeSlot: 'morning' }));
+        expect(res.status).toBe(200);
+        const row = (await db.select().from(inspections).all())[0]!;
+        expect(row.durationMin).toBe(240);
+        expect(row.scheduledStartMs).toBeTruthy();
+        expect(new Date(row.scheduledEndMs as unknown as Date).getTime() - new Date(row.scheduledStartMs as unknown as Date).getTime()).toBe(240 * 60000);
+    });
+
     it('single-service booking stores the full start ISO datetime, not the bare date', async () => {
         const app = buildApp();
         const res = await postBook(app, bookingBody());

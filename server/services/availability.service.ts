@@ -91,14 +91,26 @@ export class AvailabilityService {
     /**
      * Deletes an availability override.
      */
-    async deleteOverride(tenantId: string, id: string) {
-        const db = this.getDrizzle();
-        const existing = await db.select().from(availabilityOverrides).where(and(
+    async getOverride(tenantId: string, id: string) {
+        const existing = await this.getDrizzle().select().from(availabilityOverrides).where(and(
             eq(availabilityOverrides.id, id),
             eq(availabilityOverrides.tenantId, tenantId)
         )).get();
-
         if (!existing) throw Errors.NotFound('Override not found');
-        await db.delete(availabilityOverrides).where(and(eq(availabilityOverrides.id, id), eq(availabilityOverrides.tenantId, tenantId)));
+        return existing;
+    }
+
+    /**
+     * Deletes a MANUAL availability override. A row with a `source` was imported
+     * from a connected calendar and belongs to that connection (the next sync would
+     * bring it back, or disconnecting removes it), so it is refused here.
+     */
+    async deleteOverride(tenantId: string, id: string) {
+        const existing = await this.getOverride(tenantId, id);
+        if (existing.source != null) {
+            throw Errors.Conflict('This entry is synced from a connected calendar. Change it in that calendar, or disconnect the calendar.');
+        }
+        await this.getDrizzle().delete(availabilityOverrides).where(and(eq(availabilityOverrides.id, id), eq(availabilityOverrides.tenantId, tenantId)));
+        return existing;
     }
 }

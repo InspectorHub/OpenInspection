@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { Link, useFetcher } from "react-router";
 import { useFetcherResult } from "~/hooks/useFetcherResult";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
+import type { BlockConflict, BlockConflictsPayload } from "~/routes/resources/block-conflicts";
 import { Drawer, Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { blockFormSeed, type CalendarEvent } from "./calendar-helpers";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -58,6 +63,14 @@ export function BlockTimeDrawer({
   const [notes, setNotes] = useState("");
   const [userId, setUserId] = useState(currentUserId);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Before saving, ask which booked inspections the block would cover. The server never requires the
+  // answer; this is the person's chance to decide. A lookup that cannot be answered does not stop the save.
+  const conflictsFetcher = useFetcher<BlockConflictsPayload>();
+  const locale = useDisplayLocale();
+  const [checking, setChecking] = useState(false);
+  const [covered, setCovered] = useState<BlockConflict[] | null>(null);
+  const checkInFlight = useRef(false);
+  const lastAnswer = useRef<unknown>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +84,7 @@ export function BlockTimeDrawer({
     setNotes(eventValue(block, "notes") ?? "");
     setUserId(eventValue(block, "userId") ?? currentUserId);
     setConfirmDelete(false);
+    setCovered(null);
   }, [block, currentUserId, dateSeed, open]);
 
   useFetcherResult(fetcher, (d) => {
@@ -79,8 +93,30 @@ export function BlockTimeDrawer({
 
   const error = fetcher.data?.ok === false ? fetcher.data.message : null;
 
+  useEffect(() => {
+    if (!checking || conflictsFetcher.state !== "idle" || conflictsFetcher.data === lastAnswer.current) return;
+    lastAnswer.current = conflictsFetcher.data;
+    checkInFlight.current = false;
+    setChecking(false);
+    const found = conflictsFetcher.data?.conflicts ?? [];
+    if (found.length > 0) setCovered(found);
+    else saveBlock();
+    // saveBlock reads the form state of the render this answer arrived in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checking, conflictsFetcher.state, conflictsFetcher.data]);
+
   function submitBlock(event: React.FormEvent) {
     event.preventDefault();
+    if (checkInFlight.current) return;
+    checkInFlight.current = true;
+    lastAnswer.current = conflictsFetcher.data;
+    setChecking(true);
+    const query = new URLSearchParams({ date, userId, allDay: String(allDay) });
+    if (!allDay) { query.set("startTime", startTime); query.set("endTime", endTime); }
+    conflictsFetcher.load(`/resources/block-conflicts?${query.toString()}`);
+  }
+
+  function saveBlock() {
     submit(
       {
         intent: block ? "block-update" : "block-create",
@@ -133,7 +169,7 @@ export function BlockTimeDrawer({
             <button
               type="submit"
               form="block-time-form"
-              {...pendingProps(submitting, undefined)}
+              {...pendingProps(submitting || checking, undefined)}
               className={`h-9 px-4 rounded-md bg-ih-primary text-[13px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 ${PENDING_CLASS}`}
             >
               {submitting ? m.calendar_block_saving() : block ? m.calendar_block_save_changes() : m.calendar_block_time()}
@@ -227,6 +263,31 @@ export function BlockTimeDrawer({
           {error && <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>}
         </form>
       </Drawer>
+
+      <ConfirmDialog
+        open={covered !== null}
+        title={m.calendar_block_conflict_title()}
+        message={(covered?.length ?? 0) === 1
+          ? m.calendar_block_conflict_body_one({ count: 1 })
+          : m.calendar_block_conflict_body_other({ count: covered?.length ?? 0 })}
+        confirmLabel={m.calendar_block_conflict_keep()}
+        cancelLabel={m.calendar_block_conflict_back()}
+        busy={submitting}
+        onConfirm={() => { setCovered(null); saveBlock(); }}
+        onCancel={() => setCovered(null)}
+      >
+        <ul className="mt-3 space-y-1 text-[13px]">
+          {(covered ?? []).map((c) => (
+            <li key={c.id}>
+              <Link to={`/inspections/${c.id}`} className="font-semibold text-ih-primary-text hover:underline">
+                {c.startTime && c.endTime
+                  ? m.calendar_block_conflict_item({ date: formatDate(c.date, { locale, timeZone: "UTC" }), start: c.startTime, end: c.endTime })
+                  : m.calendar_block_conflict_item_untimed({ date: formatDate(c.date, { locale, timeZone: "UTC" }) })}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </ConfirmDialog>
 
       <Modal
         open={confirmDelete}

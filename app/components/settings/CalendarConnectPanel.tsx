@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRevalidator, useSearchParams } from "react-router";
 import { Banner, RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { GoogleSignInButton } from "~/components/GoogleSignInButton";
 import { CalendarGlyph } from "~/components/settings/CalendarGlyph";
 import { calendarOAuthErrorToast } from "~/lib/calendar-oauth-errors";
@@ -22,6 +23,7 @@ export type CalendarCapability = "availability_read" | "events_read_write";
 export function CalendarConnectPanel({
   connected,
   capability: connectedCapability,
+  provider = null,
   oauthConfigured,
   lastSyncError,
   disabled = false,
@@ -29,6 +31,8 @@ export function CalendarConnectPanel({
 }: {
   connected: boolean;
   capability: CalendarCapability | null;
+  /** Which provider the connection is with; sent when disconnecting so only that one goes. */
+  provider?: "google" | "apple" | null;
   oauthConfigured: boolean;
   /** Why the last sync attempt failed; null once one succeeds. */
   lastSyncError?: string | null;
@@ -41,6 +45,7 @@ export function CalendarConnectPanel({
   };
   const [capability, setCapability] = useState<CalendarCapability>("events_read_write");
   const [connecting, setConnecting] = useState(false);
+  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const popupPollRef = useRef<number | null>(null);
   // #106 - a sync pulls the remote calendar and a disconnect drops the stored
   // grant. Two guards so one cannot abort the other.
@@ -129,6 +134,10 @@ export function CalendarConnectPanel({
     }, 400);
   }, [connectHref]);
 
+  const providerName = provider === "apple" ? "Apple" : "Google";
+  const disconnectFailed =
+    disconnectFetcher.state === "idle" && disconnectFetcher.data?.intent === "calendar-disconnect" && disconnectFetcher.data.ok === false;
+
   const syncResult =
     syncFetcher.state === "idle" && syncFetcher.data?.intent === "calendar-sync"
       ? syncFetcher.data
@@ -185,14 +194,29 @@ export function CalendarConnectPanel({
             </button>
             <button
               type="button"
-              {...pendingProps(disconnecting, () =>
-                submitDisconnect({ intent: "calendar-disconnect" }, { method: "post" })
-              )}
+              {...pendingProps(disconnecting, () => setConfirmingDisconnect(true))}
               className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 ${PENDING_CLASS}`}
             >
               {disconnecting ? m.settings_calconnect_disconnecting() : m.settings_calconnect_disconnect()}
             </button>
           </div>
+          {disconnectFailed && (
+            <p role="alert" className="text-[11px] text-ih-bad-fg">
+              {disconnectFetcher.data?.message ?? m.settings_schedule_error_disconnect_failed()}
+            </p>
+          )}
+          <ConfirmDialog
+            open={confirmingDisconnect}
+            title={m.settings_calconnect_disconnect_title({ provider: providerName })}
+            message={m.settings_calconnect_disconnect_message({ provider: providerName })}
+            confirmLabel={m.settings_calconnect_disconnect()}
+            busy={disconnecting}
+            onConfirm={() => {
+              // Closed only when the guard accepted the call, so a refused second click changes nothing.
+              if (submitDisconnect({ intent: "calendar-disconnect", ...(provider ? { provider } : {}) }, { method: "post" })) setConfirmingDisconnect(false);
+            }}
+            onCancel={() => setConfirmingDisconnect(false)}
+          />
           {syncResult && (
             <p
               role={syncResult.ok ? "status" : "alert"}

@@ -131,6 +131,7 @@ export default [
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   route("resources/recent-inspections", "routes/resources/recent-inspections.tsx"),
   route("resources/hub-pickers", "routes/resources/hub-pickers.tsx"),
+  route("resources/block-conflicts", "routes/resources/block-conflicts.ts"),
   route("resources/entity-audit", "routes/resources/entity-audit.tsx"),
   // C3 — the agent bell's writes (its reads ride the agent-layout loader).
   route("resources/agent-notices", "routes/resources/agent-notices.tsx"),

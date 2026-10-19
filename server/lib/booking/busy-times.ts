@@ -14,6 +14,8 @@
 /** A row carrying an inspection `date` (ISO datetime string or Date). */
 export interface BusyRow {
     date: unknown;
+    /** Recorded length of the inspection in minutes; absent or null for legacy rows and rows not yet stamped. */
+    durationMin?: number | null | undefined;
 }
 
 /** A calendar_blocks row used for slot subtraction. */
@@ -29,6 +31,38 @@ export interface CalendarBlockBusy {
  */
 export function computeBusyTimes(rows: BusyRow[]): Set<string> {
     return new Set(rows.map(r => String(r.date).slice(11, 16)));
+}
+
+/**
+ * Adds every candidate slot that falls inside a RECORDED inspection window.
+ *
+ * `computeBusyTimes` marks only the START of an inspection, so a 3-hour inspection
+ * at 09:00 left 10:00 and 11:00 on offer. A row that carries its duration blocks
+ * [start, start + duration); a row without one is left to the start-time rule, so
+ * nothing changes for data that never recorded a length. Slot [s, s + interval)
+ * overlaps the window when s < end and s + interval > start, so an inspection
+ * ending exactly when a slot starts leaves that slot free.
+ *
+ * `windowMin` is how long the CANDIDATE booking would occupy the inspector (the
+ * booked services, or the default window), not the grid step: a slot is offered
+ * only when the whole booking fits.
+ */
+export function addInspectionDurationBusyTimes(
+    busy: Set<string>,
+    rows: BusyRow[],
+    candidateSlots: string[],
+    windowMin: number,
+): void {
+    for (const row of rows) {
+        const raw = String(row.date);
+        if (!row.durationMin || row.durationMin <= 0 || raw.length < 16) continue;
+        const start = parseMinutes(raw.slice(11, 16));
+        const end = start + row.durationMin;
+        for (const slot of candidateSlots) {
+            const slotStart = parseMinutes(slot);
+            if (slotStart < end && slotStart + windowMin > start) busy.add(slot);
+        }
+    }
 }
 
 function parseMinutes(hhmm: string): number {

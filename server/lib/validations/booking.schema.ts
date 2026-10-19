@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { TimeOffConflictSchema } from './calendar-blocks.schema';
 import { createApiResponseSchema } from './shared.schema';
 
 /**
@@ -219,6 +220,8 @@ export const OverrideListResponseSchema = createApiResponseSchema(z.array(z.obje
     endTime: z.string().nullable(),
     inspectorId: z.string().trim().min(1),
     createdAt: z.string(),
+    /** Which connected calendar the row was imported from; null for a manual (hand-entered) override. */
+    source: z.enum(['google', 'apple']).nullable().describe('Calendar provider the entry was synced from, or null for a manual override. Synced entries cannot be removed through this API.'),
 }))).openapi('OverrideListResponse');
 
 export const OverrideResponseSchema = createApiResponseSchema(z.object({
@@ -230,4 +233,5 @@ export const OverrideResponseSchema = createApiResponseSchema(z.object({
         endTime: z.string().nullable(),
         inspectorId: z.string().trim().min(1),
     }),
+    conflicts: z.array(TimeOffConflictSchema).describe('Booked inspections a blocking override covers (empty for extra hours). Informational: creating the override never requires acting on it.'),
 })).openapi('OverrideResponse');

@@ -99,5 +99,12 @@
   "find_a_time_failed": "Availability could not be checked. Try again.",
   "find_a_time_free_count": "{count} free",
   "calendar_open_dispatch": "Dispatch view",
-  "dispatch_scroll_hint": "Scroll sideways to see every inspector."
+  "dispatch_scroll_hint": "Scroll sideways to see every inspector.",
+  "calendar_block_conflict_title": "This overlaps booked inspections",
+  "calendar_block_conflict_body_one": "{count} booked inspection overlaps this time. Blocking the time does not cancel or move it.",
+  "calendar_block_conflict_body_other": "{count} booked inspections overlap this time. Blocking the time does not cancel or move them.",
+  "calendar_block_conflict_item": "{date}, {start}–{end}",
+  "calendar_block_conflict_item_untimed": "{date}, time not set",
+  "calendar_block_conflict_keep": "Block anyway",
+  "calendar_block_conflict_back": "Go back"
 }

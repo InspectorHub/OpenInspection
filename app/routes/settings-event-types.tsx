@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useRevalidator } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-event-types";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { Table, Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
-import { MoneyInput } from "~/components/MoneyInput";
+import { Table, Modal, PENDING_CLASS, pendingProps, useActionLatch } from "@core/shared-ui";
+import { EventTypeFields } from "~/components/settings/EventTypeFields";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
 
 interface EventType {
@@ -59,6 +60,13 @@ const EMPTY_FORM = {
 export default function SettingsEventTypes() {
   const data = useLoaderData<typeof loader>();
   const [types, setTypes] = useState<EventType[]>(data.types as EventType[]);
+  useEffect(() => { setTypes(data.types as EventType[]); }, [data.types]);
+  const revalidator = useRevalidator();
+  const [deleteFailed, setDeleteFailed] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<EventType | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  // Two confirmations in one frame would send two deletes before `deleting` renders.
+  const deleteLatch = useActionLatch(deleting);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -132,14 +140,18 @@ export default function SettingsEventTypes() {
   }
 
   async function confirmDelete(t: EventType) {
+    setDeleteFailed(false);
+    setDeleting(true);
     // busy-controls-allow: DELETE /api/admin/event-types/:id runs EventService.deactivateEventType, which deletes the row or sets active=false by id and answers 200 even when the row is already gone, and the list update only filters by id, so a repeat changes nothing
     const res = await fetch(`/api/admin/event-types/${t.id}`, {
       method: "DELETE",
       credentials: "same-origin",
-    });
-    if (res.ok) {
+    }).catch(() => null);
+    if (res?.ok) {
       setTypes((prev) => prev.filter((x) => x.id !== t.id));
-    }
+      void revalidator.revalidate();
+    } else setDeleteFailed(true);
+    setDeleting(false);
   }
 
   return (
@@ -157,6 +169,8 @@ export default function SettingsEventTypes() {
           {m.settings_event_types_add_button()}
         </button>
       </div>
+
+      {deleteFailed && <p role="alert" className="text-[12px] font-medium text-ih-bad-fg">{m.settings_event_types_delete_failed()}</p>}
 
       {types.length === 0 ? (
         <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
@@ -219,7 +233,7 @@ export default function SettingsEventTypes() {
                       {m.common_edit()}
                     </button>
                     <button
-                      onClick={() => confirmDelete(t)}
+                      onClick={() => { setDeleteFailed(false); setPendingDelete(t); }}
                       className="text-[12px] text-ih-bad-fg hover:underline font-bold"
                     >
                       {m.common_delete()}
@@ -231,6 +245,17 @@ export default function SettingsEventTypes() {
           />
         </div>
       )}
+
+      {/* Deleting removes the type, or switches it off when visits already use it (EventService.deactivateEventType). */}
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={m.settings_event_types_delete_title()}
+        message={pendingDelete ? (pendingDelete.active ? m.settings_event_types_delete_message : m.settings_event_types_delete_message_inactive)({ name: pendingDelete.name }) : ""}
+        confirmLabel={m.common_delete()}
+        busy={deleting}
+        onConfirm={() => deleteLatch(() => { const t = pendingDelete; setPendingDelete(null); if (t) void confirmDelete(t); })}
+        onCancel={() => setPendingDelete(null)}
+      />
 
       {/* Create / Edit modal */}
       <Modal
@@ -255,137 +280,7 @@ export default function SettingsEventTypes() {
           </>
         }
       >
-        <div className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                  {m.settings_event_types_name_label()}
-                </label>
-                <input
-                  ref={nameRef}
-                  type="text"
-                  value={form.name}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, name: e.target.value }))
-                  }
-                  placeholder={m.settings_event_types_name_placeholder()}
-                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                  {m.settings_event_types_slug_label()}
-                </label>
-                <input
-                  type="text"
-                  value={form.slug}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, slug: e.target.value }))
-                  }
-                  placeholder={m.settings_event_types_slug_placeholder()}
-                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 font-mono focus:border-ih-primary focus:shadow-ih-focus outline-none"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    {m.settings_event_types_duration_label()}
-                  </label>
-                  <input
-                    type="number"
-                    value={form.defaultDurationMin}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        defaultDurationMin: Number(e.target.value),
-                      }))
-                    }
-                    min={1}
-                    className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    {m.settings_event_types_price_label()}
-                  </label>
-                  <MoneyInput
-                    cents={Math.round(form.priceDollars * 100)}
-                    onChange={(c) =>
-                      setForm((f) => ({
-                        ...f,
-                        priceDollars: c == null ? 0 : c / 100,
-                      }))
-                    }
-                    ariaLabel={m.settings_event_types_price_label()}
-                    className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    {m.settings_event_types_color_label()}
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={form.color}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, color: e.target.value }))
-                      }
-                      className="w-10 h-10 rounded-md border border-ih-border cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={form.color}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, color: e.target.value }))
-                      }
-                      className="flex-1 px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 font-mono focus:border-ih-primary focus:shadow-ih-focus outline-none"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    {m.settings_event_types_sort_label()}
-                  </label>
-                  <input
-                    type="number"
-                    value={form.sortOrder}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        sortOrder: Number(e.target.value),
-                      }))
-                    }
-                    min={0}
-                    className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                  {m.settings_event_types_followup_label()}
-                </label>
-                <input
-                  type="number"
-                  value={form.followUpDelayHours}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, followUpDelayHours: e.target.value }))
-                  }
-                  min={0}
-                  max={8760}
-                  placeholder="72"
-                  data-testid="event-type-followup-input"
-                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-                />
-                {/* This one earns always-on help: the field's whole subtlety is
-                    that 0 is a setting rather than a blank, which a label and a
-                    placeholder cannot say. */}
-                <p className="mt-1 text-[11px] text-ih-fg-3">
-                  {m.settings_event_types_followup_hint()}
-                </p>
-              </div>
-        </div>
+        <EventTypeFields form={form} setForm={setForm} nameRef={nameRef} />
       </Modal>
     </div>
   );

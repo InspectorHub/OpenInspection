@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { bookingWindowMin, slotSatisfiesWindow } from '../../lib/booking/booking-window';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, tenantConfigs } from '../../lib/db/schema';
@@ -86,30 +87,6 @@ async function resolveProperty(
  * here, and unit tests construct the service with a handle that is not
  * `c.env.DB`.
  */
-/**
- * Whether a slot on the grid falls inside a requested booking window.
- *
- * The boundaries are the ones the product already promises: the picker's own
- * copy and `windowLabelFor` describe morning as before noon and afternoon as
- * noon onward, and all day as flexible timing. Slot times are zero-padded
- * `HH:MM`, so a string compare is a clock compare.
- *
- * `custom` stays EXACT. A caller naming a time is asking for that time, and a
- * request for 10:00 that quietly became 09:00 would be worse than a refusal.
- */
-function satisfiesWindow(
-    slot: string,
-    timeSlot: z.infer<typeof PublicBookingSchema>['timeSlot'],
-    customTime: string | null,
-): boolean {
-    switch (timeSlot) {
-        case 'morning':   return slot < '12:00';
-        case 'afternoon': return slot >= '12:00';
-        case 'all-day':   return true;
-        case 'custom':    return slot === customTime;
-    }
-}
-
 export async function admitBooking(
     c: Context<HonoConfig>,
     db: DrizzleD1Database,
@@ -234,8 +211,11 @@ export async function admitBooking(
     const place = await resolveProperty(c, body.addressPlaceId);
     const propertyZip = place?.zip ?? body.addressZip ?? null;
 
+    // The same length the stored booking will have (fulfillBooking uses bookingWindowMin too), so the slot
+    // accepted here is one the post-insert arbitration accepts.
+    const windowMin = bookingWindowMin(await service.serviceTotalMinutes(tenantId, serviceIdsForQual), body.timeSlot);
     const { slots, outsideServiceArea } = await service.getTenantSlots(
-        tenantId, body.date, serviceIdsForQual, qualifiedIds, propertyZip,
+        tenantId, body.date, serviceIdsForQual, qualifiedIds, propertyZip, windowMin,
     );
     if (outsideServiceArea) {
         throw Errors.Conflict('No inspector currently serves that area. Please contact the company directly to schedule.');
@@ -249,7 +229,7 @@ export async function admitBooking(
     // could not be booked for Morning (the first option in the picker) or for
     // All Day (all the embedded widget can send) on any date at all.
     const target = slots.find(s =>
-        satisfiesWindow(s.time, body.timeSlot, body.customTime ?? null)
+        slotSatisfiesWindow(s.time, body.timeSlot, body.customTime ?? null)
         && (s.inspectorIds ?? []).some(id => !inspectorId || id === inspectorId));
     const freeIds = (target?.inspectorIds ?? []).filter(id => !inspectorId || id === inspectorId);
     if (freeIds.length === 0) {

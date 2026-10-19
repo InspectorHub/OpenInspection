@@ -89,6 +89,7 @@ export const SET_READS: Record<string, Entry> = {
     'GET /api/schedule/day-slots': E('capability-gated', 'scheduleOthers, normalised off for a restricted inspector'),
     'GET /api/tenant/presence/ws': E('projection', 'a restricted viewer receives the roster with every colleague open-inspection id withheld'),
     'GET /api/calendar/blocks': E('no-inspection-data', 'personal time blocks'),
+    'GET /api/calendar/blocks/conflicts': E('scoped-service', 'covered inspections (id, date, time window only) cut to the visible set; another person needs the calendar view rule'),
     'GET /api/calendar/ics-links': E('self-only', 'the caller own feed links'),
     'GET /api/calendar/status': E('no-inspection-data', 'calendar connection state'),
     'GET /api/calendar/read-set': E('no-inspection-data', 'calendar connection state'),

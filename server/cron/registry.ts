@@ -36,7 +36,7 @@ import { automationFlushJob, reminderEnqueueJob } from './jobs/automation';
 import { r2UsageJob, retentionLogsJob } from './jobs/daily';
 import { reportGenerationJob } from './jobs/inspections';
 import {
-    calendarSyncJob, managedComplianceJob, portalOutboxJob, qboCdcJob,
+    calendarOrphanSweepJob, calendarSyncJob, managedComplianceJob, portalOutboxJob, qboCdcJob,
 } from './jobs/integrations';
 import { orphanMediaJob, pendingAttachmentsJob } from './jobs/media';
 import { statutoryRevisionWatchJob } from './jobs/statutory';
@@ -76,4 +76,6 @@ export const CRON_JOBS: CronJob[] = [
     // stops, and it has something to do only in the ticks after an upgrade that
     // moved STARTER_CONTENT_VERSION.
     contentSeedSweepJob,
+    // Added last: it only reaches rows an older release left behind; see the job.
+    calendarOrphanSweepJob,
 ];

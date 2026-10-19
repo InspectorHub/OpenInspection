@@ -5,7 +5,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { DateOverridesPanel } from "./DateOverridesPanel";
 
 describe("DateOverridesPanel", () => {
-  it("is read-only Synced & legacy with no Add block button", () => {
+  it("lists Synced & legacy overrides with no Add block button (new time off is created in Calendar)", () => {
     const router = createMemoryRouter(
       [
         {
