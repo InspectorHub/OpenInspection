@@ -301,3 +301,20 @@ export function lifecycleState(status: string): "actionable" | "completed" | "ca
     if (status === INSPECTION_STATUS.CANCELLED) return "cancelled";
     return "actionable";
 }
+
+/**
+ * What the delete confirmation says about the record, read off the loaded page
+ * (nothing is fetched for it). `moneyCollected` is the server's own verdict.
+ */
+export function deleteFacts(
+    hub: Pick<Hub, 'invoice' | 'agreementRequests'> & { inspection: Pick<Hub['inspection'], 'reportStatus'> },
+    moneyCollected: boolean,
+) {
+    return {
+        reportPublished: isReportPublished(hub.inspection.reportStatus),
+        invoicePresent: !!hub.invoice,
+        paymentReceived: moneyCollected,
+        agreementPresent: hub.agreementRequests.length > 0,
+        agreementSigned: hub.agreementRequests.some((r) => r.status === 'signed'),
+    };
+}

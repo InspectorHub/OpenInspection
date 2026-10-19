@@ -37,6 +37,7 @@ function loaderData(reportStatus: string, canPublishCap: boolean) {
             services: [],
             agreements: [],
             agreementRequests: [],
+            lifecycle: { moneyCollected: false, statusBeforeCancel: null },
             invoice: null,
             reports: [],
             publishReadiness: { ready: true, blockingCount: 0, blockers: [] },

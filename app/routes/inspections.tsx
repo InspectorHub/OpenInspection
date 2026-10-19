@@ -4,6 +4,7 @@ import type { InspectionSearchItem } from "~/routes/resources/inspection-search"
 import type { Route } from "./+types/inspections";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { deleteInspectionViaApi } from "~/lib/inspection-delete.server";
 import { buildCreateInspectionJson } from "~/lib/inspection-create";
 import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
 import { searchContactsForTypeahead } from "~/lib/contact-search.server";
@@ -212,9 +213,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res?.ok ?? false, intent: "dismiss-checklist" as const };
   }
   if (intent === "delete") {
-    const id = formData.get("id") as string;
-    const res = await api.inspections[":id"].$delete({ param: { id } });
-    return { ok: res.ok, intent: "delete" };
+    return deleteInspectionViaApi(api, formData.get("id") as string);
   }
   if (intent === "status") {
     const id = formData.get("id") as string;

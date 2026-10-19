@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useLoaderData, Link, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
+import type { ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useCapability, useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import {
+  deleteFacts,
   deriveBlockStates,
   formatCents,
   isReportShipped,
@@ -25,6 +27,8 @@ import DocumentsSection, {
 import { BlockHeading } from "~/components/inspector-portal/BlockHeading";
 import { ClientSmsConsent } from "~/components/inspector-portal/ClientSmsConsent";
 import { LifecycleCard } from "~/components/inspector-portal/LifecycleCard";
+import { DeleteInspectionBlock } from "~/components/inspector-portal/DeleteInspectionBlock";
+import { deleteInspectionViaApi } from "~/lib/inspection-delete.server";
 import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
 import { SigningRequests } from "~/components/inspector-portal/SigningRequests";
 import { StatutoryDeliverable } from "~/components/statutory/StatutoryDeliverable";
@@ -388,6 +392,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 /*  Action — intent dispatch (mirrors dashboard.tsx)                   */
 /* ------------------------------------------------------------------ */
 
+/** After a delete that worked this page's loader would answer "not found" and replace the page with an error; everything else refreshes as usual. */
+export function shouldRevalidate({ formData, actionResult, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  const deleted = formData?.get("intent") === "delete" && (actionResult as { ok?: boolean } | undefined)?.ok === true;
+  return deleted ? false : defaultShouldRevalidate;
+}
+
 export async function action({ request, params, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const id = params.id;
@@ -397,6 +407,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
   // IA-65 — signing requests live on the inspection now; both intents keep
   // their bodies in inspector-portal-actions beside the People intents.
+  if (intent === "delete") return deleteInspectionViaApi(api, id);
   if (intent === "send-agreement") return handleSendAgreement(api, id, formData);
   if (intent === "inspector-sign") return handleInspectorSign(api, formData);
 
@@ -1267,6 +1278,14 @@ export default function InspectionHubPage() {
         onDelete={onDocDelete}
         uploading={docUploading}
         error={docError}
+      />
+
+      {/* The last thing on the page, apart from everything above: erasing the
+          inspection is not a step in its life. Cancelling is the one with a way back. */}
+      <DeleteInspectionBlock
+        inspectionId={inspection.id}
+        canCancelInstead={access.canCancel}
+        facts={deleteFacts(hub, hub.lifecycle.moneyCollected)}
       />
 
       {/* Send-agreement modal — the shared multi-signer modal (IA-65). Seeded
