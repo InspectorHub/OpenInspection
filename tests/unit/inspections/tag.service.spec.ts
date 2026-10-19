@@ -11,6 +11,7 @@
  *   - delete cascades the item links
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { logger } from '../../../server/lib/logger';
 import { TagService } from '../../../server/services/tag.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -171,5 +172,37 @@ describe('TagService', () => {
 
         const ids = await svc.listInspectionsByTag(TENANT_A, t.id);
         expect(ids.sort()).toEqual([INSPECTION_X, INSPECTION_Y].sort());
+    });
+
+    describe('listWithDefaults seeding log', () => {
+        it('reports how many were inserted and how many were already there', async () => {
+            await svc.create(TENANT_A, { name: 'Critical', color: 'rose' } as never);
+            const info = vi.spyOn(logger, 'info');
+            const out = await svc.listWithDefaults(TENANT_A);
+            expect(out).toHaveLength(5);
+            expect(info).toHaveBeenCalledWith('tags.seeded', { tenantId: TENANT_A, inserted: 4, skipped: 1 });
+            info.mockRestore();
+        });
+
+        it('counts only what this call inserted when a concurrent first load got there first', async () => {
+            const realSelect = testDb.select.bind(testDb);
+            let first = true;
+            vi.spyOn(testDb, 'select').mockImplementation(((...args: unknown[]) => {
+                const builder = (realSelect as unknown as (...a: unknown[]) => { from: (t: unknown) => { where: (w: unknown) => { all: () => Promise<unknown[]> } } })(...args);
+                if (!first) return builder;
+                first = false;
+                // The first read sees no tags; then another request inserts one before this call does.
+                return { from: (t: unknown) => ({ where: (w: unknown) => ({ all: async () => {
+                    const rows = await builder.from(t).where(w).all();
+                    await testDb.insert(schema.tags).values({ id: 'raced', tenantId: TENANT_A, name: 'Critical', color: 'rose', isSeed: true, createdAt: new Date() });
+                    return rows;
+                } }) }) };
+            }) as never);
+            const info = vi.spyOn(logger, 'info');
+            const out = await svc.listWithDefaults(TENANT_A);
+            expect(out).toHaveLength(5);
+            expect(info).toHaveBeenCalledWith('tags.seeded', { tenantId: TENANT_A, inserted: 4, skipped: 1 });
+            info.mockRestore();
+        });
     });
 });

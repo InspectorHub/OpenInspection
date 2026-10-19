@@ -81,15 +81,16 @@ export class TagService {
         const missing = SEED_TAGS.filter(seed => !have.has(seed.name));
         if (missing.length === 0) return sortTagRecords(rows.map(rowToRecord));
         const now = new Date();
-        await db.insert(tags).values(missing.map(seed => ({
+        const inserted = await db.insert(tags).values(missing.map(seed => ({
             id:        crypto.randomUUID(),
             tenantId,
             name:      seed.name,
             color:     seed.color,
             isSeed:    true,
             createdAt: now,
-        }))).onConflictDoNothing(); // a concurrent first load may have inserted them already
-        logger.info('tags.seeded', { tenantId, inserted: missing.length, skipped: SEED_TAGS.length - missing.length });
+        }))).onConflictDoNothing() // a concurrent first load may have inserted some already
+            .returning({ id: tags.id });
+        logger.info('tags.seeded', { tenantId, inserted: inserted.length, skipped: SEED_TAGS.length - inserted.length });
         return this.list(tenantId);
     }
 
