@@ -1,6 +1,6 @@
 import { and, eq, gte, lte } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { availabilityOverrides } from '../db/schema';
+import { availabilityOverrides, calendarConnections } from '../db/schema';
 import { epochMsToRfc3339 } from '../tz';
 import type { BusyBlock, CalendarProviderId } from './provider';
 
@@ -29,6 +29,13 @@ export function isBusyOverrideSource(id: CalendarProviderId): id is BusyOverride
  * Manual overrides (source IS NULL) are never touched, and neither is any
  * OTHER provider's picture: the delete is scoped to `source`, so one provider's
  * sync can never clear another's rows.
+ *
+ * It writes only for a user who is still connected with this provider. A sync
+ * that was in flight when the person disconnected would otherwise put the rows
+ * back after the disconnect had removed them, and nothing would ever clear
+ * them. The connection is checked before anything is written and once more
+ * after, and if it went away in between the rows written by this run are
+ * removed again. A disconnect landing after the last check removes them itself.
  */
 export async function syncProviderBusyOverrides(
     db: DrizzleD1Database,
@@ -46,6 +53,13 @@ export async function syncProviderBusyOverrides(
     const { tenantId, inspectorId, tenantTz, rangeFromMs, rangeToMs, source } = params;
     const minDate = epochMsToRfc3339(rangeFromMs, tenantTz).slice(0, 10);
     const maxDate = epochMsToRfc3339(rangeToMs, tenantTz).slice(0, 10);
+
+    const stillConnected = async () => !!(await db.select({ id: calendarConnections.id }).from(calendarConnections).where(and(
+        eq(calendarConnections.tenantId, tenantId),
+        eq(calendarConnections.userId, inspectorId),
+        eq(calendarConnections.provider, source),
+    )).get());
+    if (!(await stillConnected())) return { upserted: 0 };
 
     // Clear this source's previous picture for this range so events that
     // vanished from the calendar stop blocking.
@@ -93,6 +107,14 @@ export async function syncProviderBusyOverrides(
             set: { date, startTime, endTime, transparency },
         });
         upserted++;
+    }
+    if (!(await stillConnected())) {
+        await db.delete(availabilityOverrides).where(and(
+            eq(availabilityOverrides.tenantId, tenantId),
+            eq(availabilityOverrides.inspectorId, inspectorId),
+            eq(availabilityOverrides.source, source),
+        ));
+        return { upserted: 0 };
     }
     return { upserted };
 }

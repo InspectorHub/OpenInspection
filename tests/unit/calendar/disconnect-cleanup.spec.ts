@@ -19,6 +19,7 @@ import { makeExecutionContext } from '../helpers/exec-ctx';
 import * as schema from '../../../server/lib/db/schema';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { createHarness, TENANT_ID, OWNER_ID, INSPECTOR_ID } from '../helpers/tenant-email-harness';
+import { calendarCleanupWrites } from '../../../server/lib/calendar/disconnect';
 
 const OTHER_TENANT = '11111111-0000-4000-8000-0000000000ff';
 const FOREIGN_USER = '22222222-0000-4000-8000-0000000000ff';
@@ -112,6 +113,51 @@ describe('disconnecting a calendar cleans up what it synced', () => {
             expect((await disconnect('?provider=outlook')).status).toBe(400);
             expect((await ids('calendarConnections')).length).toBe(4);
             expect((await ids('availabilityOverrides')).length).toBe(6);
+        } finally { h.close(); }
+    });
+
+    it('the statements are built without reading anything first, so a reconnect before the batch runs is cleaned too', async () => {
+        const { h, ids } = await setup();
+        try {
+            const built = calendarCleanupWrites(h.db as never, TENANT_ID, INSPECTOR_ID, 'google');
+            // Built synchronously from the scope alone: nothing was read, nothing awaited.
+            expect(Array.isArray(built)).toBe(true);
+            expect(built).toHaveLength(4);
+            // A reconnect lands between building and running the batch: a new connection with a read calendar.
+            // (one connection per user and provider, so the old one is replaced by a new id)
+            await h.db.delete(schema.calendarConnectionReadCalendars).where(eq(schema.calendarConnectionReadCalendars.connectionId, 'c-g'));
+            await h.db.delete(schema.calendarConnections).where(eq(schema.calendarConnections.id, 'c-g'));
+            const now = new Date();
+            await h.db.insert(schema.calendarConnections).values({
+                id: 'c-g2', tenantId: TENANT_ID, userId: INSPECTOR_ID, provider: 'google', authType: 'oauth', credentialsEnc: 'x', credentialsDekEnc: 'y',
+                capabilities: 'availability_read', calendarId: 'primary', connectedAt: now, updatedAt: now,
+            } as never);
+            await h.db.insert(schema.calendarConnectionReadCalendars).values({ id: 'rc-g3', tenantId: TENANT_ID, connectionId: 'c-g2', externalCalendarId: 'cal-g3', createdAt: now, updatedAt: now } as never);
+            // The read-calendar delete selects its connections inside the same statement, so nothing is orphaned.
+            for (const w of built as Array<{ run: () => unknown }>) await w.run();
+            expect(await ids('calendarConnections')).toEqual(['c-a', 'c-foreign', 'c-owner']);
+            expect(await ids('calendarConnectionReadCalendars')).toEqual(['rc-a', 'rc-foreign', 'rc-owner']);
+        } finally { h.close(); }
+    });
+
+    it('records one audit row with counts only', async () => {
+        const { h, disconnect } = await setup();
+        try {
+            expect((await disconnect('?provider=google')).status).toBe(200);
+            const rows = await h.db.select().from(schema.auditLogs).where(eq(schema.auditLogs.action, 'calendar.disconnect')).all();
+            expect(rows).toHaveLength(1);
+            expect(rows[0]!.metadata).toEqual({ provider: 'google', connections: 1, syncedBusyBlocks: 2, readCalendars: 2, eventLinks: 1 });
+            expect(rows[0]!.userId).toBe(INSPECTOR_ID);
+        } finally { h.close(); }
+    });
+
+    it('disconnecting when nothing is connected writes no audit row', async () => {
+        const { h, disconnect } = await setup();
+        try {
+            expect((await disconnect('?provider=google')).status).toBe(200);
+            expect((await disconnect('?provider=google')).status).toBe(200);
+            const rows = await h.db.select().from(schema.auditLogs).where(eq(schema.auditLogs.action, 'calendar.disconnect')).all();
+            expect(rows).toHaveLength(1);
         } finally { h.close(); }
     });
 });

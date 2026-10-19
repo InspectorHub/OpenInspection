@@ -50,8 +50,10 @@ export async function removeOrphanedSyncedOverrides(db: D1Database, limit: numbe
     if (ids.length === 0) return 0;
     const writes = [];
     for (let i = 0; i < ids.length; i += DELETE_CHUNK) {
-        // The source test again: a row that was reconnected meanwhile is not worth deleting by a stale list.
-        writes.push(d.delete(availabilityOverrides).where(and(inArray(availabilityOverrides.id, ids.slice(i, i + DELETE_CHUNK)), isNotNull(availabilityOverrides.source))));
+        // The orphan test is repeated inside the delete: the id list was read earlier, and a row whose user
+        // has connected again since then is no longer an orphan, so a stale list must not remove it.
+        // (The source test is part of it, so a hand-entered row can never be reached from here.)
+        writes.push(d.delete(availabilityOverrides).where(and(inArray(availabilityOverrides.id, ids.slice(i, i + DELETE_CHUNK)), orphanedSynced())));
     }
     await runAtomically(d as never, writes);
     return ids.length;

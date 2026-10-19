@@ -26,7 +26,7 @@
  * value the table actually holds is a lie a reader cannot detect.
  */
 export const AUDIT_FAMILIES = [
-    'agent', 'agreement_request', 'audit_log', 'availability_override', 'bulk_export', 'client', 'comment',
+    'agent', 'agreement_request', 'audit_log', 'availability_override', 'bulk_export', 'calendar_connection', 'client', 'comment',
     'contact', 'contact_role_profile', 'contractor_type', 'credential', 'defect_category',
     'import', 'inspection', 'inspection_item', 'inspection_results',
     'inspector_service_areas', 'library', 'mcp_grant', 'migration_batch',

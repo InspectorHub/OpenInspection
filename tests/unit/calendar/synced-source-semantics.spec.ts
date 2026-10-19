@@ -106,6 +106,14 @@ describe('syncProviderBusyOverrides scopes its delete to its own source', () => 
             id: INSPECTOR, tenantId: TENANT, email: 'i@t.com', role: 'inspector',
             passwordHash: 'x', createdAt: new Date(),
         });
+        // A sync writes only for a connected user, so both providers are connected.
+        const now = new Date();
+        for (const provider of ['google', 'apple'] as const) {
+            await db.insert(schema.calendarConnections).values({
+                id: `conn-${provider}`, tenantId: TENANT, userId: INSPECTOR, provider, authType: provider === 'google' ? 'oauth' : 'caldav',
+                credentialsEnc: 'x', credentialsDekEnc: 'y', capabilities: 'availability_read', calendarId: 'primary', connectedAt: now, updatedAt: now,
+            } as never);
+        }
     });
 
     afterEach(() => sqlite.close());

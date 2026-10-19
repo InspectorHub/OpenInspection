@@ -5504,6 +5504,7 @@
               "audit_log",
               "availability_override",
               "bulk_export",
+              "calendar_connection",
               "client",
               "comment",
               "contact",

@@ -1,6 +1,9 @@
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { z } from '@hono/zod-openapi';
+import type { Context } from 'hono';
+import type { HonoConfig } from '../../types/hono';
+import { auditFromContext } from '../audit';
 import {
     availabilityOverrides,
     calendarConnectionReadCalendars,
@@ -32,59 +35,97 @@ export const DISCONNECT_DESCRIPTION = 'Disconnects the calling user calendar and
  * touched. The external events themselves are not: they live in the other
  * calendar, and no credentials are left to remove them with.
  *
- * Returns the connection ids that were removed.
+ * Returns what was removed, as counts (for the audit record, which never carries names).
  */
+export interface CalendarCleanupCounts {
+    connections: number;
+    syncedBusyBlocks: number;
+    readCalendars: number;
+    eventLinks: number;
+}
+
 export async function disconnectCalendar(
     db: D1Database,
     tenantId: string,
     userId: string,
     provider?: CalendarProviderId,
-): Promise<string[]> {
+): Promise<CalendarCleanupCounts> {
     const d = drizzle(db);
-    const { writes, connectionIds } = await calendarCleanupWrites(d, tenantId, userId, provider);
-    await runAtomically(d as never, writes);
-    return connectionIds;
+    // The counts are a report. The batch below selects its own scope inside each statement, so what it
+    // removes never depends on this read (a reconnect in between is cleaned too, not orphaned).
+    const counts = await countCalendarCleanup(d, tenantId, userId, provider);
+    await runAtomically(d as never, calendarCleanupWrites(d, tenantId, userId, provider));
+    return counts;
+}
+
+/**
+ * The endpoint's disconnect: removes the integration, then records it. The audit row carries the
+ * provider and counts only (no names or addresses), and nothing is recorded when nothing was connected.
+ */
+export async function disconnectAndAudit(c: Context<HonoConfig>, tenantId: string, userId: string, provider?: CalendarProviderId): Promise<void> {
+    const removed = await disconnectCalendar(c.env.DB, tenantId, userId, provider);
+    if (removed.connections + removed.syncedBusyBlocks + removed.readCalendars + removed.eventLinks > 0) {
+        auditFromContext(c, 'calendar.disconnect', 'calendar_connection', { metadata: { provider: provider ?? 'all', ...removed } });
+    }
+}
+
+const scopeOf = (tenantId: string, userId: string, provider?: CalendarProviderId) => and(
+    eq(calendarConnections.tenantId, tenantId),
+    eq(calendarConnections.userId, userId),
+    provider ? eq(calendarConnections.provider, provider) : undefined,
+);
+const linkScopeOf = (tenantId: string, userId: string, provider?: CalendarProviderId) => and(
+    eq(calendarExternalLinks.tenantId, tenantId),
+    eq(calendarExternalLinks.userId, userId),
+    provider ? eq(calendarExternalLinks.provider, provider) : undefined,
+);
+// Synced rows only (source set); a Microsoft connection has no override source, so it matches none.
+const overrideScopeOf = (tenantId: string, userId: string, provider?: CalendarProviderId) => and(
+    eq(availabilityOverrides.tenantId, tenantId),
+    eq(availabilityOverrides.inspectorId, userId),
+    provider === 'google' || provider === 'apple' ? eq(availabilityOverrides.source, provider) : isNotNull(availabilityOverrides.source),
+);
+
+/** How many rows of each kind a cleanup with this scope would remove right now. */
+export async function countCalendarCleanup(
+    d: DrizzleD1Database,
+    tenantId: string,
+    userId: string,
+    provider?: CalendarProviderId,
+): Promise<CalendarCleanupCounts> {
+    const n = async (q: Promise<Array<{ n: number }>>) => (await q)[0]?.n ?? 0;
+    return {
+        connections: await n(d.select({ n: count() }).from(calendarConnections).where(scopeOf(tenantId, userId, provider)).all()),
+        syncedBusyBlocks: await n(d.select({ n: count() }).from(availabilityOverrides).where(overrideScopeOf(tenantId, userId, provider)).all()),
+        readCalendars: await n(d.select({ n: count() }).from(calendarConnectionReadCalendars).where(and(
+            eq(calendarConnectionReadCalendars.tenantId, tenantId),
+            inArray(calendarConnectionReadCalendars.connectionId, d.select({ id: calendarConnections.id }).from(calendarConnections).where(scopeOf(tenantId, userId, provider))),
+        )).all()),
+        eventLinks: await n(d.select({ n: count() }).from(calendarExternalLinks).where(linkScopeOf(tenantId, userId, provider)).all()),
+    };
 }
 
 /**
  * The statements that take a user's calendar integration out of a company, for a
  * caller to run in its own batch (disconnecting, or removing a member together
- * with the soft-delete). Reads the connection ids first; the returned writes are
- * not yet executed. `provider` limits them to one provider; omitted, all.
+ * with the soft-delete). Nothing is read first: the read-calendar delete picks
+ * its connections with a subselect, and it is ordered BEFORE the connection
+ * delete, so the whole removal is decided inside the one atomic batch.
+ * `provider` limits them to one provider; omitted, all.
  */
-export async function calendarCleanupWrites(
+export function calendarCleanupWrites(
     d: DrizzleD1Database,
     tenantId: string,
     userId: string,
     provider?: CalendarProviderId,
-): Promise<{ writes: unknown[]; connectionIds: string[] }> {
-    const connectionScope = and(
-        eq(calendarConnections.tenantId, tenantId),
-        eq(calendarConnections.userId, userId),
-        provider ? eq(calendarConnections.provider, provider) : undefined,
-    );
-    const connectionIds = (await d.select({ id: calendarConnections.id }).from(calendarConnections).where(connectionScope).all())
-        .map((row) => row.id);
-
-    const writes: unknown[] = [
-        d.delete(calendarExternalLinks).where(and(
-            eq(calendarExternalLinks.tenantId, tenantId),
-            eq(calendarExternalLinks.userId, userId),
-            provider ? eq(calendarExternalLinks.provider, provider) : undefined,
+): unknown[] {
+    return [
+        d.delete(calendarExternalLinks).where(linkScopeOf(tenantId, userId, provider)),
+        d.delete(availabilityOverrides).where(overrideScopeOf(tenantId, userId, provider)),
+        d.delete(calendarConnectionReadCalendars).where(and(
+            eq(calendarConnectionReadCalendars.tenantId, tenantId),
+            inArray(calendarConnectionReadCalendars.connectionId, d.select({ id: calendarConnections.id }).from(calendarConnections).where(scopeOf(tenantId, userId, provider))),
         )),
-        // Synced rows only (source set); a Microsoft connection has no override source, so it matches none.
-        d.delete(availabilityOverrides).where(and(
-            eq(availabilityOverrides.tenantId, tenantId),
-            eq(availabilityOverrides.inspectorId, userId),
-            provider === 'google' || provider === 'apple' ? eq(availabilityOverrides.source, provider) : isNotNull(availabilityOverrides.source),
-        )),
-        ...(connectionIds.length > 0
-            ? [d.delete(calendarConnectionReadCalendars).where(and(
-                eq(calendarConnectionReadCalendars.tenantId, tenantId),
-                inArray(calendarConnectionReadCalendars.connectionId, connectionIds),
-            ))]
-            : []),
-        d.delete(calendarConnections).where(connectionScope),
+        d.delete(calendarConnections).where(scopeOf(tenantId, userId, provider)),
     ];
-    return { writes, connectionIds };
 }

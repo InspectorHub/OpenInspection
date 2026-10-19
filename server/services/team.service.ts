@@ -377,8 +377,8 @@ export class TeamService {
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
         // Their calendar goes in the same batch: a connection left behind keeps syncing, and the busy
         // blocks it imported keep hiding days from customers.
-        const calendar = await calendarCleanupWrites(db, tenantId, userId);
-        await runAtomically(db, [...plan.statements, ...calendar.writes, softDelete]);
+        const calendar = calendarCleanupWrites(db, tenantId, userId);
+        await runAtomically(db, [...plan.statements, ...calendar, softDelete]);
 
         // Invalidate the removed member's live sessions immediately, and do
         // it BEFORE the (unguarded) outbox append below. jwtAuthMiddleware

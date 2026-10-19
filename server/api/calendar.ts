@@ -30,7 +30,7 @@ import {
     resolveGoogleOAuthCredentials,
 } from '../lib/calendar/resolve-google-oauth';
 import { getGoogleCalendarStatus } from '../lib/calendar/status';
-import { disconnectCalendar, DisconnectQuerySchema, DISCONNECT_DESCRIPTION } from '../lib/calendar/disconnect';
+import { disconnectAndAudit, DisconnectQuerySchema, DISCONNECT_DESCRIPTION } from '../lib/calendar/disconnect';
 import {
     CALENDAR_OAUTH_MESSAGE,
     renderCalendarOAuthPopupLanding,
@@ -114,7 +114,7 @@ const calendarRoutes = createApiRouter()
         if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
 
         const tenantId = c.get('tenantId') as string;
-        await disconnectCalendar(c.env.DB, tenantId, user.sub, c.req.valid('query').provider);
+        await disconnectAndAudit(c, tenantId, user.sub, c.req.valid('query').provider);
         return c.json({ success: true }, 200);
     })
     .openapi(syncRoute, async (c) => {

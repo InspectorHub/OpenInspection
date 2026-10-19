@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
-import { tenants, users, availabilityOverrides } from '../../../server/lib/db/schema';
+import { tenants, users, availabilityOverrides, calendarConnections } from '../../../server/lib/db/schema';
 import { syncProviderBusyOverrides } from '../../../server/lib/calendar/sync-busy';
 import { and, eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -41,6 +41,12 @@ describe('syncProviderBusyOverrides', () => {
         await db.insert(users).values({
             id: INSP, tenantId: T, email: 'i@x.com', passwordHash: 'h',
             role: 'inspector', name: 'I', createdAt: new Date(),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+        // The sync only writes for a user who is (still) connected.
+        await db.insert(calendarConnections).values({
+            id: 'conn-1', tenantId: T, userId: INSP, provider: 'google', authType: 'oauth', credentialsEnc: 'x', credentialsDekEnc: 'y',
+            capabilities: 'availability_read', calendarId: 'primary', connectedAt: new Date(), updatedAt: new Date(),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any);
     });
@@ -106,5 +112,29 @@ describe('syncProviderBusyOverrides', () => {
         const manual = await db.select().from(availabilityOverrides)
             .where(and(eq(availabilityOverrides.tenantId, T), eq(availabilityOverrides.id, 'manual-1'))).get();
         expect(manual).toBeTruthy();
+    });
+
+    it('writes nothing for a user who has disconnected (an in-flight sync cannot bring the rows back)', async () => {
+        sqlite.prepare('delete from calendar_connections').run();
+        const res = await syncProviderBusyOverrides(db as never, params, [OPAQUE, TRANSPARENT]);
+        expect(res.upserted).toBe(0);
+        expect(await googleRows()).toHaveLength(0);
+    });
+
+    it('a disconnect that lands in the middle of a sync leaves no synced rows behind', async () => {
+        // The second block's start is read after the first row was written; disconnecting there models a
+        // disconnect that ran its cleanup batch while this sync was between its checks.
+        const disconnecting = {
+            ...TRANSPARENT,
+            get start() { sqlite.prepare('delete from calendar_connections').run(); sqlite.prepare("delete from availability_overrides where source = 'google'").run(); return '2026-07-21T14:00:00Z'; },
+        };
+        await syncProviderBusyOverrides(db as never, params, [OPAQUE, disconnecting, { ...OPAQUE, externalId: 'evt-late', start: '2026-07-22T09:00:00Z', end: '2026-07-22T10:00:00Z' }]);
+        expect(await googleRows()).toHaveLength(0);
+    });
+
+    it('a connection of another provider does not count: an apple sync writes nothing while only google is connected', async () => {
+        const res = await syncProviderBusyOverrides(db as never, { ...params, source: 'apple' }, [OPAQUE]);
+        expect(res.upserted).toBe(0);
+        expect(await db.select().from(availabilityOverrides).all()).toHaveLength(0);
     });
 });

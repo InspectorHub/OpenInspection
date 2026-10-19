@@ -29,9 +29,10 @@ const I = {
     colleague: '77777777-0000-4000-8000-000000000005', // someone else's 09:00
     foreign: '77777777-0000-4000-8000-000000000006',   // other company, same day
     untimed: '77777777-0000-4000-8000-000000000007',   // date only, no time of day
+    late: '77777777-0000-4000-8000-000000000008',      // 22:00, no recorded length (assumed 3 hours: runs past midnight)
 };
 
-async function setup(opts: { withUntimed?: boolean } = {}) {
+async function setup(opts: { withUntimed?: boolean; withLate?: boolean } = {}) {
     const h = await createHarness('standalone');
     const now = new Date();
     await h.db.insert(schema.users).values({ id: OTHER_INSPECTOR, tenantId: TENANT_ID, email: 'ines@x.test', passwordHash: 'h', role: 'inspector', name: 'Ines', createdAt: now });
@@ -48,6 +49,7 @@ async function setup(opts: { withUntimed?: boolean } = {}) {
         insp(I.otherDay, TENANT_ID, INSPECTOR_ID, '2027-03-11T09:00:00Z', 'scheduled', 60),
         insp(I.colleague, TENANT_ID, OTHER_INSPECTOR, `${DAY}T09:00:00Z`, 'scheduled', 60),
         insp(I.foreign, OTHER_TENANT, FOREIGN_USER, `${DAY}T09:00:00Z`, 'scheduled', 60),
+        ...(opts.withLate ? [insp(I.late, TENANT_ID, INSPECTOR_ID, `${DAY}T22:00:00Z`, 'scheduled', null)] : []),
         ...(opts.withUntimed ? [insp(I.untimed, TENANT_ID, INSPECTOR_ID, DAY, 'scheduled', null)] : []),
     ];
     await h.db.insert(schema.inspections).values(rows as never);
@@ -98,6 +100,16 @@ describe('block preview', () => {
         try {
             const t = await token(INSPECTOR_ID, 'inspector');
             expect(ids(await (await call(t, 'GET', `/api/calendar/blocks/conflicts?date=${DAY}&allDay=true`)).json() as never)).toEqual([I.afternoon, I.morning].sort());
+        } finally { h.close(); }
+    });
+
+    it('a visit that runs past midnight is shown ending at 23:59, not wrapped to the early morning', async () => {
+        const { h, token, call } = await setup({ withLate: true });
+        try {
+            const t = await token(INSPECTOR_ID, 'inspector');
+            const json = await (await call(t, 'GET', `/api/calendar/blocks/conflicts?date=${DAY}&startTime=22:30&endTime=23:00`)).json() as { data: { conflicts: Array<{ id: string; startTime: string; endTime: string }> } };
+            const late = json.data.conflicts.find((c) => c.id === I.late)!;
+            expect([late.startTime, late.endTime]).toEqual(['22:00', '23:59']);
         } finally { h.close(); }
     });
 

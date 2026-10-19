@@ -105,6 +105,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'audit.view': { family: 'audit_log', label: 'audit_action_audit_view', meta: {}, status: { kind: 'live' } },
     'availability.override.delete': { family: 'availability_override', label: 'audit_action_availability_override_delete', meta: { date: 'name', kind: 'name', inspectorId: 'person' }, status: { kind: 'live' } },
     'booking.routing.applied': { family: 'inspection', label: 'audit_action_booking_routing_applied', meta: { applied: 'to', candidateCount: 'count', inspectorId: 'person', reason: 'reason', requested: 'from' }, status: { kind: 'live' } },
+    'calendar.disconnect': { family: 'calendar_connection', label: 'audit_action_calendar_disconnect', meta: { provider: 'name', connections: 'count', syncedBusyBlocks: 'count', readCalendars: 'count', eventLinks: 'count' }, status: { kind: 'live' } },
     'comment.created': { family: 'comment', label: 'audit_action_comment_created', meta: { textPreview: 'name' }, status: { kind: 'live' } },
     'comment.deleted': { family: 'comment', label: 'audit_action_comment_deleted', meta: { textPreview: 'name' }, status: { kind: 'live' } },
     'comment.updated': { family: 'comment', label: 'audit_action_comment_updated', meta: { category: 'name', section: 'name', severity: 'name', textPreview: 'name' }, status: { kind: 'live' } },

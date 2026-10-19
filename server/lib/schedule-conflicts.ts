@@ -89,7 +89,11 @@ export interface TimeOffConflict {
 const DEFAULT_VISIT_MIN = 180;
 
 const toMinutes = (hhmm: string): number => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
-const toHhmm = (min: number): string => `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+/** A visit that runs past midnight is shown ending at 23:59, not wrapped round to a morning time. */
+const toHhmm = (min: number): string => {
+    const m = Math.min(min, 24 * 60 - 1);
+    return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+};
 
 /**
  * The inspections this person is on (lead or helper) that a block of time off would

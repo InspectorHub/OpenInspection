@@ -58,6 +58,15 @@ choices and the links to events on the calendar. Without `provider` every
 provider the caller is connected to is disconnected. Hand-entered overrides are
 never touched, and events in the external calendar are not changed.
 
+The scope of each delete is chosen inside the statement itself, so a reconnect
+that lands while a disconnect is running is cleaned too rather than left with
+orphaned read-calendar rows. A sync that was already in flight cannot put the
+imported rows back: it writes only while the person is connected, and removes
+what it wrote if the connection went away meanwhile. Each disconnect that
+removed anything is recorded in the audit log as `calendar.disconnect`, with the
+provider and how many connections, imported busy blocks, read-calendar choices
+and event links were removed (counts only).
+
 Entries imported by older releases could outlive their connection, because
 disconnecting used to delete only the connection row. A daily job
 (`calendar-orphan-sweep`) removes imported overrides that have no connection for
