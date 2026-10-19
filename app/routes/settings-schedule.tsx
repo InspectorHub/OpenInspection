@@ -239,7 +239,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "calendar-disconnect") {
-    const res = await api.calendar.disconnect.$delete();
+    const provider = form.get("provider");
+    const res = await api.calendar.disconnect.$delete({ query: provider === "google" || provider === "apple" ? { provider } : {} });
     const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
     return {
       ok: res.ok,
@@ -318,6 +319,7 @@ export default function SettingsSchedulePage() {
         <CalendarConnectPanel
           connected={data.calendar.connected}
           capability={data.calendar.capability}
+          provider={data.calendar.provider}
           oauthConfigured={data.calendar.oauthConfigured}
           lastSyncError={data.calendar.lastSyncError}
           disabled={data.managedInspectorId !== null}

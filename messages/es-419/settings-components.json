@@ -681,5 +681,7 @@
   "settings_holiday_custom_delete_failed": "No se pudo quitar el día cerrado. Sigue en la lista; inténtelo de nuevo.",
   "settings_dateoverrides_remove_message_block": "El {date} volverá a seguir el horario semanal y los clientes podrán reservar ese día.",
   "settings_dateoverrides_remove_message_extra": "Las horas adicionales del {date} dejarán de ofrecerse para reservas.",
-  "settings_dateoverrides_synced_note": "Sincronizado desde su calendario de {provider}. Cámbielo allí."
+  "settings_dateoverrides_synced_note": "Sincronizado desde su calendario de {provider}. Cámbielo allí.",
+  "settings_calconnect_disconnect_title": "¿Desconectar el calendario de {provider}?",
+  "settings_calconnect_disconnect_message": "Los bloques de ocupado sincronizados desde este calendario se quitarán de su calendario y de la disponibilidad para reservas, por lo que esos horarios podrán reservarse de nuevo. Los eventos en el calendario de {provider} no se modifican. Puede volver a conectarlo en cualquier momento."
 }

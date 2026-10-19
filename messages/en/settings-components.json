@@ -681,5 +681,7 @@
   "settings_holiday_custom_delete_failed": "The closed day could not be removed. It is still on the list; try again.",
   "settings_dateoverrides_remove_message_block": "{date} will follow the weekly schedule again, and customers will be able to book that day.",
   "settings_dateoverrides_remove_message_extra": "The extra hours on {date} will no longer be offered for booking.",
-  "settings_dateoverrides_synced_note": "Synced from your {provider} calendar. Change it there."
+  "settings_dateoverrides_synced_note": "Synced from your {provider} calendar. Change it there.",
+  "settings_calconnect_disconnect_title": "Disconnect {provider} Calendar?",
+  "settings_calconnect_disconnect_message": "The busy blocks synced from this calendar will be removed from your calendar and from booking availability, so those times can be booked again. Events in {provider} Calendar are not changed. You can connect again at any time."
 }
