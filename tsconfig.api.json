@@ -47,6 +47,7 @@
     "tsBuildInfoFile": "./.types/.tsbuildinfo.api",
     "paths": {
       "@core/api-types": ["./packages/api-types/index.ts"],
+      "@core/offline-package": ["./packages/offline-package/index.ts"],
       "~/*": ["./app/*"]
     }
   },
@@ -57,6 +58,7 @@
     // must list every input explicitly, so leaving them out is 10 x TS6307.
     "server/**/*.json",
     "packages/api-types/**/*.ts",
+    "packages/offline-package/**/*.ts",
     "worker-configuration.d.ts"
   ],
   "exclude": ["node_modules", "dist", ".types"]

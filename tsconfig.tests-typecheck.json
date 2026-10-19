@@ -39,6 +39,7 @@
     "tsBuildInfoFile": "./.tsbuildinfo.tests-typecheck",
     "paths": {
       "@core/api-types": ["./packages/api-types/index.ts"],
+      "@core/offline-package": ["./packages/offline-package/index.ts"],
       "~/*": ["./app/*"]
     }
   },

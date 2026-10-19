@@ -53,7 +53,8 @@
     ],
     "paths": {
       "~/*": ["./app/*"],
-      "@core/shared-ui": ["./packages/shared-ui/src/index.ts"]
+      "@core/shared-ui": ["./packages/shared-ui/src/index.ts"],
+      "@core/offline-package": ["./packages/offline-package/index.ts"]
     },
     "rootDirs": [".", "./.react-router/types"],
     "noEmit": true,

@@ -26,7 +26,8 @@
     "**/*.spec.{ts,tsx}",
     "tests/**/*.ts",
     "packages/shared-ui/src/index.ts",
-    "packages/api-types/index.ts"
+    "packages/api-types/index.ts",
+    "packages/offline-package/index.ts"
   ],
   "project": [
     "app/**/*.{ts,tsx}",
