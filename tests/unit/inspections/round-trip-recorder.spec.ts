@@ -5,7 +5,7 @@
  * same ones the route specs make, and the ones that must fail do fail.
  */
 import { describe, expect, it } from 'vitest';
-import { recordRoundTrips } from '../helpers/round-trip-recorder';
+import { measureWall, recordRoundTrips, wallWithinBudget } from '../helpers/round-trip-recorder';
 
 function fakeD1(): D1Database {
     const stmt = { bind: () => stmt, all: async () => ({ results: [] }), run: async () => ({}), first: async () => null, raw: async () => [] };
@@ -61,5 +61,29 @@ describe('round-trip recorder', () => {
         rec.reset();
         await rec.binding.prepare('x').bind().all();
         expect(rec.log.waves).toBe(1);
+    });
+
+    describe('the wall-time bound (budget of 3 round trips at 40 ms)', () => {
+        const serial = async (n: number) => {
+            const rec = recordRoundTrips(fakeD1(), 40);
+            const q = () => rec.binding.prepare('select 1').bind().all();
+            const m = await measureWall(rec, 40, async () => { for (let i = 0; i < n; i++) await q(); });
+            return { m, ok: wallWithinBudget(m, 3, 40) };
+        };
+
+        it('a request inside its budget passes', async () => {
+            expect((await serial(3)).ok).toBe(true);
+        });
+
+        it('three extra serial reads fail it, and so do two', async () => {
+            expect((await serial(6)).ok).toBe(false);
+            expect((await serial(5)).ok).toBe(false);
+        });
+
+        it('the base is the request without any delay, so it does not loosen the bound', async () => {
+            const { m } = await serial(3);
+            expect(m.base).toBeLessThan(40);
+            expect(m.ms).toBeGreaterThanOrEqual(3 * 40 - 5);
+        });
     });
 });

@@ -17,11 +17,9 @@ import * as schema from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { createHarness, TENANT_ID, OWNER_ID, type Harness } from '../helpers/tenant-email-harness';
-import { recordRoundTrips } from '../helpers/round-trip-recorder';
+import { measureWall, recordRoundTrips, wallWithinBudget } from '../helpers/round-trip-recorder';
 
 const LATENCY_MS = 40;
-/** Wall-clock backstop: the budget in round trips plus this many for the application's own work. */
-const SLACK_CALLS = 6;
 
 async function get(h: Harness, path: string, options: { warm?: boolean } = {}) {
     const rec = recordRoundTrips(h.env.DB as D1Database, LATENCY_MS);
@@ -39,14 +37,24 @@ async function get(h: Harness, path: string, options: { warm?: boolean } = {}) {
         await call();
         await call(); // warm the middleware caches; see the dashboard spec for why two
     }
-    rec.reset();
-    const start = performance.now();
-    const res = await call();
-    const ms = performance.now() - start;
+    // The measured call is the last one, so its response is the one read below.
+    let res!: Response;
+    const measured = async () => { res = await call(); };
+    let wall: { base: number; ms: number };
+    if (options.warm === false) {
+        // A first run is measured once: repeating it would measure the second run.
+        rec.setLatency(LATENCY_MS);
+        rec.reset();
+        const start = performance.now();
+        await measured();
+        wall = { base: 0, ms: performance.now() - start };
+    } else {
+        wall = await measureWall(rec, LATENCY_MS, measured);
+    }
     const body = await res.json() as { data?: unknown; meta?: { total?: number } };
     console.log(`${path.split('?')[0]}: status=${res.status} statements=${rec.log.statements} roundTrips=${rec.log.roundTrips} waves=${rec.log.waves} budget=2`);
     expect(rec.log.statements, 'the recorder counted nothing - the instrument is broken').toBeGreaterThan(0);
-    return { status: res.status, body, waves: rec.log.waves, ms, sql: rec.log.sql };
+    return { status: res.status, body, waves: rec.log.waves, wall, sql: rec.log.sql };
 }
 
 describe('read routes wait for at most two sequential round trips', () => {
@@ -66,7 +74,7 @@ describe('read routes wait for at most two sequential round trips', () => {
         // Two members (the owner and the inspector), no invitations outstanding.
         expect((r.body.data as { usage: { seatsUsed: number } }).usage.seatsUsed).toBe(2);
         expect(r.waves).toBeLessThanOrEqual(2);
-        expect(r.ms).toBeLessThanOrEqual((2 + SLACK_CALLS) * LATENCY_MS);
+        expect(wallWithinBudget(r.wall, 2, LATENCY_MS), `wall ${r.wall.ms.toFixed(0)}ms vs base ${r.wall.base.toFixed(0)}ms`).toBe(true);
     });
 
     it('tags list, first run seeds the canonical tags and later runs read them back', async () => {
@@ -79,7 +87,7 @@ describe('read routes wait for at most two sequential round trips', () => {
         // Seeded tags are not duplicated by the repeat reads that warmed the caches.
         expect(await h.db.select().from(schema.tags).all()).toHaveLength(5);
         expect(r.waves).toBeLessThanOrEqual(2);
-        expect(r.ms).toBeLessThanOrEqual((2 + SLACK_CALLS) * LATENCY_MS);
+        expect(wallWithinBudget(r.wall, 2, LATENCY_MS), `wall ${r.wall.ms.toFixed(0)}ms vs base ${r.wall.base.toFixed(0)}ms`).toBe(true);
     });
 
     it('services list', async () => {
@@ -89,7 +97,7 @@ describe('read routes wait for at most two sequential round trips', () => {
         expect(r.status).toBe(200);
         expect((r.body.data as Array<{ id: string; price?: number }>).map((s) => [s.id, s.price])).toEqual([['svc-1', 45000]]);
         expect(r.waves).toBeLessThanOrEqual(2);
-        expect(r.ms).toBeLessThanOrEqual((2 + SLACK_CALLS) * LATENCY_MS);
+        expect(wallWithinBudget(r.wall, 2, LATENCY_MS), `wall ${r.wall.ms.toFixed(0)}ms vs base ${r.wall.base.toFixed(0)}ms`).toBe(true);
     });
 
     it('templates list', async () => {
@@ -102,7 +110,7 @@ describe('read routes wait for at most two sequential round trips', () => {
         expect(r.body.meta?.total).toBe(3);
         expect((r.body.data as Array<{ name: string }>).map((t) => t.name)).toEqual(['Template 3', 'Template 2', 'Template 1']);
         expect(r.waves).toBeLessThanOrEqual(2);
-        expect(r.ms).toBeLessThanOrEqual((2 + SLACK_CALLS) * LATENCY_MS);
+        expect(wallWithinBudget(r.wall, 2, LATENCY_MS), `wall ${r.wall.ms.toFixed(0)}ms vs base ${r.wall.base.toFixed(0)}ms`).toBe(true);
     });
 
     it('tags list on a company with no tags yet: read, one insert, read', async () => {
