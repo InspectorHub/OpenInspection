@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { TimeOffConflictSchema } from './calendar-blocks.schema';
 import { createApiResponseSchema } from './shared.schema';
 
 /**
@@ -232,4 +233,5 @@ export const OverrideResponseSchema = createApiResponseSchema(z.object({
         endTime: z.string().nullable(),
         inspectorId: z.string().trim().min(1),
     }),
+    conflicts: z.array(TimeOffConflictSchema).describe('Booked inspections a blocking override covers (empty for extra hours). Informational: creating the override never requires acting on it.'),
 })).openapi('OverrideResponse');

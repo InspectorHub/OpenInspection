@@ -18,6 +18,8 @@ import { SuccessResponseSchema, createApiResponseSchema } from '../lib/validatio
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { getDrizzle } from '../lib/route-helpers';
 import { auditFromContext } from '../lib/audit';
+import { findTimeOffConflicts } from '../lib/schedule-conflicts';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 
 /**
  * GET /api/availability
@@ -118,7 +120,7 @@ const createOverrideRoute = createRoute(withMcpMetadata({
     operationId: 'createAvailabilityOverride',
     tags: ['bookings'],
     summary: 'Create an availability override',
-    description: 'Adds a single availability override (block a date, add an unusual slot). Admins may create overrides for any inspector; others only for themselves.',
+    description: 'Adds a single availability override (block a date, add an unusual slot). The response lists any booked inspections a blocking override covers under conflicts; that is information only, nothing is refused. Admins may create overrides for any inspector; others only for themselves.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         body: {
@@ -259,7 +261,14 @@ export const availabilityRoutes = createApiRouter()
             inspectorId
         });
 
-        return c.json({ success: true, data: { override: override } }, 201);
+        // Information only, never a condition: a blocking override over booked inspections is
+        // allowed, and the caller is told which they are. Extra hours cover nothing.
+        const conflicts = override.isAvailable
+            ? []
+            : await findTimeOffConflicts(getDrizzle(c), tenantId, inspectorId, await resolveInspectionScope(c), {
+                date: override.date, allDay: !override.startTime || !override.endTime, startTime: override.startTime, endTime: override.endTime,
+            });
+        return c.json({ success: true, data: { override: override, conflicts } }, 201);
     })
     .openapi(deleteOverrideRoute, async (c) => {
         const tenantId = c.get('tenantId');
