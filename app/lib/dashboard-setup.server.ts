@@ -4,7 +4,7 @@
  * The checklist needs three facts: how many templates and services the company
  * has, and whether a schedule is set (a dismissed checklist still shows its
  * progress in one collapsed row, so they are always needed). The counts need no
- * list: one template row carries the total in its meta, and the service
+ * list: the smallest page carries the total in its meta, and the service
  * catalogue is short. The wizard's own lists are not read here.
  *
  * Every read is best-effort and bounded. A failure or a stall reads as "not
@@ -16,6 +16,13 @@ import { settled } from "~/lib/concurrency";
 import { getScheduleSet } from "~/lib/schedule-onboarding.server";
 
 type Api = ReturnType<typeof createApi>;
+
+/**
+ * The smallest page the list routes accept. The shared pagination schema only
+ * allows 12, 25, 50 or 100; any other value is a 400, which the best-effort
+ * read below would swallow and report as "no templates".
+ */
+export const SMALLEST_PAGE_SIZE = "12";
 
 /** How long the dashboard waits for these before rendering without them. */
 const CHECKLIST_INPUT_TIMEOUT_MS = 2000;
@@ -30,7 +37,7 @@ export async function loadChecklistInputs(api: Api): Promise<ChecklistInputs> {
   const opts = { timeoutMs: CHECKLIST_INPUT_TIMEOUT_MS };
   const [templateCount, serviceCount, scheduleSet] = await Promise.all([
     settled(async () => {
-      const res = await api.inspections.templates.$get({ query: { page: "1", pageSize: "1" } });
+      const res = await api.inspections.templates.$get({ query: { page: "1", pageSize: SMALLEST_PAGE_SIZE } });
       if (!res.ok) return 0;
       const body = (await res.json()) as { data?: unknown[]; meta?: { total?: number } };
       return body.meta?.total ?? body.data?.length ?? 0;

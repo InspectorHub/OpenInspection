@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 
-const PAGE_SIZES = [12, 25, 50, 100] as const;
+export const PAGE_SIZES = [12, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 50;
 
 /**
