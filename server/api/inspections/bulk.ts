@@ -26,7 +26,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
-import { moneyView } from '../../lib/auth/money-access';
+import { moneyViewWith } from '../../lib/auth/money-access';
 import { resolveInspectionScope } from '../../lib/inspection/visibility';
 import { requireBatchInScope } from './bulk-scope-guard';
 import { safeISODate } from '../../lib/date';
@@ -231,23 +231,21 @@ const scheduleConflictsRoute = createRoute(withMcpMetadata({
 const bulkRoutes = createApiRouter()
     .openapi(dashboardRoute, async (c) => {
         const tenantId = c.get('tenantId');
+        // Capabilities serve both the visibility scope and the money redaction: read once, started now so
+        // that for a caller who sees everything the read overlaps the inspection reads.
+        const capabilities = capabilitiesFor(c);
+        capabilities.catch(() => undefined); // surfaced where awaited below
         const scope    = await resolveInspectionScope(c);
-        const buckets  = await c.var.services.inspection.getDashboardBuckets(tenantId, scope);
-        // Agent Accounts A3 — count concierge bookings awaiting this inspector's
-        // approval so the dashboard's UPCOMING card can render the substate line.
-        let conciergePending = 0;
-        try {
-            const result = await c.var.services.concierge.listAwaitingInspector(tenantId, scope);
-            conciergePending = result.count;
-        } catch (err) {
-            logger.warn('inspections.dashboard.concierge.failed', {
-                tenantId,
-                error: err instanceof Error ? err.message : String(err),
+        // Agent Accounts A3 — concierge bookings awaiting this inspector's approval (UPCOMING card substate line).
+        const concierge = (async () => (await c.var.services.concierge.listAwaitingInspector(tenantId, scope)).count)()
+            .catch((err: unknown) => {
+                logger.warn('inspections.dashboard.concierge.failed', { tenantId, error: err instanceof Error ? err.message : String(err) });
+                return 0;
             });
-        }
+        const [buckets, conciergePending, caps] = await Promise.all([c.var.services.inspection.getDashboardBuckets(tenantId, scope), concierge, capabilities]);
         return c.json({
             success: true,
-            data: await moneyView(c, {
+            data: moneyViewWith({
                 ...buckets,
                 needsAttention: toWireDates(buckets.needsAttention),
                 today:          toWireDates(buckets.today),
@@ -256,7 +254,7 @@ const bulkRoutes = createApiRouter()
                 recentReports:  toWireDates(buckets.recentReports),
                 cancelled:      toWireDates(buckets.cancelled),
                 conciergePending,
-            }, 'inspectionFees'),
+            }, caps, 'inspectionFees'),
         });
     })
     .openapi(listInspectionsRoute, async (c) => {

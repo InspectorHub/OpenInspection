@@ -224,25 +224,25 @@ export class TemplateService {
         const baseWhere = eq(templates.tenantId, tenantId);
         const where = q?.trim() ? and(baseWhere, like(templates.name, `%${q.trim()}%`)) : baseWhere;
 
-        const totalRow = await db
-            .select({ c: sql<number>`count(*)` })
-            .from(templates)
-            .where(where)
-            .get();
+        // Independent reads, sent together (each is a D1 round trip). The import markers (#293) say
+        // which rows came from the catalogue and which retired rows an uninstall retired.
+        const [totalRow, rows, markers] = await Promise.all([
+            db
+                .select({ c: sql<number>`count(*)` })
+                .from(templates)
+                .where(where)
+                .get(),
+            db.select({ id: templates.id, name: templates.name, version: templates.version, schema: templates.schema, retiredAt: templates.retiredAt })
+                .from(templates)
+                .where(where)
+                .orderBy(desc(templates.createdAt))
+                .limit(pageSize)
+                .offset((page - 1) * pageSize)
+                .all(),
+            readImportMarkers(db, tenantId),
+        ]);
         const total = totalRow?.c ?? 0;
-
-        const rows = await db.select({ id: templates.id, name: templates.name, version: templates.version, schema: templates.schema, retiredAt: templates.retiredAt })
-            .from(templates)
-            .where(where)
-            .orderBy(desc(templates.createdAt))
-            .limit(pageSize)
-            .offset((page - 1) * pageSize)
-            .all();
-
-        // The unified catalogue's import markers (#293) — which rows came from
-        // the catalogue, and which retired rows an uninstall retired rather
-        // than an update. ./template/import-markers explains both.
-        const { catalogIdByLocalId, uninstalledLocalIds, jurisdictionByLocalId } = await readImportMarkers(db, tenantId);
+        const { catalogIdByLocalId, uninstalledLocalIds, jurisdictionByLocalId } = markers;
         const mapped = rows.map(row => ({
             id: row.id,
             name: row.name,

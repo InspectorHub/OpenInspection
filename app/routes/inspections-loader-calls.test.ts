@@ -32,7 +32,11 @@ vi.mock("~/lib/api-client.server", () => ({
     createApi: () => ({
         inspections: {
             dashboard: { $get: rec("dashboard", () => (seam.hangDashboard ? new Promise(() => {}) : json({ today: [], conciergePending: 0 }))) },
-            templates: { $get: (args: { query?: unknown }) => { templateQueries.push(args?.query); return rec("templates", () => json([{ id: "t1", name: "T", itemCount: 3 }], { meta: { total: 7 } }))(); } },
+            templates: {
+                // The list is the wizard's; the checklist must not read it.
+                $get: (args: { query?: unknown }) => { templateQueries.push(args?.query); return rec("templates", () => json([{ id: "t1", name: "T", itemCount: 3 }], { meta: { total: 7 } }))(); },
+                count: { $get: rec("templateCount", () => json({ total: 7 })) },
+            },
             index: { $post: vi.fn() },
         },
         tags: { index: { $get: rec("tags", () => json([{ id: "g1", name: "Rush", color: "#fff" }])) } },
@@ -65,11 +69,12 @@ afterEach(() => vi.useRealTimers());
 describe("/inspections loader", () => {
     it("reads the dashboard inputs and the checklist counts, and none of the wizard's lists", async () => {
         const out = await run() as { templateCount: number; serviceCount: number; scheduleSet: boolean; tags: unknown[] };
-        expect(new Set(seam.calls)).toEqual(new Set(["dashboard", "tags", "me", "usage", "templates", "services", "availability", "calendarStatus"]));
+        expect(new Set(seam.calls)).toEqual(new Set(["dashboard", "tags", "me", "usage", "templateCount", "services", "availability", "calendarStatus"]));
         expect(seam.calls).toHaveLength(8);
         expect(seam.calls).not.toContain("members");
-        // One template row is enough to count; the full 100-row list is not fetched.
-        expect(templateQueries).toEqual([{ page: "1", pageSize: "1" }]);
+        // The count comes from the count route; no template list (and none of its schema reads) is requested.
+        expect(templateQueries).toEqual([]);
+        expect(seam.calls).not.toContain("templates");
         expect(out.templateCount).toBe(7);
         expect(out.serviceCount).toBe(2);
         expect(out.scheduleSet).toBe(true);
@@ -91,7 +96,7 @@ describe("/inspections loader", () => {
         seam.hangDashboard = true;
         void run();
         await new Promise((r) => setTimeout(r, 20));
-        expect(seam.calls).toEqual(expect.arrayContaining(["dashboard", "tags", "me", "usage", "templates", "services", "availability", "calendarStatus"]));
+        expect(seam.calls).toEqual(expect.arrayContaining(["dashboard", "tags", "me", "usage", "templateCount", "services", "availability", "calendarStatus"]));
     });
 
     it("returns even when a checklist input never settles", async () => {

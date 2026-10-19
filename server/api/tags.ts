@@ -133,8 +133,7 @@ const tagsRoutes = createApiRouter()
     .openapi(listTagsRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         // Lazy-seed canonical tags so first-time tenants always see the five.
-        await c.var.services.tag.seedDefaults(tenantId);
-        const data = await c.var.services.tag.list(tenantId);
+        const data = await c.var.services.tag.listWithDefaults(tenantId);
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(createTagRoute, async (c) => {

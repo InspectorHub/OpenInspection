@@ -27,12 +27,13 @@ export const servicesRoutes = createApiRouter()
         description: "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the inspection-fees capability. Owner, manager or inspector."
     }, { scopes: ['read'], tier: 'primary' })), async (c) => {
         const tenantId = c.get('tenantId');
-        const rows = await c.var.services.service.listServices(tenantId);
+        // The catalogue and the caller's capabilities do not depend on each other: one wait, not two.
+        const [rows, caps] = await Promise.all([c.var.services.service.listServices(tenantId), capabilitiesFor(c)]);
         // IA-95 — the catalog carries `price`, and this route admits inspectors,
         // who may hold the inspection-fees capability or not: the wizard needs the price list
         // to price a line, and a caller without it must not receive a price. Writing the
         // catalogue stays with `companyFinance`.
-        return c.json({ success: true, data: redactMoney(rows, await capabilitiesFor(c), 'inspectionFees') });
+        return c.json({ success: true, data: redactMoney(rows, caps, 'inspectionFees') });
     })
     // POST /api/services/discount/validate — MUST be before /:id routes
     .openapi(createRoute(withMcpMetadata({

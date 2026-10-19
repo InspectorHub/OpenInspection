@@ -1,5 +1,5 @@
-import { eq, and, sql, inArray, isNull } from 'drizzle-orm';
-import { inspections, inspectionResults, tenantConfigs, invoices, agreementRequests, users, inspectionPeople, contactRoleProfiles, inspectionServices } from '../../lib/db/schema';
+import { eq, and, sql, inArray } from 'drizzle-orm';
+import { inspections, inspectionResults, users, inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
 import { parseFindingKey } from '../../lib/finding-key';
 import { getEffectivePriceCents } from '../../lib/effective-price';
@@ -8,6 +8,8 @@ import { DEFECT_TRADE_LABELS, isDefectTrade } from '../../types/defect-fields';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../../lib/status/report-status';
 import { visibleInspectionsCondition, type InspectionScope } from '../../lib/inspection/visibility';
+import { chunkIds } from '../../lib/id-chunks';
+import { readDashboardInputs } from './dashboard-reads';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
 
@@ -356,26 +358,37 @@ export class InspectionAnalyticsService extends InspectionSubService {
      * Single SQL fetch of all inspection_results rows for the given IDs,
      * then in-memory aggregation. Avoids N+1 round trips when the
      * dashboard renders 50+ cards. Returns a Map keyed by inspection id.
+     *
+     * `snapshots` lets a caller that already holds the inspection rows pass the
+     * template snapshots it read, which saves the statement that would read them
+     * again. The ids are bound in chunks (D1 binds at most 100 parameters per
+     * statement) and the chunks are read together.
      */
-    async getDefectStatsBatch(tenantId: string, inspectionIds: string[]): Promise<Map<string, DefectCounts>> {
+    async getDefectStatsBatch(
+        tenantId: string,
+        inspectionIds: string[],
+        snapshots?: ReadonlyMap<string, unknown>,
+    ): Promise<Map<string, DefectCounts>> {
         const out = new Map<string, DefectCounts>();
         if (inspectionIds.length === 0) return out;
 
         const db = this.getDrizzle();
-        // Pull both result rows and template snapshots in parallel.
-        const insRows = await db.select({
-            id:               inspections.id,
-            templateSnapshot: inspections.templateSnapshot,
-        }).from(inspections)
-          .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, inspectionIds)));
-        const resultRows = await db.select({
-            inspectionId: inspectionResults.inspectionId,
-            data:         inspectionResults.data,
-        }).from(inspectionResults)
-          .where(and(eq(inspectionResults.tenantId, tenantId), inArray(inspectionResults.inspectionId, inspectionIds)));
+        const insRows = snapshots
+            ? Promise.resolve([] as Array<{ id: string; templateSnapshot: unknown }>)
+            : Promise.all(chunkIds(inspectionIds).map((part) => db.select({ id: inspections.id, templateSnapshot: inspections.templateSnapshot }).from(inspections)
+                .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, part))))).then((chunks) => chunks.flat());
+        const [snapshotRows, resultChunks] = await Promise.all([
+            insRows,
+            Promise.all(chunkIds(inspectionIds).map((part) => db.select({
+                inspectionId: inspectionResults.inspectionId,
+                data:         inspectionResults.data,
+            }).from(inspectionResults)
+                .where(and(eq(inspectionResults.tenantId, tenantId), inArray(inspectionResults.inspectionId, part))))),
+        ]);
+        const resultRows = resultChunks.flat();
 
-        const tplById   = new Map<string, unknown>();
-        for (const r of insRows) tplById.set(r.id as string, r.templateSnapshot);
+        const tplById   = new Map<string, unknown>(snapshots ?? []);
+        for (const r of snapshotRows) tplById.set(r.id as string, r.templateSnapshot);
         const dataById  = new Map<string, unknown>();
         for (const r of resultRows) dataById.set(r.inspectionId as string, r.data);
 
@@ -423,20 +436,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
      */
     async getDashboardBuckets(tenantId: string, scope: InspectionScope) {
         const db  = this.getDrizzle();
-        // Every bucket is cut from this one set, so scoping it scopes them all. The company-wide
-        // lookups below (signed agreements, overdue invoices, invoice amounts, service lines) only
-        // answer "does this inspection have one": they are keyed by inspection id and no row of
-        // them reaches the response unless its inspection is in `all`.
-        const all = await db.select().from(inspections)
-            .where(and(eq(inspections.tenantId, tenantId), visibleInspectionsCondition(db, scope, tenantId)));
+        const [all, cfg, signedRows, invoiceRows, serviceRows] = await readDashboardInputs(db, tenantId, scope);
 
-        // handoff-decisions §1 — pull the configurable report-unpublished
-        // threshold. Falls back to 24h when the row is missing (legacy tenants
-        // created before the threshold default existed). 72h is the new default applied at insert time.
-        const cfg = await db.select({ thresholds: tenantConfigs.attentionThresholds })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .limit(1);
         const thresholds = cfg[0]?.thresholds ?? null;
         const reportUnpublishedH  = thresholds?.report_unpublished_h ?? 24;
         const agreementUnsignedH  = thresholds?.agreement_unsigned_h ?? 72;
@@ -453,21 +454,12 @@ export class InspectionAnalyticsService extends InspectionSubService {
         const agreementStaleAt = new Date(now - agreementUnsignedH * 3600 * 1000);
         const invoiceStaleAt   = new Date(now - invoiceOverdueH    * 3600 * 1000);
 
-        // handoff §1 — extra signals for needsAttention bucket.
-        // 1) Inspections with NO signed agreement record older than threshold.
-        // Track I-a — agreement-signed truth rides the envelope: a signed
-        // agreement_requests row (any channel) lights the dashboard 📋 icon.
-        const signedRows = await db.select({ inspectionId: agreementRequests.inspectionId })
-            .from(agreementRequests)
-            .where(and(eq(agreementRequests.tenantId, tenantId), eq(agreementRequests.status, 'signed')));
         const signedSet = new Set(signedRows.map(r => r.inspectionId as string));
-        // 2) Unpaid invoices with dueDate past invoice-overdue threshold.
-        const overdueInvoices = await db.select({ inspectionId: invoices.inspectionId, dueDate: invoices.dueDate })
-            .from(invoices)
-            .where(and(eq(invoices.tenantId, tenantId), sql`${invoices.paidAt} IS NULL`, isNull(invoices.voidedAt)));
         const overdueSet = new Set(
-            overdueInvoices
+            invoiceRows
                 .filter(r => {
+                    // Unpaid only; voided ones were left out by the read.
+                    if (r.paidAt != null) return false;
                     if (!r.dueDate || !r.inspectionId) return false;
                     return new Date(r.dueDate as string) <= invoiceStaleAt;
                 })
@@ -531,27 +523,38 @@ export class InspectionAnalyticsService extends InspectionSubService {
             ...needsAttention, ...today, ...thisWeek, ...later, ...recentReports, ...cancelled,
         ].map(i => i.id as string);
         const uniqueIds = Array.from(new Set(allBucketIds));
-        const statsMap = await this.getDefectStatsBatch(tenantId, uniqueIds);
 
         // Sub-spec B Task 7 (B-6) — list row metadata: agent name lookup. We surface:
         //   agentName  → from inspection_people (listing_agent, else buyer_agent)
         //
         // Task 9c-X3 — replaces the legacy inspections.sellingAgentId /
         // .referredByAgentId column reads (frozen cache, dropped Task 13).
-        // A single batch query (role-scoped, tenant-scoped) resolves both
-        // roles for every inspection in `all` — listing_agent = the selling
-        // agent, buyer_agent = the referred/buyer's agent — mirroring the
-        // priority the legacy code gave sellingAgentId over referredByAgentId.
+        // A batch query (role-scoped, tenant-scoped) resolves both roles for every
+        // rendered inspection — listing_agent = the selling agent, buyer_agent = the
+        // referred/buyer's agent — mirroring the priority the legacy code gave
+        // sellingAgentId over referredByAgentId.
         // Scope to `uniqueIds` (rendered bucket ids), NOT every inspection in
         // `all` — only bucket rows are decorate()'d — and chunk under D1's ~100
         // bound-param cap. The pre-fix code bound the full per-tenant inspection
         // set and threw past ~95 inspections, breaking the dashboard (#258 review).
         const listingAgentNameByInspection = new Map<string, string>();
         const buyerAgentNameByInspection   = new Map<string, string>();
-        const AGENT_ROLE_ID_CHUNK = 90; // headroom for the fixed binds (tenantId ×2, role keys ×2)
-        for (let off = 0; off < uniqueIds.length; off += AGENT_ROLE_ID_CHUNK) {
-            const chunk = uniqueIds.slice(off, off + AGENT_ROLE_ID_CHUNK);
-            const agentRoleRows = await db.select({
+
+        // Round-2 backlog #2 — Inspector name lookup so the "Inspector" column
+        // (Customize Columns) can render the assigned inspector without a
+        // second round-trip. Self-assigned (inspectorId NULL) renders blank.
+        const inspectorIdSet = new Set<string>();
+        for (const i of all) {
+            if (i.inspectorId) inspectorIdSet.add(i.inspectorId as string);
+        }
+        const inspectorNameMap = new Map<string, string>();
+
+        // The second group of reads: everything that needs the inspection set. Defect counts take the
+        // template snapshots from `all` instead of reading them again.
+        const snapshotById = new Map<string, unknown>(all.map(i => [i.id as string, i.templateSnapshot]));
+        const [statsMap, agentRoleChunks, inspectorChunks] = await Promise.all([
+            this.getDefectStatsBatch(tenantId, uniqueIds, snapshotById),
+            Promise.all(chunkIds(uniqueIds).map((chunk) => db.select({
                 inspectionId: inspectionPeople.inspectionId,
                 roleKey:      contactRoleProfiles.key,
                 contactName:  contacts.name,
@@ -570,13 +573,23 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 .where(and(
                     eq(inspectionPeople.tenantId, tenantId),
                     inArray(inspectionPeople.inspectionId, chunk),
-                ));
-            for (const r of agentRoleRows) {
-                if (!r.contactName) continue;
-                const map = r.roleKey === 'listing_agent' ? listingAgentNameByInspection : buyerAgentNameByInspection;
-                map.set(r.inspectionId as string, r.contactName as string);
-            }
+                )))),
+            Promise.all(chunkIds(Array.from(inspectorIdSet)).map((chunk) => db
+                .select({ id: users.id, name: users.name, email: users.email })
+                .from(users)
+                .where(and(eq(users.tenantId, tenantId), inArray(users.id, chunk))))),
+        ]);
+        for (const r of agentRoleChunks.flat()) {
+            if (!r.contactName) continue;
+            const map = r.roleKey === 'listing_agent' ? listingAgentNameByInspection : buyerAgentNameByInspection;
+            map.set(r.inspectionId as string, r.contactName as string);
         }
+        for (const r of inspectorChunks.flat()) {
+            // Recorded names only; a nameless account is left out of the map.
+            const nice = (r.name as string | null) ?? '';
+            if (nice) inspectorNameMap.set(r.id as string, nice);
+        }
+
         // IA-131 — the dashboard used to render `inspections.price` straight from
         // the row. That is tier 3 of the P-4 authority chain, the denormalized
         // cache, and on seeded production-shaped data it read 0 for inspections
@@ -585,18 +598,10 @@ export class InspectionAnalyticsService extends InspectionSubService {
         // could not save it either: the cache holds 0, not NULL, so there was no
         // "unknown" to fall back to.
         //
-        // Two tenant-scoped reads, same shape and scale as the paid-invoice
-        // lookup directly above (the row set is already fully in memory here), so
-        // the chain can be resolved per row without an N+1.
+        // The invoices and service lines were read with the first group (same
+        // shape and scale: the row set is already fully in memory here), so the
+        // chain can be resolved per row without an N+1.
         const invoiceAmountByInspection = new Map<string, number>();
-        const invoiceRows = await db.select({
-            inspectionId: invoices.inspectionId,
-            amountCents:  invoices.amountCents,
-            createdAt:    invoices.createdAt,
-        })
-            .from(invoices)
-            .where(and(eq(invoices.tenantId, tenantId), isNull(invoices.voidedAt)))
-            .orderBy(invoices.createdAt);
         for (const r of invoiceRows) {
             // Earliest non-voided invoice wins — same tie-break as
             // effective-price.sql.ts and contact.service.ts.
@@ -606,41 +611,12 @@ export class InspectionAnalyticsService extends InspectionSubService {
         }
 
         const serviceLinesByInspection = new Map<string, Array<{ priceSnapshot: number; priceOverride: number | null }>>();
-        const serviceRows = await db.select({
-            inspectionId:  inspectionServices.inspectionId,
-            priceSnapshot: inspectionServices.priceSnapshot,
-            priceOverride: inspectionServices.priceOverride,
-        })
-            .from(inspectionServices)
-            // Feeds getEffectivePriceCents — a soft-deleted line is history and
-            // must not be summed into what an inspection is worth.
-            .where(and(eq(inspectionServices.tenantId, tenantId), eq(inspectionServices.active, true)));
         for (const r of serviceRows) {
             const key = r.inspectionId as string;
             const list = serviceLinesByInspection.get(key);
             const line = { priceSnapshot: r.priceSnapshot ?? 0, priceOverride: r.priceOverride ?? null };
             if (list) list.push(line);
             else serviceLinesByInspection.set(key, [line]);
-        }
-
-        // Round-2 backlog #2 — Inspector name lookup so the "Inspector" column
-        // (Customize Columns) can render the assigned inspector without a
-        // second round-trip. Self-assigned (inspectorId NULL) renders blank.
-        const inspectorIdSet = new Set<string>();
-        for (const i of all) {
-            if (i.inspectorId) inspectorIdSet.add(i.inspectorId as string);
-        }
-        const inspectorNameMap = new Map<string, string>();
-        if (inspectorIdSet.size > 0) {
-            const insRows = await db
-                .select({ id: users.id, name: users.name, email: users.email })
-                .from(users)
-                .where(and(eq(users.tenantId, tenantId), inArray(users.id, Array.from(inspectorIdSet))));
-            for (const r of insRows) {
-                // Recorded names only; a nameless account is left out of the map.
-                const nice = (r.name as string | null) ?? '';
-                if (nice) inspectorNameMap.set(r.id as string, nice);
-            }
         }
 
         // Sprint 2 S2-2 — count sibling inspections per request_id so list rows

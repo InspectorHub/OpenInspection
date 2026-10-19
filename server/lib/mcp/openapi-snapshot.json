@@ -1342,6 +1342,22 @@
     "description": "Corrects a mistyped payment by appending a reversing ledger row rather than editing the original, which survives. The correcting row inherits the date the money moved, so the correction lands in the period the mistake did. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found."
   },
   {
+    "operationId": "countInspectionTemplates",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/templates/count",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Count inspection templates for current tenant",
+    "description": "Returns how many templates the company has, the same number the list reports as meta.total (retired templates are counted). Reads no template content, so it is the cheap way to ask whether any exist. Available to owner, manager and inspector roles."
+  },
+  {
     "operationId": "countsInspection",
     "method": "GET",
     "pathTemplate": "/api/inspections/counts",

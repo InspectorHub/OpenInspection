@@ -43,6 +43,16 @@ export async function moneyView<T>(c: Context<HonoConfig>, payload: T, bucket: M
 }
 
 /**
+ * `moneyView` for a caller that already holds the capability set, typically
+ * because it started the lookup alongside its other reads. Same projection;
+ * the only difference is where the capabilities came from.
+ */
+export function moneyViewWith<T>(payload: T, caps: CapabilitySet, bucket: MoneyBucket): T {
+    if (!hasMoneyField(payload)) return payload;
+    return redactMoney(payload, caps, bucket);
+}
+
+/**
  * Handler-side form of `assertMoneyWriteAllowed`: resolves the caller's
  * capabilities, checks `body`, and returns it unchanged so it can sit inside an
  * expression. A body that is not a plain object is returned as-is (validation

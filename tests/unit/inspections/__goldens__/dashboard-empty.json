@@ -1,0 +1,35 @@
+{
+ "success": true,
+ "data": {
+  "needsAttention": [],
+  "today": [],
+  "thisWeek": [],
+  "later": [],
+  "laterTotal": 0,
+  "recentReports": [],
+  "cancelled": [],
+  "defectAggregate": {
+   "later": {
+    "safety": 0,
+    "recommendation": 0,
+    "maintenance": 0
+   },
+   "thisWeek": {
+    "safety": 0,
+    "recommendation": 0,
+    "maintenance": 0
+   },
+   "needsAttention": {
+    "safety": 0,
+    "recommendation": 0,
+    "maintenance": 0
+   },
+   "recentReports": {
+    "safety": 0,
+    "recommendation": 0,
+    "maintenance": 0
+   }
+  },
+  "conciergePending": 0
+ }
+}

@@ -42,6 +42,14 @@ function rowToRecord(row: typeof tags.$inferSelect): TagRow {
     };
 }
 
+function sortTagRecords(records: TagRow[]): TagRow[] {
+    records.sort((a, b) => {
+        if (a.isSeed !== b.isSeed) return a.isSeed ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    });
+    return records;
+}
+
 export class TagService {
     constructor(private db: D1Database) {}
 
@@ -54,12 +62,36 @@ export class TagService {
         const rows = await db.select().from(tags)
             .where(eq(tags.tenantId, tenantId))
             .all();
-        const records = rows.map(rowToRecord);
-        records.sort((a, b) => {
-            if (a.isSeed !== b.isSeed) return a.isSeed ? -1 : 1;
-            return a.name.localeCompare(b.name);
-        });
-        return records;
+        return sortTagRecords(rows.map(rowToRecord));
+    }
+
+    /**
+     * The company's tags with the canonical ones guaranteed present: what `seedDefaults` then `list`
+     * return, without reading the same rows twice. It reads once; a company that already has every
+     * canonical tag is done there. Only a company missing some inserts the missing ones (one statement,
+     * from the rows already read) and reads again. The reads are sequential, not parallel: the second
+     * exists only when the first shows something missing.
+     */
+    async listWithDefaults(tenantId: string): Promise<TagRow[]> {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(tags)
+            .where(eq(tags.tenantId, tenantId))
+            .all();
+        const have = new Set(rows.map(r => r.name as string));
+        const missing = SEED_TAGS.filter(seed => !have.has(seed.name));
+        if (missing.length === 0) return sortTagRecords(rows.map(rowToRecord));
+        const now = new Date();
+        const inserted = await db.insert(tags).values(missing.map(seed => ({
+            id:        crypto.randomUUID(),
+            tenantId,
+            name:      seed.name,
+            color:     seed.color,
+            isSeed:    true,
+            createdAt: now,
+        }))).onConflictDoNothing() // a concurrent first load may have inserted some already
+            .returning({ id: tags.id });
+        logger.info('tags.seeded', { tenantId, inserted: inserted.length, skipped: SEED_TAGS.length - inserted.length });
+        return this.list(tenantId);
     }
 
     async get(id: string, tenantId: string): Promise<TagRow | null> {

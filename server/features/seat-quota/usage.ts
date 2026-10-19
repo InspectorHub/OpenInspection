@@ -74,25 +74,6 @@ export async function getSeatUsage(
 ): Promise<SeatUsage> {
     const drizzleDb = drizzle(db);
 
-    const tenantRow = await drizzleDb
-        .select({ maxUsers: tenants.maxUsers })
-        .from(tenants)
-        .where(eq(tenants.id, tenantId))
-        .limit(1);
-
-    // Normalise: schema stores `max_users` NOT NULL with default 3, and uses
-    // `0` to mean "unlimited". Surface both `0` and `null` as `max: null` so
-    // callers see a single sentinel.
-    const rawMax = tenantRow[0]?.maxUsers;
-    const max: number | null = rawMax == null || rawMax <= 0 ? null : rawMax;
-
-    // Every member counts as one seat. Defer to the shared pure helper so
-    // settings-billing and the invite middleware all agree on "used".
-    const rows = await drizzleDb
-        .select({ id: users.id, role: users.role })
-        .from(users)
-        .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt)));
-
     // `expires_at > now` is not optional: the status column has no expired
     // member and nothing sweeps this table, so without the date an ignored
     // invite would hold a seat permanently. With it, the seat is released by
@@ -105,10 +86,32 @@ export async function getSeatUsage(
     if (opts?.excludeInviteId) {
         inviteConditions.push(ne(tenantInvites.id, opts.excludeInviteId));
     }
-    const outstanding = await drizzleDb
-        .select({ id: tenantInvites.id, role: tenantInvites.role })
-        .from(tenantInvites)
-        .where(and(...inviteConditions));
+
+    // Three independent reads, sent together: each one is a round trip to D1,
+    // and none needs another's answer.
+    const [tenantRow, rows, outstanding] = await Promise.all([
+        drizzleDb
+            .select({ maxUsers: tenants.maxUsers })
+            .from(tenants)
+            .where(eq(tenants.id, tenantId))
+            .limit(1),
+        // Every member counts as one seat. Defer to the shared pure helper so
+        // settings-billing and the invite middleware all agree on "used".
+        drizzleDb
+            .select({ id: users.id, role: users.role })
+            .from(users)
+            .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt))),
+        drizzleDb
+            .select({ id: tenantInvites.id, role: tenantInvites.role })
+            .from(tenantInvites)
+            .where(and(...inviteConditions)),
+    ]);
+
+    // Normalise: schema stores `max_users` NOT NULL with default 3, and uses
+    // `0` to mean "unlimited". Surface both `0` and `null` as `max: null` so
+    // callers see a single sentinel.
+    const rawMax = tenantRow[0]?.maxUsers;
+    const max: number | null = rawMax == null || rawMax <= 0 ? null : rawMax;
 
     const used = computeSeatsHeld(rows, outstanding);
     const remaining = max === null ? Number.POSITIVE_INFINITY : Math.max(0, max - used);
