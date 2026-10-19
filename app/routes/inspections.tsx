@@ -264,7 +264,7 @@ export default function InspectionsPage() {
     (failedIds) => setSelectedIds((prev) => new Set([...prev].filter((id) => failedIds.has(id)))),
   );
   const addressOf = useMemo(
-    () => new Map(Object.values(loadedBuckets).flatMap((items) => (items as Inspection[]).map((i) => [i.id, i.address] as const))),
+    () => new Map(Object.values(loadedBuckets).flatMap((items) => (items as Inspection[]).map((i) => [i.id, i.address || i.propertyAddress || null] as const))),
     [loadedBuckets],
   );
   const buckets = useMemo(() => {

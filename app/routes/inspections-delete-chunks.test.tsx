@@ -18,7 +18,7 @@ import InspectionsPage, { shouldRevalidate } from "~/routes/inspections";
 const EMPTY = { needsAttention: [], today: [], thisWeek: [], later: [], recentReports: [], cancelled: [] };
 const rows = Array.from({ length: 25 }, (_, i) => ({ id: `r${i}`, date: "2026-09-12", address: `${i} Chunk Street`, clientName: "C", status: "scheduled", reportStatus: "in_progress" }));
 
-function mount(opts: { refuse?: string[]; stall?: boolean; garbled?: boolean } = {}) {
+function mount(opts: { refuse?: string[]; stall?: boolean; garbled?: boolean; realShape?: boolean } = {}) {
     const submits: Array<{ ids: string[]; more: string | null }> = [];
     let loads = 0;
     let release: () => void = () => {};
@@ -30,7 +30,7 @@ function mount(opts: { refuse?: string[]; stall?: boolean; garbled?: boolean } =
             path: "inspections",
             Component: InspectionsPage,
             shouldRevalidate,
-            loader: () => { loads += 1; return { buckets: { ...EMPTY, today: rows.filter((r) => !gone.has(r.id)) }, conciergePending: 0, greeting: "x", tags: [], checklistDismissed: true, templateCount: 1, serviceCount: 1, scheduleSet: true, quotaCaps: null, quotaUsage: null, loadFailed: false }; },
+            loader: () => { loads += 1; return { buckets: { ...EMPTY, today: rows.filter((r) => !gone.has(r.id)).map((r) => (opts.realShape ? { ...r, address: undefined, propertyAddress: r.address } : r)) }, conciergePending: 0, greeting: "x", tags: [], checklistDismissed: true, templateCount: 1, serviceCount: 1, scheduleSet: true, quotaCaps: null, quotaUsage: null, loadFailed: false }; },
             action: async ({ request }) => {
                 const fd = await request.formData();
                 if (fd.get("intent") !== "delete-many") return { ok: true, intent: "other" };
@@ -80,6 +80,14 @@ describe("/inspections batch delete in chunks", () => {
         expect(alert.textContent).toMatch(/Not allowed/);
         expect(view.getByText("1 selected")).toBeTruthy();
         expect(purge).not.toHaveBeenCalledWith("r12");
+    });
+
+    it("names a refused row by its address when the list rows carry propertyAddress (the real loader's field)", async () => {
+        const { view } = mount({ refuse: ["r12"], realShape: true });
+        await selectAllAndDelete(view);
+        const alert = await view.findByRole("alert", undefined, { timeout: 5000 });
+        expect(alert.textContent).toMatch(/12 Chunk Street/);
+        expect(alert.textContent).not.toMatch(/r12/);
     });
 
     it("shows the bar working and ignores edits to the selection until the run ends", async () => {
