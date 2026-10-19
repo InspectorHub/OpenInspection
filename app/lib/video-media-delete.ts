@@ -28,3 +28,24 @@ export async function freeVideoMedia(inspectionId: string, videoRef: string): Pr
     inFlight.delete(key);
   }
 }
+
+/**
+ * What identifies a video entry in the results, for removing it after its stored object is freed.
+ *
+ * A Stream video has no R2 `key` (it is ''), so it is matched by the id that was freed
+ * (`streamUid`, or `mediaId` for an R2 video), never by position: the list can change while
+ * the delete is in flight, and a match on an empty key would take any keyless entry.
+ * Position is the last resort, for an entry with no identity at all.
+ */
+export function videoEntryIdentity(
+  photo: { key: string; originalKey?: string; provider?: "stream" | "r2"; streamUid?: string; mediaId?: string },
+  idx: number,
+) {
+  const idField = photo.provider === "r2" ? "mediaId" : "streamUid";
+  const videoRef = photo[idField];
+  const docKey = photo.originalKey || photo.key;
+  const isIt = (p: { key: string; streamUid?: string; mediaId?: string }, i: number): boolean =>
+    docKey ? p.key === docKey : videoRef ? p[idField] === videoRef : i === idx;
+  return { videoRef, docKey, idField, isIt } as const;
+}
+

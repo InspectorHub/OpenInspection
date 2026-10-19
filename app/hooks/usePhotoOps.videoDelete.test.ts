@@ -11,6 +11,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const toasts = vi.hoisted(() => [] as Array<{ message: string; variant?: string }>);
 vi.mock("~/hooks/useToast", () => ({ pushToast: (t: { message: string; variant?: string }) => toasts.push(t) }));
 
+import * as Y from "yjs";
+import { seedResultsDoc, pushPendingPhoto, projectResults } from "../../server/lib/collab/results-doc";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 
 function makeCtx() {
@@ -106,7 +108,7 @@ describe("usePhotoOps video delete", () => {
     expect(setup.setResults).toHaveBeenCalledTimes(1);
   });
 
-  it("an entry with neither key nor original key is still deletable: the server frees it, then it leaves by position", async () => {
+  it("a keyless video is freed on the server, then removed by what was freed, not by the position it had at click time", async () => {
     answer = () => new Response("{}", { status: 200 });
     const { ctx, setResults } = makeCtx();
     const { result } = renderHook(() => usePhotoOps(ctx));
@@ -114,9 +116,24 @@ describe("usePhotoOps video delete", () => {
     await act(async () => { result.current.onViewerAction("delete", keyless); await new Promise((r) => setTimeout(r, 30)); });
     expect(calls).toEqual([["/api/inspections/insp1/media/video/uid-1", "DELETE"]]);
     await waitFor(() => expect(setResults).toHaveBeenCalled());
-    const updater = setResults.mock.calls[0]![0] as (prev: Record<string, unknown>) => Record<string, { photos: Array<{ key: string }> }>;
-    const out = updater({ i1: { photos: [{ key: "p0" }, { key: "" }, { key: "p2" }] } });
-    expect(out.i1!.photos.map((p) => p.key)).toEqual(["p0", "p2"]);
+    const updater = setResults.mock.calls[0]![0] as (prev: Record<string, unknown>) => Record<string, { photos: Array<{ key: string; streamUid?: string }> }>;
+    // While the delete was in flight another entry was added above it and a second keyless video sits below.
+    const out = updater({ i1: { photos: [{ key: "new" }, { key: "", streamUid: "other" }, { key: "", streamUid: "uid-1" }, { key: "p9" }] } });
+    expect(out.i1!.photos.map((p) => p.key + "|" + (p.streamUid ?? ""))).toEqual(["new|", "|other", "p9|"]);
+  });
+
+  it("a keyless video leaves the shared document too, by its stream uid, so the other editors cannot bring it back", async () => {
+    answer = () => new Response("{}", { status: 200 });
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: "_default:s1:i1" }]);
+    pushPendingPhoto(doc, "_default:s1:i1", { key: "", pendingId: "a", mediaType: "video", provider: "stream", streamUid: "uid-1" });
+    pushPendingPhoto(doc, "_default:s1:i1", { key: "", pendingId: "b", mediaType: "video", provider: "stream", streamUid: "uid-2" });
+    const setup = makeCtx();
+    (setup.ctx as unknown as { collabDoc: Y.Doc }).collabDoc = doc;
+    const { result } = renderHook(() => usePhotoOps(setup.ctx));
+    const keyless = { ...(VIDEO as object), key: "", photoIndex: 0 } as never;
+    await act(async () => { result.current.onViewerAction("delete", keyless); await new Promise((r) => setTimeout(r, 30)); });
+    await waitFor(() => expect((projectResults(doc)["_default:s1:i1"].photos ?? []).map((p) => p.streamUid)).toEqual(["uid-2"]));
   });
 
   it("a keyless entry whose delete fails stays and says so", async () => {

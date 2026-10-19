@@ -19,7 +19,8 @@ import {
   markPhotoPending as bindingMarkPhotoPending,
 } from "~/lib/collab/results-binding";
 import { pushToast } from "~/hooks/useToast";
-import { freeVideoMedia } from "~/lib/video-media-delete";
+import { freeVideoMedia, videoEntryIdentity } from "~/lib/video-media-delete";
+import { removeMediaBy as bindingRemoveMediaBy } from "../../server/lib/collab/results-doc-media";
 import { m } from "~/paraglide/messages";
 import { enqueueMedia } from "~/lib/collab/media-upload-queue";
 import { getPendingMedia } from "~/lib/collab/media-pending-store";
@@ -416,13 +417,12 @@ export function usePhotoOps(ctx: {
           return;
         }
         if (action === "delete") {
-          const videoRef = photo.provider === "r2" ? photo.mediaId : photo.streamUid;
-          const docKey = photo.originalKey || photo.key;
+          const { videoRef, docKey, idField, isIt } = videoEntryIdentity(photo, idx);
           const removeEntry = () => {
-            // An entry with no key at all can only be addressed by its position.
-            patchItemPhotos(itemId, (photos) => photos.filter((p, i) => (docKey ? p.key !== docKey : i !== idx)));
-            const fk = collabDoc && docKey ? docFindingKey(itemId, sectionId) : null;
+            patchItemPhotos(itemId, (photos) => photos.filter((p, i) => !isIt(p, i)));
+            const fk = collabDoc ? docFindingKey(itemId, sectionId) : null;
             if (collabDoc && fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
+            else if (collabDoc && fk && videoRef) bindingRemoveMediaBy(collabDoc, fk, idField, videoRef);
           };
           if (!videoRef) removeEntry();
           else {
