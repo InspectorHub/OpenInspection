@@ -19,7 +19,7 @@ import { makeExecutionContext } from '../helpers/exec-ctx';
 import * as schema from '../../../server/lib/db/schema';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { createHarness, TENANT_ID, OWNER_ID, INSPECTOR_ID } from '../helpers/tenant-email-harness';
-import { calendarCleanupWrites } from '../../../server/lib/calendar/disconnect';
+import { calendarCleanupWrites, countCalendarCleanup } from '../../../server/lib/calendar/disconnect';
 
 const OTHER_TENANT = '11111111-0000-4000-8000-0000000000ff';
 const FOREIGN_USER = '22222222-0000-4000-8000-0000000000ff';
@@ -158,6 +158,17 @@ describe('disconnecting a calendar cleans up what it synced', () => {
             expect((await disconnect('?provider=google')).status).toBe(200);
             const rows = await h.db.select().from(schema.auditLogs).where(eq(schema.auditLogs.action, 'calendar.disconnect')).all();
             expect(rows).toHaveLength(1);
+        } finally { h.close(); }
+    });
+
+    it('a provider that cannot have synced rows (microsoft) matches no synced row, in the deletes or in the counts', async () => {
+        const { h, ids } = await setup();
+        try {
+            const before = await ids('availabilityOverrides');
+            expect(await countCalendarCleanup(h.db as never, TENANT_ID, INSPECTOR_ID, 'microsoft')).toEqual({ connections: 0, syncedBusyBlocks: 0, readCalendars: 0, eventLinks: 0 });
+            for (const w of calendarCleanupWrites(h.db as never, TENANT_ID, INSPECTOR_ID, 'microsoft') as Array<{ run: () => unknown }>) await w.run();
+            expect(await ids('availabilityOverrides')).toEqual(before);
+            expect((await ids('calendarConnections')).length).toBe(4);
         } finally { h.close(); }
     });
 });

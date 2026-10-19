@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
@@ -79,15 +79,18 @@ const linkScopeOf = (tenantId: string, userId: string, provider?: CalendarProvid
     eq(calendarExternalLinks.userId, userId),
     provider ? eq(calendarExternalLinks.provider, provider) : undefined,
 );
-// Synced rows only (source set); a Microsoft connection has no override source, so it matches none.
+// Synced rows only (source set). With no provider: every synced row. With google or apple: that source.
+// Any other provider (microsoft has no override source) matches NOTHING, never "every synced row".
 const overrideScopeOf = (tenantId: string, userId: string, provider?: CalendarProviderId) => and(
     eq(availabilityOverrides.tenantId, tenantId),
     eq(availabilityOverrides.inspectorId, userId),
-    provider === 'google' || provider === 'apple' ? eq(availabilityOverrides.source, provider) : isNotNull(availabilityOverrides.source),
+    provider === undefined ? isNotNull(availabilityOverrides.source)
+        : provider === 'google' || provider === 'apple' ? eq(availabilityOverrides.source, provider)
+            : sql`0 = 1`,
 );
 
 /** How many rows of each kind a cleanup with this scope would remove right now. */
-async function countCalendarCleanup(
+export async function countCalendarCleanup(
     d: DrizzleD1Database,
     tenantId: string,
     userId: string,
