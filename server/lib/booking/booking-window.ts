@@ -8,7 +8,7 @@
  * 540 for all-day, 240 for morning or afternoon, 180 for anything else (including
  * a page that has not chosen a window yet).
  */
-export const DEFAULT_BOOKING_WINDOW_MIN = 180;
+const DEFAULT_BOOKING_WINDOW_MIN = 180;
 
 export function bookingWindowMin(serviceTotalMin: number | null | undefined, timeSlot?: string | null): number {
     if (serviceTotalMin && serviceTotalMin > 0) return serviceTotalMin;

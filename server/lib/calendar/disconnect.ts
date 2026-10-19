@@ -37,14 +37,14 @@ export const DISCONNECT_DESCRIPTION = 'Disconnects the calling user calendar and
  *
  * Returns what was removed, as counts (for the audit record, which never carries names).
  */
-export interface CalendarCleanupCounts {
+interface CalendarCleanupCounts {
     connections: number;
     syncedBusyBlocks: number;
     readCalendars: number;
     eventLinks: number;
 }
 
-export async function disconnectCalendar(
+async function disconnectCalendar(
     db: D1Database,
     tenantId: string,
     userId: string,
@@ -87,7 +87,7 @@ const overrideScopeOf = (tenantId: string, userId: string, provider?: CalendarPr
 );
 
 /** How many rows of each kind a cleanup with this scope would remove right now. */
-export async function countCalendarCleanup(
+async function countCalendarCleanup(
     d: DrizzleD1Database,
     tenantId: string,
     userId: string,
