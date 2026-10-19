@@ -42,6 +42,14 @@ function rowToRecord(row: typeof tags.$inferSelect): TagRow {
     };
 }
 
+function sortTagRecords(records: TagRow[]): TagRow[] {
+    records.sort((a, b) => {
+        if (a.isSeed !== b.isSeed) return a.isSeed ? -1 : 1;
+        return a.name.localeCompare(b.name);
+    });
+    return records;
+}
+
 export class TagService {
     constructor(private db: D1Database) {}
 
@@ -54,12 +62,24 @@ export class TagService {
         const rows = await db.select().from(tags)
             .where(eq(tags.tenantId, tenantId))
             .all();
-        const records = rows.map(rowToRecord);
-        records.sort((a, b) => {
-            if (a.isSeed !== b.isSeed) return a.isSeed ? -1 : 1;
-            return a.name.localeCompare(b.name);
-        });
-        return records;
+        return sortTagRecords(rows.map(rowToRecord));
+    }
+
+    /**
+     * The company's tags with the canonical ones guaranteed present: `seedDefaults`
+     * followed by `list`, without reading the same rows twice. The common case, a company
+     * that already has them, is a single read; only a company missing a canonical tag
+     * takes the seeding path and then reads again.
+     */
+    async listWithDefaults(tenantId: string): Promise<TagRow[]> {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(tags)
+            .where(eq(tags.tenantId, tenantId))
+            .all();
+        const have = new Set(rows.map(r => r.name as string));
+        if (SEED_TAGS.every(seed => have.has(seed.name))) return sortTagRecords(rows.map(rowToRecord));
+        await this.seedDefaults(tenantId);
+        return this.list(tenantId);
     }
 
     async get(id: string, tenantId: string): Promise<TagRow | null> {

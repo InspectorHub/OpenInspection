@@ -47,41 +47,46 @@ export const inspectorPaletteMiddleware: MiddlewareHandler<HonoConfig> = async (
         // the D1 fallback would leave 15 KV round trips standing. Reuse inside
         // one render is strictly fresher than the 300s TTL already in force.
         const cacheKey = userSlugCacheKey(user.sub);
-        // KV stores '' for "user has no slug" so the absence is cached too.
-        const slug = await memoOnce(c.env, `user-slug:${tenantId}:${user.sub}`, async () => {
-            const fromCache = await c.env.TENANT_CACHE?.get(cacheKey);
-            if (fromCache !== null && fromCache !== undefined) return fromCache;
-            const row = await drizzle(c.env.DB).select({ slug: users.slug })
-                .from(users)
-                .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
-                .get();
-            const resolved = row?.slug ?? '';
-            await c.env.TENANT_CACHE?.put(cacheKey, resolved, { expirationTtl: SLUG_CACHE_TTL_S });
-            return resolved;
-        });
+        // The two lookups are independent, so they are started together: when both are cache hits
+        // that is one wait on the cache instead of two, on every authenticated request.
+        //
         // Tenant slug: public/standalone paths set `requestedTenantSlug` via
         // tenant routing; saas AUTHENTICATED requests resolve the tenant from
         // the JWT and never set it — fall back to a cached tenants.slug lookup
         // (settings pages render slug-qualified URLs: /book/:tenant, the
         // Stripe webhook endpoint, etc.).
-        let tenantSlug = c.get('requestedTenantSlug') ?? null;
-        if (!tenantSlug) {
-            const tKey = tenantSlugCacheKey(tenantId);
-            // A separate resolve from the user slug above, not the same lookup
-            // narrowed -- different table, different key namespace.
-            const cached = await memoOnce(c.env, `tenant-slug:${tenantId}`, async () => {
-                const fromCache = await c.env.TENANT_CACHE?.get(tKey);
+        const requestedTenantSlug = c.get('requestedTenantSlug') ?? null;
+        const [slug, tenantSlugResolved] = await Promise.all([
+            // KV stores '' for "user has no slug" so the absence is cached too.
+            memoOnce(c.env, `user-slug:${tenantId}:${user.sub}`, async () => {
+                const fromCache = await c.env.TENANT_CACHE?.get(cacheKey);
                 if (fromCache !== null && fromCache !== undefined) return fromCache;
-                const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
-                    .from(tenants)
-                    .where(eq(tenants.id, tenantId))
+                const row = await drizzle(c.env.DB).select({ slug: users.slug })
+                    .from(users)
+                    .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
                     .get();
                 const resolved = row?.slug ?? '';
-                await c.env.TENANT_CACHE?.put(tKey, resolved, { expirationTtl: SLUG_CACHE_TTL_S });
+                await c.env.TENANT_CACHE?.put(cacheKey, resolved, { expirationTtl: SLUG_CACHE_TTL_S });
                 return resolved;
-            });
-            tenantSlug = cached || null;
-        }
+            }),
+            requestedTenantSlug
+                ? Promise.resolve('')
+                // A separate resolve from the user slug above, not the same lookup
+                // narrowed -- different table, different key namespace.
+                : memoOnce(c.env, `tenant-slug:${tenantId}`, async () => {
+                    const tKey = tenantSlugCacheKey(tenantId);
+                    const fromCache = await c.env.TENANT_CACHE?.get(tKey);
+                    if (fromCache !== null && fromCache !== undefined) return fromCache;
+                    const row = await drizzle(c.env.DB).select({ slug: tenants.slug })
+                        .from(tenants)
+                        .where(eq(tenants.id, tenantId))
+                        .get();
+                    const resolved = row?.slug ?? '';
+                    await c.env.TENANT_CACHE?.put(tKey, resolved, { expirationTtl: SLUG_CACHE_TTL_S });
+                    return resolved;
+                }),
+        ]);
+        const tenantSlug = requestedTenantSlug || tenantSlugResolved || null;
 
         const enriched = {
             ...branding,
