@@ -29,7 +29,15 @@ async function seedSchema(): Promise<void> {
         'CREATE TABLE IF NOT EXISTS inspection_inspectors (inspection_id TEXT NOT NULL, user_id TEXT NOT NULL, tenant_id TEXT NOT NULL, role TEXT NOT NULL DEFAULT \'lead\', created_at INTEGER NOT NULL, PRIMARY KEY (inspection_id, user_id));',
     );
     await b.DB.exec(
-        'CREATE TABLE IF NOT EXISTS inspections (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, inspector_id TEXT, property_address TEXT, date TEXT, status TEXT, report_status TEXT NOT NULL DEFAULT \'in_progress\', request_id TEXT, created_at INTEGER NOT NULL);',
+        'CREATE TABLE IF NOT EXISTS inspections (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, inspector_id TEXT, property_address TEXT, date TEXT, status TEXT, report_status TEXT NOT NULL DEFAULT \'in_progress\', request_id TEXT, created_at INTEGER NOT NULL, duration_min INTEGER, scheduled_start_ms INTEGER, scheduled_end_ms INTEGER);',
+    );
+    // The booking arbitration also reads timed calendar blocks and date overrides (time off and synced busy
+    // events). Columns per server/lib/db/schema; keep in step when the arbitration starts reading another one.
+    await b.DB.exec(
+        'CREATE TABLE IF NOT EXISTS calendar_blocks (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, user_id TEXT NOT NULL, title TEXT, date TEXT NOT NULL, start_time TEXT, end_time TEXT, is_all_day INTEGER NOT NULL DEFAULT 0, notes TEXT, created_at INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0);',
+    );
+    await b.DB.exec(
+        'CREATE TABLE IF NOT EXISTS availability_overrides (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, inspector_id TEXT NOT NULL, date TEXT NOT NULL, is_available INTEGER NOT NULL DEFAULT 0, start_time TEXT, end_time TEXT, created_at INTEGER NOT NULL DEFAULT 0, source TEXT, external_id TEXT, transparency TEXT);',
     );
 }
 
