@@ -260,7 +260,7 @@ export class BookingService {
                 inArray(availabilityOverrides.inspectorId, eligible),
                 eq(availabilityOverrides.date, dateStr),
             )).all(),
-            db.select({ userId: inspectionInspectors.userId, date: inspections.date })
+            db.select({ userId: inspectionInspectors.userId, date: inspections.date, durationMin: inspections.durationMin })
                 .from(inspectionInspectors)
                 .innerJoin(inspections, eq(inspections.id, inspectionInspectors.inspectionId))
                 .where(and(

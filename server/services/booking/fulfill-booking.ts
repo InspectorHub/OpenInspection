@@ -29,6 +29,24 @@ export interface FulfillBookingDeps {
 }
 
 /**
+ * A booking that lost the race (or whose slot was taken off the table meanwhile) is
+ * retracted whole: its rows are deleted AND the inspection allowance it consumed is
+ * given back. The rows go first; for a company on the capped plan the allowance is
+ * counted from rows, and for the others the usage counter is decremented, so a lost
+ * booking no longer leaves the counter one (or N, for a multi-service booking) too high.
+ */
+export async function retractLostBooking(
+    deps: Pick<FulfillBookingDeps, 'planQuota'>,
+    service: { revokeBooking(tenantId: string, requestId: string): Promise<void> },
+    tenantId: string,
+    requestId: string,
+    inspectionCount: number,
+): Promise<void> {
+    await service.revokeBooking(tenantId, requestId);
+    await deps.planQuota?.releaseInspection(tenantId, inspectionCount);
+}
+
+/**
  * Turn an accepted public booking into rows, and defend them.
  *
  * What is left here after the three extractions is exactly the part that
@@ -165,6 +183,48 @@ export async function fulfillBooking(
     }
     const inspectionId = primaryInspectionId;
 
+    // The scheduled instant and the booked length are stamped BEFORE the arbitration below,
+    // not after: the arbitration compares recorded windows, and a racer whose rows carry no
+    // duration yet would be judged by the older start-time rule against one whose rows do.
+    // Both racers stamp first, so both see the same facts and reach the same verdict.
+    // A-polish 9b — stamp the precise scheduled instant on every inspection
+    // this booking created. The wall-clock slot time is interpreted in the
+    // TENANT tz (not the naive :00Z of the startIso busy-check key), so
+    // downstream conflict detection, Google push, and the ICS feed reason
+    // about real instants. inspections.date is deliberately left untouched —
+    // it still keys the HH:MM busy-checks via slice(11,16). Non-fatal: the
+    // inspection rows already committed, so a stamp failure must not 500 the
+    // booker (conflict detection just falls back to the hour-bucket).
+    //
+    // The zone comes from the CLAIM, not from a second read of tenant_configs.
+    // It is the same value admission already refused the booking over, so this
+    // line cannot silently degrade to the UTC sentinel the way it used to — and
+    // there is no second place left where that degradation could reappear.
+    const scheduledStartMs = wallClockToEpochMs(body.date, requestedTime, tenantTz);
+    const slotWindowMin =
+        body.timeSlot === 'all-day' ? 540
+        : body.timeSlot === 'morning' || body.timeSlot === 'afternoon' ? 240
+        : 180;
+    const durationMin = bookedServiceDurationMin ?? slotWindowMin;
+    const scheduledEndMs = scheduledStartMs + durationMin * 60000;
+    try {
+        await db.update(inspections)
+            .set({
+                scheduledStartMs: new Date(scheduledStartMs),
+                scheduledEndMs: new Date(scheduledEndMs),
+                durationMin,
+            })
+            .where(and(
+                inArray(inspections.id, allInspectionIds),
+                eq(inspections.tenantId, tenantId),
+            ));
+    } catch (e) {
+        logger.warn('booking.scheduled-instant.stamp.failed', {
+            inspectionIds: allInspectionIds,
+            error: e instanceof Error ? e.message : String(e),
+        });
+    }
+
     // B-28 — post-insert TOCTOU recheck. Runs after our insert and BEFORE
     // any side effect (confirmation email, calendar event, notifications)
     // so a losing booker only ever sees the 409, never a confirmation for
@@ -175,7 +235,7 @@ export async function fulfillBooking(
         tenantId, inspectorId, body.date, requestedTime, createdRequestId,
     );
     if (verdict === 'lose') {
-        await service.revokeBooking(tenantId, createdRequestId);
+        await retractLostBooking(deps, service, tenantId, createdRequestId, allInspectionIds.length);
         throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
     }
 
@@ -236,44 +296,6 @@ export async function fulfillBooking(
                 inspectorId,
             },
         }));
-    }
-
-    // A-polish 9b — stamp the precise scheduled instant on every inspection
-    // this booking created. The wall-clock slot time is interpreted in the
-    // TENANT tz (not the naive :00Z of the startIso busy-check key), so
-    // downstream conflict detection, Google push, and the ICS feed reason
-    // about real instants. inspections.date is deliberately left untouched —
-    // it still keys the HH:MM busy-checks via slice(11,16). Non-fatal: the
-    // inspection rows already committed, so a stamp failure must not 500 the
-    // booker (conflict detection just falls back to the hour-bucket).
-    //
-    // The zone comes from the CLAIM, not from a second read of tenant_configs.
-    // It is the same value admission already refused the booking over, so this
-    // line cannot silently degrade to the UTC sentinel the way it used to — and
-    // there is no second place left where that degradation could reappear.
-    const scheduledStartMs = wallClockToEpochMs(body.date, requestedTime, tenantTz);
-    const slotWindowMin =
-        body.timeSlot === 'all-day' ? 540
-        : body.timeSlot === 'morning' || body.timeSlot === 'afternoon' ? 240
-        : 180;
-    const durationMin = bookedServiceDurationMin ?? slotWindowMin;
-    const scheduledEndMs = scheduledStartMs + durationMin * 60000;
-    try {
-        await db.update(inspections)
-            .set({
-                scheduledStartMs: new Date(scheduledStartMs),
-                scheduledEndMs: new Date(scheduledEndMs),
-                durationMin,
-            })
-            .where(and(
-                inArray(inspections.id, allInspectionIds),
-                eq(inspections.tenantId, tenantId),
-            ));
-    } catch (e) {
-        logger.warn('booking.scheduled-instant.stamp.failed', {
-            inspectionIds: allInspectionIds,
-            error: e instanceof Error ? e.message : String(e),
-        });
     }
 
     // The deposit is resolved and FROZEN here, after the booking has survived

@@ -7,6 +7,7 @@
 import { buildSlotGrid, type BuildSlotGridOptions } from './slot-grid';
 import {
     addCalendarBlockBusyTimes,
+    addInspectionDurationBusyTimes,
     computeBusyTimes,
     hasAllDayCalendarBlock,
     type BusyRow,
@@ -79,8 +80,11 @@ export function buildTenantSlotMap(
         const effective = blocked ? myOverrides.filter((o) => o.isAvailable) : myWindows;
         if (effective.length === 0) continue;
 
-        const busyTimes = computeBusyTimes(busy.filter((b) => b.userId === inspectorId));
+        const myBusy = busy.filter((b) => b.userId === inspectorId);
+        const busyTimes = computeBusyTimes(myBusy);
         const mySlots = buildSlotGrid(effective, gridOpts);
+        // An inspection with a recorded length also blocks the slots inside it, not just its start.
+        addInspectionDurationBusyTimes(busyTimes, myBusy, mySlots, intervalMin);
         addCalendarBlockBusyTimes(busyTimes, myBlocks, mySlots, intervalMin);
         // Synced busy subtracts overlapping slots, same as timed calendar blocks.
         addCalendarBlockBusyTimes(

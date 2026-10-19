@@ -113,6 +113,7 @@ Why things are built the way they are. Read these when the reference told you
 | [`concepts/commercial-pca-report.md`](concepts/commercial-pca-report.md) | The two commercial tiers, the ASTM vocabulary, and why the reserve schedule is opt-in |
 | [`concepts/collab-editing.md`](concepts/collab-editing.md) | Yjs CRDT in a Durable Object; what happens when the binding is absent |
 | [`concepts/kv-cache.md`](concepts/kv-cache.md) | What `TENANT_CACHE` holds and when it is invalidated |
+| [`concepts/booking-slots-and-races.md`](concepts/booking-slots-and-races.md) | How the booking page decides what to offer, how two simultaneous bookers are resolved, and why there is no unique index |
 | [`concepts/multilingual-demand-signal.md`](concepts/multilingual-demand-signal.md) | Reading `contacts.locale` as a number, and what it cannot see |
 
 ## Compliance
