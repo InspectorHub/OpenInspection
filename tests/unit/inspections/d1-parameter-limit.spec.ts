@@ -6,13 +6,14 @@
  */
 import { describe, expect, it } from 'vitest';
 import { drizzle } from 'drizzle-orm/d1';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
-import { createHarness, TENANT_ID, OWNER_ID, INSPECTOR_ID } from '../helpers/tenant-email-harness';
+import { createHarness, TENANT_ID, OWNER_ID, INSPECTOR_ID, type Harness } from '../helpers/tenant-email-harness';
 import { InspectionAnalyticsService } from '../../../server/services/inspection/inspection-analytics.service';
 import { getInspectionRosters } from '../../../server/lib/inspection/roster';
 import { anyInspectionStarted } from '../../../server/lib/inspection/inspection-started';
 import { mayActOnContact } from '../../../server/lib/inspection/assignment-access';
+import { chunkIds } from '../../../server/lib/id-chunks';
 
 const LIMIT = 100;
 
@@ -90,19 +91,68 @@ describe('reads over a long list of inspection ids stay under the D1 parameter l
         } finally { h.close(); }
     });
 
-    it('whether a manager may act on a contact seated on more than 100 inspections', async () => {
+    it('rosters carry no duplicate rows when an id appears twice in the list', async () => {
         const { h, db } = await setup();
         try {
-            await h.db.insert(schema.contacts).values({ id: 'c-many', tenantId: TENANT_ID, type: 'agent', name: 'Busy Agent', email: 'busy@realty.example', createdAt: new Date() } as never);
-            const profile = (await h.db.select({ id: schema.contactRoleProfiles.id }).from(schema.contactRoleProfiles).limit(1).get())!.id;
-            await h.db.insert(schema.inspectionPeople).values(ids.map((id, i) => ({ id: `pp-${i}`, tenantId: TENANT_ID, inspectionId: id, contactId: 'c-many', roleProfileId: profile, createdAt: new Date() })) as never);
-            const ctx = (userId: string, role: string) => ({
-                get: (k: string) => ({ userRole: role, tenantId: TENANT_ID, user: { sub: userId } } as Record<string, unknown>)[k],
-                env: { DB: limited(h.env.DB as D1Database) },
-            });
-            // The owner's seat is on the roster of the last chunk's inspections: found, not a limit error.
-            expect(await mayActOnContact(ctx(OWNER_ID, 'manager') as never, 'c-many')).toBe(true);
-            void db; void INSPECTOR_ID;
+            // The first ids also have a helper; they are repeated in the last chunk, so a repeat that
+            // slipped through would list the helper twice.
+            await h.db.insert(schema.inspectionInspectors).values(ids.slice(0, 5).map((id) => ({ inspectionId: id, userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'helper' as const, createdAt: new Date() })) as never);
+            const rosters = await getInspectionRosters(db as never, TENANT_ID, [...ids, ...ids.slice(0, 5)]);
+            expect(rosters.size).toBe(N);
+            expect(rosters.get(ids[0]!)?.helpers).toHaveLength(1);
+        } finally { h.close(); }
+    });
+
+    it('chunking drops repeated ids and keeps every chunk within the limit', () => {
+        const chunks = chunkIds([...ids, ...ids.slice(0, 10), ids[0]!]);
+        expect(chunks.flat()).toEqual(ids);
+        expect(Math.max(...chunks.map((c) => c.length))).toBeLessThanOrEqual(90);
+        expect(chunkIds([])).toEqual([]);
+    });
+});
+
+/** mayActOnContact for a contact seated on all 250 inspections, as a user who is not the owner. */
+describe('mayActOnContact across chunks of a long list', () => {
+    async function seat(h: Harness) {
+        await h.db.insert(schema.contacts).values({ id: 'c-many', tenantId: TENANT_ID, type: 'agent', name: 'Busy Agent', email: 'busy@realty.example', createdAt: new Date() } as never);
+        const profile = (await h.db.select({ id: schema.contactRoleProfiles.id }).from(schema.contactRoleProfiles).limit(1).get())!.id;
+        await h.db.insert(schema.inspectionPeople).values(ids.map((id, i) => ({ id: `pp-${i}`, tenantId: TENANT_ID, inspectionId: id, contactId: 'c-many', roleProfileId: profile, createdAt: new Date() })) as never);
+    }
+    const ctx = (h: Harness, overrides: Record<string, boolean> | null = null) => ({
+        get: (k: string) => ({
+            userRole: 'inspector', tenantId: TENANT_ID, user: { sub: INSPECTOR_ID },
+            sdb: { getById: async () => ({ permissionOverrides: overrides }) },
+        } as Record<string, unknown>)[k],
+        env: { DB: limited(h.env.DB as D1Database) },
+    }) as never;
+
+    it('a roster seat on the LAST inspection only is found (match in the last chunk)', async () => {
+        const { h } = await setup();
+        try {
+            await seat(h);
+            await h.db.delete(schema.inspectionInspectors);
+            await h.db.insert(schema.inspectionInspectors).values({ inspectionId: ids[N - 1]!, userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'helper', createdAt: new Date() } as never);
+            expect(await mayActOnContact(ctx(h), 'c-many')).toBe(true);
+        } finally { h.close(); }
+    });
+
+    it('being named by inspector_id on the LAST inspection only is found', async () => {
+        const { h } = await setup();
+        try {
+            await seat(h);
+            await h.db.delete(schema.inspectionInspectors);
+            await h.db.update(schema.inspections).set({ inspectorId: INSPECTOR_ID } as never).where(eq(schema.inspections.id, ids[N - 1]!));
+            expect(await mayActOnContact(ctx(h), 'c-many')).toBe(true);
+        } finally { h.close(); }
+    });
+
+    it('no seat in any chunk falls through to the scheduleOthers capability', async () => {
+        const { h } = await setup();
+        try {
+            await seat(h);
+            await h.db.delete(schema.inspectionInspectors); // nobody is on any roster; inspector_id is the owner everywhere
+            expect(await mayActOnContact(ctx(h), 'c-many')).toBe(false);
+            expect(await mayActOnContact(ctx(h, { scheduleOthers: true }), 'c-many')).toBe(true);
         } finally { h.close(); }
     });
 });

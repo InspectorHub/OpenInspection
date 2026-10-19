@@ -4,8 +4,13 @@
  */
 const ID_CHUNK = 90;
 
+/**
+ * Duplicates are dropped first: `IN (...)` matched a repeated id once, and the same id landing in two
+ * chunks would otherwise come back as two rows.
+ */
 export function chunkIds<T>(ids: readonly T[], size = ID_CHUNK): T[][] {
+    const unique = [...new Set(ids)];
     const out: T[][] = [];
-    for (let off = 0; off < ids.length; off += size) out.push(ids.slice(off, off + size));
+    for (let off = 0; off < unique.length; off += size) out.push(unique.slice(off, off + size));
     return out;
 }
