@@ -134,6 +134,8 @@ export function ScheduleStep({
     setDateHasSlots(null);
     const params = new URLSearchParams({ tenant, date: inspectionDate });
     if (serviceKey) params.set("serviceIds", serviceKey);
+    // Ask about the window the visitor chose: the same one the booking will be judged over.
+    if (timeWindow) params.set("timeSlot", timeWindow);
     const ctrl = new AbortController();
     const t = setTimeout(() => {
       fetch(`/api/public/slots?${params.toString()}`, { signal: ctrl.signal })
@@ -162,7 +164,7 @@ export function ScheduleStep({
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [tenant, inspectionDate, serviceKey, dateIssue]);
+  }, [tenant, inspectionDate, serviceKey, dateIssue, timeWindow]);
 
   // Report upward, never decide upward: `false` is a measured answer, `null` is
   // "we do not know", and only the first one may stop a booking.

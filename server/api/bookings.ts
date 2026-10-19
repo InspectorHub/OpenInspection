@@ -15,7 +15,7 @@
 // `hono/client` consumers. `server/index.ts` mounts the default export at
 // `/api/public` unchanged.
 import { createRoute, z } from '@hono/zod-openapi';
-import { bookingWindowMin } from '../lib/booking/booking-window';
+import { bookingWindowMin, widestBookingWindowMin, slotSatisfiesWindow } from '../lib/booking/booking-window';
 import { createApiRouter } from '../lib/openapi-router';
 import { eq } from 'drizzle-orm';
 import { services as servicesTable, tenants } from '../lib/db/schema';
@@ -143,6 +143,8 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
             inspectorId: z.string().trim().min(1).optional().describe('Restrict slots to a single inspector (client choice / deep link).'),
             propertyZip: z.string().trim().min(3).max(10).optional().openapi({ example: '78701' })
                 .describe('Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run.'),
+            timeSlot: z.enum(['morning', 'afternoon', 'all-day', 'custom']).optional().openapi({ example: 'morning' })
+                .describe('The window the customer will book (the same values POST /api/public/book takes). A slot is then offered only when a booking of that window fits it, which is what the booking is judged on, and morning or afternoon offer only starts inside that window. Omitted, a start is offered only when it fits every window (the longest one), so it never turns into a refusal whichever window is chosen.'),
         }).describe('Tenant slot query parameters'),
     },
     responses: {
@@ -242,20 +244,23 @@ export const bookingsRoutes = createApiRouter()
     .route('/', publicGeocodeRoutes)
     .openapi(getTenantSlotsRoute, async (c) => {
         await checkRateLimit(c, 'availability');
-        const { tenant, date, serviceIds, inspectorId, propertyZip } = c.req.valid('query');
+        const { tenant, date, serviceIds, inspectorId, propertyZip, timeSlot } = c.req.valid('query');
         const tenantRow = await getDrizzle(c).select({ id: tenants.id })
             .from(tenants).where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) throw Errors.NotFound('Tenant not found.');
         const ids = serviceIds ? serviceIds.split(',').filter(Boolean) : [];
         // Offer only the slots a booking of this length fits: the chosen services' minutes, or the default
         // window. The booking itself is judged over the same length (see booking-window.ts).
-        const windowMin = bookingWindowMin(await c.var.services.booking.serviceTotalMinutes(tenantRow.id, ids));
+        const totalMin = await c.var.services.booking.serviceTotalMinutes(tenantRow.id, ids);
+        const windowMin = timeSlot ? bookingWindowMin(totalMin, timeSlot) : widestBookingWindowMin(totalMin);
         const all = await c.var.services.booking.getTenantSlots(
             tenantRow.id, date, ids, undefined, propertyZip ?? null, windowMin,
         );
         const slots = all.slots.map(s => ({
             time: s.time,
-            available: inspectorId ? s.inspectorIds.includes(inspectorId) : s.available,
+            available: (inspectorId ? s.inspectorIds.includes(inspectorId) : s.available)
+                // A named window offers only starts inside it; `custom` names a time the page does not choose from this list.
+                && (!timeSlot || timeSlot === 'custom' || slotSatisfiesWindow(s.time, timeSlot, null)),
         }));
         return c.json({
             success: true,

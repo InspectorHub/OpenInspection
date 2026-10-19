@@ -9808,6 +9808,23 @@
             "example": "78701",
             "description": "Property ZIP. Restricts the union to inspectors whose service area covers it; omitted means the geographic filter cannot run. 3-10 characters."
           }
+        },
+        {
+          "name": "timeSlot",
+          "in": "query",
+          "required": false,
+          "description": "The window the customer will book (the same values POST /api/public/book takes). A slot is then offered only when a booking of that window fits it, which is what the booking is judged on, and morning or afternoon offer only starts inside that window. Omitted, a start is offered only when it fits every window (the longest one), so it never turns into a refusal whichever window is chosen. One of: morning, afternoon, all-day, custom.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "morning",
+              "afternoon",
+              "all-day",
+              "custom"
+            ],
+            "example": "morning",
+            "description": "The window the customer will book (the same values POST /api/public/book takes). A slot is then offered only when a booking of that window fits it, which is what the booking is judged on, and morning or afternoon offer only starts inside that window. Omitted, a start is offered only when it fits every window (the longest one), so it never turns into a refusal whichever window is chosen. One of: morning, afternoon, all-day, custom."
+          }
         }
       ],
       "body": null
