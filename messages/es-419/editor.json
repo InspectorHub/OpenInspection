@@ -135,5 +135,6 @@
   "editor_customdefect_category_maintenance": "Mantenimiento",
   "editor_customdefect_save_to_library": "Guardar en mi biblioteca",
   "editor_customdefect_add": "Agregar defecto",
-  "editor_cost_remove_failed": "No se pudo quitar el elemento de costo. Volvió a la lista; inténtelo de nuevo."
+  "editor_cost_remove_failed": "No se pudo quitar el elemento de costo. Volvió a la lista; inténtelo de nuevo.",
+  "editor_video_delete_failed": "No se pudo eliminar el video. Sigue en la inspección; inténtelo de nuevo cuando tenga conexión."
 }

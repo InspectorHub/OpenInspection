@@ -135,5 +135,6 @@
   "editor_customdefect_category_maintenance": "Maintenance",
   "editor_customdefect_save_to_library": "Save to my library",
   "editor_customdefect_add": "Add defect",
-  "editor_cost_remove_failed": "The cost item could not be removed. It is back in the list; try again."
+  "editor_cost_remove_failed": "The cost item could not be removed. It is back in the list; try again.",
+  "editor_video_delete_failed": "The video could not be deleted. It is still in the inspection; try again when you are online."
 }
