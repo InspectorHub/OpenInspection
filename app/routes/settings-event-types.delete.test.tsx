@@ -5,7 +5,7 @@
  * reaches the server) leaves the row in place and says so.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within, act } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import SettingsEventTypes from "~/routes/settings-event-types";
@@ -25,9 +25,15 @@ function mount() {
     ]);
     return render(<Stub initialEntries={["/settings/event-types"]} />);
 }
-const clickDelete = async (name: string) => {
+const openDelete = async (name: string) => {
     const row = (await screen.findByText(name)).closest("tr")!;
     fireEvent.click([...row.querySelectorAll("button")].find((b) => b.textContent === "Delete")!);
+    return await screen.findByRole("dialog");
+};
+/** Open the confirmation and confirm it. */
+const clickDelete = async (name: string) => {
+    const dialog = await openDelete(name);
+    fireEvent.click(within(dialog).getAllByRole("button").at(-1)!);
 };
 
 describe("settings → event types: delete", () => {
@@ -57,5 +63,39 @@ describe("settings → event types: delete", () => {
         const alert = await screen.findByRole("alert");
         expect(alert.textContent).toMatch(/could not be deleted/i);
         expect(screen.getByText("Sewer scope")).toBeTruthy();
+    });
+
+    it("asks first: the dialog names the type and says what happens, and cancelling sends nothing", async () => {
+        fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+        vi.stubGlobal("fetch", fetchMock);
+        mount();
+        const dialog = await openDelete("Sewer scope");
+        expect(dialog.textContent).toMatch(/Sewer scope/);
+        expect(dialog.textContent).toMatch(/switched off|turned off/i);
+        expect(dialog.textContent).toMatch(/deleted for good|permanently/i);
+        fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
+        await new Promise((r) => setTimeout(r, 40));
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(screen.getByText("Sewer scope")).toBeTruthy();
+    });
+
+    it("two same-frame confirmations send one delete", async () => {
+        fetchMock = vi.fn(async () => { serverRows = [T2]; return new Response("{}", { status: 200 }); });
+        vi.stubGlobal("fetch", fetchMock);
+        mount();
+        const dialog = await openDelete("Sewer scope");
+        const confirm = within(dialog).getAllByRole("button").at(-1)!;
+        await act(async () => { confirm.click(); confirm.click(); });
+        await waitFor(() => expect(screen.queryByText("Sewer scope")).toBeNull());
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("a refused delete leaves the dialog closed, the row listed and an alert shown", async () => {
+        fetchMock = vi.fn(async () => new Response("{}", { status: 409 }));
+        vi.stubGlobal("fetch", fetchMock);
+        mount();
+        await clickDelete("Sewer scope");
+        expect((await screen.findByRole("alert")).textContent).toMatch(/could not be deleted/i);
+        expect(screen.queryByRole("dialog")).toBeNull();
     });
 });
