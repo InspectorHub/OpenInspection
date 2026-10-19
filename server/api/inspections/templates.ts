@@ -10,6 +10,8 @@ import { paginationQuerySchema, PaginatedMetaSchema, buildMeta } from '../../lib
 import { CreateTemplateSchema, UpdateTemplateSchema } from '../../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { getDrizzle } from '../../lib/route-helpers';
+import { countTemplates } from '../../services/template/count';
 import { refuseStatutoryTemplateEdit } from '../../lib/middleware/refuse-statutory-template-edit';
 
 /**
@@ -60,6 +62,25 @@ const listTemplatesRoute = createRoute(withMcpMetadata({
     operationId: "listInspectionTemplates",
 }, { scopes: ['read'], tier: 'extended' }));
 
+
+/**
+ * GET /api/inspections/templates/count
+ */
+const countTemplatesRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/templates/count',
+    tags: ["inspections", "templates"],
+    summary: "Count inspection templates for current tenant",
+    description: "Returns how many templates the company has, the same number the list reports as meta.total (retired templates are counted). Reads no template content, so it is the cheap way to ask whether any exist. Available to owner, manager and inspector roles.",
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ total: z.number().int().min(0) })) } },
+            description: 'Template count',
+        },
+    },
+    operationId: "countInspectionTemplates",
+}, { scopes: ['read'], tier: 'extended' }));
 
 /**
  * GET /api/inspections/templates/duplicates
@@ -243,6 +264,9 @@ const templatesRoutes = createApiRouter()
             data: rows,
             meta: buildMeta({ total, page: queryParams.page, pageSize: queryParams.pageSize }),
         }, 200);
+    })
+    .openapi(countTemplatesRoute, async (c) => {
+        return c.json({ success: true, data: { total: await countTemplates(getDrizzle(c), c.get('tenantId')) } }, 200);
     })
     .openapi(listTemplateDuplicatesRoute, async (c) => {
         const service = c.var.services.template;
