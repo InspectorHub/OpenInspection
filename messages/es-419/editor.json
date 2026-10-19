@@ -134,5 +134,6 @@
   "editor_customdefect_category_recommendation": "Recomendación",
   "editor_customdefect_category_maintenance": "Mantenimiento",
   "editor_customdefect_save_to_library": "Guardar en mi biblioteca",
-  "editor_customdefect_add": "Agregar defecto"
+  "editor_customdefect_add": "Agregar defecto",
+  "editor_cost_remove_failed": "No se pudo quitar el elemento de costo. Volvió a la lista; inténtelo de nuevo."
 }

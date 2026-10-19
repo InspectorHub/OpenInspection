@@ -4,6 +4,7 @@ import { formatDollars } from "~/lib/money";
 import { MoneyInput } from "~/components/MoneyInput";
 import { CostExportButtons } from "~/components/CostExportButtons";
 import type { CostItemView } from "~/components/portal/sections/report/types";
+import { submitCostItem } from "~/components/editor/cost-items-api";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -46,42 +47,6 @@ function isTempId(id: string): boolean {
   return id.startsWith("tmp-");
 }
 
-async function submitCostItem(
-  inspectionId: string,
-  intent: "create" | "update" | "delete",
-  item: CostItemView,
-): Promise<{ success: boolean; id?: string }> {
-  const fd = new FormData();
-  fd.set("intent", intent);
-  fd.set("inspectionId", inspectionId);
-  if (intent !== "create") fd.set("itemId", item.id);
-  if (intent !== "delete") {
-    fd.set("system", item.system);
-    fd.set("component", item.component);
-    fd.set("location", item.location ?? "");
-    fd.set("action", item.action);
-    fd.set("costMethod", item.costMethod);
-    fd.set("quantity", item.quantity == null ? "" : String(item.quantity));
-    fd.set("uom", item.uom ?? "");
-    fd.set("unitCostCents", item.unitCostCents == null ? "" : String(item.unitCostCents));
-    fd.set("lumpSumCents", item.lumpSumCents == null ? "" : String(item.lumpSumCents));
-    fd.set("eul", item.eul == null ? "" : String(item.eul));
-    fd.set("effAge", item.effAge == null ? "" : String(item.effAge));
-    fd.set("rul", item.rul == null ? "" : String(item.rul));
-    fd.set("suggestedRemedy", item.suggestedRemedy ?? "");
-    fd.set("bucket", item.bucket);
-    fd.set("sortOrder", String(item.sortOrder ?? 0));
-  }
-  try {
-    // busy-controls-allow: update sets absolute column values and delete removes by id with no error on a missing row (CostItemService.update/remove), so a repeat is harmless; the same fetch also carries intent=create, which is not idempotent and is guarded at its only call sites (addRow behind addLatch, and a temp row's follow-up create behind saving[id])
-    const res = await fetch("/resources/cost-items", { method: "POST", credentials: "include", body: fd });
-    if (!res.ok) return { success: false };
-    return (await res.json()) as { success: boolean; id?: string };
-  } catch {
-    return { success: false };
-  }
-}
-
 export function CostItemsPanel({
   inspectionId, items, reserveEnabled,
 }: {
@@ -91,6 +56,7 @@ export function CostItemsPanel({
 }) {
   const [rows, setRows] = useState<CostItemView[]>(items);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [removeFailed, setRemoveFailed] = useState(false);
   // Temp ids the user asked to remove while their initial background
   // `create` was still in flight (see `removeRow`) — cleaned up once that
   // create resolves, by immediately deleting the just-landed server row
@@ -156,6 +122,8 @@ export function CostItemsPanel({
   }
 
   async function removeRow(id: string) {
+    const index = rows.findIndex((r) => r.id === id);
+    setRemoveFailed(false);
     setRows((prev) => prev.filter((r) => r.id !== id));
     if (isTempId(id)) {
       // Still-pending create for this row — queue the eventual delete
@@ -166,7 +134,12 @@ export function CostItemsPanel({
       return;
     }
     const row = items.find((r) => r.id === id) ?? rows.find((r) => r.id === id);
-    if (row) await submitCostItem(inspectionId, "delete", row);
+    if (!row) return;
+    const result = await submitCostItem(inspectionId, "delete", row);
+    if (result.success) return;
+    // Not confirmed: the row is still on the server, so it comes back where it was.
+    setRows((prev) => (prev.some((r) => r.id === id) ? prev : [...prev.slice(0, Math.max(index, 0)), row, ...prev.slice(Math.max(index, 0))]));
+    setRemoveFailed(true);
   }
 
   return (
@@ -182,6 +155,8 @@ export function CostItemsPanel({
           </Button>
         </div>
       </div>
+
+      {removeFailed && <p role="alert" className="text-[12px] font-medium text-ih-bad-fg">{m.editor_cost_remove_failed()}</p>}
 
       <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3">
         {rows.length > 0 && (
