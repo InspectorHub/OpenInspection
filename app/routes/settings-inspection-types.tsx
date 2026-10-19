@@ -99,12 +99,14 @@ export default function SettingsInspectionTypes() {
   function openAdd() {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setWriteFailed(false);
     setModalOpen(true);
   }
 
   function openEdit(ot: OrgSubtype) {
     setEditingId(ot.id);
     setForm({ name: ot.name, basedOn: ot.basedOn, description: ot.description });
+    setWriteFailed(false);
     setModalOpen(true);
   }
 

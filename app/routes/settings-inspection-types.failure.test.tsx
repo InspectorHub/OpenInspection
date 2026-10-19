@@ -50,4 +50,15 @@ describe("settings → inspection types: failures are shown", () => {
         await screen.findByRole("button", { name: /^enable$/i });
         expect(screen.queryByRole("alert")).toBeNull();
     });
+
+    it("opening the dialog after a failed toggle does not show the old error", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 500 })));
+        mount();
+        await screen.findByText("Pool inspection");
+        fireEvent.click(screen.getByRole("button", { name: /^disable$/i }));
+        await screen.findByRole("alert");
+        fireEvent.click(screen.getByRole("button", { name: /^edit$/i }));
+        const dialog = await screen.findByRole("dialog");
+        expect(dialog.querySelector("[role=alert]")).toBeNull();
+    });
 });
