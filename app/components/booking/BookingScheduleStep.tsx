@@ -102,6 +102,8 @@ export function ScheduleStep({
   // Null while unknown (not yet asked, still in flight, or the request failed):
   // an unreachable endpoint must not accuse the visitor of picking a bad date.
   const [dateHasSlots, setDateHasSlots] = useState<boolean | null>(null);
+  // Windows that DO have starts when the chosen one has none (empty when the chosen one has some, or none has).
+  const [otherWindows, setOtherWindows] = useState<string[]>([]);
   // The picker's own floor and ceiling. Computed once per mount — a visitor who
   // leaves the tab open across midnight is re-checked by the form state and the
   // server anyway, and a value that changes under a focused field is worse.
@@ -132,33 +134,41 @@ export function ScheduleStep({
       return;
     }
     setDateHasSlots(null);
-    const params = new URLSearchParams({ tenant, date: inspectionDate });
-    if (serviceKey) params.set("serviceIds", serviceKey);
-    // Ask about the window the visitor chose: the same one the booking will be judged over.
-    if (timeWindow) params.set("timeSlot", timeWindow);
+    setOtherWindows([]);
+    const base = new URLSearchParams({ tenant, date: inspectionDate });
+    if (serviceKey) base.set("serviceIds", serviceKey);
     const ctrl = new AbortController();
+    type Answer = { has: boolean | null; advisory: { date: string; name: string } | null };
+    // One window's question. A booking is judged over the window the visitor chose, so the list is asked
+    // about that window; `null` is "unknown" (the request failed), never "none".
+    const ask = async (w: string): Promise<Answer | null> => {
+      const q = new URLSearchParams(base);
+      q.set("timeSlot", w);
+      const r = await fetch(`/api/public/slots?${q.toString()}`, { signal: ctrl.signal });
+      if (!r.ok) return null;
+      const data = ((await r.json()) as { data?: { holidayAdvisory?: { date: string; name: string }; slots?: { time: string; available: boolean }[] } } | null)?.data;
+      return { has: Array.isArray(data?.slots) ? data.slots.some((s) => s.available) : null, advisory: data?.holidayAdvisory ?? null };
+    };
     const t = setTimeout(() => {
-      fetch(`/api/public/slots?${params.toString()}`, { signal: ctrl.signal })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((body) => {
-          const data = (body as {
-            data?: {
-              holidayAdvisory?: { date: string; name: string };
-              slots?: { time: string; available: boolean }[];
-            };
-          } | null)?.data;
-          setHolidayAdvisory(data?.holidayAdvisory ?? null);
-          // The tenant's weekly hours, slot rules, time off, holidays and
-          // calendar blocks all land in this one array. No slot is bookable =>
-          // the company is not working that day, whatever the grid looks like.
-          setDateHasSlots(
-            Array.isArray(data?.slots) ? data.slots.some((s) => s.available) : null,
-          );
-        })
-        .catch(() => {
-          setHolidayAdvisory(null);
-          setDateHasSlots(null);
-        });
+      void (async () => {
+        const first = await ask(timeWindow || "morning");
+        setHolidayAdvisory(first?.advisory ?? null);
+        // The tenant's weekly hours, slot rules, time off, holidays and calendar blocks all land in this
+        // list. Nothing bookable in the chosen window is only "none" for the DATE when no other window has
+        // a start either; so the other windows are asked, and only then (one request in the usual case).
+        if (first?.has !== false) { setDateHasSlots(first?.has ?? null); return; }
+        const others: string[] = [];
+        for (const w of ["morning", "afternoon", "all-day"].filter((x) => x !== timeWindow)) {
+          const r = await ask(w);
+          if (r === null || r.has === null) { setDateHasSlots(null); return; }
+          if (r.has) others.push(w);
+        }
+        setOtherWindows(others);
+        setDateHasSlots(others.length > 0);
+      })().catch(() => {
+        setHolidayAdvisory(null);
+        setDateHasSlots(null);
+      });
     }, 300);
     return () => {
       clearTimeout(t);
@@ -232,6 +242,17 @@ export function ScheduleStep({
             {m.booking_date_none_available({
               company,
               date: formatBookingDate(inspectionDate, displayLocale),
+            })}
+          </p>
+        )}
+        {!dateIssue && dateHasSlots === true && otherWindows.length > 0 && (
+          <p role="alert" className="text-[12px] font-semibold text-ih-bad-fg">
+            {m.booking_window_none_left({
+              window: (timeWindows().find((w) => w.id === timeWindow)?.label ?? "").toLocaleLowerCase(displayLocale),
+              date: formatBookingDate(inspectionDate, displayLocale),
+              others: new Intl.ListFormat(displayLocale, { type: "disjunction" }).format(
+                otherWindows.map((id) => timeWindows().find((w) => w.id === id)?.label ?? id),
+              ),
             })}
           </p>
         )}

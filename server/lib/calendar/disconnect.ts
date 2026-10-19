@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, isNotNull } from 'drizzle-orm';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
@@ -86,7 +86,7 @@ const overrideScopeOf = (tenantId: string, userId: string, provider?: CalendarPr
     eq(availabilityOverrides.inspectorId, userId),
     provider === undefined ? isNotNull(availabilityOverrides.source)
         : provider === 'google' || provider === 'apple' ? eq(availabilityOverrides.source, provider)
-            : sql`0 = 1`,
+            : inArray(availabilityOverrides.source, []), // an empty list matches nothing
 );
 
 /** How many rows of each kind a cleanup with this scope would remove right now. */

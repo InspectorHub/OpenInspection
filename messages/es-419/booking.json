@@ -60,6 +60,7 @@
   "booking_date_error_past": "Esa fecha ya pasó. Elija hoy o una fecha posterior.",
   "booking_date_error_too_far": "Esa fecha está a más de un año. Elija una fecha dentro de los próximos 12 meses.",
   "booking_date_error_invalid": "Elija una fecha válida.",
+  "booking_window_none_left": "No quedan horarios {window} el {date}. Pruebe {others}, o elija otra fecha.",
   "booking_date_none_available": "{company} no tiene horarios disponibles el {date}. Elija otra fecha.",
   "booking_field_time_window_label": "Franja horaria",
   "booking_schedule_custom_time_suffix": "en la fecha seleccionada",

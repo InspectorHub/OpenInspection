@@ -134,7 +134,7 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
     path: '/slots',
     tags: ['bookings', 'public'],
     summary: 'Company-level bookable time slots for a date',
-    description: 'Returns the union of qualified inspectors\' bookable 30-minute slots for the given date (IA-26 aggregation). When inspectorId is supplied the result is restricted to that inspector (deep-link / client-choice flow). Free-inspector identities are never exposed on this public surface.',
+    description: 'Returns the union of qualified inspectors\' bookable 30-minute slots for the given date (IA-26 aggregation). When inspectorId is supplied the result is restricted to that inspector (deep-link / client-choice flow). Free-inspector identities are never exposed on this public surface. Pass timeSlot (the window the booking will carry): a slot is then judged over that window. Without timeSlot the list is judged over the longest window (all-day, 540 minutes when no service has a duration), so it can be much shorter than what a given window would allow; callers that know the window should always pass it.',
     request: {
         query: z.object({
             tenant: z.string().min(1).openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
