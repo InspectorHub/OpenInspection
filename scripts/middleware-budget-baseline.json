@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 161,
-    "dollarMethods": 588,
+    "files": 162,
+    "dollarMethods": 590,
     "apiWorker": 9
   },
   "fanOut": {
@@ -40,7 +40,7 @@
       "apiWorker": 0
     },
     "app/lib/inspection-delete.server.ts": {
-      "dollarMethods": 1,
+      "dollarMethods": 2,
       "apiWorker": 0
     },
     "app/lib/inspection-order-actions.ts": {
@@ -377,6 +377,10 @@
     },
     "app/routes/resources/ai-assist.tsx": {
       "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/routes/resources/block-conflicts.ts": {
+      "dollarMethods": 1,
       "apiWorker": 0
     },
     "app/routes/resources/comments-library.tsx": {
