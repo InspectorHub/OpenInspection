@@ -1,9 +1,18 @@
 import { useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { PhotoGrid } from "./PhotoGrid";
-import { MediaViewer } from "./MediaViewer";
+import { MediaViewer, type MediaAction } from "./MediaViewer";
 import type { GalleryPhoto } from "~/lib/inspection-media";
 import { m } from "~/paraglide/messages";
+
+/**
+ * The drawer lists photos from every section and unit, but the editor resolves a
+ * photo's place in the results document through the section that is open, so
+ * deleting, cropping or captioning from here could change the wrong entry or
+ * none. Only cover and annotate are handled; the rest are not offered (they used
+ * to be buttons that closed the viewer and did nothing).
+ */
+export const GALLERY_UNHANDLED_ACTIONS: readonly MediaAction[] = ["crop", "rotate", "caption", "revert", "delete", "poster"];
 
 export interface PhotoGalleryProps {
   inspectionId: string;
@@ -48,10 +57,10 @@ export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGall
         photos={photos}
         index={lightbox}
         onClose={() => setLightbox(null)}
+        hideActions={GALLERY_UNHANDLED_ACTIONS}
         onAction={(a, p) => {
           if (a === "cover") onSetCover({ key: p.key, url: p.url });
           else if (a === "annotate") onAnnotate({ key: p.key, url: p.url });
-          // crop/rotate/caption/revert/delete wired by the parent in a later dispatch
         }}
       />
     </div>
