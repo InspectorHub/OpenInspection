@@ -99,5 +99,12 @@
   "find_a_time_failed": "No se pudo comprobar la disponibilidad. Inténtalo de nuevo.",
   "find_a_time_free_count": "{count} libres",
   "calendar_open_dispatch": "Vista de despacho",
-  "dispatch_scroll_hint": "Desplázate de lado para ver a todos los inspectores."
+  "dispatch_scroll_hint": "Desplázate de lado para ver a todos los inspectores.",
+  "calendar_block_conflict_title": "Esto coincide con inspecciones reservadas",
+  "calendar_block_conflict_body_one": "{count} inspección reservada coincide con este horario. Bloquear el horario no la cancela ni la mueve.",
+  "calendar_block_conflict_body_other": "{count} inspecciones reservadas coinciden con este horario. Bloquear el horario no las cancela ni las mueve.",
+  "calendar_block_conflict_item": "{date}, {start}–{end}",
+  "calendar_block_conflict_item_untimed": "{date}, hora sin definir",
+  "calendar_block_conflict_keep": "Bloquear de todos modos",
+  "calendar_block_conflict_back": "Volver"
 }
