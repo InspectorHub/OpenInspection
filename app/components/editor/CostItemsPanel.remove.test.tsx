@@ -47,4 +47,26 @@ describe("CostItemsPanel remove", () => {
         expect(alert.textContent).toMatch(/could not be removed/i);
         expect(systems()).toEqual(["roof-system", "plumbing-system"]);
     });
+
+  it("puts back the row as it was being edited, not as the page loaded it", async () => {
+    reply = () => new Response("{}", { status: 500 });
+    render(<CostItemsPanel inspectionId="i1" items={ITEMS} reserveEnabled={false} />);
+    const first = [...document.querySelectorAll<HTMLInputElement>("input")].find((i) => i.value === "roof-system")!;
+    fireEvent.change(first, { target: { value: "roof-edited-system" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+    await screen.findByRole("alert");
+    expect(systems()).toEqual(["roof-edited-system", "plumbing-system"]);
+  });
+
+  it("the error goes away once a later change is saved", async () => {
+    reply = () => new Response("{}", { status: 500 });
+    render(<CostItemsPanel inspectionId="i1" items={ITEMS} reserveEnabled={false} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Remove" })[0]!);
+    await screen.findByRole("alert");
+    reply = () => new Response(JSON.stringify({ success: true }), { status: 200 });
+    const field = [...document.querySelectorAll<HTMLInputElement>("input")].find((i) => i.value === "roof-system")!;
+    fireEvent.change(field, { target: { value: "roof-new-system" } });
+    fireEvent.blur(field);
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
 });

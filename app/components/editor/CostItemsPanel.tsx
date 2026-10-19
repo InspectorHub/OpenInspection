@@ -85,6 +85,7 @@ export function CostItemsPanel({
     setSaving((s) => ({ ...s, [id]: true }));
     const result = await submitCostItem(inspectionId, isTempId(id) ? "create" : "update", row);
     setSaving((s) => ({ ...s, [id]: false }));
+    if (result.success) setRemoveFailed(false);
     if (result.success && isTempId(id) && result.id) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, id: result.id! } : r)));
     }
@@ -123,6 +124,7 @@ export function CostItemsPanel({
 
   async function removeRow(id: string) {
     const index = rows.findIndex((r) => r.id === id);
+    const row = rows[index];
     setRemoveFailed(false);
     setRows((prev) => prev.filter((r) => r.id !== id));
     if (isTempId(id)) {
@@ -133,7 +135,6 @@ export function CostItemsPanel({
       if (saving[id]) pendingRemovalRef.current.add(id);
       return;
     }
-    const row = items.find((r) => r.id === id) ?? rows.find((r) => r.id === id);
     if (!row) return;
     const result = await submitCostItem(inspectionId, "delete", row);
     if (result.success) return;
