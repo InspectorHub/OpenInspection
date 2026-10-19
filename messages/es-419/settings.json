@@ -310,5 +310,8 @@
   "settings_team_templates_archive": "Archivar",
   "settings_team_templates_archive_title": "¿Archivar esta plantilla?",
   "settings_team_templates_archive_confirm": "{name} ya no se podrá elegir y su nombre se podrá volver a usar. Quienes ya la tienen conservan sus permisos.",
-  "settings_team_templates_limit": "Una empresa puede tener {max} plantillas. Archive una para guardar otra."
+  "settings_team_templates_limit": "Una empresa puede tener {max} plantillas. Archive una para guardar otra.",
+  "settings_hub_offline_packages_title": "Paquetes sin conexión",
+  "settings_hub_offline_packages_desc": "Importe el trabajo que un miembro del equipo exportó cuando la aplicación no pudo sincronizar.",
+  "settings_team_remove_member_import_link": "Importar un paquete sin conexión"
 }

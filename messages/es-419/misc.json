@@ -269,5 +269,6 @@
   "outbound_verify_title": "Confirme que es una persona",
   "outbound_verify_body": "Su empresa es nueva, así que verificamos una vez antes de cada correo a clientes desde nuestro remitente compartido. Solo toma un momento.",
   "outbound_verify_cancel": "Cancelar",
-  "outbound_verify_load_failed": "No se pudo cargar la verificación. Revise su conexión e inténtelo de nuevo."
+  "outbound_verify_load_failed": "No se pudo cargar la verificación. Revise su conexión e inténtelo de nuevo.",
+  "command_palette_settings_offline_packages": "Configuración - Importar paquete sin conexión"
 }

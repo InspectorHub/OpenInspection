@@ -220,6 +220,7 @@ export default [
       route("settings/data", "routes/settings-data.tsx"),
       route("settings/imports", "routes/settings-imports.tsx"),
       route("settings/imports/:batchId", "routes/settings-imports-batch.tsx"),
+      route("settings/offline-packages", "routes/settings-offline-packages.tsx"),
       route("settings/compliance", "routes/settings-compliance.tsx"),
       // The authority's own PDF for each statutory revision this build
       // publishes. In Settings rather than Library because it is a deployment

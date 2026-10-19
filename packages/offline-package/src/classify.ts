@@ -35,7 +35,7 @@ export type Classified =
     /** The refusal names inspections: send those on their own and the rest without them. */
     | { kind: 'splittable'; ids: string[]; status: number; code?: string; reason?: string; queuedWrite?: boolean }
     /** The whole package is refused and splitting cannot help. */
-    | { kind: 'fatal'; status: number; code?: string }
+    | { kind: 'fatal'; status: number; code?: string; details?: Record<string, unknown> }
     /**
      * Not confirmed and not refused for good: send the same part again after a pause.
      * `inspectionId`, `reason` and `queuedWrite` are what the failure said about the one inspection
@@ -137,7 +137,8 @@ export function classifyResponse(result: SendResult, expectedInspections?: numbe
     const answer = { status, ...(code ? { code } : {}) };
 
     if (status === 413 || (status === 422 && code === 'PACKAGE_TOO_LARGE')) return { kind: 'too_large', limits: readLimits(details), ...answer };
-    if (code === 'PACKAGE_EXPIRED' || code === 'PACKAGE_FROM_THE_FUTURE') return { kind: 'fatal', ...answer };
+    // Their figures (`maxAgeDays`, `maxFutureSkewDays`) are kept so a page can say how old a package may be.
+    if (code === 'PACKAGE_EXPIRED' || code === 'PACKAGE_FROM_THE_FUTURE') return { kind: 'fatal', ...answer, ...(Object.keys(details).length > 0 ? { details } : {}) };
     if (status === 409 && code === 'PACKAGE_INSPECTION_DELETED') {
         const ids = namedInspections(details);
         return ids.length > 0 ? { kind: 'splittable', ids, ...answer } : { kind: 'fatal', ...answer };

@@ -31,6 +31,17 @@ describe("RemoveMemberDialog", () => {
         expect(alert.textContent).toBe(WARNING);
     });
 
+    it("links the hand-over sentence to the offline package import page", () => {
+        render(<RemoveMemberDialog target={TARGET} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />);
+        const link = within(screen.getByRole("dialog")).getByRole("link", { name: "Import an offline package" });
+        expect(link.getAttribute("href")).toBe("/settings/offline-packages");
+    });
+
+    it("offers no link while the dialog is closed (positive control)", () => {
+        render(<RemoveMemberDialog target={null} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />);
+        expect(screen.queryByRole("link", { name: "Import an offline package" })).toBeNull();
+    });
+
     it("hands the same target back on confirm", () => {
         const onConfirm = vi.fn();
         render(<RemoveMemberDialog target={TARGET} busy={false} error={null} onConfirm={onConfirm} onCancel={() => {}} />);

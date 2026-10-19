@@ -269,5 +269,6 @@
   "outbound_verify_title": "Confirm you are a person",
   "outbound_verify_body": "Your company is new, so we check once before each client email goes out on our shared sender. It only takes a moment.",
   "outbound_verify_cancel": "Cancel",
-  "outbound_verify_load_failed": "The check could not load. Check your connection and try again."
+  "outbound_verify_load_failed": "The check could not load. Check your connection and try again.",
+  "command_palette_settings_offline_packages": "Settings - Import offline package"
 }

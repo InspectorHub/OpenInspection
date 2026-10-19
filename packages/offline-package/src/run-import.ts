@@ -66,6 +66,8 @@ export interface HeldBack {
     code?: string;
     /** The server's own `details.reason`, when it gave one. */
     detail?: string;
+    /** The figures of a refusal of the whole package (`maxAgeDays`, `maxFutureSkewDays`), when it gave any. */
+    details?: Record<string, unknown>;
 }
 
 export interface ImportReport {
@@ -97,7 +99,7 @@ interface Unit {
     bytes?: Uint8Array;
 }
 
-type Answer = { status?: number; code?: string };
+type Answer = { status?: number; code?: string; details?: Record<string, unknown> };
 
 /** A part the retries ran out on, with what its last failure said about the inspection it stopped at. */
 type GaveUp = { kind: 'gave_up'; inspectionId?: string; reason?: string; queuedWrite?: boolean; inFlight?: boolean } & Answer;
@@ -105,6 +107,7 @@ type GaveUp = { kind: 'gave_up'; inspectionId?: string; reason?: string; queuedW
 const answerOf = (from: Answer): Answer => ({
     ...(from.status !== undefined ? { status: from.status } : {}),
     ...(from.code !== undefined ? { code: from.code } : {}),
+    ...(from.details !== undefined ? { details: from.details } : {}),
 });
 
 function reasonFor(status: number, code: string | undefined, detail: string | undefined, queuedWrite: boolean | undefined): HeldBackReason {

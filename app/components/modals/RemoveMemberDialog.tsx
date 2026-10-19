@@ -60,6 +60,14 @@ export function RemoveMemberDialog({
             onCancel={onCancel}
         >
             <Banner tone="warn" className="mt-3 font-normal!">{m.settings_team_remove_member_warning()}</Banner>
+            {/* The warning ends with "give it to another team member to import"; this is where they do that.
+                A plain anchor, not a router Link: this dialog also renders outside a router in its specs,
+                and leaving for the import page closes it anyway. */}
+            <p className="mt-2 text-[13px]">
+                <a href="/settings/offline-packages" className="font-bold text-ih-primary-text hover:underline">
+                    {m.settings_team_remove_member_import_link()}
+                </a>
+            </p>
             {target && openInspections !== null && (
                 <div className="mt-3 space-y-2">
                     <Banner tone="warn" className="font-normal!">
