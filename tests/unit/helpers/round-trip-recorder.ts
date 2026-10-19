@@ -8,11 +8,13 @@
  *
  *   statements   every statement executed (a batch counts each of its members)
  *   roundTrips   calls to D1 (a batch is ONE call)
- *   waves        sequential depth: a call that starts while no other call is
- *                in flight begins a new wave. Two awaited statements in a row
- *                are two waves; two issued with Promise.all are one.
+ *   waves        CAUSAL depth: a call's depth is 1 + the deepest call that had
+ *                FINISHED before it started. Two awaited statements in a row are
+ *                depth 2; two issued with Promise.all are depth 1; a serial chain
+ *                nested inside a Promise.all still counts its full length, which
+ *                a "starts while nothing is in flight" rule would hide.
  *
- * Every call also sleeps `latencyMs` before touching the database, so waves
+  * Every call also sleeps `latencyMs` before touching the database, so waves
  * show up as wall time: elapsed / latencyMs approximates the number of
  * sequential round trips, which is what production pays at roughly 60-150 ms
  * each. With no sleep a Promise.all would still look parallel here, but only by
@@ -35,19 +37,20 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 export function recordRoundTrips(db: D1Database, latencyMs = 5): RecordingBinding {
     const log: RoundTripLog = { statements: 0, roundTrips: 0, waves: 0, sql: [] };
-    let inFlight = 0;
+    // Deepest depth among calls that have finished; a call starting now sits one below it.
+    let finishedDepth = 0;
 
     async function call<T>(statements: string[], run: () => Promise<T>): Promise<T> {
-        if (inFlight === 0) log.waves++;
-        inFlight++;
+        const depth = finishedDepth + 1;
         log.roundTrips++;
         log.statements += statements.length;
-        log.sql.push(...statements.map((sql) => `[wave ${log.waves}] ${sql}`));
+        log.sql.push(...statements.map((sql) => `[wave ${depth}] ${sql}`));
+        log.waves = Math.max(log.waves, depth);
         try {
             if (latencyMs > 0) await sleep(latencyMs);
             return await run();
         } finally {
-            inFlight--;
+            finishedDepth = Math.max(finishedDepth, depth);
         }
     }
 
@@ -83,6 +86,6 @@ export function recordRoundTrips(db: D1Database, latencyMs = 5): RecordingBindin
     return {
         binding,
         log,
-        reset: () => { log.statements = 0; log.roundTrips = 0; log.waves = 0; log.sql.length = 0; inFlight = 0; },
+        reset: () => { log.statements = 0; log.roundTrips = 0; log.waves = 0; log.sql.length = 0; finishedDepth = 0; },
     };
 }

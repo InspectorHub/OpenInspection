@@ -66,10 +66,11 @@ export class TagService {
     }
 
     /**
-     * The company's tags with the canonical ones guaranteed present: `seedDefaults`
-     * followed by `list`, without reading the same rows twice. The common case, a company
-     * that already has them, is a single read; only a company missing a canonical tag
-     * takes the seeding path and then reads again.
+     * The company's tags with the canonical ones guaranteed present: what `seedDefaults` then `list`
+     * return, without reading the same rows twice. It reads once; a company that already has every
+     * canonical tag is done there. Only a company missing some inserts the missing ones (one statement,
+     * from the rows already read) and reads again. The reads are sequential, not parallel: the second
+     * exists only when the first shows something missing.
      */
     async listWithDefaults(tenantId: string): Promise<TagRow[]> {
         const db = this.getDrizzle();
@@ -77,8 +78,18 @@ export class TagService {
             .where(eq(tags.tenantId, tenantId))
             .all();
         const have = new Set(rows.map(r => r.name as string));
-        if (SEED_TAGS.every(seed => have.has(seed.name))) return sortTagRecords(rows.map(rowToRecord));
-        await this.seedDefaults(tenantId);
+        const missing = SEED_TAGS.filter(seed => !have.has(seed.name));
+        if (missing.length === 0) return sortTagRecords(rows.map(rowToRecord));
+        const now = new Date();
+        await db.insert(tags).values(missing.map(seed => ({
+            id:        crypto.randomUUID(),
+            tenantId,
+            name:      seed.name,
+            color:     seed.color,
+            isSeed:    true,
+            createdAt: now,
+        }))).onConflictDoNothing(); // a concurrent first load may have inserted them already
+        logger.info('tags.seeded', { tenantId, inserted: missing.length, skipped: SEED_TAGS.length - missing.length });
         return this.list(tenantId);
     }
 

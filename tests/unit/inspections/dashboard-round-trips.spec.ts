@@ -37,7 +37,9 @@ import { createHarness, TENANT_ID, OWNER_ID, INSPECTOR_ID, type Harness } from '
 import { FIXED_NOW, MANAGER_ID, seedDashboard } from '../helpers/dashboard-fixture';
 import { recordRoundTrips, type RoundTripLog } from '../helpers/round-trip-recorder';
 
-const LATENCY_MS = 25;
+const LATENCY_MS = 40;
+/** Wall-clock backstop: the budget in round trips plus this many for the application's own work. */
+const SLACK_CALLS = 6;
 
 async function measure(h: Harness, sub: string, role: string): Promise<RoundTripLog & { ms: number }> {
     const rec = recordRoundTrips(h.env.DB as D1Database, LATENCY_MS);
@@ -71,6 +73,8 @@ describe('dashboard round-trip budget', () => {
         // ROUNDTRIP_SQL=1 prints each statement with the wave it started in.
         if (process.env.ROUNDTRIP_SQL) console.log(m.sql.map((q) => '  ' + q.slice(0, 100)).join(String.fromCharCode(10)));
         console.log(`dashboard ${who}: statements=${m.statements} roundTrips=${m.roundTrips} waves=${m.waves} budget=${budget} wall=${m.ms.toFixed(0)}ms at ${LATENCY_MS}ms per call`);
+        // The wall clock agrees with the wave count: nothing hides a serial chain from both.
+        expect(m.ms).toBeLessThanOrEqual((budget + SLACK_CALLS) * LATENCY_MS);
     };
 
 

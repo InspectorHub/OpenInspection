@@ -19,9 +19,11 @@ import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { createHarness, TENANT_ID, OWNER_ID, type Harness } from '../helpers/tenant-email-harness';
 import { recordRoundTrips } from '../helpers/round-trip-recorder';
 
-const LATENCY_MS = 25;
+const LATENCY_MS = 40;
+/** Wall-clock backstop: the budget in round trips plus this many for the application's own work. */
+const SLACK_CALLS = 6;
 
-async function get(h: Harness, path: string) {
+async function get(h: Harness, path: string, options: { warm?: boolean } = {}) {
     const rec = recordRoundTrips(h.env.DB as D1Database, LATENCY_MS);
     (h.env as unknown as Record<string, unknown>).DB = rec.binding;
     const keyring = await buildKeyring(h.env as unknown as Record<string, string | undefined>);
@@ -33,14 +35,18 @@ async function get(h: Harness, path: string) {
         await exec.settle();
         return res;
     };
-    await call();
-    await call(); // warm the middleware caches; see the dashboard spec for why two
+    if (options.warm !== false) {
+        await call();
+        await call(); // warm the middleware caches; see the dashboard spec for why two
+    }
     rec.reset();
+    const start = performance.now();
     const res = await call();
+    const ms = performance.now() - start;
     const body = await res.json() as { data?: unknown; meta?: { total?: number } };
     console.log(`${path.split('?')[0]}: status=${res.status} statements=${rec.log.statements} roundTrips=${rec.log.roundTrips} waves=${rec.log.waves} budget=2`);
     expect(rec.log.statements, 'the recorder counted nothing - the instrument is broken').toBeGreaterThan(0);
-    return { status: res.status, body, waves: rec.log.waves };
+    return { status: res.status, body, waves: rec.log.waves, ms, sql: rec.log.sql };
 }
 
 describe('read routes wait for at most two sequential round trips', () => {
@@ -60,6 +66,7 @@ describe('read routes wait for at most two sequential round trips', () => {
         // Two members (the owner and the inspector), no invitations outstanding.
         expect((r.body.data as { usage: { seatsUsed: number } }).usage.seatsUsed).toBe(2);
         expect(r.waves).toBeLessThanOrEqual(2);
+        expect(r.ms).toBeLessThanOrEqual((2 + SLACK_CALLS) * LATENCY_MS);
     });
 
     it('tags list, first run seeds the canonical tags and later runs read them back', async () => {
@@ -72,6 +79,7 @@ describe('read routes wait for at most two sequential round trips', () => {
         // Seeded tags are not duplicated by the repeat reads that warmed the caches.
         expect(await h.db.select().from(schema.tags).all()).toHaveLength(5);
         expect(r.waves).toBeLessThanOrEqual(2);
+        expect(r.ms).toBeLessThanOrEqual((2 + SLACK_CALLS) * LATENCY_MS);
     });
 
     it('services list', async () => {
@@ -81,6 +89,7 @@ describe('read routes wait for at most two sequential round trips', () => {
         expect(r.status).toBe(200);
         expect((r.body.data as Array<{ id: string; price?: number }>).map((s) => [s.id, s.price])).toEqual([['svc-1', 45000]]);
         expect(r.waves).toBeLessThanOrEqual(2);
+        expect(r.ms).toBeLessThanOrEqual((2 + SLACK_CALLS) * LATENCY_MS);
     });
 
     it('templates list', async () => {
@@ -93,5 +102,20 @@ describe('read routes wait for at most two sequential round trips', () => {
         expect(r.body.meta?.total).toBe(3);
         expect((r.body.data as Array<{ name: string }>).map((t) => t.name)).toEqual(['Template 3', 'Template 2', 'Template 1']);
         expect(r.waves).toBeLessThanOrEqual(2);
+        expect(r.ms).toBeLessThanOrEqual((2 + SLACK_CALLS) * LATENCY_MS);
+    });
+
+    it('tags list on a company with no tags yet: read, one insert, read', async () => {
+        await harness();
+        // Warm the middleware on another route so what is counted is the tags route's own chain.
+        await get(h, '/api/services');
+        const r = await get(h, '/api/tags', { warm: false });
+        expect(r.status).toBe(200);
+        expect((r.body.data as unknown[]).length).toBe(5);
+        expect(await h.db.select().from(schema.tags).all()).toHaveLength(5);
+        // The middleware's wave, then read -> seed -> read. The seed path used to
+        // spend a read, a second read, five inserts one by one, and a third read.
+        expect(r.waves).toBeLessThanOrEqual(4);
+        expect(r.sql.filter((q) => /insert into "tags"/i.test(q))).toHaveLength(1);
     });
 });
