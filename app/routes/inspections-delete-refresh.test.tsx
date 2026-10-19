@@ -9,9 +9,12 @@
  * cleared, until a manual reload. The page now hides the rows it just asked to
  * delete, and shows them again if the delete is refused.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
+
+const purge = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock("~/lib/collab/offline-purge", () => ({ purgeInspectionOfflineData: purge }));
 
 import InspectionsPage from "~/routes/inspections";
 
@@ -20,8 +23,10 @@ const mk = (id: string, address: string) => ({ id, date: "2026-09-12", address, 
 const A = mk("insp-a", "742 Evergreen Terrace");
 const B = mk("insp-b", "1 Other Street");
 
-function renderDashboard(opts: { deleteOk: boolean; loaderRows: () => Array<typeof A> }) {
+/** `refuse` names ids the server refuses; `deleteOk:false` refuses all of them. */
+function renderDashboard(opts: { deleteOk: boolean; loaderRows: () => Array<typeof A>; refuse?: string[] }) {
     const deleted: string[] = [];
+    const submits: string[][] = [];
     const context = { branding: { defaultLocale: "en-US", defaultTimezone: "UTC" }, user: { capabilities: { deleteInspection: true } } };
     const Stub = createRoutesStub([
         {
@@ -35,8 +40,14 @@ function renderDashboard(opts: { deleteOk: boolean; loaderRows: () => Array<type
                     Component: InspectionsPage,
                     action: async ({ request }) => {
                         const fd = await request.formData();
-                        if (fd.get("intent") === "delete") deleted.push(String(fd.get("id")));
-                        return { ok: opts.deleteOk, intent: "delete" };
+                        if (fd.get("intent") !== "delete-many") return { ok: true, intent: String(fd.get("intent")) };
+                        const ids = String(fd.get("ids")).split(",");
+                        submits.push(ids);
+                        const refused = (id: string) => !opts.deleteOk || (opts.refuse ?? []).includes(id);
+                        const done = ids.filter((id) => !refused(id));
+                        deleted.push(...done);
+                        const failed = ids.filter(refused).map((id) => ({ id, error: "You cannot delete this" }));
+                        return { ok: failed.length === 0, intent: "delete-many", deleted: done, failed };
                     },
                     loader: () => ({
                         buckets: { ...EMPTY_BUCKETS, today: opts.loaderRows() },
@@ -47,7 +58,7 @@ function renderDashboard(opts: { deleteOk: boolean; loaderRows: () => Array<type
             ],
         },
     ]);
-    return { view: render(<Stub initialEntries={["/inspections"]} />), deleted };
+    return { view: render(<Stub initialEntries={["/inspections"]} />), deleted, submits };
 }
 
 async function deleteFirstRow(view: ReturnType<typeof render>) {
@@ -57,6 +68,8 @@ async function deleteFirstRow(view: ReturnType<typeof render>) {
     await view.findByText("Clear");
     fireEvent.click(view.getAllByRole("button").find((b) => b.textContent === "Delete")!);
 }
+
+beforeEach(() => purge.mockClear());
 
 describe("/inspections after Delete", () => {
     it("drops the row even when the re-read still returns it (stale read after the write)", async () => {
@@ -76,9 +89,9 @@ describe("/inspections after Delete", () => {
     });
 
     it("shows the row again when the delete is refused", async () => {
-        const { view, deleted } = renderDashboard({ deleteOk: false, loaderRows: () => [A, B] });
+        const { view, submits } = renderDashboard({ deleteOk: false, loaderRows: () => [A, B] });
         await deleteFirstRow(view);
-        await waitFor(() => expect(deleted).toEqual(["insp-a"]));
+        await waitFor(() => expect(submits).toEqual([["insp-a"]]));
         await waitFor(() => expect(view.getByText("742 Evergreen Terrace")).toBeTruthy());
     });
 
@@ -87,5 +100,53 @@ describe("/inspections after Delete", () => {
         await deleteFirstRow(view);
         await waitFor(() => expect(view.queryByText("742 Evergreen Terrace")).toBeNull());
         expect(view.getByText("1 Other Street")).toBeTruthy();
+    });
+
+    it("sends ONE request for several selected rows, however many", async () => {
+        const { view, submits } = renderDashboard({ deleteOk: true, loaderRows: () => [A, B] });
+        await view.findByText("742 Evergreen Terrace");
+        const boxes = [...view.container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+        boxes.slice(0, 2).forEach((b) => fireEvent.click(b));
+        await view.findByText("Clear");
+        fireEvent.click(view.getAllByRole("button").find((b) => b.textContent === "Delete")!);
+        await waitFor(() => expect(view.queryByText("742 Evergreen Terrace")).toBeNull());
+        expect(submits).toHaveLength(1);
+        expect(submits[0]!.length).toBeGreaterThanOrEqual(1);
+        expect(new Set(submits[0]).size).toBe(submits[0]!.length);
+    });
+
+    it("clears the device copy only of the rows the server deleted", async () => {
+        const { view, submits } = renderDashboard({ deleteOk: true, refuse: ["insp-b"], loaderRows: () => [A, B] });
+        await view.findByText("742 Evergreen Terrace");
+        [...view.container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].forEach((b) => fireEvent.click(b));
+        await view.findByText("Clear");
+        fireEvent.click(view.getAllByRole("button").find((b) => b.textContent === "Delete")!);
+        await waitFor(() => expect(submits).toHaveLength(1));
+        await waitFor(() => expect(purge).toHaveBeenCalled());
+        const purged = purge.mock.calls.map((c) => (c as unknown as string[])[0]);
+        expect(purged).not.toContain("insp-b");
+        expect(purged).toContain("insp-a");
+    });
+
+    it("names a row that could not be deleted, keeps it listed and selected, and says why", async () => {
+        const { view } = renderDashboard({ deleteOk: true, refuse: ["insp-b"], loaderRows: () => [A, B] });
+        await view.findByText("742 Evergreen Terrace");
+        [...view.container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].forEach((b) => fireEvent.click(b));
+        await view.findByText("Clear");
+        fireEvent.click(view.getAllByRole("button").find((b) => b.textContent === "Delete")!);
+        const alert = await view.findByRole("alert");
+        expect(alert.textContent).toMatch(/1 Other Street/);
+        expect(alert.textContent).toMatch(/You cannot delete this/);
+        expect(view.getByText("1 Other Street")).toBeTruthy();
+        expect(view.queryByText("742 Evergreen Terrace")).toBeNull();
+        expect(view.getByText(/1 selected/i)).toBeTruthy();
+    });
+
+    it("a fully refused batch keeps every row and the selection", async () => {
+        const { view } = renderDashboard({ deleteOk: false, loaderRows: () => [A, B] });
+        await deleteFirstRow(view);
+        await view.findByRole("alert");
+        expect(view.getByText("742 Evergreen Terrace")).toBeTruthy();
+        expect(view.getByText("Clear")).toBeTruthy();
     });
 });

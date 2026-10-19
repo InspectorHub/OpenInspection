@@ -375,5 +375,7 @@
   "inspections_hub_delete_cancel_instead": "Cancelar la inspección en su lugar",
   "inspections_hub_delete_consent": "Entiendo que esto elimina de forma permanente esta inspección y sus archivos",
   "inspections_hub_delete_confirm": "Eliminar inspección",
-  "inspections_hub_delete_error": "No se pudo eliminar la inspección. Inténtelo de nuevo."
+  "inspections_hub_delete_error": "No se pudo eliminar la inspección. Inténtelo de nuevo.",
+  "inspections_list_delete_failed": "Estas inspecciones no se pudieron eliminar y siguen en la lista:",
+  "inspections_list_delete_failed_item": "{address}: {reason}"
 }

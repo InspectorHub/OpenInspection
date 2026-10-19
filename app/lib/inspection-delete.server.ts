@@ -28,3 +28,31 @@ export async function deleteInspectionViaApi(api: Api, id: string): Promise<Dele
     return { ok: false, intent: "delete", error: m.inspections_hub_delete_error() };
   }
 }
+
+export interface DeleteInspectionsResult {
+    /** True only when at least one id was given and every one of them is gone. */
+    ok: boolean;
+    intent: "delete-many";
+    /** Ids that are gone (deleted now, or already gone). */
+    deleted: string[];
+    /** Ids that are still there, with the reason the server gave. */
+    failed: Array<{ id: string; error: string }>;
+}
+
+/**
+ * Delete several inspections in ONE request, one after another. There is no bulk
+ * endpoint, and a second delete path on the same tables is not worth having; one
+ * at a time keeps each cascade's audit rows in order. The outcome is per id so a
+ * page can clear exactly what is gone and say what is not.
+ */
+export async function deleteInspectionsViaApi(api: Api, ids: readonly string[]): Promise<DeleteInspectionsResult> {
+    const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+    const deleted: string[] = [];
+    const failed: Array<{ id: string; error: string }> = [];
+    for (const id of unique) {
+        const res = await deleteInspectionViaApi(api, id);
+        if (res.ok) deleted.push(id);
+        else failed.push({ id, error: res.error ?? m.inspections_hub_delete_error() });
+    }
+    return { ok: unique.length > 0 && failed.length === 0, intent: "delete-many", deleted, failed };
+}

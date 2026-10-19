@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * The list's delete intent goes through the shared helper: a delete of an
+ * The list's delete-many intent goes through the shared helper: a delete of an
  * inspection that is already gone is a success, so its row is not brought back.
  */
 import { describe, it, expect, vi } from "vitest";
@@ -23,24 +23,26 @@ vi.mock("~/lib/api-client.server", () => ({
 import { action } from "~/routes/inspections";
 import { routeArgs } from "../../tests/helpers/route-args";
 
-const run = () => {
-    const body = new URLSearchParams({ intent: "delete", id: "insp-9" });
+const run = (ids: string) => {
+    const body = new URLSearchParams({ intent: "delete-many", ids });
     const request = new Request("http://localhost/inspections", { method: "POST", body, headers: { "content-type": "application/x-www-form-urlencoded" } });
-    return action(routeArgs(request, { params: {}, context: {} as never }) as never) as Promise<{ ok: boolean; intent: string }>;
+    return action(routeArgs(request, { params: {}, context: {} as never }) as never) as Promise<{ ok: boolean; intent: string; deleted: string[]; failed: Array<{ id: string }> }>;
 };
 
-describe("/inspections action intent=delete", () => {
-    it("deletes the id it was given", async () => {
+describe("/inspections action intent=delete-many", () => {
+    it("deletes every id it was given, in one request", async () => {
         seam.status = 200; seam.calls = [];
-        expect(await run()).toMatchObject({ ok: true, intent: "delete" });
-        expect(seam.calls).toEqual(["insp-9"]);
+        expect(await run("insp-9,insp-8")).toMatchObject({ ok: true, intent: "delete-many", deleted: ["insp-9", "insp-8"], failed: [] });
+        expect(seam.calls).toEqual(["insp-9", "insp-8"]);
     });
     it("treats an inspection that is already gone (404) as deleted", async () => {
         seam.status = 404;
-        expect(await run()).toMatchObject({ ok: true, intent: "delete" });
+        expect(await run("insp-9")).toMatchObject({ ok: true, deleted: ["insp-9"] });
     });
-    it("reports a refusal", async () => {
+    it("reports a refusal per id", async () => {
         seam.status = 403;
-        expect(await run()).toMatchObject({ ok: false, intent: "delete" });
+        const out = await run("insp-9");
+        expect(out).toMatchObject({ ok: false, deleted: [] });
+        expect(out.failed.map((f) => f.id)).toEqual(["insp-9"]);
     });
 });

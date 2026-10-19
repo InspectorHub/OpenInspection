@@ -23,11 +23,10 @@
  * the same inspection. There is no channel to them and no record of which ones
  * hold a copy. `app/lib/collab/offline-purge.ts` enumerates the limits.
  *
- * Batched rather than per id, because the page fires N deletes through ONE
- * fetcher and only the last response is observable — so a batch where one
- * delete failed purges all of them. Stated because it is a real edge, not an
- * oversight: the alternative (a fetcher per row) is a larger change to a page
- * this does not otherwise touch.
+ * Takes a list of ids so a caller that deletes several can queue them together.
+ * The inspection page, which deletes exactly one, is the caller today; the list
+ * reads its per-id outcome from the batch answer instead and purges only what
+ * the server confirmed.
  */
 import { useCallback, useEffect, useState } from "react";
 import { purgeInspectionOfflineData } from "~/lib/collab/offline-purge";
