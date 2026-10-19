@@ -222,7 +222,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.availability.overrides[":id"].$delete({
       param: { id: String(form.get("id")) },
     });
-    return { ok: res.ok, intent };
+    if (res.ok) return { ok: true, intent };
+    // 403 (a colleague's row) and 409 (a synced row) carry a reason the person can act on; anything else stays generic.
+    const body = res.status === 403 || res.status === 409
+      ? ((await res.json().catch(() => null)) as { error?: { message?: string } } | null)
+      : null;
+    return { ok: false, intent, message: body?.error?.message ?? null };
   }
 
   if (intent === "calendar-sync") {

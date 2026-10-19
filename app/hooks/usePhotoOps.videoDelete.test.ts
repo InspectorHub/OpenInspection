@@ -105,4 +105,27 @@ describe("usePhotoOps video delete", () => {
     expect(calls).toHaveLength(2);
     expect(setup.setResults).toHaveBeenCalledTimes(1);
   });
+
+  it("an entry with neither key nor original key is still deletable: the server frees it, then it leaves by position", async () => {
+    answer = () => new Response("{}", { status: 200 });
+    const { ctx, setResults } = makeCtx();
+    const { result } = renderHook(() => usePhotoOps(ctx));
+    const keyless = { ...(VIDEO as object), key: "", photoIndex: 1 } as never;
+    await act(async () => { result.current.onViewerAction("delete", keyless); await new Promise((r) => setTimeout(r, 30)); });
+    expect(calls).toEqual([["/api/inspections/insp1/media/video/uid-1", "DELETE"]]);
+    await waitFor(() => expect(setResults).toHaveBeenCalled());
+    const updater = setResults.mock.calls[0]![0] as (prev: Record<string, unknown>) => Record<string, { photos: Array<{ key: string }> }>;
+    const out = updater({ i1: { photos: [{ key: "p0" }, { key: "" }, { key: "p2" }] } });
+    expect(out.i1!.photos.map((p) => p.key)).toEqual(["p0", "p2"]);
+  });
+
+  it("a keyless entry whose delete fails stays and says so", async () => {
+    answer = () => new Response("{}", { status: 500 });
+    const { ctx, setResults } = makeCtx();
+    const { result } = renderHook(() => usePhotoOps(ctx));
+    const keyless = { ...(VIDEO as object), key: "", photoIndex: 0 } as never;
+    await act(async () => { result.current.onViewerAction("delete", keyless); await new Promise((r) => setTimeout(r, 30)); });
+    expect(setResults).not.toHaveBeenCalled();
+    expect(toasts).toHaveLength(1);
+  });
 });

@@ -18,6 +18,13 @@ interface DateOverride {
   source?: "google" | "apple" | null;
 }
 
+/** What removing this row changes, in words that match it: extra hours, a block over part of the day, or the whole day. */
+function removeMessage(o: DateOverride, date: string): string {
+  if (o.isAvailable) return m.settings_dateoverrides_remove_message_extra({ date });
+  if (o.startTime && o.endTime) return m.settings_dateoverrides_remove_message_window({ date, start: o.startTime, end: o.endTime });
+  return m.settings_dateoverrides_remove_message_block({ date });
+}
+
 /**
  * Legacy / Google-synced availability overrides, each removable after a
  * confirmation (nothing else can clear one). New time off is created via
@@ -33,7 +40,7 @@ export function DateOverridesPanel({
   const locale = useDisplayLocale();
   const [pending, setPending] = useState<DateOverride | null>(null);
   // Posts to this route's action (`override-remove`), which relays DELETE /api/availability/overrides/:id.
-  const { fetcher, submit, busy } = useGuardedSubmit<{ ok?: boolean; intent?: string }>();
+  const { fetcher, submit, busy } = useGuardedSubmit<{ ok?: boolean; intent?: string; message?: string | null }>();
   if (initialOverrides.length === 0 && !pending) return null;
 
   return (
@@ -75,11 +82,11 @@ export function DateOverridesPanel({
           </div>
         ))}
       </div>
-      <ActionFailureAlert result={fetcher.data} intents={["override-remove"]} busy={busy}>{m.settings_dateoverrides_remove_failed()}</ActionFailureAlert>
+      <ActionFailureAlert result={fetcher.data} intents={["override-remove"]} busy={busy}>{fetcher.data?.message ?? m.settings_dateoverrides_remove_failed()}</ActionFailureAlert>
       <ConfirmDialog
         open={pending !== null}
         title={m.settings_dateoverrides_remove_title()}
-        message={pending ? (pending.isAvailable ? m.settings_dateoverrides_remove_message_extra : m.settings_dateoverrides_remove_message_block)({ date: formatDate(pending.date, { locale, timeZone: "UTC" }) }) : ""}
+        message={pending ? removeMessage(pending, formatDate(pending.date, { locale, timeZone: "UTC" })) : ""}
         confirmLabel={m.common_remove()}
         busy={busy}
         onConfirm={() => {

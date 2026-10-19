@@ -135,5 +135,6 @@
   "settings_event_types_delete_failed": "The event type could not be deleted. Try again.",
   "settings_inspection_types_write_failed": "The change could not be saved. Nothing was changed; try again.",
   "settings_event_types_delete_title": "Delete this event type?",
+  "settings_event_types_delete_message_inactive": "Delete \"{name}\"? It is already switched off. If visits already use it, it stays on those visits; if no visit uses it, it is deleted for good. This cannot be undone.",
   "settings_event_types_delete_message": "Delete \"{name}\"? If visits already use it, it is switched off instead: it stays on those visits but can no longer be chosen for new ones. If no visit uses it, it is deleted for good. This cannot be undone."
 }

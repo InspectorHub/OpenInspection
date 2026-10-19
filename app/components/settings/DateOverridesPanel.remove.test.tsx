@@ -20,7 +20,7 @@ const SYNCED = [
   { id: "a1", date: "2027-01-06", isAvailable: false, startTime: "10:00", endTime: "11:00", source: "apple" as const },
 ];
 
-function mount(ok: boolean, initial: Array<(typeof ROWS)[number] | (typeof SYNCED)[number]> = ROWS) {
+function mount(ok: boolean, initial: Array<(typeof ROWS)[number] | (typeof SYNCED)[number]> = ROWS, message: string | null = null) {
   const posted: Array<Record<string, FormDataEntryValue>> = [];
   let rows = initial;
   const context = { branding: { defaultLocale: "en-US", defaultTimezone: "UTC" }, user: { capabilities: {} } };
@@ -35,7 +35,7 @@ function mount(ok: boolean, initial: Array<(typeof ROWS)[number] | (typeof SYNCE
           const fd = Object.fromEntries(await request.formData());
           posted.push(fd);
           if (ok) rows = rows.filter((r) => r.id !== fd.id);
-          return { ok, intent: "override-remove" };
+          return ok ? { ok, intent: "override-remove" } : { ok, intent: "override-remove", message };
         },
       }],
     },
@@ -108,5 +108,23 @@ describe("DateOverridesPanel remove", () => {
     mount(true, SYNCED);
     await screen.findByText(/Synced from your Google calendar/);
     expect(screen.queryAllByRole("button", { name: /^remove/i })).toHaveLength(0);
+  });
+
+  it("a partial-window block says only that window opens again, never that the whole day does", async () => {
+    mount(true, [{ id: "w1", date: "2026-12-24", isAvailable: false, startTime: "10:00", endTime: "12:00", source: null }]);
+    fireEvent.click((await removeButtons())[0]!);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toMatch(/10:00.12:00/);
+    expect(dialog.textContent).toMatch(/available for booking again/);
+    expect(dialog.textContent).not.toMatch(/that day/);
+    expect(dialog.textContent).not.toMatch(/follow the weekly schedule again/);
+  });
+
+  it("a refusal that carries a reason shows the reason", async () => {
+    mount(false, ROWS, "You can only manage your own availability");
+    fireEvent.click((await removeButtons())[0]!);
+    await confirm();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/You can only manage your own availability/);
   });
 });

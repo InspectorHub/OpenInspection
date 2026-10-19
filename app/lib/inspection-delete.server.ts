@@ -23,6 +23,9 @@ export interface DeleteInspectionResult {
 export async function deleteInspectionViaApi(api: Api, id: string): Promise<DeleteInspectionResult> {
   try {
     const res = await api.inspections[":id"].$delete({ param: { id } });
+    // Any 404 counts as done, including a company member who has lost visibility of the inspection
+    // (which also reads as 404): the outcome the person asked for, the row gone from their list, holds
+    // either way, and reporting a failure would offer a retry that can never succeed.
     if ((res.status as number) === 404) return { ok: true, intent: "delete", error: undefined };
     // The delete route checks the caller's right to the id BEFORE it looks the id up, so for
     // someone who is not an owner a missing id answers 403, not 404. Only on a 403, ask the

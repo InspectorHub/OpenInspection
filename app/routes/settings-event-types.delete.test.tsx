@@ -52,6 +52,18 @@ describe("settings → event types: delete", () => {
         expect(screen.queryByRole("alert")).toBeNull();
     });
 
+    it("an already-inactive type is not told it will be 'switched off instead'", async () => {
+        serverRows = [{ ...T1, active: false }, T2];
+        vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
+        mount();
+        const inactive = (await openDelete("Sewer scope")).textContent ?? "";
+        expect(inactive).toMatch(/already switched off/);
+        expect(inactive).not.toMatch(/switched off instead/);
+        fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /cancel/i }));
+        await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+        expect((await openDelete("Radon test")).textContent).toMatch(/switched off instead/);
+    });
+
     it.each([
         ["the server refuses", () => new Response(JSON.stringify({ error: { message: "Not allowed" } }), { status: 403 })],
         ["the request cannot be made", () => { throw new TypeError("network"); }],

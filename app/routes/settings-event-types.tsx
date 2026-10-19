@@ -250,7 +250,7 @@ export default function SettingsEventTypes() {
       <ConfirmDialog
         open={pendingDelete !== null}
         title={m.settings_event_types_delete_title()}
-        message={pendingDelete ? m.settings_event_types_delete_message({ name: pendingDelete.name }) : ""}
+        message={pendingDelete ? (pendingDelete.active ? m.settings_event_types_delete_message : m.settings_event_types_delete_message_inactive)({ name: pendingDelete.name }) : ""}
         confirmLabel={m.common_delete()}
         busy={deleting}
         onConfirm={() => deleteLatch(() => { const t = pendingDelete; setPendingDelete(null); if (t) void confirmDelete(t); })}

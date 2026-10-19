@@ -418,11 +418,11 @@ export function usePhotoOps(ctx: {
         if (action === "delete") {
           const videoRef = photo.provider === "r2" ? photo.mediaId : photo.streamUid;
           const docKey = photo.originalKey || photo.key;
-          if (!docKey) return;
           const removeEntry = () => {
-            patchItemPhotos(itemId, (photos) => photos.filter((p) => p.key !== docKey));
-            const fk = collabDoc ? docFindingKey(itemId, sectionId) : null;
-            if (collabDoc && fk) bindingRemovePhoto(collabDoc, fk, docKey);
+            // An entry with no key at all can only be addressed by its position.
+            patchItemPhotos(itemId, (photos) => photos.filter((p, i) => (docKey ? p.key !== docKey : i !== idx)));
+            const fk = collabDoc && docKey ? docFindingKey(itemId, sectionId) : null;
+            if (collabDoc && fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
           };
           if (!videoRef) removeEntry();
           else {

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useRevalidator } from "react-router";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { purgeInspectionOfflineData } from "~/lib/collab/offline-purge";
 import { MAX_DELETE_BATCH } from "~/lib/inspection-delete-limit";
@@ -16,6 +17,9 @@ type Failure = { id: string; error: string };
  *   `busy` stays true for the whole run, the answers are merged, and the page
  *   re-reads once, after the last chunk. A request is one Worker invocation and
  *   each delete is a full cascade, so the server caps what one request may carry.
+ *   A chunk sent with `more` has its reload skipped by the page's shouldRevalidate;
+ *   if every chunk after it is then refused (so the last chunk that would have
+ *   reloaded never goes out), the run re-reads the list itself when it ends.
  * - Several submits at once on one fetcher cancel each other and only the last
  *   answer is seen, which is why chunks are sent in turn, never together. The
  *   fetcher is dedicated so a status change on the list cannot cancel a delete.
@@ -42,15 +46,38 @@ export function useBatchDelete(presentIds: ReadonlySet<string>, onSettled: (fail
     const merged = useRef<{ deleted: string[]; failed: Failure[] }>({ deleted: [], failed: [] });
     const handled = useRef<unknown>(null);
     const sawBusy = useRef(false);
+    // True while the last chunk actually sent asked the router to skip its reload.
+    const reloadOwed = useRef(false);
+    const { revalidate } = useRevalidator();
 
     const sendNext = (): boolean => {
         const chunk = queue.current.shift();
         if (!chunk) return false;
         current.current = chunk;
         sawBusy.current = false;
-        const sent = submit({ intent: "delete-many", ids: chunk.join(","), ...(queue.current.length > 0 ? { more: "1" } : {}) }, { method: "post" });
-        if (!sent) merged.current.failed.push(...chunk.map((id) => ({ id, error: m.inspections_hub_delete_error() })));
+        const more = queue.current.length > 0;
+        const sent = submit({ intent: "delete-many", ids: chunk.join(","), ...(more ? { more: "1" } : {}) }, { method: "post" });
+        if (sent) reloadOwed.current = more;
+        else merged.current.failed.push(...chunk.map((id) => ({ id, error: m.inspections_hub_delete_error() })));
         return sent;
+    };
+
+    /** Send the next chunk that the guard accepts; refused chunks are reported as failed. False when none was sent. */
+    const sendRemaining = (): boolean => {
+        while (queue.current.length > 0) { if (sendNext()) return true; }
+        return false;
+    };
+
+    const finish = () => {
+        const { deleted, failed } = merged.current;
+        const failedIds = new Set(failed.map((f) => f.id));
+        setHiddenIds((prev) => new Set([...prev].filter((id) => !failedIds.has(id))));
+        setFailures(failed);
+        setRunning(false);
+        onSettled(failedIds);
+        // The last chunk that would have reloaded the page never went out: read it ourselves.
+        if (reloadOwed.current) { reloadOwed.current = false; revalidate(); }
+        for (const id of deleted) void purgeInspectionOfflineData(id);
     };
 
     useEffect(() => {
@@ -70,14 +97,8 @@ export function useBatchDelete(presentIds: ReadonlySet<string>, onSettled: (fail
             // Lost, or answered with something that is not a batch answer. Its rows are still there.
             merged.current.failed.push(...current.current.map((id) => ({ id, error: m.inspections_hub_delete_error() })));
         }
-        while (queue.current.length > 0) { if (sendNext()) return; }
-        const { deleted, failed } = merged.current;
-        const failedIds = new Set(failed.map((f) => f.id));
-        setHiddenIds((prev) => new Set([...prev].filter((id) => !failedIds.has(id))));
-        setFailures(failed);
-        setRunning(false);
-        onSettled(failedIds);
-        for (const id of deleted) void purgeInspectionOfflineData(id);
+        if (sendRemaining()) return;
+        finish();
         // The page's setter and the guarded submit are stable enough; re-running on them would loop.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetcher.state, fetcher.data, running]);
@@ -101,7 +122,9 @@ export function useBatchDelete(presentIds: ReadonlySet<string>, onSettled: (fail
         setRunning(true);
         setHiddenIds((prev) => new Set([...prev, ...unique]));
         setFailures([]);
-        sendNext();
+        reloadOwed.current = false;
+        // A first send the guard refuses must not leave the run waiting for an answer that never comes.
+        if (!sendRemaining()) finish();
         return true;
     };
 
