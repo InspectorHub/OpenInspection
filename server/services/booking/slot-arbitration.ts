@@ -126,8 +126,9 @@ async function timeOffCovers(
     if (synced.some(o => overlaps(o.startTime!, o.endTime!))) return true;
     const manual = overrides.filter(o => o.source == null);
     if (manual.some(o => !o.isAvailable)) {
-        // A manual block leaves only the extra hours on offer; blocked unless one of them holds the window.
-        const holds = manual.some(o => o.isAvailable && o.startTime && o.endTime && toMin(o.startTime) <= startMin && endMin <= toMin(o.endTime));
+        // A manual block leaves only the extra hours on offer, and the grid offers a START inside them
+        // (the booking may run on past their end, as it may past the weekly hours), so judge the start.
+        const holds = manual.some(o => o.isAvailable && o.startTime && o.endTime && toMin(o.startTime) <= startMin && startMin < toMin(o.endTime));
         return !holds;
     }
     return false;

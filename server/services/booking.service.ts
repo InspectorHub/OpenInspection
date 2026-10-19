@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, sql, inArray, isNull } from 'drizzle-orm';
-import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, serviceInspectors, users } from '../lib/db/schema';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, serviceInspectors, services, users } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { FIELD_ROLES } from '../lib/auth/roles';
 import type { HonoConfig } from '../types/hono';
@@ -191,6 +191,14 @@ export class BookingService {
         return !!row;
     }
 
+    /** Total booked minutes of the chosen services, or null when none carries a duration. */
+    async serviceTotalMinutes(tenantId: string, serviceIds: string[]): Promise<number | null> {
+        if (serviceIds.length === 0) return null;
+        const rows = await this.getDrizzle().select({ d: services.durationMinutes }).from(services)
+            .where(and(eq(services.tenantId, tenantId), inArray(services.id, serviceIds))).all();
+        return rows.reduce((sum, r) => sum + (r.d ?? 0), 0) || null;
+    }
+
     /**
      * IA-26 aggregation layer — the union of qualified inspectors' bookable
      * slots for one date. A slot is available iff at least one qualified
@@ -214,6 +222,7 @@ export class BookingService {
         serviceIds: string[],
         qualifiedIds?: string[],
         propertyZip?: string | null,
+        windowMin?: number,
     ): Promise<{
         slots: Array<{ time: string; available: boolean; inspectorIds: string[] }>;
         holidayAdvisory?: { date: string; name: string };
@@ -277,7 +286,7 @@ export class BookingService {
         ]);
 
         const gridOpts = await loadSlotGridOptions(this.db, tenantId);
-        const slotMap = buildTenantSlotMap(eligible, windows, overrides, busy, blocks, gridOpts);
+        const slotMap = buildTenantSlotMap(eligible, windows, overrides, busy, blocks, gridOpts, windowMin);
         const rules = await loadBookingRules(this.db, tenantId);
 
         const slots = [...slotMap.entries()]

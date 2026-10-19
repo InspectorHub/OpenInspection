@@ -42,12 +42,16 @@ export function computeBusyTimes(rows: BusyRow[]): Set<string> {
  * nothing changes for data that never recorded a length. Slot [s, s + interval)
  * overlaps the window when s < end and s + interval > start, so an inspection
  * ending exactly when a slot starts leaves that slot free.
+ *
+ * `windowMin` is how long the CANDIDATE booking would occupy the inspector (the
+ * booked services, or the default window), not the grid step: a slot is offered
+ * only when the whole booking fits.
  */
 export function addInspectionDurationBusyTimes(
     busy: Set<string>,
     rows: BusyRow[],
     candidateSlots: string[],
-    intervalMin: number,
+    windowMin: number,
 ): void {
     for (const row of rows) {
         const raw = String(row.date);
@@ -56,7 +60,7 @@ export function addInspectionDurationBusyTimes(
         const end = start + row.durationMin;
         for (const slot of candidateSlots) {
             const slotStart = parseMinutes(slot);
-            if (slotStart < end && slotStart + intervalMin > start) busy.add(slot);
+            if (slotStart < end && slotStart + windowMin > start) busy.add(slot);
         }
     }
 }

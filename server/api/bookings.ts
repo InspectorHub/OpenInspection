@@ -15,6 +15,7 @@
 // `hono/client` consumers. `server/index.ts` mounts the default export at
 // `/api/public` unchanged.
 import { createRoute, z } from '@hono/zod-openapi';
+import { bookingWindowMin } from '../lib/booking/booking-window';
 import { createApiRouter } from '../lib/openapi-router';
 import { eq } from 'drizzle-orm';
 import { services as servicesTable, tenants } from '../lib/db/schema';
@@ -246,8 +247,11 @@ export const bookingsRoutes = createApiRouter()
             .from(tenants).where(eq(tenants.slug, tenant)).get();
         if (!tenantRow) throw Errors.NotFound('Tenant not found.');
         const ids = serviceIds ? serviceIds.split(',').filter(Boolean) : [];
+        // Offer only the slots a booking of this length fits: the chosen services' minutes, or the default
+        // window. The booking itself is judged over the same length (see booking-window.ts).
+        const windowMin = bookingWindowMin(await c.var.services.booking.serviceTotalMinutes(tenantRow.id, ids));
         const all = await c.var.services.booking.getTenantSlots(
-            tenantRow.id, date, ids, undefined, propertyZip ?? null,
+            tenantRow.id, date, ids, undefined, propertyZip ?? null, windowMin,
         );
         const slots = all.slots.map(s => ({
             time: s.time,

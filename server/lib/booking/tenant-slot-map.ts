@@ -44,6 +44,13 @@ export interface SlotBlockRow extends CalendarBlockBusy {
 
 /**
  * Returns Map<slot HH:MM, Set<free inspector id>> for the given day inputs.
+ *
+ * `windowMin` is how long the booking being offered will occupy the inspector.
+ * Every candidate slot is judged over [s, s + windowMin) against recorded
+ * inspection windows, timed calendar blocks and synced busy events, which is the
+ * window the post-insert arbitration judges the stored booking over, so a slot
+ * offered here is a slot the arbitration accepts. Omitted (the day views, which
+ * ask no one to book), a candidate is judged over one grid step as before.
  */
 export function buildTenantSlotMap(
     qualified: string[],
@@ -52,9 +59,11 @@ export function buildTenantSlotMap(
     busy: SlotBusyRow[],
     blocks: SlotBlockRow[],
     gridOpts: BuildSlotGridOptions,
+    windowMin?: number,
 ): Map<string, Set<string>> {
     const slotMap = new Map<string, Set<string>>();
     const intervalMin = gridOpts.intervalMin ?? 30;
+    const candidateMin = Math.max(windowMin ?? intervalMin, intervalMin);
 
     for (const inspectorId of qualified) {
         const myWindows = windows.filter((w) => w.inspectorId === inspectorId);
@@ -84,14 +93,14 @@ export function buildTenantSlotMap(
         const busyTimes = computeBusyTimes(myBusy);
         const mySlots = buildSlotGrid(effective, gridOpts);
         // An inspection with a recorded length also blocks the slots inside it, not just its start.
-        addInspectionDurationBusyTimes(busyTimes, myBusy, mySlots, intervalMin);
-        addCalendarBlockBusyTimes(busyTimes, myBlocks, mySlots, intervalMin);
+        addInspectionDurationBusyTimes(busyTimes, myBusy, mySlots, candidateMin);
+        addCalendarBlockBusyTimes(busyTimes, myBlocks, mySlots, candidateMin);
         // Synced busy subtracts overlapping slots, same as timed calendar blocks.
         addCalendarBlockBusyTimes(
             busyTimes,
             syncedBusy.map((g) => ({ allDay: false, startTime: g.startTime, endTime: g.endTime })),
             mySlots,
-            intervalMin,
+            candidateMin,
         );
 
         for (const time of mySlots) {

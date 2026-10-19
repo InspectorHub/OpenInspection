@@ -1,4 +1,5 @@
 import type { Context } from 'hono';
+import { bookingWindowMin } from '../../lib/booking/booking-window';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, tenantConfigs } from '../../lib/db/schema';
@@ -234,8 +235,11 @@ export async function admitBooking(
     const place = await resolveProperty(c, body.addressPlaceId);
     const propertyZip = place?.zip ?? body.addressZip ?? null;
 
+    // The same length the stored booking will have (fulfillBooking uses bookingWindowMin too), so the slot
+    // accepted here is one the post-insert arbitration accepts.
+    const windowMin = bookingWindowMin(await service.serviceTotalMinutes(tenantId, serviceIdsForQual), body.timeSlot);
     const { slots, outsideServiceArea } = await service.getTenantSlots(
-        tenantId, body.date, serviceIdsForQual, qualifiedIds, propertyZip,
+        tenantId, body.date, serviceIdsForQual, qualifiedIds, propertyZip, windowMin,
     );
     if (outsideServiceArea) {
         throw Errors.Conflict('No inspector currently serves that area. Please contact the company directly to schedule.');
