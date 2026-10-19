@@ -6,7 +6,7 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 160,
+    "files": 161,
     "dollarMethods": 588,
     "apiWorker": 9
   },
@@ -37,6 +37,10 @@
     },
     "app/lib/dashboard-setup.server.ts": {
       "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/lib/inspection-delete.server.ts": {
+      "dollarMethods": 1,
       "apiWorker": 0
     },
     "app/lib/inspection-order-actions.ts": {
@@ -224,7 +228,7 @@
       "apiWorker": 0
     },
     "app/routes/inspections.tsx": {
-      "dollarMethods": 8,
+      "dollarMethods": 7,
       "apiWorker": 0
     },
     "app/routes/inspector-portal.tsx": {
