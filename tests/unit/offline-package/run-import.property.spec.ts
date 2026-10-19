@@ -8,7 +8,7 @@
  * `OFFLINE_PACKAGE_SEED` replays one.
  */
 import { describe, it, expect } from 'vitest';
-import { MAX_ATTEMPTS_PER_PART, readPackageSummary, runImport, type SendResult } from '@core/offline-package';
+import { MAX_ATTEMPTS_PER_PART, extractHeldBackPackage, readPackageSummary, runImport, type SendResult } from '@core/offline-package';
 import { makeCase, mustBeValid } from '../helpers/offline-package-cases';
 import { confirmedFor, crossingProblems, harness, partitionProblems, refusal } from '../helpers/offline-package-harness';
 
@@ -115,6 +115,7 @@ describe(`runImport over random packages and random faults (seed ${BASE_SEED}, $
         let held = 0;
         let imported = 0;
         let splitCases = 0;
+        let heldPackages = 0;
         for (let n = 0; n < CASES; n++) {
             const seed = BASE_SEED + n;
             const { world, spec } = buildWorld(seed);
@@ -139,6 +140,14 @@ describe(`runImport over random packages and random faults (seed ${BASE_SEED}, $
             expect(h.invalid, `${where}: every part is a package the engine accepts`).toEqual([]);
             for (const view of h.views) expect(crossingProblems(original, view), where).toEqual([]);
             expect(report.requests, where).toBe(h.calls.length);
+            // Review focus 7: what was left behind can be handed on as a package of its own.
+            if (report.heldBack.length > 0) {
+                const heldIds = report.heldBack.map((x) => x.id);
+                const held = mustBeValid(extractHeldBackPackage(zip, heldIds));
+                expect(held.ids, `${where}: the held-back package carries exactly the held-back inspections`).toEqual(ids.filter((id) => heldIds.includes(id)));
+                expect(crossingProblems(original, held), where).toEqual([]);
+                heldPackages++;
+            }
             expect(h.calls.length, `${where}: bounded`).toBeLessThanOrEqual((ids.length + 2) * MAX_ATTEMPTS_PER_PART);
             for (const x of report.heldBack) {
                 expect(['not_found', 'forbidden', 'different_report', 'deleted', 'apply_failed', 'refused', 'too_large_to_split', 'package_rejected', 'gave_up'], where).toContain(x.reason);
@@ -152,6 +161,7 @@ describe(`runImport over random packages and random faults (seed ${BASE_SEED}, $
         expect(imported).toBeGreaterThan(0);
         expect(held).toBeGreaterThan(0);
         expect(splitCases).toBeGreaterThan(CASES / 4);
+        expect(heldPackages).toBeGreaterThan(CASES / 8);
     }, PROPERTY_TIMEOUT_MS);
 
     it('with no transient faults, holds back exactly the refused inspections, each for the reason its refusal gave', async () => {

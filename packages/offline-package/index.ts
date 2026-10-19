@@ -7,7 +7,7 @@
 export * from './src/limits';
 export * from './src/manifest';
 export { PackageFormatError, parsePackage, readPackageSummary } from './src/format';
-export type { PackageSummary, ParsedPackage } from './src/format';
+export type { PackageSummary, ParseOptions, ParsedPackage } from './src/format';
 export { extractHeldBackPackage, planParts, splitPackage } from './src/split';
 export type { Part, PartLimits, PartPlan, SplitResult } from './src/split';
 export { classifyResponse } from './src/classify';

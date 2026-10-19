@@ -11,12 +11,13 @@
  */
 
 import { unzipSync, zipSync, type Zippable } from 'fflate';
+import { IMPORT_LIMIT_CEILINGS } from './limits';
 import { MediaIndexSchema, OFFLINE_ID_PATTERN, OfflinePackageManifestSchema, OutboxSchema } from './manifest';
 import type { MediaIndex, OfflinePackageManifest, OutboxEntry } from './manifest';
 
-export const MANIFEST_ENTRY = 'manifest.json';
-export const OUTBOX_ENTRY = 'outbox.json';
-export const MEDIA_INDEX_ENTRY = 'media/index.json';
+const MANIFEST_ENTRY = 'manifest.json';
+const OUTBOX_ENTRY = 'outbox.json';
+const MEDIA_INDEX_ENTRY = 'media/index.json';
 
 const EXTENSION_BY_TYPE = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/heic': 'heic' } as const;
 const ID = OFFLINE_ID_PATTERN.source.slice(1, -1);
@@ -51,21 +52,33 @@ export interface ParsedPackage {
     photos: ReadonlyMap<string, Uint8Array>;
 }
 
-export function yjsEntryName(inspectionId: string): string {
+function yjsEntryName(inspectionId: string): string {
     return `yjs/${inspectionId}.bin`;
 }
 
-export function mediaEntryName(pendingId: string, contentType: MediaIndex[number]['contentType']): string {
+function mediaEntryName(pendingId: string, contentType: MediaIndex[number]['contentType']): string {
     return `media/${pendingId}.${EXTENSION_BY_TYPE[contentType]}`;
 }
 
-/** The entry names in the archive's directory. Nothing is inflated. */
-function listEntryNames(zip: Uint8Array): string[] {
+export interface ParseOptions {
+    /** Most bytes the entries may declare unpacked, together. Defaults to the most an operator can raise the server's limit to. */
+    maxUncompressedBytes?: number;
+}
+
+/**
+ * The entry names in the archive's directory. Nothing is inflated, so the sizes the
+ * directory declares are checked here, before any entry is.
+ */
+function listEntryNames(zip: Uint8Array, options: ParseOptions): string[] {
     const names: string[] = [];
+    let declared = 0;
     try {
-        unzipSync(zip, { filter: (file) => { names.push(file.name); return false; } });
+        unzipSync(zip, { filter: (file) => { names.push(file.name); declared += file.originalSize; return false; } });
     } catch {
         throw new PackageFormatError('not a valid zip archive');
+    }
+    if (declared > (options.maxUncompressedBytes ?? IMPORT_LIMIT_CEILINGS.uncompressedBytes)) {
+        throw new PackageFormatError('the package declares more unpacked data than is allowed');
     }
     if (new Set(names).size !== names.length) throw new PackageFormatError('duplicate entry name');
     for (const name of names) {
@@ -107,8 +120,8 @@ function parseIndexes(files: Record<string, Uint8Array>): { manifestRaw: Record<
  * entries are inflated; yjs states and photos are never touched, so a damaged
  * photo does not stop a preview.
  */
-export function readPackageSummary(zip: Uint8Array): PackageSummary {
-    listEntryNames(zip);
+export function readPackageSummary(zip: Uint8Array, options: ParseOptions = {}): PackageSummary {
+    listEntryNames(zip, options);
     const { manifest, outbox, media } = parseIndexes(inflateEntries(zip, new Set([MANIFEST_ENTRY, OUTBOX_ENTRY, MEDIA_INDEX_ENTRY])));
     return {
         manifest,
@@ -122,8 +135,8 @@ export function readPackageSummary(zip: Uint8Array): PackageSummary {
  * entry mentions is in the manifest, every manifest inspection has its Yjs state,
  * every indexed photo has its bytes, and nothing else is present.
  */
-export function parsePackage(zip: Uint8Array): ParsedPackage {
-    const names = listEntryNames(zip);
+export function parsePackage(zip: Uint8Array, options: ParseOptions = {}): ParsedPackage {
+    const names = listEntryNames(zip, options);
     const files = inflateEntries(zip, new Set(names));
     const { manifestRaw, manifest, outbox, media } = parseIndexes(files);
 

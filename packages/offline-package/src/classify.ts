@@ -33,11 +33,16 @@ export interface NeedsAttention {
 export type Classified =
     | { kind: 'confirmed'; applied: number; skipped: number; failed: NeedsAttention[] }
     /** The refusal names inspections: send those on their own and the rest without them. */
-    | { kind: 'splittable'; ids: string[]; status: number; code?: string; reason?: string }
+    | { kind: 'splittable'; ids: string[]; status: number; code?: string; reason?: string; queuedWrite?: boolean }
     /** The whole package is refused and splitting cannot help. */
     | { kind: 'fatal'; status: number; code?: string }
-    /** Not confirmed and not refused for good: send the same part again after a pause. */
-    | { kind: 'retry'; status?: number; code?: string }
+    /**
+     * Not confirmed and not refused for good: send the same part again after a pause.
+     * `inspectionId`, `reason` and `queuedWrite` are what the failure said about the one inspection
+     * it stopped on, kept so that a part which keeps failing there can be cut around it.
+     * `inFlight` marks the answer that only means another request holds a queued write's key.
+     */
+    | { kind: 'retry'; status?: number; code?: string; inspectionId?: string; reason?: string; queuedWrite?: boolean; inFlight?: boolean }
     /** Over the server's limits; `limits` is what the refusal offered to split to, when it offered any. */
     | { kind: 'too_large'; limits: PartLimits | null; status: number; code?: string };
 
@@ -67,12 +72,14 @@ function readFailed(value: unknown): NeedsAttention[] | null {
     return out;
 }
 
-function readConfirmed(body: unknown): Classified | null {
+function readConfirmed(body: unknown, expectedInspections: number | undefined): Classified | null {
     const data = isRecord(body) && isRecord(body.data) ? body.data : body;
     if (!isRecord(data) || !isRecord(data.outbox) || !isRecord(data.yjs)) return null;
     const { applied, skipped } = data.outbox;
     const failed = readFailed(data.outbox.failed);
     if (!isCount(data.inspections) || !isCount(data.photos) || !isCount(applied) || !isCount(skipped) || !failed) return null;
+    // An answer that counts a different number of inspections than the part held is not about this part.
+    if (expectedInspections !== undefined && data.inspections !== expectedInspections) return null;
     if (!isCount(data.yjs.changed) || !isCount(data.yjs.unchanged)) return null;
     return { kind: 'confirmed', applied, skipped, failed };
 }
@@ -98,10 +105,31 @@ function namedInspections(details: Record<string, unknown>): string[] {
     return typeof details.inspectionId === 'string' ? [details.inspectionId] : [];
 }
 
-export function classifyResponse(result: SendResult): Classified {
+/** What a transient failure said about the inspection it stopped on. */
+function retryFor(answer: { status: number; code?: string }, details: Record<string, unknown>): Classified {
+    const inspectionId = typeof details.inspectionId === 'string' ? details.inspectionId : undefined;
+    const reason = typeof details.reason === 'string' ? details.reason : undefined;
+    return {
+        kind: 'retry',
+        ...answer,
+        ...(inspectionId !== undefined ? { inspectionId } : {}),
+        ...(reason !== undefined ? { reason } : {}),
+        ...(typeof details.idempotencyKey === 'string' ? { queuedWrite: true } : {}),
+        ...(reason === IN_FLIGHT_REASON ? { inFlight: true } : {}),
+    };
+}
+
+/** The server turns a queued write's 408, 429 or 5xx into a 400 and keeps the original status in `details.status`. */
+const isTransientStatus = (value: unknown): boolean => isCount(value) && (value === 408 || value === 429 || value >= 500);
+
+/**
+ * `expectedInspections` is the number of inspections the request carried. A 200 whose count
+ * differs is not an answer about that request, so it is not a confirmation.
+ */
+export function classifyResponse(result: SendResult, expectedInspections?: number): Classified {
     const { status } = result;
     if (!Number.isInteger(status)) return { kind: 'retry' };
-    if (status === 200) return readConfirmed(result.body) ?? { kind: 'retry', status };
+    if (status === 200) return readConfirmed(result.body, expectedInspections) ?? { kind: 'retry', status };
     // Any other success or redirect is not an answer this import can read.
     if (status < 400) return { kind: 'retry', status };
 
@@ -114,14 +142,20 @@ export function classifyResponse(result: SendResult): Classified {
         const ids = namedInspections(details);
         return ids.length > 0 ? { kind: 'splittable', ids, ...answer } : { kind: 'fatal', ...answer };
     }
-    if (status === 409 && details.reason === IN_FLIGHT_REASON) return { kind: 'retry', ...answer };
+    if (status === 409 && details.reason === IN_FLIGHT_REASON) return retryFor(answer, details);
     // A failure while applying one inspection's data (503 with its id) may have written part of
     // the package. Repeating the whole part is safe because every step is idempotent.
-    if (status === 408 || status === 429 || status >= 500) return { kind: 'retry', ...answer };
+    if (status === 408 || status === 429 || status >= 500) return retryFor(answer, details);
+    // A queued write that was rate limited or timed out is reported as a 400 naming the write.
+    if (typeof details.idempotencyKey === 'string' && isTransientStatus(details.status)) return retryFor(answer, details);
 
     const ids = namedInspections(details);
     if (ids.length > 0) {
-        return { kind: 'splittable', ids, ...answer, ...(typeof details.reason === 'string' ? { reason: details.reason } : {}) };
+        return {
+            kind: 'splittable', ids, ...answer,
+            ...(typeof details.reason === 'string' ? { reason: details.reason } : {}),
+            ...(typeof details.idempotencyKey === 'string' ? { queuedWrite: true } : {}),
+        };
     }
     return { kind: 'fatal', ...answer };
 }

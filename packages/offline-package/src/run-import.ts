@@ -7,11 +7,16 @@
  *    neither. A part is imported only on a confirmed 200.
  *  - Strictly serial: one request in flight at a time, and a confirmed part is
  *    never sent again.
- *  - Bounded: at most `MAX_ATTEMPTS_PER_PART` sends of one part, a total time
- *    budget for retries, and at most `inspections + 1` times that the answer sends
- *    the loop back to cut the package differently.
+ *  - Bounded: at most `MAX_ATTEMPTS_PER_PART` failed sends of one part, a time
+ *    window per part (measured from that part's own first send), and a longer
+ *    wait, inside the same window, for a key another request holds. Every answer
+ *    that sends the loop back to cut the package differently leaves strictly
+ *    smaller units, so the loop ends by itself; `maxReactions` is only a backstop
+ *    that no run reaches.
  *  - A refusal of the whole package stops the run. The parts not yet sent are held
  *    back with the same reason rather than dropped.
+ *  - Nothing a callback or the cutting code throws can lose an inspection: what was
+ *    imported stays imported and the rest is held back as `gave_up`.
  */
 
 import { classifyResponse, type Classified, type NeedsAttention, type SendResult } from './classify';
@@ -20,14 +25,25 @@ import { planParsedParts } from './split';
 
 export type { NeedsAttention, SendResult } from './classify';
 
-/** Sends one package. Reports a refusal as a result; throws only when no answer was received. */
+/**
+ * Sends one package. Reports a refusal as a result; throws only when no answer was received.
+ *
+ * The transport owns the request's timeout and its cancellation: `runImport` waits for the
+ * promise and never aborts it, so a transport that can hang forever hangs the import. A
+ * request that is abandoned by a timeout should reject (it is then sent again).
+ */
 export type Send = (bytes: Uint8Array) => Promise<SendResult>;
 
 export const MAX_ATTEMPTS_PER_PART = 5;
 export const BACKOFF_BASE_MS = 1000;
 export const BACKOFF_CAP_MS = 15_000;
-/** Once this much time has passed, a part that is not confirmed on its next send is given up on. */
+/**
+ * Once this much time has passed since a part was first sent, that part is not sent again after
+ * a failure. A key held by another request is waited for until the pauses add up to this much.
+ */
 export const MAX_RETRY_WINDOW_MS = 5 * 60 * 1000;
+/** The `detail` of an inspection left behind because code on this side failed, not the server. */
+const LOCAL_ERROR = 'local_error';
 
 export type HeldBackReason =
     | 'not_found'
@@ -83,13 +99,18 @@ interface Unit {
 
 type Answer = { status?: number; code?: string };
 
+/** A part the retries ran out on, with what its last failure said about the inspection it stopped at. */
+type GaveUp = { kind: 'gave_up'; inspectionId?: string; reason?: string; queuedWrite?: boolean; inFlight?: boolean } & Answer;
+
 const answerOf = (from: Answer): Answer => ({
     ...(from.status !== undefined ? { status: from.status } : {}),
     ...(from.code !== undefined ? { code: from.code } : {}),
 });
 
-function reasonFor(status: number, detail: string | undefined): HeldBackReason {
-    if (status === 409) return 'deleted';
+function reasonFor(status: number, code: string | undefined, detail: string | undefined, queuedWrite: boolean | undefined): HeldBackReason {
+    // A queued write's refusal is about the write, whatever status it came back with.
+    if (queuedWrite) return 'apply_failed';
+    if (status === 409 && code === 'PACKAGE_INSPECTION_DELETED') return 'deleted';
     if (status === 404) return 'not_found';
     if (status === 403) return 'forbidden';
     if (detail !== undefined) return 'apply_failed';
@@ -103,7 +124,6 @@ export async function runImport(zip: Uint8Array, send: Send, options: ImportOpti
     const input = parsed.manifest.inspections.map((i) => i.id);
     const sleep = options.sleep ?? defaultSleep;
     const now = options.now ?? Date.now;
-    const started = now();
 
     const imported: string[] = [];
     const heldBack: HeldBack[] = [];
@@ -113,7 +133,10 @@ export async function runImport(zip: Uint8Array, send: Send, options: ImportOpti
     let requests = 0;
     let reactions = 0;
     let settled = 0;
-    const maxReactions = input.length + 1;
+    // Every reaction either holds back at least one inspection (at most n of them) or cuts a unit
+    // into strictly smaller ones (fewer than n: the cut has at most n leaves). So 2n is the true
+    // bound; this is a backstop above it, never a limit a real run is held to.
+    const maxReactions = 4 * input.length + 4;
     let stopped: Answer | null = null;
 
     const queue: Unit[] = [{ ids: input, bytes: zip }];
@@ -121,105 +144,157 @@ export async function runImport(zip: Uint8Array, send: Send, options: ImportOpti
         for (const id of ids) heldBack.push({ id, reason, ...answerOf(from), ...(detail !== undefined ? { detail } : {}) });
     };
 
-    /** Send one part until it is confirmed, refused or the attempts run out. */
-    const sendPart = async (bytes: Uint8Array): Promise<Classified | ({ kind: 'gave_up' } & Answer)> => {
+    /**
+     * Send one part until it is confirmed, refused or the retries run out. The window is the
+     * part's own: it starts at this part's first send, not at the start of the import.
+     */
+    const sendPart = async (bytes: Uint8Array, expectedInspections: number): Promise<Classified | GaveUp> => {
+        const partStarted = now();
+        let waited = 0;
+        let failures = 0;
         for (let attempt = 1; ; attempt++) {
             requests++;
             let classified: Classified;
             try {
-                classified = classifyResponse(await send(bytes));
+                classified = classifyResponse(await send(bytes), expectedInspections);
             } catch {
                 // No usable answer: the part is not confirmed. Sending it again is safe.
                 classified = { kind: 'retry' };
             }
             if (classified.kind !== 'retry') return classified;
-            if (attempt >= MAX_ATTEMPTS_PER_PART || now() - started > MAX_RETRY_WINDOW_MS) return { kind: 'gave_up', ...answerOf(classified) };
-            await sleep(Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempt - 1)));
+            const delay = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** Math.min(attempt - 1, 20));
+            const outOfTime = now() - partStarted > MAX_RETRY_WINDOW_MS;
+            // A key another request holds is released when that request ends, so it is waited for
+            // by the clock; the pauses are summed too, so an injected clock cannot make this endless.
+            const exhausted = classified.inFlight
+                ? outOfTime || waited + delay > MAX_RETRY_WINDOW_MS
+                : outOfTime || ++failures >= MAX_ATTEMPTS_PER_PART;
+            if (exhausted) return { ...classified, kind: 'gave_up' };
+            await sleep(delay);
+            waited += delay;
         }
     };
 
-    while (queue.length > 0) {
-        const unit = queue.shift()!;
-        if (stopped) {
-            hold(unit.ids, 'package_rejected', stopped);
-        } else {
-            const outcome = await sendPart(unit.bytes ?? writePackageFor(parsed, new Set(unit.ids)));
-            switch (outcome.kind) {
-                case 'confirmed':
-                    imported.push(...unit.ids);
-                    applied += outcome.applied;
-                    skipped += outcome.skipped;
-                    for (const failure of outcome.failed) needsAttention.set(failure.idempotencyKey, failure);
-                    break;
-                case 'gave_up':
+    /** Runs the whole queue. Anything it throws is handled by the caller. */
+    const drain = async (): Promise<void> => {
+        while (queue.length > 0) {
+            const unit = queue.shift()!;
+            if (stopped) {
+                hold(unit.ids, 'package_rejected', stopped);
+            } else {
+                await settle(unit);
+            }
+            settled++;
+            options.onProgress?.({ settled, imported: imported.length, heldBack: heldBack.length, pending: queue.length });
+        }
+    };
+
+    /**
+     * Hold back `named` (a subset of the unit) and put the rest back to be sent without them.
+     * Every use takes at least one inspection out of the unit, which is what keeps the loop finite.
+     */
+    const cutAway = (unit: Unit, named: readonly string[], reason: HeldBackReason, from: Answer, detail: string | undefined): void => {
+        hold(named, reason, from, detail);
+        const rest = unit.ids.filter((id) => !named.includes(id));
+        if (rest.length > 0) queue.unshift({ ids: rest });
+    };
+
+    const settle = async (unit: Unit): Promise<void> => {
+        const outcome = await sendPart(unit.bytes ?? writePackageFor(parsed, new Set(unit.ids)), unit.ids.length);
+        switch (outcome.kind) {
+            case 'confirmed':
+                imported.push(...unit.ids);
+                applied += outcome.applied;
+                skipped += outcome.skipped;
+                for (const failure of outcome.failed) needsAttention.set(failure.idempotencyKey, failure);
+                break;
+            case 'gave_up': {
+                // A part that keeps failing on one inspection it names, with a reason of the server's
+                // own, is not lost with it: that one is left behind and the others are sent again.
+                const culprit = outcome.inspectionId;
+                if (
+                    culprit !== undefined && unit.ids.includes(culprit) && !outcome.inFlight
+                    && (outcome.reason !== undefined || outcome.queuedWrite === true) && reactions < maxReactions
+                ) {
+                    reactions++;
+                    cutAway(unit, [culprit], 'apply_failed', outcome, outcome.reason);
+                } else {
                     hold(unit.ids, 'gave_up', outcome);
-                    break;
-                case 'retry':
-                    // sendPart never returns a retry; kept so a new class cannot fall through silently.
+                }
+                break;
+            }
+            case 'retry':
+                // sendPart never returns a retry; kept so a new class cannot fall through silently.
+                hold(unit.ids, 'gave_up', outcome);
+                break;
+            case 'fatal':
+                stopped = answerOf(outcome);
+                hold(unit.ids, 'package_rejected', stopped);
+                break;
+            case 'splittable': {
+                reactions++;
+                const inPart = new Set(unit.ids);
+                const named = outcome.ids.filter((id) => inPart.has(id));
+                if (reactions > maxReactions) {
                     hold(unit.ids, 'gave_up', outcome);
-                    break;
-                case 'fatal':
+                } else if (named.length === 0) {
+                    // Names something this part does not hold: nothing can be cut away to make progress.
                     stopped = answerOf(outcome);
                     hold(unit.ids, 'package_rejected', stopped);
-                    break;
-                case 'splittable': {
-                    reactions++;
-                    const inPart = new Set(unit.ids);
-                    const named = outcome.ids.filter((id) => inPart.has(id));
-                    if (reactions > maxReactions) {
-                        hold(unit.ids, 'gave_up', outcome);
-                    } else if (named.length === 0) {
-                        // Names something this part does not hold: nothing can be cut away to make progress.
-                        stopped = answerOf(outcome);
-                        hold(unit.ids, 'package_rejected', stopped);
-                    } else {
-                        hold(named, reasonFor(outcome.status, outcome.reason), outcome, outcome.reason);
-                        const rest = unit.ids.filter((id) => !named.includes(id));
-                        if (rest.length > 0) queue.unshift({ ids: rest });
-                    }
+                } else {
+                    cutAway(unit, named, reasonFor(outcome.status, outcome.code, outcome.reason, outcome.queuedWrite), outcome, outcome.reason);
+                }
+                break;
+            }
+            case 'too_large': {
+                reactions++;
+                if (reactions > maxReactions) {
+                    hold(unit.ids, 'gave_up', outcome);
                     break;
                 }
-                case 'too_large': {
-                    reactions++;
-                    if (reactions > maxReactions) {
-                        hold(unit.ids, 'gave_up', outcome);
-                        break;
-                    }
-                    const halves = (): Unit[] => {
-                        const half = Math.ceil(unit.ids.length / 2);
-                        return [{ ids: unit.ids.slice(0, half) }, { ids: unit.ids.slice(half) }];
-                    };
-                    let next: Unit[];
-                    if (outcome.limits) {
-                        const plan = planParsedParts(parsed, unit.ids, outcome.limits);
-                        hold(plan.tooLarge, 'too_large_to_split', outcome);
-                        const sameAsSent = plan.parts.length === 1 && plan.parts[0]!.ids.length === unit.ids.length;
-                        // The limits did not shrink anything: the server is counting something the limits
-                        // do not name, so cut in half instead of sending the same part again.
-                        next = sameAsSent && unit.ids.length > 1 ? halves() : plan.parts.map((p) => ({ ids: p.ids, bytes: p.bytes }));
-                        if (sameAsSent && unit.ids.length === 1) {
-                            heldBack.push({ id: unit.ids[0]!, reason: 'too_large_to_split', ...answerOf(outcome) });
-                            next = [];
-                        }
-                    } else if (unit.ids.length > 1) {
-                        next = halves();
-                    } else {
-                        hold(unit.ids, 'too_large_to_split', outcome);
+                const halves = (): Unit[] => {
+                    const half = Math.ceil(unit.ids.length / 2);
+                    return [{ ids: unit.ids.slice(0, half) }, { ids: unit.ids.slice(half) }];
+                };
+                let next: Unit[];
+                if (outcome.limits) {
+                    const plan = planParsedParts(parsed, unit.ids, outcome.limits);
+                    hold(plan.tooLarge, 'too_large_to_split', outcome);
+                    const sameAsSent = plan.parts.length === 1 && plan.parts[0]!.ids.length === unit.ids.length;
+                    // The limits did not shrink anything: the server is counting something the limits
+                    // do not name, so cut in half instead of sending the same part again.
+                    next = sameAsSent && unit.ids.length > 1 ? halves() : plan.parts.map((p) => ({ ids: p.ids, bytes: p.bytes }));
+                    if (sameAsSent && unit.ids.length === 1) {
+                        heldBack.push({ id: unit.ids[0]!, reason: 'too_large_to_split', ...answerOf(outcome) });
                         next = [];
                     }
-                    queue.unshift(...next);
-                    break;
+                } else if (unit.ids.length > 1) {
+                    next = halves();
+                } else {
+                    hold(unit.ids, 'too_large_to_split', outcome);
+                    next = [];
                 }
+                queue.unshift(...next);
+                break;
             }
         }
-        settled++;
-        options.onProgress?.({ settled, imported: imported.length, heldBack: heldBack.length, pending: queue.length });
+    };
+
+    let failedLocally = false;
+    try {
+        await drain();
+    } catch {
+        // The parts, the callback or the cutting code failed on this side. What the server confirmed
+        // stays imported; everything else is left behind below instead of rejecting the whole run.
+        failedLocally = true;
     }
 
     // Safety net for the first invariant: nothing the loop above handles can leave an inspection
     // unaccounted for, but if it ever did, the inspection is reported rather than lost.
     const accounted = new Set([...imported, ...heldBack.map((h) => h.id)]);
-    for (const id of input) if (!accounted.has(id)) heldBack.push({ id, reason: 'gave_up' });
+    for (const id of input) {
+        if (!accounted.has(id)) heldBack.push({ id, reason: 'gave_up', ...(failedLocally ? { detail: LOCAL_ERROR } : {}) });
+    }
 
     const order = new Map(input.map((id, i) => [id, i] as const));
     const byManifest = (a: string, b: string): number => (order.get(a) ?? 0) - (order.get(b) ?? 0);

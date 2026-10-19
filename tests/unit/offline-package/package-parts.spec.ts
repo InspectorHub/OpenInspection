@@ -68,6 +68,20 @@ describe('readPackageSummary', () => {
         expect(() => readPackageSummary(withoutManifest())).toThrow(PackageFormatError);
         expect(() => readPackageSummary(new Uint8Array([1, 2, 3]))).toThrow(PackageFormatError);
     });
+
+    describe('the declared unpacked size', () => {
+        // 4000 bytes of photo and two 32-byte states plus the indexes: well under 10 KiB, well over 1 KiB.
+        it('is checked before anything is inflated, against the caller\'s limit', () => {
+            expect(() => parsePackage(zip, { maxUncompressedBytes: 1024 })).toThrow(PackageFormatError);
+            expect(() => readPackageSummary(zip, { maxUncompressedBytes: 1024 })).toThrow(PackageFormatError);
+        });
+
+        it('lets the same package through under a larger limit, and by default (control)', () => {
+            expect(parsePackage(zip, { maxUncompressedBytes: 10 * 1024 }).manifest.inspections).toHaveLength(2);
+            expect(readPackageSummary(zip, { maxUncompressedBytes: 10 * 1024 }).counts.inspections).toBe(2);
+            expect(parsePackage(zip).manifest.inspections).toHaveLength(2);
+        });
+    });
 });
 
 describe('splitPackage', () => {
@@ -198,6 +212,24 @@ describe('planParts', () => {
         const plan = planParts(zip, limits);
         expect(plan.tooLarge).toEqual(['insp-1']);
         check(plan, mustBeValid(zip), limits);
+    });
+
+    describe('a limit the server has not stated', () => {
+        // One inspection with 210 photos is 214 entries: over the default of 200, which is only a guess.
+        const { zip } = makeCase({ inspections: 2, photos: { 0: 210 }, photoBytes: 10 });
+        const wide: PartLimits = { inspections: 8, outbox: 20, photos: 1500, compressedBytes: 16 * MIB };
+
+        it('does not condemn an inspection on the default entry count; the server corrects it', () => {
+            const plan = planParts(zip, wide);
+            expect(plan.tooLarge).toEqual([]);
+            expect(plan.parts.flatMap((p) => p.ids).sort()).toEqual(['insp-0', 'insp-1']);
+        });
+
+        it('holds it back once the server has named the entry count (control)', () => {
+            const plan = planParts(zip, { ...wide, entries: 200 });
+            expect(plan.tooLarge).toEqual(['insp-0']);
+            expect(plan.parts.flatMap((p) => p.ids)).toEqual(['insp-1']);
+        });
     });
 
     it('splits by size when the counts fit but the bytes do not', () => {

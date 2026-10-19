@@ -198,7 +198,8 @@ describe('runImport: retries', () => {
         expect(h.maxInFlight).toBe(1);
     });
 
-    it.each(transient)('%s: gives up after the attempts allowed and holds the part back', async (_name, answer) => {
+    // A key held by another request has its own, longer budget (run-import-failures.spec.ts).
+    it.each(transient.filter(([name]) => !name.includes('in_flight')))('%s: gives up after the attempts allowed and holds the part back', async (_name, answer) => {
         const h = harness(() => answer);
         const report = await runImport(package5.zip, h.send, h.options);
         expect(h.calls).toHaveLength(MAX_ATTEMPTS_PER_PART);
@@ -290,7 +291,7 @@ describe('runImport: queued writes the server refused', () => {
 });
 
 describe('runImport: bounded and serial', () => {
-    it('gives up on what is left once the answers have sent it back more than inspections + 1 times', async () => {
+    it('ends by itself when every answer sends the part back: each cut is strictly smaller', async () => {
         const three = makeCase({ inspections: 3 });
         // No limits to cut to, so every refusal halves the part; each one, a leaf included, is one resend.
         const h = harness(() => ({ status: 413 }));
@@ -298,7 +299,7 @@ describe('runImport: bounded and serial', () => {
         expect(h.calls).toHaveLength(5);
         expect(report.imported).toEqual([]);
         expect(report.heldBack.map((x) => [x.id, x.reason])).toEqual([
-            ['insp-0', 'too_large_to_split'], ['insp-1', 'too_large_to_split'], ['insp-2', 'gave_up'],
+            ['insp-0', 'too_large_to_split'], ['insp-1', 'too_large_to_split'], ['insp-2', 'too_large_to_split'],
         ]);
         expectAccountedFor(report, three.ids);
     });

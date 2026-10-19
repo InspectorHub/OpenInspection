@@ -83,7 +83,13 @@ function add(totals: Totals, weight: Weight): Totals {
     };
 }
 
-function fitsWithin(totals: Totals, limits: PartLimits): boolean {
+/**
+ * `alone` asks whether one inspection can ever be sent, which decides that it is given up on.
+ * The entry count and the unpacked size are only guesses until the server has named them, so
+ * that verdict does not rest on a guess: the inspection is sent once and the refusal corrects it.
+ * Grouping inspections into parts still uses the guess, which only costs a resend.
+ */
+function fitsWithin(totals: Totals, limits: PartLimits, alone = false): boolean {
     const entries = FIXED_ENTRIES + totals.inspections + totals.photos;
     // The server has no limit for the unpacked size to name, so a part is held to the default
     // ratio of unpacked to packed bytes, which no default package reaches.
@@ -92,8 +98,8 @@ function fitsWithin(totals: Totals, limits: PartLimits): boolean {
     return totals.inspections <= Math.max(1, limits.inspections)
         && totals.writes <= limits.outbox
         && totals.photos <= limits.photos
-        && entries <= (limits.entries ?? DEFAULT_IMPORT_LIMITS.entries)
-        && totals.bytes <= unpacked
+        && (entries <= (limits.entries ?? DEFAULT_IMPORT_LIMITS.entries) || (alone && limits.entries === undefined))
+        && (totals.bytes <= unpacked || (alone && limits.uncompressedBytes === undefined))
         && totals.bytes <= limits.compressedBytes;
 }
 
@@ -113,7 +119,7 @@ export function planParsedParts(parsed: ParsedPackage, ids: readonly string[], l
     let totals = EMPTY;
     for (const id of ordered) {
         const weight = weights.get(id)!;
-        if (!fitsWithin(add(EMPTY, weight), limits)) {
+        if (!fitsWithin(add(EMPTY, weight), limits, true)) {
             tooLarge.push(id);
             continue;
         }
@@ -158,7 +164,7 @@ export function planParts(zip: Uint8Array, limits: PartLimits): PartPlan {
 }
 
 /** Move the named inspections, whole, into `part`; the others stay in `rest`. */
-export function splitParsed(parsed: ParsedPackage, inspectionIds: readonly string[]): { part: Uint8Array; rest: Uint8Array | null } {
+function splitParsed(parsed: ParsedPackage, inspectionIds: readonly string[]): { part: Uint8Array; rest: Uint8Array | null } {
     const all = parsed.manifest.inspections.map((i) => i.id);
     const known = new Set(all);
     const named = new Set(inspectionIds);
