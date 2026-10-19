@@ -92,3 +92,24 @@ describe('slot list and admission agree on the window (no service durations)', (
         expect(await book(h, 'custom', offered[0]!)).toBe(200);
     });
 });
+
+describe('GET /api/public/slots is never cached', () => {
+    let h: Harness;
+    afterEach(() => h.close());
+
+    it.each([
+        ['a 200', `tenant=${TENANT_SLUG}&date=${MONDAY}`, 200],
+        ['an unknown tenant (404)', `tenant=nobody&date=${MONDAY}`, 404],
+        ['a malformed date (400)', `tenant=${TENANT_SLUG}&date=soon`, 400],
+        ['an unknown time slot (400)', `tenant=${TENANT_SLUG}&date=${MONDAY}&timeSlot=evening`, 400],
+    ])('answers %s with Cache-Control: no-store and keeps Vary: Origin', { timeout: 60_000 }, async (_n, query, status) => {
+        h = await createHarness('standalone');
+        await seed(h, false);
+        const exec = makeExecutionContext({ label: 'slots-cache' });
+        const res = await app.request(`/api/public/slots?${query}`, { headers: { origin: 'https://example.test' } }, h.env, exec.ctx);
+        expect(res.status).toBe(status);
+        expect(res.headers.get('cache-control')).toBe('no-store');
+        expect(res.headers.get('vary') ?? '').toMatch(/Origin/i);
+    });
+});
+

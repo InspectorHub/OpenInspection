@@ -174,7 +174,12 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
     operationId: 'getTenantBookingSlots',
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const bookingsRoutes = createApiRouter()
+const bookingsRouter = createApiRouter();
+// The slot list changes with every booking, block and sync: never cache it, on any status. (A statement of
+// its own, not a link in the chain below: `.use` on a chained router loses the OpenAPI typing.)
+bookingsRouter.use('/slots', async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
+
+export const bookingsRoutes = bookingsRouter
     .route('/', bookingProfileRoutes)
     .route('/', depositIntentRoutes)
     .openapi(listInspectorsRoute, async (c) => {
