@@ -238,7 +238,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function InspectionsPage() {
-  const { buckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage, loadFailed } = useLoaderData<typeof loader>();
+  const { buckets: loadedBuckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage, loadFailed } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   // Scheduled times render in the viewer's effective zone, resolved once here
   // rather than per row (and never left to the browser — see format-date).
@@ -248,6 +248,20 @@ export default function InspectionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const fetcher = useFetcher();
+  // Rows the person just asked to delete. They leave the list at once, without
+  // waiting for the router's re-read, which can still return them if it reads
+  // right after the write. A refused delete puts them back; a confirmed one is
+  // simply absent from the next read.
+  const [hiddenIds, setHiddenIds] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data?.intent === "delete" && fetcher.data.ok === false) setHiddenIds(new Set());
+  }, [fetcher.state, fetcher.data]);
+  const buckets = useMemo(() => {
+    if (hiddenIds.size === 0) return loadedBuckets;
+    return Object.fromEntries(
+      Object.entries(loadedBuckets).map(([key, items]) => [key, (items as Inspection[]).filter((i) => !hiddenIds.has(i.id))]),
+    ) as typeof loadedBuckets;
+  }, [loadedBuckets, hiddenIds]);
 
   /* ---- IA-12 Onboarding checklist ---- */
   // Optimistic dismiss: hide immediately on click, persist via BFF.
@@ -530,6 +544,7 @@ export default function InspectionsPage() {
   const batchDelete = () => {
     if (selectedIds.size === 0) return;
     const ids = [...selectedIds];
+    setHiddenIds((prev) => new Set([...prev, ...ids]));
     for (const id of ids) {
       // busy-controls-allow: DELETE /api/inspections/:id resolves the row through getInspection first, which answers 404 once the cascade has removed it, so a repeat writes nothing
       fetcher.submit({ intent: "delete", id }, { method: "post" });
