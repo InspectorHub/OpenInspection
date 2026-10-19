@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNotNull, lte, notInArray, or, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import {
     availabilityOverrides,
@@ -7,6 +7,7 @@ import {
     inspectionEvents,
     inspectionInspectors,
     inspections,
+    users,
 } from '../lib/db/schema';
 import {
     loadCustomHolidaysInRange,
@@ -340,13 +341,15 @@ export async function listCalendarItems(
         };
     });
 
-    // availability_overrides has no provider/source column yet, so every
-    // isAvailable=false override is represented as external busy time.
+    // Every isAvailable=false override is shown as busy time, hand-entered or synced. A removed
+    // (soft-deleted) member's rows are left out: they can no longer work, and removing them also
+    // removes their synced rows and calendar connection, which this keeps true for hand-entered ones.
     const busyRows = await db.select()
         .from(availabilityOverrides)
         .where(and(
             eq(availabilityOverrides.tenantId, tenantId),
             eq(availabilityOverrides.isAvailable, false),
+            notInArray(availabilityOverrides.inspectorId, db.select({ id: users.id }).from(users).where(and(eq(users.tenantId, tenantId), isNotNull(users.deletedAt)))),
             gte(availabilityOverrides.date, range.startDate),
             lte(availabilityOverrides.date, range.endDate),
             selectedUsers ? inArray(availabilityOverrides.inspectorId, selectedUsers) : undefined,

@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { z } from '@hono/zod-openapi';
 import {
     availabilityOverrides,
@@ -41,6 +41,23 @@ export async function disconnectCalendar(
     provider?: CalendarProviderId,
 ): Promise<string[]> {
     const d = drizzle(db);
+    const { writes, connectionIds } = await calendarCleanupWrites(d, tenantId, userId, provider);
+    await runAtomically(d as never, writes);
+    return connectionIds;
+}
+
+/**
+ * The statements that take a user's calendar integration out of a company, for a
+ * caller to run in its own batch (disconnecting, or removing a member together
+ * with the soft-delete). Reads the connection ids first; the returned writes are
+ * not yet executed. `provider` limits them to one provider; omitted, all.
+ */
+export async function calendarCleanupWrites(
+    d: DrizzleD1Database,
+    tenantId: string,
+    userId: string,
+    provider?: CalendarProviderId,
+): Promise<{ writes: unknown[]; connectionIds: string[] }> {
     const connectionScope = and(
         eq(calendarConnections.tenantId, tenantId),
         eq(calendarConnections.userId, userId),
@@ -49,7 +66,7 @@ export async function disconnectCalendar(
     const connectionIds = (await d.select({ id: calendarConnections.id }).from(calendarConnections).where(connectionScope).all())
         .map((row) => row.id);
 
-    const writes = [
+    const writes: unknown[] = [
         d.delete(calendarExternalLinks).where(and(
             eq(calendarExternalLinks.tenantId, tenantId),
             eq(calendarExternalLinks.userId, userId),
@@ -69,6 +86,5 @@ export async function disconnectCalendar(
             : []),
         d.delete(calendarConnections).where(connectionScope),
     ];
-    await runAtomically(d as never, writes);
-    return connectionIds;
+    return { writes, connectionIds };
 }
