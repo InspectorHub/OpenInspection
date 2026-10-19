@@ -375,8 +375,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
         const db = this.getDrizzle();
         const insRows = snapshots
             ? Promise.resolve([] as Array<{ id: string; templateSnapshot: unknown }>)
-            : db.select({ id: inspections.id, templateSnapshot: inspections.templateSnapshot }).from(inspections)
-                .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, inspectionIds)));
+            : Promise.all(chunkIds(inspectionIds).map((part) => db.select({ id: inspections.id, templateSnapshot: inspections.templateSnapshot }).from(inspections)
+                .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, part))))).then((chunks) => chunks.flat());
         const [snapshotRows, resultChunks] = await Promise.all([
             insRows,
             Promise.all(chunkIds(inspectionIds).map((part) => db.select({

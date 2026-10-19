@@ -18,6 +18,7 @@ import { getInspectionRoster } from './roster';
 import { requireVisibleInspection, resolveInspectionScope } from './visibility';
 import { capabilitiesFor } from '../middleware/require-capability';
 import type { HonoConfig } from '../../types/hono';
+import { chunkIds } from '../id-chunks';
 
 /** How the caller works this inspection: its lead (roster lead, or the named inspector), a helper, or not at all. */
 async function rosterRoleOf(c: Context<HonoConfig>, inspectionId: string): Promise<'lead' | 'helper' | null> {
@@ -85,10 +86,17 @@ export async function mayActOnContact(c: Context<HonoConfig>, contactId: string)
         .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.contactId, contactId))).all();
     if (seats.length === 0) return true;
     const ids = seats.map((s) => s.id);
-    const onRoster = await db.select({ id: inspectionInspectors.inspectionId }).from(inspectionInspectors)
-        .where(and(eq(inspectionInspectors.tenantId, tenantId), eq(inspectionInspectors.userId, userId), inArray(inspectionInspectors.inspectionId, ids))).get();
-    if (onRoster) return true;
-    const named = await db.select({ id: inspections.id }).from(inspections)
-        .where(and(eq(inspections.tenantId, tenantId), eq(inspections.inspectorId, userId), inArray(inspections.id, ids))).get();
-    return Boolean(named) || (await capabilitiesFor(c)).scheduleOthers;
+    // The contact's inspections can outnumber what one statement may bind (D1: 100), so ask in chunks.
+    for (const part of chunkIds(ids)) {
+        const onRoster = await db.select({ id: inspectionInspectors.inspectionId }).from(inspectionInspectors)
+            .where(and(eq(inspectionInspectors.tenantId, tenantId), eq(inspectionInspectors.userId, userId), inArray(inspectionInspectors.inspectionId, part))).get();
+        if (onRoster) return true;
+    }
+    let named = false;
+    for (const part of chunkIds(ids)) {
+        const hit = await db.select({ id: inspections.id }).from(inspections)
+            .where(and(eq(inspections.tenantId, tenantId), eq(inspections.inspectorId, userId), inArray(inspections.id, part))).get();
+        if (hit) { named = true; break; }
+    }
+    return named || (await capabilitiesFor(c)).scheduleOthers;
 }

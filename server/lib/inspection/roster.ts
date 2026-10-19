@@ -25,6 +25,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspectionInspectors } from '../db/schema';
 import { users } from '../db/schema';
+import { chunkIds } from '../id-chunks';
 
 interface RosterMember {
     id: string;
@@ -59,7 +60,8 @@ export async function getInspectionRosters(
     const out = new Map<string, InspectionRoster>();
     if (inspectionIds.length === 0) return out;
 
-    const rows = await db.select({
+    // Ids are bound in chunks (D1 binds at most 100 parameters per statement); the chunks are read together.
+    const rows = (await Promise.all(chunkIds(inspectionIds).map((part) => db.select({
         inspectionId: inspectionInspectors.inspectionId,
         role:         inspectionInspectors.role,
         userId:       users.id,
@@ -73,9 +75,9 @@ export async function getInspectionRosters(
             // carries a null tenant_id, and scoping on the join would drop
             // rows rather than protect them.
             eq(inspectionInspectors.tenantId, tenantId),
-            inArray(inspectionInspectors.inspectionId, inspectionIds),
+            inArray(inspectionInspectors.inspectionId, part),
         ))
-        .all();
+        .all()))).flat();
 
     for (const r of rows) {
         const entry = out.get(r.inspectionId) ?? { lead: null, helpers: [] };
