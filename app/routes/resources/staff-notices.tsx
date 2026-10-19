@@ -86,14 +86,14 @@ export async function action({ request, context }: Route.ActionArgs): Promise<St
   const headers = { "x-token-relay": "1" };
   try {
     if (intent === "notice-mark-all-read") {
-      await api.notifications["mark-all-read"].$post({}, { headers });
-      return { ok: true, intent };
+      const res = await api.notifications["mark-all-read"].$post({}, { headers });
+      return res.ok ? { ok: true, intent } : { ok: false, intent };
     }
     if (intent === "notice-dismiss" && noticeId) {
       // DELETE archives — it is a soft-delete on the inbox row, and it never
       // touches the delivery ledger.
-      await api.notifications[":id"].$delete({ param: { id: noticeId } }, { headers });
-      return { ok: true, intent };
+      const res = await api.notifications[":id"].$delete({ param: { id: noticeId } }, { headers });
+      return res.ok ? { ok: true, intent } : { ok: false, intent };
     }
   } catch {
     return { ok: false, intent };

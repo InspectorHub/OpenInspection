@@ -63,6 +63,7 @@ export function StaffNoticeBell() {
       onDismiss={(id) => submit("notice-dismiss", id)}
       onRemedy={() => {}}
       busy={busy}
+      error={write.data?.ok === false ? m.notice_write_failed() : undefined}
     />
   );
 }

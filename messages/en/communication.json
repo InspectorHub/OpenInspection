@@ -124,5 +124,6 @@
   "comm_reason_recipient_muted": "Not sent — this person switched these messages off.",
   "comm_reason_managed_quota": "Not sent — this month's text allowance has been used.",
   "comm_reason_skipped_generic": "Not sent — a sending rule stopped it.",
-  "comm_reason_failed_generic": "Not delivered — the sending service refused or couldn't deliver it. Try again later."
+  "comm_reason_failed_generic": "Not delivered — the sending service refused or couldn't deliver it. Try again later.",
+  "notice_write_failed": "That change could not be saved. Try again."
 }

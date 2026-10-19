@@ -33,6 +33,7 @@ export function NoticeBell({
   onDismiss,
   onRemedy,
   busy = false,
+  error,
 }: {
   notices: NoticeRowData[];
   unread: number;
@@ -61,6 +62,8 @@ export function NoticeBell({
   onRemedy: (remedy: NoticeRemedy) => void;
   /** #106 - the write guard's in-flight flag; see NoticeList's `busy`. */
   busy?: boolean;
+  /** A write the caller made was refused; shown at the top of the panel. */
+  error?: string | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
@@ -114,6 +117,7 @@ export function NoticeBell({
               </button>
             )}
           </div>
+          {error && <p role="alert" className="px-3 py-2 text-[12px] font-medium text-ih-bad-fg border-b border-ih-border">{error}</p>}
           <NoticeList
             notices={notices}
             emailComposer={emailComposer}

@@ -124,5 +124,6 @@
   "comm_reason_recipient_muted": "No enviado: esta persona desactivó estos mensajes.",
   "comm_reason_managed_quota": "No enviado: se agotó el límite de mensajes de texto de este mes.",
   "comm_reason_skipped_generic": "No enviado: una regla de envío lo detuvo.",
-  "comm_reason_failed_generic": "No entregado: el servicio de envío lo rechazó o no pudo entregarlo. Inténtelo más tarde."
+  "comm_reason_failed_generic": "No entregado: el servicio de envío lo rechazó o no pudo entregarlo. Inténtelo más tarde.",
+  "notice_write_failed": "No se pudo guardar el cambio. Inténtelo de nuevo."
 }
