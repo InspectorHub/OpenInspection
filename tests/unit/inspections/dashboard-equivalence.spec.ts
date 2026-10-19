@@ -14,12 +14,14 @@
  * rows name this company's inspection ids. The last must read exactly like the
  * company alone, and nothing of the other company may appear in it.
  */
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { app } from '../../../server/index';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { createHarness, TENANT_ID, OWNER_ID, INSPECTOR_ID, type Harness } from '../helpers/tenant-email-harness';
-import { FIXED_NOW, MANAGER_ID, OTHER_TENANT_ID, seedDashboard } from '../helpers/dashboard-fixture';
+import { FIXED_NOW, MANAGER_ID, OTHER_TENANT_ID, inspectionId, seedDashboard } from '../helpers/dashboard-fixture';
 
 async function dashboardText(h: Harness, sub: string, role: string): Promise<string> {
     const keyring = await buildKeyring(h.env as unknown as Record<string, string | undefined>);
@@ -33,7 +35,19 @@ async function dashboardText(h: Harness, sub: string, role: string): Promise<str
     return `${JSON.stringify(JSON.parse(await res.text()), null, 1)}\n`;
 }
 
-const golden = (name: string) => `./__goldens__/dashboard-${name}.json`;
+/**
+ * A golden that is missing is a failure, never a recording: a reference that writes itself on the first run
+ * would pass against whatever the code does today. Recording is a deliberate act, done against the code the
+ * goldens are meant to describe (see __goldens__/README.md), with GOLDEN_GENERATE=1.
+ */
+const golden = (name: string) => {
+    const path = `./__goldens__/dashboard-${name}.json`;
+    const exists = existsSync(resolve(__dirname, path));
+    if (!exists && process.env.GOLDEN_GENERATE !== '1') {
+        throw new Error(`golden ${path} is missing; see __goldens__/README.md before recording one`);
+    }
+    return path;
+};
 
 describe('dashboard response is unchanged by the read restructuring', () => {
     let h: Harness;
@@ -73,6 +87,19 @@ describe('dashboard response is unchanged by the read restructuring', () => {
         expect(text).not.toContain(OTHER_TENANT_ID);
         expect(text).not.toContain('Foreign');
         expect(text).not.toContain('c-other');
+    });
+
+    it('another company next to it changes nothing for the assigned-only inspector either (negative control)', async () => {
+        h = await createHarness('standalone');
+        await seedDashboard(h, { withOtherCompany: true });
+        const text = await dashboardText(h, INSPECTOR_ID, 'inspector');
+        await expect(text).toMatchFileSnapshot(golden('inspector'));
+        const ids = (JSON.parse(text) as { data: Record<string, Array<{ id: string }>> }).data;
+        const seen = new Set(['needsAttention', 'today', 'thisWeek', 'later', 'recentReports', 'cancelled'].flatMap((b) => ids[b]!.map((r) => r.id)));
+        // Theirs by inspector_id alone (4, 6, whatever the other company's roster says), by roster (2), as a helper (5): visible.
+        // A roster that names someone else (14) and the other company's seat for them (3): not visible.
+        for (const n of [2, 4, 5, 6]) expect(seen.has(inspectionId(n)), `inspection ${n} should be visible`).toBe(true);
+        for (const n of [3, 14]) expect(seen.has(inspectionId(n)), `inspection ${n} should be hidden`).toBe(false);
     });
 
     it('the fixture reaches every part of the response (the instrument is alive)', async () => {

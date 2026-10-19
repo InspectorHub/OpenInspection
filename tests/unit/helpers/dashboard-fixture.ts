@@ -54,6 +54,9 @@ function specs(): Spec[] {
         { n: 10, date: '2026-10-07', status: 'completed', reportStatus: 'submitted', ageHours: 5, inspectorId: OWNER_ID },
         { n: 11, date: '2026-09-01', status: 'cancelled', ageHours: 24 * 60, inspectorId: OWNER_ID },
         { n: 12, date: '2026-10-17', status: 'cancelled', ageHours: 24 * 3, inspectorId: INSPECTOR_ID },
+        // Names the inspector in the inspector_id column, but the roster names someone else: the roster wins, so this is
+        // NOT theirs. Inspection 4 is the opposite case (inspector_id only, no roster), which is theirs.
+        { n: 14, date: '2026-10-21', status: 'scheduled', ageHours: 1, inspectorId: INSPECTOR_ID },
         { n: 13, date: '2026-10-20', status: 'scheduled', ageHours: 1, inspectorId: null, concierge: 'awaiting_inspector' },
     ];
     // 55 inspections beyond a week out: more than the 50 the bucket shows.
@@ -103,6 +106,7 @@ export async function seedDashboard(h: Harness, options: { withOtherCompany?: bo
         { inspectionId: id(2), userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'lead', createdAt: created(1) },
         { inspectionId: id(5), userId: OWNER_ID, tenantId: TENANT_ID, role: 'lead', createdAt: created(1) },
         { inspectionId: id(5), userId: INSPECTOR_ID, tenantId: TENANT_ID, role: 'helper', createdAt: created(1) },
+        { inspectionId: id(14), userId: OWNER_ID, tenantId: TENANT_ID, role: 'lead', createdAt: created(1) },
     ] as never);
     await db.insert(schema.inspectionResults).values([1, 2, 4, 7].map((n) => ({
         id: `res-${n}`, tenantId: TENANT_ID, inspectionId: id(n), data: n === 1 ? '{}' : RESULTS, lastSyncedAt: created(1), createdAt: created(1),
@@ -155,6 +159,11 @@ export async function seedDashboard(h: Harness, options: { withOtherCompany?: bo
     ] as never);
     await db.insert(schema.inspectionServices).values({ id: 'x-is', tenantId: OTHER_TENANT_ID, inspectionId: id(6), serviceId: 'svc-cat', nameSnapshot: 'X', priceSnapshot: 12345, priceOverride: null } as never);
     await db.insert(schema.inspectionResults).values({ id: 'x-res', tenantId: OTHER_TENANT_ID, inspectionId: id(3), data: RESULTS, lastSyncedAt: created(1), createdAt: created(1) } as never);
+    // The other company's roster rows name THIS company's inspector on inspections they must not see (3 and 14 are
+    // not theirs) and give a foreign lead to ones that are theirs by inspector_id alone (4 and 6). A roster lookup that
+    // lost its tenant filter would reveal the first group and hide the second from the assigned-only inspector.
+    await db.insert(schema.inspectionInspectors).values([3, 14].map((n) => ({ inspectionId: id(n), userId: INSPECTOR_ID, tenantId: OTHER_TENANT_ID, role: 'lead' as const, createdAt: created(1) }))
+        .concat([4, 6].map((n) => ({ inspectionId: id(n), userId: OTHER_OWNER_ID, tenantId: OTHER_TENANT_ID, role: 'lead' as const, createdAt: created(1) }))) as never);
     await db.insert(schema.inspectionPeople).values({ id: 'x-p', tenantId: OTHER_TENANT_ID, inspectionId: id(5), contactId: 'c-other', roleProfileId: listing, createdAt: created(1) } as never);
     await db.insert(schema.agreementRequests).values([3, 7, 8, 100].map((n) => ({
         id: `x-ar-${n}`, tenantId: OTHER_TENANT_ID, inspectionId: id(n), agreementId: 'agr-tpl', clientEmail: 'x@example.com', clientName: 'X',
