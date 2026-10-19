@@ -14,6 +14,8 @@ import type { UserRole } from '../../../server/types/auth';
 // The lifecycle facts have their own spec (hub-lifecycle.spec.ts); this one stubs the database away.
 vi.mock('../../../server/lib/inspection/hub-lifecycle', () => ({
     hubLifecycle: async () => ({ moneyCollected: false, statusBeforeCancel: null }),
+    // The route reads the caller-aware one; same shape as the real function, with the delete verdict.
+    hubLifecycleFor: async () => ({ moneyCollected: false, statusBeforeCancel: null, mayDelete: true }),
 }));
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
