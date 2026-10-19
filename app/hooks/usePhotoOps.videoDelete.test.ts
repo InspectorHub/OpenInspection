@@ -72,4 +72,37 @@ describe("usePhotoOps video delete", () => {
     expect(toasts[0]!.variant).toBe("error");
     expect(toasts[0]!.message).toMatch(/could not be deleted/i);
   });
+
+  it("removes the entry by its key, not by the position it had when the delete started", async () => {
+    answer = () => new Response("{}", { status: 200 });
+    const { ctx, setResults } = makeCtx();
+    const { result } = renderHook(() => usePhotoOps(ctx));
+    await act(async () => { result.current.onViewerAction("delete", VIDEO); await new Promise((r) => setTimeout(r, 30)); });
+    // Between the click and the answer another photo was added above the video.
+    const updater = setResults.mock.calls[0]![0] as (prev: Record<string, unknown>) => Record<string, { photos: Array<{ key: string }> }>;
+    const out = updater({ i1: { photos: [{ key: "new-photo" }, { key: "v1" }] }, "_default:s1:i1": { photos: [{ key: "new-photo" }, { key: "v1" }] } });
+    expect(Object.values(out).every((f) => f.photos.map((p) => p.key).join() === "new-photo")).toBe(true);
+  });
+
+  it("a second delete of the same video while the first is in flight sends nothing", async () => {
+    let release: () => void = () => {};
+    answer = () => new Promise<Response>((resolve) => { release = () => resolve(new Response("{}", { status: 200 })); });
+    const { ctx, setResults } = makeCtx();
+    const { result } = renderHook(() => usePhotoOps(ctx));
+    await act(async () => { result.current.onViewerAction("delete", VIDEO); result.current.onViewerAction("delete", VIDEO); });
+    expect(calls).toHaveLength(1);
+    await act(async () => { release(); await new Promise((r) => setTimeout(r, 30)); });
+    expect(setResults).toHaveBeenCalledTimes(1);
+  });
+
+  it("after a failed delete the same video can be deleted again", async () => {
+    answer = () => new Response("{}", { status: 500 });
+    const setup = makeCtx();
+    const { result } = renderHook(() => usePhotoOps(setup.ctx));
+    await act(async () => { result.current.onViewerAction("delete", VIDEO); await new Promise((r) => setTimeout(r, 30)); });
+    answer = () => new Response("{}", { status: 200 });
+    await act(async () => { result.current.onViewerAction("delete", VIDEO); await new Promise((r) => setTimeout(r, 30)); });
+    expect(calls).toHaveLength(2);
+    expect(setup.setResults).toHaveBeenCalledTimes(1);
+  });
 });

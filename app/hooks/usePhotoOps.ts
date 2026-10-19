@@ -416,20 +416,21 @@ export function usePhotoOps(ctx: {
           return;
         }
         if (action === "delete") {
-          // Storage first, entry second: removing the entry first left a failed delete as an
-          // orphaned object nothing pointed at. The entry goes only once the object is gone.
           const videoRef = photo.provider === "r2" ? photo.mediaId : photo.streamUid;
           const docKey = photo.originalKey || photo.key;
+          if (!docKey) return;
           const removeEntry = () => {
-            patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
+            patchItemPhotos(itemId, (photos) => photos.filter((p) => p.key !== docKey));
             const fk = collabDoc ? docFindingKey(itemId, sectionId) : null;
-            if (collabDoc && fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
+            if (collabDoc && fk) bindingRemovePhoto(collabDoc, fk, docKey);
           };
           if (!videoRef) removeEntry();
-          else void freeVideoMedia(state.inspection.id, videoRef).then((freed) => {
-            if (freed) removeEntry();
-            else pushToast({ message: m.editor_video_delete_failed(), variant: "error", durationMs: 6000 });
-          });
+          else {
+            void freeVideoMedia(state.inspection.id, videoRef).then((freed) => {
+              if (freed) removeEntry();
+              else if (freed === false) pushToast({ message: m.editor_video_delete_failed(), variant: "error", durationMs: 6000 });
+            });
+          }
           return;
         }
         // cover / caption fall through to the photo handlers below (they address by
