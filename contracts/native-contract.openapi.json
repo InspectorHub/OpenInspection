@@ -410,6 +410,111 @@
         }
       }
     },
+    "/api/client/inspections/visible": {
+      "post": {
+        "operationId": "getVisibleInspections",
+        "tags": [
+          "client"
+        ],
+        "summary": "Check which local inspections the server still shows this member",
+        "description": "Takes the inspection ids a native device holds and returns the ones that still exist in the signed-in company and that this member may see, in request order. An id that is missing from the answer was deleted, never existed, or is not visible to this member; the response does not say which, so a restricted member learns nothing about inspections outside their assignments. The device compares the answer with its local copies when it is back online. A failure is an error status and never an empty list. Read-only, though it is a POST so the ids travel in the body.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Inspection ids the device holds locally. Between 1 and the server limit (300 by default; the limit is returned in details.limits.ids when exceeded). Each id is 1 to 64 characters from A-Z, a-z, 0-9, underscore and hyphen; a request that breaks any of these is refused whole with 422."
+                  }
+                },
+                "required": [
+                  "ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The requested ids that are visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visible": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "The requested ids that exist in the signed-in company and that this member can see, in request order and without repeats. An id that was deleted, never existed, belongs to another company or is not assigned to this member is simply absent; the response never says which."
+                        }
+                      },
+                      "required": [
+                        "visible"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The request does not carry a native session"
+          },
+          "422": {
+            "description": "The list is empty, longer than the server limit (details.limits.ids names it), or holds an id that is not 1 to 64 characters of A-Z, a-z, 0-9, underscore or hyphen; nothing was looked up"
+          }
+        }
+      }
+    },
     "/api/client/session": {
       "get": {
         "operationId": "getClientSession",

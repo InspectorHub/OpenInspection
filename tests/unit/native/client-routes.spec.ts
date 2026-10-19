@@ -53,7 +53,7 @@ describe('native version handshake (real app)', () => {
     });
     expect(res.status, await res.clone().text()).toBe(200);
     expect(await res.json()).toEqual({ success: true, data: {
-      minSupported: '1.2.0', recommended: '1.6.0', downloadUrl: 'https://example.com/ios', serverContractVersion: 1,
+      minSupported: '1.2.0', recommended: '1.6.0', downloadUrl: 'https://example.com/ios', serverContractVersion: 2,
     } });
   });
 

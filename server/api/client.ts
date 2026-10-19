@@ -9,10 +9,14 @@ import { requireRole } from '../lib/middleware/rbac';
 import { readBoundedBody } from '../lib/bounded-body';
 import { importOfflinePackage } from '../services/offline-import.service';
 import { getDrizzle } from '../lib/route-helpers';
+import { readVisibleIdsLimit, VISIBLE_ID_PATTERN } from '../lib/native/visibility-limits';
+import { findVisibleInspectionIds } from '../services/native-visibility.service';
+import { resolveInspectionScope } from '../lib/inspection/visibility';
 import { readVersionPolicy, SERVER_CONTRACT_VERSION } from '../lib/native/client-version';
 import { recordNativeClientSeen } from '../services/native-client-seen';
 import {
     ClientCompatQuerySchema, ClientCompatResponseSchema, ClientSessionResponseSchema, ImportOfflinePackageResponseSchema,
+    VisibleInspectionsRequestSchema, VisibleInspectionsResponseSchema,
 } from '../lib/validations/client.schema';
 
 /** Default when a tenant has no config row yet; matches the column default. */
@@ -50,6 +54,19 @@ const importOfflinePackageRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'excluded' }));
 
+const visibleInspectionsRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/inspections/visible', operationId: 'getVisibleInspections', tags: ['client'],
+    summary: 'Check which local inspections the server still shows this member',
+    description: 'Takes the inspection ids a native device holds and returns the ones that still exist in the signed-in company and that this member may see, in request order. An id that is missing from the answer was deleted, never existed, or is not visible to this member; the response does not say which, so a restricted member learns nothing about inspections outside their assignments. The device compares the answer with its local copies when it is back online. A failure is an error status and never an empty list. Read-only, though it is a POST so the ids travel in the body.',
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    request: { body: { required: true, content: { 'application/json': { schema: VisibleInspectionsRequestSchema } } } },
+    responses: {
+        200: { description: 'The requested ids that are visible to the caller', content: { 'application/json': { schema: VisibleInspectionsResponseSchema } } },
+        401: { description: 'The request does not carry a native session' },
+        422: { description: 'The list is empty, longer than the server limit (details.limits.ids names it), or holds an id that is not 1 to 64 characters of A-Z, a-z, 0-9, underscore or hyphen; nothing was looked up' },
+    },
+}, { scopes: ['read'], tier: 'excluded' }));
+
 export const clientRoutes = createApiRouter()
     .openapi(getClientCompatRoute, (c) => {
         const { platform } = c.req.valid('query');
@@ -69,6 +86,23 @@ export const clientRoutes = createApiRouter()
         return c.json({ success: true as const, data: {
             userId: user.sub, tenantId, role: user.role, offlineMaxDays: row?.days ?? DEFAULT_OFFLINE_MAX_DAYS,
         } }, 200);
+    })
+    .openapi(visibleInspectionsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        if (!c.get('nativeClient') || !c.get('user') || !tenantId) throw Errors.Unauthorized('Native session required');
+        const { ids } = c.req.valid('json');
+        const max = readVisibleIdsLimit(c.env);
+        if (ids.length === 0 || ids.length > max || !ids.every((id) => VISIBLE_ID_PATTERN.test(id))) {
+            throw Errors.UnprocessableEntity(
+                ids.length > max
+                    ? `Too many ids: ${ids.length} sent, at most ${max} per request.`
+                    : 'ids must hold 1 or more ids of 1 to 64 characters from A-Z, a-z, 0-9, underscore and hyphen.',
+                { limits: { ids: max } },
+            );
+        }
+        const scope = await resolveInspectionScope(c);
+        const visible = await findVisibleInspectionIds(getDrizzle(c), scope, tenantId, ids);
+        return c.json({ success: true as const, data: { visible } }, 200);
     })
     .openapi(importOfflinePackageRoute, async (c) => {
         const limits = readImportLimits(c.env);

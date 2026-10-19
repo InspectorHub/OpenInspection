@@ -39,10 +39,11 @@ export interface NativeNonOpenApiEntry {
 }
 
 export const NATIVE_CONTRACT: readonly NativeContractEntry[] = [
-    // Version handshake, identity and offline package import.
+    // Version handshake, identity, offline package import and reconcile.
     { method: 'get', path: '/api/client/compat' },
     { method: 'get', path: '/api/client/session' },
     { method: 'post', path: '/api/client/import' },
+    { method: 'post', path: '/api/client/inspections/visible' },
     // Inspection record: list, create (client-supplied id), read, update, complete.
     { method: 'get', path: '/api/inspections' },
     { method: 'post', path: '/api/inspections' },

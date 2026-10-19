@@ -480,6 +480,18 @@ Reading a variable never throws. A missing, blank or non-numeric value falls
 back to the default, and a number outside the range is clamped into it, so a
 misconfiguration can never switch a limit off.
 
+The reconcile call (`POST /api/client/inspections/visible`, which a device uses
+to learn which of its local inspections the server no longer shows it) has one
+limit of the same kind:
+
+| Variable | Default | Allowed range |
+|---|---|---|
+| `NATIVE_VISIBLE_MAX_IDS` (ids per request) | 300 | 1 to 2000 |
+
+A request over the limit, an empty one, or one with an id outside `A-Z a-z 0-9 _ -`
+(1 to 64 characters) is refused with 422 and `details.limits.ids`. The server
+looks the ids up in chunks of 80, so no statement binds more than 90 parameters.
+
 Three constants are fixed rather than configurable, because together they define
 how long the server remembers what it has applied:
 

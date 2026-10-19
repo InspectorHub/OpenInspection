@@ -20,6 +20,14 @@ export const ClientSessionResponseSchema = createApiResponseSchema(z.object({
     offlineMaxDays: z.number().int().describe('Days the device may stay offline before locking'),
 }));
 
+export const VisibleInspectionsRequestSchema = z.object({
+    ids: z.array(z.string()).describe('Inspection ids the device holds locally. Between 1 and the server limit (300 by default; the limit is returned in details.limits.ids when exceeded). Each id is 1 to 64 characters from A-Z, a-z, 0-9, underscore and hyphen; a request that breaks any of these is refused whole with 422.'),
+});
+
+export const VisibleInspectionsResponseSchema = createApiResponseSchema(z.object({
+    visible: z.array(z.string()).describe('The requested ids that exist in the signed-in company and that this member can see, in request order and without repeats. An id that was deleted, never existed, belongs to another company or is not assigned to this member is simply absent; the response never says which.'),
+}));
+
 export const ImportOfflinePackageResponseSchema = createApiResponseSchema(z.object({
     inspections: z.number().int().describe('Inspections the package covered'),
     photos: z.number().int().describe('Photos written to storage'),

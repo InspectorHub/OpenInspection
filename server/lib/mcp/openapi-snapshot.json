@@ -9897,6 +9897,36 @@
     "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. Available to owner, manager and inspector roles."
   },
   {
+    "operationId": "getVisibleInspections",
+    "method": "POST",
+    "pathTemplate": "/api/client/inspections/visible",
+    "scopes": [
+      "read"
+    ],
+    "tag": "client",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Inspection ids the device holds locally. Between 1 and the server limit (300 by default; the limit is returned in details.limits.ids when exceeded). Each id is 1 to 64 characters from A-Z, a-z, 0-9, underscore and hyphen; a request that breaks any of these is refused whole with 422."
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      }
+    },
+    "summary": "Check which local inspections the server still shows this member",
+    "description": "Takes the inspection ids a native device holds and returns the ones that still exist in the signed-in company and that this member may see, in request order. An id that is missing from the answer was deleted, never existed, or is not visible to this member; the response does not say which, so a restricted member learns nothing about inspections outside their assignments. The device compares the answer with its local copies when it is back online. A failure is an error status and never an empty list. Read-only, though it is a POST so the ids travel in the body."
+  },
+  {
     "operationId": "grantAgentSmsConsent",
     "method": "PUT",
     "pathTemplate": "/api/agent/notification-preferences/sms-consent",

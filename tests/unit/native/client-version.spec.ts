@@ -99,6 +99,13 @@ describe('NEVER_BLOCK_RULES', () => {
     expect(blocked('GET', '/api/tenant/settings')).toBe(true);
     expect(blocked('POST', '/api/inspections/abc/other')).toBe(true);
   });
+  it('never blocks the reconcile call, by method and path (positive control: neighbours and other verbs still 426)', () => {
+    expect(blocked('POST', '/api/client/inspections/visible')).toBe(false);
+    expect(blocked('post', '/api/client/inspections/visible')).toBe(false);
+    expect(blocked('GET', '/api/client/inspections/visible')).toBe(true);
+    expect(blocked('POST', '/api/client/inspections/visible/extra')).toBe(true);
+    expect(blocked('POST', '/api/client/inspections')).toBe(true);
+  });
   it('blocks everything else', () => {
     expect(blocked('GET', '/api/client/other')).toBe(true);
     expect(blocked('POST', '/api/inspections/abc')).toBe(true);
