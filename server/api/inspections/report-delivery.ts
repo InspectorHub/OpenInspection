@@ -11,7 +11,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { capabilitiesFor } from '../../lib/middleware/require-capability';
 import { redactMoney } from '../../lib/auth/money-redaction';
-import { hubLifecycle } from '../../lib/inspection/hub-lifecycle';
+import { hubLifecycleFor } from '../../lib/inspection/hub-lifecycle';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl } from '../../lib/public-urls';
@@ -513,7 +513,7 @@ const reportDeliveryRoutes = createApiRouter()
         const payLink = caps.companyFinance ? await hubPayLink(c, tenantId, id, data.invoice) : { url: null, unavailable: null };
         const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl: payLink.url, payUrlUnavailable: payLink.unavailable } : null };
         const { invoice, ...rest } = hub;
-        const lifecycle = await hubLifecycle(getDrizzle(c), tenantId, data.inspection); // yes/no and a status, never an amount
+        const lifecycle = await hubLifecycleFor(c, tenantId, data.inspection, caps); // yes/no and a status, never an amount
         return c.json({ success: true, data: { ...redactMoney(rest, caps, 'inspectionFees'), invoice: redactMoney(invoice, caps, 'companyFinance'), lifecycle } }, 200);
     })
     .openapi(createRoute(withMcpMetadata({

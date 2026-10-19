@@ -26,7 +26,7 @@ const PLAIN: DeleteFacts = { reportPublished: false, invoicePresent: false, paym
 const posted: Array<Record<string, FormDataEntryValue>> = [];
 let reply: () => { ok: boolean; intent: "delete"; error?: string } = () => ({ ok: true, intent: "delete" });
 
-function mount(opts: { canDelete?: boolean; facts?: Partial<DeleteFacts>; canCancelInstead?: boolean } = {}) {
+function mount(opts: { canDelete?: boolean; mayDelete?: boolean; facts?: Partial<DeleteFacts>; canCancelInstead?: boolean } = {}) {
   const context = { branding: { defaultLocale: "en-US", defaultTimezone: "UTC" }, user: { capabilities: { deleteInspection: opts.canDelete ?? true } } };
   const Stub = createRoutesStub([
     {
@@ -38,7 +38,7 @@ function mount(opts: { canDelete?: boolean; facts?: Partial<DeleteFacts>; canCan
         { path: "inspections", Component: () => <p>THE LIST</p> },
         {
           path: "inspections/:id",
-          Component: () => <DeleteInspectionBlock inspectionId="insp-1" facts={{ ...PLAIN, ...opts.facts }} canCancelInstead={opts.canCancelInstead ?? true} />,
+          Component: () => <DeleteInspectionBlock inspectionId="insp-1" facts={{ ...PLAIN, ...opts.facts }} canCancelInstead={opts.canCancelInstead ?? true} mayDelete={opts.mayDelete ?? true} />,
           action: async ({ request }) => {
             posted.push(Object.fromEntries(await request.formData()));
             return reply();
@@ -66,6 +66,13 @@ beforeEach(() => {
 describe("DeleteInspectionBlock", () => {
   it("is not offered without the deleteInspection capability", async () => {
     mount({ canDelete: false });
+    await new Promise((r) => setTimeout(r, 40));
+    expect(screen.queryByRole("button", { name: /Delete this inspection/ })).toBeNull();
+    expect(screen.queryByText("Delete inspection")).toBeNull();
+  });
+
+  it("is not offered when the server says this viewer may not delete THIS inspection (a non-lead inspector holds the capability)", async () => {
+    mount({ canDelete: true, mayDelete: false });
     await new Promise((r) => setTimeout(r, 40));
     expect(screen.queryByRole("button", { name: /Delete this inspection/ })).toBeNull();
     expect(screen.queryByText("Delete inspection")).toBeNull();

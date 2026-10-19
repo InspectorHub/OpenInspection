@@ -149,7 +149,7 @@ interface HubData extends HubPayload {
   reports?: ReportRow[];
   communication?: { delivered: number; needsAttention: number; unread: number; rulesActive: number };
   /** Server-decided facts for the cancel and restore controls (a yes/no and a status, never an amount). */
-  lifecycle: { moneyCollected: boolean; statusBeforeCancel: RestorableStatus | null };
+  lifecycle: { moneyCollected: boolean; statusBeforeCancel: RestorableStatus | null; mayDelete: boolean };
 }
 
 interface PeopleAgent {
@@ -1286,6 +1286,7 @@ export default function InspectionHubPage() {
         inspectionId={inspection.id}
         canCancelInstead={access.canCancel}
         facts={deleteFacts(hub, hub.lifecycle.moneyCollected)}
+        mayDelete={hub.lifecycle.mayDelete}
       />
 
       {/* Send-agreement modal — the shared multi-signer modal (IA-65). Seeded

@@ -36,10 +36,11 @@ export interface DeleteFacts {
  * of the inspection the same way (`useOfflinePurgeOnDelete`). On success, or
  * when the inspection turns out to be gone already, it goes back to the list.
  */
-export function DeleteInspectionBlock(props: { inspectionId: string; facts: DeleteFacts; canCancelInstead: boolean }) {
+export function DeleteInspectionBlock(props: { inspectionId: string; facts: DeleteFacts; canCancelInstead: boolean; /** The hub's `lifecycle.mayDelete`: the delete route's own rule for this viewer and this inspection. */ mayDelete: boolean }) {
     // The hooks below run only for someone who may delete, so the gate is its own component.
     const canDelete = useCapability("deleteInspection");
-    return canDelete ? <DeleteInspectionBlockInner {...props} /> : null;
+    const { mayDelete, ...rest } = props;
+    return canDelete && mayDelete ? <DeleteInspectionBlockInner {...rest} /> : null;
 }
 
 function DeleteInspectionBlockInner({ inspectionId, facts, canCancelInstead }: { inspectionId: string; facts: DeleteFacts; canCancelInstead: boolean }) {
