@@ -219,7 +219,7 @@ export default function TemplatesPage() {
   return (
     <div className="space-y-ih-list">
       <Breadcrumb items={[{ label: m.templates_breadcrumb_library(), href: "/library" }, { label: m.templates_breadcrumb_current() }]} />
-      <ActionFailureAlert result={fetcher.data as { ok?: boolean; intent?: string } | undefined} intents={["delete"]}>{m.common_delete_failed()}</ActionFailureAlert>
+      <ActionFailureAlert result={fetcher.data as { ok?: boolean; intent?: string } | undefined} intents={["delete"]} busy={writing}>{m.common_delete_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.templates_list_heading()}
         meta={metaParts.join(" · ")}

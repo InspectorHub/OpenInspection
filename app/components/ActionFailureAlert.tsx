@@ -16,11 +16,13 @@ export interface ActionResultLike {
  * renders nothing for a success, for another intent, or before any answer.
  * The answer lasts until the fetcher's next submission replaces it.
  */
-export function ActionFailureAlert({ result, intents, children }: {
+export function ActionFailureAlert({ result, intents, busy = false, children }: {
     result: ActionResultLike | undefined | null;
     intents: readonly string[];
+    /** The next attempt has started: the old failure is stale and is not shown. */
+    busy?: boolean;
     children: ReactNode;
 }) {
-    if (!result || result.ok !== false || !result.intent || !intents.includes(result.intent)) return null;
+    if (busy || !result || result.ok !== false || !result.intent || !intents.includes(result.intent)) return null;
     return <Banner tone="danger">{children}</Banner>;
 }

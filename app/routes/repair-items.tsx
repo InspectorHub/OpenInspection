@@ -132,7 +132,7 @@ export default function RepairItemsPage() {
       {/* IA-118 — "no repair items" reads as "nothing needs fixing", a claim
           about a property. Do not make it on a failed fetch. */}
       {loadFailed && <LoadFailedNotice what={m.repair_items_heading()} />}
-      <ActionFailureAlert result={deleteFetcher.data} intents={["delete"]}>{m.common_delete_failed()}</ActionFailureAlert>
+      <ActionFailureAlert result={deleteFetcher.data} intents={["delete"]} busy={deleting}>{m.common_delete_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.repair_items_heading()}
         meta={m.repair_items_meta({ count: items.length })}

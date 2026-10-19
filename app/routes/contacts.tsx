@@ -200,7 +200,7 @@ export default function ContactsPage() {
 
   return (
     <div className="space-y-ih-list">
-      <ActionFailureAlert result={archiveFetcher.data} intents={["delete"]}>{m.common_archive_failed()}</ActionFailureAlert>
+      <ActionFailureAlert result={archiveFetcher.data} intents={["delete"]} busy={archiveBusy}>{m.common_archive_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.contacts_label_contacts()}
         meta={metaLine}

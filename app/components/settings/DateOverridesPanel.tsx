@@ -68,7 +68,7 @@ export function DateOverridesPanel({
           </div>
         ))}
       </div>
-      <ActionFailureAlert result={fetcher.data} intents={["override-remove"]}>{m.settings_dateoverrides_remove_failed()}</ActionFailureAlert>
+      <ActionFailureAlert result={fetcher.data} intents={["override-remove"]} busy={busy}>{m.settings_dateoverrides_remove_failed()}</ActionFailureAlert>
       <ConfirmDialog
         open={pending !== null}
         title={m.settings_dateoverrides_remove_title()}

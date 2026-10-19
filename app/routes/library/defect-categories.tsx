@@ -76,7 +76,7 @@ export default function DefectCategoriesPage() {
       {loadFailed && <LoadFailedNotice />}
 
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_defect_heading() }]} />
-      <ActionFailureAlert result={deleteFetcher.data} intents={["delete"]}>{m.common_delete_failed()}</ActionFailureAlert>
+      <ActionFailureAlert result={deleteFetcher.data} intents={["delete"]} busy={deleting}>{m.common_delete_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.library_defect_heading()}
         meta={categories.length === 1 ? m.library_defect_meta_one({ count: categories.length }) : m.library_defect_meta_other({ count: categories.length })}

@@ -11,6 +11,12 @@ describe("ActionFailureAlert", () => {
         const v = show({ ok: false, intent: "delete" });
         expect(v.getByRole("alert").textContent).toBe("It failed");
     });
+    it("is hidden while the next attempt is under way, and returns if that fails too", () => {
+        const v = render(<ActionFailureAlert result={{ ok: false, intent: "delete" }} intents={["delete"]} busy>It failed</ActionFailureAlert>);
+        expect(v.queryByRole("alert")).toBeNull();
+        v.rerender(<ActionFailureAlert result={{ ok: false, intent: "delete" }} intents={["delete"]}>It failed</ActionFailureAlert>);
+        expect(v.getByRole("alert")).toBeTruthy();
+    });
     it.each([
         ["before any answer", undefined],
         ["a success", { ok: true, intent: "delete" }],

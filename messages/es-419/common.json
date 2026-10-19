@@ -21,5 +21,6 @@
   "common_copy": "Copiar",
   "common_delete_failed": "No se pudo eliminar. No se cambió nada; inténtelo de nuevo.",
   "common_archive_failed": "No se pudo archivar. No se cambió nada; inténtelo de nuevo.",
-  "common_cancel_invite_failed": "No se pudo cancelar la invitación. Sigue pendiente; inténtelo de nuevo."
+  "common_cancel_invite_failed": "No se pudo cancelar la invitación. Sigue pendiente; inténtelo de nuevo.",
+  "common_resend_invite_failed": "No se pudo reenviar la invitación. Inténtelo de nuevo."
 }

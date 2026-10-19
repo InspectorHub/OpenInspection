@@ -81,7 +81,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   if (intent === "resend-invite") {
     const res = await api.team.invites[":token"].resend.$post({ param: { token: inviteToken } });
-    return { ok: res.ok, resent: res.ok };
+    return { ok: res.ok, resent: res.ok, intent: "resend-invite" };
   }
   if (intent === "remove-member") {
     return removeMemberAction(api, form);
@@ -107,7 +107,7 @@ export default function TeamPage() {
   const { submit: submitResetTwoFactor, busy: resetTwoFactorBusy } = useGuardedSubmit<{ ok?: boolean }>();
   const [pendingReset, setPendingReset] = useState<ResetTwoFactorTarget | null>(null);
   const removeMember = useRemoveMember(members);
-  const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
+  const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean; intent?: string }>();
   const resendLatch = useSubmitLatch(resendFetcher.state);
   const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
 
@@ -156,7 +156,8 @@ export default function TeamPage() {
         <SeatBanner usage={sessionCtx.seatUsage} billingUrl={billingUrl} />
       )}
 
-      <ActionFailureAlert result={cancelFetcher.data} intents={["cancel-invite"]}>{m.common_cancel_invite_failed()}</ActionFailureAlert>
+      <ActionFailureAlert result={cancelFetcher.data} intents={["cancel-invite"]} busy={cancelBusy}>{m.common_cancel_invite_failed()}</ActionFailureAlert>
+      <ActionFailureAlert result={resendFetcher.data} intents={["resend-invite"]} busy={resendFetcher.state !== "idle"}>{m.common_resend_invite_failed()}</ActionFailureAlert>
       <Breadcrumb
         items={[
           { label: m.settings_crumb_settings(), href: "/settings" },
