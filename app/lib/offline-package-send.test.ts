@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { classifyResponse, IMPORT_LIMIT_CEILINGS } from '@core/offline-package';
-import { sendOfflinePackage } from './offline-package-send';
+import { defaultSendTimeoutMs, MAX_SEND_TIMEOUT_MS, MIN_SEND_TIMEOUT_MS, sendOfflinePackage } from './offline-package-send';
 
 type Call = { url: string; init: RequestInit };
 
@@ -22,6 +22,19 @@ const CONFIRMED = {
 };
 
 const bytes = (n: number): Uint8Array => new Uint8Array(n);
+
+describe('defaultSendTimeoutMs', () => {
+    it('grows with the size of the package so a slow uplink can finish a large upload', () => {
+        expect(defaultSendTimeoutMs(IMPORT_LIMIT_CEILINGS.compressedBytes)).toBeGreaterThan(defaultSendTimeoutMs(1024));
+        // 24 MiB at 1.5 Mbps takes about 134 s; the default must outlast it.
+        expect(defaultSendTimeoutMs(IMPORT_LIMIT_CEILINGS.compressedBytes)).toBeGreaterThan(134_000);
+    });
+
+    it('never drops below the base allowance and never exceeds the cap', () => {
+        expect(defaultSendTimeoutMs(0)).toBe(MIN_SEND_TIMEOUT_MS);
+        expect(defaultSendTimeoutMs(Number.MAX_SAFE_INTEGER)).toBe(MAX_SEND_TIMEOUT_MS);
+    });
+});
 
 describe('sendOfflinePackage request shape', () => {
     it('posts the zip to the same-origin import path with the session cookie and nothing else', async () => {

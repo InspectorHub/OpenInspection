@@ -5,16 +5,17 @@
  * This is a component-level same-origin `fetch`, an accepted exception to the
  * "loaders and actions first" rule, for three reasons:
  *  - A package is up to 24 MiB. Routing it through a React Router action would
- *    make the SSR worker hold the form data (`formData()` keeps several copies)
- *    and add the session and loader revalidation work on top of an import that
- *    already spends most of the request's subrequest budget.
+ *    make the SSR worker buffer the whole upload and then forward it, and add the
+ *    session and loader revalidation work on top of an import that already
+ *    spends most of the request's subrequest budget.
  *  - The request must carry a `Content-Length`, which the server requires. A
  *    `Blob` body lets the browser set it; this file never sets it by hand.
  *  - The session is the HttpOnly cookie, which a same-origin request carries
  *    (`credentials: 'same-origin'`). No bearer token is involved.
  *
  * The caller owns the same-frame guard (the import page runs the whole import
- * behind `useActionLatch`); this module only sends.
+ * behind `useActionLatch`); this module only sends. `lint:busy-controls` scans
+ * only `.tsx` files, so the guard is enforced on the page, not here.
  *
  * Contract with `runImport`: a refusal is a RESULT (status, code, details,
  * body); only a request that got no answer at all (network failure, timeout,
@@ -24,7 +25,17 @@
 import { IMPORT_LIMIT_CEILINGS, type SendResult } from '@core/offline-package';
 
 export const IMPORT_PATH = '/api/client/import';
-export const DEFAULT_SEND_TIMEOUT_MS = 120_000;
+/** Allowance for the server to answer once the last byte has arrived, and the floor for any package. */
+export const MIN_SEND_TIMEOUT_MS = 60_000;
+export const MAX_SEND_TIMEOUT_MS = 10 * 60_000;
+/** A conservative field uplink: 100 KiB/s, so 24 MiB is allowed about four minutes on top of the floor. */
+const ASSUMED_UPLINK_BYTES_PER_SECOND = 100 * 1024;
+
+/** Time allowed for one request: the floor plus the time `bytes` take at the assumed uplink, capped. */
+export function defaultSendTimeoutMs(bytes: number): number {
+    const transfer = (bytes / ASSUMED_UPLINK_BYTES_PER_SECOND) * 1000;
+    return Math.min(MAX_SEND_TIMEOUT_MS, MIN_SEND_TIMEOUT_MS + Math.ceil(transfer));
+}
 /** Longest piece of a non-JSON answer kept in `body`. */
 const MAX_TEXT_BODY_CHARS = 2000;
 
@@ -58,7 +69,7 @@ export async function sendOfflinePackage(bytes: Uint8Array, opts: SendOptions = 
     const onAbort = (): void => controller.abort(opts.signal?.reason);
     if (opts.signal?.aborted) onAbort();
     else opts.signal?.addEventListener('abort', onAbort, { once: true });
-    const timer = setTimeout(() => controller.abort(new Error('Import request timed out')), opts.timeoutMs ?? DEFAULT_SEND_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(new Error('Import request timed out')), opts.timeoutMs ?? defaultSendTimeoutMs(bytes.byteLength));
 
     try {
         const response = await doFetch(IMPORT_PATH, {
