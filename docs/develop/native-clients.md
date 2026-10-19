@@ -145,6 +145,50 @@ local data. The **device enforces it**; the server only publishes it, in
 `GET /api/client/session`. Change it with `PATCH /api/admin/tenant-config`.
 A company with no configuration row reports the default.
 
+### Deleted inspections and local copies
+
+When an inspection is hard-deleted on the server, a device that already holds a
+local copy is told on its next successful connection, not at the moment of
+deletion.
+
+**How a device reconciles.** On connecting, the device sends the ids of its local
+inspections to `POST /api/client/inspections/visible` and receives the subset the
+signed-in user can still see. For each local inspection that is not in that
+subset:
+
+- if the device holds **no unuploaded data** for it, the local copy is removed;
+- if it holds **unuploaded data** (edits or photos not yet sent), the copy is
+  **quarantined**: it is hidden from normal lists and kept so the user can export
+  it or remove it deliberately. Nothing is deleted from under unsent work.
+
+A reconcile that fails (no network, a server error, a rejected request) removes
+nothing. The device treats an error as "unknown", never as "everything is gone".
+
+**What is guaranteed.** After a device's next successful reconcile, it no longer
+shows a copy of an inspection the server has deleted, apart from a quarantined
+copy that holds unuploaded data.
+
+**What is not guaranteed.**
+
+- A device that stays offline keeps its copies until it connects again, or until
+  it locks its local data after `offline_max_days`, whichever the device reaches
+  first.
+- Copies made outside the app are out of scope: system screenshots, the camera
+  roll and exported packages are not tracked or removed.
+
+**Server side.** Hard-deleting an inspection removes its rows, its stored media
+and, when the collaborative editing Durable Object (`INSPECTION_DOC`) is bound, the
+stored document behind each of its reports. That last step runs after the delete
+has completed and is best effort: if it fails, the delete still succeeds, the
+failure is logged as a warning with the inspection id, and the `inspection.delete`
+audit event records `collabPurge: "failed"` (`"ok"` when it worked, `"skipped"`
+when the namespace is not bound or the inspection had no report).
+
+**Known leftover.** The collaborative document storage of inspections deleted
+before this purge existed may still hold content. A Durable Object cannot be
+enumerated and the report ids of those deletions were not recorded, so there is no
+sweep that can find them.
+
 ---
 
 ## 4. Version handshake
@@ -490,7 +534,7 @@ limit of the same kind:
 
 A request over the limit, an empty one, or one with an id outside `A-Z a-z 0-9 _ -`
 (1 to 64 characters) is refused with 422 and `details.limits.ids`. The server
-looks the ids up in chunks of 80, so no statement binds more than 90 parameters.
+looks the ids up in chunks of 80. A statement binds those ids, the company id and, for a caller limited to their assigned inspections, four more parameters, so the worst case is 85 and no statement binds more than 90.
 
 Three constants are fixed rather than configurable, because together they define
 how long the server remembers what it has applied:

@@ -210,11 +210,11 @@ const coreRoutes = createApiRouter()
 
         // Cascade-delete every inspection-scoped row + R2 asset (D1 does not honor
         // FK cascades at runtime). Ownership verified by getInspection above.
-        await deleteInspectionCascade(getDrizzle(c), c.env.PHOTOS, tenantId, id);
+        const collabPurge = await deleteInspectionCascade(getDrizzle(c), c.env.PHOTOS, tenantId, id, c.env.INSPECTION_DOC);
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
             entityId: id,
-            metadata: { propertyAddress: inspection.propertyAddress, status: facts.status, reportPublished: facts.reportPublished, hadInvoice: facts.hadInvoice },
+            metadata: { propertyAddress: inspection.propertyAddress, status: facts.status, reportPublished: facts.reportPublished, hadInvoice: facts.hadInvoice, collabPurge },
         });
         return c.json({ success: true }, 200);
     })

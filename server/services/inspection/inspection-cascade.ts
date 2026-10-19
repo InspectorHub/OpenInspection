@@ -2,6 +2,7 @@ import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, reportTranslations, reports } from '../../lib/db/schema';
 import { inspectionScopedTables } from '../../lib/db/scoped-tables';
+import { purgeCollabDocs, type CollabPurgeOutcome } from './collab-purge';
 
 /**
  * Hard-delete an inspection and EVERY row + R2 asset it owns.
@@ -15,13 +16,19 @@ import { inspectionScopedTables } from '../../lib/db/scoped-tables';
  * schema (every table with an `inspection_id` column) so it cannot drift.
  *
  * The caller MUST have already verified the inspection belongs to `tenantId`.
+ *
+ * When `collab` (the collab Durable Object namespace) is passed, the storage behind
+ * each of the inspection's reports is purged AFTER every row and R2 asset is gone.
+ * That purge is best effort and its outcome is returned rather than thrown: see
+ * `purgeCollabDocs`. Omitting it leaves collab storage alone (`skipped`).
  */
 export async function deleteInspectionCascade(
     db: DrizzleD1Database,
     r2: R2Bucket,
     tenantId: string,
     inspectionId: string,
-): Promise<void> {
+    collab?: DurableObjectNamespace,
+): Promise<CollabPurgeOutcome> {
     // 0. Rows owned by a REPORT rather than by the inspection.
     //
     // The derived set below is every table carrying `inspection_id`, and it is
@@ -70,4 +77,7 @@ export async function deleteInspectionCascade(
 
     // 3. Finally the inspection row itself (keyed by `id`, not `inspection_id`).
     await db.delete(inspections).where(eq(inspections.id, inspectionId));
+
+    // 4. Collab Durable Objects, last: the ids above were read before their rows went.
+    return purgeCollabDocs(collab, tenantId, inspectionId, reportIds);
 }

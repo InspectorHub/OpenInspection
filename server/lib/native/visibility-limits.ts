@@ -5,8 +5,8 @@
  * A request carries up to `NATIVE_VISIBLE_MAX_IDS` ids (default 300). Every id costs one bind
  * parameter, and D1 allows 100 bind parameters per statement, so the ids are looked up in chunks of
  * `VISIBLE_IDS_PER_QUERY`. A chunk's statement also binds the company id and, for a caller restricted
- * to their assigned inspections, the five parameters of the assignment condition, so the chunk size
- * leaves room for both: no statement binds more than 90 parameters.
+ * to their assigned inspections, the four parameters of the assignment condition, so the chunk size
+ * leaves room for both: no statement binds more than 90 parameters (the worst case is 80 + 1 + 4 = 85).
  *
  * Reading the variable never throws. A missing, blank or non-numeric value falls back to the default
  * and a number outside the allowed range is clamped into it, so a misconfiguration can never switch

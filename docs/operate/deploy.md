@@ -194,6 +194,15 @@ wrangler r2 bucket lifecycle add PHOTOS ia-after-365d \
 
 > A hosted/managed deployment runs the same rule on its own `PHOTOS` bucket. Self-hosters who do not want Infrequent Access can simply skip this step — it is a cost optimization, not a correctness requirement.
 
+### Deleting an inspection
+
+Deleting an inspection removes its database rows, its objects in the `PHOTOS` bucket and, when the `INSPECTION_DOC` Durable Object is bound, the collaborative document storage behind each of its reports. The Durable Object step runs last and is best effort: if it fails the inspection is still deleted, a warning naming the inspection id appears in the Worker logs, and the `inspection.delete` audit event carries `collabPurge: "failed"` (`"ok"` on success, `"skipped"` when the binding is absent or the inspection had no report). There is no automatic retry.
+
+Two things to know when you operate native clients:
+
+- **Local copies on devices.** A device removes its copy of a deleted inspection when it next reconciles with the server, so the guarantee starts at that device's next successful connection. A device that stays offline keeps its copies until it connects or until it locks after `offline_max_days`. A copy holding unuploaded data is quarantined for export or removal instead of being deleted. Screenshots, the camera roll and exported packages are outside what the app can remove. See [`../develop/native-clients.md`](../develop/native-clients.md).
+- **Known leftover.** Collaborative document storage of inspections deleted before this purge existed may remain. Durable Objects cannot be enumerated and the report ids of those deletions were not recorded, so it cannot be swept.
+
 ### Tenant offboarding (export then purge)
 
 When a tenant is offboarded, the platform first builds a **full data export** ZIP (CSV/JSON of inspections, templates and agreements **plus the photo bytes themselves** under `photos/`, size-bounded so large tenants stay within Worker memory limits; any object beyond the budget is listed in `photos-manifest.json` with `included: false`), then purges all tenant rows, R2 objects and KV keys. The purge writes a durable, non-personal **destruction record** (`tenant_destruction_records`: tenant id, row/object/byte counts, timestamp) that intentionally has no foreign key to `tenants` so it survives the deletion as compliance proof. These run via the integration endpoints `POST /api/platform/tenants/:slug/data-export` and `.../purge`.

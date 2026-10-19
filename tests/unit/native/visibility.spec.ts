@@ -22,8 +22,12 @@ describe('visible-ids limit', () => {
         expect(readVisibleIdsLimit({ NATIVE_VISIBLE_MAX_IDS: '999999' })).toBe(VISIBLE_IDS_LIMIT_CEILING);
     });
 
-    it('keeps one query under the 90 bind parameters the plan allows, scope parameters included', () => {
-        // tenant id (1) + the scope condition (5 for a restricted caller) + one per id.
-        expect(VISIBLE_IDS_PER_QUERY + 1 + 5).toBeLessThanOrEqual(90);
+    it('keeps the worst-case statement within its stated margin: ids + company id + the four assignment parameters', () => {
+        const worstCase = VISIBLE_IDS_PER_QUERY + 1 + 4;
+        // 90 is the budget this module promises; D1's own limit is 100, so the promise leaves headroom.
+        expect(worstCase).toBeLessThanOrEqual(90);
+        expect(worstCase).toBe(85);
+        // A chunk smaller than the limit would multiply the statement count for no gain in safety.
+        expect(VISIBLE_IDS_PER_QUERY).toBeGreaterThanOrEqual(50);
     });
 });
