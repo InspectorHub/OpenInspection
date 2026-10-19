@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useRevalidator } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-event-types";
 import { createApi } from "~/lib/api-client.server";
@@ -59,6 +59,9 @@ const EMPTY_FORM = {
 export default function SettingsEventTypes() {
   const data = useLoaderData<typeof loader>();
   const [types, setTypes] = useState<EventType[]>(data.types as EventType[]);
+  useEffect(() => { setTypes(data.types as EventType[]); }, [data.types]);
+  const revalidator = useRevalidator();
+  const [deleteFailed, setDeleteFailed] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -132,14 +135,16 @@ export default function SettingsEventTypes() {
   }
 
   async function confirmDelete(t: EventType) {
+    setDeleteFailed(false);
     // busy-controls-allow: DELETE /api/admin/event-types/:id runs EventService.deactivateEventType, which deletes the row or sets active=false by id and answers 200 even when the row is already gone, and the list update only filters by id, so a repeat changes nothing
     const res = await fetch(`/api/admin/event-types/${t.id}`, {
       method: "DELETE",
       credentials: "same-origin",
-    });
-    if (res.ok) {
+    }).catch(() => null);
+    if (res?.ok) {
       setTypes((prev) => prev.filter((x) => x.id !== t.id));
-    }
+      void revalidator.revalidate();
+    } else setDeleteFailed(true);
   }
 
   return (
@@ -157,6 +162,8 @@ export default function SettingsEventTypes() {
           {m.settings_event_types_add_button()}
         </button>
       </div>
+
+      {deleteFailed && <p role="alert" className="text-[12px] font-medium text-ih-bad-fg">{m.settings_event_types_delete_failed()}</p>}
 
       {types.length === 0 ? (
         <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">

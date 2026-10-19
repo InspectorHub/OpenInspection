@@ -131,5 +131,6 @@
   "settings_event_types_followup_hours": "{hours} h",
   "settings_event_types_followup_immediate": "De inmediato",
   "settings_event_types_followup_label": "Retraso del seguimiento (horas)",
-  "settings_event_types_followup_hint": "Horas que pasan desde que se completa una visita hasta que sale su seguimiento. 0 lo envía de inmediato."
+  "settings_event_types_followup_hint": "Horas que pasan desde que se completa una visita hasta que sale su seguimiento. 0 lo envía de inmediato.",
+  "settings_event_types_delete_failed": "No se pudo eliminar el tipo de evento. Inténtelo de nuevo."
 }

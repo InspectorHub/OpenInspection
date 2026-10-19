@@ -131,5 +131,6 @@
   "settings_event_types_followup_hours": "{hours} h",
   "settings_event_types_followup_immediate": "Immediately",
   "settings_event_types_followup_label": "Follow-up delay (hours)",
-  "settings_event_types_followup_hint": "Hours after a visit is completed before its follow-up goes out. 0 sends it immediately."
+  "settings_event_types_followup_hint": "Hours after a visit is completed before its follow-up goes out. 0 sends it immediately.",
+  "settings_event_types_delete_failed": "The event type could not be deleted. Try again."
 }
