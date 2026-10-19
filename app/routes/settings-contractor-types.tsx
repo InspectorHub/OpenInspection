@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher } from "react-router";
 import { Icon, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import type { Route } from "./+types/settings-contractor-types";
 import { requireToken } from "~/lib/session.server";
@@ -112,7 +113,7 @@ export default function SettingsContractorTypes() {
   const createFetcher = useFetcher<typeof action>();
   const createLatch = useSubmitLatch(createFetcher.state);
   const { fetcher: reorderFetcher, submit: submitReorder, busy: reordering } = useGuardedSubmit<typeof action>();
-  const { submit: submitDelete, busy: deletingType } = useGuardedSubmit<typeof action>();
+  const { fetcher: deleteFetcher, submit: submitDelete, busy: deletingType } = useGuardedSubmit<typeof action>();
   const preflightFetcher = useFetcher<typeof action>();
   const [pendingDelete, setPendingDelete] = useState<ContractorType | null>(null);
   const [newName, setNewName] = useState("");
@@ -155,6 +156,7 @@ export default function SettingsContractorTypes() {
     <div className="space-y-ih-list">
       <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_contractor_types_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">{m.settings_contractor_types_intro()}</p>
+      <ActionFailureAlert result={deleteFetcher.data} intents={["delete"]}>{m.common_delete_failed()}</ActionFailureAlert>
 
       <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
         <createFetcher.Form method="POST" className="flex gap-2" onSubmit={createLatch((e) => { if (!newName.trim()) { e.preventDefault(); return; } setNewName(""); })}>

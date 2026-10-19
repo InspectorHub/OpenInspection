@@ -5,6 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Pill, Button, EmptyState, Modal } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useCapability } from "~/hooks/useSessionContext";
@@ -99,7 +100,7 @@ export default function RepairItemsPage() {
   // #106 - the editor writes a library item and the delete removes one. Two
   // guards so the modal save and a delete cannot abort one another.
   const { submit: submitItem, busy: saving } = useGuardedSubmit<typeof action>();
-  const { submit: submitDelete, busy: deleting } = useGuardedSubmit<typeof action>();
+  const { fetcher: deleteFetcher, submit: submitDelete, busy: deleting } = useGuardedSubmit<typeof action>();
   // The library is gated by the same three verbs the API enforces on
   // /api/recommendations (templateCreate / templateEdit / templateDelete), so a
   // control is shown only when its request would be accepted. Fail-closed.
@@ -131,6 +132,7 @@ export default function RepairItemsPage() {
       {/* IA-118 — "no repair items" reads as "nothing needs fixing", a claim
           about a property. Do not make it on a failed fetch. */}
       {loadFailed && <LoadFailedNotice what={m.repair_items_heading()} />}
+      <ActionFailureAlert result={deleteFetcher.data} intents={["delete"]}>{m.common_delete_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.repair_items_heading()}
         meta={m.repair_items_meta({ count: items.length })}

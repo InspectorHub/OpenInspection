@@ -19,6 +19,7 @@ import { resetMemberTwoFactor } from "./team.reset-two-factor.server";
 import { useDisplayLocale, useSessionContext } from "~/hooks/useSessionContext";
 import { importEntryHref } from "~/lib/import-entry-points";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { PageHeader, TabStrip, Card, Button, EmptyState, Table, Banner, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
@@ -76,7 +77,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "cancel-invite") {
     const res = await api.team.invites[":token"].$delete({ param: { token: inviteToken } });
-    return { ok: res.ok };
+    return { ok: res.ok, intent: "cancel-invite" };
   }
   if (intent === "resend-invite") {
     const res = await api.team.invites[":token"].resend.$post({ param: { token: inviteToken } });
@@ -99,7 +100,7 @@ export default function TeamPage() {
   const activeMemberCount = members.filter((x) => x.status !== "pending").length;
   // #106 - cancelling an invite burns the token; a second cancel would 404
   // and read as a failure. `resendFetcher` below is a <Form>, not a submit.
-  const { submit: submitCancel, busy: cancelBusy } = useGuardedSubmit<{ ok?: boolean }>();
+  const { fetcher: cancelFetcher, submit: submitCancel, busy: cancelBusy } = useGuardedSubmit<{ ok?: boolean; intent?: string }>();
   // The owner's two-factor reset. Its own submit rather than sharing the
   // cancel-invite one: two dialogs sharing a busy flag disable each other, and
   // a reset that silently rode a cancel's in-flight guard would be dropped.
@@ -155,6 +156,7 @@ export default function TeamPage() {
         <SeatBanner usage={sessionCtx.seatUsage} billingUrl={billingUrl} />
       )}
 
+      <ActionFailureAlert result={cancelFetcher.data} intents={["cancel-invite"]}>{m.common_cancel_invite_failed()}</ActionFailureAlert>
       <Breadcrumb
         items={[
           { label: m.settings_crumb_settings(), href: "/settings" },

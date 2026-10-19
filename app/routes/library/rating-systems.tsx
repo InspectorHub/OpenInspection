@@ -6,6 +6,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { RatingSystemEditor, type EditorSystem } from "~/components/RatingSystemEditor";
 import type { Severity } from "~/lib/severity";
 import { SEVERITY_LABEL } from "~/lib/severity";
@@ -112,6 +113,7 @@ export default function RatingSystemsPage() {
       {loadFailed && <LoadFailedNotice />}
 
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_rating_heading() }]} />
+      <ActionFailureAlert result={deleteFetcher.data} intents={["delete"]}>{m.common_delete_failed()}</ActionFailureAlert>
       <PageHeader
         title={m.library_rating_heading()}
         meta={systems.length === 1 ? m.library_rating_meta_one({ count: systems.length }) : m.library_rating_meta_other({ count: systems.length })}
