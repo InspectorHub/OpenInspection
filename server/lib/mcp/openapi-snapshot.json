@@ -5502,6 +5502,7 @@
               "agent",
               "agreement_request",
               "audit_log",
+              "availability_override",
               "bulk_export",
               "client",
               "comment",
@@ -5849,7 +5850,7 @@
       "body": null
     },
     "summary": "Delete an availability override",
-    "description": "Removes the specified availability override entry, restoring the default recurring schedule for that date."
+    "description": "Removes a manual availability override, restoring the default recurring schedule for that date. Owners and managers may remove any; an inspector only their own (403 otherwise). An entry synced from a connected calendar is managed by that connection and is refused with 409. The removal is written to the audit log."
   },
   {
     "operationId": "deleteCalendarBlock",

@@ -13,6 +13,9 @@
  * compile, and `scripts/check-audit-registry.mjs` walks the other direction.
  */
 export type AuditAction =
+    // A manual date override removed from an inspector's availability. Records the date,
+    // whether it blocked the day or added hours, and whose it was; never a name or address.
+    | 'availability.override.delete'
     | 'inspection.create'
     | 'inspection.delete'
     | 'inspection.status_change'

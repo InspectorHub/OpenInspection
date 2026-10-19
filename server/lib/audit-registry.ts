@@ -103,6 +103,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
         status: { kind: 'in-esign-log', note: 'A presentation is appended to esign_audit_logs as `signer.presented`, once per signer. The envelope-level `request.viewed` event is declared there but never appended, and this name has never been written to audit_logs.' },
     },
     'audit.view': { family: 'audit_log', label: 'audit_action_audit_view', meta: {}, status: { kind: 'live' } },
+    'availability.override.delete': { family: 'availability_override', label: 'audit_action_availability_override_delete', meta: { date: 'name', kind: 'name', inspectorId: 'person' }, status: { kind: 'live' } },
     'booking.routing.applied': { family: 'inspection', label: 'audit_action_booking_routing_applied', meta: { applied: 'to', candidateCount: 'count', inspectorId: 'person', reason: 'reason', requested: 'from' }, status: { kind: 'live' } },
     'comment.created': { family: 'comment', label: 'audit_action_comment_created', meta: { textPreview: 'name' }, status: { kind: 'live' } },
     'comment.deleted': { family: 'comment', label: 'audit_action_comment_deleted', meta: { textPreview: 'name' }, status: { kind: 'live' } },
