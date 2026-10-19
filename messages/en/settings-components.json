@@ -675,5 +675,9 @@
   "settings_stripesteps_account_capabilities": "Account can take payments",
   "settings_stripesteps_webhook": "Webhook delivery verified",
   "settings_teststeps_status_pending": "Waiting",
-  "settings_integrations_resend_name": "Resend"
+  "settings_integrations_resend_name": "Resend",
+  "settings_dateoverrides_remove_title": "Remove this date override?",
+  "settings_dateoverrides_remove_message": "{date} will follow the weekly schedule again.",
+  "settings_dateoverrides_remove_failed": "The date override could not be removed. It is still in place; try again.",
+  "settings_holiday_custom_delete_failed": "The closed day could not be removed. It is still on the list; try again."
 }

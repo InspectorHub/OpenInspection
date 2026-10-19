@@ -197,7 +197,7 @@ export function HolidayAdvancedDetails({
           </button>
           {saved && <span className="text-[13px] text-ih-ok-fg font-bold">{m.settings_holiday_saved()}</span>}
           {failed && (
-            <span className="text-[13px] text-ih-bad-fg font-bold">
+            <span role="alert" className="text-[13px] text-ih-bad-fg font-bold">
               {failMessage ?? m.settings_holiday_save_failed()}
             </span>
           )}

@@ -88,6 +88,8 @@ export function HolidayClosedPanel({
     fetcher.data?.intent === "holidays-save" &&
     fetcher.data.ok === false &&
     !dirty;
+  // A refused removal of a custom closed day is reported too; it used to vanish.
+  const removeFailed = fetcher.state === "idle" && fetcher.data?.intent === "holiday-custom-delete" && fetcher.data.ok === false;
 
   useEffect(() => {
     if (fetcher.state !== "idle" || !fetcher.data) return;
@@ -306,8 +308,8 @@ export function HolidayClosedPanel({
         onSave={handleAdvancedSave}
         saving={saving}
         saved={saved}
-        failed={failed}
-        failMessage={fetcher.data?.message}
+        failed={failed || removeFailed}
+        failMessage={removeFailed ? m.settings_holiday_custom_delete_failed() : fetcher.data?.message}
       />
 
       <ConfirmDialog
