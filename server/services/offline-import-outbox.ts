@@ -42,7 +42,7 @@ import { offlineImportApplied } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { createCredentialScope, isInProcessRequest, REQUEST_SCOPE } from '../lib/request-scope';
 import { logger } from '../lib/logger';
-import { APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH, type OutboxEntry } from '../lib/native/offline-package';
+import { APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH, type OutboxEntry } from '@core/offline-package';
 import type { HonoConfig } from '../types/hono';
 
 export interface OutboxFailure {

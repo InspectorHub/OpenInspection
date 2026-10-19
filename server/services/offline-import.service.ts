@@ -31,7 +31,8 @@
 import type { Context } from 'hono';
 import { and, eq, inArray } from 'drizzle-orm';
 import { AppError, ErrorCode, Errors } from '../lib/errors';
-import { enforceLimit, packageTooLarge, type ImportLimits } from '../lib/native/import-limits';
+import type { ImportLimits } from '@core/offline-package';
+import { enforceLimit, packageTooLarge } from '../lib/native/import-limits';
 import { applyOutbox, findDeletedCreates, LOOKUP_CHUNK, sweepAppliedRecords, type OutboxFailure } from './offline-import-outbox';
 import { auditFromContext } from '../lib/audit';
 import { inspections } from '../lib/db/schema';
@@ -49,7 +50,7 @@ import {
 import {
     MediaIndexSchema, OfflinePackageManifestSchema, OutboxSchema, PACKAGE_MAX_AGE_DAYS, PACKAGE_MAX_FUTURE_SKEW_DAYS,
     type MediaIndex, type OfflinePackageManifest, type OutboxEntry,
-} from '../lib/native/offline-package';
+} from '@core/offline-package';
 import type { HonoConfig } from '../types/hono';
 
 export interface OfflineImportResult {

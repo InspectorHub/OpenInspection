@@ -26,7 +26,7 @@ import type { InspectionDocDO } from '../../../server/durable-objects/inspection
 import type { PhotoEntry } from '../../../server/lib/collab/results-doc.types';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { applyMigrations } from '../migration-replay';
-import { PACKAGE_MAX_AGE_DAYS, PACKAGE_MAX_FUTURE_SKEW_DAYS, APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH } from '../../../server/lib/native/offline-package';
+import { PACKAGE_MAX_AGE_DAYS, PACKAGE_MAX_FUTURE_SKEW_DAYS, APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH } from '@core/offline-package';
 import { fingerprint } from '../../../server/lib/idempotency/fingerprint';
 import { buildPackage, declareEntrySize, JPEG_BYTES, type PackageSpec } from '../../unit/helpers/offline-package-fixture';
 
