@@ -677,7 +677,9 @@
   "settings_teststeps_status_pending": "Waiting",
   "settings_integrations_resend_name": "Resend",
   "settings_dateoverrides_remove_title": "Remove this date override?",
-  "settings_dateoverrides_remove_message": "{date} will follow the weekly schedule again.",
   "settings_dateoverrides_remove_failed": "The date override could not be removed. It is still in place; try again.",
-  "settings_holiday_custom_delete_failed": "The closed day could not be removed. It is still on the list; try again."
+  "settings_holiday_custom_delete_failed": "The closed day could not be removed. It is still on the list; try again.",
+  "settings_dateoverrides_remove_message_block": "{date} will follow the weekly schedule again, and customers will be able to book that day.",
+  "settings_dateoverrides_remove_message_extra": "The extra hours on {date} will no longer be offered for booking.",
+  "settings_dateoverrides_synced_note": "Synced from your {provider} calendar. Change it there."
 }

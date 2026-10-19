@@ -14,6 +14,8 @@ interface DateOverride {
   isAvailable: boolean;
   startTime: string | null;
   endTime: string | null;
+  /** The calendar provider the row was synced from; null for a hand-entered (manual) override. */
+  source?: "google" | "apple" | null;
 }
 
 /**
@@ -64,7 +66,12 @@ export function DateOverridesPanel({
                 </span>
               )}
             </div>
-            <Button variant="danger-link" size="sm" onClick={() => setPending(o)}>{m.common_remove()}</Button>
+            {!o.source ? (
+              <Button variant="danger-link" size="sm" onClick={() => setPending(o)}>{m.common_remove()}</Button>
+            ) : (
+              // Synced rows belong to the calendar connection: the next sync brings them back and the API refuses a removal.
+              <span className="text-[12px] text-ih-fg-3">{m.settings_dateoverrides_synced_note({ provider: o.source === "google" ? "Google" : "Apple" })}</span>
+            )}
           </div>
         ))}
       </div>
@@ -72,7 +79,7 @@ export function DateOverridesPanel({
       <ConfirmDialog
         open={pending !== null}
         title={m.settings_dateoverrides_remove_title()}
-        message={pending ? m.settings_dateoverrides_remove_message({ date: formatDate(pending.date, { locale, timeZone: "UTC" }) }) : ""}
+        message={pending ? (pending.isAvailable ? m.settings_dateoverrides_remove_message_extra : m.settings_dateoverrides_remove_message_block)({ date: formatDate(pending.date, { locale, timeZone: "UTC" }) }) : ""}
         confirmLabel={m.common_remove()}
         busy={busy}
         onConfirm={() => {

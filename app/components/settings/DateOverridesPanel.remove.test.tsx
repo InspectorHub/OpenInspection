@@ -12,13 +12,17 @@ import { createRoutesStub, Outlet } from "react-router";
 import { DateOverridesPanel } from "./DateOverridesPanel";
 
 const ROWS = [
-  { id: "o1", date: "2026-12-24", isAvailable: false, startTime: null, endTime: null },
-  { id: "o2", date: "2026-12-31", isAvailable: true, startTime: "09:00", endTime: "12:00" },
+  { id: "o1", date: "2026-12-24", isAvailable: false, startTime: null, endTime: null, source: null },
+  { id: "o2", date: "2026-12-31", isAvailable: true, startTime: "09:00", endTime: "12:00", source: null },
+];
+const SYNCED = [
+  { id: "g1", date: "2027-01-05", isAvailable: false, startTime: "10:00", endTime: "11:00", source: "google" as const },
+  { id: "a1", date: "2027-01-06", isAvailable: false, startTime: "10:00", endTime: "11:00", source: "apple" as const },
 ];
 
-function mount(ok: boolean) {
+function mount(ok: boolean, initial: Array<(typeof ROWS)[number] | (typeof SYNCED)[number]> = ROWS) {
   const posted: Array<Record<string, FormDataEntryValue>> = [];
-  let rows = ROWS;
+  let rows = initial;
   const context = { branding: { defaultLocale: "en-US", defaultTimezone: "UTC" }, user: { capabilities: {} } };
   const Stub = createRoutesStub([
     {
@@ -26,7 +30,7 @@ function mount(ok: boolean) {
       children: [{
         path: "settings/schedule",
         loader: () => ({ rows }),
-        Component: () => <DateOverridesPanel initialOverrides={rows} />,
+        Component: () => <DateOverridesPanel initialOverrides={rows as never} />,
         action: async ({ request }) => {
           const fd = Object.fromEntries(await request.formData());
           posted.push(fd);
@@ -76,5 +80,33 @@ describe("DateOverridesPanel remove", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/could not be removed/i);
     expect(screen.getAllByRole("button", { name: /^remove/i })).toHaveLength(2);
+  });
+
+  it("a whole-day block says the day will be bookable again", async () => {
+    mount(true);
+    fireEvent.click((await removeButtons())[0]!);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toMatch(/will follow the weekly schedule again, and customers will be able to book that day/);
+  });
+
+  it("an extra-hours row says the extra hours will no longer be offered", async () => {
+    mount(true);
+    fireEvent.click((await removeButtons())[1]!);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toMatch(/The extra hours on .* will no longer be offered for booking/);
+  });
+
+  it("synced rows have no Remove; they say where to change them", async () => {
+    mount(true, [...ROWS, ...SYNCED]);
+    await removeButtons();
+    expect(screen.getAllByRole("button", { name: /^remove/i })).toHaveLength(2);
+    expect(screen.getByText(/Synced from your Google calendar\. Change it there\./)).toBeTruthy();
+    expect(screen.getByText(/Synced from your Apple calendar\. Change it there\./)).toBeTruthy();
+  });
+
+  it("a panel holding only synced rows offers no Remove at all", async () => {
+    mount(true, SYNCED);
+    await screen.findByText(/Synced from your Google calendar/);
+    expect(screen.queryAllByRole("button", { name: /^remove/i })).toHaveLength(0);
   });
 });

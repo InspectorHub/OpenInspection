@@ -39,6 +39,7 @@ interface DateOverride {
   isAvailable: boolean;
   startTime: string | null;
   endTime: string | null;
+  source: "google" | "apple" | null;
 }
 
 function civilToday(): string {
