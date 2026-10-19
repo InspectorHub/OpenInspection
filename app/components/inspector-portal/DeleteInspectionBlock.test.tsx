@@ -205,4 +205,17 @@ describe("DeleteInspectionBlock", () => {
     await openDialog();
     expect((screen.getByRole("checkbox", { name: /I understand/ }) as HTMLInputElement).checked).toBe(false);
   });
+
+  it("a failure shown before closing is not shown again when the dialog is reopened", async () => {
+    reply = () => ({ ok: false, intent: "delete", error: "You cannot delete inspections" });
+    mount();
+    await openDialog();
+    tick();
+    fireEvent.click(confirmButton());
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await openDialog();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

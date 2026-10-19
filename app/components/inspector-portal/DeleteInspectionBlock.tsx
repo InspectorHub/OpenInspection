@@ -49,7 +49,9 @@ function DeleteInspectionBlockInner({ inspectionId, facts, canCancelInstead }: {
     const { fetcher, submit, busy } = useGuardedSubmit<{ ok?: boolean; intent?: string; error?: string }>();
     const purgeOfflineData = useOfflinePurgeOnDelete(fetcher);
 
-    const settled = fetcher.state === "idle" ? fetcher.data : undefined;
+    // An answer seen before the dialog was closed must not greet the next opening.
+    const [ignored, setIgnored] = useState<unknown>(null);
+    const settled = fetcher.state === "idle" && fetcher.data !== ignored ? fetcher.data : undefined;
     const done = settled?.intent === "delete" && settled.ok === true;
     const error = settled?.intent === "delete" && settled.ok === false ? (settled.error ?? m.inspections_hub_delete_error()) : undefined;
 
@@ -80,8 +82,8 @@ function DeleteInspectionBlockInner({ inspectionId, facts, canCancelInstead }: {
                     busy={busy}
                     error={error}
                     onConfirm={confirm}
-                    onClose={() => setOpen(false)}
-                    onCancelInstead={canCancelInstead ? () => { setOpen(false); setCancelOpen(true); } : undefined}
+                    onClose={() => { setIgnored(fetcher.data); setOpen(false); }}
+                    onCancelInstead={canCancelInstead ? () => { setIgnored(fetcher.data); setOpen(false); setCancelOpen(true); } : undefined}
                 />
             )}
             {cancelOpen && <CancelInspectionModal open inspectionId={inspectionId} onClose={() => setCancelOpen(false)} />}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useLoaderData, useFetcher, useSearchParams, useNavigate, redirect } from "react-router";
+import { useLoaderData, useFetcher, useSearchParams, useNavigate, redirect, data, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { InspectionSearchItem } from "~/routes/resources/inspection-search";
 import type { Route } from "./+types/inspections";
 import { requireToken } from "~/lib/session.server";
@@ -14,7 +14,7 @@ import { QuotaBanner } from "~/components/QuotaBanner";
 import { useSessionContext, useDisplayTimeZone, useCapability } from "~/hooks/useSessionContext";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
 import { loadChecklistInputs } from "~/lib/dashboard-setup.server";
-import { PageHeader, TabStrip, Pill, Card, Button, Icon, Banner } from "@core/shared-ui";
+import { PageHeader, TabStrip, Pill, Card, Button, Icon } from "@core/shared-ui";
 import {
   DEFAULT_COLUMNS,
   ALWAYS_ON,
@@ -31,6 +31,7 @@ import {
 import { matchesFilter, matchesWorkflow, tabMatches, statFocusIds, isStatFocus, shouldShowListControls, type StatFocus } from "~/lib/dashboard-filters";
 import { dedupeBucketMembership, emptyDashboard } from "~/lib/dashboard-buckets";
 import { useBatchDelete } from "~/hooks/useBatchDelete";
+import { BatchDeleteFailures } from "~/components/dashboard/BatchDeleteFailures";
 import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
 import { FiltersDrawer } from "~/components/dashboard/FiltersDrawer";
 import { ColumnsPopover } from "~/components/dashboard/ColumnsPopover";
@@ -152,6 +153,12 @@ function getGreeting() {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
+// A chunk with more behind it (`more=1`) does not re-read the list; the last one does.
+export function shouldRevalidate({ formData, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  const midBatch = formData?.get("intent") === "delete-many" && formData.get("more") === "1";
+  return midBatch ? false : defaultShouldRevalidate;
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const formData = await request.formData();
@@ -215,7 +222,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "delete-many") {
     // ONE request for the whole selection: several submits on one fetcher cancel
     // each other, and only the last would be seen.
-    return deleteInspectionsViaApi(api, String(formData.get("ids") ?? "").split(","));
+    const result = await deleteInspectionsViaApi(api, String(formData.get("ids") ?? "").split(","));
+    // More ids than one request may carry: refused whole, nothing deleted.
+    return result.tooMany ? data(result, { status: 400 }) : result;
   }
   if (intent === "status") {
     const id = formData.get("id") as string;
@@ -249,8 +258,11 @@ export default function InspectionsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const fetcher = useFetcher();
-  // Batch Delete: one request, rows hidden at once, refusals reported (see the hook).
-  const { deleteMany, hiddenIds, failures: deleteFailures, dismissFailures } = useBatchDelete((failedIds) => setSelectedIds(failedIds));
+  const presentIds = useMemo(() => new Set(Object.values(loadedBuckets).flatMap((items) => (items as Inspection[]).map((i) => i.id))), [loadedBuckets]);
+  const { deleteMany, busy: deleting, hiddenIds, failures: deleteFailures, dismissFailures } = useBatchDelete(
+    presentIds,
+    (failedIds) => setSelectedIds((prev) => new Set([...prev].filter((id) => failedIds.has(id)))),
+  );
   const addressOf = useMemo(
     () => new Map(Object.values(loadedBuckets).flatMap((items) => (items as Inspection[]).map((i) => [i.id, i.address] as const))),
     [loadedBuckets],
@@ -548,7 +560,6 @@ export default function InspectionsPage() {
   const isStaff = sessionCtx !== null && isStaffRole(sessionCtx.user.role);
   const canOpenEditor = useCapability("editReports");
 
-  // The selection stays until the answer is in; only rows that are really gone leave it.
   const batchDelete = () => { deleteMany([...selectedIds]); };
 
   /* ---- CSV export ---- */
@@ -664,7 +675,7 @@ export default function InspectionsPage() {
       tenantSlug={tenantSlug}
       selectedIds={selectedIds}
       isColumnVisible={isColumnRendered}
-      toggleSelect={toggleSelect}
+      toggleSelect={deleting ? () => {} : toggleSelect}
       transitionStatus={transitionStatus}
       timeZone={displayTz}
       orderStatusesOnly={isStaff} canChangeStatus={!isStaff || canScheduleOthers} canRestore={canScheduleOthers}
@@ -791,17 +802,7 @@ export default function InspectionsPage() {
       />
       </>)}
 
-      {/* What the last batch delete could not remove, by address, with the reason. */}
-      {deleteFailures.length > 0 && (
-        <Banner tone="danger" dismissible onDismiss={dismissFailures}>
-          <p className="font-semibold">{m.inspections_list_delete_failed()}</p>
-          <ul className="mt-1 list-disc pl-5">
-            {deleteFailures.map((f) => (
-              <li key={f.id}>{m.inspections_list_delete_failed_item({ address: addressOf.get(f.id) ?? f.id, reason: f.error })}</li>
-            ))}
-          </ul>
-        </Banner>
-      )}
+      <BatchDeleteFailures failures={deleteFailures} addressOf={addressOf} onDismiss={dismissFailures} />
 
       {/* Batch actions bar */}
       {selectedIds.size > 0 && (
@@ -809,9 +810,9 @@ export default function InspectionsPage() {
           <span className="text-[13px] font-bold text-ih-primary-text">
             {m.inspections_list_batch_selected({ count: selectedIds.size })}
           </span>
-          {canDelete && <Button variant="danger" size="sm" onClick={batchDelete}>{m.common_delete()}</Button>}
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>{m.inspections_list_batch_select_all()}</Button>
-          <Button variant="ghost" size="sm" onClick={clearSelection}>{m.common_clear()}</Button>
+          {canDelete && <Button variant="danger" size="sm" pending={deleting} onClick={batchDelete}>{m.common_delete()}</Button>}
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={() => { if (!deleting) selectAll(); }}>{m.inspections_list_batch_select_all()}</Button>
+          <Button variant="ghost" size="sm" onClick={() => { if (!deleting) clearSelection(); }}>{m.common_clear()}</Button>
         </div>
       )}
 

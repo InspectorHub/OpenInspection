@@ -377,5 +377,6 @@
   "inspections_hub_delete_confirm": "Delete inspection",
   "inspections_hub_delete_error": "The inspection could not be deleted. Try again.",
   "inspections_list_delete_failed": "These inspections could not be deleted and are still in the list:",
-  "inspections_list_delete_failed_item": "{address}: {reason}"
+  "inspections_list_delete_failed_item": "{address}: {reason}",
+  "inspections_list_delete_too_many": "Delete at most {max} inspections at a time."
 }

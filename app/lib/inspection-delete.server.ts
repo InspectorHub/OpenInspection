@@ -8,8 +8,9 @@
  * server's reason (for example a missing capability) or a readable fallback.
  */
 import type { createApi } from "~/lib/api-client.server";
-import { toActionResult } from "~/lib/inspector-portal-actions";
+import { toActionResult } from "~/lib/action-result";
 import { m } from "~/paraglide/messages";
+import { MAX_DELETE_BATCH } from "~/lib/inspection-delete-limit";
 
 type Api = ReturnType<typeof createApi>;
 
@@ -23,11 +24,27 @@ export async function deleteInspectionViaApi(api: Api, id: string): Promise<Dele
   try {
     const res = await api.inspections[":id"].$delete({ param: { id } });
     if ((res.status as number) === 404) return { ok: true, intent: "delete", error: undefined };
+    // The delete route checks the caller's right to the id BEFORE it looks the id up, so for
+    // someone who is not an owner a missing id answers 403, not 404. Only on a 403, ask the
+    // read route: if the inspection no longer exists, the person's request is already met.
+    if ((res.status as number) === 403 && (await isGone(api, id))) return { ok: true, intent: "delete", error: undefined };
     return await toActionResult(res, "delete", m.inspections_hub_delete_error());
   } catch {
     return { ok: false, intent: "delete", error: m.inspections_hub_delete_error() };
   }
 }
+
+async function isGone(api: Api, id: string): Promise<boolean> {
+  try {
+    // The typed read route is the whole inspection payload; only its status matters here.
+    const read = api.inspections[":id"].$get as unknown as (args: { param: { id: string } }) => Promise<Response>;
+    return (await read({ param: { id } })).status === 404;
+  } catch {
+    return false;
+  }
+}
+
+export { MAX_DELETE_BATCH };
 
 export interface DeleteInspectionsResult {
     /** True only when at least one id was given and every one of them is gone. */
@@ -37,6 +54,8 @@ export interface DeleteInspectionsResult {
     deleted: string[];
     /** Ids that are still there, with the reason the server gave. */
     failed: Array<{ id: string; error: string }>;
+    /** Set when the request was refused for naming more than MAX_DELETE_BATCH ids; nothing was deleted. */
+    tooMany?: true;
 }
 
 /**
@@ -49,6 +68,10 @@ export async function deleteInspectionsViaApi(api: Api, ids: readonly string[]):
     const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
     const deleted: string[] = [];
     const failed: Array<{ id: string; error: string }> = [];
+    if (unique.length > MAX_DELETE_BATCH) {
+        const error = m.inspections_list_delete_too_many({ max: MAX_DELETE_BATCH });
+        return { ok: false, intent: "delete-many", deleted: [], failed: unique.map((id) => ({ id, error })), tooMany: true };
+    }
     for (const id of unique) {
         const res = await deleteInspectionViaApi(api, id);
         if (res.ok) deleted.push(id);
