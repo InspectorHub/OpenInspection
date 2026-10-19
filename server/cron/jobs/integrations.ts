@@ -15,7 +15,8 @@ import { calendarConnections } from '../../lib/db/schema/calendar';
 import { SYNC_OUTBOX_STATUS } from '../../lib/status/sync-outbox-status';
 import { runQBOCDC } from '../../services/qbo/cron-cdc';
 import { logger } from '../../lib/logger';
-import { TICK, db, exists, type CronJob } from '../types';
+import { hasOrphanedSyncedOverrides, removeOrphanedSyncedOverrides } from '../../lib/calendar/orphan-sweep';
+import { DAILY_04, TICK, db, exists, type CronJob } from '../types';
 
 // 2. QBO CDC payment sync (was hourly)
 export const qboCdcJob: CronJob = {
@@ -171,5 +172,27 @@ export const calendarSyncJob: CronJob = {
         });
         if (swept.attempted > 0) logger.info('[cron] calendar sync sweep', swept);
         return { processed: swept.attempted, nextCursor: null };
+    },
+};
+
+// 5d-bis. Remove synced date overrides whose calendar connection no longer
+//     exists. The sync sweep above only visits existing connections, so rows left
+//     behind by an older release's disconnect (connection row deleted, imported
+//     busy blocks kept) or by a removed member were never reached; they keep
+//     hiding days from customers. Once a day is plenty: nothing new becomes an
+//     orphan any more (disconnect and member removal clean up in the same
+//     operation), so this only reaches what was left before. Counts only are logged.
+export const calendarOrphanSweepJob: CronJob = {
+    key: 'calendar-orphan-sweep',
+    label: 'Remove synced date overrides whose calendar is no longer connected',
+    trigger: DAILY_04,
+    modes: ['standalone', 'saas'],
+    maxBatch: 200,
+    probe: async (env) => ((await hasOrphanedSyncedOverrides(env.DB)) ? 1 : 0),
+    run: async (env) => {
+        const removed = await removeOrphanedSyncedOverrides(env.DB, 200);
+        if (removed > 0) logger.info('[cron] calendar orphan sweep', { removed });
+        // A full batch means there may be more: ask for another pass rather than wait a day.
+        return { processed: removed, nextCursor: removed >= 200 ? 'more' : null };
     },
 };

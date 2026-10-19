@@ -28,7 +28,7 @@ describe('cron registry', () => {
      * arrived unannounced" — and the single equality that used to carry both
      * reported the second failure using the first one's name.
      */
-    const ADDED_SINCE = ['statutory-revision-watch', 'content-seed-sweep'];
+    const ADDED_SINCE = ['statutory-revision-watch', 'content-seed-sweep', 'calendar-orphan-sweep'];
 
     it('declares every job the monolithic handler used to run, in order', () => {
         const keys = CRON_JOBS.map((j) => j.key);
@@ -43,6 +43,14 @@ describe('cron registry', () => {
         // never matches anything.
         expect([...keys, 'ghost-job'].filter((k) => !LEGACY.includes(k) && !ADDED_SINCE.includes(k)))
             .toEqual(['ghost-job']);
+    });
+
+    it('sweeps orphaned calendar overrides once a day, in both modes, in bounded batches', () => {
+        const job = CRON_JOBS.find((j) => j.key === 'calendar-orphan-sweep');
+        expect(job, 'calendar-orphan-sweep is not registered').toBeDefined();
+        expect(job!.trigger).toBe(DAILY_04);
+        expect(job!.modes).toEqual(['standalone', 'saas']);
+        expect(job!.maxBatch).toBeLessThanOrEqual(200);
     });
 
     it('has unique keys', () => {
