@@ -38,7 +38,7 @@ export type ImportState =
 const IDLE: ImportState = { kind: "idle", error: null };
 
 /** Why a chosen file is refused before it is even opened, or null. */
-export function refusalForFile(file: { name: string; size: number }): string | null {
+function refusalForFile(file: { name: string; size: number }): string | null {
     if (!/\.zip$/i.test(file.name)) return m.offline_import_err_not_zip();
     if (file.size === 0) return m.offline_import_err_empty();
     const max = IMPORT_LIMIT_CEILINGS.compressedBytes;

@@ -24,7 +24,7 @@
  */
 import { IMPORT_LIMIT_CEILINGS, type SendResult } from '@core/offline-package';
 
-export const IMPORT_PATH = '/api/client/import';
+const IMPORT_PATH ='/api/client/import';
 /** Allowance for the server to answer once the last byte has arrived, and the floor for any package. */
 export const MIN_SEND_TIMEOUT_MS = 60_000;
 export const MAX_SEND_TIMEOUT_MS = 10 * 60_000;

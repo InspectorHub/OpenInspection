@@ -9,7 +9,7 @@
 import { extractHeldBackPackage } from "@core/offline-package";
 
 /** Inspection ids are `[A-Za-z0-9_-]{1,64}`, so a name built from one is already safe. */
-export function heldBackFileName(ids: readonly string[]): string {
+function heldBackFileName(ids: readonly string[]): string {
     return ids.length === 1 ? `offline-package-left-behind-${ids[0]}.zip` : `offline-package-left-behind-${ids.length}-inspections.zip`;
 }
 

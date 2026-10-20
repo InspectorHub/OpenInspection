@@ -12,7 +12,8 @@ import { makeCase } from "../../../tests/unit/helpers/offline-package-cases";
 import { confirmedFor } from "../../../tests/unit/helpers/offline-package-harness";
 
 export type Answer = { status: number; body: unknown };
-export type Respond = (call: number, bytes: Uint8Array) => Answer | "throw" | Promise<Answer | "throw">;
+// i18n-literal-ok: a test-only type naming the "throw" sentinel, not text a person reads
+export type Respond =(call: number, bytes: Uint8Array) => Answer | "throw" | Promise<Answer | "throw">;
 
 export const NO_WAIT: ImportOptions = { sleep: async () => {} };
 export const SIGNED_OUT_SENTENCE = /Your session may have expired or you may not have permission to import\./;

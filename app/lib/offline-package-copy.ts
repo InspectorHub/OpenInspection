@@ -49,7 +49,7 @@ function explainPackageRejected(h: HeldBack): HeldBackExplanation {
     return { group: "package_rejected", label, what: m.offline_import_what_package_rejected(), next: m.offline_import_next_package_rejected() };
 }
 
-export function explainHeldBack(h: HeldBack): HeldBackExplanation {
+function explainHeldBack(h: HeldBack): HeldBackExplanation {
     switch (h.reason) {
         case "package_rejected":
             return explainPackageRejected(h);
