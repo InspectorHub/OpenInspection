@@ -14,9 +14,15 @@
  *   - anything whose specifier contains `.server`
  *   - `cloudflare:*` runtime modules
  *   - a relative path that resolves outside `packages/field-ui/`
+ *   - any other `@core/*` alias (`@core/api-types`, `@core/offline-package`, ...)
  * Allowed on purpose: `@core/shared-ui` (bundled into the package), the
  * package's own `@core/field-ui` alias, and third-party peers such as `react`
  * and `yjs`.
+ *
+ * This reads static `import`/`export ... from` statements and single-line
+ * `import('x')` / `require('x')` calls. It is not a full parser: a multi-line
+ * dynamic import, a template-literal specifier, `vi.mock`, `import.meta.glob` and
+ * `new URL(..., import.meta.url)` are not seen.
  *
  * Both numbers print on every run. Zero files scanned is a broken walker, not a
  * clean package, so it fails.
@@ -59,6 +65,11 @@ function reasonFor(file, specifier) {
         return 'react-router is the host router; take behaviour through FieldDataSource instead';
     }
     if (specifier.startsWith('~/')) return 'the ~/ app alias reaches into the web app';
+    // Only shared-ui is bundled into dist (tsup `noExternal`); any other @core/* alias
+    // would stay a bare specifier that no other host can resolve.
+    if (specifier.startsWith('@core/') && !/^@core\/(shared-ui|field-ui)(\/|$)/.test(specifier)) {
+        return 'only @core/shared-ui (bundled) and @core/field-ui (itself) resolve outside the web app';
+    }
     if (specifier.includes('.server')) return 'server-only modules cannot ship in the package';
     if (specifier.startsWith('cloudflare:')) return 'cloudflare: runtime modules are not available in other hosts';
     if (specifier.startsWith('.')) {

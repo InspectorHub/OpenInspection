@@ -41,6 +41,14 @@ describe('field-ui boundary', () => {
     expect(reason("import a from '../../shared-ui/src/index';")).toEqual(['../../shared-ui/src/index']);
   });
 
+  it('lets only the bundled and own @core aliases through; any other @core package would stay a bare specifier in dist', () => {
+    const reason = (source: string) => findBoundaryViolations([at('src/x.ts', source)]).map((x: { specifier: string }) => x.specifier);
+    expect(reason("import type { T } from '@core/api-types';")).toEqual(['@core/api-types']);
+    expect(reason("import { s } from '@core/offline-package';")).toEqual(['@core/offline-package']);
+    expect(reason("import { Button } from '@core/shared-ui/src/Button';")).toEqual([]);
+    expect(reason("import { x } from '@core/field-ui/shared/finding-key';")).toEqual([]);
+  });
+
   it('sees side-effect, re-export, dynamic, require and multi-line forms', () => {
     const reason = (source: string) => findBoundaryViolations([at('src/x.ts', source)]).map((x: { specifier: string }) => x.specifier);
     expect(reason("import 'react-router';")).toEqual(['react-router']);
