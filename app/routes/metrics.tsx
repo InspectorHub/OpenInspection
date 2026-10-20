@@ -4,7 +4,7 @@ import { requireNotStaffLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Table } from "@core/shared-ui";
-import { formatDollars } from "~/lib/money";
+import { formatDollars } from "@core/field-ui/shared/money";
 import { useDisplayLocale, useDisplayCurrency, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { DateRangePicker } from "~/components/metrics/DateRangePicker";
 import { FindingsBySection, type FindingsData } from "~/components/metrics/FindingsBySection";

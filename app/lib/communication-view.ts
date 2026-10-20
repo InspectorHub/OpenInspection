@@ -3,7 +3,7 @@
  * fetch — unit-testable shaping of the two payload arrays.
  */
 import { m } from "~/paraglide/messages";
-import { cachedDateTimeFormat } from "./intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 
 export interface DeliveryRow {
   id: string;

@@ -2,7 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/repair-request.$shareToken";
 import { createApi } from "~/lib/api-client.server";
 import { PublicNotice } from "~/components/PublicNotice";
-import { formatCents } from "~/lib/money";
+import { formatCents } from "@core/field-ui/shared/money";
 import type { RepairActionTag } from "~/lib/repair-action-tag";
 import { m } from "~/paraglide/messages";
 

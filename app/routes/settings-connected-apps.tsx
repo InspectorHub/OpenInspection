@@ -7,7 +7,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { isAdminRole } from "~/lib/access";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import type { McpGrant } from "../../server/lib/validations/mcp.schema";
 import { MODULE_GROUPS } from "../../server/lib/mcp/tag-catalog";

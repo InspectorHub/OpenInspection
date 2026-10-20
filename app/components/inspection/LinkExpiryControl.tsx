@@ -5,7 +5,7 @@ import {
   type ReportLinkTtl,
   type ReportLinkTtlUnit,
 } from "../../../server/lib/report-link-ttl";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 

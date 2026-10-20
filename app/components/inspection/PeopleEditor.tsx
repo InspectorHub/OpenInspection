@@ -14,7 +14,7 @@ import { PRIMARY_CLIENT_KEY } from "../../../server/lib/people/default-role-prof
 import { ROLE_KINDS, type RoleKind } from "../../../server/lib/people/role-kinds";
 import { isSoleClient } from "../../../server/lib/people/primary-client";
 import type { ReportLinkTtl } from "../../../server/lib/report-link-ttl";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";

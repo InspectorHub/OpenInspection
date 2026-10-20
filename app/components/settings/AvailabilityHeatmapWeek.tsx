@@ -1,5 +1,5 @@
 import { m } from "~/paraglide/messages";
-import { cachedDateTimeFormat } from "~/lib/intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 
 export type HeatmapStatus = "open" | "full" | "closed" | "unconfigured";
 

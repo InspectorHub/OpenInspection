@@ -4,7 +4,7 @@
  * sub-components (InvoiceDisplay / StripePayPanel).
  */
 import type { PillTone } from "@core/shared-ui";
-import { formatDollars } from "~/lib/money";
+import { formatDollars } from "@core/field-ui/shared/money";
 
 export interface InvoiceData {
   number: string;

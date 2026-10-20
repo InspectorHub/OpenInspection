@@ -7,7 +7,7 @@ import { REPORT_STATE_TONE, type Inspection } from "~/lib/dashboard-schema";
 import { Pill, Icon } from "@core/shared-ui";
 import { RestoreInspectionAction } from "~/components/RestoreInspectionAction";
 import { m } from "~/paraglide/messages";
-import { formatDollars } from "~/lib/money";
+import { formatDollars } from "@core/field-ui/shared/money";
 import { useDisplayLocale, useDisplayCurrency, useTenantFormatPrefs } from "~/hooks/useSessionContext";
 
 interface DashboardInspectionRowProps {

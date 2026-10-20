@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { formatCents, parseDollarsToCents, formatDollars, parseCurrencyToCents } from '~/lib/money';
+import { formatCents, parseDollarsToCents, formatDollars, parseCurrencyToCents } from './money';
 
 describe('formatCents', () => {
   it('formats integer cents as $X,XXX.XX', () => {

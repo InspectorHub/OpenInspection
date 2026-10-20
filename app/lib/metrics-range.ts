@@ -1,4 +1,4 @@
-import { cachedDateTimeFormat } from "./intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 /**
  * The date range behind /metrics — presets, arithmetic, and URL round-tripping.
  *

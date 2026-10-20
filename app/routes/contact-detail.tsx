@@ -5,7 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
-import { formatCentsOrDash } from "~/lib/money";
+import { formatCentsOrDash } from "@core/field-ui/shared/money";
 import { formatCents } from "~/lib/hub-blocks";
 import { humanizeStatus, capitalize } from "~/lib/status";
 import { Breadcrumb } from "~/components/Breadcrumb";

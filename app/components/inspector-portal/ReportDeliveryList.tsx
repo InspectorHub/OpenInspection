@@ -45,7 +45,7 @@
  */
 import { m } from "~/paraglide/messages";
 import type { ReportLinkRow } from "~/lib/communication-view";
-import { cachedDateTimeFormat } from "~/lib/intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 
 export function ReportDeliveryList({
   rows,

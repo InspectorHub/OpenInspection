@@ -4,7 +4,7 @@ import { Button } from "@core/shared-ui";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 

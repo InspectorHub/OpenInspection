@@ -22,7 +22,7 @@ import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { reasonText, type NoticeGroup, type NoticeChannel, type DeliveryRow } from "~/lib/communication-view";
-import { cachedDateTimeFormat } from "~/lib/intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 
 function channelIcon(channel: string) {
   // Known channels get a glyph; anything else gets a neutral dot. The LABEL

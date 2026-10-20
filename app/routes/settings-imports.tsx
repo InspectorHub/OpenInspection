@@ -8,7 +8,7 @@ import { StartImportPanel } from "~/components/imports/StartImportPanel";
 import { useDisplayLocale, useDisplayTimeZone, useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
 import { createApi } from "~/lib/api-client.server";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import {
     asImportEntryIntent,
     importEntryHref,

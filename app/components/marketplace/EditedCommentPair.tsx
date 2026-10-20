@@ -1,5 +1,5 @@
 import { m } from "~/paraglide/messages";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 
 export interface EditedCommentPairData {
   commentId: string;

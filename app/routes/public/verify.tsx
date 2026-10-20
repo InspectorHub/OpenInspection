@@ -1,7 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/verify";
 import { createApi } from "~/lib/api-client.server";
-import { formatDateTime } from "~/lib/format";
+import { formatDateTime } from "@core/field-ui/shared/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
 import { AgreementLanguageDisclosure } from "~/components/agreements/AgreementLanguageDisclosure";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";

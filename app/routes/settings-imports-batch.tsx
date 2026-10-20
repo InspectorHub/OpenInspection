@@ -17,7 +17,7 @@ import { useDisplayLocale, useDisplayTimeZone, useSessionContext } from "~/hooks
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { requireAdminLoader } from "~/lib/access.server";
 import { createApi } from "~/lib/api-client.server";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { importIntentLabel, importStatusLabel, importStatusTone } from "~/lib/import-run-labels";
 import type { BatchReport, StageMapping } from "~/lib/imports-types";
 import {

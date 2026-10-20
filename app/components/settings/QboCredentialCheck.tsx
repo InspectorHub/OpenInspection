@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Banner, Button } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { formatDateTime } from "~/lib/format";
+import { formatDateTime } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 import type { QboCheckOutcome, QboCheckedSetting } from "~/lib/qbo-credential-check";
 import type { QBOCredentialSource } from "../../../server/services/qbo/api-base";

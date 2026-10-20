@@ -6,7 +6,7 @@ import { requireCapabilityLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, StatCard, Button, EmptyState, Table, Banner, Modal } from "@core/shared-ui";
-import { formatCurrency, formatDate } from "~/lib/format";
+import { formatCurrency, formatDate } from "@core/field-ui/shared/format";
 import { collectedCents } from "~/lib/invoice-totals";
 import { InvoiceAmountCell } from "~/components/invoices/InvoiceAmountCell";
 import { useDisplayLocale, useDisplayCurrency, useCompanyTimeZone } from "~/hooks/useSessionContext";

@@ -1,7 +1,7 @@
 import { Banner, Button, Card, StatCard } from "@core/shared-ui";
 import type { ImportReport } from "@core/offline-package";
 import { HeldBackList } from "~/components/offline-package/HeldBackList";
-import { formatNumber } from "~/lib/format";
+import { formatNumber } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 /**

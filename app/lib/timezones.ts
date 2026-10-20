@@ -1,4 +1,4 @@
-import { cachedDateTimeFormat } from "./intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 /** IANA timezone ids for the settings pickers. Runtime built-in — no library.
  *  `supportedValuesOf` exists in the Workers/V8 runtime and modern browsers;
  *  the fallback keeps SSR safe if it is ever unavailable. */

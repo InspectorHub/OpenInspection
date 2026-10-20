@@ -1,5 +1,5 @@
 import { AA_NORMAL, fillContrast } from "~/lib/brand";
-import { formatNumber } from "~/lib/format";
+import { formatNumber } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 /**

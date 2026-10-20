@@ -1,4 +1,4 @@
-import { cachedDateTimeFormat } from "./intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 /**
  * Civil (wall-clock) date + time → the UTC instant it names in a given zone.
  *

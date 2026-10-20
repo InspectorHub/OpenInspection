@@ -1,4 +1,4 @@
-import { formatRelativeTime } from "~/lib/format";
+import { formatRelativeTime } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 import type { createApi } from "~/lib/api-client.server";
 import type { TemplateOption } from "~/components/team/permission-template-ui";

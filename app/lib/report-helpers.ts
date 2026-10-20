@@ -7,7 +7,7 @@
  * are byte-identical to their former in-component definitions.
  */
 
-import { formatDate } from "./format";
+import { formatDate } from "@core/field-ui/shared/format";
 
 /* ------------------------------------------------------------------ */
 /* Section icon mapping */

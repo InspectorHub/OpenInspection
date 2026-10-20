@@ -2,7 +2,7 @@ import type { CompanyProfile } from "./booking-constants";
 import { PublicAddressAutocomplete, type PublicAddressSuggestion } from "./PublicAddressAutocomplete";
 import { BookingDepositPanel } from "./BookingDepositPanel";
 import { BookingSummaryCard } from "./BookingSummaryCard";
-import { formatCurrency } from "~/lib/format";
+import { formatCurrency } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 

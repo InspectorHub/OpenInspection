@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render } from "@testing-library/react";
 import { InspectorSyncBadge, syncBadgeState } from "./InspectorSyncBadge";
-import { formatRelativeTime } from "~/lib/format";
+import { formatRelativeTime } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 const NOW = Date.UTC(2026, 7, 3, 12, 0, 0);

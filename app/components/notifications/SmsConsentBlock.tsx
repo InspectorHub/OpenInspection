@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Checkbox } from "@core/shared-ui";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { SmsDisclosure } from "~/components/notifications/SmsDisclosure";
 import { m } from "~/paraglide/messages";
 

@@ -1,6 +1,6 @@
 import { Banner, Button, Card, formatFileSize } from "@core/shared-ui";
 import type { PackageSummary } from "@core/offline-package";
-import { formatDateTime, formatNumber } from "~/lib/format";
+import { formatDateTime, formatNumber } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 /**
