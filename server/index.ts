@@ -720,14 +720,12 @@ export default {
     // the default export keeps its full shape for any other consumer.
     queue: queueConsumer,
 };
-export { SignCompletionWorkflow } from './workflows/sign-completion-workflow';
 
-// Design System 0520 subsystem B phase 2 — presence Durable Objects.
-// wrangler needs them re-exported from the entrypoint so it can discover
-// the class names referenced by [[durable_objects.bindings]] in wrangler.jsonc.
-export { InspectionPresenceDO } from './durable-objects/inspection-presence';
-export { TenantPresenceDO     } from './durable-objects/tenant-presence';
-export { InspectionDocDO      } from './durable-objects/inspection-doc';
+// The signing workflow and the presence / collaboration Durable Objects. wrangler needs
+// them exported from the entrypoint so it can discover the class names referenced by
+// [[durable_objects.bindings]] in wrangler.jsonc; they are defined in one place,
+// `./lib/worker-exports`, so the generated worker types can name them without this module.
+export { SignCompletionWorkflow, InspectionPresenceDO, TenantPresenceDO, InspectionDocDO } from './lib/worker-exports';
 
 // Exported for the route-metadata vitest gate; OpenAPIHono.getOpenAPIDocument()
 // inspects the doc without needing a live request.

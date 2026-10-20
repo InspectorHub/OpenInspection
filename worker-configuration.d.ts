@@ -3,7 +3,9 @@
 // Runtime types generated with workerd@1.20260405.1 2024-09-23 nodejs_compat
 declare namespace Cloudflare {
 	interface GlobalProps {
-		mainModule: typeof import("./server/index");
+		// Hand-maintained: points at the module that only names the worker's exported classes,
+		// not at `server/index`, so a program that includes this file does not pull in every route.
+		mainModule: typeof import("./server/lib/worker-exports");
 	}
 	interface Env {
 		TENANT_CACHE: KVNamespace;

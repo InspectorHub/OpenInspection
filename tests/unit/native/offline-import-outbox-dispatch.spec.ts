@@ -46,8 +46,7 @@ describe('applyOutbox dispatch through the registered API app', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        vi.mocked(mockDrizzle).mockReturnValue(testDb as never);
     });
 
     it('replays every entry, in order, to the registered app with the caller credentials and records each', async () => {
