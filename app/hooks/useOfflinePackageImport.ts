@@ -13,7 +13,7 @@
  * The preview reads only the manifest and the two indexes (`readPackageSummary`).
  * Nothing leaves the browser until `start` is called.
  */
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
     IMPORT_LIMIT_CEILINGS, PackageFormatError, readPackageSummary, runImport,
     type ImportOptions, type ImportReport, type PackageSummary,
@@ -51,11 +51,14 @@ export function useOfflinePackageImport(options: ImportOptions = {}) {
     // The package bytes can be 24 MiB; they stay out of React state so a re-render never copies them.
     const bytes = useRef<Uint8Array | null>(null);
     const fileNameRef = useRef("");
+    // The summary `choose` already read from these same bytes; `start` reuses it instead of parsing a second time.
+    const summaryRef = useRef<PackageSummary | null>(null);
     const optionsRef = useRef(options);
     optionsRef.current = options;
 
     const choose = useCallback(async (file: File) => {
         bytes.current = null;
+        summaryRef.current = null;
         const refusal = refusalForFile(file);
         if (refusal) {
             setState({ kind: "idle", error: refusal });
@@ -65,6 +68,7 @@ export function useOfflinePackageImport(options: ImportOptions = {}) {
             const read = new Uint8Array(await file.arrayBuffer());
             const summary = readPackageSummary(read);
             bytes.current = read;
+            summaryRef.current = summary;
             fileNameRef.current = file.name;
             setState({ kind: "preview", fileName: file.name, summary, error: null });
         } catch {
@@ -74,20 +78,17 @@ export function useOfflinePackageImport(options: ImportOptions = {}) {
 
     const reset = useCallback(() => {
         bytes.current = null;
+        summaryRef.current = null;
         setState(IDLE);
     }, []);
 
     /** Runs the import of the chosen package. The caller guards it against a second call in the same frame. */
     const start = useCallback(async () => {
         const zip = bytes.current;
-        if (!zip) return;
+        const summary = summaryRef.current;
+        // Both are set together by `choose`, which refuses a file it cannot read; neither is set before a file is chosen.
+        if (!zip || !summary) return;
         const fileName = fileNameRef.current;
-        let summary: PackageSummary;
-        try {
-            summary = readPackageSummary(zip);
-        } catch {
-            return;
-        }
         setState({ kind: "running", fileName, summary, progress: { current: 1, total: 1, imported: 0, heldBack: 0 } });
         try {
             const report = await runImport(zip, (part) => sendOfflinePackage(part), {
@@ -107,6 +108,16 @@ export function useOfflinePackageImport(options: ImportOptions = {}) {
             setState({ kind: "preview", fileName, summary, error: message });
         }
     }, []);
+
+    // Leaving mid-import abandons the parts not yet sent (the file is unchanged and can be imported again,
+    // but the person should be asked first). The browser shows its own standard prompt, so no copy here.
+    const running = state.kind === "running";
+    useEffect(() => {
+        if (!running) return;
+        const warn = (event: BeforeUnloadEvent): void => { event.preventDefault(); };
+        window.addEventListener("beforeunload", warn);
+        return () => window.removeEventListener("beforeunload", warn);
+    }, [running]);
 
     return { state, choose, reset, start, bytes };
 }

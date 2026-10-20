@@ -24,7 +24,9 @@ describe("the result", () => {
         await runToResult(three, (_n, b) => ok(b, { skipped: 0 }));
         const result = screen.getByTestId("offline-package-result");
         expect(within(result).getByText("Imported").nextSibling?.textContent).toBe("3");
-        expect(within(result).getByText("Needs attention").nextSibling?.textContent).toBe("0");
+        expect(within(result).getByText("Not imported").nextSibling?.textContent).toBe("0");
+        expect(within(result).getByText("Refused changes").nextSibling?.textContent).toBe("0");
+        expect(within(result).queryByText("Needs attention")).toBeNull();
         expect(within(result).getByText("Everything in this package was imported.")).toBeTruthy();
         expect(screen.queryByTestId("offline-package-held-back")).toBeNull();
         expect(screen.queryByRole("button", { name: "Import this file again" })).toBeNull();
@@ -47,8 +49,23 @@ describe("the result", () => {
         expect(attention.textContent).toContain("Reason: forbidden");
         const result = screen.getByTestId("offline-package-result");
         expect(within(result).getByText("Imported").nextSibling?.textContent).toBe("3");
-        expect(within(result).getByText("Needs attention").nextSibling?.textContent).toBe("1");
+        expect(within(result).getByText("Refused changes").nextSibling?.textContent).toBe("1");
+        expect(within(result).getByText("Not imported").nextSibling?.textContent).toBe("0");
         expect(screen.queryByTestId("offline-package-held-back")).toBeNull();
+    });
+
+    it("counts refused changes and inspections left behind in separate cards, never added together", async () => {
+        const failed = [0, 1, 2].map((i) => ({ idempotencyKey: `k-${i}`, op: "inspection.update", inspectionId: "insp-0", status: 403, reason: "forbidden" }));
+        await runToResult(three, (_n, b) => {
+            const ids = readPackageSummary(b).manifest.inspections.map((i) => i.id);
+            return ids.length === 3 ? refused(404, "NOT_FOUND", { inspectionId: "insp-1" }) : ok(b, { failed });
+        });
+        const result = screen.getByTestId("offline-package-result");
+        expect(within(result).getByText("Imported").nextSibling?.textContent).toBe("2");
+        expect(within(result).getByText("Not imported").nextSibling?.textContent).toBe("1");
+        expect(within(result).getByText("Refused changes").nextSibling?.textContent).toBe("3");
+        expect(screen.getAllByTestId("held-back-row")).toHaveLength(1);
+        expect(within(screen.getByTestId("offline-package-attention")).getAllByRole("listitem")).toHaveLength(3);
     });
 
     it("shows each inspection that was left behind with its reason and the server answer, and downloads it as a valid package of its own", async () => {
@@ -177,6 +194,20 @@ describe("other reasons an inspection is left behind", () => {
         await waitFor(() => expect(screen.queryByTestId("offline-package-held-back")).toBeNull());
         expect(fetchMock.mock.calls.length).toBe(before + 1);
         expect(within(screen.getByTestId("offline-package-result")).getByText("Imported").nextSibling?.textContent).toBe("3");
+    });
+
+    it("sends the repeat once when 'Import this file again' is pressed twice in the same frame", async () => {
+        let offline = true;
+        const { fetchMock } = await runToResult(three, (_n, b) => (offline ? "throw" : ok(b)));
+        offline = false;
+        const before = fetchMock.mock.calls.length;
+        const button = screen.getByRole("button", { name: "Import this file again" });
+        await act(async () => {
+            button.click();
+            button.click();
+        });
+        await waitFor(() => expect(screen.queryByTestId("offline-package-held-back")).toBeNull());
+        expect(fetchMock.mock.calls.length).toBe(before + 1);
     });
 });
 

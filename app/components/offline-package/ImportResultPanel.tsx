@@ -5,14 +5,15 @@ import { formatNumber } from "~/lib/format";
 import { m } from "~/paraglide/messages";
 
 /**
- * The outcome of an import, in three numbers and then the detail behind the
- * third.
+ * The outcome of an import, in four numbers and then the detail behind the
+ * last two.
  *
- * "Needs attention" is two different things, kept in two lists: queued changes
- * the server refused (their inspection's results and photos still arrived, so
- * this is not a failure of the import) and inspections that were left behind
- * (listed with a reason and a download). A queued-write refusal is never
- * counted as a failed import.
+ * Two different things need a look, each with its own card, its own unit and its
+ * own list: inspections that were left behind (counted in inspections, listed
+ * with a reason and a download) and queued changes the server refused (counted
+ * in changes; their inspection's results and photos still arrived). The two are
+ * never added together, and a queued-write refusal is never counted as a failed
+ * import.
  */
 export function ImportResultPanel({
     report, locale, getOriginal, onAgain, onAnother,
@@ -23,7 +24,8 @@ export function ImportResultPanel({
     onAgain: () => void;
     onAnother: () => void;
 }) {
-    const attention = report.needsAttention.length + report.heldBack.length;
+    const refusedChanges = report.needsAttention.length;
+    const leftBehind = report.heldBack.length;
     const nothingChanged = report.imported.length > 0 && report.heldBack.length === 0 && report.applied === 0
         && report.skipped > 0 && report.needsAttention.length === 0;
     const banner = report.heldBack.length > 0
@@ -39,10 +41,11 @@ export function ImportResultPanel({
         <div className="space-y-ih-list" data-testid="offline-package-result">
             <Card className="p-5 space-y-4">
                 <h2 className="text-[15px] font-bold text-ih-fg-1">{m.offline_import_result_heading()}</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <StatCard tone="sat" label={m.offline_import_stat_imported()} value={formatNumber(report.imported.length, { locale })} hint={m.offline_import_stat_imported_hint()} />
                     <StatCard tone="neutral" label={m.offline_import_stat_skipped()} value={formatNumber(report.skipped, { locale })} hint={m.offline_import_stat_skipped_hint()} />
-                    <StatCard tone={attention > 0 ? "monitor" : "neutral"} label={m.offline_import_stat_attention()} value={formatNumber(attention, { locale })} hint={m.offline_import_stat_attention_hint()} />
+                    <StatCard tone={leftBehind > 0 ? "monitor" : "neutral"} label={m.offline_import_stat_left_behind()} value={formatNumber(leftBehind, { locale })} hint={m.offline_import_stat_left_behind_hint()} />
+                    <StatCard tone={refusedChanges > 0 ? "monitor" : "neutral"} label={m.offline_import_stat_refused()} value={formatNumber(refusedChanges, { locale })} hint={m.offline_import_stat_refused_hint()} />
                 </div>
                 {banner}
                 <div className="flex flex-wrap gap-2">

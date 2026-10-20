@@ -172,6 +172,24 @@ describe("while it runs", () => {
         expect(parts).toEqual([["insp-0", "insp-1", "insp-2"], ["insp-0", "insp-2"]]);
         expect(peak).toBe(1);
     });
+
+    it("asks the browser to confirm leaving only while the import runs", async () => {
+        const leave = (): boolean => !window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+        let release: (() => void) | undefined;
+        stubNetwork(async (_n, bytes) => {
+            await new Promise<void>((resolve) => { release = resolve; });
+            return ok(bytes);
+        });
+        renderPage();
+        await choose(fileOf(three.zip));
+        expect(leave()).toBe(false);
+        await confirmImport();
+        await screen.findByTestId("offline-package-progress");
+        expect(leave()).toBe(true);
+        await act(async () => { release?.(); });
+        await screen.findByTestId("offline-package-result");
+        expect(leave()).toBe(false);
+    });
 });
 
 describe("a package the browser can read but the import cannot", () => {
