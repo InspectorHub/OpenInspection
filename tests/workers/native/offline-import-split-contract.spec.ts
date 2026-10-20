@@ -311,6 +311,7 @@ describe('a refusal of the whole package names no inspection, and the repaired p
         const res = await importAs(manager, buildPackage({ ...pkg(manager, [real]), tenantId: OTHER_TENANT }));
         expect(res.status).toBe(403);
         const error = await errorOf(res);
+        expect(error.message).toContain('different workspace');
         expect(error.details ?? {}).not.toHaveProperty('inspectionId');
         expect(error.details ?? {}).not.toHaveProperty('inspectionIds');
         await ok(await importAs(manager, buildPackage(pkg(manager, [real]))));
@@ -322,7 +323,9 @@ describe('a refusal of the whole package names no inspection, and the repaired p
         const zip = buildPackage(pkg(restricted, [real]));
         const res = await importAs(restricted, zip);
         expect(res.status).toBe(403);
-        expect(named(await errorOf(res))).toEqual([]);
+        const refused = await errorOf(res);
+        expect(refused.message).toContain('Edit report content');
+        expect(named(refused)).toEqual([]);
         expect(await ratingOf(real)).toBeUndefined();
         await ok(await importAs(manager, zip));
     });
@@ -331,20 +334,26 @@ describe('a refusal of the whole package names no inspection, and the repaired p
         const real = await createInspection(owner);
         const other = await createInspection(owner);
         const base = pkg(manager, [real]);
-        const faults: PackageSpec[] = [
-            { ...base, outbox: [{ idempotencyKey: fresh('k'), op: 'inspection.update', payload: { id: other.id, propertyAddress: '9 Outside Road' } }] },
-            { ...base, media: [{ pendingId: 'p1', inspectionId: other.id, contentType: 'image/jpeg' }] },
-            { ...base, yjs: {} },
-            { ...base, outbox: [{ idempotencyKey: fresh('k'), op: 'inspection.delete', payload: { id: real.id } }] },
+        // Each fault is paired with the stable part of the sentence the server gives for it, so a 400
+        // for some other reason cannot pass for the one under test.
+        const faults: Array<[PackageSpec, string]> = [
+            [{ ...base, outbox: [{ idempotencyKey: fresh('k'), op: 'inspection.update', payload: { id: other.id, propertyAddress: '9 Outside Road' } }] }, 'outbox names an inspection outside the manifest'],
+            [{ ...base, media: [{ pendingId: 'p1', inspectionId: other.id, contentType: 'image/jpeg' }] }, 'media index names an inspection outside the manifest'],
+            [{ ...base, yjs: {} }, `no Yjs state for inspection ${real.id}`],
+            [{ ...base, outbox: [{ idempotencyKey: fresh('k'), op: 'inspection.delete', payload: { id: real.id } }] }, 'outbox is invalid'],
         ];
-        for (const fault of faults) {
+        for (const [fault, sentence] of faults) {
             const res = await importAs(manager, buildPackage(fault));
             expect(res.status, await res.clone().text()).toBe(400);
-            expect(named(await errorOf(res))).toEqual([]);
+            const error = await errorOf(res);
+            expect(error.message).toContain(sentence);
+            expect(named(error)).toEqual([]);
         }
         const notZip = await importAs(manager, new TextEncoder().encode('definitely not a zip archive'));
         expect(notZip.status).toBe(400);
-        expect(named(await errorOf(notZip))).toEqual([]);
+        const notZipError = await errorOf(notZip);
+        expect(notZipError.message).toContain('not a valid zip archive');
+        expect(named(notZipError)).toEqual([]);
 
         await ok(await importAs(manager, buildPackage(base)));
     });

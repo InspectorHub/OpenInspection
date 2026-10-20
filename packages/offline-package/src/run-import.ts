@@ -214,6 +214,10 @@ export async function runImport(zip: Uint8Array, send: Send, options: ImportOpti
             case 'gave_up': {
                 // A part that keeps failing on one inspection it names, with a reason of the server's
                 // own, is not lost with it: that one is left behind and the others are sent again.
+                // Trade-off, on purpose: when the whole backend is failing (a 503 on every part), each
+                // inspection in turn can be cut away this way and ends as `apply_failed` rather than
+                // `gave_up`. Nothing is lost by that, because a held-back inspection is retrievable
+                // with `extractHeldBackPackage` and importing it again is idempotent.
                 const culprit = outcome.inspectionId;
                 if (
                     culprit !== undefined && unit.ids.includes(culprit) && !outcome.inFlight

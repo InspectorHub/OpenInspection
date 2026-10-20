@@ -146,6 +146,10 @@ export function classifyResponse(result: SendResult, expectedInspections?: numbe
     if (status === 409 && details.reason === IN_FLIGHT_REASON) return retryFor(answer, details);
     // A failure while applying one inspection's data (503 with its id) may have written part of
     // the package. Repeating the whole part is safe because every step is idempotent.
+    // The id and reason are kept on the retry so that a part which keeps failing on one inspection
+    // can be cut around it. If the whole backend is down, that cutting can run through every
+    // inspection and leave each as `apply_failed` instead of `gave_up`: a deliberate trade-off,
+    // since a held-back inspection can be retrieved and imported again without losing data.
     if (status === 408 || status === 429 || status >= 500) return retryFor(answer, details);
     // A queued write that was rate limited or timed out is reported as a 400 naming the write.
     if (typeof details.idempotencyKey === 'string' && isTransientStatus(details.status)) return retryFor(answer, details);

@@ -5,8 +5,9 @@
  * that wrote it.
  */
 import { describe, it, expect } from 'vitest';
+import { unzipSync } from 'fflate';
 import {
-    PackageFormatError, extractHeldBackPackage, parsePackage, planParts, readPackageSummary, splitPackage,
+    IMPORT_LIMIT_CEILINGS, PackageFormatError, extractHeldBackPackage, parsePackage, planParts, readPackageSummary, splitPackage,
     type PartLimits,
 } from '@core/offline-package';
 import { buildPackage } from '../helpers/offline-package-fixture';
@@ -80,6 +81,35 @@ describe('readPackageSummary', () => {
             expect(parsePackage(zip, { maxUncompressedBytes: 10 * 1024 }).manifest.inspections).toHaveLength(2);
             expect(readPackageSummary(zip, { maxUncompressedBytes: 10 * 1024 }).counts.inspections).toBe(2);
             expect(parsePackage(zip).manifest.inspections).toHaveLength(2);
+        });
+
+        describe('by default, the most an operator can raise the server\'s limit to', () => {
+            const declaredTotal = (bytes: Uint8Array): number => {
+                let total = 0;
+                unzipSync(bytes, { filter: (file) => { total += file.originalSize; return false; } });
+                return total;
+            };
+            // Zeros deflate to almost nothing, so the archive stays small while it declares a lot.
+            const withYjsOf = (size: number): Uint8Array => buildPackage({
+                tenantId: 'tenant-1', inspections: [{ id: 'insp-0', reportId: 'rep-0' }], yjs: { 'insp-0': new Uint8Array(size) },
+            });
+            const exactly = IMPORT_LIMIT_CEILINGS.uncompressedBytes - (declaredTotal(withYjsOf(1)) - 1);
+
+            it('refuses a package that declares one byte more than that, before unpacking it', () => {
+                const over = withYjsOf(exactly + 1);
+                expect(declaredTotal(over)).toBe(IMPORT_LIMIT_CEILINGS.uncompressedBytes + 1);
+                expect(over.length).toBeLessThan(1024 * 1024);
+                expect(() => readPackageSummary(over)).toThrow(PackageFormatError);
+                expect(() => readPackageSummary(over)).toThrow('more unpacked data than is allowed');
+                expect(() => parsePackage(over)).toThrow('more unpacked data than is allowed');
+            });
+
+            it('accepts a package that declares exactly that much (control)', () => {
+                const at = withYjsOf(exactly);
+                expect(declaredTotal(at)).toBe(IMPORT_LIMIT_CEILINGS.uncompressedBytes);
+                expect(readPackageSummary(at).counts).toEqual({ inspections: 1, writes: 0, photos: 0 });
+                expect(parsePackage(at).yjs.get('insp-0')).toHaveLength(exactly);
+            });
         });
     });
 });

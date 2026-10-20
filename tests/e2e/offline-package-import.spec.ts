@@ -167,8 +167,17 @@ test('a manager imports a package, the missing inspection is left behind with it
         expect((await read.json()).data?.inspection?.propertyAddress, 'the queued change was applied').toBe(real.after);
         await expect.poll(async () => {
             const results = await request.get(`${BASE_URL}/api/inspections/${real.id}/results`, { headers: auth });
-            return JSON.stringify((await results.json()).data?.results);
-        }, { message: 'the device rating reaches the stored results', timeout: 15000 }).toContain('Repair');
+            const stored = (await results.json()).data?.results as Record<string, { rating?: string }> | undefined;
+            return stored?.[FINDING]?.rating;
+        }, { message: 'the device rating reaches the stored results under the finding it was set on', timeout: 15000 }).toBe('Repair');
+    }
+
+    // Someone edits the address after the first import. A repeat that really re-ran the queued
+    // write would put `after` back; one that skips it leaves this value alone.
+    const third = (real: Real): string => `3 ${real.id} Edited Since Road, Testville`;
+    for (const real of [first, second]) {
+        const edit = await request.patch(`${BASE_URL}/api/inspections/${real.id}`, { data: { propertyAddress: third(real) }, headers: auth });
+        expect(edit.status(), 'the address edit between the two uploads').toBe(200);
     }
 
     // ---- the same file again: the changes are skipped, nothing is applied twice ----
@@ -180,6 +189,6 @@ test('a manager imports a package, the missing inspection is left behind with it
     await expect(page.getByTestId('offline-package-held-back').getByTestId('held-back-row')).toContainText(missingId);
     for (const real of [first, second]) {
         const read = await request.get(`${BASE_URL}/api/inspections/${real.id}`, { headers: auth });
-        expect((await read.json()).data?.inspection?.propertyAddress).toBe(real.after);
+        expect((await read.json()).data?.inspection?.propertyAddress, 'the skipped write did not overwrite the later edit').toBe(third(real));
     }
 });
