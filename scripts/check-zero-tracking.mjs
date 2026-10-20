@@ -47,7 +47,7 @@ const ROOT = process.cwd();
 // posture is about what the BROWSER does.
 const ROOTS = ['app', 'public'];
 const EXT = /\.(ts|tsx|js|jsx|mjs|html)$/;
-const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.types', 'paraglide', 'vendor', 'fonts']);
+const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.types', '.types-tsgo', 'paraglide', 'vendor', 'fonts']);
 
 // Files that match a rule for a reason that has been looked at. Each needs a
 // sentence, not a name — a bare allowlist entry is indistinguishable from a

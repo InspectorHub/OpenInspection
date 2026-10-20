@@ -44,7 +44,7 @@ const root = process.cwd();
 /** Source trees that any tsconfig in this repo expands with a wildcard include. */
 const ROOTS = ['app', 'server', 'workers', 'packages', 'tests', 'scripts'];
 const SKIP_DIRS = new Set([
-    'node_modules', 'build', 'dist', 'dist-check', '.types', '.react-router',
+    'node_modules', 'build', 'dist', 'dist-check', '.types', '.types-tsgo', '.react-router',
     '.wrangler', '.worktrees', 'paraglide',
 ]);
 

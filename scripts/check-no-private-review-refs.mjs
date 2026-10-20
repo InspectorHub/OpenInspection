@@ -43,7 +43,7 @@ import { join, relative, sep } from 'node:path';
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.css', '.html', '.md', '.json', '.yml', '.yaml'];
 const SKIP_DIRS = new Set([
-    'node_modules', '.git', 'build', 'dist', '.wrangler', '.types',
+    'node_modules', '.git', 'build', 'dist', '.wrangler', '.types', '.types-tsgo',
     'coverage', '.docs-shots', 'test-results', 'playwright-report',
     'local-fixtures', '.react-router', '.superpowers',
 ]);

@@ -341,8 +341,8 @@ compiler from `@typescript/native-preview`. It is a convenience for local work.
 CI and the pre-commit hook still use the real `tsc`, which stays the authority.
 
 **When to use it.** A new worktree with no `.types/`, a cold or invalidated
-`tsc` cache, or a machine with little free memory. Measured on the server
-program, cold: `tsgo --checkers 1` took 63-70 s and peaked at about 7.2-7.6 GB;
+`tsc` cache, or a machine with little free memory. Measured on one Windows
+machine with about 16 GB of RAM, on the server program, cold: `tsgo --checkers 1` took 63-70 s and peaked at about 7.2-7.6 GB;
 `tsc -b` took about 175 s and peaked at about 9.65 GB. A full cold
 `type-check:native` (all four steps) took about 84 s, with the api step about
 66 s. A second run with nothing changed is a stat pass of under a second.
@@ -354,9 +354,14 @@ program, cold: `tsgo --checkers 1` took 63-70 s and peaked at about 7.2-7.6 GB;
 - It is not faster everywhere. After server declarations change, its incremental
   rebuild takes about 61-69 s, against about 11-21 s for a warm `tsc -b`. It
   removes the cold-start cliff; it does not replace a warm `tsc` loop.
-- It is not the authority. In a test that injected 39 kinds of type error, `tsc`
-  reported all of them and `tsgo` missed none, but a green native run is still
-  not a substitute for the CI result.
+- It is not the authority. In one injected-error test on this repository (39
+  kinds of type error), `tsc` reported all of them and `tsgo` missed none. That
+  is one sample, not a guarantee, and a green native run is still not a
+  substitute for the CI result.
+- It builds in project-reference mode (`tsc -b` style), whereas
+  `type-check:tests` runs `tsc -p tsconfig.tests.json --noEmit`. The first writes
+  build-info and declarations and skips up-to-date projects; the second writes
+  nothing. Do not compare timings across the two modes.
 - Keep it serial, and do not run it beside another type-check, eslint or a build.
   `--checkers 1` is fixed in the script on purpose: the default of four checkers
   copies the type cache into each one, roughly multiplying memory, and has

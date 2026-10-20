@@ -30,6 +30,13 @@
  *   (tsconfig.native-*.json) redirect everything into `.types-tsgo/`, and this
  *   script never writes to `.types/`.
  *
+ * Why `-b` for every step:
+ *   The native configs build in project-reference mode (`-b`). The existing
+ *   `type-check:tests` script instead runs `tsc -p tsconfig.tests.json --noEmit`.
+ *   The two are not the same operation: `-b` writes build-info and declarations
+ *   (into `.types-tsgo/` here) and skips up-to-date projects, while `--noEmit`
+ *   writes nothing. Do not compare a timing from one with a timing from the other.
+ *
  * Serial rule:
  *   Steps run one after another, and this script must not run alongside another
  *   type-check, eslint or a build. Peak memory of a cold run is about 7.5 GB.
@@ -37,7 +44,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, posix } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /** Fixed on purpose: see "Why one checker" above. */
@@ -55,8 +62,31 @@ export function nativeSteps() {
   }));
 }
 
+/**
+ * True when `p` is the native output directory or lives under it. The path is
+ * normalised first, so `./.types-tsgo/../.types/x` resolves to `.types/x` and is
+ * rejected instead of passing on its prefix.
+ */
+export function isInsideNativeOutDir(p) {
+  const n = stripTrailingSlash(p);
+  return n === NATIVE_OUT_DIR || n.startsWith(`${NATIVE_OUT_DIR}/`);
+}
+
+/** True when every step passes `--checkers 1`. See "Why one checker" above. */
+export function stepsUseSingleChecker(steps) {
+  return steps.length > 0 && steps.every((s) => {
+    const i = s.args.indexOf('--checkers');
+    return i >= 0 && s.args[i + 1] === '1';
+  });
+}
+
+/** True for an exact preview version such as `7.0.0-dev.20260707.2` (no range prefix). */
+export function isExactPinnedVersion(v) {
+  return /^\d+\.\d+\.\d+-dev\.\d+\.\d+$/.test(v);
+}
+
 function stripTrailingSlash(p) {
-  return p.replace(/^\.\//, '').replace(/\/+$/, '');
+  return posix.normalize(String(p)).replace(/^\.\//, '').replace(/\/+$/, '');
 }
 
 /**
@@ -70,7 +100,7 @@ export function validateNativeConfig(config, expected) {
     problems.push(`extends must be ${expected.extends}, got ${String(config.extends)}`);
   }
   const opts = config.compilerOptions ?? {};
-  const inside = (p) => stripTrailingSlash(p).startsWith(`${NATIVE_OUT_DIR}/`) || stripTrailingSlash(p) === NATIVE_OUT_DIR;
+  const inside = isInsideNativeOutDir;
   if (typeof opts.tsBuildInfoFile !== 'string') {
     problems.push('tsBuildInfoFile is required');
   } else if (!inside(opts.tsBuildInfoFile)) {
@@ -94,7 +124,7 @@ function fmtSeconds(ms) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
-function resolveTsgoLauncher(root) {
+export function resolveTsgoLauncher(root) {
   try {
     const require = createRequire(join(root, 'package.json'));
     const pkgJson = require.resolve('@typescript/native-preview/package.json');
@@ -104,29 +134,41 @@ function resolveTsgoLauncher(root) {
   }
 }
 
-export function main() {
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const launcher = resolveTsgoLauncher(root);
+/**
+ * Runs every step in order and stops at the first failure, returning its exit
+ * code. The collaborators are injectable so the control flow can be tested
+ * without a compiler; the defaults are the real ones.
+ */
+export function main({
+  root = resolve(dirname(fileURLToPath(import.meta.url)), '..'),
+  resolveLauncher = resolveTsgoLauncher,
+  spawn = spawnSync,
+  log = console.log,
+  error = console.error,
+} = {}) {
+  const launcher = resolveLauncher(root);
   if (!launcher) {
-    console.error('type-check:native: @typescript/native-preview is not installed. Run `npm install` first.');
+    error('type-check:native: @typescript/native-preview is not installed. Run `npm install` first.');
     return 1;
   }
   const started = Date.now();
   for (const step of nativeSteps()) {
     const t0 = Date.now();
-    console.log(`\n[native] ${step.name}: tsgo ${step.args.join(' ')}`);
+    log(`
+[native] ${step.name}: tsgo ${step.args.join(' ')}`);
     // The launcher is a plain Node script, so running it through this Node
     // binary works on every platform without a .cmd shim.
-    const res = spawnSync(process.execPath, [launcher, ...step.args], { cwd: root, stdio: 'inherit' });
+    const res = spawn(process.execPath, [launcher, ...step.args], { cwd: root, stdio: 'inherit' });
     const elapsed = fmtSeconds(Date.now() - t0);
     const code = res.status ?? 1;
     if (code !== 0) {
-      console.error(`[native] ${step.name}: FAILED with exit code ${code} after ${elapsed}`);
+      error(`[native] ${step.name}: FAILED with exit code ${code} after ${elapsed}`);
       return code;
     }
-    console.log(`[native] ${step.name}: ok in ${elapsed}`);
+    log(`[native] ${step.name}: ok in ${elapsed}`);
   }
-  console.log(`\n[native] all steps passed in ${fmtSeconds(Date.now() - started)}`);
+  log(`
+[native] all steps passed in ${fmtSeconds(Date.now() - started)}`);
   return 0;
 }
 

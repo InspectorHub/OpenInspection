@@ -107,6 +107,9 @@ export default tseslint.config(
         // type-aware parser can't resolve them. They don't need type-aware
         // linting — ignore them rather than widen the tsconfig projects.
         //
+        // `.types-tsgo/**` is the same kind of output from the optional native check
+        // (`npm run type-check:native`) and is ignored for the same reason.
+        //
         // `.types/**` is tsc project-reference output (the .d.ts tsconfig.api.json
         // emits for the app program). Generated, gitignored, and in no lintable
         // TS project — leaving it in produced 803 "file not found in any of the
@@ -177,7 +180,7 @@ export default tseslint.config(
         // directory does not exist. That divergence is worse than the lint it
         // skips: it makes the local pre-push gate disagree with the gate it exists
         // to predict.
-        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'backups/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.types-tsgo/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'backups/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],

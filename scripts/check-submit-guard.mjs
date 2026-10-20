@@ -112,7 +112,7 @@ const AWAITING_CEILING_PATH = join(__dirname, 'submit-guard-awaiting-ceiling.jso
 /** Client surfaces only. The posture is about what the BROWSER does. */
 const SCAN_ROOTS = ['app'];
 const EXT = /\.(ts|tsx)$/;
-const SKIP_DIR = new Set(['node_modules', 'build', 'dist', '.types', 'paraglide', '__tests__']);
+const SKIP_DIR = new Set(['node_modules', 'build', 'dist', '.types', '.types-tsgo', 'paraglide', '__tests__']);
 const SKIP_FILE = /\.(test|spec)\.(ts|tsx)$/;
 
 /**

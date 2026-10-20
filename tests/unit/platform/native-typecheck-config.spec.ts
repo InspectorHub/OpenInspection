@@ -11,8 +11,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+// The directive must sit directly above the line carrying the module specifier, where tsc reports
+// the missing declaration, so the import stays on one line.
 // @ts-expect-error -- plain .mjs helper, no types alongside it (same as the other tooling specs).
-import { nativeSteps, validateNativeConfig } from '../../../scripts/type-check-native.mjs';
+import { nativeSteps, validateNativeConfig, isInsideNativeOutDir, stepsUseSingleChecker, isExactPinnedVersion, main } from '../../../scripts/type-check-native.mjs';
 
 const ROOT = path.resolve(__dirname, '../../..');
 
@@ -93,9 +95,119 @@ describe('native type-check steps', () => {
         }
     });
 
-    it('a step list without the flag would be caught by the same assertion', () => {
-        const args = ['-b', 'tsconfig.native-api.json'];
-        expect(args.indexOf('--checkers')).toBe(-1);
+    it('the single-checker check accepts the real steps and rejects one without the flag', () => {
+        expect(stepsUseSingleChecker(nativeSteps())).toBe(true);
+        const real = nativeSteps() as { name: string; config: string; args: string[] }[];
+        const missing = real.map((s, i) => (i === 0 ? { ...s, args: ['-b', s.config] } : s));
+        expect(stepsUseSingleChecker(missing)).toBe(false);
+        const wrong = real.map((s) => ({ ...s, args: ['-b', s.config, '--checkers', '4'] }));
+        expect(stepsUseSingleChecker(wrong)).toBe(false);
+    });
+});
+
+describe('native output directory containment', () => {
+    it('accepts paths that stay inside .types-tsgo/', () => {
+        expect(isInsideNativeOutDir('./.types-tsgo/.tsbuildinfo.api')).toBe(true);
+        expect(isInsideNativeOutDir('./.types-tsgo')).toBe(true);
+        expect(isInsideNativeOutDir('.types-tsgo/server/')).toBe(true);
+        expect(isInsideNativeOutDir('./.types-tsgo/a/../b')).toBe(true);
+    });
+
+    it('rejects traversal out of .types-tsgo/ and look-alike names', () => {
+        expect(isInsideNativeOutDir('./.types-tsgo/../.types/x')).toBe(false);
+        expect(isInsideNativeOutDir('.types-tsgo/../.types/.tsbuildinfo.api')).toBe(false);
+        expect(isInsideNativeOutDir('../.types-tsgo/x')).toBe(false);
+        expect(isInsideNativeOutDir('./.types-tsgo-old/x')).toBe(false);
+        expect(isInsideNativeOutDir('./.types/x')).toBe(false);
+    });
+
+    it('the validator rejects a traversal into .types/ in either field and accepts the normal form', () => {
+        const expected = { extends: './tsconfig.api.json', references: false };
+        const good = {
+            extends: './tsconfig.api.json',
+            compilerOptions: { outDir: './.types-tsgo', tsBuildInfoFile: './.types-tsgo/.tsbuildinfo.api' },
+        };
+        expect(validateNativeConfig(good, expected)).toEqual([]);
+        const sneaky = {
+            extends: './tsconfig.api.json',
+            compilerOptions: {
+                outDir: './.types-tsgo/../.types',
+                tsBuildInfoFile: './.types-tsgo/../.types/.tsbuildinfo.api',
+            },
+        };
+        const problems = validateNativeConfig(sneaky, expected).join('\n');
+        expect(problems).toMatch(/outDir/);
+        expect(problems).toMatch(/tsBuildInfoFile/);
+    });
+});
+
+describe('native type-check runner control flow', () => {
+    const quiet = { log: () => undefined, error: () => undefined };
+
+    it('runs every step in order and returns 0 when all succeed', () => {
+        const seen: string[] = [];
+        const code = main({
+            root: ROOT,
+            resolveLauncher: () => '/fake/tsgo',
+            spawn: (_node: string, args: string[]) => {
+                seen.push(args[2]);
+                return { status: 0 };
+            },
+            ...quiet,
+        });
+        expect(code).toBe(0);
+        expect(seen).toEqual([
+            'tsconfig.native-api.json',
+            'tsconfig.native-app.json',
+            'tsconfig.native-tests.json',
+            'tsconfig.native-e2e.json',
+        ]);
+    });
+
+    it('stops at the first failing step and returns its exit code', () => {
+        const seen: string[] = [];
+        const errors: string[] = [];
+        const code = main({
+            root: ROOT,
+            resolveLauncher: () => '/fake/tsgo',
+            spawn: (_node: string, args: string[]) => {
+                seen.push(args[2]);
+                return { status: args[2] === 'tsconfig.native-app.json' ? 2 : 0 };
+            },
+            log: () => undefined,
+            error: (m: string) => errors.push(m),
+        });
+        expect(code).toBe(2);
+        expect(seen).toEqual(['tsconfig.native-api.json', 'tsconfig.native-app.json']);
+        expect(errors.join('\n')).toMatch(/app: FAILED with exit code 2/);
+    });
+
+    it('treats a process with no exit status as a failure', () => {
+        const code = main({
+            root: ROOT,
+            resolveLauncher: () => '/fake/tsgo',
+            spawn: () => ({ status: null }),
+            ...quiet,
+        });
+        expect(code).toBe(1);
+    });
+
+    it('returns 1 with an install hint when the package is missing, and runs nothing', () => {
+        const errors: string[] = [];
+        let spawned = 0;
+        const code = main({
+            root: ROOT,
+            resolveLauncher: () => null,
+            spawn: () => {
+                spawned += 1;
+                return { status: 0 };
+            },
+            log: () => undefined,
+            error: (m: string) => errors.push(m),
+        });
+        expect(code).toBe(1);
+        expect(spawned).toBe(0);
+        expect(errors.join('\n')).toMatch(/npm install/);
     });
 });
 
@@ -106,19 +218,57 @@ describe('native type-check packaging', () => {
             scripts: Record<string, string>;
         };
         const v = pkg.devDependencies['@typescript/native-preview'];
-        expect(v).toMatch(/^\d+\.\d+\.\d+-dev\.\d+\.\d+$/);
+        expect(isExactPinnedVersion(v)).toBe(true);
         expect(pkg.scripts['type-check:native']).toBe('node scripts/type-check-native.mjs');
         // The authoritative script must not have been rewired to the preview compiler.
         expect(pkg.scripts['type-check:api']).not.toMatch(/tsgo/);
     });
 
-    it('rejects a ranged version by the same pattern', () => {
-        expect('^7.0.0-dev.20260707.2').not.toMatch(/^\d+\.\d+\.\d+-dev\.\d+\.\d+$/);
+    it('the exact-pin check accepts an exact version and rejects ranged ones', () => {
+        expect(isExactPinnedVersion('7.0.0-dev.20260707.2')).toBe(true);
+        expect(isExactPinnedVersion('^7.0.0-dev.20260707.2')).toBe(false);
+        expect(isExactPinnedVersion('~7.0.0-dev.20260707.2')).toBe(false);
+        expect(isExactPinnedVersion('latest')).toBe(false);
     });
 
     it('ignores the native output directory in git', () => {
         const lines = readFileSync(path.join(ROOT, '.gitignore'), 'utf8').split(/\r?\n/).map((l) => l.trim());
         expect(lines).toContain('.types-tsgo/');
         expect(lines).toContain('.types/');
+    });
+});
+
+describe('generated-directory skip lists cover .types-tsgo', () => {
+    const read = (f: string) => readFileSync(path.join(ROOT, f), 'utf8');
+    const hasEntry = (src: string, name: string) => src.includes(`'${name}'`) || src.includes(`"${name}"`);
+    const SCRIPTS = [
+        'scripts/check-english-only.mjs',
+        'scripts/check-extension-collisions.mjs',
+        'scripts/check-ai-classification.mjs',
+        'scripts/check-test-imports.mjs',
+        'scripts/check-submit-guard.mjs',
+        'scripts/check-zero-tracking.mjs',
+        'scripts/check-view-tracking-invariants.mjs',
+        'scripts/check-no-private-review-refs.mjs',
+    ];
+
+    for (const f of SCRIPTS) {
+        it(`${f} skips both .types and .types-tsgo`, () => {
+            const src = read(f);
+            // Positive control: the check finds the long-standing entry, so a miss below is real.
+            expect(hasEntry(src, '.types'), `${f} control`).toBe(true);
+            expect(hasEntry(src, '.types-tsgo'), f).toBe(true);
+        });
+    }
+
+    it('eslint ignores .types-tsgo/** as well as .types/**', () => {
+        const src = read('eslint.config.js');
+        expect(src).toContain("'.types/**'");
+        expect(src).toContain("'.types-tsgo/**'");
+    });
+
+    it('the entry check tells a present name from an absent one', () => {
+        expect(hasEntry("new Set(['node_modules', '.types'])", '.types-tsgo')).toBe(false);
+        expect(hasEntry("new Set(['node_modules', '.types', '.types-tsgo'])", '.types-tsgo')).toBe(true);
     });
 });

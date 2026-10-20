@@ -69,7 +69,7 @@ const EXTS = ['.ts', '.tsx', '.js', '.mjs', '.css', '.html', '.md'];
  * about. A gate that reports files nobody can fix is a gate people learn to skim.
  */
 const SKIP_DIRS = new Set([
-    'node_modules', '.git', 'build', 'dist', '.wrangler', '.worktrees', '.types',
+    'node_modules', '.git', 'build', 'dist', '.wrangler', '.worktrees', '.types', '.types-tsgo',
     '.superpowers', '.react-router', 'paraglide', 'messages', 'public',
     'local-fixtures', 'coverage',
 ]);

@@ -58,7 +58,7 @@ import ts from "typescript";
 export const TIMED_ROOTS = new Set(["it", "test", "fit", "xit"]);
 
 const SPEC_RE = /\.(test|spec)\.(ts|tsx|js|jsx|mts|cts)$/;
-const SKIP_DIRS = new Set(["node_modules", "paraglide", ".types", "dist", "build"]);
+const SKIP_DIRS = new Set(["node_modules", "paraglide", ".types", ".types-tsgo", "dist", "build"]);
 
 /**
  * What a specifier costs. Only `graph` walks an import graph; everything else
