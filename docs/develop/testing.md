@@ -333,6 +333,40 @@ job, which is the price of the name meaning what it says.
 Every job that touches generated types runs `gen-version`, `i18n:compile:cached`
 and `react-router typegen` first. CodeQL runs separately (`codeql.yml`).
 
+### Native type-check (optional)
+
+`npm run type-check:native` runs the same four programs as `npm run type-check`
+(api, app, tests, e2e, in that order) through `tsgo`, the native TypeScript
+compiler from `@typescript/native-preview`. It is a convenience for local work.
+CI and the pre-commit hook still use the real `tsc`, which stays the authority.
+
+**When to use it.** A new worktree with no `.types/`, a cold or invalidated
+`tsc` cache, or a machine with little free memory. Measured on the server
+program, cold: `tsgo --checkers 1` took 63-70 s and peaked at about 7.2-7.6 GB;
+`tsc -b` took about 175 s and peaked at about 9.65 GB. A full cold
+`type-check:native` (all four steps) took about 84 s, with the api step about
+66 s. A second run with nothing changed is a stat pass of under a second.
+
+**Limits.**
+
+- It is a preview. The version is pinned exactly in `package.json`; bump it on
+  purpose and re-run it on a known-good tree.
+- It is not faster everywhere. After server declarations change, its incremental
+  rebuild takes about 61-69 s, against about 11-21 s for a warm `tsc -b`. It
+  removes the cold-start cliff; it does not replace a warm `tsc` loop.
+- It is not the authority. In a test that injected 39 kinds of type error, `tsc`
+  reported all of them and `tsgo` missed none, but a green native run is still
+  not a substitute for the CI result.
+- Keep it serial, and do not run it beside another type-check, eslint or a build.
+  `--checkers 1` is fixed in the script on purpose: the default of four checkers
+  copies the type cache into each one, roughly multiplying memory, and has
+  driven a 16 GB machine to a few MB of free memory.
+- It writes to its own directory, `.types-tsgo/` (gitignored), through the
+  `tsconfig.native-*.json` files, which only redirect output and `references`.
+  It never touches `.types/` or the `.tsbuildinfo.*` files: two compilers
+  sharing one build-info file overwrite each other and make both start cold.
+  Deleting `.types-tsgo/` is always safe.
+
 ---
 
 ## 4. Gotchas & anti-patterns (hard-won)
