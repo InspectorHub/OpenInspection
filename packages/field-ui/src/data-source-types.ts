@@ -232,6 +232,42 @@ export interface PropertyMetaField {
 /** The loader returns the `commercial:<subtype>`-keyed subset of METADATA_PRESETS. */
 export type CommercialPresets = Record<string, PropertyMetaField[]>;
 
+/** Source today: `AutoAdvanceMode` in app/lib/rating-levels.ts. Replaced by Task 3. */
+export type AutoAdvanceMode = 'always' | 'keyboard' | 'off';
+
+/** Source today: `ReportLinkTtl` in server/lib/report-link-ttl.ts. Replaced by Task 3. */
+export type ReportLinkTtl = 'never' | { count: number; unit: 'days' | 'months' | 'years' };
+
+/**
+ * The tenant's inspection-editor preferences, as `useInspectionPrefs` reads and
+ * patches them (app/hooks/useInspectionPrefs.ts, `InspectionPrefs`). Replaced by
+ * Task 5 when the hook moves into the package.
+ */
+export interface InspectionPrefs {
+  cloneDefault: 'rating' | 'rating_notes' | 'all';
+  autoAdvance: AutoAdvanceMode;
+  autoAdvanceDelayMs: number;
+  pinnedTagIds: string[];
+  /** Which defect fields the publish gate requires tenant-wide. */
+  requireDefectFields: 'none' | 'location' | 'trade' | 'both';
+  agentRepairAccess: 'off' | 'read' | 'readwrite';
+  reportLinkTtl: ReportLinkTtl;
+}
+
+/**
+ * A crop rectangle in source-image pixels, as the editor serialises it to the
+ * crop endpoints (usePhotoOps `cropTransform`: `{ aspect, orientation, ...pixels }`).
+ */
+export interface PhotoCropTransform {
+  /** 'free' or a preset such as '3:2'. */
+  aspect: string;
+  orientation: 'landscape' | 'portrait';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /** The cooling-window signal the publish dialog reads. */
 export interface OutboundCoolingWindow {
   unlockAtMs: number;
