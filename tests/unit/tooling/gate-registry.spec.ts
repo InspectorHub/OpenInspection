@@ -317,6 +317,10 @@ describe('gate registry', () => {
             // tokeniser, beside the overlays gate in cost, and neither carries a baseline.
             'busycontrols',
             'hiddenfocusable',
+            // An import from the host app compiles in the web app and only breaks the field editor
+            // package in another host, so the commit that types it is the cheap moment. One walk of
+            // packages/field-ui/src; it fails on zero files scanned.
+            'fielduiboundary',
         ].sort();
         const actual = [...SCRIPT_GATES, DUP_GATE].filter((g) => g.rung === PRECOMMIT).map((g) => g.key).sort();
         expect(actual).toEqual(EXPECTED_PRECOMMIT);

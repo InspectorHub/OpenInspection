@@ -54,7 +54,9 @@
     "paths": {
       "~/*": ["./app/*"],
       "@core/shared-ui": ["./packages/shared-ui/src/index.ts"],
-      "@core/offline-package": ["./packages/offline-package/index.ts"]
+      "@core/offline-package": ["./packages/offline-package/index.ts"],
+      "@core/field-ui": ["./packages/field-ui/src/index.ts"],
+      "@core/field-ui/*": ["./packages/field-ui/src/*"]
     },
     "rootDirs": [".", "./.react-router/types"],
     "noEmit": true,
@@ -98,7 +100,13 @@
     // it, no npm script runs it, no tool reads it. It is NOT what checks these
     // files, and editing it will not affect anything. This is.
     "packages/shared-ui/src/**/*.ts",
-    "packages/shared-ui/src/**/*.tsx"
+    "packages/shared-ui/src/**/*.tsx",
+    // Same arrangement for the field editor package: listed so its sources and
+    // co-located specs are compiled even before any route imports them.
+    // `packages/field-ui/tsconfig.json` is an orphan like shared-ui's; this is
+    // what checks the files.
+    "packages/field-ui/src/**/*.ts",
+    "packages/field-ui/src/**/*.tsx"
   ],
   // ⚠️ NO SPEC EXCLUSIONS, AND THAT IS LOAD-BEARING.
   //

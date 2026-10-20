@@ -39,6 +39,7 @@
     "app/components/media-studio/react-konva.ssr-stub.tsx",
     "server/lib/compliance/retention-policy.ts",
     "packages/shared-ui/src/index.ts",
+    "packages/field-ui/src/index.ts",
     "packages/api-types/index.ts"
   ],
   "project": [

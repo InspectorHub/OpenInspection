@@ -3,6 +3,9 @@
   "version": "2.2.0",
   "private": false,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/InspectorHub/OpenInspection.git"
@@ -179,6 +182,7 @@
     "docs:modes": "tsx scripts/gen-deployment-modes-doc.ts",
     "lint:doclinks": "node scripts/check-doc-links.mjs",
     "lint:no-portal-routes": "node scripts/check-no-portal-routes.mjs",
+    "lint:field-ui-boundary": "node scripts/check-field-ui-boundary.mjs",
     "docs:shots": "playwright test -c playwright.docs-shots.config.ts",
     "lint:unwired": "node scripts/check-unwired.mjs",
     "lint:unread-fields": "node scripts/check-unread-fields.mjs",
@@ -270,6 +274,7 @@
     "miniflare": "^4.20260405.0",
     "swagger-ui-dist": "^5.32.6",
     "tailwindcss": "^4.1.0",
+    "tsup": "^9.0.0",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0",

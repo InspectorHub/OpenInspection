@@ -190,6 +190,11 @@ export const SCRIPT_GATES = [
     // rebase, and after a push it is not fixable at all. Measured at 0.67s over
     // 3,605 files.
     { key: 'privatereview', label: 'No private-review references', script: 'check-no-private-review-refs.mjs', fix: 'npm run lint:private-review', rung: PRECOMMIT },
+    // PRECOMMIT: an import from the host app (react-router, `~/`, a .server module) compiles in
+    // the web app and only breaks the package in some other host, so the one moment it is cheap
+    // to catch is the commit that typed it. Walks packages/field-ui/src only; milliseconds. It
+    // fails on ZERO files scanned, because an empty walk would read as a clean package.
+    { key: 'fielduiboundary', label: 'field-ui import boundary', script: 'check-field-ui-boundary.mjs', fix: 'npm run lint:field-ui-boundary', rung: PRECOMMIT },
     // ---- PUSH rung -------------------------------------------------------
     // The 33 gates `npm run lint` used to chain with `&&`. Generated from
     // package.json rather than retyped, and pinned by the spec against that

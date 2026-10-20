@@ -27,7 +27,9 @@
     "tests/**/*.ts",
     "packages/shared-ui/src/index.ts",
     "packages/api-types/index.ts",
-    "packages/offline-package/index.ts"
+    "packages/offline-package/index.ts",
+    "packages/field-ui/src/index.ts",
+    "packages/field-ui/tsup.config.ts"
   ],
   "project": [
     "app/**/*.{ts,tsx}",
@@ -59,6 +61,7 @@
     "miniflare",
     "lint-staged",
     "cloudflare",
-    "@inlang/plugin-message-format"
+    "@inlang/plugin-message-format",
+    "@core/.+"
   ]
 }

@@ -11,6 +11,7 @@ export default defineConfig({
       '~': path.resolve(__dirname, 'app'),
       '@core/shared-ui': path.resolve(__dirname, 'packages/shared-ui/src'),
       '@core/offline-package': path.resolve(__dirname, 'packages/offline-package/index.ts'),
+      '@core/field-ui': path.resolve(__dirname, 'packages/field-ui/src'),
     },
   },
   test: {
@@ -66,6 +67,8 @@ export default defineConfig({
       'app/**/*.test.tsx',
       'packages/shared-ui/src/**/*.test.ts',
       'packages/shared-ui/src/**/*.test.tsx',
+      'packages/field-ui/src/**/*.test.ts',
+      'packages/field-ui/src/**/*.test.tsx',
     ],
     setupFiles: ['tests/setup-web.ts'],
   },
