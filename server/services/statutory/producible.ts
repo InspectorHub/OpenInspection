@@ -35,9 +35,9 @@ import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import * as schema from '../../lib/db/schema';
 import { StatutoryOverflowService } from './overflow.service';
-import { gatherStatutoryInputs } from '../../api/inspections/statutory-inputs';
+import { gatherStatutoryInputs } from './statutory-inputs';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
-import type { StatutoryInputs } from '../../api/inspections/statutory-inputs';
+import type { StatutoryInputs } from './statutory-inputs';
 import type { StatutoryGroupInstances } from '../../lib/statutory/values';
 
 // Not exported: it is this file's own shorthand for the two callers here, and

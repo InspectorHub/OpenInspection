@@ -40,7 +40,7 @@ import { StatutoryOverflowService } from './overflow.service';
 import {
     gatherStatutoryInputs,
     type StatutoryInspectionRow,
-} from '../../api/inspections/statutory-inputs';
+} from './statutory-inputs';
 import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
 
 // Not exported: nothing needs one missing field's type on its own, and the

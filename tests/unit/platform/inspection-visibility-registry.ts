@@ -158,7 +158,6 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
     'server/api/sms.ts': E('handler-assert', 'public opt-in and webhooks are token-driven; GET /sms/consent asserts visibility; the rest is owner/manager'),
     'server/api/agent.ts': E('self-only', 'the agent portal is keyed to the signed-in agent account; the leaderboard is owner/manager'),
     'server/api/inspections/statutory-details.ts': E('guarded-by-path', '/{id}/statutory-details routes'),
-    'server/api/inspections/statutory-inputs.ts': E('guarded-by-path', '/{id}/statutory inputs routes'),
     'server/api/inspections/statutory.ts': E('guarded-by-path', 'helpers for the /{id}/statutory-form routes'),
     'server/api/evidence.ts': E('handler-assert', 'each download asserts the envelope belongs to a visible inspection'),
     'server/api/agreements-render.ts': E('public-token', 'internal /m2m surface, reached with the service credential and never by a staff session'),

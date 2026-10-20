@@ -41,6 +41,7 @@ import { buildBaseTemplateVars } from './template-vars';
 import { readTenantDisplay } from '../../lib/inspection/scheduled-date-display';
 import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import { smsSendGate } from '../../lib/sms/send-gate';
+import { recordSentStatus } from '../../lib/sms/delivery-status';
 import type { RoleKind } from '../../lib/people/role-kinds';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 import type { UsageMetric } from '../../lib/usage/period';
@@ -211,7 +212,6 @@ export async function sendOneSms(args: SendOneSmsArgs): Promise<void> {
         await db.update(automationLogs)
             .set({ status: 'sent', deliveredAt: new Date(), senderIdentity })
             .where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
-        const { recordSentStatus } = await import('../../api/sms');
         await recordSentStatus(db, inspection.tenantId, res.id, Date.now());
         try {
             await metering?.record(tenant.id, gate.smsMode === 'own' ? 'sms_byo' : 'sms', currentPeriodKey(new Date()));

@@ -13,8 +13,8 @@
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import * as schema from '../../lib/db/schema';
-import { PeopleService } from '../../services/people.service';
-import { CredentialService } from '../../services/credential.service';
+import { PeopleService } from '../people.service';
+import { CredentialService } from '../credential.service';
 import { itemResultsFor } from '../../lib/statutory/item-results';
 import { calendarDayForForm } from '../../lib/statutory/value-parts';
 import { decodeSignatureDataUri, type SignatureImage } from '../../lib/statutory/signature-image';
