@@ -41,8 +41,9 @@ export type FieldCommand =
   /** `crop` is the JSON string of a `PhotoCropTransform` (the action forwards it as a form field). */
   | { type: 'crop-cover'; sourceKey: string; crop: string; image: Blob }
   /**
-   * `nodes` is the JSON string of the serialised annotation node tree (`'[]'` when
-   * absent). `photoIndex` must be >= 0. `sectionId` is optional: the action omits it
+   * `nodes` is the JSON string of the serialised annotation node tree; always send it (the
+   * action tolerates a missing value by treating it as `'[]'`, which is not part of this
+   * contract). `photoIndex` must be >= 0. `sectionId` is optional: the action omits it
    * from the request when empty.
    */
   | { type: 'annotate'; itemId: string; photoIndex: number; nodes: string; image: Blob; sectionId?: string }

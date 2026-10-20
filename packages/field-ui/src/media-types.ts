@@ -20,7 +20,17 @@ export type PhotoUploadMeta =
   | (PendingMediaTarget & { targetType: 'item' })
   | (PendingMediaTarget & { targetType: 'defect'; customId: string; defectKind: 'canned' | 'custom' });
 
-/** A baked crop of an existing photo. Cropping always re-derives from the ORIGINAL `photoKey`. */
+/**
+ * A baked crop of an existing photo. Cropping always re-derives from the ORIGINAL `photoKey`.
+ *
+ * `photoKey` is the authority; `photoIndex` is only the position the photo had when the
+ * record was queued. The route addresses a photo by index and does not check the key, so
+ * an uploader MUST re-resolve the index from `findingKey` + `photoKey` against the current
+ * results document at upload time (the web drain does this in `currentPhotoIndex`) and
+ * must fail the record when the photo is gone, never trust the queued index: a photo
+ * removed while the device was offline would otherwise shift every later index and land
+ * the crop on a different photo. Task 4 owns this when the drain moves into the package.
+ */
 export interface PhotoCropMeta extends PendingMediaTarget {
   photoIndex: number;
   photoKey: string;
@@ -29,7 +39,10 @@ export interface PhotoCropMeta extends PendingMediaTarget {
   sectionId?: string;
 }
 
-/** A baked annotation layered on a photo. `nodesJson` is the serialised annotation node tree. */
+/**
+ * A baked annotation layered on a photo. `nodesJson` is the serialised annotation node tree.
+ * `photoKey` is authoritative and `photoIndex` a queued snapshot, exactly as for `PhotoCropMeta`.
+ */
 export interface PhotoAnnotateMeta extends PendingMediaTarget {
   photoIndex: number;
   photoKey: string;
@@ -79,8 +92,10 @@ export interface MediaFileResult {
  *
  * One call uploads one record (one file). The `upload-photo` action takes a batch
  * and answers `{ ok, keys: string[], results: MediaFileResult[], itemId, targetType,
- * customId, defectKind }`; a host that batches maps each file to one `upload` call,
- * and the single `key` / `result` here are that file's entry of `keys[]` / `results[]`.
+ * customId, defectKind }`; a host that batches maps each file to one `upload` call.
+ * The single `key` / `result` here are that file's outcome: `results[index]` lines up with
+ * the file's position in the batch, while `keys[]` holds only the successful files and is
+ * not aligned with it, so read `results[index].key` rather than `keys[index]`.
  *
  * - `kind: 'photo'`: `key` is the stored photo key.
  * - `kind: 'crop'`: `key` is the derived `croppedKey`.
