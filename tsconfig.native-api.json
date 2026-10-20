@@ -1,0 +1,11 @@
+{
+  // Optional native (tsgo) twin of ./tsconfig.api.json. Only the output
+  // location changes. It must not share `.types/` with the tsc project: two
+  // compilers writing one build-info file overwrite each other and force a cold
+  // rebuild on both sides.
+  "extends": "./tsconfig.api.json",
+  "compilerOptions": {
+    "outDir": "./.types-tsgo",
+    "tsBuildInfoFile": "./.types-tsgo/.tsbuildinfo.api"
+  }
+}

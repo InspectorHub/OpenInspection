@@ -50,6 +50,7 @@ wrangler.*.toml
 # input timestamps, which is the only thing keeping it honest; a committed copy
 # goes stale and produces cross-boundary errors with no matching source.
 .types/
+.types-tsgo/
 
 # drizzle-kit schema-first: generated/temp artifacts (db:check regenerates drizzle-tmp)
 drizzle-tmp/
