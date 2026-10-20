@@ -15,6 +15,7 @@ import { callApiAsUser } from './identity-bridge';
 import { extendedToolsEnabled } from './flag';
 import { MCP_MAX_RESULT_BYTES } from './result-limits';
 import type { AppEnv } from '../../types/hono';
+import { getApiApp } from '../api-app';
 
 /**
  * OAuth grant props encrypted into every access token and handed to the MCP
@@ -107,7 +108,7 @@ function makeExecutionContext(): ExecutionContext {
 }
 
 async function loadComponentSchemas(): Promise<Record<string, unknown>> {
-    const { app } = await import('../../index');
+    const app = await getApiApp();
     const { buildOpenApiDocument } = await import('../openapi/build-document');
     const doc = buildOpenApiDocument(app, OPENAPI_DOC_CONFIG) as {
         components?: { schemas?: Record<string, unknown> };

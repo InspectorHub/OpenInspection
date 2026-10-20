@@ -42,6 +42,7 @@ import { offlineImportApplied } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { createCredentialScope, isInProcessRequest, REQUEST_SCOPE } from '../lib/request-scope';
 import { logger } from '../lib/logger';
+import { getApiApp } from '../lib/api-app';
 import { APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH, type OutboxEntry } from '@core/offline-package';
 import type { HonoConfig } from '../types/hono';
 
@@ -210,7 +211,7 @@ export async function applyOutbox(
     if (!tenantId || !userId) throw Errors.Unauthorized();
 
     const already = await recordedEntries(c, tenantId, entries);
-    const { app } = await import('../index');
+    const app = await getApiApp();
     // Every replay carries the same bearer. Share the credential lookups across them (and only
     // those) instead of resolving the token and re-reading the credential-change marker per entry.
     const replayEnv = isInProcessRequest(c.env) ? c.env : { ...c.env, [REQUEST_SCOPE]: createCredentialScope() };

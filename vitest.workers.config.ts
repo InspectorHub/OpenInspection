@@ -99,5 +99,7 @@ export default defineConfig({
     ],
     test: {
         include: ['tests/workers/**/*.spec.ts'],
+        // Registers the API app loader the production entry registers.
+        setupFiles: ['tests/workers/setup-api-app.ts'],
     },
 });
