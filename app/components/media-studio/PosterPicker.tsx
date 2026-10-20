@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
 import { PENDING_CLASS, pendingProps, useLayer } from "@core/shared-ui";
-import { framesForDuration } from "../../../server/lib/media/poster-timestamp";
+import { framesForDuration } from "@core/field-ui/shared/poster-timestamp";
 import { m } from "~/paraglide/messages";
 
 /**

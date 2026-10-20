@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
-import { findingKey } from '../../../server/lib/finding-key';
+import { findingKey } from '@core/field-ui/shared/finding-key';
 import {
     readResultMap,
     bindResultMap,

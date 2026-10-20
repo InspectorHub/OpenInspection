@@ -11,7 +11,7 @@
  */
 
 import type { TemplateSection } from '../types/template-schema';
-import type { } from './commercial-subtypes';
+import type { } from '@core/field-ui/shared/commercial-subtypes';
 
 export function sectionApplies(
     section: TemplateSection,

@@ -5,7 +5,7 @@
  * (they never mutate the input map or its nested entries) and idempotent, so a
  * retried switch is safe.
  */
-import { parseFindingKey, findingKey, DEFAULT_UNIT } from './finding-key';
+import { parseFindingKey, findingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 
 interface Defect { included?: boolean; location?: string }
 interface Entry { tabs?: { defects?: Defect[] }; customComments?: { defects?: Defect[] } }

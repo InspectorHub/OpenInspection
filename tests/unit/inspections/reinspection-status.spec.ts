@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_REINSPECTION_STATUSES, parseReinspectionStatuses, isOpenStatus } from '../../../server/lib/reinspection-status';
+import { DEFAULT_REINSPECTION_STATUSES, parseReinspectionStatuses, isOpenStatus } from '@core/field-ui/shared/reinspection-status';
 
 describe('reinspection status config', () => {
     it('defaults to 3 neutral categories', () => {

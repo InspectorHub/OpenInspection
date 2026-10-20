@@ -45,6 +45,7 @@ export default defineConfig({
         alias: {
             '~': path.resolve(__dirname, 'app'),
             '@core/offline-package': path.resolve(__dirname, 'packages/offline-package/index.ts'),
+            '@core/field-ui': path.resolve(__dirname, 'packages/field-ui/src'),
         },
     },
     plugins: [

@@ -18,7 +18,7 @@ import type {
 import {
     subtreeOf, deleteSubtree, duplicateSubtree, moveSubtreeAmongSiblings,
     reorderSubtree, remapParentIds,
-} from '../../../server/lib/template-hierarchy';
+} from '@core/field-ui/shared/template-hierarchy';
 
 export type { ItemType };
 

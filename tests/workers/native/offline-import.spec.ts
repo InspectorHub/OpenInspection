@@ -23,7 +23,7 @@ import { NATIVE_SCOPE, type NativeProps } from '../../../server/lib/auth/native-
 import { collabDocName } from '../../../server/lib/collab/doc-name';
 import { seedResultsDoc, applyItemPatch, pushPendingPhoto, projectResults } from '../../../server/lib/collab/results-doc';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
-import type { PhotoEntry } from '../../../server/lib/collab/results-doc.types';
+import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { applyMigrations } from '../migration-replay';
 import { PACKAGE_MAX_AGE_DAYS, PACKAGE_MAX_FUTURE_SKEW_DAYS, APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH } from '@core/offline-package';

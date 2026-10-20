@@ -1,4 +1,4 @@
-import { PLATFORM_SUBTYPES } from "../../../server/lib/commercial-subtypes";
+import { PLATFORM_SUBTYPES } from "@core/field-ui/shared/commercial-subtypes";
 import { PROPERTY_TYPE_OPTIONS } from "./types";
 import type { PropertyType } from "./types";
 import { m } from "~/paraglide/messages";

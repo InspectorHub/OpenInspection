@@ -19,7 +19,7 @@
  */
 import * as Y from 'yjs';
 import { applyItemPatch } from './results-doc';
-import type { FindingKey } from './results-doc.types';
+import type { FindingKey } from '@core/field-ui/shared/results-doc.types';
 
 export type CarriedKeyResolution =
     | { ok: true; findingKey: FindingKey }

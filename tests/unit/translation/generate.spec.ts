@@ -22,7 +22,7 @@ import { AIService } from '../../../server/services/ai.service';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ReportTranslationService } from '../../../server/services/report-translation.service';
 import { RecordingAiProvider } from '../../../server/lib/ai/providers/recording';
-import { RELIANCE_TEMPLATES } from '../../../server/lib/pca-reliance-text';
+import { RELIANCE_TEMPLATES } from '@core/field-ui/shared/pca-reliance-text';
 import { COURTESY_TRANSLATION_NOTICE } from '../../../server/lib/legal/courtesy-translation-notice';
 import { segmentReport } from '../../../server/lib/translation/segment-report';
 import {

@@ -27,7 +27,7 @@
  * default unit is what a form reads, and an item answered ONLY under some other
  * unit is reported rather than substituted.
  */
-import { parseFindingKey, DEFAULT_UNIT } from '../finding-key';
+import { parseFindingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 import type { StatutoryItemResult } from './resolve-source';
 
 /** What a stored answer set looks like before it is keyed by item. */

@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, inspectionResults } from '../lib/db/schema';
-import { findingKey, DEFAULT_UNIT } from '../lib/finding-key';
+import { findingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 import { withoutRepairPriceDeep } from '../lib/repair-price-keys';
 
 /**

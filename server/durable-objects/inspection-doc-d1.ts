@@ -14,7 +14,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { inspectionResults, inspections } from '../lib/db/schema';
-import type { ResultsProjection } from '../lib/collab/results-doc.types';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 
 export type ProjectionWrite = 'written' | 'inspection_gone';
 

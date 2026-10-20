@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { resolveActivePropertyPreset } from "./property-preset";
-import type { PropertyMetaField } from "../../server/lib/commercial-subtypes";
+import type { PropertyMetaField } from "@core/field-ui/shared/commercial-subtypes";
 
 const presets: Record<string, PropertyMetaField[]> = {
   "commercial:office": [

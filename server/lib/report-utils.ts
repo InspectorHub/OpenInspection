@@ -2,7 +2,7 @@
  * Pure utility functions for inspection report statistics.
  * Supports both dynamic rating levels and legacy 3-level format.
  */
-import { findingKey, DEFAULT_UNIT } from './finding-key';
+import { findingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 import { DEFECT_TRADE_LABELS, isDefectTrade } from '../types/defect-fields';
 
 export interface RatingLevel {

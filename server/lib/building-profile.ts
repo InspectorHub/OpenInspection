@@ -1,4 +1,4 @@
-import { getMetadataPreset } from './commercial-subtypes';
+import { getMetadataPreset } from '@core/field-ui/shared/commercial-subtypes';
 
 export interface ProfileRow {
   id: string;

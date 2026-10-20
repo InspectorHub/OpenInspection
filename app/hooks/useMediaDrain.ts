@@ -27,7 +27,7 @@ import {
 import type { PendingMediaRecord } from '~/lib/collab/media-pending-store';
 import { resolvePendingPhoto } from '~/lib/collab/results-binding';
 import { readResultMap } from '~/lib/collab/results-binding';
-import type { PhotoEntry } from '../../server/lib/collab/results-doc.types';
+import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 
 /** Resolve the CURRENT index of `photoKey` in the doc's photo array for `fk`. */
 function currentPhotoIndex(doc: Y.Doc, findingKey: string, photoKey: string): number {

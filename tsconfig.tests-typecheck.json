@@ -42,6 +42,8 @@
     "paths": {
       "@core/api-types": ["./packages/api-types/index.ts"],
       "@core/offline-package": ["./packages/offline-package/index.ts"],
+      "@core/field-ui": ["./packages/field-ui/src/index.ts"],
+      "@core/field-ui/*": ["./packages/field-ui/src/*"],
       "~/*": ["./app/*"]
     }
   },

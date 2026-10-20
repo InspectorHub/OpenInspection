@@ -12,7 +12,7 @@
  * the map, and `total` is computed once. The caller reads exactly one results
  * row; nothing here mutates or re-serializes the map.
  */
-import { findingsForUnit, findingKeysFromTemplateSnapshot, DEFAULT_UNIT } from './finding-key';
+import { findingsForUnit, findingKeysFromTemplateSnapshot, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 
 interface UnitProgress {
     unitId: string;

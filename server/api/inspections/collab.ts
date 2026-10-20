@@ -36,7 +36,7 @@ import { issueWsTicket, WS_TICKET_TTL_S } from '../../lib/native/ws-ticket';
 import { getDrizzle } from '../../lib/route-helpers';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../../lib/db/schema';
-import { parseReinspectionStatuses } from '../../lib/reinspection-status';
+import { parseReinspectionStatuses } from '@core/field-ui/shared/reinspection-status';
 import { forwardCollabImport } from '../../lib/collab/import-route';
 import { authorizeCollab, collabStub } from '../../lib/collab/authorize';
 import { mayEditReports } from '../../lib/inspection/report-authoring-guard';

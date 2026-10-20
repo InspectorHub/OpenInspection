@@ -23,7 +23,7 @@ import type {
     DefectState,
     RepairItemSnapshot,
     CustomCommentEntry,
-} from './results-doc.types';
+} from '@core/field-ui/shared/results-doc.types';
 import { withoutRepairPriceRows } from '../repair-price-keys';
 
 type CannedTab = 'information' | 'limitations' | 'defects';

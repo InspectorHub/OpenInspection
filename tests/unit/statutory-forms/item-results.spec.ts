@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { itemResultsFor } from '../../../server/lib/statutory/item-results';
-import { findingKey } from '../../../server/lib/finding-key';
+import { findingKey } from '@core/field-ui/shared/finding-key';
 
 /**
  * Re-keying an inspection's answers by item id.

@@ -4,7 +4,7 @@
  * (server/lib/finding-key.ts); this module slices and aggregates them for the
  * report. No DB. Severity + category rules mirror Phase F §3.4.
  */
-import { findingsForUnit, parseFindingKey, DEFAULT_UNIT } from './finding-key';
+import { findingsForUnit, parseFindingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 import type { RatingLevel } from './report-utils';
 
 export type Severity = 'good' | 'marginal' | 'significant' | 'minor';

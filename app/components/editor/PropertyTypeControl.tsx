@@ -6,7 +6,7 @@ import { m } from "~/paraglide/messages";
 import {
   INSPECTION_PROPERTY_TYPES,
   type InspectionPropertyType,
-} from "../../../server/lib/inspection-property-type";
+} from "@core/field-ui/shared/inspection-property-type";
 
 /** Label per canonical slug. A value added to the tuple is a compile error here. */
 const LABELS: Record<InspectionPropertyType, () => string> = {

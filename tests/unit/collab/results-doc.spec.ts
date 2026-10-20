@@ -20,7 +20,7 @@ import {
   loadResultsProjection,
   removeFindingKeys,
 } from '../../../server/lib/collab/results-doc';
-import type { ResultsProjection } from '../../../server/lib/collab/results-doc.types';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 
 const FK = '_default:s1:i1';
 

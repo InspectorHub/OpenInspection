@@ -28,6 +28,8 @@ export default defineConfig({
       // A runtime package (schemas and limits the offline import executes), so
       // unlike the type-only `@core/api-types` it needs a runtime alias.
       '@core/offline-package': path.resolve(__dirname, 'packages/offline-package/index.ts'),
+      // Pure editor logic that the server also imports (`@core/field-ui/shared/*`).
+      '@core/field-ui': path.resolve(__dirname, 'packages/field-ui/src'),
     },
   },
   test: {

@@ -11,7 +11,7 @@
 import type { DefectCategory } from '../types/template-schema';
 import type { AgentRepairAccess } from '../lib/people/agent-repair-access';
 import { readItemDefectStates, readItemEntry } from '../lib/read-item-defects';
-import type { ResultsProjection, DefectState } from '../lib/collab/results-doc.types';
+import type { ResultsProjection, DefectState } from '@core/field-ui/shared/results-doc.types';
 
 export interface AgentRecommendationRow {
     inspectionId:    string;

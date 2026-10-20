@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { leadingOutlineToken, outlineNumbers } from '../../../server/lib/template-hierarchy';
+import { leadingOutlineToken, outlineNumbers } from '@core/field-ui/shared/template-hierarchy';
 
 /**
  * F53 — a statutory template's own letters must not be doubled by the editor's

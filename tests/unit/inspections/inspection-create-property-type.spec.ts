@@ -25,7 +25,7 @@ import { CreateInspectionSchema } from '../../../server/lib/validations/inspecti
 import {
     INSPECTION_PROPERTY_TYPES,
     type InspectionPropertyType,
-} from '../../../server/lib/inspection-property-type';
+} from '@core/field-ui/shared/inspection-property-type';
 import { resolveReportTier } from '../../../server/lib/report-tier';
 import { buildPcaReportBlock } from '../../../server/lib/pca-report-block';
 import { resolveBuildingProfile } from '../../../server/lib/building-profile';

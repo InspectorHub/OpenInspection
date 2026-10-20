@@ -7,7 +7,7 @@ import type { AddressSelection } from "~/routes/resources/places";
  * `server/lib/inspection-property-type.ts` — a literal retyped in the component
  * is how the selection came to be posted in a shape no endpoint accepted.
  */
-export { INSPECTION_PROPERTY_TYPES } from "../../server/lib/inspection-property-type";
+export { INSPECTION_PROPERTY_TYPES } from "@core/field-ui/shared/inspection-property-type";
 
 /**
  * The form body the New Inspection wizard posts.

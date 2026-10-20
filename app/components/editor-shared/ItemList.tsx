@@ -6,7 +6,7 @@ import { InlineRename } from "./InlineRename";
 import { findingKey } from "~/hooks/findings/shared";
 import type { EditorGroup } from "~/lib/editor/statutory-groups";
 import { m } from "~/paraglide/messages";
-import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "../../../server/lib/template-hierarchy";
+import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "@core/field-ui/shared/template-hierarchy";
 import { useItemRowMenu } from "~/hooks/useItemRowMenu";
 import { ItemRowIndent } from "./ItemRowIndent";
 import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtreeDeleteModal";

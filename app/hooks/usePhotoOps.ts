@@ -24,7 +24,7 @@ import { removeMediaBy as bindingRemoveMediaBy } from "../../server/lib/collab/r
 import { m } from "~/paraglide/messages";
 import { enqueueMedia } from "~/lib/collab/media-upload-queue";
 import { getPendingMedia } from "~/lib/collab/media-pending-store";
-import type { PhotoEntry } from "../../server/lib/collab/results-doc.types";
+import type { PhotoEntry } from "@core/field-ui/shared/results-doc.types";
 
 /** #181 PR-G — offline detection. The legacy app/lib/offline helper was removed
  * (Task 15); a bare `navigator.onLine === false` check is the offline gate. SSR

@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { hasCycle, itemDepths, MAX_ITEM_DEPTH } from '../template-hierarchy';
+import { hasCycle, itemDepths, MAX_ITEM_DEPTH } from '@core/field-ui/shared/template-hierarchy';
 
 /**
  * Spec 5B — Template schema (v2) validation.

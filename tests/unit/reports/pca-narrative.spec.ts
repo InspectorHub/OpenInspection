@@ -1,6 +1,6 @@
 // tests/unit/pca-narrative.spec.ts
 import { describe, it, expect } from 'vitest';
-import { resolvePcaNarrative, PCA_NARRATIVE_SEED } from '../../../server/lib/pca-narrative';
+import { resolvePcaNarrative, PCA_NARRATIVE_SEED } from '@core/field-ui/shared/pca-narrative';
 
 describe('resolvePcaNarrative', () => {
   it('returns the full seed for null (pre-launch reset / fresh report)', () => {

@@ -6,7 +6,7 @@ import {
   addItem, duplicateItem, deleteItem, moveItem, renameItem,
 } from "~/lib/editor/structure-ops";
 import type { Snapshot, ItemType } from "~/lib/editor/structure-ops";
-import { subtreeOf } from "../../server/lib/template-hierarchy";
+import { subtreeOf } from "@core/field-ui/shared/template-hierarchy";
 import { m } from "~/paraglide/messages";
 
 /** Impact data shown in the StructureDeleteModal — for a section OR a single item. */

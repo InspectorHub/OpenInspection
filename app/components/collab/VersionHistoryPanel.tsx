@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type * as Y from "yjs";
 import { Modal, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { applyItemPatch } from "../../../server/lib/collab/results-doc";
-import type { ResultsProjection } from "../../../server/lib/collab/results-doc.types";
+import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
 import { diffProjections, type FindingDiff, type ScalarField } from "~/lib/collab/snapshot-diff";
 import { VersionCompare } from "~/components/collab/VersionCompare";
 import { useReturnFocusAfterCompare } from "~/components/collab/useReturnFocusAfterCompare";

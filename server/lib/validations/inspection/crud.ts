@@ -2,7 +2,7 @@ import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema, SuccessResponseSchema } from '../shared.schema';
 import { INSPECTION_STATUSES } from '../../status/inspection-status';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
-import { INSPECTION_PROPERTY_TYPES } from '../../inspection-property-type';
+import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 import { RESERVED_INSPECTION_SEGMENTS } from '../../inspection/reserved-segments';
 
 /**

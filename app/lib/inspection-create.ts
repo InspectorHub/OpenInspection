@@ -41,7 +41,7 @@ interface ServiceSelection {
 
 import { civilToInstantISO } from "./civil-time";
 
-import type { InspectionPropertyType } from '../../server/lib/inspection-property-type';
+import type { InspectionPropertyType } from '@core/field-ui/shared/inspection-property-type';
 
 export interface CreateInspectionJson {
   propertyAddress: string;

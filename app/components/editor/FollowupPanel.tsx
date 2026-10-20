@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SegmentedControl, Textarea } from "@core/shared-ui";
-import { DEFAULT_REINSPECTION_STATUSES } from "../../../server/lib/reinspection-status";
+import { DEFAULT_REINSPECTION_STATUSES } from "@core/field-ui/shared/reinspection-status";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { FollowupActionResult } from "~/routes/inspection-edit/action-followup.server";

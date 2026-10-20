@@ -1,7 +1,7 @@
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { inspections, inspectionResults, users, inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
-import { parseFindingKey } from '../../lib/finding-key';
+import { parseFindingKey } from '@core/field-ui/shared/finding-key';
 import { getEffectivePriceCents } from '../../lib/effective-price';
 import { RECOMMENDATION_CATEGORY_LABELS } from '../../lib/recommendation-categories';
 import { DEFECT_TRADE_LABELS, isDefectTrade } from '../../types/defect-fields';

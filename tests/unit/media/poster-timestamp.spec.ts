@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { framesForDuration, pctFromSec, secFromPct } from '../../../server/lib/media/poster-timestamp';
+import { framesForDuration, pctFromSec, secFromPct } from '@core/field-ui/shared/poster-timestamp';
 
 describe('framesForDuration', () => {
     it('returns N evenly-spaced frames spanning the duration', () => {

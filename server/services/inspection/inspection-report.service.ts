@@ -7,7 +7,7 @@ import { loadPinnedSnapshot } from '../../lib/report-snapshot';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
 import { resolveTenantTimeZone } from '../../lib/tz';
-import { parseReinspectionStatuses } from '../../lib/reinspection-status';
+import { parseReinspectionStatuses } from '@core/field-ui/shared/reinspection-status';
 import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
 import { renderTemplate } from '../../lib/mustache';
@@ -34,7 +34,7 @@ import { CostItemService } from '../cost-item.service';
 import { resolveReportTier } from '../../lib/report-tier';
 import { assignPhotoNumbers, derivePhotoMode, buildPhotoRefIndex, resolvePhotoRef, type AppendixPhoto, type PhotoMode } from '../../lib/report-photos';
 import { computeConformance, deriveConformanceInput, type AstmConformance } from '../../lib/pca-conformance';
-import { RELIANCE_TEMPLATES } from '../../lib/pca-reliance-text';
+import { RELIANCE_TEMPLATES } from '@core/field-ui/shared/pca-reliance-text';
 import { ComplianceService } from '../compliance/pca-compliance.service';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
@@ -43,7 +43,7 @@ import type {
     CannedState,
     DefectState,
     ResultsProjection,
-} from '../../lib/collab/results-doc.types';
+} from '@core/field-ui/shared/results-doc.types';
 
 import type {
     CannedDefect, CannedInfoComment, SchemaData, SchemaItem, SchemaSection,
@@ -165,7 +165,7 @@ export class InspectionReportService extends InspectionSubService {
         // method could name what the report reads -- so no spec could assert
         // it, and `lint:item-key-parity` had no seventh mirror to compare.
         // PhotoEntry, CannedState, DefectState, and ResultsProjection (ItemEntry)
-        // are imported from '../../lib/collab/results-doc.types' — single
+        // are imported from '@core/field-ui/shared/results-doc.types' — single
         // source of truth for the inspection_results.data projection shape.
 
         // Feature #20 — the per-inspection templateSnapshot IS the shape of

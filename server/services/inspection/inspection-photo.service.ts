@@ -4,7 +4,7 @@ import { eq, and, sql } from 'drizzle-orm';
 import { inspections, inspectionResults, inspectionMediaPool } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
-import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../../lib/finding-key';
+import { findingKey, parseFindingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
 import { storePhotoAtKey } from '../../lib/media/store-photo';
 import { collectAttachedPhotos } from '../../lib/media/collect-attached';

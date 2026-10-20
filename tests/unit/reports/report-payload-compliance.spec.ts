@@ -4,7 +4,7 @@
 // is exercised by the Task 9 loader test + E2E, per the Phase M brief).
 import { describe, it, expect } from 'vitest';
 import { computeConformance, deriveConformanceInput } from '../../../server/lib/pca-conformance';
-import { RELIANCE_TEMPLATES } from '../../../server/lib/pca-reliance-text';
+import { RELIANCE_TEMPLATES } from '@core/field-ui/shared/pca-reliance-text';
 
 describe('report payload compliance shaping', () => {
   it('full_pca with reviewer + received PSQ + a deviation is conformant', () => {

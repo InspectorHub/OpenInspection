@@ -17,7 +17,7 @@
  * Splitting these out keeps the SQL-touching service surface
  * minimal and the logic deterministic / unit-testable.
  */
-import { parseFindingKey } from './finding-key';
+import { parseFindingKey } from '@core/field-ui/shared/finding-key';
 
 export interface InspectionRow {
     createdAt: string | Date;

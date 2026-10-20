@@ -46,9 +46,9 @@ import {
     loadResultsProjection,
     removeFindingKeys,
 } from '../lib/collab/results-doc';
-import type { ResultsProjection } from '../lib/collab/results-doc.types';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 import { followupResponse } from '../lib/collab/followup-patch';
-import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
+import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { purgePathMatches } from './purge-path';

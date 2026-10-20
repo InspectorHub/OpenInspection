@@ -16,7 +16,7 @@ import { INSPECTION_RESULTS_TEST_DDL } from '../../helpers/inline-ddl';
 import { seedResultsDoc, pushPendingPhoto, appendPhoto, projectResults } from '../../../server/lib/collab/results-doc';
 import { MAX_PENDING_ENTRIES } from '../../../server/durable-objects/inspection-doc-import';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
-import type { PhotoEntry } from '../../../server/lib/collab/results-doc.types';
+import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 
 interface TestBindings {
     DB: D1Database;

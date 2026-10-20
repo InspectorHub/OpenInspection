@@ -14,7 +14,7 @@
  */
 
 import type * as Y from 'yjs';
-import { findingKey } from '../../../server/lib/finding-key';
+import { findingKey } from '@core/field-ui/shared/finding-key';
 import { cloneByScope } from '../../hooks/findings/shared';
 import type {
     AttachedRepairItem,

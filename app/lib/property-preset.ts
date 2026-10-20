@@ -1,4 +1,4 @@
-import type { PropertyMetaField } from "../../server/lib/commercial-subtypes";
+import type { PropertyMetaField } from "@core/field-ui/shared/commercial-subtypes";
 
 // Resolve the Property Info field preset for the editor (design 2026-07-13).
 // A commercial inspection with a chosen subtype gets that subtype's preset, so

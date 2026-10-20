@@ -15,7 +15,7 @@ import {
 import { validatePendingMap, resolvePendingKeys, MAX_PENDING_ENTRIES } from '../../../server/durable-objects/inspection-doc-import';
 import { resolvePendingInDo } from '../../../server/lib/collab/resolve-pending-route';
 import { followupResponse } from '../../../server/lib/collab/followup-patch';
-import type { PhotoEntry } from '../../../server/lib/collab/results-doc.types';
+import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 
 const SCOPE = { tenantId: 't1', inspectionId: 'insp1' };
 const PREFIX = 't1/inspections/insp1/photos/';

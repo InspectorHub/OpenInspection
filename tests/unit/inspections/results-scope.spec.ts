@@ -20,7 +20,7 @@ import { and, eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { inspectionResults } from '../../../server/lib/db/schema';
-import { findingsForUnit } from '../../../server/lib/finding-key';
+import { findingsForUnit } from '@core/field-ui/shared/finding-key';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 const TENANT = '00000000-0000-0000-0000-000000000099';

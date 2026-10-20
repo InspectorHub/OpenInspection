@@ -114,7 +114,7 @@ const MONEY_FIELD_SHAPE =
  * exception in the inventory rather than discovering it in the code.
  */
 const FIELD_FILES = [
-    "server/lib/collab/results-doc.types.ts",
+    "packages/field-ui/src/shared/results-doc.types.ts",
     "app/hooks/findings/shared.ts",
     "server/types/template-schema.ts",
     // The template's TS type and its Zod schema are two declarations of one
@@ -204,10 +204,10 @@ const INVENTORY = [
       reason: "Commercial property-condition assessment: as above, assessor-authored." },
 
     // ── FIELDS: what an inspection persists ─────────────────────────────────
-    { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateSnapshotMin", disposition: "legacy-read",
+    { kind: "field", id: "packages/field-ui/src/shared/results-doc.types.ts#estimateSnapshotMin", disposition: "legacy-read",
       reason: "Repair-item snapshot from before repair items carried scope only. Optional and "
             + "never written; declared so an older finding still parses." },
-    { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateSnapshotMax", disposition: "legacy-read",
+    { kind: "field", id: "packages/field-ui/src/shared/results-doc.types.ts#estimateSnapshotMax", disposition: "legacy-read",
       reason: "Upper bound of the same retired repair-item snapshot range; same terms as the min." },
     // The four keys that used to sit here — `estimateLow` / `estimateHigh` on a
     // canned defect state and `estimateMin` / `estimateMax` on a result entry —

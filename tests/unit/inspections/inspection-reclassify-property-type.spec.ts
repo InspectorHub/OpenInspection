@@ -31,7 +31,7 @@ import { inspectionsRoutes } from '../../../server/api/inspections';
 import { InspectionService } from '../../../server/services/inspection.service';
 import type { HonoConfig } from '../../../server/types/hono';
 import { UpdateInspectionSchema } from '../../../server/lib/validations/inspection.schema';
-import { INSPECTION_PROPERTY_TYPES } from '../../../server/lib/inspection-property-type';
+import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 import { resolveReportTier } from '../../../server/lib/report-tier';
 import { buildPcaReportBlock } from '../../../server/lib/pca-report-block';
 import { resolveBuildingProfile } from '../../../server/lib/building-profile';

@@ -12,7 +12,7 @@
  * Server-only: composes the server-only registry / narrative / systems-summary
  * pieces. The app side consumes the re-declared types in report/types.ts.
  */
-import { resolvePcaNarrative, type PcaNarrative } from './pca-narrative';
+import { resolvePcaNarrative, type PcaNarrative } from '@core/field-ui/shared/pca-narrative';
 import { buildSystemsSummary, type SystemsSummaryInput, type SystemsSummaryRow } from './pca-systems-summary';
 import type { Deviation } from './pca-deviations';
 

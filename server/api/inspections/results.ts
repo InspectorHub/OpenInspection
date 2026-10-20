@@ -18,11 +18,11 @@ import {
     ResultsBatchResponseSchema,
 } from '../../lib/validations/inspection.schema';
 import { PcaNarrativePatchSchema } from '../../lib/validations/pca-narrative.schema';
-import { resolvePcaNarrative } from '../../lib/pca-narrative';
+import { resolvePcaNarrative } from '@core/field-ui/shared/pca-narrative';
 import { TemplateSchemaV2Schema } from '../../lib/validations/template.schema';
 import { AggregatedRecommendationsResponseSchema } from '../../lib/validations/recommendation.schema';
 import { aggregateAttachedRecommendations } from '../../lib/aggregate-recommendations';
-import { findingsForUnit } from '../../lib/finding-key';
+import { findingsForUnit } from '@core/field-ui/shared/finding-key';
 import { applyResultsBatch } from '../../services/inspection-results.service';
 import { inspectionResults } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
