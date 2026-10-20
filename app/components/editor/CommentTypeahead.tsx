@@ -1,5 +1,5 @@
 // app/components/editor/CommentTypeahead.tsx
-import type { TypeaheadEntry } from "../../lib/comment-typeahead";
+import type { TypeaheadEntry } from "@core/field-ui/shared/comment-typeahead";
 import { m } from "~/paraglide/messages";
 
 interface CommentTypeaheadProps {

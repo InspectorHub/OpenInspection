@@ -20,7 +20,7 @@ vi.mock('~/hooks/useSessionContext', () => ({
 
 import { VersionCompare } from '~/components/collab/VersionCompare';
 import { VersionHistoryPanel } from '~/components/collab/VersionHistoryPanel';
-import type { FindingDiff } from '~/lib/collab/snapshot-diff';
+import type { FindingDiff } from '@core/field-ui/shared/snapshot-diff';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

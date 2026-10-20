@@ -8,7 +8,7 @@ import {
   fragmentBeforeCaret,
   replaceFragmentBeforeCaret,
   type TypeaheadEntry,
-} from "~/lib/comment-typeahead";
+} from "@core/field-ui/shared/comment-typeahead";
 
 const E = (p: Partial<TypeaheadEntry> & { id: string }): TypeaheadEntry => ({
   title: "", comment: "", ...p,

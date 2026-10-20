@@ -1,4 +1,4 @@
-import type { EditorRatingLevel } from "../../lib/rating-levels";
+import type { EditorRatingLevel } from "@core/field-ui/shared/rating-levels";
 import { RatingSegment, type RatingOption, type RatingTone } from "../editor-shared/RatingSegment";
 import { m } from "~/paraglide/messages";
 

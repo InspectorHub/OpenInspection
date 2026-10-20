@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { flattenMedia, type MediaApiBody } from '~/lib/inspection-media';
+import { flattenMedia, type MediaApiBody } from '@core/field-ui/shared/inspection-media';
 describe('flattenMedia', () => {
   const body: MediaApiBody = { data: {
     attached: [{ key: 'a.jpg', url: '/p/a.jpg', itemLabel: 'Roof' }, { key: 'a.jpg', url: '/p/a.jpg', itemLabel: 'Roof' }],

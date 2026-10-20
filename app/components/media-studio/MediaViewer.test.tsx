@@ -20,7 +20,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { MediaViewer } from "~/components/media-studio/MediaViewer";
-import type { GalleryPhoto } from "~/lib/inspection-media";
+import type { GalleryPhoto } from "@core/field-ui/shared/inspection-media";
 
 /** The lightbox is a third-party surface; this suite is about what it is HANDED. */
 vi.mock("~/components/media-studio/PhotoLightbox", () => ({

@@ -8,7 +8,7 @@
 import type { Route } from "./+types/inspection-media";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { flattenMedia, type GalleryPhoto } from "~/lib/inspection-media";
+import { flattenMedia, type GalleryPhoto } from "@core/field-ui/shared/inspection-media";
 
 /**
  * `answered` is the difference between "this inspection has no photos" and "no

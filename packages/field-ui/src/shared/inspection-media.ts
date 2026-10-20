@@ -6,11 +6,13 @@ export interface GalleryPhoto {
   key: string;
   url: string;
   label: string;
-  itemId?: string;
-  photoIndex?: number;
-  annotated?: boolean;
-  originalKey?: string;
-  defectId?: string;
+  // `| undefined` is explicit because `flattenMedia` copies these straight from an API row whose
+  // fields are optional, and the server program checks this file with exactOptionalPropertyTypes.
+  itemId?: string | undefined;
+  photoIndex?: number | undefined;
+  annotated?: boolean | undefined;
+  originalKey?: string | undefined;
+  defectId?: string | undefined;
   /** Plan 4 — the baked cropped derivative key, when this photo has one. */
   croppedKey?: string;
   /** Plan 7 — media discriminator. Absent ⇒ treated as 'photo'. */

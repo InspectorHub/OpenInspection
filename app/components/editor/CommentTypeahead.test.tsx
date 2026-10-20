@@ -3,7 +3,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { CommentTypeahead } from "../../../app/components/editor/CommentTypeahead";
-import type { TypeaheadEntry } from "../../../app/lib/comment-typeahead";
+import type { TypeaheadEntry } from "@core/field-ui/shared/comment-typeahead";
 
 const matches: TypeaheadEntry[] = [
   { id: "a", title: "Shingles Lifted", comment: "Multiple shingles lifted." },

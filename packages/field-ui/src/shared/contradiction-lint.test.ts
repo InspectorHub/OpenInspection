@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { findRatingContradictions } from '~/lib/contradiction-lint';
+import { findRatingContradictions } from '@core/field-ui/shared/contradiction-lint';
 
 /**
  * C-14b — the standard template pre-checks an Information narrative reading

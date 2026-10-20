@@ -4,7 +4,7 @@ import { CommentTypeahead } from "./CommentTypeahead";
 import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
 import {
   flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
-} from "../../lib/comment-typeahead";
+} from "@core/field-ui/shared/comment-typeahead";
 import { AiAssistPanel } from "./AiAssistPanel";
 import { NotesFieldHeader } from "./NotesFieldHeader";
 import { CloneLastButton } from "./CloneLastButton";
@@ -21,9 +21,9 @@ import {
 import { ItemPhotoStrip, type StripPhoto } from "../media-studio/ItemPhotoStrip";
 import type { AttachedRepairItem } from "../../hooks/useFindings";
 import type { ItemAttribute } from "../../lib/types";
-import { shouldTriggerSlash } from "../../lib/slash-trigger";
-import { findRatingLevel, type EditorRatingLevel } from "../../lib/rating-levels";
-import { findRatingContradictions } from "../../lib/contradiction-lint";
+import { shouldTriggerSlash } from "@core/field-ui/shared/slash-trigger";
+import { findRatingLevel, type EditorRatingLevel } from "@core/field-ui/shared/rating-levels";
+import { findRatingContradictions } from "@core/field-ui/shared/contradiction-lint";
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
 import type { DefectTrade } from "../../lib/defect-fields";
 import { ItemHeading } from "./ItemHeading";

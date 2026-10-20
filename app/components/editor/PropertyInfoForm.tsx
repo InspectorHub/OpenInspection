@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
-import { isDedicatedFactKey } from "~/lib/property-facts-keys";
+import { isDedicatedFactKey } from "@core/field-ui/shared/property-facts-keys";
 import { m } from "~/paraglide/messages";
 
 interface MetadataField {

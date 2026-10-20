@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { shouldTriggerSlash } from '~/lib/slash-trigger';
+import { shouldTriggerSlash } from '@core/field-ui/shared/slash-trigger';
 
 describe('shouldTriggerSlash', () => {
   it('triggers at position 0 (empty value or caret at start)', () => {

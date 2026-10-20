@@ -22,8 +22,8 @@ export interface BuildingProfileInput {
 
 /**
  * Commercial PCA Phase F — resolve the Building Profile display rows for the
- * report. Server-only so the `commercial-subtypes` presets never reach the
- * client bundle. Value precedence: the `property_facts` JSON envelope, then the
+ * report. Resolved server-side from the `commercial-subtypes` presets (a pure
+ * module in the field-ui shared package). Value precedence: the `property_facts` JSON envelope, then the
  * dedicated residential columns. Only preset-listed field ids surface (so a
  * propertyType with no preset returns []). Empty / undefined values are dropped
  * so the report renders only populated facts; the report layer decides

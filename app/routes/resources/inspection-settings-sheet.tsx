@@ -8,7 +8,7 @@
 import type { Route } from "./+types/inspection-settings-sheet";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { flattenMedia } from "~/lib/inspection-media";
+import { flattenMedia } from "@core/field-ui/shared/inspection-media";
 
 interface Template {
     id: string;

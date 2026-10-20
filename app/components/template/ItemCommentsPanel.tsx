@@ -9,7 +9,7 @@ import {
   flattenItemTabs,
   fragmentBeforeCaret,
   replaceFragmentBeforeCaret,
-} from "../../lib/comment-typeahead";
+} from "@core/field-ui/shared/comment-typeahead";
 
 export interface ItemCommentsPanelProps {
   selectedItem: TemplateItem;

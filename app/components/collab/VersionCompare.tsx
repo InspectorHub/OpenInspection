@@ -1,4 +1,4 @@
-import type { FindingDiff } from "~/lib/collab/snapshot-diff";
+import type { FindingDiff } from "@core/field-ui/shared/snapshot-diff";
 import { m } from "~/paraglide/messages";
 import { PENDING_CLASS, pendingProps, useActionLatch, useLayer } from "@core/shared-ui";
 

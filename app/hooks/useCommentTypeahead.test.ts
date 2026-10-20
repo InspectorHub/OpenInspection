@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useCommentTypeahead } from "~/hooks/useCommentTypeahead";
-import type { TypeaheadEntry } from "~/lib/comment-typeahead";
+import type { TypeaheadEntry } from "@core/field-ui/shared/comment-typeahead";
 
 const entries: TypeaheadEntry[] = [
   { id: "a", title: "Alpha", comment: "" },

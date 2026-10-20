@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import { INSPECTION_STATUS } from "~/lib/status";
-import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
+import { findRatingLevel, ratingAdvanceDecision } from "@core/field-ui/shared/rating-levels";
 import { makeCustomDefect } from "~/lib/custom-defects";
 import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/hooks/useInspection";
 import { findingKey } from "~/hooks/findings/shared";

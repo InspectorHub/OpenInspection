@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { findRatingLevel, ratingAdvanceDecision } from '~/lib/rating-levels';
+import { findRatingLevel, ratingAdvanceDecision } from '@core/field-ui/shared/rating-levels';
 
 /**
  * B-18 — the editor looked ratings up via `levels.find(l => l.id === rating)`

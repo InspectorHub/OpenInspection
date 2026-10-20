@@ -5,7 +5,7 @@
 // (from) value preserved, item add/remove, coarse nested flagging + summary,
 // no-change findings excluded, and stable ordering.
 import { describe, it, expect } from 'vitest';
-import { diffProjections } from '../../../app/lib/collab/snapshot-diff';
+import { diffProjections } from '@core/field-ui/shared/snapshot-diff';
 import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 
 describe('diffProjections — scalar changes', () => {

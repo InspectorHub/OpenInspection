@@ -4,7 +4,7 @@ import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
 import { RepairItemsPanel } from "./RepairItemsPanel";
 import { CustomDefectForm } from "./CustomDefectForm";
 import type { AttachedRepairItem } from "../../hooks/useFindings";
-import { renderTemplate } from "../../lib/mustache";
+import { renderTemplate } from "@core/field-ui/shared/mustache";
 import {
   DEFECT_TRADE_LABELS,
   DEFECT_DEADLINE_LABELS,

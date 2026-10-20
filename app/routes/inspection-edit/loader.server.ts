@@ -333,9 +333,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  };
 
  // Commercial subtype-preset field definitions for PropertyInfoForm (design
- // 2026-07-13). commercial-subtypes is a server-only module — it never reaches
- // the client bundle; only these resolved field arrays cross the loader
- // boundary. Keyed `commercial:<subtype>`; the editor picks the active one off
+ // 2026-07-13). commercial-subtypes is a pure module in the field-ui shared package;
+ // the loader resolves the presets here so only these resolved field arrays
+ // cross the loader boundary. Keyed `commercial:<subtype>`; the editor picks the active one off
  // state.inspection.commercialSubtype so the Property Info field list reacts
  // live to the Phase T subtype selector with no extra fetch. Commercial subset
  // only — residential inspections keep PropertyInfoForm's own default fields.

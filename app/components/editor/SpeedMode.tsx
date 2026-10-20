@@ -3,7 +3,7 @@ import { Icon, Button, useLayer } from '@core/shared-ui';
 import { usePointerGesture } from '../../hooks/usePointerGesture';
 import { MobileBottomDrawer } from '../MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
-import { shouldShowSpeedModeCoach, markSpeedModeCoached } from '../../lib/speedmode-coach';
+import { shouldShowSpeedModeCoach, markSpeedModeCoached } from '@core/field-ui/shared/speedmode-coach';
 import { m } from "~/paraglide/messages";
 
 interface JumpToSection {

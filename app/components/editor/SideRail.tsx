@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { IconButton, Icon } from "@core/shared-ui";
-import { renderTemplate } from "../../lib/mustache";
+import { renderTemplate } from "@core/field-ui/shared/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../lib/defect-fields";
-import { photoDisplayName, withDownload } from "../../lib/photo-name";
+import { photoDisplayName, withDownload } from "@core/field-ui/shared/photo-name";
 import { PhotoGallery } from "~/components/media-studio/PhotoGallery";
 import { CommentLibraryList } from "./CommentLibraryList";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
