@@ -22,8 +22,15 @@ import { formatFileSize } from "@core/shared-ui";
 import { sendOfflinePackage } from "~/lib/offline-package-send";
 import { m } from "~/paraglide/messages";
 
+/**
+ * Progress counted in inspections, not in parts: the package names a fixed number of inspections, and each one ends
+ * up imported or left behind exactly once. The number of parts is not known up front (a refusal cuts the named
+ * inspection away and the rest is sent again), so a part counter would keep growing while the import runs.
+ */
 export interface ImportProgress {
-    current: number;
+    /** Inspections that have been imported or left behind so far. */
+    done: number;
+    /** Inspections the package names. Fixed for the whole run. */
     total: number;
     imported: number;
     heldBack: number;
@@ -89,15 +96,15 @@ export function useOfflinePackageImport(options: ImportOptions = {}) {
         // Both are set together by `choose`, which refuses a file it cannot read; neither is set before a file is chosen.
         if (!zip || !summary) return;
         const fileName = fileNameRef.current;
-        setState({ kind: "running", fileName, summary, progress: { current: 1, total: 1, imported: 0, heldBack: 0 } });
+        const total = Math.max(1, summary.counts.inspections);
+        setState({ kind: "running", fileName, summary, progress: { done: 0, total, imported: 0, heldBack: 0 } });
         try {
             const report = await runImport(zip, (part) => sendOfflinePackage(part), {
                 ...optionsRef.current,
                 onProgress: (p) => {
                     optionsRef.current.onProgress?.(p);
-                    const total = Math.max(1, p.settled + p.pending);
                     setState((s) => s.kind === "running"
-                        ? { ...s, progress: { current: Math.min(total, p.settled + 1), total, imported: p.imported, heldBack: p.heldBack } }
+                        ? { ...s, progress: { done: Math.min(s.progress.total, p.imported + p.heldBack), total: s.progress.total, imported: p.imported, heldBack: p.heldBack } }
                         : s);
                 },
             });

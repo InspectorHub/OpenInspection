@@ -141,8 +141,9 @@ describe("confirming", () => {
 });
 
 describe("while it runs", () => {
-    it("shows the part being sent and sends the parts one at a time", async () => {
+    it("counts progress in inspections and sends the parts one at a time", async () => {
         let release: (() => void) | undefined;
+        let releaseSecond: (() => void) | undefined;
         let inFlight = 0;
         let peak = 0;
         const parts: string[][] = [];
@@ -156,6 +157,7 @@ describe("while it runs", () => {
                 inFlight--;
                 return refused(404, "NOT_FOUND", { inspectionId: "insp-1" });
             }
+            await new Promise<void>((resolve) => { releaseSecond = resolve; });
             inFlight--;
             return ok(bytes);
         });
@@ -163,11 +165,21 @@ describe("while it runs", () => {
         await choose(fileOf(three.zip));
         await confirmImport();
         const progress = await screen.findByTestId("offline-package-progress");
-        expect(progress.textContent).toContain("Sending part 1 of 1");
-        expect(within(progress).getByRole("progressbar")).toBeTruthy();
+        // The package names three inspections and none has been settled yet.
+        expect(progress.textContent).toContain("0 of 3 inspections processed");
+        expect(within(progress).getByRole("progressbar").getAttribute("aria-valuemax")).toBe("3");
         expect(fetchMock).toHaveBeenCalledTimes(1);
 
+        // One inspection is refused and cut away; the rest is sent again as a new part. The count moves forward and the
+        // total does not: a part counter would have grown here.
         await act(async () => { release?.(); });
+        await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+        const during = screen.getByTestId("offline-package-progress");
+        expect(during.textContent).toContain("1 of 3 inspections processed");
+        expect(within(during).getByRole("progressbar").getAttribute("aria-valuemax")).toBe("3");
+        expect(within(during).getByRole("progressbar").getAttribute("aria-valuenow")).toBe("1");
+
+        await act(async () => { releaseSecond?.(); });
         await screen.findByTestId("offline-package-result");
         expect(parts).toEqual([["insp-0", "insp-1", "insp-2"], ["insp-0", "insp-2"]]);
         expect(peak).toBe(1);
