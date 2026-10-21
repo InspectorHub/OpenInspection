@@ -39,16 +39,19 @@
  * with site data blocked), and no failure here ever rejects — a cleanup that
  * throws would take down the caller's delete flow, which is the worse outcome.
  */
-import { listPendingMedia, deletePendingMedia } from "./media-pending-store";
+import type { PendingMediaStore } from "../media-types";
 
 /**
  * What the host contributes to a purge: whether it has any local store at all,
- * and how to erase one inspection's persisted results document. The web host is
- * `webOfflinePurgeHost` in `app/lib/field/web-collab.ts`.
+ * where its queued media lives, and how to erase one inspection's persisted
+ * results document. The web host is `webOfflinePurgeHost` in
+ * `app/lib/field/web-collab.ts`.
  */
 export interface OfflinePurgeHost {
     /** False when the host has no local store (SSR, site data blocked). */
     available(): boolean;
+    /** The queued-media store. `delete` and `list` must not reject. */
+    media: PendingMediaStore;
     /** Erase the persisted results doc for one inspection; must not reject. */
     clearResultsData(inspectionId: string): Promise<void>;
 }
@@ -77,12 +80,12 @@ export async function purgeInspectionOfflineData(
     // one: the Yjs database is a mirror of a document the server just destroyed,
     // while a pending blob is the original.
     let pendingMediaDeleted = 0;
-    const pending = await listPendingMedia(inspectionId);
+    const pending = await host.media.list(inspectionId);
     for (const record of pending) {
-        // `deletePendingMedia` resolves on failure as well as success, so the
+        // `delete` resolves on failure as well as success, so the
         // count is "rows we asked to remove", not "rows provably gone". Stated
         // rather than implied: a caller must not read it as a receipt.
-        await deletePendingMedia(record.pendingId);
+        await host.media.delete(record.pendingId);
         pendingMediaDeleted += 1;
     }
 

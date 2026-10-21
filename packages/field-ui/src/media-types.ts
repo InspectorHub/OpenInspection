@@ -26,7 +26,7 @@ export type PhotoUploadMeta =
  * `photoKey` is the authority; `photoIndex` is only the position the photo had when the
  * record was queued. The route addresses a photo by index and does not check the key, so
  * an uploader MUST re-resolve the index from `findingKey` + `photoKey` against the current
- * results document at upload time (the web drain does this in `currentPhotoIndex`) and
+ * results document at upload time (the web uploader does this in `app/lib/field/web-uploader.ts`) and
  * must fail the record when the photo is gone, never trust the queued index: a photo
  * removed while the device was offline would otherwise shift every later index and land
  * the crop on a different photo. Task 4 owns this when the drain moves into the package.

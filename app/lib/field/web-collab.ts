@@ -15,6 +15,7 @@ import type {
 } from "@core/field-ui/collab/results-doc-connection";
 import type { OfflinePurgeHost } from "@core/field-ui/collab/offline-purge";
 import type { ResultsDocHost } from "@core/field-ui/collab/use-results-doc";
+import { webMediaStore } from "./web-media-store";
 
 /**
  * Delete an IndexedDB database by name, resolving once the delete settles.
@@ -96,5 +97,6 @@ export function webClearResultsData(inspectionId: string): Promise<void> {
 /** What `purgeInspectionOfflineData` needs from the web host. */
 export const webOfflinePurgeHost: OfflinePurgeHost = {
     available: () => typeof indexedDB !== "undefined",
+    media: webMediaStore,
     clearResultsData: webClearResultsData,
 };

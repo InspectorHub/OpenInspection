@@ -24,6 +24,7 @@ import { useMediaDrain } from "~/hooks/useMediaDrain";
 import { webCollabHost } from "~/lib/field/web-collab";
 import { bindResultMap, appendPendingPhoto } from "@core/field-ui/collab/results-binding";
 import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
+import { webMediaStore } from "~/lib/field/web-media-store";
 import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
 import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
 import { SectionRail } from "~/components/editor-shared/SectionRail";
@@ -1167,13 +1168,12 @@ function InspectionEditPage() {
   const fk = findingKey(activeUnitId, sid, itemId);
   for (const baked of bakedFiles) {
   const pendingId = crypto.randomUUID();
-  await enqueueMedia({
+  await enqueueMedia(webMediaStore, {
   pendingId,
   inspectionId: String(state.inspection.id),
-  findingKey: fk,
-  kind: "photo",
-  blob: baked,
-  enqueuedAt: Date.now(),
+  kind: "photo", blob: baked,
+  meta: { targetType: "item", findingKey: fk, itemId },
+  createdAt: Date.now(),
   });
   appendPendingPhoto(doc, fk, pendingId);
   }

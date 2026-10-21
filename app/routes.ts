@@ -128,6 +128,8 @@ export default [
   route("resources/statutory-update", "routes/resources/statutory-update.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
   route("resources/inspection-media", "routes/resources/inspection-media.tsx"),
+  // The offline media drain posts here (photo / crop / annotation) instead of calling /api from the browser.
+  route("resources/media-upload", "routes/resources/media-upload.ts"),
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   route("resources/recent-inspections", "routes/resources/recent-inspections.tsx"),
   route("resources/hub-pickers", "routes/resources/hub-pickers.tsx"),

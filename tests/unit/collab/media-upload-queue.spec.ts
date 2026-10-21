@@ -1,23 +1,15 @@
-// @vitest-environment happy-dom
 /**
- * Unit tests for the offline media pending store + upload queue (#181 PR-G).
+ * Unit tests for the offline media upload queue (#181 PR-G).
  *
- *   packages/field-ui/src/collab/media-pending-store.ts
  *   packages/field-ui/src/collab/media-upload-queue.ts
  *
- * Uses fake-indexeddb — no server. Imported here rather than through a global
- * setup file, which would load the polyfill for all 561 specs to serve three.
+ * The store is INJECTED, so these run against an in-memory `PendingMediaStore`:
+ * no IndexedDB, no DOM, no server. The IndexedDB implementation and its
+ * on-disk layout are covered by app/lib/field/web-media-store.test.ts.
  */
 
-import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-    putPendingMedia,
-    getPendingMedia,
-    listPendingMedia,
-    deletePendingMedia,
-    type PendingMediaRecord,
-} from '@core/field-ui/collab/media-pending-store';
+import type { PendingMediaRecord, PendingMediaStore } from '@core/field-ui/media-types';
 import {
     enqueueMedia,
     drainMediaQueue,
@@ -27,21 +19,32 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/** An in-memory store. `list` deliberately returns insertion order, NOT oldest-first. */
+function memoryStore(): PendingMediaStore & { rows: Map<string, PendingMediaRecord> } {
+    const rows = new Map<string, PendingMediaRecord>();
+    return {
+        rows,
+        put: async (rec) => { rows.set(rec.pendingId, rec); },
+        get: async (id) => rows.get(id) ?? null,
+        list: async (inspectionId) =>
+            [...rows.values()].filter((r) => inspectionId === undefined || r.inspectionId === inspectionId),
+        delete: async (id) => { rows.delete(id); },
+        objectUrl: async (id) => (rows.has(id) ? `blob:mem/${id}` : null),
+    };
+}
+
 let seq = 0;
 
-/** Build a pending record with a unique id + monotonically increasing enqueuedAt. */
-function makeRecord(overrides: Partial<PendingMediaRecord> = {}): PendingMediaRecord {
+/** Build a photo record with a unique id + monotonically increasing createdAt. */
+function makeRecord(overrides: { pendingId?: string; inspectionId?: string; createdAt?: number } = {}): PendingMediaRecord {
     seq += 1;
     return {
-        pendingId:    overrides.pendingId ?? `p-${seq}-${crypto.randomUUID()}`,
+        kind: 'photo',
+        pendingId: overrides.pendingId ?? `p-${seq}`,
         inspectionId: overrides.inspectionId ?? 'insp-1',
-        findingKey:   overrides.findingKey ?? '_default:s1:i1',
-        kind:         overrides.kind ?? 'photo',
-        blob:         overrides.blob ?? new Blob([`bytes-${seq}`], { type: 'image/jpeg' }),
-        photoKey:     overrides.photoKey,
-        crop:         overrides.crop,
-        nodesJson:    overrides.nodesJson,
-        enqueuedAt:   overrides.enqueuedAt ?? seq,
+        blob: new Blob([`bytes-${seq}`], { type: 'image/jpeg' }),
+        createdAt: overrides.createdAt ?? seq,
+        meta: { targetType: 'item', findingKey: '_default:s1:i1', itemId: 'i1' },
     };
 }
 
@@ -62,83 +65,36 @@ function okUploader(result: UploadResult = { key: 'r2/new-key' }): {
     };
 }
 
-/** Drain a fresh test DB by deleting every record before each test. */
-async function clearStore(): Promise<void> {
-    const all = await listPendingMedia();
-    for (const r of all) await deletePendingMedia(r.pendingId);
-}
+let store: ReturnType<typeof memoryStore>;
 
-beforeEach(async () => {
-    await clearStore();
-});
-
-// ─── Store ────────────────────────────────────────────────────────────────────
-
-describe('media-pending-store', () => {
-    it('persists a record that survives a fresh read', async () => {
-        // NOTE: fake-indexeddb under happy-dom revives the stored Blob as a plain
-        // object (it fails `instanceof Blob` and has no `.text()`), so this test
-        // asserts the record + its fields survive the round-trip, not Blob methods.
-        // Real browsers return a genuine Blob; the store treats it as opaque bytes.
-        const rec = makeRecord({ kind: 'crop', photoKey: 'orig-key', findingKey: 'fk-1' });
-        await putPendingMedia(rec);
-
-        const read = await getPendingMedia(rec.pendingId);
-        expect(read).toBeDefined();
-        expect(read?.pendingId).toBe(rec.pendingId);
-        expect(read?.kind).toBe('crop');
-        expect(read?.photoKey).toBe('orig-key');
-        expect(read?.findingKey).toBe('fk-1');
-        expect(read?.blob).toBeDefined();
-    });
-
-    it('getPendingMedia resolves undefined for an absent id', async () => {
-        expect(await getPendingMedia('does-not-exist')).toBeUndefined();
-    });
-
-    it('listPendingMedia filters by inspection and sorts oldest-first', async () => {
-        await putPendingMedia(makeRecord({ inspectionId: 'A', enqueuedAt: 30 }));
-        await putPendingMedia(makeRecord({ inspectionId: 'A', enqueuedAt: 10 }));
-        await putPendingMedia(makeRecord({ inspectionId: 'B', enqueuedAt: 20 }));
-
-        const a = await listPendingMedia('A');
-        expect(a.map((r) => r.enqueuedAt)).toEqual([10, 30]);
-        expect(a.every((r) => r.inspectionId === 'A')).toBe(true);
-
-        const all = await listPendingMedia();
-        expect(all).toHaveLength(3);
-    });
-
-    it('deletePendingMedia removes a record', async () => {
-        const rec = makeRecord();
-        await putPendingMedia(rec);
-        await deletePendingMedia(rec.pendingId);
-        expect(await getPendingMedia(rec.pendingId)).toBeUndefined();
-    });
+beforeEach(() => {
+    store = memoryStore();
 });
 
 // ─── Queue ────────────────────────────────────────────────────────────────────
 
 describe('media-upload-queue', () => {
-    it('enqueueMedia stores the blob and returns the pendingId', async () => {
+    it('enqueueMedia stores the record through the injected store and returns the pendingId', async () => {
         const rec = makeRecord();
-        const id = await enqueueMedia(rec);
+        const id = await enqueueMedia(store, rec);
         expect(id).toBe(rec.pendingId);
+        expect(await store.get(id)).toBe(rec);
+    });
 
-        const read = await getPendingMedia(id);
-        expect(read).toBeDefined();
-        expect(read?.blob).toBeDefined();
+    it('enqueueMedia rejects when the store write rejects (nothing is reported queued)', async () => {
+        const failing: PendingMediaStore = { ...store, put: async () => { throw new Error('quota'); } };
+        await expect(enqueueMedia(failing, makeRecord())).rejects.toThrow('quota');
     });
 
     it('drainMediaQueue uploads, calls onUploaded with the key, and deletes the record', async () => {
-        const rec = makeRecord({ inspectionId: 'insp-1' });
-        await enqueueMedia(rec);
+        await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1' }));
 
         const { uploader, calls } = okUploader({ key: 'r2/photo-123' });
         const swaps: Array<{ rec: PendingMediaRecord; result: UploadResult }> = [];
 
         const summary = await drainMediaQueue({
             inspectionId: 'insp-1',
+            store,
             uploader,
             onUploaded: (r, result) => swaps.push({ rec: r, result }),
         });
@@ -148,12 +104,26 @@ describe('media-upload-queue', () => {
         expect(swaps).toHaveLength(1);
         expect(swaps[0].result.key).toBe('r2/photo-123');
         // Store empty after a successful drain.
-        expect(await listPendingMedia('insp-1')).toHaveLength(0);
+        expect(await store.list('insp-1')).toHaveLength(0);
+    });
+
+    it('onUploaded runs BEFORE the record is deleted', async () => {
+        const rec = makeRecord();
+        await enqueueMedia(store, rec);
+        let presentDuringSwap: boolean | null = null;
+        await drainMediaQueue({
+            inspectionId: 'insp-1',
+            store,
+            uploader: okUploader().uploader,
+            onUploaded: () => { presentDuringSwap = store.rows.has(rec.pendingId); },
+        });
+        expect(presentDuringSwap).toBe(true);
+        expect(store.rows.has(rec.pendingId)).toBe(false);
     });
 
     it('a failing uploader leaves the record queued, counts failed, never calls onUploaded', async () => {
         const rec = makeRecord({ inspectionId: 'insp-1' });
-        await enqueueMedia(rec);
+        await enqueueMedia(store, rec);
 
         let onUploadedCalls = 0;
         const failingUploader: MediaUploader = {
@@ -162,6 +132,7 @@ describe('media-upload-queue', () => {
 
         const summary = await drainMediaQueue({
             inspectionId: 'insp-1',
+            store,
             uploader: failingUploader,
             onUploaded: () => { onUploadedCalls += 1; },
         });
@@ -169,18 +140,15 @@ describe('media-upload-queue', () => {
         expect(summary).toEqual({ uploaded: 0, failed: 1 });
         expect(onUploadedCalls).toBe(0);
         // Record stays queued for the next drain.
-        const still = await listPendingMedia('insp-1');
+        const still = await store.list('insp-1');
         expect(still).toHaveLength(1);
         expect(still[0].pendingId).toBe(rec.pendingId);
     });
 
     it('mixed batch (2 ok, 1 fail): 2 uploaded+deleted, 1 remains, second drain retries it', async () => {
-        const recA = makeRecord({ inspectionId: 'insp-1', enqueuedAt: 1, pendingId: 'A' });
-        const recBad = makeRecord({ inspectionId: 'insp-1', enqueuedAt: 2, pendingId: 'BAD' });
-        const recC = makeRecord({ inspectionId: 'insp-1', enqueuedAt: 3, pendingId: 'C' });
-        await enqueueMedia(recA);
-        await enqueueMedia(recBad);
-        await enqueueMedia(recC);
+        await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'A' }));
+        await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 2, pendingId: 'BAD' }));
+        await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 3, pendingId: 'C' }));
 
         // First drain: BAD throws, A + C succeed.
         const firstUploaded: string[] = [];
@@ -193,40 +161,86 @@ describe('media-upload-queue', () => {
         };
         const first = await drainMediaQueue({
             inspectionId: 'insp-1',
+            store,
             uploader: flaky,
             onUploaded: () => { /* noop */ },
         });
         expect(first).toEqual({ uploaded: 2, failed: 1 });
         expect(firstUploaded.sort()).toEqual(['A', 'C']);
 
-        const remaining = await listPendingMedia('insp-1');
+        const remaining = await store.list('insp-1');
         expect(remaining.map((r) => r.pendingId)).toEqual(['BAD']);
 
         // Second drain: the recovered uploader clears BAD.
         const { uploader: recovered, calls } = okUploader({ key: 'r2/BAD' });
         const second = await drainMediaQueue({
             inspectionId: 'insp-1',
+            store,
             uploader: recovered,
             onUploaded: () => { /* noop */ },
         });
         expect(second).toEqual({ uploaded: 1, failed: 0 });
         expect(calls.map((r) => r.pendingId)).toEqual(['BAD']);
-        expect(await listPendingMedia('insp-1')).toHaveLength(0);
+        expect(await store.list('insp-1')).toHaveLength(0);
+    });
+
+    it('uploads oldest first even when the store lists out of order', async () => {
+        await enqueueMedia(store, makeRecord({ pendingId: 'late', createdAt: 30 }));
+        await enqueueMedia(store, makeRecord({ pendingId: 'early', createdAt: 10 }));
+        await enqueueMedia(store, makeRecord({ pendingId: 'mid', createdAt: 20 }));
+        const { uploader, calls } = okUploader();
+        await drainMediaQueue({ inspectionId: 'insp-1', store, uploader, onUploaded: () => { /* noop */ } });
+        expect(calls.map((r) => r.pendingId)).toEqual(['early', 'mid', 'late']);
     });
 
     it('drains only the target inspection, leaving other inspections untouched', async () => {
-        await enqueueMedia(makeRecord({ inspectionId: 'insp-1' }));
-        await enqueueMedia(makeRecord({ inspectionId: 'insp-2' }));
+        await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1' }));
+        await enqueueMedia(store, makeRecord({ inspectionId: 'insp-2' }));
 
         const { uploader } = okUploader();
         const summary = await drainMediaQueue({
             inspectionId: 'insp-1',
+            store,
             uploader,
             onUploaded: () => { /* noop */ },
         });
 
         expect(summary.uploaded).toBe(1);
-        expect(await listPendingMedia('insp-1')).toHaveLength(0);
-        expect(await listPendingMedia('insp-2')).toHaveLength(1);
+        expect(await store.list('insp-1')).toHaveLength(0);
+        expect(await store.list('insp-2')).toHaveLength(1);
+    });
+
+    it('a failed store.delete after a good upload does not wedge or fail the drain', async () => {
+        await enqueueMedia(store, makeRecord());
+        const flakyDelete: PendingMediaStore = { ...store, delete: async () => { throw new Error('idb'); } };
+        const summary = await drainMediaQueue({
+            inspectionId: 'insp-1',
+            store: flakyDelete,
+            uploader: okUploader().uploader,
+            onUploaded: () => { /* noop */ },
+        });
+        expect(summary).toEqual({ uploaded: 1, failed: 0 });
+    });
+
+    it('a second concurrent drain for the same inspection is coalesced (no double upload)', async () => {
+        await enqueueMedia(store, makeRecord());
+        let release: () => void = () => { /* replaced below */ };
+        const gate = new Promise<void>((r) => { release = r; });
+        const calls: string[] = [];
+        const slow: MediaUploader = {
+            upload: async (rec) => { calls.push(rec.pendingId); await gate; return { key: 'k' }; },
+        };
+        const deps = { inspectionId: 'insp-1', store, uploader: slow, onUploaded: () => { /* noop */ } };
+        const first = drainMediaQueue(deps);
+        await Promise.resolve();
+        const second = await drainMediaQueue(deps);
+        expect(second).toEqual({ uploaded: 0, failed: 0 });
+        release();
+        expect(await first).toEqual({ uploaded: 1, failed: 0 });
+        expect(calls).toHaveLength(1);
+        // The guard is released afterwards: a later drain runs again.
+        await enqueueMedia(store, makeRecord());
+        const third = await drainMediaQueue({ ...deps, uploader: okUploader().uploader });
+        expect(third.uploaded).toBe(1);
     });
 });

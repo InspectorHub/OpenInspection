@@ -1,9 +1,11 @@
 /**
  * Offline media upload queue / drain engine (#181 PR-G infra).
  *
- * Pure orchestration over the local blob store (media-pending-store.ts). The
- * actual network upload is INJECTED via a `MediaUploader`, so unit tests drive
- * the full happy/failure paths with no server.
+ * Pure orchestration over a local blob store. Both ends are INJECTED: the store
+ * (`PendingMediaStore`, the contract in ../media-types; the web host backs it
+ * with IndexedDB in `app/lib/field/web-media-store.ts`) and the network upload
+ * (a `MediaUploader`), so unit tests drive the full happy/failure paths with no
+ * browser and no server.
  *
  * Design:
  *  - `enqueueMedia` persists the record and returns its `pendingId`. The caller
@@ -20,12 +22,7 @@
  * No React imports.
  */
 
-import {
-    putPendingMedia,
-    listPendingMedia,
-    deletePendingMedia,
-    type PendingMediaRecord,
-} from './media-pending-store';
+import type { PendingMediaRecord, PendingMediaStore } from '../media-types';
 
 // ─── Injected upload contract ──────────────────────────────────────────────────
 
@@ -49,6 +46,8 @@ export interface MediaUploader {
 
 export interface DrainDeps {
     inspectionId: string;
+    /** Where the pending records live. */
+    store:        PendingMediaStore;
     uploader:     MediaUploader;
     /**
      * Called after a successful upload, BEFORE the record is deleted, so the
@@ -80,11 +79,11 @@ const draining = new Set<string>();
  * Persist a pending-media record and return its `pendingId`. The caller then
  * records `pendingUpload: true` + this id on the corresponding doc photo entry.
  *
- * Rejects if the underlying write fails (see putPendingMedia) — the caller must
- * not mark the doc entry pending when the blob did not land.
+ * Rejects if the underlying write fails (`PendingMediaStore.put` must reject) —
+ * the caller must not mark the doc entry pending when the blob did not land.
  */
-export async function enqueueMedia(rec: PendingMediaRecord): Promise<string> {
-    await putPendingMedia(rec);
+export async function enqueueMedia(store: PendingMediaStore, rec: PendingMediaRecord): Promise<string> {
+    await store.put(rec);
     return rec.pendingId;
 }
 
@@ -92,13 +91,13 @@ export async function enqueueMedia(rec: PendingMediaRecord): Promise<string> {
  * Drain all pending media for one inspection (oldest first).
  *
  * For each record: `await uploader.upload(rec)`; on success call
- * `onUploaded(rec, result)` then `deletePendingMedia(rec.pendingId)`; on a
+ * `onUploaded(rec, result)` then `store.delete(rec.pendingId)`; on a
  * failed upload, leave the record queued and continue. Returns counts of
  * uploaded vs failed. Concurrent drains for the same inspection are coalesced
  * (the second returns `{ uploaded: 0, failed: 0 }`).
  */
 export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
-    const { inspectionId, uploader, onUploaded } = deps;
+    const { inspectionId, store, uploader, onUploaded } = deps;
 
     if (draining.has(inspectionId)) {
         // Another drain owns this inspection's queue right now.
@@ -109,7 +108,8 @@ export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
     let uploaded = 0;
     let failed = 0;
     try {
-        const pending = await listPendingMedia(inspectionId);
+        // Oldest first, whatever order the store happens to list in.
+        const pending = [...(await store.list(inspectionId))].sort((a, b) => a.createdAt - b.createdAt);
         for (const rec of pending) {
             let result: UploadResult;
             try {
@@ -121,7 +121,8 @@ export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
             }
             // Upload succeeded — swap the doc entry, then drop the local blob.
             onUploaded(rec, result);
-            await deletePendingMedia(rec.pendingId);
+            // A failed cleanup must not wedge the drain: the next drain re-attempts it.
+            await store.delete(rec.pendingId).catch(() => undefined);
             uploaded += 1;
         }
     } finally {

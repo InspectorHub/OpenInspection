@@ -23,7 +23,7 @@ import { freeVideoMedia, videoEntryIdentity } from "~/lib/video-media-delete";
 import { removeMediaBy as bindingRemoveMediaBy } from "../../server/lib/collab/results-doc-media";
 import { m } from "~/paraglide/messages";
 import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
-import { getPendingMedia } from "@core/field-ui/collab/media-pending-store";
+import { webMediaStore } from "~/lib/field/web-media-store";
 import type { PhotoEntry } from "@core/field-ui/shared/results-doc.types";
 
 /** #181 PR-G — offline detection. The legacy app/lib/offline helper was removed
@@ -172,13 +172,9 @@ export function usePhotoOps(ctx: {
     void (async () => {
       for (const id of pendingIds) {
         if (pendingUrls[id]) continue; // already have a URL for this id
-        const rec = await getPendingMedia(id);
-        if (cancelled) break;
-        // happy-dom/fake-indexeddb revives Blob as a plain object; guard for a
-        // real Blob before createObjectURL (placeholder path otherwise).
-        if (rec && typeof URL !== "undefined" && rec.blob instanceof Blob) {
-          created[id] = URL.createObjectURL(rec.blob);
-        }
+        const url = await webMediaStore.objectUrl(id); // null: gone, or not a real Blob
+        if (cancelled) { if (url) URL.revokeObjectURL(url); break; }
+        if (url) created[id] = url;
       }
       if (!cancelled && Object.keys(created).length > 0) {
         setPendingUrls((prev) => ({ ...prev, ...created }));
@@ -523,15 +519,13 @@ export function usePhotoOps(ctx: {
       if (isOffline()) {
         if (collabDoc && fk && originalKey) {
           const pendingId = crypto.randomUUID();
-          void enqueueMedia({
+          void enqueueMedia(webMediaStore, {
             pendingId,
             inspectionId: String(state.inspection.id),
-            findingKey: fk,
             kind: "crop",
             blob,
-            photoKey: originalKey,
-            crop: cropTransform,
-            enqueuedAt: Date.now(),
+            meta: { findingKey: fk, itemId, photoIndex, photoKey: originalKey, crop: cropTransform, ...(sectionId ? { sectionId } : {}) },
+            createdAt: Date.now(),
           }).then(() => {
             bindingMarkPhotoPending(collabDoc, fk, originalKey, pendingId, "crop", {
               crop: cropTransform,
@@ -592,15 +586,13 @@ export function usePhotoOps(ctx: {
       if (isOffline()) {
         if (fk && originalKey) {
           const pendingId = crypto.randomUUID();
-          void enqueueMedia({
+          void enqueueMedia(webMediaStore, {
             pendingId,
             inspectionId: String(state.inspection.id),
-            findingKey: fk,
             kind: "annotate",
             blob,
-            photoKey: originalKey,
-            nodesJson,
-            enqueuedAt: Date.now(),
+            meta: { findingKey: fk, itemId, photoIndex, photoKey: originalKey, nodesJson, ...(sectionId ? { sectionId } : {}) },
+            createdAt: Date.now(),
           }).then(() => {
             bindingMarkPhotoPending(collabDoc, fk, originalKey, pendingId, "annotate", {
               annotationsJson: nodesJson,
