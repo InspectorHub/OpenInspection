@@ -21,6 +21,7 @@ import { usePresence } from "~/hooks/usePresence";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { useResultsDoc } from "@core/field-ui/collab/use-results-doc";
 import { useMediaDrain } from "~/hooks/useMediaDrain";
+import { webCollabHost } from "~/lib/field/web-collab";
 import { bindResultMap, appendPendingPhoto } from "@core/field-ui/collab/results-binding";
 import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
 import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
@@ -317,7 +318,7 @@ function InspectionEditPage() {
  // drain callback, but the drain (useMediaDrain) needs the live doc that
  // useResultsDoc returns. The ref is filled right after useMediaDrain below.
  const drainRef = useRef<() => void>(() => {});
- const collab = useResultsDoc(String(loaderData.inspection.id), () => drainRef.current());
+ const collab = useResultsDoc(String(loaderData.inspection.id), webCollabHost, () => drainRef.current());
 
  // #181 PR-G — build the media drain (uploader + doc swap) over the live doc.
  const { drain: mediaDrain } = useMediaDrain(String(loaderData.inspection.id), collab?.doc ?? null);
@@ -2239,7 +2240,6 @@ function InspectionEditPage() {
   onConfirm={structure.submitSaveTemplate}
   onCancel={structure.closeSaveTemplate}
  />
-
 
  {/* Media Studio — gallery "Set as cover" crop overlay */}
  {galleryCropSource && (

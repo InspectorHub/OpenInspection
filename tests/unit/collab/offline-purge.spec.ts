@@ -24,6 +24,7 @@ import * as Y from "yjs";
 import { IndexeddbPersistence } from "y-indexeddb";
 
 import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
+import { webOfflinePurgeHost } from "~/lib/field/web-collab";
 import {
     putPendingMedia,
     listPendingMedia,
@@ -82,7 +83,7 @@ describe("purgeInspectionOfflineData", () => {
     });
 
     it("removes the deleted inspection's Yjs database and queued media", async () => {
-        const result = await purgeInspectionOfflineData(DELETED);
+        const result = await purgeInspectionOfflineData(DELETED, webOfflinePurgeHost);
 
         expect(result.attempted).toBe(true);
         expect(result.pendingMediaDeleted).toBe(2);
@@ -93,7 +94,7 @@ describe("purgeInspectionOfflineData", () => {
     });
 
     it("leaves every other inspection on the device untouched", async () => {
-        await purgeInspectionOfflineData(DELETED);
+        await purgeInspectionOfflineData(DELETED, webOfflinePurgeHost);
 
         expect(await resultsDbHasData(SURVIVOR)).toBe(true);
         const survivors = await listPendingMedia(SURVIVOR);
@@ -101,7 +102,7 @@ describe("purgeInspectionOfflineData", () => {
     });
 
     it("is safe to call for an inspection this device never opened", async () => {
-        const result = await purgeInspectionOfflineData("never-seen-here");
+        const result = await purgeInspectionOfflineData("never-seen-here", webOfflinePurgeHost);
         expect(result.attempted).toBe(true);
         expect(result.pendingMediaDeleted).toBe(0);
         // And it did not take the others with it.
@@ -109,6 +110,6 @@ describe("purgeInspectionOfflineData", () => {
     });
 
     it("is a no-op without an id, and never rejects", async () => {
-        await expect(purgeInspectionOfflineData("")).resolves.toMatchObject({ attempted: false });
+        await expect(purgeInspectionOfflineData("", webOfflinePurgeHost)).resolves.toMatchObject({ attempted: false });
     });
 });

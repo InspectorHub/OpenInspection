@@ -1,7 +1,7 @@
 /**
  * React hook — connects a browser Y.Doc to the InspectionDocDO.
  *
- * Thin wrapper around connectResultsDoc. All WebSocket/IndexedDB construction
+ * Thin wrapper around connectResultsDoc. All WebSocket/persistence construction
  * happens inside useEffect (client-only); returns null on the SSR pass.
  *
  * Lifecycle: re-initialises only when inspectionId changes.
@@ -10,9 +10,16 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { connectResultsDoc } from './results-doc-connection';
-import type { ResultsDocHandle } from './results-doc-connection';
+import type { ConnectOptions, ResultsDocHandle } from './results-doc-connection';
 
 export type { ResultsDocHandle };
+
+/**
+ * The host-supplied pieces of a connection: persistence store, socket URL and
+ * (optionally) the network-is-back signal. The web host is `webCollabHost` in
+ * `app/lib/field/web-collab.ts`. Pass a stable reference (a module constant).
+ */
+export type ResultsDocHost = Pick<ConnectOptions, 'persistence' | 'wsUrl' | 'subscribeOnline'>;
 
 /**
  * Returns the live ResultsDocHandle once the client connection is established,
@@ -29,6 +36,7 @@ export type { ResultsDocHandle };
  */
 export function useResultsDoc(
     inspectionId: string | null,
+    host: ResultsDocHost,
     onSynced?: () => void,
 ): ResultsDocHandle | null {
     const [handle, setHandle] = useState<ResultsDocHandle | null>(null);
@@ -38,10 +46,6 @@ export function useResultsDoc(
     onSyncedRef.current = onSynced;
 
     useEffect(() => {
-        // SSR guard — should not be reached in practice (useEffect is
-        // browser-only), but defend against edge cases in test environments.
-        if (typeof window === 'undefined') return;
-
         // No id → collab disabled; do not connect (hook yields null).
         if (!inspectionId) {
             setHandle(null);
@@ -49,6 +53,7 @@ export function useResultsDoc(
         }
 
         const { handle: initial, destroy } = connectResultsDoc(inspectionId, {
+            ...host,
             onChange: (updated) => {
                 // Spread so React sees a new object reference and re-renders.
                 setHandle({ ...updated });
@@ -62,7 +67,7 @@ export function useResultsDoc(
         setHandle({ ...initial });
 
         return destroy;
-    }, [inspectionId]);
+    }, [inspectionId, host]);
 
     return handle;
 }

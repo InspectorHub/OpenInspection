@@ -35,12 +35,23 @@
  * narrows the exposure; it is NOT a guarantee that no copy of a deleted
  * inspection's field content remains on any device.
  *
- * Browser-only: every call is a no-op without `indexedDB` (SSR, or a profile
+ * Browser-only: every call is a no-op when the host reports no local store (SSR, or a profile
  * with site data blocked), and no failure here ever rejects — a cleanup that
  * throws would take down the caller's delete flow, which is the worse outcome.
  */
-import { deleteResultsDb } from "./results-doc-connection";
 import { listPendingMedia, deletePendingMedia } from "./media-pending-store";
+
+/**
+ * What the host contributes to a purge: whether it has any local store at all,
+ * and how to erase one inspection's persisted results document. The web host is
+ * `webOfflinePurgeHost` in `app/lib/field/web-collab.ts`.
+ */
+export interface OfflinePurgeHost {
+    /** False when the host has no local store (SSR, site data blocked). */
+    available(): boolean;
+    /** Erase the persisted results doc for one inspection; must not reject. */
+    clearResultsData(inspectionId: string): Promise<void>;
+}
 
 export interface OfflinePurgeResult {
     /** Queued media records removed (photos, crops, annotations awaiting upload). */
@@ -54,9 +65,12 @@ const NOT_ATTEMPTED: OfflinePurgeResult = {
     attempted: false,
 };
 
-export async function purgeInspectionOfflineData(inspectionId: string): Promise<OfflinePurgeResult> {
+export async function purgeInspectionOfflineData(
+    inspectionId: string,
+    host: OfflinePurgeHost,
+): Promise<OfflinePurgeResult> {
     if (!inspectionId) return NOT_ATTEMPTED;
-    if (typeof indexedDB === "undefined") return NOT_ATTEMPTED;
+    if (!host.available()) return NOT_ATTEMPTED;
 
     // Queued media FIRST. Those are client-produced bytes that exist nowhere
     // else, so if only one of the two deletes gets to run, it should be this
@@ -72,7 +86,7 @@ export async function purgeInspectionOfflineData(inspectionId: string): Promise<
         pendingMediaDeleted += 1;
     }
 
-    await deleteResultsDb(inspectionId);
+    await host.clearResultsData(inspectionId);
 
     return { pendingMediaDeleted, attempted: true };
 }

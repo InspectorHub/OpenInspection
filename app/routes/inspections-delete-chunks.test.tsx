@@ -79,7 +79,7 @@ describe("/inspections batch delete in chunks", () => {
         expect(alert.textContent).toMatch(/12 Chunk Street/);
         expect(alert.textContent).toMatch(/Not allowed/);
         expect(view.getByText("1 selected")).toBeTruthy();
-        expect(purge).not.toHaveBeenCalledWith("r12");
+        expect(purge).not.toHaveBeenCalledWith("r12", expect.anything());
     });
 
     it("names a refused row by its address when the list rows carry propertyAddress (the real loader's field)", async () => {

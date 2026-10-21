@@ -175,7 +175,7 @@ describe("DeleteInspectionBlock", () => {
     tick();
     fireEvent.click(confirmButton());
     expect(await screen.findByText("THE LIST")).toBeTruthy();
-    await waitFor(() => expect(purge).toHaveBeenCalledWith("insp-1"));
+    await waitFor(() => expect(purge).toHaveBeenCalledWith("insp-1", expect.anything()));
   });
 
   it("an inspection that is already gone is the same success (the action reports ok)", async () => {

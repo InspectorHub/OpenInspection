@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
+import { webOfflinePurgeHost } from "~/lib/field/web-collab";
 import { MAX_DELETE_BATCH } from "~/lib/inspection-delete-limit";
 import type { DeleteInspectionsResult } from "~/lib/inspection-delete.server";
 import { m } from "~/paraglide/messages";
@@ -77,7 +78,7 @@ export function useBatchDelete(presentIds: ReadonlySet<string>, onSettled: (fail
         onSettled(failedIds);
         // The last chunk that would have reloaded the page never went out: read it ourselves.
         if (reloadOwed.current) { reloadOwed.current = false; revalidate(); }
-        for (const id of deleted) void purgeInspectionOfflineData(id);
+        for (const id of deleted) void purgeInspectionOfflineData(id, webOfflinePurgeHost);
     };
 
     useEffect(() => {

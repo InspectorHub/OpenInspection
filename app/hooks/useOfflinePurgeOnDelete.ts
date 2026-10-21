@@ -30,6 +30,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
+import { webOfflinePurgeHost } from "~/lib/field/web-collab";
 
 /** The shape this hook reads off the page's delete fetcher. */
 export interface DeleteFetcherLike {
@@ -47,7 +48,7 @@ export function useOfflinePurgeOnDelete(fetcher: DeleteFetcherLike): (ids: strin
         setQueue([]);
         // Fire and forget: the purge never rejects, and a cleanup must not be
         // able to block or fail the deletion the user already completed.
-        void Promise.all(ids.map((id) => purgeInspectionOfflineData(id)));
+        void Promise.all(ids.map((id) => purgeInspectionOfflineData(id, webOfflinePurgeHost)));
     }, [fetcher.state, fetcher.data, queue]);
 
     return useCallback((ids: string[]) => {

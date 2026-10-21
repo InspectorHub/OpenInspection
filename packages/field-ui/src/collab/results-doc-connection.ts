@@ -4,19 +4,23 @@
  * Manages a Y.Doc with IndexedDB offline persistence and a Yjs sync-protocol
  * WebSocket provider to the authorized collab route. No React imports.
  *
+ * The persistence store, the socket URL and the "network is back" signal are
+ * supplied by the host through `ConnectOptions`; this module reaches for no
+ * browser global itself. The web host lives in `app/lib/field/web-collab.ts`.
+ *
  * Design choices:
- *  - IndexedDB is opened first; the WebSocket is opened ONLY inside the
- *    `persistence.once('synced')` callback. This prevents a race where a fresh
+ *  - IndexedDB is opened first; the WebSocket is opened ONLY once the
+ *    persistence's `whenSynced` has resolved (the host's persistence is the
+ *    IndexedDB mirror on the web). This prevents a race where a fresh
  *    empty remote state overwrites locally-persisted data before it is applied.
  *  - Awareness is intentionally absent. The production DO (InspectionDocDO)
  *    handles only MSG_SYNC (byte 0). Presence stays in InspectionPresenceDO.
- *  - The `WebSocketImpl` and `location` options are injectable so tests can
- *    drive the connection without a real browser WebSocket or window.location.
+ *  - The `WebSocketImpl` option is injectable so tests can drive the connection
+ *    without a real browser WebSocket.
  *  - The `destroy()` function is idempotent; double-calling is safe.
  */
 
 import * as Y from 'yjs';
-import { IndexeddbPersistence } from 'y-indexeddb';
 import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
@@ -36,32 +40,15 @@ const MSG_SYNC = 0;
  */
 const MSG_RESTORE = 2;
 
-// ─── IndexedDB helper ───────────────────────────────────────────────────────────
-
-/** The IndexedDB database name for an inspection's results doc. */
-function resultsDbName(inspectionId: string): string {
-    return 'results-' + inspectionId;
-}
+// ─── Persistence naming ──────────────────────────────────────────────────────────
 
 /**
- * Delete the IndexedDB database backing a results doc, resolving once the
- * delete settles. Resolves on success, block, OR error so a restore-resync is
- * never wedged by a transient IndexedDB failure (best-effort cleanup — the
- * fresh empty doc + remote step2 are the authoritative convergence path).
- *
- * Exported so the connection module and tests can await the same teardown.
+ * The persistence name for an inspection's results doc. The host's persistence
+ * factory decides what to do with it; the web host uses it verbatim as the
+ * IndexedDB database name, so existing offline data keeps loading.
  */
-export function deleteResultsDb(inspectionId: string): Promise<void> {
-    return new Promise<void>((resolve) => {
-        try {
-            const req = indexedDB.deleteDatabase(resultsDbName(inspectionId));
-            req.onsuccess = () => resolve();
-            req.onerror = () => resolve();
-            req.onblocked = () => resolve();
-        } catch {
-            resolve();
-        }
-    });
+export function resultsDocName(inspectionId: string): string {
+    return 'results-' + inspectionId;
 }
 
 // ─── Public types ──────────────────────────────────────────────────────────────
@@ -75,17 +62,38 @@ export interface ResultsDocHandle {
     synced: boolean;
 }
 
+/** What a persistence store handed back by the host must offer. */
+export interface ResultsDocPersistence {
+    /** Resolves once the stored state has been applied to the doc. */
+    whenSynced: Promise<unknown>;
+    /** Release the store (close the database); the stored data stays. */
+    destroy(): Promise<void> | void;
+    /**
+     * Erase the stored data. Called on MSG_RESTORE, after `destroy()`, so the
+     * rebuilt doc starts empty. Best-effort: it must not reject the resync.
+     */
+    clearData?(): Promise<void>;
+}
+
+/** Host-supplied factory: open a persistence store for `doc` under `name`. */
+export type ResultsDocPersistenceFactory = (name: string, doc: Y.Doc) => ResultsDocPersistence;
+
 export interface ConnectOptions {
+    /** Host persistence factory (IndexedDB on the web). Required. */
+    persistence: ResultsDocPersistenceFactory;
+    /** Host WebSocket URL builder for an inspection id. Required. */
+    wsUrl: (inspectionId: string) => string;
+    /**
+     * Subscribe to the host's "network is back" signal; returns an unsubscribe.
+     * When it fires the backoff resets and the socket reopens immediately.
+     * Omitted means no such signal (reconnect relies on the backoff timer).
+     */
+    subscribeOnline?: (onOnline: () => void) => () => void;
     /**
      * Injectable WebSocket constructor for tests.
      * Defaults to globalThis.WebSocket when omitted.
      */
     WebSocketImpl?: typeof WebSocket;
-    /**
-     * Injectable origin for URL construction in tests.
-     * Defaults to window.location when omitted.
-     */
-    location?: { protocol: string; host: string };
     /**
      * Called whenever persistenceSynced or synced flip so React wrappers
      * can trigger a re-render with the updated handle.
@@ -114,24 +122,6 @@ export function reconnectDelayMs(attempt: number): number {
     return Math.min(exp, RECONNECT_MAX_MS);
 }
 
-// ─── URL builder ──────────────────────────────────────────────────────────────
-
-/**
- * Build the WebSocket URL for the inspection collaborative doc endpoint.
- *
- * Converts `https:` → `wss:` and `http:` → `ws:`. The inspection id is
- * percent-encoded so ids containing slashes or other special characters route
- * correctly.
- */
-export function buildCollabWsUrl(
-    inspectionId: string,
-    loc: { protocol: string; host: string },
-): string {
-    const wsProtocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-    const path = `/api/inspections/${encodeURIComponent(inspectionId)}/collab/ws`;
-    return `${wsProtocol}//${loc.host}${path}`;
-}
-
 // ─── Connection factory ────────────────────────────────────────────────────────
 
 /**
@@ -141,9 +131,9 @@ export function buildCollabWsUrl(
  * tears everything down cleanly.
  *
  * Lifecycle:
- *   1. Y.Doc + IndexeddbPersistence are created immediately.
+ *   1. Y.Doc + the host's persistence are created immediately.
  *   2. A `doc.on('update')` forwarder is registered (skips echoes).
- *   3. `persistence.once('synced')` flips `persistenceSynced`, calls `onChange`,
+ *   3. `persistence.whenSynced` resolving flips `persistenceSynced`, calls `onChange`,
  *      then opens the WebSocket so the remote sync happens AFTER local state is
  *      applied.
  *   4. On open, the client sends a sync step1 to the DO.
@@ -157,10 +147,9 @@ export function buildCollabWsUrl(
  */
 export function connectResultsDoc(
     inspectionId: string,
-    opts: ConnectOptions = {},
+    opts: ConnectOptions,
 ): { handle: ResultsDocHandle; destroy: () => void } {
     const WS = opts.WebSocketImpl ?? globalThis.WebSocket;
-    const loc = opts.location ?? (typeof window !== 'undefined' ? window.location : { protocol: 'https:', host: 'localhost' });
 
     // ── Reassignable doc + persistence ─────────────────────────────────────────
     // `doc` and `persistence` are NOT const: a MSG_RESTORE control frame rebuilds
@@ -169,7 +158,7 @@ export function connectResultsDoc(
     // cleanly. Database name is `results-<id>` (distinct from the POC prefix).
 
     let doc = new Y.Doc();
-    let persistence = new IndexeddbPersistence(resultsDbName(inspectionId), doc);
+    let persistence = opts.persistence(resultsDocName(inspectionId), doc);
 
     // ── Mutable handle (mutated in-place; React wrapper reads it via onChange) ─
 
@@ -233,10 +222,7 @@ export function connectResultsDoc(
         openSocket();
     }
 
-    const hasWindow = typeof window !== 'undefined';
-    if (hasWindow) {
-        window.addEventListener('online', handleOnline);
-    }
+    const unsubscribeOnline = opts.subscribeOnline?.(handleOnline);
 
     // ── Local update forwarder ────────────────────────────────────────────────
     // Forward every local doc mutation to the server as a framed update message.
@@ -289,17 +275,18 @@ export function connectResultsDoc(
             doc.off('update', docUpdateHandler);
             const oldPersistence = persistence;
             const oldDoc = doc;
-            await oldPersistence.destroy().catch(() => { /* ignore */ });
+            await Promise.resolve(oldPersistence.destroy()).catch(() => { /* ignore */ });
             if (destroyed) return; // destroyed while awaiting
 
             // (2) Clear local IndexedDB so the rebuilt doc starts empty.
-            await deleteResultsDb(inspectionId);
+            // Best-effort: a failed clear must never wedge the resync.
+            await Promise.resolve(oldPersistence.clearData?.()).catch(() => { /* ignore */ });
             if (destroyed) return;
 
             // (3) Fresh doc + fresh persistence, re-wired and published.
             const freshDoc = new Y.Doc();
             doc = freshDoc;
-            persistence = new IndexeddbPersistence(resultsDbName(inspectionId), freshDoc);
+            persistence = opts.persistence(resultsDocName(inspectionId), freshDoc);
             bindDoc();
             oldDoc.destroy();
 
@@ -322,7 +309,7 @@ export function connectResultsDoc(
     function openSocket(): void {
         if (destroyed) return;
 
-        const url = buildCollabWsUrl(inspectionId, loc);
+        const url = opts.wsUrl(inspectionId);
         ws = new WS(url);
         ws.binaryType = 'arraybuffer';
 
@@ -408,12 +395,12 @@ export function connectResultsDoc(
 
     bindDoc();
 
-    persistence.once('synced', () => {
+    persistence.whenSynced.then(() => {
         if (destroyed) return;
         handle.persistenceSynced = true;
         opts.onChange?.(handle);
         openSocket();
-    });
+    }, () => { /* a store that fails to open never opens the socket, as before */ });
 
     // ── Destroy ───────────────────────────────────────────────────────────────
 
@@ -421,12 +408,10 @@ export function connectResultsDoc(
         if (destroyed) return;
         destroyed = true;
         clearReconnectTimer();
-        if (hasWindow) {
-            window.removeEventListener('online', handleOnline);
-        }
+        unsubscribeOnline?.();
         doc.off('update', docUpdateHandler);
         try { ws?.close(); } catch { /* already closing */ }
-        persistence.destroy().catch(() => { /* ignore */ });
+        Promise.resolve(persistence.destroy()).catch(() => { /* ignore */ });
         doc.destroy();
     }
 
