@@ -55,6 +55,8 @@
  *     `tests/unit/legal/agent-terms-classification.spec.ts` reads the same
  *     universe from the RUNNING application and asserts the two agree, which is
  *     the positive control on this parser going blind.
+ *   - A router may be a chain or plain statements (`app.openapi(a, …); app.route('/', b);`); both are read
+ *     (`scripts/lib/router-registrations.mjs`). A registration the reader cannot follow is a reader PROBLEM.
  *
  * Usage:
  *   node scripts/check-agent-terms-classification.mjs
@@ -64,6 +66,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { recordLink, readStatementRegistrations } from './lib/router-registrations.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -190,7 +193,7 @@ export function parseModule(source, fileName) {
         }
 
         // `const someRouter = createApiRouter().openapi(x, …).route('/', y)`
-        const chain = { openapi: [], mounts: [] };
+        const chain = { openapi: [], mounts: [], inline: [], nested: [] };
         let cursor = node.initializer;
         let rooted = false;
         while (ts.isCallExpression(cursor)) {
@@ -200,23 +203,13 @@ export function parseModule(source, fileName) {
                 break;
             }
             if (!ts.isPropertyAccessExpression(callee)) break;
-            const member = callee.name.text;
-            if (member === 'openapi' && cursor.arguments.length && ts.isIdentifier(cursor.arguments[0])) {
-                // `.openapi(routeConst, handler)` registers a route. A zod
-                // schema's `.openapi('SchemaName')` takes a STRING and is
-                // deliberately not matched here.
-                chain.openapi.push(cursor.arguments[0].text);
-            }
-            if (member === 'route' && cursor.arguments.length >= 2) {
-                const prefix = literalString(cursor.arguments[0]);
-                const ident = ts.isIdentifier(cursor.arguments[1]) ? cursor.arguments[1].text : null;
-                if (prefix !== null && ident) chain.mounts.push({ prefix, ident });
-            }
+            recordLink(ts, chain, callee.name.text, cursor, literalString);
             cursor = callee.expression;
             if (ts.isNewExpression(cursor)) { rooted = true; break; }
         }
         if (rooted) routers.set(name, chain);
     });
+    readStatementRegistrations(ts, sf, routers, walk, literalString);
 
     return { routeDefs, routers, imports, defaultExport };
 }
@@ -284,6 +277,9 @@ export function collectAgentRoutes({ readFile, entry = ENTRY, mounts = AGENT_MOU
             problems.push(`no router named ${exportName} found in ${file}`);
             return;
         }
+
+        for (const shown of chain.inline) problems.push(`${file}: ${routerName} registers a route that is not a named constant (${shown})`);
+        for (const shown of chain.nested) problems.push(`${file}: ${routerName} registers through ${shown}…) outside a top-level statement`);
 
         for (const routeConst of chain.openapi) {
             const declaredPath = mod.routeDefs.get(routeConst);
@@ -396,27 +392,23 @@ export function evaluate(universe, rows) {
 
 /* ─────────────────────────────────── CLI ───────────────────────────────────── */
 
-function run() {
-    const readFile = (relative) => {
-        const abs = join(ROOT, relative);
-        return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
-    };
-
+/** The whole run; `readFile` and `io` are injectable so a test can drive this over fixtures. */
+export function run(readFile = (relative) => (existsSync(join(ROOT, relative)) ? readFileSync(join(ROOT, relative), 'utf8') : null), io = console) {
     const universeResult = collectAgentRoutes({ readFile });
     const tableSource = readFile(TABLE);
     if (tableSource === null) {
-        console.error(`agent-terms classification: could not read ${TABLE} — the reader is broken, not the repo.`);
+        io.error(`agent-terms classification: could not read ${TABLE} — the reader is broken, not the repo.`);
         return 1;
     }
     const { rows, found } = collectBindingTable(tableSource);
     if (!found) {
-        console.error('agent-terms classification: AGENT_ROUTE_BINDING was not found in its own module — the reader is broken, not the repo.');
+        io.error('agent-terms classification: AGENT_ROUTE_BINDING was not found in its own module — the reader is broken, not the repo.');
         return 1;
     }
 
     const result = evaluate(universeResult.paths, rows);
 
-    console.log(
+    io.log(
         `agent-terms classification: examined ${result.examined} agent-reachable route(s) · `
         + `flagged ${result.flagged} · rows in the table ${rows.length} · `
         + `mounts descended ${universeResult.mountsExamined} of ${universeResult.mountsSeen} declared `
@@ -425,29 +417,29 @@ function run() {
 
     // Zero examined means the reader is broken, not that the repo is clean.
     if (result.examined === 0) {
-        console.error('  ✘ ZERO routes examined. A gate that reaches nothing passes everything — the reader is broken, not the repo.');
+        io.error('  ✘ ZERO routes examined. A gate that reaches nothing passes everything — the reader is broken, not the repo.');
         return 1;
     }
     if (rows.length === 0) {
-        console.error('  ✘ the classification table is EMPTY — an empty table would leave every route below unanswered and still print a count.');
+        io.error('  ✘ the classification table is EMPTY — an empty table would leave every route below unanswered and still print a count.');
         return 1;
     }
 
     if (universeResult.problems.length) {
-        for (const problem of universeResult.problems) console.error(`  ✘ reader problem: ${problem}`);
+        for (const problem of universeResult.problems) io.error(`  ✘ reader problem: ${problem}`);
         return 1;
     }
 
     if (result.flagged === 0) {
-        console.log('  ✓ every agent-reachable route says whether using it requires the agent to be bound.');
+        io.log('  ✓ every agent-reachable route says whether using it requires the agent to be bound.');
         return 0;
     }
 
     for (const [why, items] of result.findings) {
-        console.error(`  ✘ ${items.length} route(s) ${why}:`);
-        for (const item of items) console.error(`      ${item}`);
+        io.error(`  ✘ ${items.length} route(s) ${why}:`);
+        for (const item of items) io.error(`      ${item}`);
     }
-    console.error(`\n  fix: ${TABLE}`);
+    io.error(`\n  fix: ${TABLE}`);
     return 1;
 }
 

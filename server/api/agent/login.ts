@@ -2,6 +2,7 @@ import { createRoute } from '@hono/zod-openapi';
 import { setCookie } from 'hono/cookie';
 import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
+import type { ApiOf } from '../../lib/api-schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getBaseUrl } from '../../lib/url';
 import { signJwt } from '../../lib/jwt-keyring';
@@ -99,94 +100,97 @@ const loginLinkRoute = createRoute(withMcpMetadata({
     operationId: 'agentLoginLink',
 }, { scopes: [], tier: 'excluded' }));
 
-export const agentLoginRoutes = createApiRouter()
-    .openapi(loginRoute, async (c) => {
-        const { email, password } = c.req.valid('json');
+export const agentLoginRoutes = createApiRouter();
+agentLoginRoutes.openapi(loginRoute, async (c) => {
+    const { email, password } = c.req.valid('json');
 
-        const row = await findGlobalAgentByEmail(c.env.DB, email);
-        if (!row) {
-            // Timing-equalization — mirrors AuthService.validateCredentials:
-            // run a throwaway verify even though there's no account to check
-            // against, so a missing email doesn't answer measurably faster.
-            await verifyPassword(password, DUMMY_HASH);
-            throw Errors.Unauthorized('Invalid email or password');
-        }
+    const row = await findGlobalAgentByEmail(c.env.DB, email);
+    if (!row) {
+        // Timing-equalization — mirrors AuthService.validateCredentials:
+        // run a throwaway verify even though there's no account to check
+        // against, so a missing email doesn't answer measurably faster.
+        await verifyPassword(password, DUMMY_HASH);
+        throw Errors.Unauthorized('Invalid email or password');
+    }
 
-        const [valid, needsRehash] = await verifyPassword(password, row.passwordHash);
-        if (!valid) {
-            throw Errors.Unauthorized('Invalid email or password');
-        }
+    const [valid, needsRehash] = await verifyPassword(password, row.passwordHash);
+    if (!valid) {
+        throw Errors.Unauthorized('Invalid email or password');
+    }
 
-        if (needsRehash) {
-            const upgraded = await hashPassword(password);
-            await getDrizzle(c).update(users).set({ passwordHash: upgraded }).where(eq(users.id, row.id));
-        }
+    if (needsRehash) {
+        const upgraded = await hashPassword(password);
+        await getDrizzle(c).update(users).set({ passwordHash: upgraded }).where(eq(users.id, row.id));
+    }
 
-        // Agent JWT claim shape mirrors server/api/agent-signup.ts and the
-        // magic-login redeem handler (server/api/agent/magic-login.ts)
-        // EXACTLY — no tenantId/custom:tenantId. Agents are global users.
-        const keyring = await c.var.keyringPromise!;
-        const now = Math.floor(Date.now() / 1000);
-        const token = await signJwt({
-            sub: row.id,
-            role: 'agent',
-            'custom:userRole': 'agent',
-            email: row.email,
-            iat: now,
-            exp: now + 60 * 60 * 24,
-        }, keyring);
+    // Agent JWT claim shape mirrors server/api/agent-signup.ts and the
+    // magic-login redeem handler (server/api/agent/magic-login.ts)
+    // EXACTLY — no tenantId/custom:tenantId. Agents are global users.
+    const keyring = await c.var.keyringPromise!;
+    const now = Math.floor(Date.now() / 1000);
+    const token = await signJwt({
+        sub: row.id,
+        role: 'agent',
+        'custom:userRole': 'agent',
+        email: row.email,
+        iat: now,
+        exp: now + 60 * 60 * 24,
+    }, keyring);
 
-        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
+    setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
-        // Tenant-less global agent identity — same reasoning as the
-        // magic-login redeem handler: no tenant-scoped audit_logs row
-        // (auditLogs.tenantId is a NOT NULL FK), structured logging only.
-        logger.info('agent.login.password', { userId: row.id });
+    // Tenant-less global agent identity — same reasoning as the
+    // magic-login redeem handler: no tenant-scoped audit_logs row
+    // (auditLogs.tenantId is a NOT NULL FK), structured logging only.
+    logger.info('agent.login.password', { userId: row.id });
 
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(loginLinkRoute, async (c) => {
-        const { email } = c.req.valid('json');
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+agentLoginRoutes.openapi(loginLinkRoute, async (c) => {
+    const { email } = c.req.valid('json');
 
-        const loginUrl = await requestMagicLoginByEmail({
-            kv: c.env.TENANT_CACHE,
-            db: c.env.DB,
-            email,
-            coreBaseUrl: getBaseUrl(c),
-        });
-
-        if (loginUrl) {
-            // Do NOT await the send inside the request — only awaiting on the
-            // known-account path would make it measurably slower than the
-            // unknown-email path, a timing enumeration oracle. Defer to
-            // waitUntil so the response returns immediately in all cases.
-            const sendPromise = (async () => {
-                try {
-                    // Agent accounts belong to no company: the deployment speaks.
-                    await c.var.services.platformEmail().sendAgentLoginLink(email, loginUrl);
-                } catch (err) {
-                    logger.error('agent.login.link_send_failed', {}, err instanceof Error ? err : undefined);
-                }
-            })();
-            // `c.executionCtx` throws when no execution context is present
-            // (e.g. unit tests) — probe defensively rather than via a
-            // truthiness check. Mirrors server/api/portal.ts's requestLink.
-            let execCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
-            try {
-                execCtx = c.executionCtx;
-            } catch {
-                execCtx = undefined;
-            }
-            if (execCtx) execCtx.waitUntil(sendPromise);
-            else await sendPromise;
-        }
-
-        logger.info('agent.login.link_requested', { found: loginUrl !== null });
-
-        // Identical response in all cases — payload AND timing (the only
-        // I/O-variable step, the email send, is deferred above) — so there
-        // is no enumeration oracle.
-        return c.json({ success: true as const, data: { sent: true as const } }, 200);
+    const loginUrl = await requestMagicLoginByEmail({
+        kv: c.env.TENANT_CACHE,
+        db: c.env.DB,
+        email,
+        coreBaseUrl: getBaseUrl(c),
     });
 
-export type AgentLoginApi = typeof agentLoginRoutes;
+    if (loginUrl) {
+        // Do NOT await the send inside the request — only awaiting on the
+        // known-account path would make it measurably slower than the
+        // unknown-email path, a timing enumeration oracle. Defer to
+        // waitUntil so the response returns immediately in all cases.
+        const sendPromise = (async () => {
+            try {
+                // Agent accounts belong to no company: the deployment speaks.
+                await c.var.services.platformEmail().sendAgentLoginLink(email, loginUrl);
+            } catch (err) {
+                logger.error('agent.login.link_send_failed', {}, err instanceof Error ? err : undefined);
+            }
+        })();
+        // `c.executionCtx` throws when no execution context is present
+        // (e.g. unit tests) — probe defensively rather than via a
+        // truthiness check. Mirrors server/api/portal.ts's requestLink.
+        let execCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
+        try {
+            execCtx = c.executionCtx;
+        } catch {
+            execCtx = undefined;
+        }
+        if (execCtx) execCtx.waitUntil(sendPromise);
+        else await sendPromise;
+    }
+
+    logger.info('agent.login.link_requested', { found: loginUrl !== null });
+
+    // Identical response in all cases — payload AND timing (the only
+    // I/O-variable step, the email send, is deferred above) — so there
+    // is no enumeration oracle.
+    return c.json({ success: true as const, data: { sent: true as const } }, 200);
+});
+
+/** Registration order. Drives `AgentLoginApi`; a test pins it to what `agentLoginRoutes` really registered. */
+export const agentLoginRouteConfigs = [loginRoute, loginLinkRoute] as const;
+
+export type AgentLoginApi = ApiOf<typeof agentLoginRouteConfigs>;

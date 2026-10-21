@@ -183,6 +183,86 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/agent-signup.ts',
+        tuple: 'agentSignupRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent-signup');
+            return { app: m.default, configs: m.agentSignupRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agent.ts',
+        tuple: 'agentRouteParts',
+        load: async () => {
+            const m = await import('../../../server/api/agent');
+            return { app: m.default, configs: m.agentRouteParts };
+        },
+    },
+    {
+        file: 'server/api/agent/login.ts',
+        tuple: 'agentLoginRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent/login');
+            return { app: m.agentLoginRoutes, configs: m.agentLoginRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agent/magic-login.ts',
+        tuple: 'agentMagicLoginRedeemRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent/magic-login');
+            return { app: m.agentMagicLoginRedeemRoutes, configs: m.agentMagicLoginRedeemRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agent/magic-login.ts',
+        tuple: 'agentMagicLoginRequestRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent/magic-login');
+            return { app: m.agentMagicLoginRequestRoutes, configs: m.agentMagicLoginRequestRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agent/notices.ts',
+        tuple: 'agentNoticeRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent/notices');
+            return { app: m.agentNoticeRoutes, configs: m.agentNoticeRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agent/notification-preferences.ts',
+        tuple: 'agentNotificationPreferenceRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent/notification-preferences');
+            return { app: m.default, configs: m.agentNotificationPreferenceRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agent/photo.ts',
+        tuple: 'agentPhotoRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent/photo');
+            return { app: m.default, configs: m.agentPhotoRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agent/report-context.ts',
+        tuple: 'agentReportContextRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent/report-context');
+            return { app: m.agentReportContextRoutes, configs: m.agentReportContextRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agent/terms.ts',
+        tuple: 'agentTermsRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/agent/terms');
+            return { app: m.agentTermsRoutes, configs: m.agentTermsRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/agents.ts',
         tuple: 'agentsRouteConfigs',
         load: async () => {
@@ -414,6 +494,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/evidence');
             return { app: m.default, configs: m.evidenceRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/identity.ts',
+        tuple: 'identityRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/identity');
+            return { app: m.default, configs: m.identityRouteConfigs };
         },
     },
     {

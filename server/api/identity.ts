@@ -13,6 +13,7 @@
  */
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import type { HonoConfig } from '../types/hono';
 import type { Context } from 'hono';
 import { Errors } from '../lib/errors';
@@ -87,28 +88,31 @@ const accountDeleteRoute = createRoute(withMcpMetadata({
     // person ever seeing the request.
 }, { scopes: ['write'], tier: 'excluded' }));
 
-const identityRoutes = createApiRouter()
-    .openapi(accountExportRoute, async (c) => {
-        const userId = getCallerUserId(c);
-        const db = getDrizzle(c);
-        const data = await exportAccount(db, userId);
+const app = createApiRouter();
+app.openapi(accountExportRoute, async (c) => {
+    const userId = getCallerUserId(c);
+    const db = getDrizzle(c);
+    const data = await exportAccount(db, userId);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(accountDeleteRoute, async (c) => {
+    const userId = getCallerUserId(c);
+    const { confirmEmail } = c.req.valid('json');
+    const db = getDrizzle(c);
+    try {
+        const data = await softDeleteAccount(db, userId, confirmEmail, c.env.TENANT_CACHE, (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
         return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(accountDeleteRoute, async (c) => {
-        const userId = getCallerUserId(c);
-        const { confirmEmail } = c.req.valid('json');
-        const db = getDrizzle(c);
-        try {
-            const data = await softDeleteAccount(db, userId, confirmEmail, c.env.TENANT_CACHE, (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
-            return c.json({ success: true as const, data }, 200);
-        } catch (e) {
-            if (e instanceof Error && /not found/i.test(e.message)) {
-                throw Errors.NotFound(e.message);
-            }
-            throw Errors.BadRequest(e instanceof Error ? e.message : 'delete failed');
+    } catch (e) {
+        if (e instanceof Error && /not found/i.test(e.message)) {
+            throw Errors.NotFound(e.message);
         }
-    });
+        throw Errors.BadRequest(e instanceof Error ? e.message : 'delete failed');
+    }
+});
 
-export type IdentityApi = typeof identityRoutes;
+/** Registration order. Drives `IdentityApi`; a test pins it to what `app` really registered. */
+export const identityRouteConfigs = [accountExportRoute, accountDeleteRoute] as const;
 
-export default identityRoutes;
+export type IdentityApi = ApiOf<typeof identityRouteConfigs>;
+
+export default app;

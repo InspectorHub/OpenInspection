@@ -9,6 +9,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
+import type { ApiOf } from '../../lib/api-schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { requireRole } from '../../lib/middleware/rbac';
 import { getDrizzle } from '../../lib/route-helpers';
@@ -108,51 +109,54 @@ const optinLinkRoute = createRoute(withMcpMetadata({
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /** Mounted under the /api/agent router group (see server/api/agent.ts). */
-export const agentNoticeRoutes = createApiRouter()
-    .openapi(listRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
-        const db = getDrizzle(c);
-        const contactIds = await contactIdsForAgent(db, user.sub);
-        const [notices, unread] = await Promise.all([
-            listNoticesForContacts(db, { contactIds }),
-            unreadNoticeCountForContacts(db, contactIds),
-        ]);
-        return c.json({ success: true as const, data: { notices, unread } }, 200);
-    })
-    .openapi(markReadRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
-        const db = getDrizzle(c);
-        const contactIds = await contactIdsForAgent(db, user.sub);
-        const { ids } = c.req.valid('json');
-        if (ids && ids.length > 0) await markNoticesRead(db, contactIds, ids);
-        else await markAllNoticesRead(db, contactIds);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(archiveRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
-        const db = getDrizzle(c);
-        const contactIds = await contactIdsForAgent(db, user.sub);
-        const { id } = c.req.valid('param');
-        await archiveNotice(db, contactIds, id);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(optinLinkRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
-        const db = getDrizzle(c);
-        const contactIds = await contactIdsForAgent(db, user.sub);
-        const { id } = c.req.valid('param');
-        const owned = await getOwnedNotice(db, contactIds, id);
-        if (!owned) return c.json({ error: 'Not found' }, 404);
-        const token = await mintOptinToken(owned.tenantId, owned.contactId, c.env.JWT_SECRET);
-        return c.json({ success: true as const, data: { url: `/sms-optin/${encodeURIComponent(token)}` } }, 200);
-    });
+export const agentNoticeRoutes = createApiRouter();
+agentNoticeRoutes.openapi(listRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
+    const db = getDrizzle(c);
+    const contactIds = await contactIdsForAgent(db, user.sub);
+    const [notices, unread] = await Promise.all([
+        listNoticesForContacts(db, { contactIds }),
+        unreadNoticeCountForContacts(db, contactIds),
+    ]);
+    return c.json({ success: true as const, data: { notices, unread } }, 200);
+});
+agentNoticeRoutes.openapi(markReadRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
+    const db = getDrizzle(c);
+    const contactIds = await contactIdsForAgent(db, user.sub);
+    const { ids } = c.req.valid('json');
+    if (ids && ids.length > 0) await markNoticesRead(db, contactIds, ids);
+    else await markAllNoticesRead(db, contactIds);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+agentNoticeRoutes.openapi(archiveRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
+    const db = getDrizzle(c);
+    const contactIds = await contactIdsForAgent(db, user.sub);
+    const { id } = c.req.valid('param');
+    await archiveNotice(db, contactIds, id);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+agentNoticeRoutes.openapi(optinLinkRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
+    const db = getDrizzle(c);
+    const contactIds = await contactIdsForAgent(db, user.sub);
+    const { id } = c.req.valid('param');
+    const owned = await getOwnedNotice(db, contactIds, id);
+    if (!owned) return c.json({ error: 'Not found' }, 404);
+    const token = await mintOptinToken(owned.tenantId, owned.contactId, c.env.JWT_SECRET);
+    return c.json({ success: true as const, data: { url: `/sms-optin/${encodeURIComponent(token)}` } }, 200);
+});
 
-export type AgentNoticesApi = typeof agentNoticeRoutes;
+/** Registration order. Drives `AgentNoticesApi`; a test pins it to what `agentNoticeRoutes` really registered. */
+export const agentNoticeRouteConfigs = [listRoute, markReadRoute, archiveRoute, optinLinkRoute] as const;
+
+export type AgentNoticesApi = ApiOf<typeof agentNoticeRouteConfigs>;
