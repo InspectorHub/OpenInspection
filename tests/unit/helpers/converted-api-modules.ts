@@ -1065,6 +1065,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/session-context.ts',
+        tuple: 'sessionContextRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/session-context');
+            return { app: m.default, configs: m.sessionContextRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/services.ts',
         tuple: 'servicesRouteConfigs',
         load: async () => {

@@ -10056,6 +10056,20 @@
     "description": "Returns the inspector restriction list for a service. An empty userIds array means all non-agent staff are qualified (no restriction rows). Admin or owner only."
   },
   {
+    "operationId": "getSessionContext",
+    "method": "GET",
+    "pathTemplate": "/api/session/context",
+    "scopes": [],
+    "tag": "client",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get branding, user and deployment context for the session",
+    "description": "Returns the company branding and display defaults, the signed-in user with resolved capabilities, the deployment flags the interface gates on, seat usage, video provider, outbound cooling window and unread message count. Requires a signed-in session; the answer is never cached."
+  },
+  {
     "operationId": "getSetupStatus",
     "method": "GET",
     "pathTemplate": "/api/auth/setup-status",

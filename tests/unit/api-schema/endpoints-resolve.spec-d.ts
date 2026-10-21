@@ -57,6 +57,7 @@ import type { RatingSystemsApi } from '../../../server/api/rating-systems';
 import type { RecommendationsApi } from '../../../server/api/recommendations';
 import type { RepairBuilderApi } from '../../../server/api/repair-builder';
 import type { RoleProfilesApi } from '../../../server/api/role-profiles';
+import type { SessionContextApi } from '../../../server/api/session-context';
 import type { ScheduleApi } from '../../../server/api/schedule-week-summary';
 import type { SecretsApi } from '../../../server/api/secrets';
 import type { ServicesApi } from '../../../server/api/services';
@@ -90,6 +91,7 @@ describe('converted routers: every route resolves to an endpoint', () => {
         expectTypeOf<Unresolved<SchemaOf<QboApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<RepairBuilderApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<SecretsApi>>>().toEqualTypeOf<never>();
+        expectTypeOf<Unresolved<SchemaOf<SessionContextApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<UsageApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<AdminBrandingApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<AdminDefectCategoriesApi>>>().toEqualTypeOf<never>();

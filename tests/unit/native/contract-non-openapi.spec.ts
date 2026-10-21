@@ -2,7 +2,7 @@
  * The native endpoints OpenAPI cannot describe, pinned here instead.
  *
  * The OpenAPI snapshot covers JSON operations declared through createRoute().
- * WebSocket upgrades, binary bodies, plain JSON routes and the OAuth endpoints
+ * WebSocket upgrades, binary bodies and the OAuth endpoints
  * live outside it, so a rename or a changed frame constant would pass every
  * schema check while breaking an installed app. Each registry entry is therefore
  * pinned by something executable: the route still answers (not 404), the frame
@@ -55,7 +55,7 @@ describe('native non-OpenAPI contract', () => {
 
     it('pins at least one endpoint of every kind', () => {
         const kinds = new Set(NATIVE_NON_OPENAPI_CONTRACT.map((e) => e.kind));
-        expect([...kinds].sort()).toEqual(['binary', 'json', 'oauth', 'websocket']);
+        expect([...kinds].sort()).toEqual(['binary', 'oauth', 'websocket']);
     });
 
     it('reports a path that does not exist as 404 (positive control for the route checks below)', async () => {
