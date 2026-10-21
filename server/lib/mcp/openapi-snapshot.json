@@ -5916,6 +5916,41 @@
     "description": "Deletes an owned calendar block. Owners and managers can delete any block in their company."
   },
   {
+    "operationId": "deleteClientDocument",
+    "method": "DELETE",
+    "pathTemplate": "/api/public/inspections/{id}/documents/{docId}",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose documents are addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose documents are addressed."
+          }
+        },
+        {
+          "name": "docId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the document to act on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the document to act on."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a document the client uploaded",
+    "description": "Client-portal delete of one document on an inspection. Only the seat that uploaded the document may remove it. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
+  },
+  {
     "operationId": "deleteContact",
     "method": "DELETE",
     "pathTemplate": "/api/contacts/{id}",
@@ -6119,6 +6154,43 @@
     },
     "summary": "Delete an inspection cost item",
     "description": "Delete a commercial PCA cost line item, tenant-scoped. Removing an item never touches the finding it was linked from."
+  },
+  {
+    "operationId": "deleteInspectionDocument",
+    "method": "DELETE",
+    "pathTemplate": "/api/inspections/{id}/documents/{docId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose documents are addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose documents are addressed."
+          }
+        },
+        {
+          "name": "docId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the document to act on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the document to act on."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete any document on an inspection",
+    "description": "Staff delete of one document on an inspection, whoever uploaded it. Owners, managers and inspectors only."
   },
   {
     "operationId": "deleteInspectionEvent",
@@ -11088,6 +11160,56 @@
     "description": "Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers, and anyone holding the scheduleOthers capability, may select other users; everyone else is restricted to themselves. Inspections and scheduled visits are limited to the inspections the caller can see in the inspection list."
   },
   {
+    "operationId": "listClientDocuments",
+    "method": "GET",
+    "pathTemplate": "/api/public/inspections/{id}/documents",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose documents are addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose documents are addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List client-visible inspection documents",
+    "description": "Client-portal read of the documents on one inspection that the client may see: everything clients uploaded plus inspector uploads marked client visible. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
+  },
+  {
+    "operationId": "listClientMessages",
+    "method": "GET",
+    "pathTemplate": "/api/public/inspections/{id}/messages",
+    "scopes": [],
+    "tag": "messages",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose conversation is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose conversation is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the client conversation for an inspection",
+    "description": "Client-portal read of the message thread between the caller and the inspector, oldest first. It marks the staff messages in that thread read. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
+  },
+  {
     "operationId": "listComplianceAiAssurance",
     "method": "GET",
     "pathTemplate": "/api/admin/compliance/ai-assurance",
@@ -11406,6 +11528,33 @@
     },
     "summary": "List cost items for an inspection",
     "description": "List every commercial PCA cost line item recorded for the inspection, in display order, for the editor panel and downstream export routes."
+  },
+  {
+    "operationId": "listInspectionDocuments",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/documents",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose documents are addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose documents are addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List all documents on an inspection",
+    "description": "Staff read of every document attached to one inspection, including internal ones the client cannot see. Open to any signed-in staff member of the company."
   },
   {
     "operationId": "listInspectionEvents",
@@ -19205,6 +19354,31 @@
     },
     "summary": "Seed the Document Review checklist",
     "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched."
+  },
+  {
+    "operationId": "sendClientMessage",
+    "method": "POST",
+    "pathTemplate": "/api/public/inspections/{id}/messages",
+    "scopes": [],
+    "tag": "messages",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose conversation is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose conversation is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Send a message as the client",
+    "description": "Client-portal send of one message into the caller thread; the inspector is notified by email. The JSON body is {body, attachments?}: body is 1 to 5000 characters and attachments holds at most 5 descriptors from the upload route. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
   },
   {
     "operationId": "sendMessageThread",

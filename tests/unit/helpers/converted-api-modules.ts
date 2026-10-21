@@ -343,6 +343,24 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/client-documents.ts',
+        tuple: 'clientDocumentsRouteConfigs',
+        native: ['put /inspections/:id/documents', 'get /inspections/:id/documents/:docId'],
+        load: async () => {
+            const m = await import('../../../server/api/client-documents');
+            return { app: m.default, configs: m.clientDocumentsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/client-documents.ts',
+        tuple: 'inspectorDocumentsRouteConfigs',
+        native: ['put /:id/documents', 'get /:id/documents/:docId'],
+        load: async () => {
+            const m = await import('../../../server/api/client-documents');
+            return { app: m.inspectorDocumentsRoutes, configs: m.inspectorDocumentsRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/concierge.ts',
         tuple: 'conciergeRouteConfigs',
         load: async () => {
@@ -762,6 +780,15 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/messages');
             return { app: m.default, configs: m.messageRouteParts };
+        },
+    },
+    {
+        file: 'server/api/messages.ts',
+        tuple: 'clientMessageRouteConfigs',
+        native: ['post /inspections/:id/messages/upload', 'get /inspections/:id/messages/attachments/:attachmentId'],
+        load: async () => {
+            const m = await import('../../../server/api/messages');
+            return { app: m.clientMessageRoutes, configs: m.clientMessageRouteConfigs };
         },
     },
     {

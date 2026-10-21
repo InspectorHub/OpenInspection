@@ -23,7 +23,7 @@
  * (shared with client-documents) — the messageToken keying is retired.
  */
 import { mayActOnInspection, assertMayActOnInspection } from '../lib/inspection/assignment-access';
-import { Hono, type Context, type Next } from 'hono';
+import type { Context, Next } from 'hono';
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { mounted, type ApiOf } from '../lib/api-schema';
@@ -38,6 +38,7 @@ import { getBaseUrl, resolveTenantSlug } from '../lib/url';
 import type { HonoConfig } from '../types/hono';
 import { r2Keys } from '../lib/r2-keys';
 import { messageThreadRoutes, messageThreadRouteConfigs } from './messages-threads';
+import { clientMessageListRoute, clientMessageSendRoute } from './messages-client-routes';
 import { resolveInspectionScope } from '../lib/inspection/visibility';
 import { r2Get } from '../lib/r2/objects';
 
@@ -315,11 +316,10 @@ const sendBodySchema = z.object({
     })).max(5).optional(),
 });
 
-export const clientMessageRoutes = new Hono<HonoConfig>();
+export const clientMessageRoutes = createApiRouter();
 
-// GET /api/public/inspections/:id/messages — list + mark inspector msgs read.
-clientMessageRoutes.get('/inspections/:id/messages', async (c) => {
-    const inspectionId = c.req.param('id');
+clientMessageRoutes.openapi(clientMessageListRoute, async (c) => {
+    const { id: inspectionId } = c.req.valid('param');
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
     const svc = c.var.services.message;
@@ -330,12 +330,11 @@ clientMessageRoutes.get('/inspections/:id/messages', async (c) => {
     const all = await svc.listForInspection(inspectionId, actor.tenantId);
     const messages = thread ? all.filter((mrow) => mrow.contactId === thread.contactId) : all;
     if (thread) await svc.markThreadReadForContact(actor.tenantId, thread.contactId, inspectionId);
-    return c.json({ success: true, data: messages }, 200);
+    return c.json({ success: true as const, data: messages }, 200);
 });
 
-// POST /api/public/inspections/:id/messages — send as client.
-clientMessageRoutes.post('/inspections/:id/messages', async (c) => {
-    const inspectionId = c.req.param('id');
+clientMessageRoutes.openapi(clientMessageSendRoute, async (c) => {
+    const { id: inspectionId } = c.req.valid('param');
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
     const parsed = sendBodySchema.safeParse(await c.req.json().catch(() => null));
@@ -361,7 +360,7 @@ clientMessageRoutes.post('/inspections/:id/messages', async (c) => {
             db: c.env.DB, kv: c.env.TENANT_CACHE, baseUrl: c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`,
         });
     } catch { /* silent */ }
-    return c.json({ success: true, data: row }, 201);
+    return c.json({ success: true as const, data: row }, 201);
 });
 
 // POST /api/public/inspections/:id/messages/upload — attach a file (client).
@@ -392,5 +391,8 @@ clientMessageRoutes.get('/inspections/:id/messages/attachments/:attachmentId', a
     if (!obj) return c.json({ error: 'Not found' }, 404);
     return streamAttachment(obj, att);
 });
+
+export const clientMessageRouteConfigs = [clientMessageListRoute, clientMessageSendRoute] as const;
+export type ClientMessagesApi = ApiOf<typeof clientMessageRouteConfigs>;
 
 export default messageRoutes;
