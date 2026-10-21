@@ -263,10 +263,6 @@
     "kind": "deferred",
     "reason": "Optional host capability declared on the FieldDataSource contract. The editor components that consume resources.settingsSheet are still in app/ and move into the package in Plan B Task 5 (hooks and components move); until they do, nothing in app/ or server/ reads it through this type. Owed: wire it there, and the entry goes."
   },
-  "packages/field-ui/src/data-source-types.ts#TemplateSnapshot.schemaVersion": {
-    "kind": "deferred",
-    "reason": "Structural copy of the stored version discriminator on the editor-data contract. It duplicates the real TemplateSnapshot now that the template types live in the package, and is deleted when data-source-types is rebuilt on those types (the batch after Plan B Task 3d). Owed: remove with the copy."
-  },
   "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.commands": {
     "kind": "record",
     "reason": "The ordered list of commands the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."

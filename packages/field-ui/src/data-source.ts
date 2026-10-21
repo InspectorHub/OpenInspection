@@ -75,7 +75,8 @@ export interface EditorData {
 
 export interface SessionInfo {
   tenantSlug: string | null;
-  videoProvider: 'stream' | 'r2' | null;
+  /** The company's video backend; the session-context contract always answers one of the two. */
+  videoProvider: 'r2' | 'stream';
   streamCustomerSubdomain: string | null;
   collabEditing: boolean;
   /** Replaces the editor's hard-coded presence user id. */

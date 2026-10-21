@@ -1,21 +1,23 @@
 /**
- * Structural data types of the `FieldDataSource` contract.
+ * Data types of the `FieldDataSource` contract.
  *
  * The package may not import from `app/` or `server/` (see
- * `scripts/check-field-ui-boundary.mjs`), so the shapes the editor reads are
- * declared here, field by field, from what `app/routes/inspection-edit/loader.server.ts`
+ * `scripts/check-field-ui-boundary.mjs`). Types that live in `./shared` are
+ * re-exported from there, so the contract and the editor logic share one
+ * definition. The shapes the editor reads that still live in the host
+ * (`app/hooks/useInspection.ts`, the inspection-edit loader, server libraries)
+ * are declared here from what `app/routes/inspection-edit/loader.server.ts`
  * returns and what `app/routes/inspection-edit.tsx` reads off it.
- *
- * Each type below is a TEMPORARY duplicate of an existing definition. When the
- * owning implementation file moves into the package (plan B, Task 3 for pure
- * logic, Task 5 for components), the moved file becomes the single source and
- * the matching declaration here is deleted. The owner is named per type.
- *
- * Where a deep structure is not pinned down yet, the member is typed with a
- * named `unknown` alias (never `any`) that the named later task tightens.
  */
 
-/** Source today: `Inspection` in app/hooks/useInspection.ts. Replaced by Task 3. */
+import type { Snapshot } from './shared/structure-ops';
+import type { PropertyMetaField } from './shared/commercial-subtypes';
+import type { PcaNarrative } from './shared/pca-narrative';
+import type { AutoAdvanceMode } from './shared/rating-levels';
+
+export type { PropertyMetaField, PcaNarrative, AutoAdvanceMode };
+
+/** Mirrors `Inspection` in app/hooks/useInspection.ts. */
 export interface EditorInspection {
   id: string;
   propertyAddress?: string;
@@ -36,7 +38,7 @@ export interface EditorInspection {
   [key: string]: unknown;
 }
 
-/** Source today: `RatingLevel` in app/hooks/useInspection.ts. Replaced by Task 3. */
+/** Mirrors `RatingLevel` in app/hooks/useInspection.ts. */
 export interface RatingLevel {
   id: string;
   label: string;
@@ -51,12 +53,11 @@ export interface RatingLevel {
 
 /**
  * Item bodies carry canned-comment tabs, attributes, options and more; the
- * editor reads them through narrower local types today. Task 3 replaces this
- * alias with the canonical item type moved from server/types/template-schema.ts.
+ * editor reads them through narrower local types.
  */
 export type TemplateItemBody = Record<string, unknown>;
 
-/** Source today: `SchemaItem` in app/hooks/useInspection.ts. Replaced by Task 3. */
+/** Mirrors `SchemaItem` in app/hooks/useInspection.ts. */
 export interface SchemaItem extends TemplateItemBody {
   id: string;
   label: string;
@@ -64,7 +65,7 @@ export interface SchemaItem extends TemplateItemBody {
   type: string;
 }
 
-/** Source today: `SchemaSection` in app/hooks/useInspection.ts. Replaced by Task 3. */
+/** Mirrors `SchemaSection` in app/hooks/useInspection.ts. */
 export interface SchemaSection {
   id: string;
   title: string;
@@ -73,29 +74,29 @@ export interface SchemaSection {
   items: SchemaItem[];
 }
 
-/** The schema after the loader overlays report-data sections. Replaced by Task 3. */
+/** The schema after the loader overlays report-data sections. */
 export interface TemplateSchema {
   sections: SchemaSection[];
 }
 
-/** Source today: `ResultMap` in app/hooks/useInspection.ts. Replaced by Task 3. */
+/** Mirrors `ResultMap` in app/hooks/useInspection.ts. */
 export type ResultMap = Record<string, Record<string, unknown>>;
 
-/** Source today: `TagPin` in app/components/editor/TagChipRow.tsx. Replaced by Task 5. */
+/** Mirrors `TagPin` in app/components/editor/TagChipRow.tsx. */
 export interface TagLibraryEntry {
   id: string;
   name: string;
   color: string;
 }
 
-/** The loader returns `{ id, name, color }` rows. Replaced by Task 5 if a component type is moved. */
+/** The loader returns `{ id, name, color }` rows. */
 export interface DefectCategory {
   id: string;
   name: string;
   color: string;
 }
 
-/** Source today: `UnitScopeRow` in app/components/editor/BreadcrumbDropdown.tsx. Replaced by Task 5. */
+/** Mirrors `UnitScopeRow` in app/components/editor/BreadcrumbDropdown.tsx. */
 export interface InspectionUnit {
   id: string;
   name: string;
@@ -115,20 +116,15 @@ export interface UnitProgress {
 
 /**
  * The raw, un-normalised template snapshot structural operations rebuild from.
- * Sections stay opaque: the editor hands them back to the data source unchanged.
- * Task 3 narrows `sections` to the canonical `TemplateSection[]`.
+ * This is the `Snapshot` the structural operations in `./shared/structure-ops`
+ * take and return, so a snapshot read from the data source feeds them directly.
  */
-export interface TemplateSnapshot {
-  schemaVersion: 2;
-  sections: unknown[];
-  [key: string]: unknown;
-}
+export type TemplateSnapshot = Snapshot;
 
 /**
  * Source today: `RevisionStatus` in server/lib/statutory/revision-status.ts, which
  * is NOT moved into the package (it pulls in pdf-lib). The data source computes
- * it, so this declaration stays the package's own contract; a drift test against
- * the server union belongs to Task 3.
+ * it, so this declaration is the package's own contract.
  */
 export type RevisionStatus =
   | { kind: 'current' }
@@ -138,13 +134,13 @@ export type RevisionStatus =
   | {
       kind: 'withdrawn';
       version: string;
-      /** The server's `WithdrawalReason` union; tightened by the Task 3 drift test. */
+      /** The server's `WithdrawalReason` union. */
       reason: string;
       withdrawnAt: number;
       replacementVersion: string | null;
     };
 
-/** Source today: the local `StatutoryDetails` in loader.server.ts. Replaced by Task 5. */
+/** Mirrors the local `StatutoryDetails` in loader.server.ts. */
 export interface StatutoryDetails {
   inspectorSignatureDate: string | null;
   employeePrintedName: string | null;
@@ -156,7 +152,7 @@ export interface StatutoryDetails {
   ownerCellPhone: string | null;
 }
 
-/** Source today: the local `StatutoryCoverage` in loader.server.ts. Replaced by Task 5. */
+/** Mirrors the local `StatutoryCoverage` in loader.server.ts. */
 export interface StatutoryCoverage {
   formId: string;
   formTitle: string;
@@ -196,7 +192,7 @@ export interface RelianceText {
   siteSpecific: string;
 }
 
-/** Source today: `CompliancePanelData` in app/components/inspection-edit/CompliancePanel.tsx. Replaced by Task 5. */
+/** Mirrors `CompliancePanelData` in app/components/inspection-edit/CompliancePanel.tsx. */
 export interface CompliancePanelData {
   reportSignoffs: ReportSignoffView[];
   psq: PsqView | null;
@@ -205,43 +201,15 @@ export interface CompliancePanelData {
   relianceText: RelianceText;
 }
 
-/** Source today: `PcaNarrative` in server/lib/pca-narrative.ts. Replaced by Task 3. */
-export interface PcaNarrative {
-  transmittalLetter: string;
-  summaryGeneralDescription: string;
-  summaryPhysicalCondition: string;
-  summaryRecommendations: string;
-  purpose: string;
-  scopeOfWork: string;
-  limitationsExceptions: string;
-  reconnaissance: string;
-  additionalConsiderations: string;
-}
-
-/** Source today: `PropertyMetaField` in server/lib/commercial-subtypes.ts. Replaced by Task 3. */
-export interface PropertyMetaField {
-  id: string;
-  label: string;
-  type: 'text' | 'number' | 'select' | 'boolean' | 'date';
-  group?: string;
-  required?: boolean;
-  unit?: string;
-  options?: string[];
-}
-
 /** The loader returns the `commercial:<subtype>`-keyed subset of METADATA_PRESETS. */
 export type CommercialPresets = Record<string, PropertyMetaField[]>;
 
-/** Duplicate of `AutoAdvanceMode` in `shared/rating-levels.ts`; collapsing the two is a later task. */
-export type AutoAdvanceMode = 'always' | 'keyboard' | 'off';
-
-/** Source today: `ReportLinkTtl` in server/lib/report-link-ttl.ts. Replaced by Task 3. */
+/** Mirrors `ReportLinkTtl` in server/lib/report-link-ttl.ts (server code, not importable here). */
 export type ReportLinkTtl = 'never' | { count: number; unit: 'days' | 'months' | 'years' };
 
 /**
  * The tenant's inspection-editor preferences, as `useInspectionPrefs` reads and
- * patches them (app/hooks/useInspectionPrefs.ts, `InspectionPrefs`). Replaced by
- * Task 5 when the hook moves into the package.
+ * patches them (app/hooks/useInspectionPrefs.ts, `InspectionPrefs`).
  */
 export interface InspectionPrefs {
   cloneDefault: 'rating' | 'rating_notes' | 'all';

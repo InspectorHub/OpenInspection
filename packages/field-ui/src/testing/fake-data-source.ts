@@ -53,7 +53,7 @@ export interface FakeDataSource extends FieldDataSource {
 
 const DEFAULT_SESSION: SessionInfo = {
   tenantSlug: null,
-  videoProvider: null,
+  videoProvider: 'r2',
   streamCustomerSubdomain: null,
   collabEditing: false,
   userId: 'fake-user',
