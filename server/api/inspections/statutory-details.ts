@@ -108,25 +108,30 @@ async function requireStatutoryInspection(
     if (!declaration) throw Errors.NotFound('This inspection produces no statutory form');
 }
 
-const statutoryDetailsRoutes = createApiRouter()
-    .openapi(readRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB, { schema });
-        await requireStatutoryInspection(db, tenantId, id);
-        const details = await new StatutoryDetailsService(db).get(tenantId, id);
-        return c.json({ success: true, data: details }, 200);
-    })
+const app = createApiRouter();
+app.openapi(readRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB, { schema });
+    await requireStatutoryInspection(db, tenantId, id);
+    const details = await new StatutoryDetailsService(db).get(tenantId, id);
+    return c.json({ success: true, data: details }, 200);
+});
+app.openapi(writeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    const db = drizzle(c.env.DB, { schema });
+    await requireStatutoryInspection(db, tenantId, id);
+    const details = await new StatutoryDetailsService(db)
+        .save(tenantId, id, patch, Date.now());
+    return c.json({ success: true, data: details }, 200);
+});
 
-    .openapi(writeRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const db = drizzle(c.env.DB, { schema });
-        await requireStatutoryInspection(db, tenantId, id);
-        const details = await new StatutoryDetailsService(db)
-            .save(tenantId, id, patch, Date.now());
-        return c.json({ success: true, data: details }, 200);
-    });
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const statutoryDetailsRouteConfigs = [
+    readRoute,
+    writeRoute,
+] as const;
 
-export default statutoryDetailsRoutes;
+export default app;

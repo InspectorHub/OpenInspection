@@ -217,108 +217,118 @@ async function personOnInspection(
 
 const NO_ACCESS = { status: 'not_sent' as const, sentAt: null, expiresAt: null };
 
-const peopleRoutes = createApiRouter()
-    .openapi(listPeopleRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        await assertInspectionOwned(getDrizzle(c), id, tenantId);
-        const people: PersonServiceRow[] = await c.var.services.people.listPeople(tenantId, id);
-        // IA-36 ⑪ — join the report-link state on by recipient email. Kept in
-        // the handler (not PeopleService) so the people service stays free of
-        // the portal-access dependency, same seam as the remove→revoke cascade.
-        const access: PortalAccessRowView[] = await c.var.services.portalAccess.listAccessForInspection(tenantId, id);
-        const byEmail = new Map(access.map((a) => [a.recipientEmail, a]));
-        const data = people.map((p) => {
-            const a = p.email ? byEmail.get(p.email) : undefined;
-            return {
-                ...p,
-                access: a ? { status: a.status, sentAt: a.sentAt, expiresAt: a.expiresAt } : NO_ACCESS,
-            };
-        });
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(addPersonRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const { contactId, roleProfileId } = c.req.valid('json');
-        const db = getDrizzle(c);
-        await assertInspectionOwned(db, id, tenantId);
-
-        // Tenant-ownership pre-check for BOTH ids before ever calling
-        // PeopleService.addPerson — see file header for why this can't be
-        // skipped (addPerson does not verify contactId at all).
-        // A contact the caller cannot see answers exactly like one that does not exist, and is never attached:
-        // attaching it to a visible inspection would make it visible to them.
-        await requireVisibleContact(db, await resolveInspectionScope(c), tenantId, contactId);
-        const contact = await db.select({ id: contacts.id }).from(contacts)
-            .where(and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId))).get();
-        if (!contact) throw Errors.NotFound('Contact not found');
-        const profile = await db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
-            .where(and(eq(contactRoleProfiles.id, roleProfileId), eq(contactRoleProfiles.tenantId, tenantId))).get();
-        if (!profile) throw Errors.NotFound('Role profile not found');
-
-        const { added } = await c.var.services.people.addPerson(tenantId, id, contactId, roleProfileId);
-        return c.json({ success: true as const, data: { added } }, 201);
-    })
-    .openapi(removePersonRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id, personId } = c.req.valid('param');
-        await assertInspectionOwned(getDrizzle(c), id, tenantId);
-        // IA-36 ⑬ — the primary client IS removable; what is not allowed is
-        // leaving the inspection with nobody on the client side. Say so, rather
-        // than hiding the control and letting the operator guess why.
-        const people: PersonServiceRow[] = await c.var.services.people.listPeople(tenantId, id);
-        if (isSoleClient(people, personId)) {
-            throw Errors.Conflict('This is the only client on the inspection. Add another client or make someone else primary first.');
-        }
-        const { email } = await c.var.services.people.removePerson(tenantId, id, personId);
-        // IA-36 ① — leaving the inspection stops the person's report link. Their
-        // access token is revoked (revokedAt beats any expiry, so the link is
-        // dead regardless of the report-link TTL).
-        if (email) {
-            const { previousTokenHash } = await c.var.services.portalAccess.revokeForRecipient(tenantId, id, email) ?? {};
-            // ④ — the only durable trace of "which link stopped working, when,
-            // and on whose action". Hash only: the plaintext never leaves the
-            // sealed column, least of all into a log the whole company can read.
-            auditFromContext(c, 'portal_access.revoked', 'inspection', {
-                entityId: id,
-                metadata: { recipientEmail: email, previousTokenHash: previousTokenHash ?? null, reason: 'removed_from_inspection' },
-            });
-        }
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(resetAccessRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id, personId } = c.req.valid('param');
-        await assertInspectionOwned(getDrizzle(c), id, tenantId);
-        const { person } = await personOnInspection(c, tenantId, id, personId);
-        if (!person.email) throw Errors.BadRequest('This person has no email address, so they have no report link.');
-        const rotated = await c.var.services.portalAccess.rotateForRecipient(tenantId, id, person.email);
-        if (!rotated) throw Errors.NotFound('No report link has been issued to this person yet.');
-        auditFromContext(c, 'portal_access.rotated', 'inspection', {
-            entityId: id,
-            metadata: { recipientEmail: person.email, previousTokenHash: rotated.previousTokenHash },
-        });
-        // The new token is NOT returned. It reaches the recipient the same way
-        // the first one did — by sending the report — so a rotated link never
-        // sits in a browser history or a support-chat paste.
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(makePrimaryRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id, personId } = c.req.valid('param');
-        await assertInspectionOwned(getDrizzle(c), id, tenantId);
-        await c.var.services.people.makePrimary(tenantId, id, personId);
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(reportLinkExpiryRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const { ttl } = c.req.valid('json');
-        await assertInspectionOwned(getDrizzle(c), id, tenantId);
-        const expiresAt = reportLinkExpiresAt(ttl, Date.now());
-        await c.var.services.portalAccess.setExpiryForInspection(tenantId, id, expiresAt);
-        return c.json({ success: true as const, data: { expiresAt } }, 200);
+const app = createApiRouter();
+app.openapi(listPeopleRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    await assertInspectionOwned(getDrizzle(c), id, tenantId);
+    const people: PersonServiceRow[] = await c.var.services.people.listPeople(tenantId, id);
+    // IA-36 ⑪ — join the report-link state on by recipient email. Kept in
+    // the handler (not PeopleService) so the people service stays free of
+    // the portal-access dependency, same seam as the remove→revoke cascade.
+    const access: PortalAccessRowView[] = await c.var.services.portalAccess.listAccessForInspection(tenantId, id);
+    const byEmail = new Map(access.map((a) => [a.recipientEmail, a]));
+    const data = people.map((p) => {
+        const a = p.email ? byEmail.get(p.email) : undefined;
+        return {
+            ...p,
+            access: a ? { status: a.status, sentAt: a.sentAt, expiresAt: a.expiresAt } : NO_ACCESS,
+        };
     });
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(addPersonRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const { contactId, roleProfileId } = c.req.valid('json');
+    const db = getDrizzle(c);
+    await assertInspectionOwned(db, id, tenantId);
 
-export default peopleRoutes;
+    // Tenant-ownership pre-check for BOTH ids before ever calling
+    // PeopleService.addPerson — see file header for why this can't be
+    // skipped (addPerson does not verify contactId at all).
+    // A contact the caller cannot see answers exactly like one that does not exist, and is never attached:
+    // attaching it to a visible inspection would make it visible to them.
+    await requireVisibleContact(db, await resolveInspectionScope(c), tenantId, contactId);
+    const contact = await db.select({ id: contacts.id }).from(contacts)
+        .where(and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId))).get();
+    if (!contact) throw Errors.NotFound('Contact not found');
+    const profile = await db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
+        .where(and(eq(contactRoleProfiles.id, roleProfileId), eq(contactRoleProfiles.tenantId, tenantId))).get();
+    if (!profile) throw Errors.NotFound('Role profile not found');
+
+    const { added } = await c.var.services.people.addPerson(tenantId, id, contactId, roleProfileId);
+    return c.json({ success: true as const, data: { added } }, 201);
+});
+app.openapi(removePersonRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id, personId } = c.req.valid('param');
+    await assertInspectionOwned(getDrizzle(c), id, tenantId);
+    // IA-36 ⑬ — the primary client IS removable; what is not allowed is
+    // leaving the inspection with nobody on the client side. Say so, rather
+    // than hiding the control and letting the operator guess why.
+    const people: PersonServiceRow[] = await c.var.services.people.listPeople(tenantId, id);
+    if (isSoleClient(people, personId)) {
+        throw Errors.Conflict('This is the only client on the inspection. Add another client or make someone else primary first.');
+    }
+    const { email } = await c.var.services.people.removePerson(tenantId, id, personId);
+    // IA-36 ① — leaving the inspection stops the person's report link. Their
+    // access token is revoked (revokedAt beats any expiry, so the link is
+    // dead regardless of the report-link TTL).
+    if (email) {
+        const { previousTokenHash } = await c.var.services.portalAccess.revokeForRecipient(tenantId, id, email) ?? {};
+        // ④ — the only durable trace of "which link stopped working, when,
+        // and on whose action". Hash only: the plaintext never leaves the
+        // sealed column, least of all into a log the whole company can read.
+        auditFromContext(c, 'portal_access.revoked', 'inspection', {
+            entityId: id,
+            metadata: { recipientEmail: email, previousTokenHash: previousTokenHash ?? null, reason: 'removed_from_inspection' },
+        });
+    }
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(resetAccessRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id, personId } = c.req.valid('param');
+    await assertInspectionOwned(getDrizzle(c), id, tenantId);
+    const { person } = await personOnInspection(c, tenantId, id, personId);
+    if (!person.email) throw Errors.BadRequest('This person has no email address, so they have no report link.');
+    const rotated = await c.var.services.portalAccess.rotateForRecipient(tenantId, id, person.email);
+    if (!rotated) throw Errors.NotFound('No report link has been issued to this person yet.');
+    auditFromContext(c, 'portal_access.rotated', 'inspection', {
+        entityId: id,
+        metadata: { recipientEmail: person.email, previousTokenHash: rotated.previousTokenHash },
+    });
+    // The new token is NOT returned. It reaches the recipient the same way
+    // the first one did — by sending the report — so a rotated link never
+    // sits in a browser history or a support-chat paste.
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(makePrimaryRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id, personId } = c.req.valid('param');
+    await assertInspectionOwned(getDrizzle(c), id, tenantId);
+    await c.var.services.people.makePrimary(tenantId, id, personId);
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(reportLinkExpiryRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const { ttl } = c.req.valid('json');
+    await assertInspectionOwned(getDrizzle(c), id, tenantId);
+    const expiresAt = reportLinkExpiresAt(ttl, Date.now());
+    await c.var.services.portalAccess.setExpiryForInspection(tenantId, id, expiresAt);
+    return c.json({ success: true as const, data: { expiresAt } }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const peopleRouteConfigs = [
+    listPeopleRoute,
+    addPersonRoute,
+    removePersonRoute,
+    resetAccessRoute,
+    makePrimaryRoute,
+    reportLinkExpiryRoute,
+] as const;
+
+export default app;

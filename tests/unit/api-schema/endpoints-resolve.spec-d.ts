@@ -19,6 +19,7 @@ import type { EmailTemplatesApi } from '../../../server/api/email-templates';
 import type { EvidenceApi } from '../../../server/api/evidence';
 import type { InspectionPrefsApi } from '../../../server/api/inspection-prefs';
 import type { InspectionRequestsApi } from '../../../server/api/inspection-requests';
+import type { InspectionsApi } from '../../../server/api/inspections';
 import type { IntegrationsApi } from '../../../server/api/integrations';
 import type { IntegrationsAiApi } from '../../../server/api/integrations-ai';
 import type { IntegrationsTestStepsApi } from '../../../server/api/integrations-test-steps';
@@ -83,6 +84,7 @@ describe('converted routers: every route resolves to an endpoint', () => {
         expectTypeOf<Unresolved<SchemaOf<EvidenceApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<InspectionPrefsApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<InspectionRequestsApi>>>().toEqualTypeOf<never>();
+        expectTypeOf<Unresolved<SchemaOf<InspectionsApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<IntegrationsAiApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<IntegrationsTestStepsApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<McpGrantsApi>>>().toEqualTypeOf<never>();
@@ -99,6 +101,7 @@ describe('converted routers: every route resolves to an endpoint', () => {
         expectTypeOf<Unresolved<SchemaOf<UsersApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<WidgetApi>>>().toEqualTypeOf<never>();
         expectTypeOf<EmptyPaths<SchemaOf<AdminApi>>>().toEqualTypeOf<never>();
+        expectTypeOf<EmptyPaths<SchemaOf<InspectionsApi>>>().toEqualTypeOf<never>();
         expectTypeOf<EmptyPaths<SchemaOf<PublicReportApi>>>().toEqualTypeOf<never>();
     });
 

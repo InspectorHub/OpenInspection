@@ -61,9 +61,22 @@ function expected(parts: readonly RoutePart[], prefix = '/'): string[] {
     });
 }
 
-/** The same list as Hono's route table spells it (`{id}` is `:id`). */
-function expectedDispatch(parts: readonly RoutePart[]): string[] {
-    return expected(parts).map((key) => key.replace(/\{([^}]+)\}/g, ':$1'));
+/**
+ * The same list as Hono's route table spells it (`{id}` is `:id`). A legacy mount contributes what the child
+ * router dispatches, not what it registered with OpenAPI: a child written as a chain may also carry plain
+ * `.get()` / `.post()` routes, which the OpenAPI registry never sees but Hono does dispatch.
+ */
+function expectedDispatch(parts: readonly RoutePart[], prefix = '/'): string[] {
+    return parts.flatMap((part) => {
+        if (isMounted(part)) return expectedDispatch(part.parts, mergePath(prefix, part.prefix));
+        if (isLegacy(part)) {
+            return dispatched(part.router as Router).map((key) => {
+                const [method, path] = key.split(' ');
+                return `${method} ${mergePath(prefix, mergePath(part.prefix, path ?? '/'))}`;
+            });
+        }
+        return [`${part.method} ${mergePath(prefix, part.path)}`.replace(/\{([^}]+)\}/g, ':$1')];
+    });
 }
 
 function mountsIn(parts: readonly RoutePart[]): AnyMounted[] {

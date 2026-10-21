@@ -63,151 +63,156 @@ const sendSmsRoute = createRoute(withMcpMetadata({
         + 'Recipients must be people already on the inspection who have a phone — no free-typed numbers. At most ten recipients per request, each listed once, and the same person is texted at most three times per hour per inspection (429 past that). Owner and manager, and inspectors assigned to the inspection or granted the scheduleOthers capability; other inspectors get 403.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-const sendSmsRoutes = createApiRouter()
-    .openapi(sendSmsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = getTenantId(c);
-        const { recipients } = c.req.valid('json');
-        const db = getDrizzle(c);
-        const rawDb = c.env.DB;
+const app = createApiRouter();
+app.openapi(sendSmsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = getTenantId(c);
+    const { recipients } = c.req.valid('json');
+    const db = getDrizzle(c);
+    const rawDb = c.env.DB;
 
-        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
-        const tenant = await db.select().from(tenants).where(eq(tenants.id, tenantId)).get();
-        if (!tenant) throw Errors.NotFound('Tenant');
+    const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+    const tenant = await db.select().from(tenants).where(eq(tenants.id, tenantId)).get();
+    if (!tenant) throw Errors.NotFound('Tenant');
 
-        const primary = await c.var.services.people.getPrimaryClient(tenantId, id);
-        const flushInspection = {
-            id,
-            tenantId,
-            propertyAddress: String(inspection.propertyAddress ?? ''),
-            date: String(inspection.date ?? ''),
-            status: inspection.status,
-            reportStatus: inspection.reportStatus,
-            paymentStatus: inspection.paymentStatus,
-            clientContactId: primary?.contactId ?? null,
-            clientName: primary?.name ?? null,
-        };
+    const primary = await c.var.services.people.getPrimaryClient(tenantId, id);
+    const flushInspection = {
+        id,
+        tenantId,
+        propertyAddress: String(inspection.propertyAddress ?? ''),
+        date: String(inspection.date ?? ''),
+        status: inspection.status,
+        reportStatus: inspection.reportStatus,
+        paymentStatus: inspection.paymentStatus,
+        clientContactId: primary?.contactId ?? null,
+        clientName: primary?.name ?? null,
+    };
 
-        const deployProfile = c.var.profile;
-        const quotaGuard = deployProfile?.hasUsageQuota
-            ? new PlanQuotaGuard(rawDb, { enforced: true, billingPortalUrl: deployProfile.billingPortalUrl, aiCaps: tenantAiCapsLoader(rawDb) })
-            : undefined;
-        const metering = deployProfile?.hasUsageQuota ? new MeteringService(rawDb) : undefined;
+    const deployProfile = c.var.profile;
+    const quotaGuard = deployProfile?.hasUsageQuota
+        ? new PlanQuotaGuard(rawDb, { enforced: true, billingPortalUrl: deployProfile.billingPortalUrl, aiCaps: tenantAiCapsLoader(rawDb) })
+        : undefined;
+    const metering = deployProfile?.hasUsageQuota ? new MeteringService(rawDb) : undefined;
 
-        const sms = {
-            resolveProvider: (tid: string) => loadProviderForTenant(c.env, tid),
-        };
+    const sms = {
+        resolveProvider: (tid: string) => loadProviderForTenant(c.env, tid),
+    };
 
-        const appName = c.env.APP_NAME || 'OpenInspection';
-        const appHost = getBaseUrl(c);
-        const sentTo: string[] = [];
-        const skipped: Array<{ recipient: string; reason: string; outcome: 'skipped' | 'failed' }> = [];
+    const appName = c.env.APP_NAME || 'OpenInspection';
+    const appHost = getBaseUrl(c);
+    const sentTo: string[] = [];
+    const skipped: Array<{ recipient: string; reason: string; outcome: 'skipped' | 'failed' }> = [];
 
-        // Shared sendAt so the Outbox collapses the batch (same as A2 email).
-        const batchSendAt = new Date();
+    // Shared sendAt so the Outbox collapses the batch (same as A2 email).
+    const batchSendAt = new Date();
 
-        for (const recipient of recipients) {
-            const label = recipient.contactId;
-            try {
-                // Must be seated on this inspection with this role — no freelancers.
-                const seated = await db.select({
-                    phone: contacts.phone,
-                    roleKey: contactRoleProfiles.key,
-                }).from(inspectionPeople)
-                    .innerJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
-                    .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
-                    .where(and(
-                        eq(inspectionPeople.tenantId, tenantId),
-                        eq(inspectionPeople.inspectionId, id),
-                        eq(inspectionPeople.contactId, recipient.contactId),
-                        eq(contactRoleProfiles.key, recipient.roleKey),
-                        eq(contacts.tenantId, tenantId),
-                    ))
-                    .get();
+    for (const recipient of recipients) {
+        const label = recipient.contactId;
+        try {
+            // Must be seated on this inspection with this role — no freelancers.
+            const seated = await db.select({
+                phone: contacts.phone,
+                roleKey: contactRoleProfiles.key,
+            }).from(inspectionPeople)
+                .innerJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
+                .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
+                .where(and(
+                    eq(inspectionPeople.tenantId, tenantId),
+                    eq(inspectionPeople.inspectionId, id),
+                    eq(inspectionPeople.contactId, recipient.contactId),
+                    eq(contactRoleProfiles.key, recipient.roleKey),
+                    eq(contacts.tenantId, tenantId),
+                ))
+                .get();
 
-                if (!seated) {
-                    const reason = 'Person is not on this inspection with that role';
-                    skipped.push({ recipient: label, reason, outcome: 'skipped' });
-                    continue;
-                }
-                if (!seated.phone) {
-                    const reason = 'No phone on file for this recipient';
-                    skipped.push({ recipient: label, reason, outcome: 'skipped' });
-                    continue;
-                }
+            if (!seated) {
+                const reason = 'Person is not on this inspection with that role';
+                skipped.push({ recipient: label, reason, outcome: 'skipped' });
+                continue;
+            }
+            if (!seated.phone) {
+                const reason = 'No phone on file for this recipient';
+                skipped.push({ recipient: label, reason, outcome: 'skipped' });
+                continue;
+            }
 
-                const roleTpl = await resolveRoleSmsTemplate(db, rawDb, tenantId, recipient.roleKey);
-                const bodyTemplate = roleTpl?.body ?? DEFAULT_SMS_BODY;
+            const roleTpl = await resolveRoleSmsTemplate(db, rawDb, tenantId, recipient.roleKey);
+            const bodyTemplate = roleTpl?.body ?? DEFAULT_SMS_BODY;
 
-                const logId = crypto.randomUUID();
-                await db.insert(automationLogs).values({
-                    id: logId,
-                    tenantId,
-                    automationId: null,
-                    inspectionId: id,
-                    recipient: seated.phone,
-                    recipientRoleKey: recipient.roleKey,
-                    recipientContactId: recipient.contactId,
-                    channel: 'sms',
-                    sendAt: batchSendAt,
-                    deliveredAt: null,
-                    status: 'pending',
-                    error: null,
+            const logId = crypto.randomUUID();
+            await db.insert(automationLogs).values({
+                id: logId,
+                tenantId,
+                automationId: null,
+                inspectionId: id,
+                recipient: seated.phone,
+                recipientRoleKey: recipient.roleKey,
+                recipientContactId: recipient.contactId,
+                channel: 'sms',
+                sendAt: batchSendAt,
+                deliveredAt: null,
+                status: 'pending',
+                error: null,
+            });
+
+            const log = await db.select().from(automationLogs)
+                .where(and(eq(automationLogs.id, logId), eq(automationLogs.tenantId, tenantId)))
+                .get();
+            if (!log) throw new Error('Failed to insert SMS ledger row');
+
+            await sendOneSms({
+                db,
+                log,
+                inspection: flushInspection,
+                tenant,
+                bodyTemplate,
+                sms,
+                appName,
+                appHost,
+                env: c.env,
+                ...(quotaGuard ? { quotaGuard } : {}),
+                ...(metering ? { metering } : {}),
+            });
+
+            const after = await db.select({ status: automationLogs.status, error: automationLogs.error })
+                .from(automationLogs)
+                .where(and(eq(automationLogs.id, logId), eq(automationLogs.tenantId, tenantId)))
+                .get();
+
+            if (after?.status === 'sent') {
+                sentTo.push(seated.phone);
+                // Only a text that went out spends the hourly allowance.
+                await recordSmsSent(c, id, recipient.contactId).catch(() => {});
+                auditFromContext(c, 'inspection.send_sms', 'inspection', {
+                    entityId: id,
+                    metadata: { recipient: seated.phone, roleKey: recipient.roleKey, channel: 'sms' },
                 });
-
-                const log = await db.select().from(automationLogs)
-                    .where(and(eq(automationLogs.id, logId), eq(automationLogs.tenantId, tenantId)))
-                    .get();
-                if (!log) throw new Error('Failed to insert SMS ledger row');
-
-                await sendOneSms({
-                    db,
-                    log,
-                    inspection: flushInspection,
-                    tenant,
-                    bodyTemplate,
-                    sms,
-                    appName,
-                    appHost,
-                    env: c.env,
-                    ...(quotaGuard ? { quotaGuard } : {}),
-                    ...(metering ? { metering } : {}),
-                });
-
-                const after = await db.select({ status: automationLogs.status, error: automationLogs.error })
-                    .from(automationLogs)
-                    .where(and(eq(automationLogs.id, logId), eq(automationLogs.tenantId, tenantId)))
-                    .get();
-
-                if (after?.status === 'sent') {
-                    sentTo.push(seated.phone);
-                    // Only a text that went out spends the hourly allowance.
-                    await recordSmsSent(c, id, recipient.contactId).catch(() => {});
-                    auditFromContext(c, 'inspection.send_sms', 'inspection', {
-                        entityId: id,
-                        metadata: { recipient: seated.phone, roleKey: recipient.roleKey, channel: 'sms' },
-                    });
-                } else {
-                    skipped.push({
-                        recipient: label,
-                        reason: after?.error ?? after?.status ?? 'Send failed',
-                        outcome: after?.status === 'failed' ? 'failed' : 'skipped',
-                    });
-                }
-            } catch (err) {
-                logger.error('[send-sms] recipient send failed', { inspectionId: id, recipient: label }, err instanceof Error ? err : undefined);
+            } else {
                 skipped.push({
                     recipient: label,
-                    reason: err instanceof Error ? err.message : 'Send failed',
-                    outcome: 'failed',
+                    reason: after?.error ?? after?.status ?? 'Send failed',
+                    outcome: after?.status === 'failed' ? 'failed' : 'skipped',
                 });
             }
+        } catch (err) {
+            logger.error('[send-sms] recipient send failed', { inspectionId: id, recipient: label }, err instanceof Error ? err : undefined);
+            skipped.push({
+                recipient: label,
+                reason: err instanceof Error ? err.message : 'Send failed',
+                outcome: 'failed',
+            });
         }
+    }
 
-        return c.json({
-            success: true as const,
-            data: { sentTo, ...(skipped.length ? { skipped } : {}) },
-        }, 200);
-    });
+    return c.json({
+        success: true as const,
+        data: { sentTo, ...(skipped.length ? { skipped } : {}) },
+    }, 200);
+});
 
-export default sendSmsRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const sendSmsRouteConfigs = [
+    sendSmsRoute,
+] as const;
+
+export default app;

@@ -76,46 +76,55 @@ const patchNarrativeRoute = createRoute(withMcpMetadata({
     description: "Replaces the report-level narrative wholesale; null or blank clears it. Last writer wins, so a retry stores the same text. The narrative carries professional liability: model-assisted drafts must be recorded in ai_content_reviews (artifact_type 'report', artifact_id this reports.id) by the surface that offered them, before the text is saved here.",
 }, { scopes: ['write'], tier: 'extended' }));
 
-const inspectionReportRoutes = createApiRouter()
-    // DELETE /api/inspections/:id/reports/:reportId
-    .openapi(createRoute(withMcpMetadata({
-        method: 'delete', path: '/{id}/reports/{reportId}',
-        tags: ['inspections'],
-        summary: 'Delete one deliverable from an inspection',
-        middleware: [requireRole('owner', 'manager')] as const,
-        request: { params: ReportParam },
-        responses: {
-            200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Report and its document deleted' },
-            404: { description: 'Report not found on this inspection in this tenant' },
-            409: { description: 'Refused: the report is the primary one, or it has been published' },
-        },
-        operationId: 'deleteInspectionReport',
-        description: 'Permanently deletes one report and everything belonging only to it — its findings document, the collaborative Yjs state, and its version rows. The billing line that produced it is untouched. Refused for the primary report (every order keeps one; without it the order cannot be edited) and for a published report (it has been delivered and its signed versions are what let a client verify what they hold).',
-    }, { scopes: ['write'], tier: 'primary' })), async (c) => {
-        const tenantId = getTenantId(c);
-        const { id, reportId } = c.req.valid('param');
-        await deleteReport(getDrizzle(c), tenantId, id, reportId);
-        return c.json({ success: true });
-    })
-    .openapi(getNarrativeRoute, async (c) => {
-        const { id, reportId } = c.req.valid('param');
-        const inspectorNarrative = await getReportNarrative(getDrizzle(c), getTenantId(c), id, reportId);
-        return c.json({ success: true as const, data: { reportId, inspectorNarrative } }, 200);
-    })
-    .openapi(patchNarrativeRoute, async (c) => {
-        const { id, reportId } = c.req.valid('param');
-        const { inspectorNarrative } = c.req.valid('json');
-        const stored = await setReportNarrative(getDrizzle(c), getTenantId(c), id, reportId, inspectorNarrative);
-        // The LENGTH, never the prose. An audit row is read by people who are
-        // not the client, and the narrative is findings about a named person's
-        // property — logging it would copy that text into a second table with a
-        // different retention story. What an auditor needs is that this person
-        // rewrote this report's narrative at this time.
-        auditFromContext(c, 'inspection.report_narrative.update', 'inspection', {
-            entityId: id,
-            metadata: { reportId, cleared: stored === null, length: stored?.length ?? 0 },
-        });
-        return c.json({ success: true as const, data: { reportId, inspectorNarrative: stored } }, 200);
-    });
+const deleteInspectionReportRoute = createRoute(withMcpMetadata({
+    method: 'delete', path: '/{id}/reports/{reportId}',
+    tags: ['inspections'],
+    summary: 'Delete one deliverable from an inspection',
+    middleware: [requireRole('owner', 'manager')] as const,
+    request: { params: ReportParam },
+    responses: {
+        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Report and its document deleted' },
+        404: { description: 'Report not found on this inspection in this tenant' },
+        409: { description: 'Refused: the report is the primary one, or it has been published' },
+    },
+    operationId: 'deleteInspectionReport',
+    description: 'Permanently deletes one report and everything belonging only to it — its findings document, the collaborative Yjs state, and its version rows. The billing line that produced it is untouched. Refused for the primary report (every order keeps one; without it the order cannot be edited) and for a published report (it has been delivered and its signed versions are what let a client verify what they hold).',
+}, { scopes: ['write'], tier: 'primary' }));
 
-export default inspectionReportRoutes;
+const app = createApiRouter();
+// DELETE /api/inspections/:id/reports/:reportId
+app.openapi(deleteInspectionReportRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id, reportId } = c.req.valid('param');
+    await deleteReport(getDrizzle(c), tenantId, id, reportId);
+    return c.json({ success: true });
+});
+app.openapi(getNarrativeRoute, async (c) => {
+    const { id, reportId } = c.req.valid('param');
+    const inspectorNarrative = await getReportNarrative(getDrizzle(c), getTenantId(c), id, reportId);
+    return c.json({ success: true as const, data: { reportId, inspectorNarrative } }, 200);
+});
+app.openapi(patchNarrativeRoute, async (c) => {
+    const { id, reportId } = c.req.valid('param');
+    const { inspectorNarrative } = c.req.valid('json');
+    const stored = await setReportNarrative(getDrizzle(c), getTenantId(c), id, reportId, inspectorNarrative);
+    // The LENGTH, never the prose. An audit row is read by people who are
+    // not the client, and the narrative is findings about a named person's
+    // property — logging it would copy that text into a second table with a
+    // different retention story. What an auditor needs is that this person
+    // rewrote this report's narrative at this time.
+    auditFromContext(c, 'inspection.report_narrative.update', 'inspection', {
+        entityId: id,
+        metadata: { reportId, cleared: stored === null, length: stored?.length ?? 0 },
+    });
+    return c.json({ success: true as const, data: { reportId, inspectorNarrative: stored } }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const inspectionReportRouteConfigs = [
+    deleteInspectionReportRoute,
+    getNarrativeRoute,
+    patchNarrativeRoute,
+] as const;
+
+export default app;

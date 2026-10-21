@@ -66,28 +66,33 @@ const relockReportRoute = createRoute(withMcpMetadata({
     description: 'Restores the agreement/payment gate for this inspection and clears the recorded unlock reason.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-const reportGateRoutes = createApiRouter()
-    .openapi(unlockReportRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const { reason } = c.req.valid('json');
-        const userId = c.get('user')?.sub ?? '';
-        const { alreadyUnlocked } = await c.var.services.inspection.unlockReportGate(tenantId, id, userId, reason);
-        // Audited even when it was already unlocked: someone asked for this, and
-        // the attempt is part of the story of who wanted the gate open.
-        auditFromContext(c, 'inspection.report_unlocked', 'inspection', {
-            entityId: id,
-            metadata: { reason, alreadyUnlocked },
-        });
-        return c.json({ success: true as const, data: { unlocked: true } }, 200);
-    })
-    .openapi(relockReportRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        await c.var.services.inspection.relockReportGate(tenantId, id);
-        auditFromContext(c, 'inspection.report_relocked', 'inspection', { entityId: id });
-        return c.json({ success: true as const, data: { unlocked: false } }, 200);
-    })
-;
+const app = createApiRouter();
+app.openapi(unlockReportRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const { reason } = c.req.valid('json');
+    const userId = c.get('user')?.sub ?? '';
+    const { alreadyUnlocked } = await c.var.services.inspection.unlockReportGate(tenantId, id, userId, reason);
+    // Audited even when it was already unlocked: someone asked for this, and
+    // the attempt is part of the story of who wanted the gate open.
+    auditFromContext(c, 'inspection.report_unlocked', 'inspection', {
+        entityId: id,
+        metadata: { reason, alreadyUnlocked },
+    });
+    return c.json({ success: true as const, data: { unlocked: true } }, 200);
+});
+app.openapi(relockReportRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    await c.var.services.inspection.relockReportGate(tenantId, id);
+    auditFromContext(c, 'inspection.report_relocked', 'inspection', { entityId: id });
+    return c.json({ success: true as const, data: { unlocked: false } }, 200);
+});
 
-export default reportGateRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const reportGateRouteConfigs = [
+    unlockReportRoute,
+    relockReportRoute,
+] as const;
+
+export default app;

@@ -273,6 +273,167 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/inspections.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections');
+            return { app: m.inspectionsRoutes, configs: m.inspectionsRouteParts };
+        },
+    },
+    {
+        file: 'server/api/inspections/bulk.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/bulk');
+            return { app: m.default, configs: m.bulkRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/cancellation.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/cancellation');
+            return { app: m.default, configs: m.cancellationRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/communication.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/communication');
+            return { app: m.default, configs: m.communicationRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/compliance.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/compliance');
+            return { app: m.default, configs: m.complianceRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/cost-export.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/cost-export');
+            return { app: m.default, configs: m.costExportRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/cost-items.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/cost-items');
+            return { app: m.default, configs: m.costItemRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/hierarchy.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/hierarchy');
+            return { app: m.default, configs: m.hierarchyRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/media-upload-url.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/media-upload-url');
+            return { app: m.default, configs: m.mediaUploadUrlRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/media.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/media');
+            return { app: m.default, configs: m.mediaRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/pay-splits.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/pay-splits');
+            return { app: m.default, configs: m.paySplitRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/people.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/people');
+            return { app: m.default, configs: m.peopleRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/repair-requests.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/repair-requests');
+            return { app: m.default, configs: m.inspectionRepairRequestRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/report-gate.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/report-gate');
+            return { app: m.default, configs: m.reportGateRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/report-translation.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/report-translation');
+            return { app: m.default, configs: m.reportTranslationRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/reports.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/reports');
+            return { app: m.default, configs: m.inspectionReportRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/results.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/results');
+            return { app: m.default, configs: m.resultsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/schedule.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/schedule');
+            return { app: m.default, configs: m.scheduleRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/send-sms.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/send-sms');
+            return { app: m.default, configs: m.sendSmsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/services.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/services');
+            return { app: m.default, configs: m.inspectionServiceRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/statutory-details.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/statutory-details');
+            return { app: m.default, configs: m.statutoryDetailsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/statutory.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/statutory');
+            return { app: m.default, configs: m.statutoryRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/templates.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/templates');
+            return { app: m.default, configs: m.templatesRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/integrations-ai.ts',
         load: async () => {
             const m = await import('../../../server/api/integrations-ai');

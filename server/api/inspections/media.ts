@@ -328,106 +328,109 @@ const approveConciergeRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 
-const mediaRoutes = createApiRouter()
-    .openapi(uploadPhotoRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const formData = await c.req.parseBody();
-        const file = formData['file'] as File;
-        const itemId = formData['itemId'] as string;
-        const targetTypeRaw = formData['targetType'];
-        const customIdRaw = formData['customId'];
-        const targetType = (targetTypeRaw === 'defect' ? 'defect' : 'item') as 'item' | 'defect';
-        const customId = typeof customIdRaw === 'string' && customIdRaw.length > 0 ? customIdRaw : null;
+const app = createApiRouter();
+app.openapi(uploadPhotoRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const formData = await c.req.parseBody();
+    const file = formData['file'] as File;
+    const itemId = formData['itemId'] as string;
+    const targetTypeRaw = formData['targetType'];
+    const customIdRaw = formData['customId'];
+    const targetType = (targetTypeRaw === 'defect' ? 'defect' : 'item') as 'item' | 'defect';
+    const customId = typeof customIdRaw === 'string' && customIdRaw.length > 0 ? customIdRaw : null;
 
-        if (!file || !itemId) throw Errors.BadRequest('File and Item ID are required');
-        if (targetType === 'defect' && !customId) throw Errors.BadRequest('customId is required when targetType=defect');
+    if (!file || !itemId) throw Errors.BadRequest('File and Item ID are required');
+    if (targetType === 'defect' && !customId) throw Errors.BadRequest('customId is required when targetType=defect');
 
-        const service = c.var.services.inspection;
-        const key = await service.uploadPhoto(id, c.get('tenantId'), itemId, file);
-        return c.json({ success: true, data: { key, targetType, itemId, customId } }, 200);
-    })
-    .openapi(servePhotoRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { id } = c.req.valid('param');
-        const { key, download, w } = c.req.valid('query');
-        // Ownership: keys are `${tenantId}/${inspectionId}/...`; reject anything
-        // outside this caller's tenant + the inspection in the path.
-        if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
-        // DB-16 — `?w=` asks for an on-the-fly thumbnail so grid previews don't
-        // download full-resolution originals.
-        const res = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
-            width: w,
-            download: download === '1',
-        });
-        return res ?? c.notFound();
-    })
-    .openapi(mediaCenterRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const data = await c.var.services.inspection.getMediaCenter(id, c.get('tenantId'));
-        return c.json({ success: true, data }, 200);
-    })
-    .openapi(mediaUploadRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const formData = await c.req.parseBody();
-        const file = formData['file'] as File;
-        const takenAtRaw = formData['takenAt'];
-        if (!file) throw Errors.BadRequest('File is required');
-
-        let takenAt: number | null = null;
-        if (typeof takenAtRaw === 'string' && takenAtRaw.length > 0) {
-            const n = Number(takenAtRaw);
-            if (Number.isFinite(n) && n > 0) takenAt = Math.round(n);
-        }
-
-        const result = await c.var.services.inspection.uploadPoolPhoto(id, c.get('tenantId'), file, { takenAt });
-        return c.json({ success: true, data: result }, 200);
-    })
-    .openapi(mediaAttachRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { poolId, itemId, sectionId } = c.req.valid('json');
-        const result = await c.var.services.inspection.attachPoolPhoto(id, c.get('tenantId'), poolId, itemId, sectionId);
-        auditFromContext(c, 'inspection.media.attach', 'inspection', {
-            entityId: id,
-            metadata: { poolId, itemId, sectionId },
-        });
-        return c.json({ success: true, data: result }, 200);
-    })
-    .openapi(mediaPoolDeleteRoute, async (c) => {
-        const { id, poolId } = c.req.valid('param');
-        await c.var.services.inspection.deletePoolPhoto(id, c.get('tenantId'), poolId);
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(itemPhotosReorderRoute, async (c) => {
-        const { id, itemId } = c.req.valid('param');
-        const { order, sectionId } = c.req.valid('json');
-        await c.var.services.inspection.reorderItemPhotos(id, c.get('tenantId'), itemId, order, sectionId);
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(itemPhotoDetachRoute, async (c) => {
-        const { id, itemId, photoIndex } = c.req.valid('param');
-        const { sectionId } = c.req.valid('json');
-        await c.var.services.inspection.detachItemPhoto(id, c.get('tenantId'), itemId, Number(photoIndex), sectionId);
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(itemPhotoRevertRoute, async (c) => {
-        const { id, itemId, photoIndex } = c.req.valid('param');
-        const { sectionId } = c.req.valid('json');
-        await c.var.services.inspection.revertPhotoEdits(id, c.get('tenantId'), itemId, Number(photoIndex), sectionId);
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(itemPhotoMoveRoute, async (c) => {
-        const { id, itemId, photoIndex } = c.req.valid('param');
-        const { toItemId, toSectionId, fromSectionId } = c.req.valid('json');
-        await c.var.services.inspection.moveItemPhoto(
-            id, c.get('tenantId'), itemId, Number(photoIndex), toItemId, fromSectionId, toSectionId,
-        );
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(approveConciergeRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        await c.var.services.concierge.approveByInspector(id, tenantId);
-        return c.json({ success: true as const }, 200);
+    const service = c.var.services.inspection;
+    const key = await service.uploadPhoto(id, c.get('tenantId'), itemId, file);
+    return c.json({ success: true, data: { key, targetType, itemId, customId } }, 200);
+});
+app.openapi(servePhotoRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const { key, download, w } = c.req.valid('query');
+    // Ownership: keys are `${tenantId}/${inspectionId}/...`; reject anything
+    // outside this caller's tenant + the inspection in the path.
+    if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
+    // DB-16 — `?w=` asks for an on-the-fly thumbnail so grid previews don't
+    // download full-resolution originals.
+    const res = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
+        width: w,
+        download: download === '1',
     });
+    return res ?? c.notFound();
+});
+app.openapi(mediaCenterRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const data = await c.var.services.inspection.getMediaCenter(id, c.get('tenantId'));
+    return c.json({ success: true, data }, 200);
+});
+app.openapi(mediaUploadRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const formData = await c.req.parseBody();
+    const file = formData['file'] as File;
+    const takenAtRaw = formData['takenAt'];
+    if (!file) throw Errors.BadRequest('File is required');
 
-export default mediaRoutes;
+    let takenAt: number | null = null;
+    if (typeof takenAtRaw === 'string' && takenAtRaw.length > 0) {
+        const n = Number(takenAtRaw);
+        if (Number.isFinite(n) && n > 0) takenAt = Math.round(n);
+    }
+
+    const result = await c.var.services.inspection.uploadPoolPhoto(id, c.get('tenantId'), file, { takenAt });
+    return c.json({ success: true, data: result }, 200);
+});
+app.openapi(mediaAttachRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { poolId, itemId, sectionId } = c.req.valid('json');
+    const result = await c.var.services.inspection.attachPoolPhoto(id, c.get('tenantId'), poolId, itemId, sectionId);
+    auditFromContext(c, 'inspection.media.attach', 'inspection', {
+        entityId: id,
+        metadata: { poolId, itemId, sectionId },
+    });
+    return c.json({ success: true, data: result }, 200);
+});
+app.openapi(mediaPoolDeleteRoute, async (c) => {
+    const { id, poolId } = c.req.valid('param');
+    await c.var.services.inspection.deletePoolPhoto(id, c.get('tenantId'), poolId);
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(itemPhotosReorderRoute, async (c) => {
+    const { id, itemId } = c.req.valid('param');
+    const { order, sectionId } = c.req.valid('json');
+    await c.var.services.inspection.reorderItemPhotos(id, c.get('tenantId'), itemId, order, sectionId);
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(itemPhotoDetachRoute, async (c) => {
+    const { id, itemId, photoIndex } = c.req.valid('param');
+    const { sectionId } = c.req.valid('json');
+    await c.var.services.inspection.detachItemPhoto(id, c.get('tenantId'), itemId, Number(photoIndex), sectionId);
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(itemPhotoRevertRoute, async (c) => {
+    const { id, itemId, photoIndex } = c.req.valid('param');
+    const { sectionId } = c.req.valid('json');
+    await c.var.services.inspection.revertPhotoEdits(id, c.get('tenantId'), itemId, Number(photoIndex), sectionId);
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(itemPhotoMoveRoute, async (c) => {
+    const { id, itemId, photoIndex } = c.req.valid('param');
+    const { toItemId, toSectionId, fromSectionId } = c.req.valid('json');
+    await c.var.services.inspection.moveItemPhoto(
+        id, c.get('tenantId'), itemId, Number(photoIndex), toItemId, fromSectionId, toSectionId,
+    );
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(approveConciergeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    await c.var.services.concierge.approveByInspector(id, tenantId);
+    return c.json({ success: true as const }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const mediaRouteConfigs = [uploadPhotoRoute, servePhotoRoute, mediaCenterRoute, mediaUploadRoute, mediaAttachRoute, mediaPoolDeleteRoute, itemPhotosReorderRoute, itemPhotoDetachRoute, itemPhotoRevertRoute, itemPhotoMoveRoute, approveConciergeRoute] as const;
+
+export default app;

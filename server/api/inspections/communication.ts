@@ -117,52 +117,57 @@ const communicationRoute = createRoute(withMcpMetadata({
     description: "Returns the inspection's communication in two never-interleaved arrays: messages (written by people — the client, agents, staff) and deliveries (sent by the platform — automation emails and SMS with their per-recipient outcome and raw skip/fail reason).",
 }, { scopes: ['read'], tier: 'extended', capability: 'viewCommunication' }));
 
-const communicationRoutes = createApiRouter()
-    .openapi(communicationRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const { markRead } = c.req.valid('query');
+const app = createApiRouter();
+app.openapi(communicationRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const { markRead } = c.req.valid('query');
 
-        // 404 for another tenant's inspection BEFORE reading anything else.
-        const owner = await getDrizzle(c).select({ id: inspections.id })
-            .from(inspections)
-            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
-            .get();
-        if (!owner) return c.json({ success: false, error: 'Inspection not found' }, 404);
+    // 404 for another tenant's inspection BEFORE reading anything else.
+    const owner = await getDrizzle(c).select({ id: inspections.id })
+        .from(inspections)
+        .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+        .get();
+    if (!owner) return c.json({ success: false, error: 'Inspection not found' }, 404);
 
-        const [messages, deliveries, reportLinks] = await Promise.all([
-            c.var.services.message.listForInspection(id, tenantId),
-            c.var.services.automation.getCommunicationDeliveries(tenantId, id),
-            // Read here rather than inside the automation service: the answer is
-            // assembled from three tables that service does not own (access
-            // tokens, report_views, its own logs), and the reasoning about what
-            // may be said belongs next to the assessment it comes from.
-            listReportLinkStatus(getDrizzle(c), tenantId, id),
-        ]);
-        // After the read, so the rows still carry their unread state in THIS
-        // response and the UI can style them; the next hub load sees zero.
-        if (markRead) await c.var.services.message.markInspectionReadForStaff(id, tenantId);
+    const [messages, deliveries, reportLinks] = await Promise.all([
+        c.var.services.message.listForInspection(id, tenantId),
+        c.var.services.automation.getCommunicationDeliveries(tenantId, id),
+        // Read here rather than inside the automation service: the answer is
+        // assembled from three tables that service does not own (access
+        // tokens, report_views, its own logs), and the reasoning about what
+        // may be said belongs next to the assessment it comes from.
+        listReportLinkStatus(getDrizzle(c), tenantId, id),
+    ]);
+    // After the read, so the rows still carry their unread state in THIS
+    // response and the UI can style them; the next hub load sees zero.
+    if (markRead) await c.var.services.message.markInspectionReadForStaff(id, tenantId);
 
-        return c.json({
-            success: true as const,
-            data: {
-                messages: messages.map((m: typeof messages[number]) => ({
-                    id: m.id,
-                    direction: (m.fromRole === 'inspector' ? 'out' : 'in') as 'in' | 'out',
-                    contactId: m.contactId,
-                    fromRole: m.fromRole,
-                    fromName: m.fromName ?? null,
-                    body: m.body,
-                    attachments: m.attachments ?? [],
-                    readAt: m.readAt == null ? null : (m.readAt instanceof Date ? m.readAt.getTime() : Number(m.readAt)),
-                    createdAt: m.createdAt instanceof Date ? m.createdAt.getTime() : Number(m.createdAt),
-                })),
-                deliveries,
-                reportLinks,
-            },
-        }, 200);
-    });
+    return c.json({
+        success: true as const,
+        data: {
+            messages: messages.map((m: typeof messages[number]) => ({
+                id: m.id,
+                direction: (m.fromRole === 'inspector' ? 'out' : 'in') as 'in' | 'out',
+                contactId: m.contactId,
+                fromRole: m.fromRole,
+                fromName: m.fromName ?? null,
+                body: m.body,
+                attachments: m.attachments ?? [],
+                readAt: m.readAt == null ? null : (m.readAt instanceof Date ? m.readAt.getTime() : Number(m.readAt)),
+                createdAt: m.createdAt instanceof Date ? m.createdAt.getTime() : Number(m.createdAt),
+            })),
+            deliveries,
+            reportLinks,
+        },
+    }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const communicationRouteConfigs = [
+    communicationRoute,
+] as const;
 
 // Types flow through InspectionsApi via the router composition in
 // ../inspections.ts; no standalone Api type needed.
-export default communicationRoutes;
+export default app;

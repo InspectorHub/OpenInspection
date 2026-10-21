@@ -203,85 +203,93 @@ function stripUndefinedKeys<T extends object>(obj: T): { [K in keyof T]?: Exclud
     return out as { [K in keyof T]?: Exclude<T[K], undefined> };
 }
 
-const costItemRoutes = createApiRouter()
-    .openapi(listCostItemsRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const items = await new CostItemService(c.env.DB).listByInspection(id, tenantId);
-        // Tenant-scoped reserve-schedule flag (JWT tenantId only — never
-        // client input), same read shape as cost-export.ts's xlsx handler.
-        const cfg = await getDrizzle(c)
-            .select({ reserveScheduleEnabled: tenantConfigs.reserveScheduleEnabled })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-        return c.json({ success: true as const, data: items, reserveEnabled: Boolean(cfg?.reserveScheduleEnabled) }, 200);
-    })
-    .openapi(createCostItemRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const input = c.req.valid('json');
+const app = createApiRouter();
+app.openapi(listCostItemsRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const items = await new CostItemService(c.env.DB).listByInspection(id, tenantId);
+    // Tenant-scoped reserve-schedule flag (JWT tenantId only — never
+    // client input), same read shape as cost-export.ts's xlsx handler.
+    const cfg = await getDrizzle(c)
+        .select({ reserveScheduleEnabled: tenantConfigs.reserveScheduleEnabled })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
+    return c.json({ success: true as const, data: items, reserveEnabled: Boolean(cfg?.reserveScheduleEnabled) }, 200);
+});
+app.openapi(createCostItemRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const input = c.req.valid('json');
 
-        let lumpSumCents = input.lumpSumCents ?? null;
-        let suggestedRemedy = input.suggestedRemedy ?? '';
-        if (input.findingKey && input.unitCostCents == null && lumpSumCents == null && !suggestedRemedy) {
-            const seed = await loadFindingSeed(getDrizzle(c), id, tenantId, input.findingKey);
-            if (seed) {
-                lumpSumCents = lumpSumCents ?? seed.lumpSumCents;
-                suggestedRemedy = suggestedRemedy || seed.suggestedRemedy;
-            }
+    let lumpSumCents = input.lumpSumCents ?? null;
+    let suggestedRemedy = input.suggestedRemedy ?? '';
+    if (input.findingKey && input.unitCostCents == null && lumpSumCents == null && !suggestedRemedy) {
+        const seed = await loadFindingSeed(getDrizzle(c), id, tenantId, input.findingKey);
+        if (seed) {
+            lumpSumCents = lumpSumCents ?? seed.lumpSumCents;
+            suggestedRemedy = suggestedRemedy || seed.suggestedRemedy;
         }
+    }
 
-        // Field-by-field with `?? <default>` (not `...input`) — every optional
-        // field on the Zod-inferred `input` type carries an explicit
-        // `| undefined` branch, which `exactOptionalPropertyTypes` rejects
-        // against CostItemService's `CreateInput` (declared `T | null`, no
-        // undefined). Matches the codebase-wide "?? null at the call site"
-        // convention (see e.g. inspections/core.ts, agreements.ts).
-        const itemId = await new CostItemService(c.env.DB).create(tenantId, {
-            inspectionId: id,
-            buildingId: input.buildingId ?? null,
-            instanceIndex: input.instanceIndex ?? null,
-            unitId: input.unitId ?? null,
-            findingKey: input.findingKey ?? null,
-            system: input.system,
-            component: input.component,
-            location: input.location ?? '',
-            action: input.action,
-            costMethod: input.costMethod,
-            quantity: input.quantity ?? null,
-            uom: input.uom ?? null,
-            unitCostCents: input.unitCostCents ?? null,
-            lumpSumCents,
-            eul: input.eul ?? null,
-            effAge: input.effAge ?? null,
-            rul: input.rul ?? null,
-            suggestedRemedy,
-            bucket: input.bucket,
-            sectionRef: input.sectionRef ?? null,
-            photoRef: input.photoRef ?? null,
-            sortOrder: input.sortOrder ?? 0,
-        });
-        return c.json({ success: true as const, data: { id: itemId } }, 201);
-    })
-    .openapi(updateCostItemRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { itemId } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        // Only the keys the client actually sent should reach the SET clause
-        // (a genuinely-omitted field must not overwrite existing data with
-        // null). `stripUndefinedKeys` both filters those out at runtime and
-        // narrows the static type to satisfy `exactOptionalPropertyTypes`
-        // against `Partial<CreateInput>` (which has no `| undefined` branch
-        // on its optional fields).
-        await new CostItemService(c.env.DB).update(itemId, tenantId, stripUndefinedKeys(patch));
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(deleteCostItemRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { itemId } = c.req.valid('param');
-        await new CostItemService(c.env.DB).remove(itemId, tenantId);
-        return c.json({ success: true as const }, 200);
+    // Field-by-field with `?? <default>` (not `...input`) — every optional
+    // field on the Zod-inferred `input` type carries an explicit
+    // `| undefined` branch, which `exactOptionalPropertyTypes` rejects
+    // against CostItemService's `CreateInput` (declared `T | null`, no
+    // undefined). Matches the codebase-wide "?? null at the call site"
+    // convention (see e.g. inspections/core.ts, agreements.ts).
+    const itemId = await new CostItemService(c.env.DB).create(tenantId, {
+        inspectionId: id,
+        buildingId: input.buildingId ?? null,
+        instanceIndex: input.instanceIndex ?? null,
+        unitId: input.unitId ?? null,
+        findingKey: input.findingKey ?? null,
+        system: input.system,
+        component: input.component,
+        location: input.location ?? '',
+        action: input.action,
+        costMethod: input.costMethod,
+        quantity: input.quantity ?? null,
+        uom: input.uom ?? null,
+        unitCostCents: input.unitCostCents ?? null,
+        lumpSumCents,
+        eul: input.eul ?? null,
+        effAge: input.effAge ?? null,
+        rul: input.rul ?? null,
+        suggestedRemedy,
+        bucket: input.bucket,
+        sectionRef: input.sectionRef ?? null,
+        photoRef: input.photoRef ?? null,
+        sortOrder: input.sortOrder ?? 0,
     });
+    return c.json({ success: true as const, data: { id: itemId } }, 201);
+});
+app.openapi(updateCostItemRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { itemId } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    // Only the keys the client actually sent should reach the SET clause
+    // (a genuinely-omitted field must not overwrite existing data with
+    // null). `stripUndefinedKeys` both filters those out at runtime and
+    // narrows the static type to satisfy `exactOptionalPropertyTypes`
+    // against `Partial<CreateInput>` (which has no `| undefined` branch
+    // on its optional fields).
+    await new CostItemService(c.env.DB).update(itemId, tenantId, stripUndefinedKeys(patch));
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(deleteCostItemRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { itemId } = c.req.valid('param');
+    await new CostItemService(c.env.DB).remove(itemId, tenantId);
+    return c.json({ success: true as const }, 200);
+});
 
-export default costItemRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const costItemRouteConfigs = [
+    listCostItemsRoute,
+    createCostItemRoute,
+    updateCostItemRoute,
+    deleteCostItemRoute,
+] as const;
+
+export default app;

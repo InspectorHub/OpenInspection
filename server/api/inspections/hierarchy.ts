@@ -221,130 +221,146 @@ const diffVersionRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 
-const hierarchyRoutes = createApiRouter()
-    .openapi(createUnitRoute, async (c) => {
-        const { id }      = c.req.valid('param');
-        const input       = c.req.valid('json');
-        const tenantId    = c.get('tenantId');
-        try {
-            const out = await c.var.services.unit.create(tenantId, { inspectionId: id, ...input });
-            return c.json({ success: true as const, data: out }, 200);
-        } catch (err) {
-            throw Errors.BadRequest((err as Error).message);
-        }
-    })
-    .openapi(bulkCreateUnitsRoute, async (c) => {
-        const { id }   = c.req.valid('param');
-        const body     = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const drafts = body.mode === 'floors_stacks'
-            ? expandFloorsStacks({
-                floors: body.floors, stacks: body.stacks,
-                ...(body.startAt !== undefined ? { startAt: body.startAt } : {}),
-              })
-            : parseUnitCsv(body.csv);
-        try {
-            const out = await c.var.services.unit.createMany(tenantId, id, drafts, {
-                parentUnitId: body.parentUnitId ?? null,
-                kind: 'unit',
-                type: 'unit',
-            });
-            return c.json({ success: true as const, data: out }, 200);
-        } catch (err) {
-            throw Errors.BadRequest((err as Error).message);
-        }
-    })
-    .openapi(duplicateUnitRoute, async (c) => {
-        const { id, unitId } = c.req.valid('param');
-        try {
-            // Scope the duplicate to this inspection so a unit from another
-            // inspection cannot be cloned through this URL.
-            const out = await c.var.services.unit.duplicate(c.get('tenantId'), unitId, id);
-            return c.json({ success: true as const, data: out }, 200);
-        } catch (err) {
-            throw Errors.BadRequest((err as Error).message);
-        }
-    })
-    .openapi(unitModeSwitchRoute, async (c) => {
-        const { id }   = c.req.valid('param');
-        const { mode } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        try {
-            const data = mode === 'per_unit'
-                ? await c.var.services.unitSwitch.toPerUnit(tenantId, id)
-                : await c.var.services.unitSwitch.toTagged(tenantId, id);
-            return c.json({ success: true as const, data }, 200);
-        } catch (err) {
-            throw Errors.BadRequest((err as Error).message);
-        }
-    })
-    .openapi(unitProgressRoute, async (c) => {
-        const { id }   = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        // Ownership guard + source of the template snapshot (denominator).
-        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
-        const units = (await c.var.services.unit.list(tenantId, id)).filter((u: { kind: string }) => u.kind === 'unit');
-        // One tenant-scoped results row read — computeUnitProgress does the rest
-        // server-side; the full map never leaves the worker.
-        const db  = getDrizzle(c);
-        const row = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId)))
-            .get();
-        const data = (row?.data || {}) as Record<string, unknown>;
-        const summary = computeUnitProgress(
-            data,
-            (inspection as { templateSnapshot?: unknown }).templateSnapshot,
-            units.map((u: { id: string }) => u.id),
-        );
-        return c.json({ success: true as const, data: summary }, 200);
-    })
-    .openapi(listUnitsRoute, async (c) => {
-        const { id }   = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const units    = await c.var.services.unit.list(tenantId, id);
-        return c.json({ success: true as const, data: { units } }, 200);
-    })
-    .openapi(updateUnitRoute, async (c) => {
-        const { unitId } = c.req.valid('param');
-        const patch      = c.req.valid('json');
-        await c.var.services.unit.update(c.get('tenantId'), unitId, patch);
+const app = createApiRouter();
+app.openapi(createUnitRoute, async (c) => {
+    const { id }      = c.req.valid('param');
+    const input       = c.req.valid('json');
+    const tenantId    = c.get('tenantId');
+    try {
+        const out = await c.var.services.unit.create(tenantId, { inspectionId: id, ...input });
+        return c.json({ success: true as const, data: out }, 200);
+    } catch (err) {
+        throw Errors.BadRequest((err as Error).message);
+    }
+});
+app.openapi(bulkCreateUnitsRoute, async (c) => {
+    const { id }   = c.req.valid('param');
+    const body     = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    const drafts = body.mode === 'floors_stacks'
+        ? expandFloorsStacks({
+            floors: body.floors, stacks: body.stacks,
+            ...(body.startAt !== undefined ? { startAt: body.startAt } : {}),
+          })
+        : parseUnitCsv(body.csv);
+    try {
+        const out = await c.var.services.unit.createMany(tenantId, id, drafts, {
+            parentUnitId: body.parentUnitId ?? null,
+            kind: 'unit',
+            type: 'unit',
+        });
+        return c.json({ success: true as const, data: out }, 200);
+    } catch (err) {
+        throw Errors.BadRequest((err as Error).message);
+    }
+});
+app.openapi(duplicateUnitRoute, async (c) => {
+    const { id, unitId } = c.req.valid('param');
+    try {
+        // Scope the duplicate to this inspection so a unit from another
+        // inspection cannot be cloned through this URL.
+        const out = await c.var.services.unit.duplicate(c.get('tenantId'), unitId, id);
+        return c.json({ success: true as const, data: out }, 200);
+    } catch (err) {
+        throw Errors.BadRequest((err as Error).message);
+    }
+});
+app.openapi(unitModeSwitchRoute, async (c) => {
+    const { id }   = c.req.valid('param');
+    const { mode } = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    try {
+        const data = mode === 'per_unit'
+            ? await c.var.services.unitSwitch.toPerUnit(tenantId, id)
+            : await c.var.services.unitSwitch.toTagged(tenantId, id);
+        return c.json({ success: true as const, data }, 200);
+    } catch (err) {
+        throw Errors.BadRequest((err as Error).message);
+    }
+});
+app.openapi(unitProgressRoute, async (c) => {
+    const { id }   = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    // Ownership guard + source of the template snapshot (denominator).
+    const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+    const units = (await c.var.services.unit.list(tenantId, id)).filter((u: { kind: string }) => u.kind === 'unit');
+    // One tenant-scoped results row read — computeUnitProgress does the rest
+    // server-side; the full map never leaves the worker.
+    const db  = getDrizzle(c);
+    const row = await db.select().from(inspectionResults)
+        .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId)))
+        .get();
+    const data = (row?.data || {}) as Record<string, unknown>;
+    const summary = computeUnitProgress(
+        data,
+        (inspection as { templateSnapshot?: unknown }).templateSnapshot,
+        units.map((u: { id: string }) => u.id),
+    );
+    return c.json({ success: true as const, data: summary }, 200);
+});
+app.openapi(listUnitsRoute, async (c) => {
+    const { id }   = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const units    = await c.var.services.unit.list(tenantId, id);
+    return c.json({ success: true as const, data: { units } }, 200);
+});
+app.openapi(updateUnitRoute, async (c) => {
+    const { unitId } = c.req.valid('param');
+    const patch      = c.req.valid('json');
+    await c.var.services.unit.update(c.get('tenantId'), unitId, patch);
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(deleteUnitRoute, async (c) => {
+    const { unitId } = c.req.valid('param');
+    await c.var.services.unit.delete(c.get('tenantId'), unitId);
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(moveUnitRoute, async (c) => {
+    const { unitId } = c.req.valid('param');
+    const { newParentUnitId, newSortOrder } = c.req.valid('json');
+    try {
+        await c.var.services.unit.move(c.get('tenantId'), unitId, newParentUnitId, newSortOrder);
         return c.json({ success: true as const }, 200);
-    })
-    .openapi(deleteUnitRoute, async (c) => {
-        const { unitId } = c.req.valid('param');
-        await c.var.services.unit.delete(c.get('tenantId'), unitId);
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(moveUnitRoute, async (c) => {
-        const { unitId } = c.req.valid('param');
-        const { newParentUnitId, newSortOrder } = c.req.valid('json');
-        try {
-            await c.var.services.unit.move(c.get('tenantId'), unitId, newParentUnitId, newSortOrder);
-            return c.json({ success: true as const }, 200);
-        } catch (err) {
-            throw Errors.BadRequest((err as Error).message);
-        }
-    })
-    .openapi(listVersionsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const versions = await c.var.services.reportVersion.list(c.get('tenantId'), id);
-        return c.json({ success: true as const, data: { versions } }, 200);
-    })
-    .openapi(getVersionRoute, async (c) => {
-        const { id, n } = c.req.valid('param');
-        const snap = await c.var.services.reportVersion.get(c.get('tenantId'), id, parseInt(n, 10));
-        if (!snap) throw Errors.NotFound('Version not found');
-        return c.json({ success: true as const, data: snap }, 200);
-    })
-    .openapi(diffVersionRoute, async (c) => {
-        const { id, n } = c.req.valid('param');
-        const { from }  = c.req.valid('query');
-        const diff = await c.var.services.reportVersion.diff(
-            c.get('tenantId'), id, parseInt(from, 10), parseInt(n, 10),
-        );
-        if (!diff) throw Errors.NotFound('Version diff not available');
-        return c.json({ success: true as const, data: diff }, 200);
-    })
+    } catch (err) {
+        throw Errors.BadRequest((err as Error).message);
+    }
+});
+app.openapi(listVersionsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const versions = await c.var.services.reportVersion.list(c.get('tenantId'), id);
+    return c.json({ success: true as const, data: { versions } }, 200);
+});
+app.openapi(getVersionRoute, async (c) => {
+    const { id, n } = c.req.valid('param');
+    const snap = await c.var.services.reportVersion.get(c.get('tenantId'), id, parseInt(n, 10));
+    if (!snap) throw Errors.NotFound('Version not found');
+    return c.json({ success: true as const, data: snap }, 200);
+});
+app.openapi(diffVersionRoute, async (c) => {
+    const { id, n } = c.req.valid('param');
+    const { from }  = c.req.valid('query');
+    const diff = await c.var.services.reportVersion.diff(
+        c.get('tenantId'), id, parseInt(from, 10), parseInt(n, 10),
+    );
+    if (!diff) throw Errors.NotFound('Version diff not available');
+    return c.json({ success: true as const, data: diff }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const hierarchyRouteConfigs = [
+    createUnitRoute,
+    bulkCreateUnitsRoute,
+    duplicateUnitRoute,
+    unitModeSwitchRoute,
+    unitProgressRoute,
+    listUnitsRoute,
+    updateUnitRoute,
+    deleteUnitRoute,
+    moveUnitRoute,
+    listVersionsRoute,
+    getVersionRoute,
+    diffVersionRoute,
+] as const;
     // Typed-Hono dead-routes cleanup Task 10 — vectorised result patches.;
 
-export default hierarchyRoutes;
+export default app;
