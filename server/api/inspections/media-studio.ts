@@ -297,7 +297,6 @@ const cropItemPhotoRoute = createRoute(withMcpMetadata({
     description: "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain).",
 }, { scopes: ['write'], tier: 'excluded' }));
 
-
 // ── Route handlers ────────────────────────────────────────────────────────────
 
 // Optional `sectionId` multipart field — present only for defect (composite-key)
@@ -338,189 +337,190 @@ function parseCrop<T>(formData: Record<string, unknown>, schema: { safeParse(v: 
     return parsed.data;
 }
 
-const mediaStudioRoutes = createApiRouter()
-    .openapi(videoCreateUploadRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        // Ownership check (404 on cross-tenant); tenantId is from the JWT.
-        await c.var.services.inspection.getInspection(id, tenantId);
+const mediaStudioRoutes = createApiRouter();
+mediaStudioRoutes.openapi(videoCreateUploadRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    // Ownership check (404 on cross-tenant); tenantId is from the JWT.
+    await c.var.services.inspection.getInspection(id, tenantId);
 
-        const { backend, provider } = await resolveVideoBackend(c);
-        let out: { uploadURL: string; ref: { provider: 'stream'; streamUid: string } | { provider: 'r2'; mediaId: string; r2Key: string } };
-        try {
-            out = await backend.createUpload(id, { native: c.var.nativeClient === true, userId: c.get('user').sub });
-        } catch (err) {
-            // Cloudflare Stream rejects the direct-upload mint when the account has
-            // no allocated minutes / Stream isn't provisioned (QuotaReachedError),
-            // or on a transient Stream API failure. Translate to a typed 503 so the
-            // editor can show WHY rather than a generic 500 the client blames on the
-            // inspector's connection. The real Stream error is logged for ops.
-            const detail = err instanceof Error ? err.message : String(err);
-            logger.error('Video create-upload failed', { inspectionId: id, provider }, err instanceof Error ? err : undefined);
-            const isQuota = /quota|capacity|allocated|minutes|storage/i.test(detail);
-            throw Errors.ServiceUnavailable(
-                isQuota
-                    ? 'Video uploads are unavailable — the video service has no remaining storage quota. Ask your administrator to enable Stream or add minutes.'
-                    : 'Video uploads are temporarily unavailable. Please try again later, or contact your administrator if it persists.',
-            );
-        }
-
-        return c.json({
-            success: true,
-            data: {
-                uploadURL: out.uploadURL,
-                provider,
-                ref: out.ref,
-            },
-        }, 200);
-    })
-    .openapi(videoFinalizeRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const ref = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        await c.var.services.inspection.getInspection(id, tenantId);
-
-        const { backend } = await resolveVideoBackend(c);
-        const posterRef = ref.provider === 'r2' && ref.posterKey
-            ? { posterKey: ref.posterKey }
-            : undefined;
-
-        const { poolId } = await backend.finalize(ref, posterRef);
-        const details = await backend.getDetails(ref);
-
-        auditFromContext(c, 'inspection.media.video.finalize', 'inspection', {
-            entityId: id,
-            metadata: { poolId },
-        });
-
-        return c.json({
-            success: true,
-            data: {
-                poolId,
-                streamUid: ref.provider === 'stream' ? ref.streamUid : null,
-                durationSec: details.durationSec ?? null,
-                readyToStream: details.readyToStream,
-            },
-        }, 200);
-    })
-    .openapi(videoPosterRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { streamUid, posterPct } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        await c.var.services.inspection.getInspection(id, tenantId);
-
-        // Poster frame is Stream-only — uses MediaVideoService directly since
-        // setPoster is not part of the VideoBackend interface (R2 videos use
-        // the r2-upload-poster route to store a JPEG poster image instead).
-        const svc = new MediaVideoService(c.env.STREAM, tenantId, getBaseUrl(c));
-        await svc.setPoster(streamUid, posterPct);
-
-        // Persist posterPct on the pool row (best-effort; the Stream side is the
-        // source of truth for the rendered thumbnail).
-        const db = getDrizzle(c);
-        await db.update(inspectionMediaPool)
-            .set({ posterPct })
-            .where(and(eq(inspectionMediaPool.streamUid, streamUid), eq(inspectionMediaPool.tenantId, tenantId)));
-
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(videoDeleteRoute, async (c) => {
-        const { id, streamUid: videoRef } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        await c.var.services.inspection.getInspection(id, tenantId);
-
-        const { backend, provider } = await resolveVideoBackend(c);
-        const db = getDrizzle(c);
-
-        if (provider === 'stream') {
-            await backend.delete({ provider: 'stream', streamUid: videoRef });
-        } else {
-            // R2: videoRef is the mediaId. Look up the pool row to get r2Key for
-            // the delete call (the backend needs the full ref to locate the object).
-            const row = await db
-                .select({ r2Key: inspectionMediaPool.r2Key })
-                .from(inspectionMediaPool)
-                .where(and(
-                    eq(inspectionMediaPool.id, videoRef),
-                    eq(inspectionMediaPool.tenantId, tenantId),
-                    eq(inspectionMediaPool.provider, 'r2'),
-                ))
-                .get();
-            if (!row) throw Errors.NotFound('Video not found');
-            await backend.delete({ provider: 'r2', mediaId: videoRef, r2Key: row.r2Key });
-        }
-
-        auditFromContext(c, 'inspection.media.video.delete', 'inspection', {
-            entityId: id,
-            metadata: { videoRef },
-        });
-
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(updateMediaAnnotationsRoute, async (c) => {
-        const { id, mediaId } = c.req.valid('param');
-        const { annotations, caption } = c.req.valid('json');
-
-        const out = await c.var.services.inspection.updateMediaAnnotations(
-            id,
-            mediaId,
-            c.get('tenantId'),
-            annotations,
-            caption,
+    const { backend, provider } = await resolveVideoBackend(c);
+    let out: { uploadURL: string; ref: { provider: 'stream'; streamUid: string } | { provider: 'r2'; mediaId: string; r2Key: string } };
+    try {
+        out = await backend.createUpload(id, { native: c.var.nativeClient === true, userId: c.get('user').sub });
+    } catch (err) {
+        // Cloudflare Stream rejects the direct-upload mint when the account has
+        // no allocated minutes / Stream isn't provisioned (QuotaReachedError),
+        // or on a transient Stream API failure. Translate to a typed 503 so the
+        // editor can show WHY rather than a generic 500 the client blames on the
+        // inspector's connection. The real Stream error is logged for ops.
+        const detail = err instanceof Error ? err.message : String(err);
+        logger.error('Video create-upload failed', { inspectionId: id, provider }, err instanceof Error ? err : undefined);
+        const isQuota = /quota|capacity|allocated|minutes|storage/i.test(detail);
+        throw Errors.ServiceUnavailable(
+            isQuota
+                ? 'Video uploads are unavailable — the video service has no remaining storage quota. Ask your administrator to enable Stream or add minutes.'
+                : 'Video uploads are temporarily unavailable. Please try again later, or contact your administrator if it persists.',
         );
+    }
 
-        if (!out) {
-            throw Errors.NotFound('Media not found');
-        }
+    return c.json({
+        success: true,
+        data: {
+            uploadURL: out.uploadURL,
+            provider,
+            ref: out.ref,
+        },
+    }, 200);
+});
+mediaStudioRoutes.openapi(videoFinalizeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const ref = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    await c.var.services.inspection.getInspection(id, tenantId);
 
-        return c.json({ success: true as const, data: out }, 200);
-    })
-    .openapi(saveAnnotationRoute, async (c) => {
-        const { id, itemId, photoIndex } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const formData = await c.req.parseBody();
-        const file = formData['image'] as File | undefined;
-        const nodesJson = String(formData['nodes'] ?? '[]');
-        const sectionId = readSectionId(formData);
-        if (!file) throw Errors.BadRequest('image file required');
-        const bytes = await file.arrayBuffer();
-        // #181 — under collab the doc owns results.data; bake to R2 + return the
-        // key, but skip the metadata write (the client mirrors it into the doc).
-        const skipResultsWrite = await isCollabEditingEnabled(c.env.DB, tenantId);
-        const result = await c.var.services.inspection.saveAnnotation(
-            id, tenantId, itemId, photoIndex, bytes, nodesJson, sectionId, { skipResultsWrite },
-        );
-        return c.json({ success: true, data: result }, 200);
-    })
-    .openapi(setCoverCropRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const formData = await c.req.parseBody();
-        const file = formData['image'] as File | undefined;
-        if (!file) throw Errors.BadRequest('image file required');
-        const crop = parseCrop(formData, CoverCropSchema);
-        const sourceKey = String(formData['sourceKey'] ?? '');
-        const bytes = await file.arrayBuffer();
-        const result = await c.var.services.inspection.setCroppedCover(id, tenantId, sourceKey, bytes, crop);
-        return c.json({ success: true, data: result }, 200);
-    })
-    .openapi(cropItemPhotoRoute, async (c) => {
-        const { id, itemId, photoIndex } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const formData = await c.req.parseBody();
-        const file = formData['image'] as File | undefined;
-        if (!file) throw Errors.BadRequest('image file required');
-        const crop = parseCrop(formData, PhotoCropSchema);
-        const sectionId = readSectionId(formData);
-        const bytes = await file.arrayBuffer();
-        // #181 — under collab the doc owns results.data; bake to R2 + return the
-        // key, but skip the metadata write (the client mirrors it into the doc).
-        const skipResultsWrite = await isCollabEditingEnabled(c.env.DB, tenantId);
-        const result = await c.var.services.inspection.saveCroppedItemPhoto(
-            id, tenantId, itemId, photoIndex, bytes, crop, sectionId, { skipResultsWrite },
-        );
-        return c.json({ success: true, data: result }, 200);
+    const { backend } = await resolveVideoBackend(c);
+    const posterRef = ref.provider === 'r2' && ref.posterKey
+        ? { posterKey: ref.posterKey }
+        : undefined;
+
+    const { poolId } = await backend.finalize(ref, posterRef);
+    const details = await backend.getDetails(ref);
+
+    auditFromContext(c, 'inspection.media.video.finalize', 'inspection', {
+        entityId: id,
+        metadata: { poolId },
     });
+
+    return c.json({
+        success: true,
+        data: {
+            poolId,
+            streamUid: ref.provider === 'stream' ? ref.streamUid : null,
+            durationSec: details.durationSec ?? null,
+            readyToStream: details.readyToStream,
+        },
+    }, 200);
+});
+mediaStudioRoutes.openapi(videoPosterRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { streamUid, posterPct } = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    await c.var.services.inspection.getInspection(id, tenantId);
+
+    // Poster frame is Stream-only — uses MediaVideoService directly since
+    // setPoster is not part of the VideoBackend interface (R2 videos use
+    // the r2-upload-poster route to store a JPEG poster image instead).
+    const svc = new MediaVideoService(c.env.STREAM, tenantId, getBaseUrl(c));
+    await svc.setPoster(streamUid, posterPct);
+
+    // Persist posterPct on the pool row (best-effort; the Stream side is the
+    // source of truth for the rendered thumbnail).
+    const db = getDrizzle(c);
+    await db.update(inspectionMediaPool)
+        .set({ posterPct })
+        .where(and(eq(inspectionMediaPool.streamUid, streamUid), eq(inspectionMediaPool.tenantId, tenantId)));
+
+    return c.json({ success: true as const }, 200);
+});
+mediaStudioRoutes.openapi(videoDeleteRoute, async (c) => {
+    const { id, streamUid: videoRef } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    await c.var.services.inspection.getInspection(id, tenantId);
+
+    const { backend, provider } = await resolveVideoBackend(c);
+    const db = getDrizzle(c);
+
+    if (provider === 'stream') {
+        await backend.delete({ provider: 'stream', streamUid: videoRef });
+    } else {
+        // R2: videoRef is the mediaId. Look up the pool row to get r2Key for
+        // the delete call (the backend needs the full ref to locate the object).
+        const row = await db
+            .select({ r2Key: inspectionMediaPool.r2Key })
+            .from(inspectionMediaPool)
+            .where(and(
+                eq(inspectionMediaPool.id, videoRef),
+                eq(inspectionMediaPool.tenantId, tenantId),
+                eq(inspectionMediaPool.provider, 'r2'),
+            ))
+            .get();
+        if (!row) throw Errors.NotFound('Video not found');
+        await backend.delete({ provider: 'r2', mediaId: videoRef, r2Key: row.r2Key });
+    }
+
+    auditFromContext(c, 'inspection.media.video.delete', 'inspection', {
+        entityId: id,
+        metadata: { videoRef },
+    });
+
+    return c.json({ success: true as const }, 200);
+});
+mediaStudioRoutes.openapi(updateMediaAnnotationsRoute, async (c) => {
+    const { id, mediaId } = c.req.valid('param');
+    const { annotations, caption } = c.req.valid('json');
+
+    const out = await c.var.services.inspection.updateMediaAnnotations(
+        id,
+        mediaId,
+        c.get('tenantId'),
+        annotations,
+        caption,
+    );
+
+    if (!out) {
+        throw Errors.NotFound('Media not found');
+    }
+
+    return c.json({ success: true as const, data: out }, 200);
+});
+mediaStudioRoutes.openapi(saveAnnotationRoute, async (c) => {
+    const { id, itemId, photoIndex } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const formData = await c.req.parseBody();
+    const file = formData['image'] as File | undefined;
+    const nodesJson = String(formData['nodes'] ?? '[]');
+    const sectionId = readSectionId(formData);
+    if (!file) throw Errors.BadRequest('image file required');
+    const bytes = await file.arrayBuffer();
+    // #181 — under collab the doc owns results.data; bake to R2 + return the
+    // key, but skip the metadata write (the client mirrors it into the doc).
+    const skipResultsWrite = await isCollabEditingEnabled(c.env.DB, tenantId);
+    const result = await c.var.services.inspection.saveAnnotation(
+        id, tenantId, itemId, photoIndex, bytes, nodesJson, sectionId, { skipResultsWrite },
+    );
+    return c.json({ success: true, data: result }, 200);
+});
+mediaStudioRoutes.openapi(setCoverCropRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const formData = await c.req.parseBody();
+    const file = formData['image'] as File | undefined;
+    if (!file) throw Errors.BadRequest('image file required');
+    const crop = parseCrop(formData, CoverCropSchema);
+    const sourceKey = String(formData['sourceKey'] ?? '');
+    const bytes = await file.arrayBuffer();
+    const result = await c.var.services.inspection.setCroppedCover(id, tenantId, sourceKey, bytes, crop);
+    return c.json({ success: true, data: result }, 200);
+});
+mediaStudioRoutes.openapi(cropItemPhotoRoute, async (c) => {
+    const { id, itemId, photoIndex } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const formData = await c.req.parseBody();
+    const file = formData['image'] as File | undefined;
+    if (!file) throw Errors.BadRequest('image file required');
+    const crop = parseCrop(formData, PhotoCropSchema);
+    const sectionId = readSectionId(formData);
+    const bytes = await file.arrayBuffer();
+    // #181 — under collab the doc owns results.data; bake to R2 + return the
+    // key, but skip the metadata write (the client mirrors it into the doc).
+    const skipResultsWrite = await isCollabEditingEnabled(c.env.DB, tenantId);
+    const result = await c.var.services.inspection.saveCroppedItemPhoto(
+        id, tenantId, itemId, photoIndex, bytes, crop, sectionId, { skipResultsWrite },
+    );
+    return c.json({ success: true, data: result }, 200);
+});
+export const mediaStudioRouteConfigs = [videoCreateUploadRoute, videoFinalizeRoute, videoPosterRoute, videoDeleteRoute, updateMediaAnnotationsRoute, saveAnnotationRoute, setCoverCropRoute, cropItemPhotoRoute] as const;
 
 // Register R2 binary routes (upload + Range serve) — split into media-video-r2.ts
 // to keep this file under the large-file ceiling.

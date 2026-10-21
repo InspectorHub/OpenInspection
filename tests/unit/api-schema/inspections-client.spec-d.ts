@@ -184,13 +184,26 @@ describe('InspectionsApi client', () => {
         expectTypeOf<Batched>().toEqualTypeOf<z.output<typeof ResultsBatchResponseSchema>>();
     });
 
-    it('exposes a route of a sub-router that is still a chain, typed from its declared schemas', () => {
+    it('exposes the routes of the publish, media studio and report delivery sub-routers, now listed with their route configs', () => {
         type Reinspect = InferRequestType<Client[':id']['reinspect']['$post']>;
         expectTypeOf<Reinspect['json']>().toEqualTypeOf<z.input<typeof CreateReinspectionSchema>>();
         type Completed = InferResponseType<Client[':id']['complete']['$post'], 200>;
         expectTypeOf<Completed>().toEqualTypeOf<z.output<typeof SuccessResponseSchema>>();
-        expectTypeOf<Client[':id']['collab']['ws']>().toHaveProperty('$get');
         expectTypeOf<Client[':id']['publish']>().toHaveProperty('$post');
+        // The confirm route is defined in publish-routes.ts and the agent routes in report-delivery-routes.ts.
+        expectTypeOf<Client[':id']['confirm']>().toHaveProperty('$post');
+        expectTypeOf<Client[':id']['agent-token']>().toHaveProperty('$post');
+        expectTypeOf<Client[':id']['share-agent']>().toHaveProperty('$post');
+        expectTypeOf<Client[':id']['media']['video']['create-upload']>().toHaveProperty('$post');
+        expectTypeOf<Client[':id']['cover']>().toHaveProperty('$post');
+        expectTypeOf<Client[':id']['report-data']>().toHaveProperty('$get');
+    });
+
+    it('exposes a route of a sub-router that is still a chain, typed from its own schema', () => {
+        // collab (and core, agreements, agreement-sign) cannot list their routes: they hold native handlers.
+        expectTypeOf<Client[':id']['collab']['ws']>().toHaveProperty('$get');
+        // The retired HTML report route is a native handler too, so it is its own router, mounted with legacyMounted.
+        expectTypeOf<Client[':id']['report']>().toHaveProperty('$get');
     });
 
     it('does not expose methods or paths that nothing registered', () => {

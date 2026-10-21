@@ -30,11 +30,11 @@ import bulkRoutes, { bulkRouteConfigs } from './inspections/bulk';
 import scheduleRoutes, { scheduleRouteConfigs } from './inspections/schedule';
 import mediaRoutes, { mediaRouteConfigs } from './inspections/media';
 import mediaUploadUrlRoutes, { mediaUploadUrlRouteConfigs } from './inspections/media-upload-url';
-import mediaStudioRoutes from './inspections/media-studio';
-import publishRoutes from './inspections/publish';
+import mediaStudioRoutes, { mediaStudioRouteConfigs } from './inspections/media-studio';
+import publishRoutes, { publishRouteConfigs } from './inspections/publish';
 import reportGateRoutes, { reportGateRouteConfigs } from './inspections/report-gate';
 import reportTranslationRoutes, { reportTranslationRouteConfigs } from './inspections/report-translation';
-import reportDeliveryRoutes from './inspections/report-delivery';
+import reportDeliveryRoutes, { reportDeliveryRouteConfigs, reportMovedRoutes } from './inspections/report-delivery';
 import sendSmsRoutes, { sendSmsRouteConfigs } from './inspections/send-sms';
 import agreementsRoutes from './inspections/agreements';
 // The in-person signing route, split out of agreements.ts at the 400-line
@@ -72,6 +72,8 @@ inspectionsRoutes.route('/', publishRoutes);
 inspectionsRoutes.route('/', reportGateRoutes);
 inspectionsRoutes.route('/', reportTranslationRoutes);
 inspectionsRoutes.route('/', reportDeliveryRoutes);
+// The retired HTML report route (410 MOVED), a router of its own: see report-delivery.ts.
+inspectionsRoutes.route('/', reportMovedRoutes);
 // After the report-delivery routes: this one serves a FOURTH deliverable and
 // shares their headers, not their file. See lib/deliverable-headers.ts.
 inspectionsRoutes.route('/', statutoryRoutes);
@@ -126,11 +128,12 @@ export const inspectionsRouteParts = [
     mounted('/', resultsRoutes, resultsRouteConfigs),
     mounted('/', mediaRoutes, mediaRouteConfigs),
     mounted('/', mediaUploadUrlRoutes, mediaUploadUrlRouteConfigs),
-    legacyMounted('/', mediaStudioRoutes),
-    legacyMounted('/', publishRoutes),
+    mounted('/', mediaStudioRoutes, mediaStudioRouteConfigs),
+    mounted('/', publishRoutes, publishRouteConfigs),
     mounted('/', reportGateRoutes, reportGateRouteConfigs),
     mounted('/', reportTranslationRoutes, reportTranslationRouteConfigs),
-    legacyMounted('/', reportDeliveryRoutes),
+    mounted('/', reportDeliveryRoutes, reportDeliveryRouteConfigs),
+    legacyMounted('/', reportMovedRoutes),
     mounted('/', statutoryRoutes, statutoryRouteConfigs),
     mounted('/', statutoryDetailsRoutes, statutoryDetailsRouteConfigs),
     mounted('/', sendSmsRoutes, sendSmsRouteConfigs),

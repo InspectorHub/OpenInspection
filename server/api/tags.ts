@@ -260,49 +260,51 @@ const listInspectionTagMapRoute = createRoute(withMcpMetadata({
     description: "Return, for one inspection, a map from each checklist item id to the tags attached to that item."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const inspectionTagRoutes = createApiRouter()
-    .openapi(listInspectionItemTagsRoute, async (c) => {
-        const { id, itemId } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        const data = await c.var.services.tag.getItemTags(tenantId, id, itemId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(linkInspectionItemTagRoute, async (c) => {
-        const { id, itemId } = c.req.valid('param');
-        const { tagId } = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
+export const inspectionTagRoutes = createApiRouter();
+inspectionTagRoutes.openapi(listInspectionItemTagsRoute, async (c) => {
+    const { id, itemId } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    const data = await c.var.services.tag.getItemTags(tenantId, id, itemId);
+    return c.json({ success: true as const, data }, 200);
+});
+inspectionTagRoutes.openapi(linkInspectionItemTagRoute, async (c) => {
+    const { id, itemId } = c.req.valid('param');
+    const { tagId } = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
 
-        // Verify the inspection belongs to this tenant before linking.
-        await c.var.services.inspection.getInspection(id, tenantId);
-        await c.var.services.tag.linkToItem(tenantId, id, itemId, tagId);
-        auditFromContext(c, 'tag.linked', 'inspection_item', {
-            entityId: id,
-            metadata: { itemId, tagId },
-        });
-        return c.json({ success: true as const, data: { linked: true as const } }, 200);
-    })
-    .openapi(unlinkInspectionItemTagRoute, async (c) => {
-        const { id, itemId, tagId } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-
-        // Tenant ownership guard via inspection lookup.
-        await c.var.services.inspection.getInspection(id, tenantId);
-        await c.var.services.tag.unlinkFromItem(tenantId, id, itemId, tagId);
-        auditFromContext(c, 'tag.unlinked', 'inspection_item', {
-            entityId: id,
-            metadata: { itemId, tagId },
-        });
-        return c.json({ success: true as const, data: { unlinked: true as const } }, 200);
-    })
-    .openapi(listInspectionTagMapRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        await c.var.services.inspection.getInspection(id, tenantId);
-        const data = await c.var.services.tag.getInspectionTagMap(tenantId, id);
-        if (!data) throw Errors.Internal('Tag map unavailable');
-        return c.json({ success: true as const, data }, 200);
+    // Verify the inspection belongs to this tenant before linking.
+    await c.var.services.inspection.getInspection(id, tenantId);
+    await c.var.services.tag.linkToItem(tenantId, id, itemId, tagId);
+    auditFromContext(c, 'tag.linked', 'inspection_item', {
+        entityId: id,
+        metadata: { itemId, tagId },
     });
+    return c.json({ success: true as const, data: { linked: true as const } }, 200);
+});
+inspectionTagRoutes.openapi(unlinkInspectionItemTagRoute, async (c) => {
+    const { id, itemId, tagId } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
 
-export type InspectionTagApi = typeof inspectionTagRoutes;
+    // Tenant ownership guard via inspection lookup.
+    await c.var.services.inspection.getInspection(id, tenantId);
+    await c.var.services.tag.unlinkFromItem(tenantId, id, itemId, tagId);
+    auditFromContext(c, 'tag.unlinked', 'inspection_item', {
+        entityId: id,
+        metadata: { itemId, tagId },
+    });
+    return c.json({ success: true as const, data: { unlinked: true as const } }, 200);
+});
+inspectionTagRoutes.openapi(listInspectionTagMapRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    await c.var.services.inspection.getInspection(id, tenantId);
+    const data = await c.var.services.tag.getInspectionTagMap(tenantId, id);
+    if (!data) throw Errors.Internal('Tag map unavailable');
+    return c.json({ success: true as const, data }, 200);
+});
+
+export const inspectionTagRouteConfigs = [listInspectionItemTagsRoute, linkInspectionItemTagRoute, unlinkInspectionItemTagRoute, listInspectionTagMapRoute] as const;
+
+export type InspectionTagApi = ApiOf<typeof inspectionTagRouteConfigs>;
 
 export default tagsRoutes;

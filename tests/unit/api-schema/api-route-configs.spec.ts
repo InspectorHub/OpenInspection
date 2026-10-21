@@ -7,7 +7,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../../server/lib/openapi-router';
 import { legacyMounted, mounted } from '../../../server/lib/api-schema';
 import type { Mounted, RoutePart } from '../../../server/lib/api-schema';
-import { CONVERTED_API_MODULES, importsApiSchema, needsRegistration } from '../helpers/converted-api-modules';
+import { CONVERTED_API_MODULES, importsApiSchema, needsRegistration, routerTuples } from '../helpers/converted-api-modules';
 
 /**
  * A converted router's `XxxApi` type is derived from its `xxxRouteConfigs` / `xxxRouteParts` tuple, not
@@ -33,6 +33,9 @@ type AnyMounted = Mounted<string, readonly RoutePart[]>;
 
 const isMounted = (part: RoutePart): part is AnyMounted => 'parts' in part;
 const isLegacy = (part: RoutePart): part is Extract<RoutePart, { legacy: true }> => 'legacy' in part;
+
+/** The plain handlers each registered router adds, from the registry; filled once the modules are loaded. */
+const nativeByRouter = new Map<unknown, readonly string[]>();
 
 function registered(app: Router): string[] {
     return app.openAPIRegistry.definitions.flatMap((d) => (d.type === 'route' ? [`${d.route.method} ${d.route.path}`] : []));
@@ -68,7 +71,15 @@ function expected(parts: readonly RoutePart[], prefix = '/'): string[] {
  */
 function expectedDispatch(parts: readonly RoutePart[], prefix = '/'): string[] {
     return parts.flatMap((part) => {
-        if (isMounted(part)) return expectedDispatch(part.parts, mergePath(prefix, part.prefix));
+        if (isMounted(part)) {
+            const base = mergePath(prefix, part.prefix);
+            // A mounted child's plain handlers are dispatched too; the registry names them (`native`), the tuple cannot.
+            const plain = (nativeByRouter.get(part.router) ?? []).map((key) => {
+                const [method, path] = key.split(' ');
+                return `${method} ${mergePath(base, path ?? '/')}`;
+            });
+            return [...expectedDispatch(part.parts, base), ...plain];
+        }
         if (isLegacy(part)) {
             return dispatched(part.router as Router).map((key) => {
                 const [method, path] = key.split(' ');
@@ -127,6 +138,13 @@ describe('the comparison used below can say no', () => {
         expect(expected([routeA, routeB])).not.toEqual(registered(app));
     });
 
+    it('rejects a plain handler that is dispatched but named nowhere', () => {
+        const app = tinyRouter();
+        app.get('/plain', (c) => c.text('x'));
+        expect(expectedDispatch([routeA, routeB])).not.toEqual(dispatched(app));
+        expect([...expectedDispatch([routeA, routeB]), 'get /plain']).toEqual(dispatched(app));
+    });
+
     it('rejects a different order', () => {
         expect(expected([routeB, routeA])).not.toEqual(registered(tinyRouter()));
     });
@@ -175,14 +193,17 @@ describe('route config tuples of converted routers', () => {
     // Importing a router pulls in its whole server graph; the first one pays for the transform, so load them all
     // once, under a timeout sized for that, instead of letting whichever case runs first time out.
     beforeAll(async () => {
-        for (const m of CONVERTED_API_MODULES) await m.load();
+        for (const m of CONVERTED_API_MODULES) {
+            const { app } = await m.load();
+            if (m.native) nativeByRouter.set(app, m.native);
+        }
     }, 120_000);
 
     it('registers at least one module', () => {
         expect(CONVERTED_API_MODULES.length).toBeGreaterThan(0);
     });
 
-    describe.each(CONVERTED_API_MODULES.map((m) => [m.file, m] as const))('%s', (_file, mod) => {
+    describe.each(CONVERTED_API_MODULES.map((m) => [`${m.file} ${m.tuple}`, m] as const))('%s', (_name, mod) => {
         it('lists exactly the routes the router registered, in registration order', async () => {
             const { app, configs } = await mod.load();
             const seen = registered(app);
@@ -193,7 +214,8 @@ describe('route config tuples of converted routers', () => {
         it('lists exactly what Hono dispatches, in registration order', async () => {
             const { app, configs } = await mod.load();
             expect(dispatched(app).length).toBeGreaterThan(0);
-            expect(expectedDispatch(configs)).toEqual(dispatched(app));
+            // Plain handlers registered after the route configs (see `native` in the registry) are named, not excused.
+            expect([...expectedDispatch(configs), ...(mod.native ?? [])]).toEqual(dispatched(app));
         });
 
         it('lists each route and each mount once', async () => {
@@ -214,23 +236,28 @@ describe('route config tuples of converted routers', () => {
         expect(loaded.flatMap((m) => mountsIn(m.configs)).length).toBeGreaterThan(0);
     });
 
-    it('registers every router file that imports ApiOf or mounted, or exports a tuple by the usual name', () => {
+    it('registers every router (one entry per tuple) in every file that imports ApiOf or mounted, or exports a tuple by the usual name', () => {
         const apiDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../server/api');
         const repoRoot = path.resolve(apiDir, '../..');
+        // One `file#tuple` per router: a file with two converted routers needs two entries.
         const found: string[] = [];
         const walk = (dir: string) => {
             for (const name of readdirSync(dir)) {
                 const full = path.join(dir, name);
                 if (statSync(full).isDirectory()) walk(full);
                 else if (name.endsWith('.ts') && needsRegistration(readFileSync(full, 'utf8'))) {
-                    found.push(path.relative(repoRoot, full).split(path.sep).join('/'));
+                    const file = path.relative(repoRoot, full).split(path.sep).join('/');
+                    const tuples = routerTuples(readFileSync(full, 'utf8'));
+                    // A file that imports the helpers but names no tuple is itself a finding: it cannot be registered.
+                    if (tuples.length === 0) found.push(`${file}#?`);
+                    for (const tuple of tuples) found.push(`${file}#${tuple}`);
                 }
             }
         };
         walk(apiDir);
         // Positive control: the scan finds files at all, so an empty list cannot pass for "all registered".
         expect(found.length).toBeGreaterThan(0);
-        expect(CONVERTED_API_MODULES.map((m) => m.file).sort()).toEqual(found.sort());
+        expect(CONVERTED_API_MODULES.map((m) => `${m.file}#${m.tuple}`).sort()).toEqual(found.sort());
     });
 });
 
@@ -256,6 +283,18 @@ export type FooApi = ApiOf<typeof fooRoutesList>;
         expect(importsApiSchema(`import * as schema from '../lib/api-schema';`)).toBe(true);
     });
 
+    it('lists every tuple of a file, so a second converted router in it needs its own entry', () => {
+        const twoRouters = `export const aRouteConfigs = [x] as const;
+export type AApi = ApiOf<typeof aRouteConfigs>;
+const bParts = [y] as const;
+export type BApi = ApiOf<typeof bParts>;
+`;
+        expect(routerTuples(twoRouters)).toEqual(['aRouteConfigs', 'bParts']);
+        // The same tuple named twice is one router.
+        expect(routerTuples(`${twoRouters}export type AgainApi = ApiOf<typeof aRouteConfigs>;`)).toEqual(['aRouteConfigs', 'bParts']);
+        expect(routerTuples('export default createApiRouter();')).toEqual([]);
+    });
+
     it('flags the by-name tuple even without the import', () => {
         expect(needsRegistration('export const fooRouteConfigs = [a, b] as const;')).toBe(true);
         expect(needsRegistration('export const fooRouteParts = [a, b] as const;')).toBe(true);
@@ -277,6 +316,8 @@ export default createApiRouter();`)).toBe(false);
         for (const m of CONVERTED_API_MODULES) {
             const source = readFileSync(path.join(repoRoot, m.file), 'utf8');
             expect(needsRegistration(source), m.file).toBe(true);
+            // The entry names a tuple the file really has, not a typo that would only fail when it loads.
+            expect(routerTuples(source), m.file).toContain(m.tuple);
         }
     });
 });
