@@ -1,59 +1,26 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import { legacyMounted, mounted, type ApiOf } from '../lib/api-schema';
 import { importBusyForConnection } from '../lib/calendar/sync-engine';
 import { resolveReadSet, saveReadSet, resolveReadCalendarIds } from '../lib/calendar/read-set';
 import { SaveReadSetSchema } from '../lib/validations/calendar-read-set.schema';
 import { AppError } from '../lib/errors';
-import {
-    CalendarSyncResponseSchema,
-    CalendarCallbackQuerySchema,
-    CalendarConnectQuerySchema,
-} from '../lib/validations/calendar.schema';
+import { CalendarSyncResponseSchema } from '../lib/validations/calendar.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { logger } from '../lib/logger';
-import { getBaseUrl } from '../lib/url';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { getRedirectUri } from '../lib/google-calendar';
-import { createPkceChallenge, CalendarConnectError } from '../lib/calendar/provider';
 import { getCalendarProvider } from '../lib/calendar/registry';
 import {
-    CALENDAR_OAUTH_TTL_SEC,
-    calendarOAuthKvKey,
-    getCalendarConnection,
     loadOpenCalendarConnection,
     markCalendarSynced,
-    upsertCalendarConnection,
-    type PendingCalendarOAuth,
 } from '../lib/calendar/connection';
-import {
-    loadGoogleOAuthMode,
-    resolveGoogleOAuthCredentials,
-} from '../lib/calendar/resolve-google-oauth';
 import { getGoogleCalendarStatus } from '../lib/calendar/status';
 import { disconnectAndAudit, DisconnectQuerySchema, DISCONNECT_DESCRIPTION } from '../lib/calendar/disconnect';
-import {
-    CALENDAR_OAUTH_MESSAGE,
-    renderCalendarOAuthPopupLanding,
-} from '../lib/calendar/oauth-popup-landing';
-import calendarBlockRoutes from './calendar-blocks';
+import calendarBlockRoutes, { calendarBlockRouteConfigs } from './calendar-blocks';
 import calendarIcsLinkRoutes from './calendar-ics-links';
-import calendarItemsRoutes from './calendar-items';
-import type { Context } from 'hono';
-import type { HonoConfig } from '../types/hono';
+import calendarItemsRoutes, { calendarItemsRouteConfigs } from './calendar-items';
+import calendarOAuthRoutes from './calendar/oauth';
 import { getDrizzle } from '../lib/route-helpers';
-
-function oauthErrorLanding(c: Context<HonoConfig>, message: string) {
-    return c.html(renderCalendarOAuthPopupLanding({
-        type: CALENDAR_OAUTH_MESSAGE.ERROR,
-        error: message,
-    }), 200);
-}
-
-function oauthConnectedLanding(c: Context<HonoConfig>) {
-    return c.html(renderCalendarOAuthPopupLanding({
-        type: CALENDAR_OAUTH_MESSAGE.CONNECTED,
-    }), 200);
-}
 
 /** DELETE /api/calendar/disconnect: disconnects the user's calendar and what it synced. */
 const disconnectRoute = createRoute(withMcpMetadata({
@@ -105,67 +72,10 @@ const syncRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['write'], tier: 'extended' }));
 
-const calendarRoutes = createApiRouter()
-    .route('/', calendarBlockRoutes)
-    .route('/', calendarIcsLinkRoutes)
-    .route('/', calendarItemsRoutes)
-    .openapi(disconnectRoute, async (c) => {
-        const user = c.get('user');
-        if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
-
-        const tenantId = c.get('tenantId') as string;
-        await disconnectAndAudit(c, tenantId, user.sub, c.req.valid('query').provider);
-        return c.json({ success: true }, 200);
-    })
-    .openapi(syncRoute, async (c) => {
-        const jwtUser = c.get('user');
-        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
-
-        const tenantId = c.get('tenantId') as string;
-        const open = await loadOpenCalendarConnection(
-            c.env.DB,
-            tenantId,
-            jwtUser.sub,
-            c.env.JWT_SECRET,
-            c.env.JWT_SECRET_PREVIOUS,
-        );
-        if (!open) {
-            return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 400);
-        }
-
-        const auth = await getCalendarProvider(open.connection.provider).resolveAuth({
-            tenantId, credentials: open.credentials, env: c.env,
-        });
-        if (!auth) {
-            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
-        }
-        const db = getDrizzle(c);
-
-        // One code path for the button and the cron sweep. It consumes RAW
-        // listBusy output: mergeBusyIntervals unions overlapping ranges into
-        // anonymous blocks and discards the per-event externalId, without which
-        // OI cannot recognise the events it pushed itself, cannot see
-        // recurrence, and cannot key the upsert on anything stable.
-        let result;
-        try {
-            result = await importBusyForConnection(db, open.connection, auth);
-        } catch (e) {
-            logger.error('[calendar] sync listBusy failed', { tenantId }, e instanceof Error ? e : undefined);
-            return c.json({ success: false, error: { message: 'Failed to fetch Google Calendar busy blocks' } }, 500);
-        }
-
-        const inspectorId = jwtUser.sub;
-        await markCalendarSynced(c.env.DB, tenantId, inspectorId);
-
-        return c.json({
-            success: true,
-            data: {
-                blockedDatesCreated: result.upserted,
-                totalEvents: result.totalEvents,
-                skipped: result.skipped,
-            },
-        }, 200);
-    })
+// The plain handlers of this router. They are a router of their own because a route list cannot express them:
+// each contributes its inferred schema to the client type, so the parent mounts the router with legacyMounted at
+// the place they were registered. The PUT stays in this file: the mutating-route allow-list keys it by file.
+const calendarNativeRoutes = createApiRouter()
     .get('/status', async (c) => {
         const user = c.get('user');
         if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
@@ -266,149 +176,83 @@ const calendarRoutes = createApiRouter()
             success: true,
             data: { readCalendarIds: resolved.readCalendarIds, writeCalendarId: resolved.writeCalendarId },
         }, 200);
-    })
-    /**
-     * GET /api/calendar/connect?capability=…&provider=google
-     * Redirects inspector to Google OAuth consent (PKCE S256).
-     */
-    .get('/connect', async (c) => {
-        const user = c.get('user');
-        if (!user) return c.redirect('/login');
-
-        const parsed = CalendarConnectQuerySchema.safeParse(c.req.query());
-        if (!parsed.success) {
-            return c.json({ success: false, error: { message: 'Invalid connect parameters' } }, 400);
-        }
-        const { capability, provider } = parsed.data;
-        if (provider !== 'google') {
-            return c.json({ success: false, error: { message: 'Provider not implemented' } }, 501);
-        }
-
-        const tenantId = c.get('tenantId') as string;
-        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
-        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
-        if (!oauthCreds) {
-            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 501);
-        }
-
-        if (!c.env.TENANT_CACHE) {
-            return c.json({ success: false, error: { message: 'Calendar OAuth is unavailable' } }, 503);
-        }
-
-        const pkce = await createPkceChallenge();
-        const state = crypto.randomUUID();
-        const pending: PendingCalendarOAuth = {
-            userId: user.sub,
-            tenantId,
-            verifier: pkce.verifier,
-            capability,
-            provider,
-        };
-        await c.env.TENANT_CACHE.put(
-            calendarOAuthKvKey(state),
-            JSON.stringify(pending),
-            { expirationTtl: CALENDAR_OAUTH_TTL_SEC },
-        );
-
-        const baseUrl = getBaseUrl(c);
-        const impl = getCalendarProvider(provider);
-        if (impl.connectFlow.kind !== 'redirect' || !impl.startConnect) {
-            // A form provider connects through POST /connect/caldav; there is
-            // nothing to redirect to.
-            return c.json({ success: false, error: { message: 'Provider not implemented' } }, 501);
-        }
-        const authUrl = impl.startConnect({
-            clientId: oauthCreds.clientId,
-            redirectUri: getRedirectUri(baseUrl),
-            state,
-            pkce,
-            capability,
-        });
-        return c.redirect(authUrl.toString());
-    })
-    /**
-     * GET /api/calendar/callback
-     * Exchanges OAuth code, stores encrypted credentials in calendar_connections.
-     *
-     * Identity comes from the one-time KV state minted at GET /connect (when the
-     * user was same-site authenticated). Google returns here via a cross-site
-     * top-level navigation, so __Host-inspector_token (SameSite=Strict) is not
-     * sent — same pattern as portal OIDC / core SSO handoff.
-     */
-    .get('/callback', async (c) => {
-        const parsed = CalendarCallbackQuerySchema.safeParse(c.req.query());
-        if (!parsed.success) {
-            return c.json({ success: false, error: { message: 'Invalid query parameters' } }, 400);
-        }
-        const { code, state, error } = parsed.data;
-
-        if (error) {
-            return oauthErrorLanding(c, error);
-        }
-        if (!code || !state) return oauthErrorLanding(c, 'Missing authorization code or state');
-
-        if (!c.env.TENANT_CACHE) {
-            return oauthErrorLanding(c, 'Calendar OAuth is unavailable');
-        }
-
-        const pendingRaw = await c.env.TENANT_CACHE.get(calendarOAuthKvKey(state));
-        if (!pendingRaw) {
-            return oauthErrorLanding(c, 'OAuth session expired or invalid');
-        }
-        const pending = JSON.parse(pendingRaw) as PendingCalendarOAuth;
-        await c.env.TENANT_CACHE.delete(calendarOAuthKvKey(state));
-
-        const sessionUser = c.get('user');
-        if (sessionUser && sessionUser.sub !== pending.userId) {
-            return oauthErrorLanding(c, 'OAuth state mismatch');
-        }
-
-        const tenantId = pending.tenantId;
-        const userId = pending.userId;
-
-        const baseUrl = getBaseUrl(c);
-        // The KV state check, the identity check, the sealing and the popup
-        // landing stay here: none of them is the provider's business. What the
-        // provider owns is the exchange and the capability it grants.
-        const provider = getCalendarProvider(pending.provider);
-        let connected;
-        try {
-            connected = await provider.completeConnect({
-                tenantId,
-                env: c.env,
-                submission: {
-                    kind: 'oauth_code',
-                    code,
-                    verifier: pending.verifier,
-                    redirectUri: getRedirectUri(baseUrl),
-                },
-                requestedCapability: pending.capability,
-            });
-        } catch (e) {
-            if (e instanceof CalendarConnectError) return oauthErrorLanding(c, e.message);
-            logger.error('[calendar] Token exchange failed', {}, e instanceof Error ? e : undefined);
-            return oauthErrorLanding(c, 'Failed to exchange authorization code');
-        }
-
-        const existing = await getCalendarConnection(c.env.DB, tenantId, userId, pending.provider);
-
-        await upsertCalendarConnection({
-            db: c.env.DB,
-            tenantId,
-            userId,
-            provider: pending.provider,
-            authType: connected.authType,
-            capability: connected.capability,
-            calendarId: connected.calendarId,
-            credentials: connected.credentials,
-            jwtSecret: c.env.JWT_SECRET,
-            ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
-            ...(existing?.credentialsDekEnc ? { existingDekEnc: existing.credentialsDekEnc } : {}),
-        });
-
-        return oauthConnectedLanding(c);
     });
 
-export type CalendarApi = typeof calendarRoutes;
+const app = createApiRouter();
+app.route('/', calendarBlockRoutes);
+app.route('/', calendarIcsLinkRoutes);
+app.route('/', calendarItemsRoutes);
+app.openapi(disconnectRoute, async (c) => {
+    const user = c.get('user');
+    if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
 
-export default calendarRoutes;
+    const tenantId = c.get('tenantId') as string;
+    await disconnectAndAudit(c, tenantId, user.sub, c.req.valid('query').provider);
+    return c.json({ success: true }, 200);
+});
+app.openapi(syncRoute, async (c) => {
+    const jwtUser = c.get('user');
+    if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+
+    const tenantId = c.get('tenantId') as string;
+    const open = await loadOpenCalendarConnection(
+        c.env.DB,
+        tenantId,
+        jwtUser.sub,
+        c.env.JWT_SECRET,
+        c.env.JWT_SECRET_PREVIOUS,
+    );
+    if (!open) {
+        return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 400);
+    }
+
+    const auth = await getCalendarProvider(open.connection.provider).resolveAuth({
+        tenantId, credentials: open.credentials, env: c.env,
+    });
+    if (!auth) {
+        return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
+    }
+    const db = getDrizzle(c);
+
+    // One code path for the button and the cron sweep. It consumes RAW
+    // listBusy output: mergeBusyIntervals unions overlapping ranges into
+    // anonymous blocks and discards the per-event externalId, without which
+    // OI cannot recognise the events it pushed itself, cannot see
+    // recurrence, and cannot key the upsert on anything stable.
+    let result;
+    try {
+        result = await importBusyForConnection(db, open.connection, auth);
+    } catch (e) {
+        logger.error('[calendar] sync listBusy failed', { tenantId }, e instanceof Error ? e : undefined);
+        return c.json({ success: false, error: { message: 'Failed to fetch Google Calendar busy blocks' } }, 500);
+    }
+
+    const inspectorId = jwtUser.sub;
+    await markCalendarSynced(c.env.DB, tenantId, inspectorId);
+
+    return c.json({
+        success: true,
+        data: {
+            blockedDatesCreated: result.upserted,
+            totalEvents: result.totalEvents,
+            skipped: result.skipped,
+        },
+    }, 200);
+});
+app.route('/', calendarNativeRoutes);
+app.route('/', calendarOAuthRoutes);
+
+/** Registration order, mounts included. Drives `CalendarApi`; a test pins it to what `app` really registered. */
+export const calendarRouteParts = [
+    mounted('/', calendarBlockRoutes, calendarBlockRouteConfigs),
+    legacyMounted('/', calendarIcsLinkRoutes),
+    mounted('/', calendarItemsRoutes, calendarItemsRouteConfigs),
+    disconnectRoute,
+    syncRoute,
+    legacyMounted('/', calendarNativeRoutes),
+    legacyMounted('/', calendarOAuthRoutes),
+] as const;
+
+export type CalendarApi = ApiOf<typeof calendarRouteParts>;
+
+export default app;

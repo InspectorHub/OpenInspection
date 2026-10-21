@@ -287,11 +287,35 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/calendar-blocks.ts',
+        tuple: 'calendarBlockRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/calendar-blocks');
+            return { app: m.default, configs: m.calendarBlockRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/calendar-events.ts',
         tuple: 'calendarEventsRouteConfigs',
         load: async () => {
             const m = await import('../../../server/api/calendar-events');
             return { app: m.default, configs: m.calendarEventsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/calendar-items.ts',
+        tuple: 'calendarItemsRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/calendar-items');
+            return { app: m.default, configs: m.calendarItemsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/calendar.ts',
+        tuple: 'calendarRouteParts',
+        load: async () => {
+            const m = await import('../../../server/api/calendar');
+            return { app: m.default, configs: m.calendarRouteParts };
         },
     },
     {
@@ -642,6 +666,38 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/invoices/payments');
             return { app: m.default, configs: m.invoicePaymentRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/marketplace.ts',
+        tuple: 'marketplaceRouteParts',
+        load: async () => {
+            const m = await import('../../../server/api/marketplace');
+            return { app: m.default, configs: m.marketplaceRouteParts };
+        },
+    },
+    {
+        file: 'server/api/marketplace/statutory-update.ts',
+        tuple: 'statutoryUpdateRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/marketplace/statutory-update');
+            return { app: m.default, configs: m.statutoryUpdateRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/marketplace/sub-routes.ts',
+        tuple: 'marketplaceSubRouteParts',
+        load: async () => {
+            const m = await import('../../../server/api/marketplace/sub-routes');
+            return { app: m.default, configs: m.marketplaceSubRouteParts };
+        },
+    },
+    {
+        file: 'server/api/marketplace/uninstall.ts',
+        tuple: 'marketplaceUninstallRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/marketplace/uninstall');
+            return { app: m.default, configs: m.marketplaceUninstallRouteConfigs };
         },
     },
     {

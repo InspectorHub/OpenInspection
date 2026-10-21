@@ -172,157 +172,166 @@ async function tenantUserExists(
     return Boolean(user);
 }
 
-const calendarBlockRoutes = createApiRouter()
-    .openapi(createBlockRoute, async (c) => {
-        const user = c.get('user');
-        const tenantId = c.get('tenantId');
-        const role = c.get('userRole');
-        const input = c.req.valid('json');
-        const targetUserId = input.userId ?? user.sub;
+const app = createApiRouter();
+app.openapi(createBlockRoute, async (c) => {
+    const user = c.get('user');
+    const tenantId = c.get('tenantId');
+    const role = c.get('userRole');
+    const input = c.req.valid('json');
+    const targetUserId = input.userId ?? user.sub;
 
-        if (!isAdmin(role) && targetUserId !== user.sub) {
-            return c.json(errorResponse('Inspectors can only create their own calendar blocks', 'FORBIDDEN'), 403);
-        }
+    if (!isAdmin(role) && targetUserId !== user.sub) {
+        return c.json(errorResponse('Inspectors can only create their own calendar blocks', 'FORBIDDEN'), 403);
+    }
 
-        const db = getDrizzle(c);
-        if (!await tenantUserExists(db, tenantId, targetUserId)) {
-            return c.json(errorResponse('Target user not found', 'NOT_FOUND'), 404);
-        }
+    const db = getDrizzle(c);
+    if (!await tenantUserExists(db, tenantId, targetUserId)) {
+        return c.json(errorResponse('Target user not found', 'NOT_FOUND'), 404);
+    }
 
-        const now = new Date();
-        const block = await db.insert(calendarBlocks).values({
-            id: crypto.randomUUID(),
-            tenantId,
-            userId: targetUserId,
-            title: input.title,
-            date: input.date,
-            startTime: input.allDay ? null : (input.startTime ?? null),
-            endTime: input.allDay ? null : (input.endTime ?? null),
-            allDay: input.allDay,
-            notes: input.notes ?? null,
-            createdAt: now,
-            updatedAt: now,
-        }).returning().get();
+    const now = new Date();
+    const block = await db.insert(calendarBlocks).values({
+        id: crypto.randomUUID(),
+        tenantId,
+        userId: targetUserId,
+        title: input.title,
+        date: input.date,
+        startTime: input.allDay ? null : (input.startTime ?? null),
+        endTime: input.allDay ? null : (input.endTime ?? null),
+        allDay: input.allDay,
+        notes: input.notes ?? null,
+        createdAt: now,
+        updatedAt: now,
+    }).returning().get();
 
-        pushBlockAfterResponse(c, tenantId, block.id);
-        const conflicts = await findTimeOffConflicts(db, tenantId, targetUserId, await resolveInspectionScope(c), block);
-        return c.json({ success: true as const, data: { block: serializeBlock(block), conflicts } }, 201);
-    })
-    .openapi(blockConflictsRoute, async (c) => {
-        const user = c.get('user');
-        const tenantId = c.get('tenantId');
-        const query = c.req.valid('query');
-        const targetUserId = query.userId ?? user.sub;
-        if (targetUserId !== user.sub && !await canViewOthersCalendar(c)) {
-            return c.json(errorResponse('Inspectors can only check their own calendar', 'FORBIDDEN'), 403);
-        }
-        const conflicts = await findTimeOffConflicts(getDrizzle(c), tenantId, targetUserId, await resolveInspectionScope(c), {
-            date: query.date, allDay: query.allDay === 'true', startTime: query.startTime, endTime: query.endTime,
-        });
-        return c.json({ success: true as const, data: { conflicts } }, 200);
-    })
-    .openapi(listBlocksRoute, async (c) => {
-        const user = c.get('user');
-        const tenantId = c.get('tenantId');
-        const query = c.req.valid('query');
-        const targetUserId = query.userId ?? user.sub;
-
-        if (targetUserId !== user.sub && !await canViewOthersCalendar(c)) {
-            return c.json(errorResponse('Inspectors can only list their own calendar blocks', 'FORBIDDEN'), 403);
-        }
-
-        const rows = await getDrizzle(c).select()
-            .from(calendarBlocks)
-            .where(and(
-                eq(calendarBlocks.tenantId, tenantId),
-                eq(calendarBlocks.userId, targetUserId),
-                gte(calendarBlocks.date, query.start),
-                lte(calendarBlocks.date, query.end),
-            ))
-            .orderBy(asc(calendarBlocks.date), asc(calendarBlocks.startTime), asc(calendarBlocks.id));
-
-        return c.json({
-            success: true as const,
-            data: { blocks: rows.map(serializeBlock) },
-        }, 200);
-    })
-    .openapi(updateBlockRoute, async (c) => {
-        const user = c.get('user');
-        const tenantId = c.get('tenantId');
-        const role = c.get('userRole');
-        const { id } = c.req.valid('param');
-        const input = c.req.valid('json');
-        const db = getDrizzle(c);
-        const existing = await db.select().from(calendarBlocks)
-            .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)))
-            .get();
-
-        if (!existing) {
-            return c.json(errorResponse('Calendar block not found', 'NOT_FOUND'), 404);
-        }
-        if (!isAdmin(role) && existing.userId !== user.sub) {
-            return c.json(errorResponse('Inspectors can only update their own calendar blocks', 'FORBIDDEN'), 403);
-        }
-
-        const targetUserId = input.userId ?? existing.userId;
-        if (!isAdmin(role) && targetUserId !== user.sub) {
-            return c.json(errorResponse('Inspectors cannot reassign calendar blocks', 'FORBIDDEN'), 403);
-        }
-        if (input.userId && !await tenantUserExists(db, tenantId, targetUserId)) {
-            return c.json(errorResponse('Target user not found', 'NOT_FOUND'), 404);
-        }
-
-        const updates: Partial<typeof calendarBlocks.$inferInsert> = {
-            updatedAt: new Date(),
-        };
-        if (input.userId !== undefined) updates.userId = input.userId;
-        if (input.title !== undefined) updates.title = input.title;
-        if (input.date !== undefined) updates.date = input.date;
-        if (input.notes !== undefined) updates.notes = input.notes;
-        if (input.allDay !== undefined) {
-            updates.allDay = input.allDay;
-            if (input.allDay) {
-                updates.startTime = null;
-                updates.endTime = null;
-            }
-        }
-        if (input.allDay !== true && input.startTime !== undefined) updates.startTime = input.startTime;
-        if (input.allDay !== true && input.endTime !== undefined) updates.endTime = input.endTime;
-
-        const block = await db.update(calendarBlocks)
-            .set(updates)
-            .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)))
-            .returning()
-            .get();
-
-        pushBlockAfterResponse(c, tenantId, block.id);
-        const conflicts = await findTimeOffConflicts(db, tenantId, block.userId, await resolveInspectionScope(c), block);
-        return c.json({ success: true as const, data: { block: serializeBlock(block), conflicts } }, 200);
-    })
-    .openapi(deleteBlockRoute, async (c) => {
-        const user = c.get('user');
-        const tenantId = c.get('tenantId');
-        const role = c.get('userRole');
-        const { id } = c.req.valid('param');
-        const db = getDrizzle(c);
-        const existing = await db.select({ userId: calendarBlocks.userId })
-            .from(calendarBlocks)
-            .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)))
-            .get();
-
-        if (!existing) {
-            return c.json(errorResponse('Calendar block not found', 'NOT_FOUND'), 404);
-        }
-        if (!isAdmin(role) && existing.userId !== user.sub) {
-            return c.json(errorResponse('Inspectors can only delete their own calendar blocks', 'FORBIDDEN'), 403);
-        }
-
-        await db.delete(calendarBlocks)
-            .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)));
-        // Deleting the block here but leaving it on the owner's Google calendar
-        // would leave them blocked by time off they just cancelled.
-        dropExternalAfterResponse(c, tenantId, 'calendar_block', id);
-        return c.json({ success: true as const }, 200);
+    pushBlockAfterResponse(c, tenantId, block.id);
+    const conflicts = await findTimeOffConflicts(db, tenantId, targetUserId, await resolveInspectionScope(c), block);
+    return c.json({ success: true as const, data: { block: serializeBlock(block), conflicts } }, 201);
+});
+app.openapi(blockConflictsRoute, async (c) => {
+    const user = c.get('user');
+    const tenantId = c.get('tenantId');
+    const query = c.req.valid('query');
+    const targetUserId = query.userId ?? user.sub;
+    if (targetUserId !== user.sub && !await canViewOthersCalendar(c)) {
+        return c.json(errorResponse('Inspectors can only check their own calendar', 'FORBIDDEN'), 403);
+    }
+    const conflicts = await findTimeOffConflicts(getDrizzle(c), tenantId, targetUserId, await resolveInspectionScope(c), {
+        date: query.date, allDay: query.allDay === 'true', startTime: query.startTime, endTime: query.endTime,
     });
+    return c.json({ success: true as const, data: { conflicts } }, 200);
+});
+app.openapi(listBlocksRoute, async (c) => {
+    const user = c.get('user');
+    const tenantId = c.get('tenantId');
+    const query = c.req.valid('query');
+    const targetUserId = query.userId ?? user.sub;
 
-export default calendarBlockRoutes;
+    if (targetUserId !== user.sub && !await canViewOthersCalendar(c)) {
+        return c.json(errorResponse('Inspectors can only list their own calendar blocks', 'FORBIDDEN'), 403);
+    }
+
+    const rows = await getDrizzle(c).select()
+        .from(calendarBlocks)
+        .where(and(
+            eq(calendarBlocks.tenantId, tenantId),
+            eq(calendarBlocks.userId, targetUserId),
+            gte(calendarBlocks.date, query.start),
+            lte(calendarBlocks.date, query.end),
+        ))
+        .orderBy(asc(calendarBlocks.date), asc(calendarBlocks.startTime), asc(calendarBlocks.id));
+
+    return c.json({
+        success: true as const,
+        data: { blocks: rows.map(serializeBlock) },
+    }, 200);
+});
+app.openapi(updateBlockRoute, async (c) => {
+    const user = c.get('user');
+    const tenantId = c.get('tenantId');
+    const role = c.get('userRole');
+    const { id } = c.req.valid('param');
+    const input = c.req.valid('json');
+    const db = getDrizzle(c);
+    const existing = await db.select().from(calendarBlocks)
+        .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)))
+        .get();
+
+    if (!existing) {
+        return c.json(errorResponse('Calendar block not found', 'NOT_FOUND'), 404);
+    }
+    if (!isAdmin(role) && existing.userId !== user.sub) {
+        return c.json(errorResponse('Inspectors can only update their own calendar blocks', 'FORBIDDEN'), 403);
+    }
+
+    const targetUserId = input.userId ?? existing.userId;
+    if (!isAdmin(role) && targetUserId !== user.sub) {
+        return c.json(errorResponse('Inspectors cannot reassign calendar blocks', 'FORBIDDEN'), 403);
+    }
+    if (input.userId && !await tenantUserExists(db, tenantId, targetUserId)) {
+        return c.json(errorResponse('Target user not found', 'NOT_FOUND'), 404);
+    }
+
+    const updates: Partial<typeof calendarBlocks.$inferInsert> = {
+        updatedAt: new Date(),
+    };
+    if (input.userId !== undefined) updates.userId = input.userId;
+    if (input.title !== undefined) updates.title = input.title;
+    if (input.date !== undefined) updates.date = input.date;
+    if (input.notes !== undefined) updates.notes = input.notes;
+    if (input.allDay !== undefined) {
+        updates.allDay = input.allDay;
+        if (input.allDay) {
+            updates.startTime = null;
+            updates.endTime = null;
+        }
+    }
+    if (input.allDay !== true && input.startTime !== undefined) updates.startTime = input.startTime;
+    if (input.allDay !== true && input.endTime !== undefined) updates.endTime = input.endTime;
+
+    const block = await db.update(calendarBlocks)
+        .set(updates)
+        .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)))
+        .returning()
+        .get();
+
+    pushBlockAfterResponse(c, tenantId, block.id);
+    const conflicts = await findTimeOffConflicts(db, tenantId, block.userId, await resolveInspectionScope(c), block);
+    return c.json({ success: true as const, data: { block: serializeBlock(block), conflicts } }, 200);
+});
+app.openapi(deleteBlockRoute, async (c) => {
+    const user = c.get('user');
+    const tenantId = c.get('tenantId');
+    const role = c.get('userRole');
+    const { id } = c.req.valid('param');
+    const db = getDrizzle(c);
+    const existing = await db.select({ userId: calendarBlocks.userId })
+        .from(calendarBlocks)
+        .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)))
+        .get();
+
+    if (!existing) {
+        return c.json(errorResponse('Calendar block not found', 'NOT_FOUND'), 404);
+    }
+    if (!isAdmin(role) && existing.userId !== user.sub) {
+        return c.json(errorResponse('Inspectors can only delete their own calendar blocks', 'FORBIDDEN'), 403);
+    }
+
+    await db.delete(calendarBlocks)
+        .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)));
+    // Deleting the block here but leaving it on the owner's Google calendar
+    // would leave them blocked by time off they just cancelled.
+    dropExternalAfterResponse(c, tenantId, 'calendar_block', id);
+    return c.json({ success: true as const }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const calendarBlockRouteConfigs = [
+    createBlockRoute,
+    blockConflictsRoute,
+    listBlocksRoute,
+    updateBlockRoute,
+    deleteBlockRoute,
+] as const;
+
+export default app;

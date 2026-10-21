@@ -13,14 +13,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
 import { statutoryUpdateImpact } from '../../services/marketplace/statutory-update-impact';
 
-// What updating a statutory package would cost the inspections already under
-// way, read BEFORE the confirmation is shown. Two numbers, and the reassuring
-// one is not optional: most in-flight inspections are dated inside the
-// superseded revision's window and produce their form exactly as they would
-// have. Inspectors may read it -- their inspections are the ones being counted
-// -- even though only owner/manager can act on it.
-const statutoryUpdateRoutes = createApiRouter()
-    .openapi(createRoute(withMcpMetadata({
+const getMarketplaceStatutoryUpdateImpactRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/statutory-update/impact',
     tags: ["marketplace"],
     summary: 'Count the in-progress inspections a statutory package update would affect',
@@ -43,7 +36,16 @@ const statutoryUpdateRoutes = createApiRouter()
         },
     },
     operationId: "getMarketplaceStatutoryUpdateImpact",
-}, { scopes: ['read'], tier: 'extended' })), async (c) => {
+}, { scopes: ['read'], tier: 'extended' }));
+
+// What updating a statutory package would cost the inspections already under
+// way, read BEFORE the confirmation is shown. Two numbers, and the reassuring
+// one is not optional: most in-flight inspections are dated inside the
+// superseded revision's window and produce their form exactly as they would
+// have. Inspectors may read it -- their inspections are the ones being counted
+// -- even though only owner/manager can act on it.
+const app = createApiRouter();
+app.openapi(getMarketplaceStatutoryUpdateImpactRoute, async (c) => {
     const { id } = c.req.valid('param');
     // The counter is a free function rather than a service method: it reads and
     // writes nothing, and every surface that asks this question should provably
@@ -52,4 +54,9 @@ const statutoryUpdateRoutes = createApiRouter()
     return c.json({ success: true, data }, 200);
 });
 
-export default statutoryUpdateRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const statutoryUpdateRouteConfigs = [
+    getMarketplaceStatutoryUpdateImpactRoute,
+] as const;
+
+export default app;
