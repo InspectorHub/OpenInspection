@@ -1,5 +1,5 @@
 import { describe, it, expectTypeOf } from 'vitest';
-import type { OpenAPIHono } from '@hono/zod-openapi';
+import type { Hono } from 'hono';
 import type { AdminApi } from '../../../server/api/admin';
 import type { AdminDefectCategoriesApi } from '../../../server/api/admin/admin-defect-categories';
 import type { AdminBrandingApi } from '../../../server/api/admin/branding';
@@ -44,7 +44,7 @@ import type { UsageApi } from '../../../server/api/usage';
 import type { UsersApi } from '../../../server/api/users';
 import type { WidgetApi } from '../../../server/api/widget';
 
-type SchemaOf<A> = A extends OpenAPIHono<infer _E, infer S, infer _B> ? S : never;
+type SchemaOf<A> = A extends Hono<infer _E, infer S, infer _B> ? S : never;
 /** `[path, method]` of every endpoint that did not resolve to an object (the library would have dropped such a route). */
 type Unresolved<S> = { [P in keyof S]: { [M in keyof S[P]]: [S[P][M]] extends [never] ? [P, M] : never }[keyof S[P]] }[keyof S];
 /** Paths whose endpoints are all gone, which a `{}` result of the library's schema builder would have left out. */

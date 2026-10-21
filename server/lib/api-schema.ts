@@ -1,5 +1,5 @@
-import type { Context, Env, ToSchema } from 'hono';
-import type { RouteConfig, RouteConfigToEnv, RouteConfigToTypedResponse, RouteHandler, OpenAPIHono } from '@hono/zod-openapi';
+import type { Context, Env, Hono, ToSchema } from 'hono';
+import type { RouteConfig, RouteConfigToEnv, RouteConfigToTypedResponse, RouteHandler } from '@hono/zod-openapi';
 import type { BlankSchema, MergePath, MergeSchemaPath, Schema } from 'hono/types';
 import type { HonoConfig } from '../types/hono';
 import type { createApiRouter } from './openapi-router';
@@ -102,9 +102,13 @@ type PartsSchema<Parts extends readonly RoutePart[], Base extends string, Acc ex
 /**
  * The router type a chained registration of `Parts` would have produced, ready
  * for `hc<ApiOf<typeof xxxRouteConfigs>>()`. Pass the parts in registration order.
+ *
+ * The result is the plain `Hono` class, not `OpenAPIHono`: `hc<T>` only needs the schema, and a plain
+ * `Hono<E, S, B>` meets its `T extends Hono<any, any, any>` constraint by comparing type arguments, where an
+ * `OpenAPIHono` (a subclass) is compared member by member, once per client in the frontend's client map.
  */
 export type ApiOf<
     Parts extends readonly RoutePart[],
     E extends Env = HonoConfig,
     Base extends string = '/',
-> = OpenAPIHono<E, PartsSchema<Parts, Base>, Base>;
+> = Hono<E, PartsSchema<Parts, Base>, Base>;
