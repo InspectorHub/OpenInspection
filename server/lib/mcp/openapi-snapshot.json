@@ -1043,6 +1043,20 @@
     "description": "Used by the New Inspection wizard to show advisory/block UI for company closed days."
   },
   {
+    "operationId": "checkQboCredentials",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/credentials/check",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Check the QuickBooks Client ID and Secret",
+    "description": "Asks Intuit whether the configured Client ID and Client Secret belong together. Nothing is connected or stored and the response carries the verdict only. Rate limited per company. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "cloneInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/clone",
@@ -7108,6 +7122,20 @@
     "description": "Disconnects the calling user calendar and removes what it synced, in one atomic batch scoped to the caller and their company: the connection, the busy blocks imported from it (date overrides with that source), the read-calendar choices and the links to events on the calendar. Hand-entered overrides are never touched, and events in the external calendar are not changed. The optional provider limits the disconnect to google or apple; omitted, every provider the caller is connected to is disconnected. An unknown provider is a 400."
   },
   {
+    "operationId": "disconnectQbo",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/disconnect",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Disconnect QuickBooks from the company",
+    "description": "Revokes the Intuit refresh token and deletes the company mapping between invoices and QuickBooks invoices, which reconnecting does not restore. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "dismissOnboardingChecklist",
     "method": "POST",
     "pathTemplate": "/api/auth/checklist/dismiss",
@@ -7120,6 +7148,31 @@
     },
     "summary": "Dismiss the onboarding checklist",
     "description": "Marks the dashboard onboarding checklist as dismissed for the current user. Idempotent — safe to call multiple times."
+  },
+  {
+    "operationId": "dismissQboError",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/errors/{id}/dismiss",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the sync row to dismiss.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the sync row to dismiss."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Dismiss one open QuickBooks sync row",
+    "description": "Marks one open QuickBooks sync row as resolved because a person has looked at it; nothing is retried. Owner or manager with the companyFinance capability."
   },
   {
     "operationId": "downloadCertificatePdf",
@@ -9471,6 +9524,49 @@
     "description": "Reads the recipient's GDPR Art. 21 objection to report-view measurement. Gated by the recipient's own portal token (?token=) or the unified-portal session cookie."
   },
   {
+    "operationId": "getQboConnectionStatus",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/qbo/status",
+    "scopes": [
+      "read"
+    ],
+    "tag": "qbo",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Read the QuickBooks connection status",
+    "description": "Reports the QuickBooks connection of the company: realm, company name, last sync, open sync rows, payment discrepancies and where each credential comes from (never the credential). Owner or manager with the companyFinance capability."
+  },
+  {
+    "operationId": "getQboContactLink",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/qbo/contacts/{contactId}/link",
+    "scopes": [
+      "read"
+    ],
+    "tag": "qbo",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the contact whose QuickBooks match is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the contact whose QuickBooks match is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Read the QuickBooks match of a contact",
+    "description": "Reports whether one contact is matched to a QuickBooks customer, which customer, and how many open sync rows concern the contact. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "getRatingSystem",
     "method": "GET",
     "pathTemplate": "/api/rating-systems/{id}",
@@ -10616,6 +10712,31 @@
     },
     "summary": "Leaderboard agent for current tenant",
     "description": "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner and manager roles; inspectors and agents get 403."
+  },
+  {
+    "operationId": "linkQboContact",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/contacts/{contactId}/link",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the contact whose QuickBooks match is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the contact whose QuickBooks match is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Match a contact to a QuickBooks customer",
+    "description": "Matches one contact to an existing QuickBooks customer; the JSON body is {qboCustomerId} with a non-empty customer id. Safe to repeat. Invoices waiting for the match are pushed after the response. Owner or manager with the companyFinance capability."
   },
   {
     "operationId": "listAgentInspectors",
@@ -19313,6 +19434,20 @@
     "description": "Stores users.default_signature_base64 for the authenticated user. Reused by D2 auto-sign-on-publish + Settings -> Profile pad."
   },
   {
+    "operationId": "searchQboCustomers",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/qbo/customers",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Search QuickBooks customers by name or email",
+    "description": "Searches the connected QuickBooks company for customers. Query parameters: q (2 to 100 characters), startPosition (1-based) and limit (1 to 20). Every call goes to Intuit and is rate limited per company. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "seedDefaultsRecommendation",
     "method": "POST",
     "pathTemplate": "/api/recommendations/seed-defaults",
@@ -20207,6 +20342,20 @@
     "description": "Pulls upcoming busy time blocks from the inspector's connected calendar and merges them into availability overrides."
   },
   {
+    "operationId": "syncQboNow",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/sync",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Check QuickBooks for invoice payments now",
+    "description": "Runs one payment scan against QuickBooks and waits for it. Answers 409 when QuickBooks is not connected or the sync is paused, and 503 when QuickBooks does not respond. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "testAiConnection",
     "method": "POST",
     "pathTemplate": "/api/integrations/ai/test",
@@ -20359,6 +20508,20 @@
     "description": "Flips tenant_configs.enable_pdf_pipeline (Spec 5A / Spec 5H gate). Verify env.BROWSER liveness with GET /api/admin/system/br-smoke first."
   },
   {
+    "operationId": "toggleQboSync",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/pause",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Pause or resume the QuickBooks sync",
+    "description": "Toggles automatic QuickBooks sync for the company and returns the new setting; 404 not_connected when there is no connection. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "touchTenantComment",
     "method": "POST",
     "pathTemplate": "/api/admin/comments/{id}/touch",
@@ -20413,6 +20576,31 @@
     },
     "summary": "Stop offering an installed catalogue entry",
     "description": "Takes an installed pack out of service for this workspace. Nothing is deleted for a 1:1 kind: the local template is retired so it leaves the new-inspection picker, and inspections already using it keep producing from their own snapshot. A comment pack's imported rows ARE removed; comments the workspace wrote itself are never touched. Installing the entry again brings it back."
+  },
+  {
+    "operationId": "unlinkQboContact",
+    "method": "DELETE",
+    "pathTemplate": "/api/integrations/qbo/contacts/{contactId}/link",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the contact whose QuickBooks match is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the contact whose QuickBooks match is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Remove the QuickBooks match of a contact",
+    "description": "Removes the match between one contact and a QuickBooks customer. Nothing is sent to QuickBooks and removing a match that is already gone answers removed false. Owner or manager with the companyFinance capability."
   },
   {
     "operationId": "unlockInspectionReport",

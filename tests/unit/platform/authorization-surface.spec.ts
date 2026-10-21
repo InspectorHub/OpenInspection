@@ -58,11 +58,10 @@ function mountedGuards(): Map<string, string> {
 
 /**
  * Routers that are plain Hono apps (no OpenAPI document entry) but mount a
- * capability guard. The QuickBooks router is cookie-authenticated and
+ * capability guard. The QuickBooks connect route is an OAuth redirect and
  * hand-rolled, so its guard cannot be declared as `x-capability`.
  */
 const HAND_ROLLED_MOUNTS: Record<string, string> = {
-    'ALL /api/integrations/qbo/*': 'companyFinance',
     'GET /api/integrations/qbo/connect': 'companyFinance',
 };
 

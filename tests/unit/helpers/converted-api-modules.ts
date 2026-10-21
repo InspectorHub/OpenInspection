@@ -896,6 +896,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/qbo.ts',
+        tuple: 'qboRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/qbo');
+            return { app: m.default, configs: m.qboRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/rating-systems.ts',
         tuple: 'ratingSystemsRouteConfigs',
         load: async () => {

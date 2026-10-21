@@ -44,6 +44,7 @@ import type { ProfileApi } from '../../../server/api/profile';
 import type { PublicReportApi } from '../../../server/api/public-report';
 import type { PublicShareApi } from '../../../server/api/public-share';
 import type { PublicSlugApi } from '../../../server/api/public-slug';
+import type { QboApi } from '../../../server/api/qbo';
 import type { RatingSystemsApi } from '../../../server/api/rating-systems';
 import type { RecommendationsApi } from '../../../server/api/recommendations';
 import type { RepairBuilderApi } from '../../../server/api/repair-builder';
@@ -78,6 +79,7 @@ describe('converted routers: every route resolves to an endpoint', () => {
         expectTypeOf<Unresolved<SchemaOf<MigrationIntakeApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<PublicReportApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<RatingSystemsApi>>>().toEqualTypeOf<never>();
+        expectTypeOf<Unresolved<SchemaOf<QboApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<RepairBuilderApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<SecretsApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<UsageApi>>>().toEqualTypeOf<never>();

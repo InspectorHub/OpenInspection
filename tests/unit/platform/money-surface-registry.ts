@@ -100,6 +100,9 @@ export const MONEY_SURFACE: Record<string, Disposition> = {
     'POST /api/services/{id}/pay-rules': gate('companyFinance'),
     'PUT /api/services/{id}/pay-rules/{ruleId}': gate('companyFinance'),
 
+    // QuickBooks connection status carries both ledger figures of a payment discrepancy
+    'GET /api/integrations/qbo/status': gate('companyFinance'),
+
     // Aggregates scope themselves by capability inside the handler
     'GET /api/metrics': redact('companyFinance', 'metrics.ts'),
 };
