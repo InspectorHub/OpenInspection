@@ -17,7 +17,13 @@ import type {
     DispatchBoardResponseSchema,
     ListCalendarItemsQuerySchema,
 } from '../../../server/lib/validations/calendar-items.schema';
-import type { CalendarSyncResponseSchema } from '../../../server/lib/validations/calendar.schema';
+import type {
+    CalendarIcsLinksResponseSchema,
+    CalendarNotAuthenticatedSchema,
+    CalendarReadSetResponseSchema,
+    CalendarStatusResponseSchema,
+    CalendarSyncResponseSchema,
+} from '../../../server/lib/validations/calendar.schema';
 import type { SuccessResponseSchema } from '../../../server/lib/validations/shared.schema';
 
 type Client = ReturnType<typeof hc<CalendarApi>>;
@@ -26,8 +32,8 @@ type SchemaOf<A> = A extends Hono<infer _E, infer S, infer _B> ? S : never;
 type Keys<T> = Exclude<keyof T, '$url' | '$path'>;
 
 // Compile-time only (run by `npm run test:types`). `CalendarApi` (mounted at /api/calendar) is derived from
-// `calendarRouteParts`: the blocks and items sub-routers are listed with their route configs (`mounted`), the ICS link
-// router, the plain-handler router and the OAuth router with `legacyMounted` (they register plain Hono handlers, which a
+// `calendarRouteParts`: the blocks, items and ICS link sub-routers are listed with their route configs (`mounted`), the
+// router holding the save-set PUT and the OAuth router with `legacyMounted` (they register plain Hono handlers, which a
 // route list cannot express). A mount left out of the list, or one that moves a path, fails here. The path keys were read
 // from the declaration the chained router produced before the conversion (13 distinct paths).
 describe('CalendarApi client', () => {
@@ -86,16 +92,21 @@ describe('CalendarApi client', () => {
         expectTypeOf<Synced>().toEqualTypeOf<z.output<typeof CalendarSyncResponseSchema>>();
     });
 
+    it('types the status, read-set and ICS link reads from their declared schemas', () => {
+        expectTypeOf<InferResponseType<Client['status']['$get'], 200>>().toEqualTypeOf<z.output<typeof CalendarStatusResponseSchema>>();
+        expectTypeOf<InferResponseType<Client['read-set']['$get'], 200>>().toEqualTypeOf<z.output<typeof CalendarReadSetResponseSchema>>();
+        expectTypeOf<InferResponseType<Client['ics-links']['$get'], 200>>().toEqualTypeOf<z.output<typeof CalendarIcsLinksResponseSchema>>();
+        expectTypeOf<InferResponseType<Client['status']['$get'], 401>>().toEqualTypeOf<z.output<typeof CalendarNotAuthenticatedSchema>>();
+        expectTypeOf<InferResponseType<Client['ics-links']['$get'], 401>>().toEqualTypeOf<z.output<typeof CalendarNotAuthenticatedSchema>>();
+        type NotSignedIn = InferResponseType<Client['read-set']['$get'], 401>;
+        expectTypeOf<NotSignedIn>().toEqualTypeOf<{ success: false; error: { message: string } }>();
+    });
+
     it('exposes the plain handlers, typed from their own inferred schema', () => {
-        // The ICS links, the status/read-set/save-set handlers and the OAuth pair are mounted with legacyMounted.
-        expectTypeOf<Client['ics-links']>().toHaveProperty('$get');
-        expectTypeOf<Client['status']>().toHaveProperty('$get');
-        expectTypeOf<Client['read-set']>().toHaveProperty('$get');
+        // The save-set PUT and the OAuth pair are mounted with legacyMounted.
         expectTypeOf<Client['connect']>().toHaveProperty('$get');
         expectTypeOf<Client['callback']>().toHaveProperty('$get');
         expectTypeOf<Keys<Client['connections'][':id']['calendars']>>().toEqualTypeOf<'$put'>();
-        type NotSignedIn = InferResponseType<Client['read-set']['$get'], 401>;
-        expectTypeOf<NotSignedIn>().toEqualTypeOf<{ success: false; error: { message: string } }>();
         type Save = InferRequestType<Client['connections'][':id']['calendars']['$put']>;
         expectTypeOf<keyof Save['param']>().toEqualTypeOf<'id'>();
     });

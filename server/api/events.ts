@@ -1,6 +1,7 @@
-import {} from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { z } from '@hono/zod-openapi';
+import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { EventTypeListResponseSchema, InspectionEventListResponseSchema } from '../lib/validations/event.schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
@@ -39,10 +40,49 @@ const EventStatusBody = z.object({
 
 // ---- Event types CRUD ----
 
+// POST and PUT stay plain handlers: the money guard reads the RAW body before the schema's defaults apply, and
+// the status change authorises on the body as well, neither of which a route validator can express. They follow
+// the OpenAPI routes in the chain because `.post()` returns a plain Hono, which has no `.openapi()`.
+const listEventTypesRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/event-types', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    responses: { 200: { content: { 'application/json': { schema: EventTypeListResponseSchema } }, description: 'Event types' } },
+    operationId: 'listVisitEventTypes', summary: 'List the company visit event types',
+    description: 'Lists the event types the company schedules visits with, such as a radon drop-off, ordered by sort order. Price fields are left out for callers without the inspection-fees capability.',
+}, { scopes: ['read'], tier: 'extended' }));
+
+const listInspectionEventsRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/inspections/{inspectionId}/events', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: z.object({ inspectionId: z.string().describe('Id of the inspection whose visits to list.') }) },
+    responses: { 200: { content: { 'application/json': { schema: InspectionEventListResponseSchema } }, description: 'Visits of the inspection' } },
+    operationId: 'listInspectionEvents', summary: 'List the visits of an inspection',
+    description: 'Lists the scheduled visits (events) of one inspection, earliest first. The price is left out for callers without the inspection-fees capability.',
+}, { scopes: ['read'], tier: 'extended' }));
+
+const deleteEventRoute = createRoute(withMcpMetadata({
+    method: 'delete', path: '/events/{id}', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager')] as const,
+    request: { params: z.object({ id: z.string().describe('Id of the visit to delete.') }) },
+    responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('Always true on success.') }) } }, description: 'Deleted' } },
+    operationId: 'deleteInspectionEvent', summary: 'Delete a visit from an inspection',
+    description: 'Deletes one scheduled visit (event). Owner or manager only.',
+}, { scopes: ['write'], tier: 'extended' }));
+
 const eventsRoutes = createApiRouter()
-    .get('/event-types', requireRole('owner', 'manager', 'inspector'), async (c) => {
+    .openapi(listEventTypesRoute, async (c) => {
         const data = await c.var.services.event.listEventTypes(c.get('tenantId'));
-        return c.json({ success: true, data: await moneyView(c, data, 'inspectionFees') });
+        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
+    })
+    .openapi(listInspectionEventsRoute, async (c) => {
+        const { inspectionId } = c.req.valid('param');
+        const data = await c.var.services.event.listInspectionEvents(c.get('tenantId'), inspectionId);
+        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
+    })
+    .openapi(deleteEventRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        await c.var.services.event.deleteEvent(c.get('tenantId'), id);
+        return c.json({ success: true as const }, 200);
     })
     .post('/event-types', requireRole('owner', 'manager'), async (c) => {
         // Checked on the RAW body: the schema's default of 0 would otherwise make
@@ -53,11 +93,6 @@ const eventsRoutes = createApiRouter()
         return c.json({ success: true, data: await moneyView(c, row, 'inspectionFees') }, 201);
     })
     // ---- Inspection events ----
-    .get('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
-        const inspectionId = c.req.param('inspectionId') as string;
-        const data = await c.var.services.event.listInspectionEvents(c.get('tenantId'), inspectionId);
-        return c.json({ success: true, data: await moneyView(c, data, 'inspectionFees') });
-    })
     .post('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const inspectionId = c.req.param('inspectionId') as string;
         const parsed = EventBody.safeParse(await guardMoneyWrite(c, await c.req.json(), null));
@@ -93,11 +128,6 @@ const eventsRoutes = createApiRouter()
         // A visit of an inspection the caller cannot see is not found, whatever the body says.
         await requireVisibleEvent(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), id);
         await c.var.services.event.updateEventStatus(c.get('tenantId'), id, parsed.data.status);
-        return c.json({ success: true });
-    })
-    .delete('/events/:id', requireRole('owner', 'manager'), async (c) => {
-        const id = c.req.param('id') as string;
-        await c.var.services.event.deleteEvent(c.get('tenantId'), id);
         return c.json({ success: true });
     });
 

@@ -2,9 +2,6 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { apiCors } from './lib/native/cors-origins';
 import { serveStatic } from 'hono/cloudflare-workers';
-import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import * as schema from './lib/db/schema';
 
 import { brandingMiddleware } from './lib/middleware/branding';
 import { contextBootstrap } from './lib/middleware/context-bootstrap';
@@ -650,17 +647,6 @@ app.get('/api/public/verify/:envelopeId/document', async (c) => {
     const data = await loadVerifyData(c, envelopeId);
     if (!data) return c.text('Not found', 404);
     return c.redirect(agreementRenderPath(data.tenantSlug, data.reqRow.id), 302);
-});
-
-app.get('/api/public/verify-by-token/:token', async (c) => {
-    const token = c.req.param('token') as string;
-    const db = drizzle(c.env.DB, { schema });
-    const row = await db.select({ id: schema.agreementRequests.id })
-        .from(schema.agreementRequests)
-        .where(eq(schema.agreementRequests.verificationToken, token))
-        .get();
-    if (!row) return c.json({ success: false, error: { message: 'Not found', code: 'NOT_FOUND' } }, 404);
-    return c.json({ success: true, data: { envelopeId: row.id } });
 });
 
 app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {

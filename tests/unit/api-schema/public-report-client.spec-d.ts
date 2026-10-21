@@ -15,13 +15,18 @@ type Client = ReturnType<typeof hc<PublicReportApi>>;
 // A mount dropped from the list, or a route left out of it, fails here. Expected shapes come from the zod schemas.
 describe('PublicReportApi client (own routes interleaved with mounted children)', () => {
     it('has exactly the top-level segments of the routes and mounts, so a dropped mount shows up', () => {
-        expectTypeOf<keyof Client>().toEqualTypeOf<'verify' | 'inspections' | 'report' | 'report-gate' | 'brand' | 'legal' | 'brand-asset'>();
+        expectTypeOf<keyof Client>().toEqualTypeOf<'verify' | 'verify-by-token' | 'inspections' | 'report' | 'report-gate' | 'brand' | 'legal' | 'brand-asset'>();
     });
 
     it('exposes the child mounted before the own routes (verify)', () => {
         expectTypeOf<Client['verify'][':envelopeId']>().toHaveProperty('$get');
         expectTypeOf<Client['verify']['report'][':token']>().toHaveProperty('$get');
         expectTypeOf<Client['verify']['report'][':token']['pdf']>().toHaveProperty('$get');
+        // The token lookup is registered after the three verify routes, in the same mounted router.
+        expectTypeOf<Client['verify-by-token'][':token']>().toHaveProperty('$get');
+        expectTypeOf<keyof InferRequestType<Client['verify-by-token'][':token']['$get']>['param']>().toEqualTypeOf<'token'>();
+        expectTypeOf<InferResponseType<Client['verify-by-token'][':token']['$get'], 200>>().toEqualTypeOf<{ success: true; data: { envelopeId: string } }>();
+        expectTypeOf<InferResponseType<Client['verify-by-token'][':token']['$get'], 404>>().toEqualTypeOf<{ success: false; error: { message: string; code: string } }>();
     });
 
     it('exposes the second child mounted before the own routes (view tracking)', () => {

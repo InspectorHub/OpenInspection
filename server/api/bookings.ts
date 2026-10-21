@@ -29,7 +29,7 @@ import {
 } from '../lib/validations/booking.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import createBookingRoutes, { createBookingRouteConfigs } from './bookings/create';
-import bookingProfileRoutes from './bookings/profile';
+import bookingProfileRoutes, { bookingProfileRouteConfigs } from './bookings/profile';
 // Mounted here rather than in server/index.ts: the deposit is part of the
 // public booking surface, and `/api/public` is where this aggregator already
 // lands, so the external path is identical either way.
@@ -283,7 +283,7 @@ bookingsRoutes.openapi(getTenantSlotsRoute, async (c) => {
 
 /** Registration order, mounts included. Drives `BookingsApi`; a test pins it to what `bookingsRoutes` really registered. */
 export const bookingsRouteParts = [
-    legacyMounted('/', bookingProfileRoutes),
+    mounted('/', bookingProfileRoutes, bookingProfileRouteConfigs),
     mounted('/', depositIntentRoutes, depositIntentRouteConfigs),
     listInspectorsRoute,
     listPublicServicesRoute,

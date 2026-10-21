@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
-import { inspections, reportVersions } from '../../lib/db/schema';
+import { agreementRequests, inspections, reportVersions } from '../../lib/db/schema';
 import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
@@ -110,6 +110,37 @@ const reportVerifyPdfRoute = createRoute(withMcpMetadata({
     operationId: 'getPublicReportVerifyPdf',
     description: 'Public, no-login download of the immutable archived PDF for a specific published report version. Identified by the report_versions verification token (same token as the verifier page). Rendered once on-demand and cached forever by version number.',
 }, { scopes: [], tier: 'extended' }));
+
+// Resolves the verification token printed on a signed document to its envelope id, so the verifier page can
+// then read `/verify/{envelopeId}`. Public and unauthenticated: the token is the credential.
+const verifyByTokenRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/verify-by-token/{token}',
+    tags: ['public'],
+    summary: 'Resolve a verification token to an envelope',
+    request: { params: z.object({ token: z.string().describe('Verification token printed on the signed agreement document.') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(true).describe('Always true on success.'),
+                data: z.object({ envelopeId: z.string().describe('Id of the signature envelope the token belongs to.') }).describe('The resolved envelope.'),
+            }) } },
+            description: 'Envelope id',
+        },
+        404: {
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(false).describe('Always false on an error.'),
+                error: z.object({
+                    message: z.string().describe('Human-readable description of the error.'),
+                    code: z.string().describe('Stable machine-readable error code.'),
+                }).describe('Error detail.'),
+            }) } },
+            description: 'No envelope has this token',
+        },
+    },
+    operationId: 'getPublicVerifyByToken',
+    description: 'Public, no-login lookup that turns the verification token printed on a signed agreement into the signature envelope id, which the public verification route then reads. Answers 404 when no envelope carries the token.',
+}, { scopes: [], tier: 'excluded' }));
 
 const app = createApiRouter();
 app.openapi(verifyRoute, async (c) => {
@@ -240,12 +271,22 @@ app.openapi(reportVerifyPdfRoute, async (c) => {
         'Cache-Control': 'public, max-age=31536000, immutable',
     } });
 });
+app.openapi(verifyByTokenRoute, async (c) => {
+    const { token } = c.req.valid('param');
+    const row = await getDrizzle(c).select({ id: agreementRequests.id })
+        .from(agreementRequests)
+        .where(eq(agreementRequests.verificationToken, token))
+        .get();
+    if (!row) return c.json({ success: false as const, error: { message: 'Not found', code: 'NOT_FOUND' } }, 404);
+    return c.json({ success: true as const, data: { envelopeId: row.id } }, 200);
+});
 
 /** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
 export const publicVerifyRouteConfigs = [
     verifyRoute,
     reportVerifyRoute,
     reportVerifyPdfRoute,
+    verifyByTokenRoute,
 ] as const;
 
 export default app;

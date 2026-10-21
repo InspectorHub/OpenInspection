@@ -10,6 +10,11 @@ import type {
     InspectorsResponseSchema,
     PublicBookingSchema,
 } from '../../../server/lib/validations/booking.schema';
+import type {
+    BookingProfileNotFoundSchema,
+    CompanyBookingProfileResponseSchema,
+    InspectorBookingProfileResponseSchema,
+} from '../../../server/lib/validations/booking-profile.schema';
 
 type Client = ReturnType<typeof hc<BookingsApi>>;
 type SchemaOf<A> = A extends Hono<infer _E, infer S, infer _B> ? S : never;
@@ -33,7 +38,8 @@ type ChainPaths =
     | '/slots';
 
 // Compile-time only. `BookingsApi` is derived from `bookingsRouteParts`: converted children (booking, geocode, deposit
-// intent) are listed with `mounted`, the two still written as chains (company page, agreements) with `legacyMounted`.
+// intent, the company and inspector profiles) are listed with `mounted`, the one still written as a chain (agreements)
+// with `legacyMounted`.
 describe('BookingsApi client', () => {
     it('serves exactly the paths the chained router served', () => {
         expectTypeOf<keyof SchemaOf<BookingsApi>>().toEqualTypeOf<ChainPaths>();
@@ -66,9 +72,15 @@ describe('BookingsApi client', () => {
         expectTypeOf<keyof InferRequestType<Client['inspections'][':id']['deposit-intent']['$post']>['param']>().toEqualTypeOf<'id'>();
     });
 
+    it('types the booking profile reads from their declared schemas', () => {
+        expectTypeOf<InferResponseType<Client['book'][':tenant']['$get'], 200>>().toEqualTypeOf<z.output<typeof CompanyBookingProfileResponseSchema>>();
+        expectTypeOf<InferResponseType<Client['book'][':tenant']['$get'], 404>>().toEqualTypeOf<z.output<typeof BookingProfileNotFoundSchema>>();
+        expectTypeOf<keyof InferRequestType<Client['book'][':tenant']['$get']>['param']>().toEqualTypeOf<'tenant'>();
+        expectTypeOf<InferResponseType<Client['book'][':tenant'][':slug']['$get'], 200>>().toEqualTypeOf<z.output<typeof InspectorBookingProfileResponseSchema>>();
+        expectTypeOf<keyof InferRequestType<Client['book'][':tenant'][':slug']['$get']>['param']>().toEqualTypeOf<'tenant' | 'slug'>();
+    });
+
     it('types the children that are still chains', () => {
-        expectTypeOf<Client['book'][':tenant']>().toHaveProperty('$get');
-        expectTypeOf<Client['book'][':tenant'][':slug']>().toHaveProperty('$get');
         expectTypeOf<Client['agreements'][':token']>().toHaveProperty('$get');
         expectTypeOf<Client['agreements'][':token']['sign']>().toHaveProperty('$post');
         expectTypeOf<Client['agreements'][':token']['decline']>().toHaveProperty('$post');

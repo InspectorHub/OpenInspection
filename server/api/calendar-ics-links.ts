@@ -1,5 +1,8 @@
+import { createRoute } from '@hono/zod-openapi';
 import { and, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
+import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { CalendarIcsLinksResponseSchema, CalendarNotAuthenticatedSchema } from '../lib/validations/calendar.schema';
 import { tenantConfigs, tenants, users } from '../lib/db/schema';
 import { mintInspectorIcsToken } from '../lib/calendar/inspector-ics-token';
 import { isAdminRole } from '../lib/auth/roles';
@@ -19,10 +22,24 @@ import { getDrizzle } from '../lib/route-helpers';
  * still decides everything that matters — the sealed token only it can
  * mint, and the owner-only company feed.
  */
-const calendarIcsLinkRoutes = createApiRouter()
-    .get('/ics-links', async (c) => {
+const icsLinksRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/ics-links',
+    operationId: 'getCalendarIcsLinks',
+    tags: ['calendar'],
+    summary: 'Get the calendar subscribe feed links',
+    description: 'Returns the paths of the calendar feeds the signed-in user can subscribe to: the public busy-time feed, a sealed-token schedule feed, and for owners and managers the company-wide feed. Paths only; the caller supplies the origin.',
+    responses: {
+        200: { content: { 'application/json': { schema: CalendarIcsLinksResponseSchema } }, description: 'Feed paths' },
+        401: { content: { 'application/json': { schema: CalendarNotAuthenticatedSchema } }, description: 'Not signed in' },
+    },
+    security: [{ bearerAuth: [] }],
+}, { scopes: [], tier: 'excluded' }));
+
+const calendarIcsLinkRoutes = createApiRouter();
+calendarIcsLinkRoutes.openapi(icsLinksRoute, async (c) => {
     const user = c.get('user');
-    if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+    if (!user) return c.json({ success: false as const, error: { message: 'Not authenticated' } }, 401);
     const tenantId = c.get('tenantId') as string;
     const db = getDrizzle(c);
 
@@ -54,7 +71,10 @@ const calendarIcsLinkRoutes = createApiRouter()
         if (cfg?.icsToken) companyPath = `/api/ics/${cfg.icsToken}`;
     }
 
-    return c.json({ success: true, data: { busyPath, schedulePath, companyPath } }, 200);
-})
+    return c.json({ success: true as const, data: { busyPath, schedulePath, companyPath } }, 200);
+});
+
+/** Registration order; drives the typed client and is pinned to the router by a test. */
+export const calendarIcsLinkRouteConfigs = [icsLinksRoute] as const;
 
 export default calendarIcsLinkRoutes;

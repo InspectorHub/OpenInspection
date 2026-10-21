@@ -4550,6 +4550,24 @@
     "description": "Create a new inspection template. (POST /templates, inspections domain)."
   },
   {
+    "operationId": "createInspectionType",
+    "method": "POST",
+    "pathTemplate": "/api/admin/inspection-types",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/CreateInspectionType"
+      }
+    },
+    "summary": "Create an inspection subtype",
+    "description": "Creates a company-defined inspection subtype such as Medical Office, optionally based on a platform property subtype. Owner or manager only."
+  },
+  {
     "operationId": "createInspectionUncancel",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/uncancel",
@@ -6103,6 +6121,33 @@
     "description": "Delete a commercial PCA cost line item, tenant-scoped. Removing an item never touches the finding it was linked from."
   },
   {
+    "operationId": "deleteInspectionEvent",
+    "method": "DELETE",
+    "pathTemplate": "/api/events/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the visit to delete.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the visit to delete."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a visit from an inspection",
+    "description": "Deletes one scheduled visit (event). Owner or manager only."
+  },
+  {
     "operationId": "deleteInspectionItemsPhoto",
     "method": "DELETE",
     "pathTemplate": "/api/inspections/{id}/items/{itemId}/photos/{photoIndex}",
@@ -6257,6 +6302,33 @@
     },
     "summary": "Delete inspection template for current tenant",
     "description": "Permanently delete a template and write a template.delete audit entry. Refused with 409 while anything still references it: an inspection created from it, a service that uses it as its default, a report generated from it, or a marketplace import whose local copy it is (remove the import first). Returns 404 for an unknown template and 403 without the template delete capability. Not reversible. Restricted to owners, managers and inspectors."
+  },
+  {
+    "operationId": "deleteInspectionType",
+    "method": "DELETE",
+    "pathTemplate": "/api/admin/inspection-types/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection subtype to act on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection subtype to act on."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete an inspection subtype",
+    "description": "Deletes one company inspection subtype. Owner or manager only."
   },
   {
     "operationId": "deleteInspectionUnit",
@@ -7631,6 +7703,36 @@
     "description": "Returns the routing strategy, lead time and cutoff, plus whether the company address and per-inspector service origins have coordinates — which is what decides whether `closest` can run at all."
   },
   {
+    "operationId": "getCalendarIcsLinks",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/ics-links",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get the calendar subscribe feed links",
+    "description": "Returns the paths of the calendar feeds the signed-in user can subscribe to: the public busy-time feed, a sealed-token schedule feed, and for owners and managers the company-wide feed. Paths only; the caller supplies the origin."
+  },
+  {
+    "operationId": "getCalendarReadSet",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/read-set",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get the calendar read set",
+    "description": "Returns everything the My Schedule calendar picker needs for the signed-in user connection: the calendars the provider lists, the current read set and the write target. Answers { connected: false } when no calendar is connected."
+  },
+  {
     "operationId": "getCancellationQuote",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/cancellation-quote",
@@ -7739,6 +7841,31 @@
     },
     "summary": "Get tenant communication settings",
     "description": "Returns the tenant transactional-email identity (sender + reply-to) plus delivery/integration status flags (Resend configured, ICS URL, Google Calendar connected) for the Settings → Communication page."
+  },
+  {
+    "operationId": "getCompanyBookingProfile",
+    "method": "GET",
+    "pathTemplate": "/api/public/book/{tenant}",
+    "scopes": [],
+    "tag": "bookings",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug from the booking page URL; resolved server-side to the company.",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug from the booking page URL; resolved server-side to the company."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get a company public booking profile",
+    "description": "Public, unauthenticated, rate-limited read of what a company offers on its booking page: display name, whether online booking is open and why not, its active services with prices and deposits, and the inspector list when the company lets visitors choose. The company is resolved from the slug and 404s if unknown."
   },
   {
     "operationId": "getContactDetail",
@@ -7891,6 +8018,22 @@
     },
     "summary": "Change history for a template / comment / entity",
     "description": "Returns the tenant-scoped audit_logs entries for a single entity id, newest first, with the actor name resolved."
+  },
+  {
+    "operationId": "getGoogleCalendarStatus",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/status",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get the calendar connection status",
+    "description": "Reports whether the signed-in user has a calendar connected, which provider and capability it uses, whether Google OAuth is configured on this deployment, and when the last sync ran or why it failed."
   },
   {
     "operationId": "getImportRun",
@@ -8489,6 +8632,41 @@
     },
     "summary": "Get full snapshot for a specific version",
     "description": "Returns the full frozen snapshot captured when version n was published: the inspection record, its results data, its units, the inspectors credited at the time and the resolved report style. Reads the stored copy, so later edits to the live inspection do not change it. Returns 404 when no such version exists for the inspection in this company. Read-only. Available to owner, manager, inspector and agent roles."
+  },
+  {
+    "operationId": "getInspectorBookingProfile",
+    "method": "GET",
+    "pathTemplate": "/api/public/book/{tenant}/{slug}",
+    "scopes": [],
+    "tag": "bookings",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug from the booking page URL; resolved server-side to the company.",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug from the booking page URL; resolved server-side to the company."
+          }
+        },
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "description": "Inspector slug within the company, from the legacy deep link.",
+          "schema": {
+            "type": "string",
+            "description": "Inspector slug within the company, from the legacy deep link."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get an inspector public booking profile",
+    "description": "Public, unauthenticated, rate-limited read of one inspector booking profile: name, photo, whether that inspector is taking bookings, and the company active services. Both the company and the inspector are resolved from slugs and 404 if unknown."
   },
   {
     "operationId": "getIntegrationOverview",
@@ -9159,6 +9337,31 @@
     },
     "summary": "Public e-signature verification (court-friendly)",
     "description": "Public, no-login signature-chain verification for a signed agreement envelope. Returns chain validity + key fingerprint for independent verification."
+  },
+  {
+    "operationId": "getPublicVerifyByToken",
+    "method": "GET",
+    "pathTemplate": "/api/public/verify-by-token/{token}",
+    "scopes": [],
+    "tag": "public",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "description": "Verification token printed on the signed agreement document.",
+          "schema": {
+            "type": "string",
+            "description": "Verification token printed on the signed agreement document."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Resolve a verification token to an envelope",
+    "description": "Public, no-login lookup that turns the verification token printed on a signed agreement into the signature envelope id, which the public verification route then reads. Answers 404 when no envelope carries the token."
   },
   {
     "operationId": "getPublicViewTracking",
@@ -11205,6 +11408,33 @@
     "description": "List every commercial PCA cost line item recorded for the inspection, in display order, for the editor panel and downstream export routes."
   },
   {
+    "operationId": "listInspectionEvents",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{inspectionId}/events",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "inspectionId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose visits to list.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose visits to list."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the visits of an inspection",
+    "description": "Lists the scheduled visits (events) of one inspection, earliest first. The price is left out for callers without the inspection-fees capability."
+  },
+  {
     "operationId": "listInspectionInspectors",
     "method": "GET",
     "pathTemplate": "/api/inspections/inspectors",
@@ -11820,6 +12050,22 @@
     },
     "summary": "List duplicate marketplace imports",
     "description": "Returns one entry per marketplace template ID that has more than one local copy."
+  },
+  {
+    "operationId": "listInspectionTypes",
+    "method": "GET",
+    "pathTemplate": "/api/admin/inspection-types",
+    "scopes": [
+      "read"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the company inspection subtypes",
+    "description": "Lists the inspection subtypes the company defined (for example Medical Office), ordered by their sort order. Open to owners, managers and inspectors."
   },
   {
     "operationId": "listInspectionUnitProgress",
@@ -13353,6 +13599,22 @@
     },
     "summary": "Get current widget allowed-origin list",
     "description": "Returns the company's allowlist of website origins that may embed the booking widget, as saved by the replace-list route. An empty array when none has been set. Not paginated. Read-only. Restricted to owners and managers."
+  },
+  {
+    "operationId": "listVisitEventTypes",
+    "method": "GET",
+    "pathTemplate": "/api/event-types",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the company visit event types",
+    "description": "Lists the event types the company schedules visits with, such as a radon drop-off, ordered by sort order. Price fields are left out for callers without the inspection-fees capability."
   },
   {
     "operationId": "loginWithPassword",
@@ -22861,6 +23123,35 @@
     },
     "summary": "Update inspection template for current tenant",
     "description": "Update a template's name, checklist schema or default report profile. Despite the PUT verb it is a partial update: only the fields sent change. The schema is validated, the property type columns are re-derived from it, the template version number goes up by one on every call even if nothing changed, and a template.update audit entry is written. Returns 404 for an unknown template and 403 when the template produces an official form supplied with the software (its structure is read-only; duplicate it instead) or the user lacks the template edit capability. Restricted to owners, managers and inspectors."
+  },
+  {
+    "operationId": "updateInspectionType",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/inspection-types/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection subtype to act on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection subtype to act on."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/UpdateInspectionType"
+      }
+    },
+    "summary": "Update an inspection subtype",
+    "description": "Changes the fields given for one company inspection subtype; fields left out keep their value. Owner or manager only."
   },
   {
     "operationId": "updateInspectorCredential",

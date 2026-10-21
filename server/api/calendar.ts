@@ -5,7 +5,9 @@ import { importBusyForConnection } from '../lib/calendar/sync-engine';
 import { resolveReadSet, saveReadSet, resolveReadCalendarIds } from '../lib/calendar/read-set';
 import { SaveReadSetSchema } from '../lib/validations/calendar-read-set.schema';
 import { AppError } from '../lib/errors';
-import { CalendarSyncResponseSchema } from '../lib/validations/calendar.schema';
+import {
+    CalendarNotAuthenticatedSchema, CalendarReadSetResponseSchema, CalendarStatusResponseSchema, CalendarSyncResponseSchema,
+} from '../lib/validations/calendar.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -17,7 +19,7 @@ import {
 import { getGoogleCalendarStatus } from '../lib/calendar/status';
 import { disconnectAndAudit, DisconnectQuerySchema, DISCONNECT_DESCRIPTION } from '../lib/calendar/disconnect';
 import calendarBlockRoutes, { calendarBlockRouteConfigs } from './calendar-blocks';
-import calendarIcsLinkRoutes from './calendar-ics-links';
+import calendarIcsLinkRoutes, { calendarIcsLinkRouteConfigs } from './calendar-ics-links';
 import calendarItemsRoutes, { calendarItemsRouteConfigs } from './calendar-items';
 import calendarOAuthRoutes from './calendar/oauth';
 import { getDrizzle } from '../lib/route-helpers';
@@ -72,62 +74,39 @@ const syncRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['write'], tier: 'extended' }));
 
-// The plain handlers of this router. They are a router of their own because a route list cannot express them:
-// each contributes its inferred schema to the client type, so the parent mounts the router with legacyMounted at
-// the place they were registered. The PUT stays in this file: the mutating-route allow-list keys it by file.
-const calendarNativeRoutes = createApiRouter()
-    .get('/status', async (c) => {
-        const user = c.get('user');
-        if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
-        const tenantId = c.get('tenantId') as string;
-        return c.json({ success: true, data: await getGoogleCalendarStatus(c.env, tenantId, user.sub) });
-    })
-    /**
-     * GET /api/calendar/read-set
-     * A-polish 10b — everything the My-Schedule picker needs in one call for the
-     * current user's connection: the available calendars, the current read set,
-     * and the write target. Returns { connected:false } when not connected.
-     */
-    .get('/read-set', async (c) => {
-        const jwtUser = c.get('user');
-        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
-        const tenantId = c.get('tenantId') as string;
-        const open = await loadOpenCalendarConnection(
-            c.env.DB, tenantId, jwtUser.sub, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
-        );
-        if (!open) return c.json({ success: true, data: { connected: false } }, 200);
+/** GET /api/calendar/status: the signed-in user calendar connection and how it is doing. */
+const statusRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/status',
+    operationId: 'getGoogleCalendarStatus',
+    tags: ['calendar'],
+    summary: 'Get the calendar connection status',
+    description: 'Reports whether the signed-in user has a calendar connected, which provider and capability it uses, whether Google OAuth is configured on this deployment, and when the last sync ran or why it failed.',
+    responses: {
+        200: { content: { 'application/json': { schema: CalendarStatusResponseSchema } }, description: 'Connection status' },
+        401: { content: { 'application/json': { schema: CalendarNotAuthenticatedSchema } }, description: 'Not signed in' },
+    },
+    security: [{ bearerAuth: [] }],
+}, { scopes: ['read'], tier: 'extended' }));
 
-        const db = getDrizzle(c);
-        const readCalendarIds = await resolveReadCalendarIds(db, {
-            tenantId,
-            connectionId: open.connection.id,
-            fallbackCalendarId: open.connection.calendarId,
-        });
-        const provider = getCalendarProvider(open.connection.provider);
-        const auth = await provider.resolveAuth({
-            tenantId, credentials: open.credentials, env: c.env,
-        });
-        let calendars: Awaited<ReturnType<typeof provider.listCalendars>> = [];
-        if (auth) {
-            try {
-                calendars = await provider.listCalendars({ auth });
-            } catch (e) {
-                logger.warn('[calendar] read-set listCalendars failed', {
-                    tenantId, error: e instanceof Error ? e.message : String(e),
-                });
-            }
-        }
-        return c.json({
-            success: true,
-            data: {
-                connected: true,
-                connectionId: open.connection.id,
-                writeCalendarId: open.connection.calendarId,
-                readCalendarIds,
-                calendars,
-            },
-        }, 200);
-    })
+/** GET /api/calendar/read-set: the calendars to read busy time from and the write target, in one call. */
+const readSetRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/read-set',
+    operationId: 'getCalendarReadSet',
+    tags: ['calendar'],
+    summary: 'Get the calendar read set',
+    description: 'Returns everything the My Schedule calendar picker needs for the signed-in user connection: the calendars the provider lists, the current read set and the write target. Answers { connected: false } when no calendar is connected.',
+    responses: {
+        200: { content: { 'application/json': { schema: CalendarReadSetResponseSchema } }, description: 'Read set' },
+        401: { content: { 'application/json': { schema: CalendarNotAuthenticatedSchema } }, description: 'Not signed in' },
+    },
+    security: [{ bearerAuth: [] }],
+}, { scopes: ['read'], tier: 'extended' }));
+
+// The one plain handler left of this router: the save-set PUT. It stays a plain handler because its 400 answers
+// `{ message, details }`, not the validation envelope, and the mutating-route allow-list keys it by file.
+const calendarNativeRoutes = createApiRouter()
     /**
      * PUT /api/calendar/connections/:id/calendars
      * A-polish 10b — save the multi-read set + single write target under the
@@ -239,16 +218,64 @@ app.openapi(syncRoute, async (c) => {
         },
     }, 200);
 });
+app.openapi(statusRoute, async (c) => {
+    const user = c.get('user');
+    if (!user) return c.json({ success: false as const, error: { message: 'Not authenticated' } }, 401);
+    const tenantId = c.get('tenantId') as string;
+    return c.json({ success: true as const, data: await getGoogleCalendarStatus(c.env, tenantId, user.sub) }, 200);
+});
+app.openapi(readSetRoute, async (c) => {
+    const jwtUser = c.get('user');
+    if (!jwtUser) return c.json({ success: false as const, error: { message: 'Not authenticated' } }, 401);
+    const tenantId = c.get('tenantId') as string;
+    const open = await loadOpenCalendarConnection(
+        c.env.DB, tenantId, jwtUser.sub, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+    );
+    if (!open) return c.json({ success: true as const, data: { connected: false as const } }, 200);
+
+    const db = getDrizzle(c);
+    const readCalendarIds = await resolveReadCalendarIds(db, {
+        tenantId,
+        connectionId: open.connection.id,
+        fallbackCalendarId: open.connection.calendarId,
+    });
+    const provider = getCalendarProvider(open.connection.provider);
+    const auth = await provider.resolveAuth({
+        tenantId, credentials: open.credentials, env: c.env,
+    });
+    let calendars: Awaited<ReturnType<typeof provider.listCalendars>> = [];
+    if (auth) {
+        try {
+            calendars = await provider.listCalendars({ auth });
+        } catch (e) {
+            logger.warn('[calendar] read-set listCalendars failed', {
+                tenantId, error: e instanceof Error ? e.message : String(e),
+            });
+        }
+    }
+    return c.json({
+        success: true as const,
+        data: {
+            connected: true as const,
+            connectionId: open.connection.id,
+            writeCalendarId: open.connection.calendarId,
+            readCalendarIds,
+            calendars,
+        },
+    }, 200);
+});
 app.route('/', calendarNativeRoutes);
 app.route('/', calendarOAuthRoutes);
 
 /** Registration order, mounts included. Drives `CalendarApi`; a test pins it to what `app` really registered. */
 export const calendarRouteParts = [
     mounted('/', calendarBlockRoutes, calendarBlockRouteConfigs),
-    legacyMounted('/', calendarIcsLinkRoutes),
+    mounted('/', calendarIcsLinkRoutes, calendarIcsLinkRouteConfigs),
     mounted('/', calendarItemsRoutes, calendarItemsRouteConfigs),
     disconnectRoute,
     syncRoute,
+    statusRoute,
+    readSetRoute,
     legacyMounted('/', calendarNativeRoutes),
     legacyMounted('/', calendarOAuthRoutes),
 ] as const;

@@ -287,6 +287,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/bookings/profile.ts',
+        tuple: 'bookingProfileRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/bookings/profile');
+            return { app: m.default, configs: m.bookingProfileRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/calendar-blocks.ts',
         tuple: 'calendarBlockRouteConfigs',
         load: async () => {
@@ -300,6 +308,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/calendar-events');
             return { app: m.default, configs: m.calendarEventsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/calendar-ics-links.ts',
+        tuple: 'calendarIcsLinkRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/calendar-ics-links');
+            return { app: m.default, configs: m.calendarIcsLinkRouteConfigs };
         },
     },
     {
@@ -404,6 +420,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/inspection-sync');
             return { app: m.default, configs: m.syncRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspection-types.ts',
+        tuple: 'inspectionTypesRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/inspection-types');
+            return { app: m.default, configs: m.inspectionTypesRouteConfigs };
         },
     },
     {

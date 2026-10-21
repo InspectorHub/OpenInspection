@@ -23,6 +23,7 @@ import type { EmailTemplatesApi } from '../../../server/api/email-templates';
 import type { EvidenceApi } from '../../../server/api/evidence';
 import type { InspectionPrefsApi } from '../../../server/api/inspection-prefs';
 import type { InspectionRequestsApi } from '../../../server/api/inspection-requests';
+import type { InspectionTypesApi } from '../../../server/api/inspection-types';
 import type { InspectionSyncApi } from '../../../server/api/inspection-sync';
 import type { InspectionsApi } from '../../../server/api/inspections';
 import type { IntegrationsApi } from '../../../server/api/integrations';
@@ -95,6 +96,7 @@ describe('converted routers: every route resolves to an endpoint', () => {
         expectTypeOf<Unresolved<SchemaOf<EvidenceApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<InspectionPrefsApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<InspectionRequestsApi>>>().toEqualTypeOf<never>();
+        expectTypeOf<Unresolved<SchemaOf<InspectionTypesApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<InspectionsApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<IntegrationsAiApi>>>().toEqualTypeOf<never>();
         expectTypeOf<Unresolved<SchemaOf<IntegrationsTestStepsApi>>>().toEqualTypeOf<never>();
