@@ -43,8 +43,20 @@ type RoutePath<Path extends string> = Path extends `${infer Start}/{${infer Para
 type RouteInput<R extends RouteConfig> =
     Parameters<RouteHandler<R>>[0] extends Context<RouteConfigToEnv<R>, RoutePath<R['path']>, infer I> ? I : never;
 
+/** The `$get`-style key the library gives a method. */
+type MethodKey<M extends string> = `$${Lowercase<M>}`;
+
+/**
+ * One route's endpoint, as `ToSchema` builds it. Written as the member type of a mapped type so the checker
+ * resolves it only when a caller reads that member, not when the module's whole schema is folded.
+ */
+type EndpointOf<R extends RouteConfig, P extends string> =
+    ToSchema<R['method'], P, RouteInput<R>, RouteConfigToTypedResponse<R>> extends infer S
+        ? S extends Record<P, infer E> ? E extends Record<MethodKey<R['method']>, infer Ep> ? Ep : never : never
+        : never;
+
 type RouteSchema<R extends RouteConfig, Base extends string> =
-    ToSchema<R['method'], MergePath<Base, RoutePath<R['path']>>, RouteInput<R>, RouteConfigToTypedResponse<R>>;
+    { [K in MergePath<Base, RoutePath<R['path']>>]: { [K2 in MethodKey<R['method']>]: EndpointOf<R, K> } };
 
 type Router = ReturnType<typeof createApiRouter>;
 
