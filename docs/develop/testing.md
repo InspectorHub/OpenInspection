@@ -127,6 +127,24 @@ tests/
   (vitest v4 replacement for `environmentMatchGlobs`).
 - Prefer asserting **service-layer** behavior directly over reconstructing HTTP.
 
+### Every route is OpenAPI or a named exception
+
+`tests/unit/platform/native-routes-are-exceptions.spec.ts` reads the runtime route table of the
+real application (`app.routes`, including routes registered through helper functions), subtracts every
+method and path in the generated OpenAPI document, and requires the remainder to equal
+`NATIVE_ROUTE_EXCEPTIONS` in `tests/unit/platform/native-route-exceptions.ts` exactly. Paths are compared in
+the OpenAPI spelling (`{id}`); middleware and `app.all` dispatch lines are not routes and are skipped.
+
+- **A new plain route fails the spec, by name.** Describe it with `createRoute` (preferred), or add an entry
+  with a category from the closed list and a one-line reason (at most 120 characters) saying why it cannot or
+  should not be an OpenAPI operation.
+- **A stale entry fails too**: the route was removed, or is now in the document. Delete the entry.
+- **`MAX_ENTRIES` is a ratchet.** It equals the current count and may only go down.
+- **It prints both numbers on every run** (`native routes found`, `exceptions listed`) with a per-category
+  breakdown, and fails when the route table is empty.
+- **Out of scope:** routes served outside the Hono application (the OAuth provider wrapper paths, Durable Object
+  internal paths, React Router resource routes under `app/`).
+
 ### Worker-runtime (`tests/workers/*.spec.ts`)
 
 - Runs in real `workerd` via `@cloudflare/vitest-pool-workers`. Reserve this for
