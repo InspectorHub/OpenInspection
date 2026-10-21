@@ -133,257 +133,267 @@ const getSignerLinkRoute = createRoute(withMcpMetadata({
 
 
 
-const adminEsignRoutes = createApiRouter()
-    .openapi(listSigningRequestsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
-        const rows = await db
-            .select({
-                id: agreementRequestsTable.id,
-                agreementId: agreementRequestsTable.agreementId,
-                clientName: agreementRequestsTable.clientName,
-                clientEmail: agreementRequestsTable.clientEmail,
-                inspectionId: agreementRequestsTable.inspectionId,
-                status: agreementRequestsTable.status,
-                createdAt: agreementRequestsTable.createdAt,
-                sentAt: agreementRequestsTable.sentAt,
-                viewedAt: agreementRequestsTable.viewedAt,
-                signedAt: agreementRequestsTable.signedAt,
-                agreementName: agreementsTable.name,
-            })
-            .from(agreementRequestsTable)
-            .leftJoin(agreementsTable, eqDz(agreementRequestsTable.agreementId, agreementsTable.id))
-            .where(eqDz(agreementRequestsTable.tenantId, tenantId))
-            .orderBy(descDz(agreementRequestsTable.createdAt))
-            .limit(200);
-
-        // Track I-a Task 9 — per-envelope signer progress in ONE grouped query
-        // (GROUP BY request_id), no N+1 per row. Merge into the list by id.
-        const counts = await db
-            .select({
-                requestId: schema.agreementSigners.requestId,
-                total: sqlTpl<number>`count(*)`,
-                signed: sqlTpl<number>`sum(case when ${schema.agreementSigners.status} = 'signed' then 1 else 0 end)`,
-            })
-            .from(schema.agreementSigners)
-            .where(eqDz(schema.agreementSigners.tenantId, tenantId))
-            .groupBy(schema.agreementSigners.requestId);
-        const byReq = new Map(counts.map((r) => [r.requestId, r]));
-        const data = rows.map((r) => {
-            const c2 = byReq.get(r.id);
-            return {
-                ...r,
-                signersTotal: Number(c2?.total ?? 0),
-                signersSigned: Number(c2?.signed ?? 0),
-            };
-        });
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(getSigningRequestDetailRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const id = c.req.valid('param').id;
-        const db = drizzle(c.env.DB, { schema });
-        const reqRow = await db
-            .select()
-            .from(schema.agreementRequests)
-            .where(and(eqDz(schema.agreementRequests.id, id), eqDz(schema.agreementRequests.tenantId, tenantId)))
-            .get();
-        if (!reqRow) throw Errors.NotFound('Signing request not found');
-        const agreement = await db
-            .select()
-            .from(schema.agreements)
-            .where(eqDz(schema.agreements.id, reqRow.agreementId))
-            .get();
-        const auditRows = await db
-            .select()
-            .from(schema.esignAuditLogs)
-            .where(and(eqDz(schema.esignAuditLogs.tenantId, tenantId), eqDz(schema.esignAuditLogs.requestId, id)))
-            .orderBy(ascDz(schema.esignAuditLogs.createdAt))
-            .all();
-        const verify = await c.var.services.auditLog.verifyChain(tenantId, id);
-        return c.json({
-            success: true as const,
-            data: {
-                request: reqRow,
-                agreement: agreement ? { id: agreement.id, name: agreement.name } : null,
-                auditEvents: auditRows.map((r) => {
-                    let payload: Record<string, unknown> = {};
-                    try { payload = JSON.parse(r.payloadJson); } catch { /* ignore */ }
-                    return {
-                        id: r.id,
-                        event: r.event,
-                        createdAt: r.createdAt,
-                        payload,
-                        hash: r.hash,
-                        prevHash: r.prevHash,
-                        signature: r.signature,
-                        keyFingerprint: r.keyFingerprint,
-                    };
-                }),
-                chainValid: verify.valid,
-                chainReason: verify.valid ? null : verify.reason,
-            },
-        }, 200);
-    })
-    .openapi(downloadAuditTrailRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const id = c.req.valid('param').id;
-        const db = drizzle(c.env.DB, { schema });
-        const reqRow = await db
-            .select()
-            .from(schema.agreementRequests)
-            .where(and(eqDz(schema.agreementRequests.id, id), eqDz(schema.agreementRequests.tenantId, tenantId)))
-            .get();
-        if (!reqRow) throw Errors.NotFound('Signing request not found');
-        const auditRows = await db
-            .select()
-            .from(schema.esignAuditLogs)
-            .where(and(eqDz(schema.esignAuditLogs.tenantId, tenantId), eqDz(schema.esignAuditLogs.requestId, id)))
-            .orderBy(ascDz(schema.esignAuditLogs.createdAt))
-            .all();
-        const pubKey = await c.var.services.signingKey.getPublicKey(tenantId);
-        const payload = {
-            envelopeId: id,
-            tenantId,
-            clientName: reqRow.clientName,
-            clientEmail: reqRow.clientEmail,
-            status: reqRow.status,
-            publicKeyPem: pubKey?.pem ?? null,
-            keyFingerprint: pubKey?.fingerprint ?? null,
-            algorithm: 'Ed25519',
-            events: auditRows.map((r) => ({
-                id: r.id,
-                event: r.event,
-                createdAt: r.createdAt,
-                payloadJson: r.payloadJson,
-                prevHash: r.prevHash,
-                hash: r.hash,
-                signature: r.signature,
-                keyFingerprint: r.keyFingerprint,
-            })),
-            exportedAt: new Date().toISOString(),
-        };
-        return new Response(JSON.stringify(payload, null, 2), {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Disposition': `attachment; filename="audit-trail-${id.slice(0, 8)}.json"`,
-            },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        }) as any;
-    })
-    // --- Track I-a Task 9 — per-signer admin endpoints --------------------
-    .openapi(listSignersRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { requestId } = c.req.valid('param');
-        const svc = c.var.services.agreement;
-        // Tenant scope: confirm the envelope belongs to this tenant (404 otherwise).
-        const env = await drizzle(c.env.DB, { schema }).select({ id: schema.agreementRequests.id })
-            .from(schema.agreementRequests)
-            .where(and(eqDz(schema.agreementRequests.id, requestId), eqDz(schema.agreementRequests.tenantId, tenantId)))
-            .get();
-        if (!env) throw Errors.NotFound('Signing request not found');
-        const signers = await svc.listSigners(tenantId, requestId);
-        // Map to the safe row shape — NEVER include tokenHash / tokenEnc.
-        const data = signers.map((s: typeof schema.agreementSigners.$inferSelect) => ({
-            id: s.id,
-            name: s.name,
-            email: s.email,
-            role: s.role,
-            status: s.status,
-            channel: s.channel ?? null,
-            signedAt: s.signedAt ? s.signedAt.getTime() : null,
-            viewedAt: s.viewedAt ? s.viewedAt.getTime() : null,
-            onBehalfOf: s.onBehalfOf ?? null,
-            lastRemindedAt: s.lastRemindedAt ? s.lastRemindedAt.getTime() : null,
-        }));
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(getSignerLinkRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { requestId, signerId } = c.req.valid('param');
-        const svc = c.var.services.agreement;
-        const db = drizzle(c.env.DB, { schema });
-        // Tenant scope on the signer row (tenantId + requestId both pinned).
-        const signer = await db.select({ id: schema.agreementSigners.id, requestId: schema.agreementSigners.requestId, inspectionId: schema.agreementRequests.inspectionId })
-            .from(schema.agreementSigners)
-            .innerJoin(schema.agreementRequests, eqDz(schema.agreementSigners.requestId, schema.agreementRequests.id))
-            .where(and(
-                eqDz(schema.agreementSigners.id, signerId),
-                eqDz(schema.agreementSigners.requestId, requestId),
-                eqDz(schema.agreementSigners.tenantId, tenantId),
-            ))
-            .get();
-        if (!signer) throw Errors.NotFound('Signer not found');
-        const tenantSlug = await resolveTenantSlug(c, tenantId);
-        const token = await svc.getSignerLink(tenantId, requestId, signerId);
-        const url = await buildSignUrl(c, tenantId, signer.inspectionId, tenantSlug, token);
-        return c.json({ success: true as const, data: { url } }, 200);
-    })
-    .openapi(remindSignerRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { requestId, signerId } = c.req.valid('param');
-        const svc = c.var.services.agreement;
-        const db = drizzle(c.env.DB, { schema });
-        // Tenant scope + load the signer row (need status + lastRemindedAt + inspectionId).
-        const row = await db.select({
-            id: schema.agreementSigners.id,
-            name: schema.agreementSigners.name,
-            email: schema.agreementSigners.email,
-            status: schema.agreementSigners.status,
-            lastRemindedAt: schema.agreementSigners.lastRemindedAt,
-            inspectionId: schema.agreementRequests.inspectionId,
+const app = createApiRouter();
+app.openapi(listSigningRequestsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
+    const rows = await db
+        .select({
+            id: agreementRequestsTable.id,
+            agreementId: agreementRequestsTable.agreementId,
+            clientName: agreementRequestsTable.clientName,
+            clientEmail: agreementRequestsTable.clientEmail,
+            inspectionId: agreementRequestsTable.inspectionId,
+            status: agreementRequestsTable.status,
+            createdAt: agreementRequestsTable.createdAt,
+            sentAt: agreementRequestsTable.sentAt,
+            viewedAt: agreementRequestsTable.viewedAt,
+            signedAt: agreementRequestsTable.signedAt,
+            agreementName: agreementsTable.name,
         })
-            .from(schema.agreementSigners)
-            .innerJoin(schema.agreementRequests, eqDz(schema.agreementSigners.requestId, schema.agreementRequests.id))
-            .where(and(
-                eqDz(schema.agreementSigners.id, signerId),
-                eqDz(schema.agreementSigners.requestId, requestId),
-                eqDz(schema.agreementSigners.tenantId, tenantId),
-            ))
-            .get();
-        if (!row) throw Errors.NotFound('Signer not found');
-        // Terminal signers can't be reminded.
-        if (['signed', 'declined', 'expired'].includes(row.status)) {
-            throw Errors.Conflict('Signer is no longer awaiting signature');
-        }
-        // Rate limit: at most once per hour, measured against lastRemindedAt.
-        const now = Date.now();
-        if (row.lastRemindedAt && now - row.lastRemindedAt.getTime() < 3600_000) {
-            throw Errors.RateLimited('This signer was reminded within the last hour.');
-        }
+        .from(agreementRequestsTable)
+        .leftJoin(agreementsTable, eqDz(agreementRequestsTable.agreementId, agreementsTable.id))
+        .where(eqDz(agreementRequestsTable.tenantId, tenantId))
+        .orderBy(descDz(agreementRequestsTable.createdAt))
+        .limit(200);
 
-        const tenantSlug = await resolveTenantSlug(c, tenantId);
-        const token = await svc.getSignerLink(tenantId, requestId, signerId);
-        const signUrl = await buildSignUrl(c, tenantId, row.inspectionId, tenantSlug, token);
-        const sigInspector = await lookupSenderSignature(c, tenantId);
-        try {
-            await c.var.services.email.sendAgreementRequest(row.email, row.name, 'Agreement', signUrl, sigInspector, getBookingHost(c));
-        } catch (e: unknown) {
-            // Platform-level refusals (cooling window, suppressed address, domain
-            // unverified, quota exhausted) must surface to the caller so the admin
-            // sees why the reminder wasn't sent rather than getting a silent 200.
-            if (e instanceof AppError) throw e;
-            logger.error('Failed to send agreement reminder', {}, e instanceof Error ? e : undefined);
-        }
-
-        await db.update(schema.agreementSigners).set({ lastRemindedAt: new Date(now) })
-            .where(eqDz(schema.agreementSigners.id, signerId));
-
-        try {
-            await c.var.services.auditLog.append(tenantId, requestId, 'signer.reminded', {
-                envelopeId: requestId,
-                signerId,
-                recipientEmail: row.email,
-                tsMs: now,
-            });
-        } catch (e) {
-            logger.warn('audit.append.reminded.failed', { requestId, error: (e as Error).message });
-        }
-
-        auditFromContext(c, 'agreement.remind', 'agreement_request', { metadata: { requestId, signerId } });
-        return c.json({ success: true as const, data: { remindedAt: now } }, 200);
+    // Track I-a Task 9 — per-envelope signer progress in ONE grouped query
+    // (GROUP BY request_id), no N+1 per row. Merge into the list by id.
+    const counts = await db
+        .select({
+            requestId: schema.agreementSigners.requestId,
+            total: sqlTpl<number>`count(*)`,
+            signed: sqlTpl<number>`sum(case when ${schema.agreementSigners.status} = 'signed' then 1 else 0 end)`,
+        })
+        .from(schema.agreementSigners)
+        .where(eqDz(schema.agreementSigners.tenantId, tenantId))
+        .groupBy(schema.agreementSigners.requestId);
+    const byReq = new Map(counts.map((r) => [r.requestId, r]));
+    const data = rows.map((r) => {
+        const c2 = byReq.get(r.id);
+        return {
+            ...r,
+            signersTotal: Number(c2?.total ?? 0),
+            signersSigned: Number(c2?.signed ?? 0),
+        };
     });
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(getSigningRequestDetailRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const id = c.req.valid('param').id;
+    const db = drizzle(c.env.DB, { schema });
+    const reqRow = await db
+        .select()
+        .from(schema.agreementRequests)
+        .where(and(eqDz(schema.agreementRequests.id, id), eqDz(schema.agreementRequests.tenantId, tenantId)))
+        .get();
+    if (!reqRow) throw Errors.NotFound('Signing request not found');
+    const agreement = await db
+        .select()
+        .from(schema.agreements)
+        .where(eqDz(schema.agreements.id, reqRow.agreementId))
+        .get();
+    const auditRows = await db
+        .select()
+        .from(schema.esignAuditLogs)
+        .where(and(eqDz(schema.esignAuditLogs.tenantId, tenantId), eqDz(schema.esignAuditLogs.requestId, id)))
+        .orderBy(ascDz(schema.esignAuditLogs.createdAt))
+        .all();
+    const verify = await c.var.services.auditLog.verifyChain(tenantId, id);
+    return c.json({
+        success: true as const,
+        data: {
+            request: reqRow,
+            agreement: agreement ? { id: agreement.id, name: agreement.name } : null,
+            auditEvents: auditRows.map((r) => {
+                let payload: Record<string, unknown> = {};
+                try { payload = JSON.parse(r.payloadJson); } catch { /* ignore */ }
+                return {
+                    id: r.id,
+                    event: r.event,
+                    createdAt: r.createdAt,
+                    payload,
+                    hash: r.hash,
+                    prevHash: r.prevHash,
+                    signature: r.signature,
+                    keyFingerprint: r.keyFingerprint,
+                };
+            }),
+            chainValid: verify.valid,
+            chainReason: verify.valid ? null : verify.reason,
+        },
+    }, 200);
+});
+app.openapi(downloadAuditTrailRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const id = c.req.valid('param').id;
+    const db = drizzle(c.env.DB, { schema });
+    const reqRow = await db
+        .select()
+        .from(schema.agreementRequests)
+        .where(and(eqDz(schema.agreementRequests.id, id), eqDz(schema.agreementRequests.tenantId, tenantId)))
+        .get();
+    if (!reqRow) throw Errors.NotFound('Signing request not found');
+    const auditRows = await db
+        .select()
+        .from(schema.esignAuditLogs)
+        .where(and(eqDz(schema.esignAuditLogs.tenantId, tenantId), eqDz(schema.esignAuditLogs.requestId, id)))
+        .orderBy(ascDz(schema.esignAuditLogs.createdAt))
+        .all();
+    const pubKey = await c.var.services.signingKey.getPublicKey(tenantId);
+    const payload = {
+        envelopeId: id,
+        tenantId,
+        clientName: reqRow.clientName,
+        clientEmail: reqRow.clientEmail,
+        status: reqRow.status,
+        publicKeyPem: pubKey?.pem ?? null,
+        keyFingerprint: pubKey?.fingerprint ?? null,
+        algorithm: 'Ed25519',
+        events: auditRows.map((r) => ({
+            id: r.id,
+            event: r.event,
+            createdAt: r.createdAt,
+            payloadJson: r.payloadJson,
+            prevHash: r.prevHash,
+            hash: r.hash,
+            signature: r.signature,
+            keyFingerprint: r.keyFingerprint,
+        })),
+        exportedAt: new Date().toISOString(),
+    };
+    return new Response(JSON.stringify(payload, null, 2), {
+        status: 200,
+        headers: {
+            'Content-Type': 'application/json',
+            'Content-Disposition': `attachment; filename="audit-trail-${id.slice(0, 8)}.json"`,
+        },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }) as any;
+});
+// --- Track I-a Task 9 — per-signer admin endpoints --------------------
+app.openapi(listSignersRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { requestId } = c.req.valid('param');
+    const svc = c.var.services.agreement;
+    // Tenant scope: confirm the envelope belongs to this tenant (404 otherwise).
+    const env = await drizzle(c.env.DB, { schema }).select({ id: schema.agreementRequests.id })
+        .from(schema.agreementRequests)
+        .where(and(eqDz(schema.agreementRequests.id, requestId), eqDz(schema.agreementRequests.tenantId, tenantId)))
+        .get();
+    if (!env) throw Errors.NotFound('Signing request not found');
+    const signers = await svc.listSigners(tenantId, requestId);
+    // Map to the safe row shape — NEVER include tokenHash / tokenEnc.
+    const data = signers.map((s: typeof schema.agreementSigners.$inferSelect) => ({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        role: s.role,
+        status: s.status,
+        channel: s.channel ?? null,
+        signedAt: s.signedAt ? s.signedAt.getTime() : null,
+        viewedAt: s.viewedAt ? s.viewedAt.getTime() : null,
+        onBehalfOf: s.onBehalfOf ?? null,
+        lastRemindedAt: s.lastRemindedAt ? s.lastRemindedAt.getTime() : null,
+    }));
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(getSignerLinkRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { requestId, signerId } = c.req.valid('param');
+    const svc = c.var.services.agreement;
+    const db = drizzle(c.env.DB, { schema });
+    // Tenant scope on the signer row (tenantId + requestId both pinned).
+    const signer = await db.select({ id: schema.agreementSigners.id, requestId: schema.agreementSigners.requestId, inspectionId: schema.agreementRequests.inspectionId })
+        .from(schema.agreementSigners)
+        .innerJoin(schema.agreementRequests, eqDz(schema.agreementSigners.requestId, schema.agreementRequests.id))
+        .where(and(
+            eqDz(schema.agreementSigners.id, signerId),
+            eqDz(schema.agreementSigners.requestId, requestId),
+            eqDz(schema.agreementSigners.tenantId, tenantId),
+        ))
+        .get();
+    if (!signer) throw Errors.NotFound('Signer not found');
+    const tenantSlug = await resolveTenantSlug(c, tenantId);
+    const token = await svc.getSignerLink(tenantId, requestId, signerId);
+    const url = await buildSignUrl(c, tenantId, signer.inspectionId, tenantSlug, token);
+    return c.json({ success: true as const, data: { url } }, 200);
+});
+app.openapi(remindSignerRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { requestId, signerId } = c.req.valid('param');
+    const svc = c.var.services.agreement;
+    const db = drizzle(c.env.DB, { schema });
+    // Tenant scope + load the signer row (need status + lastRemindedAt + inspectionId).
+    const row = await db.select({
+        id: schema.agreementSigners.id,
+        name: schema.agreementSigners.name,
+        email: schema.agreementSigners.email,
+        status: schema.agreementSigners.status,
+        lastRemindedAt: schema.agreementSigners.lastRemindedAt,
+        inspectionId: schema.agreementRequests.inspectionId,
+    })
+        .from(schema.agreementSigners)
+        .innerJoin(schema.agreementRequests, eqDz(schema.agreementSigners.requestId, schema.agreementRequests.id))
+        .where(and(
+            eqDz(schema.agreementSigners.id, signerId),
+            eqDz(schema.agreementSigners.requestId, requestId),
+            eqDz(schema.agreementSigners.tenantId, tenantId),
+        ))
+        .get();
+    if (!row) throw Errors.NotFound('Signer not found');
+    // Terminal signers can't be reminded.
+    if (['signed', 'declined', 'expired'].includes(row.status)) {
+        throw Errors.Conflict('Signer is no longer awaiting signature');
+    }
+    // Rate limit: at most once per hour, measured against lastRemindedAt.
+    const now = Date.now();
+    if (row.lastRemindedAt && now - row.lastRemindedAt.getTime() < 3600_000) {
+        throw Errors.RateLimited('This signer was reminded within the last hour.');
+    }
 
-export default adminEsignRoutes;
+    const tenantSlug = await resolveTenantSlug(c, tenantId);
+    const token = await svc.getSignerLink(tenantId, requestId, signerId);
+    const signUrl = await buildSignUrl(c, tenantId, row.inspectionId, tenantSlug, token);
+    const sigInspector = await lookupSenderSignature(c, tenantId);
+    try {
+        await c.var.services.email.sendAgreementRequest(row.email, row.name, 'Agreement', signUrl, sigInspector, getBookingHost(c));
+    } catch (e: unknown) {
+        // Platform-level refusals (cooling window, suppressed address, domain
+        // unverified, quota exhausted) must surface to the caller so the admin
+        // sees why the reminder wasn't sent rather than getting a silent 200.
+        if (e instanceof AppError) throw e;
+        logger.error('Failed to send agreement reminder', {}, e instanceof Error ? e : undefined);
+    }
+
+    await db.update(schema.agreementSigners).set({ lastRemindedAt: new Date(now) })
+        .where(eqDz(schema.agreementSigners.id, signerId));
+
+    try {
+        await c.var.services.auditLog.append(tenantId, requestId, 'signer.reminded', {
+            envelopeId: requestId,
+            signerId,
+            recipientEmail: row.email,
+            tsMs: now,
+        });
+    } catch (e) {
+        logger.warn('audit.append.reminded.failed', { requestId, error: (e as Error).message });
+    }
+
+    auditFromContext(c, 'agreement.remind', 'agreement_request', { metadata: { requestId, signerId } });
+    return c.json({ success: true as const, data: { remindedAt: now } }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminEsignRouteConfigs = [
+    listSigningRequestsRoute,
+    getSigningRequestDetailRoute,
+    downloadAuditTrailRoute,
+    listSignersRoute,
+    getSignerLinkRoute,
+    remindSignerRoute,
+] as const;
+
+export default app;
 

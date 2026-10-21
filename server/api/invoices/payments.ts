@@ -115,105 +115,112 @@ const listInvoicePaymentsRoute = createRoute(withMcpMetadata({
     description: 'Returns every payment-ledger row recorded against one invoice, ordered by when the money moved, with the recording user resolved. Once an invoice can hold several payments a single total no longer answers a dispute. For a caller whose access is limited to the inspections assigned to them, an item tied to an inspection outside that set is answered as not found.',
 }, { scopes: ['read'], tier: 'extended', capability: 'companyFinance' }));
 
-const invoicePaymentRoutes = createApiRouter()
-    .openapi(recordOfflinePaymentRoute, async (c) => {
-        const id = c.req.valid('param').id as string;
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        // The recorder is the SESSION, never the body. A money entry nobody is
-        // named on cannot be defended when the payment is later disputed.
-        const recordedBy = c.get('user')?.sub as string;
-        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
+const app = createApiRouter();
+app.openapi(recordOfflinePaymentRoute, async (c) => {
+    const id = c.req.valid('param').id as string;
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    // The recorder is the SESSION, never the body. A money entry nobody is
+    // named on cannot be defended when the payment is later disputed.
+    const recordedBy = c.get('user')?.sub as string;
+    await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
 
-        const appended = await c.var.services.invoice.recordOfflinePayment(tenantId, id, {
-            amountCents: body.amountCents,
-            method: body.method,
-            // Parsed once, here at the boundary — the schema has already refused
-            // an unparseable or future instant.
-            occurredAt: new Date(body.occurredAt),
-            note: body.note ?? null,
-            allowOverpayment: body.allowOverpayment,
-            recordedBy,
-        });
-
-        // A payment that closes the invoice must also close the report's payment
-        // gate, exactly as mark-paid does. A PARTIAL one must not: the gate asks
-        // whether the invoice is settled, not whether any money arrived.
-        const inv = await c.var.services.invoice.findById(tenantId, id);
-        if (inv?.paidAt && inv.inspectionId) {
-            await c.var.services.inspection.markPaymentReceived(tenantId, inv.inspectionId);
-        }
-        // QuickBooks is a book of record, not a payment provider — the "no
-        // provider call" rule is about not charging anyone, and cash that never
-        // reaches the books is exactly the revenue this feature exists to stop
-        // losing. What is pushed is the ROW that was appended (its amount and
-        // its id as the idempotency key), never the invoice total.
-        if (c.env.QBO_CLIENT_ID) {
-            c.executionCtx.waitUntil(
-                c.var.services.qbo.recordPayment(
-                    tenantId, id, appended.amountCents / 100, qboPaymentKey(appended.id),
-                    appended.occurredAt,
-                ),
-            );
-        }
-
-        return c.json({
-            success: true as const,
-            data: {
-                id: appended.id,
-                kind: appended.kind,
-                amountCents: appended.amountCents,
-                method: body.method,
-                provider: null,
-                note: body.note ?? null,
-                occurredAt: safeISODate(appended.occurredAt),
-                recordedBy,
-                // Resolved by the ledger LIST, which the surface reloads right
-                // after; re-reading the user row here would buy one label.
-                recordedByName: null,
-                refundsId: null,
-            },
-        }, 201);
-    })
-    .openapi(correctPaymentRoute, async (c) => {
-        const { id, paymentId } = c.req.valid('param') as { id: string; paymentId: string };
-        const tenantId = c.get('tenantId');
-        const { correctedAmountCents, reason } = c.req.valid('json');
-        const recordedBy = c.get('user')?.sub as string;
-        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
-
-        // The service also re-syncs the report's payment gate: a correction can
-        // take an invoice back OUT of paid, which is precisely the state the old
-        // column model could not express.
-        const appended = await c.var.services.invoice.correctPayment(tenantId, id, paymentId, {
-            correctedAmountCents, reason, recordedBy,
-        });
-        // Deliberately NOT pushed to QuickBooks. A reversal there is not a
-        // negative payment — it is an operation on the payment already booked,
-        // and inventing a negative amount would post nonsense to somebody's
-        // books. Reconciling corrections belongs to the QBO sync work, not here.
-
-        return c.json({
-            success: true as const,
-            data: {
-                id: appended.id,
-                kind: appended.kind,
-                amountCents: appended.amountCents,
-                method: appended.method,
-                provider: null,
-                note: appended.note,
-                occurredAt: safeISODate(appended.occurredAt),
-                recordedBy,
-                recordedByName: null,
-                refundsId: appended.refundsId,
-            },
-        }, 201);
-    })
-    .openapi(listInvoicePaymentsRoute, async (c) => {
-        const id = c.req.valid('param').id as string;
-        await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), id);
-        const rows = await c.var.services.invoice.listPayments(c.get('tenantId'), id);
-        return c.json({ success: true as const, data: rows }, 200);
+    const appended = await c.var.services.invoice.recordOfflinePayment(tenantId, id, {
+        amountCents: body.amountCents,
+        method: body.method,
+        // Parsed once, here at the boundary — the schema has already refused
+        // an unparseable or future instant.
+        occurredAt: new Date(body.occurredAt),
+        note: body.note ?? null,
+        allowOverpayment: body.allowOverpayment,
+        recordedBy,
     });
 
-export default invoicePaymentRoutes;
+    // A payment that closes the invoice must also close the report's payment
+    // gate, exactly as mark-paid does. A PARTIAL one must not: the gate asks
+    // whether the invoice is settled, not whether any money arrived.
+    const inv = await c.var.services.invoice.findById(tenantId, id);
+    if (inv?.paidAt && inv.inspectionId) {
+        await c.var.services.inspection.markPaymentReceived(tenantId, inv.inspectionId);
+    }
+    // QuickBooks is a book of record, not a payment provider — the "no
+    // provider call" rule is about not charging anyone, and cash that never
+    // reaches the books is exactly the revenue this feature exists to stop
+    // losing. What is pushed is the ROW that was appended (its amount and
+    // its id as the idempotency key), never the invoice total.
+    if (c.env.QBO_CLIENT_ID) {
+        c.executionCtx.waitUntil(
+            c.var.services.qbo.recordPayment(
+                tenantId, id, appended.amountCents / 100, qboPaymentKey(appended.id),
+                appended.occurredAt,
+            ),
+        );
+    }
+
+    return c.json({
+        success: true as const,
+        data: {
+            id: appended.id,
+            kind: appended.kind,
+            amountCents: appended.amountCents,
+            method: body.method,
+            provider: null,
+            note: body.note ?? null,
+            occurredAt: safeISODate(appended.occurredAt),
+            recordedBy,
+            // Resolved by the ledger LIST, which the surface reloads right
+            // after; re-reading the user row here would buy one label.
+            recordedByName: null,
+            refundsId: null,
+        },
+    }, 201);
+});
+app.openapi(correctPaymentRoute, async (c) => {
+    const { id, paymentId } = c.req.valid('param') as { id: string; paymentId: string };
+    const tenantId = c.get('tenantId');
+    const { correctedAmountCents, reason } = c.req.valid('json');
+    const recordedBy = c.get('user')?.sub as string;
+    await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
+
+    // The service also re-syncs the report's payment gate: a correction can
+    // take an invoice back OUT of paid, which is precisely the state the old
+    // column model could not express.
+    const appended = await c.var.services.invoice.correctPayment(tenantId, id, paymentId, {
+        correctedAmountCents, reason, recordedBy,
+    });
+    // Deliberately NOT pushed to QuickBooks. A reversal there is not a
+    // negative payment — it is an operation on the payment already booked,
+    // and inventing a negative amount would post nonsense to somebody's
+    // books. Reconciling corrections belongs to the QBO sync work, not here.
+
+    return c.json({
+        success: true as const,
+        data: {
+            id: appended.id,
+            kind: appended.kind,
+            amountCents: appended.amountCents,
+            method: appended.method,
+            provider: null,
+            note: appended.note,
+            occurredAt: safeISODate(appended.occurredAt),
+            recordedBy,
+            recordedByName: null,
+            refundsId: appended.refundsId,
+        },
+    }, 201);
+});
+app.openapi(listInvoicePaymentsRoute, async (c) => {
+    const id = c.req.valid('param').id as string;
+    await requireVisibleInvoice(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), id);
+    const rows = await c.var.services.invoice.listPayments(c.get('tenantId'), id);
+    return c.json({ success: true as const, data: rows }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const invoicePaymentRouteConfigs = [
+    recordOfflinePaymentRoute,
+    correctPaymentRoute,
+    listInvoicePaymentsRoute,
+] as const;
+
+export default app;

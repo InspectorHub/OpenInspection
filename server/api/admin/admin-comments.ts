@@ -163,225 +163,234 @@ const touchCommentRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-const adminCommentsRoutes = createApiRouter()
-    .openapi(listCommentsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { severity, section, sectionId, triggerCode, search, sort, filterMode, itemLabel, page, pageSize } = c.req.valid('query');
-        // Per-user usage join — needs the JWT subject (same convention as the
-        // touch endpoint above and the rest of admin.ts).
-        const userId = c.get('user')?.sub ?? '';
-        const auto = filterMode === 'auto';
-        const db = getDrizzle(c);
-        // Filters layered defensively: tenantId always first (multi-tenant
-        // isolation rule from CLAUDE.md). `sectionId` / `triggerCode` are
-        // explicit user-typed filters and always apply; `severity` / `section`
-        // / `itemLabel` are context-derived and only apply when filterMode=auto
-        // (filterMode=all means "ignore inspection context, show everything").
-        const conditions = [eq(comments.tenantId, tenantId)];
-        if (sectionId) {
-            conditions.push(like(comments.sectionIds, `%"${escapeLikePattern(sectionId)}"%`));
-        }
-        if (triggerCode) {
-            conditions.push(eq(comments.triggerCode, triggerCode));
-        }
-        // Track H: `severity` applies whenever the caller sends it — the library
-        // modal's severity chips pass it explicitly in `all` mode too (it used to
-        // be auto-gated like section/itemLabel, which left the chips dead).
-        if (severity) conditions.push(eq(comments.severity, severity));
-        if (auto && section) conditions.push(eq(comments.section, section));
-        if (auto && itemLabel) conditions.push(eq(comments.itemLabel, itemLabel));
-        // Track H (IA-5): search is pushed down to SQL so pagination + count
-        // are correct. (The old behavior filtered in JS AFTER the limit, so a
-        // match beyond the first page silently never surfaced.) Matches text
-        // OR the curated search_keywords column; SQLite LIKE is ASCII
-        // case-insensitive, which is what the library content needs.
-        if (search && search.trim().length >= 2) {
-            const needle = `%${escapeLikePattern(search.trim())}%`;
-            conditions.push(or(like(comments.text, needle), like(comments.searchKeywords, needle))!);
-        }
+const app = createApiRouter();
+app.openapi(listCommentsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { severity, section, sectionId, triggerCode, search, sort, filterMode, itemLabel, page, pageSize } = c.req.valid('query');
+    // Per-user usage join — needs the JWT subject (same convention as the
+    // touch endpoint above and the rest of admin.ts).
+    const userId = c.get('user')?.sub ?? '';
+    const auto = filterMode === 'auto';
+    const db = getDrizzle(c);
+    // Filters layered defensively: tenantId always first (multi-tenant
+    // isolation rule from CLAUDE.md). `sectionId` / `triggerCode` are
+    // explicit user-typed filters and always apply; `severity` / `section`
+    // / `itemLabel` are context-derived and only apply when filterMode=auto
+    // (filterMode=all means "ignore inspection context, show everything").
+    const conditions = [eq(comments.tenantId, tenantId)];
+    if (sectionId) {
+        conditions.push(like(comments.sectionIds, `%"${escapeLikePattern(sectionId)}"%`));
+    }
+    if (triggerCode) {
+        conditions.push(eq(comments.triggerCode, triggerCode));
+    }
+    // Track H: `severity` applies whenever the caller sends it — the library
+    // modal's severity chips pass it explicitly in `all` mode too (it used to
+    // be auto-gated like section/itemLabel, which left the chips dead).
+    if (severity) conditions.push(eq(comments.severity, severity));
+    if (auto && section) conditions.push(eq(comments.section, section));
+    if (auto && itemLabel) conditions.push(eq(comments.itemLabel, itemLabel));
+    // Track H (IA-5): search is pushed down to SQL so pagination + count
+    // are correct. (The old behavior filtered in JS AFTER the limit, so a
+    // match beyond the first page silently never surfaced.) Matches text
+    // OR the curated search_keywords column; SQLite LIKE is ASCII
+    // case-insensitive, which is what the library content needs.
+    if (search && search.trim().length >= 2) {
+        const needle = `%${escapeLikePattern(search.trim())}%`;
+        conditions.push(or(like(comments.text, needle), like(comments.searchKeywords, needle))!);
+    }
 
-        // ORDER BY by sort. SQLite treats NULL as smaller than any value, so
-        // descDz(commentUsage.lastUsedAt) naturally puts user-touched rows first
-        // and untouched rows last — matches the `recent` / `frequent` specs.
-        const orderByExpr =
-            sort === 'recent'   ? [descDz(commentUsage.lastUsedAt)]
-          : sort === 'created'  ? [descDz(comments.createdAt)]
-          : sort === 'frequent' ? [descDz(commentUsage.useCount), descDz(commentUsage.lastUsedAt)]
-          : sort === 'alpha'    ? [ascDz(comments.text)]
-          :                       [ascDz(comments.severity), descDz(comments.createdAt)];
+    // ORDER BY by sort. SQLite treats NULL as smaller than any value, so
+    // descDz(commentUsage.lastUsedAt) naturally puts user-touched rows first
+    // and untouched rows last — matches the `recent` / `frequent` specs.
+    const orderByExpr =
+        sort === 'recent'   ? [descDz(commentUsage.lastUsedAt)]
+      : sort === 'created'  ? [descDz(comments.createdAt)]
+      : sort === 'frequent' ? [descDz(commentUsage.useCount), descDz(commentUsage.lastUsedAt)]
+      : sort === 'alpha'    ? [ascDz(comments.text)]
+      :                       [ascDz(comments.severity), descDz(comments.createdAt)];
 
-        const rows = await db.select({
-            id:             comments.id,
-            tenantId:       comments.tenantId,
-            text:           comments.text,
-            category:       comments.category,
-            section:        comments.section,
-            sectionIds:     comments.sectionIds,
-            itemLabels:     comments.itemLabels,
-            itemLabel:      comments.itemLabel,
-            triggerCode:    comments.triggerCode,
-            searchKeywords: comments.searchKeywords,
-            libraryId:      comments.libraryId,
-            severity:       comments.severity,
-            repairSummary:               comments.repairSummary,
-            recommendedContractorTypeId: comments.recommendedContractorTypeId,
-            createdAt:      comments.createdAt,
-            editedAt:       comments.editedAt,
-            importHash:     comments.importHash,
-            useCount:       commentUsage.useCount,
-            lastUsedAt:     commentUsage.lastUsedAt,
-        })
-            .from(comments)
-            .leftJoin(commentUsage, and(
-                eq(commentUsage.commentId, comments.id),
-                eq(commentUsage.tenantId,  tenantId),
-                eq(commentUsage.userId,    userId),
-            ))
-            .where(and(...conditions))
-            .orderBy(...orderByExpr)
-            .limit(pageSize)
-            .offset((page - 1) * pageSize)
-            .all();
-
-        // Total count for pagination meta — exact now that search lives in the
-        // WHERE clause (Track H).
-        const totalRow = await db
-            .select({ c: sqlTpl<number>`count(*)` })
-            .from(comments)
-            .where(and(...conditions))
-            .get();
-        const total = totalRow?.c ?? 0;
-        // `commentRowToResponse` is exported via the local helper above and used
-        // by the create / update routes — we extend in-place at the route to
-        // avoid touching the create / update signatures.
-        const data = rows.map(r => ({
-            ...commentRowToResponse(r),
-            useCount:   r.useCount ?? 0,
-            lastUsedAt: r.lastUsedAt != null ? r.lastUsedAt.toISOString() : null,
-        }));
-        return c.json({
-            success: true as const,
-            data,
-            meta: buildMeta({ total, page, pageSize }),
-        }, 200);
+    const rows = await db.select({
+        id:             comments.id,
+        tenantId:       comments.tenantId,
+        text:           comments.text,
+        category:       comments.category,
+        section:        comments.section,
+        sectionIds:     comments.sectionIds,
+        itemLabels:     comments.itemLabels,
+        itemLabel:      comments.itemLabel,
+        triggerCode:    comments.triggerCode,
+        searchKeywords: comments.searchKeywords,
+        libraryId:      comments.libraryId,
+        severity:       comments.severity,
+        repairSummary:               comments.repairSummary,
+        recommendedContractorTypeId: comments.recommendedContractorTypeId,
+        createdAt:      comments.createdAt,
+        editedAt:       comments.editedAt,
+        importHash:     comments.importHash,
+        useCount:       commentUsage.useCount,
+        lastUsedAt:     commentUsage.lastUsedAt,
     })
-    .openapi(createCommentRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { text, category, severity, section, repairSummary, recommendedContractorTypeId } = c.req.valid('json');
-        const db = getDrizzle(c);
-        const row = {
-            id: crypto.randomUUID(),
-            tenantId,
-            text,
+        .from(comments)
+        .leftJoin(commentUsage, and(
+            eq(commentUsage.commentId, comments.id),
+            eq(commentUsage.tenantId,  tenantId),
+            eq(commentUsage.userId,    userId),
+        ))
+        .where(and(...conditions))
+        .orderBy(...orderByExpr)
+        .limit(pageSize)
+        .offset((page - 1) * pageSize)
+        .all();
+
+    // Total count for pagination meta — exact now that search lives in the
+    // WHERE clause (Track H).
+    const totalRow = await db
+        .select({ c: sqlTpl<number>`count(*)` })
+        .from(comments)
+        .where(and(...conditions))
+        .get();
+    const total = totalRow?.c ?? 0;
+    // `commentRowToResponse` is exported via the local helper above and used
+    // by the create / update routes — we extend in-place at the route to
+    // avoid touching the create / update signatures.
+    const data = rows.map(r => ({
+        ...commentRowToResponse(r),
+        useCount:   r.useCount ?? 0,
+        lastUsedAt: r.lastUsedAt != null ? r.lastUsedAt.toISOString() : null,
+    }));
+    return c.json({
+        success: true as const,
+        data,
+        meta: buildMeta({ total, page, pageSize }),
+    }, 200);
+});
+app.openapi(createCommentRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { text, category, severity, section, repairSummary, recommendedContractorTypeId } = c.req.valid('json');
+    const db = getDrizzle(c);
+    const row = {
+        id: crypto.randomUUID(),
+        tenantId,
+        text,
+        category: category ?? null,
+        section: section ?? null,
+        // S2-7 — libraryId tracks marketplace provenance; null for tenant-authored.
+        libraryId: null as string | null,
+        sectionIds: null as string | null,
+        itemLabels: null as string | null,
+        triggerCode: null as string | null,
+        searchKeywords: null as string | null,
+        itemLabel: null as string | null,
+        severity: severity ?? null,
+        repairSummary: repairSummary ?? null,
+        recommendedContractorTypeId: recommendedContractorTypeId ?? null,
+        createdAt: new Date(),
+        // #348 — a tenant-authored comment has no import to differ from, and
+        // has not been edited since being written.
+        editedAt: null as Date | null,
+        importHash: null as string | null,
+    };
+    await db.insert(comments).values(row);
+    auditFromContext(c, 'comment.created', 'comment', {
+        entityId: row.id,
+        metadata: { textPreview: text.slice(0, 80) },
+    });
+    return c.json({ success: true as const, data: { comment: commentRowToResponse(row) } }, 201);
+});
+app.openapi(deleteCommentRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const db = getDrizzle(c);
+    const existing = await db.select().from(comments)
+        .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
+    if (!existing) throw Errors.NotFound('Comment not found');
+    await db.delete(comments).where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
+    auditFromContext(c, 'comment.deleted', 'comment', {
+        entityId: id,
+        metadata: { textPreview: (existing.text as string).slice(0, 80) },
+    });
+    return c.json({ success: true }, 200);
+});
+app.openapi(updateCommentRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const { text, category, severity, section, repairSummary, recommendedContractorTypeId } = c.req.valid('json');
+    const db = getDrizzle(c);
+    const existing = await db.select().from(comments)
+        .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
+    if (!existing) throw Errors.NotFound('Comment not found');
+    const patch: Partial<typeof comments.$inferInsert> = {
+        text,
+        category: category ?? null,
+        severity: severity ?? null,
+        section: section ?? null,
+        // #348 — display marker ("edited 12 March"). Whether a marketplace
+        // re-import may overwrite this row is decided by comparing its text
+        // against comments.import_hash, not by this field, so a write path
+        // that forgets to set it cannot cause an edit to be silently lost.
+        editedAt: new Date(),
+    };
+    if (repairSummary !== undefined) patch.repairSummary = repairSummary ?? null;
+    if (recommendedContractorTypeId !== undefined) patch.recommendedContractorTypeId = recommendedContractorTypeId ?? null;
+    await db.update(comments)
+        .set(patch)
+        .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
+    const updated = { ...existing, ...patch } as typeof comments.$inferSelect;
+    auditFromContext(c, 'comment.updated', 'comment', {
+        entityId: id,
+        metadata: {
             category: category ?? null,
-            section: section ?? null,
-            // S2-7 — libraryId tracks marketplace provenance; null for tenant-authored.
-            libraryId: null as string | null,
-            sectionIds: null as string | null,
-            itemLabels: null as string | null,
-            triggerCode: null as string | null,
-            searchKeywords: null as string | null,
-            itemLabel: null as string | null,
-            severity: severity ?? null,
-            repairSummary: repairSummary ?? null,
-            recommendedContractorTypeId: recommendedContractorTypeId ?? null,
-            createdAt: new Date(),
-            // #348 — a tenant-authored comment has no import to differ from, and
-            // has not been edited since being written.
-            editedAt: null as Date | null,
-            importHash: null as string | null,
-        };
-        await db.insert(comments).values(row);
-        auditFromContext(c, 'comment.created', 'comment', {
-            entityId: row.id,
-            metadata: { textPreview: text.slice(0, 80) },
-        });
-        return c.json({ success: true as const, data: { comment: commentRowToResponse(row) } }, 201);
-    })
-    .openapi(deleteCommentRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const db = getDrizzle(c);
-        const existing = await db.select().from(comments)
-            .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
-        if (!existing) throw Errors.NotFound('Comment not found');
-        await db.delete(comments).where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
-        auditFromContext(c, 'comment.deleted', 'comment', {
-            entityId: id,
-            metadata: { textPreview: (existing.text as string).slice(0, 80) },
-        });
-        return c.json({ success: true }, 200);
-    })
-    .openapi(updateCommentRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const { text, category, severity, section, repairSummary, recommendedContractorTypeId } = c.req.valid('json');
-        const db = getDrizzle(c);
-        const existing = await db.select().from(comments)
-            .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
-        if (!existing) throw Errors.NotFound('Comment not found');
-        const patch: Partial<typeof comments.$inferInsert> = {
-            text,
-            category: category ?? null,
             severity: severity ?? null,
             section: section ?? null,
-            // #348 — display marker ("edited 12 March"). Whether a marketplace
-            // re-import may overwrite this row is decided by comparing its text
-            // against comments.import_hash, not by this field, so a write path
-            // that forgets to set it cannot cause an edit to be silently lost.
-            editedAt: new Date(),
-        };
-        if (repairSummary !== undefined) patch.repairSummary = repairSummary ?? null;
-        if (recommendedContractorTypeId !== undefined) patch.recommendedContractorTypeId = recommendedContractorTypeId ?? null;
-        await db.update(comments)
-            .set(patch)
-            .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId)));
-        const updated = { ...existing, ...patch } as typeof comments.$inferSelect;
-        auditFromContext(c, 'comment.updated', 'comment', {
-            entityId: id,
-            metadata: {
-                category: category ?? null,
-                severity: severity ?? null,
-                section: section ?? null,
-                textPreview: text.slice(0, 80),
-            },
-        });
-        return c.json({ success: true as const, data: { comment: commentRowToResponse(updated) } }, 200);
-    })
-    .openapi(touchCommentRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        // Convention in this file: auth middleware stashes the decoded JWT under
-        // the 'user' key with `.sub` as the user id (see lines ~866, ~2169).
-        const userId = c.get('user')?.sub ?? '';
-        if (!userId) throw Errors.Unauthorized();
-        const now = new Date();
-        const db = getDrizzle(c);
+            textPreview: text.slice(0, 80),
+        },
+    });
+    return c.json({ success: true as const, data: { comment: commentRowToResponse(updated) } }, 200);
+});
+app.openapi(touchCommentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    // Convention in this file: auth middleware stashes the decoded JWT under
+    // the 'user' key with `.sub` as the user id (see lines ~866, ~2169).
+    const userId = c.get('user')?.sub ?? '';
+    if (!userId) throw Errors.Unauthorized();
+    const now = new Date();
+    const db = getDrizzle(c);
 
-        const existing = await db.select().from(commentUsage)
+    const existing = await db.select().from(commentUsage)
+        .where(and(
+            eq(commentUsage.tenantId,  tenantId),
+            eq(commentUsage.userId,    userId),
+            eq(commentUsage.commentId, id),
+        ))
+        .get();
+
+    if (existing) {
+        const nextCount = existing.useCount + 1;
+        await db.update(commentUsage)
+            .set({ useCount: nextCount, lastUsedAt: now })
             .where(and(
                 eq(commentUsage.tenantId,  tenantId),
                 eq(commentUsage.userId,    userId),
                 eq(commentUsage.commentId, id),
-            ))
-            .get();
+            ));
+        return c.json({ success: true as const, data: { commentId: id, useCount: nextCount } }, 200);
+    }
 
-        if (existing) {
-            const nextCount = existing.useCount + 1;
-            await db.update(commentUsage)
-                .set({ useCount: nextCount, lastUsedAt: now })
-                .where(and(
-                    eq(commentUsage.tenantId,  tenantId),
-                    eq(commentUsage.userId,    userId),
-                    eq(commentUsage.commentId, id),
-                ));
-            return c.json({ success: true as const, data: { commentId: id, useCount: nextCount } }, 200);
-        }
-
-        await db.insert(commentUsage).values({
-            tenantId, userId, commentId: id, useCount: 1, lastUsedAt: now,
-        });
-        return c.json({ success: true as const, data: { commentId: id, useCount: 1 } }, 200);
+    await db.insert(commentUsage).values({
+        tenantId, userId, commentId: id, useCount: 1, lastUsedAt: now,
     });
+    return c.json({ success: true as const, data: { commentId: id, useCount: 1 } }, 200);
+});
 
-export default adminCommentsRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminCommentsRouteConfigs = [
+    listCommentsRoute,
+    createCommentRoute,
+    deleteCommentRoute,
+    updateCommentRoute,
+    touchCommentRoute,
+] as const;
+
+export default app;

@@ -14,6 +14,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { eq } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import { tenantConfigs, tenantAiAttestations } from '../lib/db/schema';
@@ -358,40 +359,47 @@ export async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: SecretsSa
     return c.json({ success: true as const }, 200);
 }
 
-const secretsRoutes = createApiRouter()
-    .openapi(getSecretsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
+const app = createApiRouter();
+app.openapi(getSecretsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
 
-        const row = await db
-            .select({ secretsEnc: tenantConfigs.secretsEnc, dekEnc: tenantConfigs.dekEnc })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
+    const row = await db
+        .select({ secretsEnc: tenantConfigs.secretsEnc, dekEnc: tenantConfigs.dekEnc })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
 
-        let stored: Record<string, string> = {};
-        if (row?.secretsEnc) {
-            try {
-                stored = await openSecrets(
-                    row.secretsEnc, row.dekEnc ?? null, tenantId,
-                    c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
-                );
-            } catch {
-                // Corrupt or key-rotated — return empty, let admin re-enter
-            }
+    let stored: Record<string, string> = {};
+    if (row?.secretsEnc) {
+        try {
+            stored = await openSecrets(
+                row.secretsEnc, row.dekEnc ?? null, tenantId,
+                c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+            );
+        } catch {
+            // Corrupt or key-rotated — return empty, let admin re-enter
         }
+    }
 
-        // Build masked output for every known key
-        const masked: Record<string, string> = {};
-        for (const key of INTEGRATION_SECRET_KEYS) {
-            masked[key] = maskSecret(stored[key] ?? null);
-        }
+    // Build masked output for every known key
+    const masked: Record<string, string> = {};
+    for (const key of INTEGRATION_SECRET_KEYS) {
+        masked[key] = maskSecret(stored[key] ?? null);
+    }
 
-        return c.json({ success: true as const, data: masked }, 200);
-    })
-    .openapi(putSecretsRoute, (c) => saveSecretsImpl(c, c.req.valid('json')))
-    .openapi(postSecretsRoute, (c) => saveSecretsImpl(c, c.req.valid('json')));
+    return c.json({ success: true as const, data: masked }, 200);
+});
+app.openapi(putSecretsRoute, (c) => saveSecretsImpl(c, c.req.valid('json')));
+app.openapi(postSecretsRoute, (c) => saveSecretsImpl(c, c.req.valid('json')));
 
-export type SecretsApi = typeof secretsRoutes;
+/** Registration order. Drives `SecretsApi`; a test pins it to what `app` really registered. */
+export const secretsRouteConfigs = [
+    getSecretsRoute,
+    putSecretsRoute,
+    postSecretsRoute,
+] as const;
 
-export default secretsRoutes;
+export type SecretsApi = ApiOf<typeof secretsRouteConfigs>;
+
+export default app;

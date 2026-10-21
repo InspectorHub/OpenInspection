@@ -10,6 +10,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import { mounted, type ApiOf } from '../lib/api-schema';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
@@ -18,7 +19,7 @@ import { resolveEmailProvider } from '../lib/email/resolve-provider';
 import { logger } from '../lib/logger';
 import { recordIntegrationTest, listIntegrationTestResults, type IntegrationTarget } from '../lib/integration-test-results';
 import { getDrizzle, createDrizzle } from '../lib/route-helpers';
-import integrationsOverviewRoutes from './integrations-overview';
+import integrationsOverviewRoutes, { integrationsOverviewRouteConfigs } from './integrations-overview';
 
 /**
  * Single write point for the four "Test connection" probes in this file — keeps
@@ -167,164 +168,175 @@ const testResultsRoute = createRoute(withMcpMetadata({
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-const integrationsRoutes = createApiRouter()
-    .openapi(statusRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const out = await c.var.services.integrations.status(tenantId);
-        return c.json({ success: true as const, data: out }, 200);
-    })
-    .openapi(testResultsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const data = await listIntegrationTestResults(getDrizzle(c), tenantId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(stripeTestRoute, async (c) => {
-        const env = c.env;
-        const tenantId = c.get('tenantId');
-        const uid = c.get('user')?.sub ?? null;
-        const secretKey = env.STRIPE_SECRET_KEY;
-        if (!secretKey) {
-            await logTest(c.env, tenantId, uid, 'stripe', false, 'No Stripe secret key is configured.');
-            return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'No Stripe secret key is configured.' } }, 503);
-        }
-        try {
-            const { StripeService } = await import('../services/stripe.service');
-            const { accountName } = await new StripeService(secretKey).getAccount();
-            const livemode = secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_');
-            await logTest(c.env, tenantId, uid, 'stripe', true, `Connected to ${accountName}${livemode ? ' (live mode)' : ' (test mode)'}.`);
-            return c.json({ success: true as const, data: { accountName, livemode } }, 200);
-        } catch {
-            await logTest(c.env, tenantId, uid, 'stripe', false, 'Stripe rejected the stored secret key.');
-            return c.json({ success: false as const, error: { code: 'STRIPE_KEY_INVALID', message: 'Stripe rejected the stored secret key.' } }, 502);
-        }
-    })
-    .openapi(stripeWebhookLogRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const { readWebhookLog } = await import('../lib/stripe-webhook-log');
-        const entries = await readWebhookLog(c.env.TENANT_CACHE, tenantId);
-        return c.json({ success: true as const, data: entries }, 200);
-    })
-    .openapi(resendTestRoute, async (c) => {
-        const env = c.env;
-        const tenantId = c.get('tenantId');
-        const uid = c.get('user')?.sub ?? null;
-        const key = env.RESEND_API_KEY;
-        if (!key) {
-            await logTest(c.env, tenantId, uid, 'email', false, 'No Resend API key is configured.', 'resend');
-            return c.json({ success: false as const, error: { code: 'RESEND_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
-        }
-        // Auth-only probe via the Resend provider — no hand-rolled vendor URL.
-        const { ResendProvider } = await import('../lib/email/providers/resend');
-        const provider = new ResendProvider({ apiKey: key });
-        const probe = await provider.probeApiKey();
-        // No HTTP response at all: the key was never checked, so never report it valid.
-        if (!probe.reachable) {
-            await logTest(c.env, tenantId, uid, 'email', false, 'Could not reach Resend.', 'resend');
-            return c.json({ success: false as const, error: { code: 'RESEND_UNREACHABLE', message: 'Could not reach Resend.' } }, 503);
-        }
-        if (!probe.valid) {
-            await logTest(c.env, tenantId, uid, 'email', false, 'Resend rejected the stored API key.', 'resend');
-            return c.json({ success: false as const, error: { code: 'RESEND_KEY_INVALID', message: 'Resend rejected the stored API key.' } }, 502);
-        }
-        const listing = await provider.listDomains();
-        if (!listing.ok && listing.reason === 'restricted') {
-            await logTest(c.env, tenantId, uid, 'email', true, 'Resend key valid (send-only key; sender domains cannot be checked).', 'resend');
-            return c.json({ success: true as const, data: { domains: 0 } }, 200);
-        }
-        const verified = listing.ok ? listing.verified : 0;
-        const unverified = listing.ok ? listing.total - listing.verified : 0;
-        const verifiedPart = verified > 0
-            ? ` · ${verified} verified domain${verified === 1 ? '' : 's'}`
-            : unverified > 0 ? ' · no verified domains' : '';
-        const unverifiedPart = unverified > 0 ? ` (${unverified} not yet verified)` : '';
-        await logTest(c.env, tenantId, uid, 'email', true, `Resend key valid${verifiedPart}${unverifiedPart}.`, 'resend');
-        return c.json({ success: true as const, data: { domains: verified } }, 200);
-    })
-    .openapi(emailValidateRoute, async (c) => {
-        const { provider } = c.req.valid('json');
-        const env = c.env;
-        const tenantId = c.get('tenantId');
-        const uid = c.get('user')?.sub ?? null;
+const app = createApiRouter();
+app.openapi(statusRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+    const out = await c.var.services.integrations.status(tenantId);
+    return c.json({ success: true as const, data: out }, 200);
+});
+app.openapi(testResultsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+    const data = await listIntegrationTestResults(getDrizzle(c), tenantId);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(stripeTestRoute, async (c) => {
+    const env = c.env;
+    const tenantId = c.get('tenantId');
+    const uid = c.get('user')?.sub ?? null;
+    const secretKey = env.STRIPE_SECRET_KEY;
+    if (!secretKey) {
+        await logTest(c.env, tenantId, uid, 'stripe', false, 'No Stripe secret key is configured.');
+        return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'No Stripe secret key is configured.' } }, 503);
+    }
+    try {
+        const { StripeService } = await import('../services/stripe.service');
+        const { accountName } = await new StripeService(secretKey).getAccount();
+        const livemode = secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_');
+        await logTest(c.env, tenantId, uid, 'stripe', true, `Connected to ${accountName}${livemode ? ' (live mode)' : ' (test mode)'}.`);
+        return c.json({ success: true as const, data: { accountName, livemode } }, 200);
+    } catch {
+        await logTest(c.env, tenantId, uid, 'stripe', false, 'Stripe rejected the stored secret key.');
+        return c.json({ success: false as const, error: { code: 'STRIPE_KEY_INVALID', message: 'Stripe rejected the stored secret key.' } }, 502);
+    }
+});
+app.openapi(stripeWebhookLogRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+    const { readWebhookLog } = await import('../lib/stripe-webhook-log');
+    const entries = await readWebhookLog(c.env.TENANT_CACHE, tenantId);
+    return c.json({ success: true as const, data: entries }, 200);
+});
+app.openapi(resendTestRoute, async (c) => {
+    const env = c.env;
+    const tenantId = c.get('tenantId');
+    const uid = c.get('user')?.sub ?? null;
+    const key = env.RESEND_API_KEY;
+    if (!key) {
+        await logTest(c.env, tenantId, uid, 'email', false, 'No Resend API key is configured.', 'resend');
+        return c.json({ success: false as const, error: { code: 'RESEND_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
+    }
+    // Auth-only probe via the Resend provider — no hand-rolled vendor URL.
+    const { ResendProvider } = await import('../lib/email/providers/resend');
+    const provider = new ResendProvider({ apiKey: key });
+    const probe = await provider.probeApiKey();
+    // No HTTP response at all: the key was never checked, so never report it valid.
+    if (!probe.reachable) {
+        await logTest(c.env, tenantId, uid, 'email', false, 'Could not reach Resend.', 'resend');
+        return c.json({ success: false as const, error: { code: 'RESEND_UNREACHABLE', message: 'Could not reach Resend.' } }, 503);
+    }
+    if (!probe.valid) {
+        await logTest(c.env, tenantId, uid, 'email', false, 'Resend rejected the stored API key.', 'resend');
+        return c.json({ success: false as const, error: { code: 'RESEND_KEY_INVALID', message: 'Resend rejected the stored API key.' } }, 502);
+    }
+    const listing = await provider.listDomains();
+    if (!listing.ok && listing.reason === 'restricted') {
+        await logTest(c.env, tenantId, uid, 'email', true, 'Resend key valid (send-only key; sender domains cannot be checked).', 'resend');
+        return c.json({ success: true as const, data: { domains: 0 } }, 200);
+    }
+    const verified = listing.ok ? listing.verified : 0;
+    const unverified = listing.ok ? listing.total - listing.verified : 0;
+    const verifiedPart = verified > 0
+        ? ` · ${verified} verified domain${verified === 1 ? '' : 's'}`
+        : unverified > 0 ? ' · no verified domains' : '';
+    const unverifiedPart = unverified > 0 ? ` (${unverified} not yet verified)` : '';
+    await logTest(c.env, tenantId, uid, 'email', true, `Resend key valid${verifiedPart}${unverifiedPart}.`, 'resend');
+    return c.json({ success: true as const, data: { domains: verified } }, 200);
+});
+app.openapi(emailValidateRoute, async (c) => {
+    const { provider } = c.req.valid('json');
+    const env = c.env;
+    const tenantId = c.get('tenantId');
+    const uid = c.get('user')?.sub ?? null;
 
-        // Build creds from env (integration-secrets middleware merges the tenant's
-        // stored keys into env before this handler runs — same path as resendTestRoute).
-        let creds: { apiKey: string } | { apiKey: string; domain: string } | null = null;
+    // Build creds from env (integration-secrets middleware merges the tenant's
+    // stored keys into env before this handler runs — same path as resendTestRoute).
+    let creds: { apiKey: string } | { apiKey: string; domain: string } | null = null;
 
-        switch (provider) {
-            case 'resend': {
-                const key = env.RESEND_API_KEY;
-                if (!key) {
-                    await logTest(c.env, tenantId, uid, 'email', false, 'No Resend API key is configured.', provider);
-                    return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
-                }
-                creds = { apiKey: key };
-                break;
+    switch (provider) {
+        case 'resend': {
+            const key = env.RESEND_API_KEY;
+            if (!key) {
+                await logTest(c.env, tenantId, uid, 'email', false, 'No Resend API key is configured.', provider);
+                return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
             }
-            case 'sendgrid': {
-                const key = env.SENDGRID_API_KEY;
-                if (!key) {
-                    await logTest(c.env, tenantId, uid, 'email', false, 'No SendGrid API key is configured.', provider);
-                    return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No SendGrid API key is configured.' } }, 503);
-                }
-                creds = { apiKey: key };
-                break;
-            }
-            case 'postmark': {
-                const token = env.POSTMARK_SERVER_TOKEN;
-                if (!token) {
-                    await logTest(c.env, tenantId, uid, 'email', false, 'No Postmark Server Token is configured.', provider);
-                    return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No Postmark Server Token is configured.' } }, 503);
-                }
-                creds = { apiKey: token };
-                break;
-            }
-            case 'mailgun': {
-                const key = env.MAILGUN_API_KEY;
-                const domain = env.MAILGUN_DOMAIN;
-                if (!key || !domain) {
-                    await logTest(c.env, tenantId, uid, 'email', false, 'Mailgun API key and domain are both required.', provider);
-                    return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'Mailgun API key and domain are both required.' } }, 503);
-                }
-                creds = { apiKey: key, domain };
-                break;
-            }
+            creds = { apiKey: key };
+            break;
         }
-
-        try {
-            const adapter = resolveEmailProvider(provider, creds);
-            const result = adapter.validateCredentials
-                ? await adapter.validateCredentials()
-                : { ok: true as const };
-
-            if (result.ok) {
-                await logTest(c.env, tenantId, uid, 'email', true, `${provider} credentials valid.`, provider);
-                return c.json({ success: true as const, data: { ok: true as const } }, 200);
+        case 'sendgrid': {
+            const key = env.SENDGRID_API_KEY;
+            if (!key) {
+                await logTest(c.env, tenantId, uid, 'email', false, 'No SendGrid API key is configured.', provider);
+                return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No SendGrid API key is configured.' } }, 503);
             }
-            await logTest(c.env, tenantId, uid, 'email', false, (result as { ok: false; error: string }).error, provider);
-            return c.json({
-                success: false as const,
-                error: { code: 'EMAIL_KEY_INVALID', message: (result as { ok: false; error: string }).error },
-            }, 502);
-        } catch (err) {
-            // Never 500 — surface as 502 with a safe message; do NOT log the key.
-            logger.warn('[email-validate] unexpected error during credential check', {
-                tenantId,
-                provider,
-                error: err instanceof Error ? err.message : String(err),
-            });
-            await logTest(c.env, tenantId, uid, 'email', false, 'Credential validation failed unexpectedly.', provider);
-            return c.json({
-                success: false as const,
-                error: { code: 'EMAIL_KEY_INVALID', message: 'Credential validation failed unexpectedly.' },
-            }, 502);
+            creds = { apiKey: key };
+            break;
         }
-    })
-    // Its own file; chained here so the typed client reaches it as
-    // `api.integrations.overview` without a second router on this base path.
-    .route('/overview', integrationsOverviewRoutes);
+        case 'postmark': {
+            const token = env.POSTMARK_SERVER_TOKEN;
+            if (!token) {
+                await logTest(c.env, tenantId, uid, 'email', false, 'No Postmark Server Token is configured.', provider);
+                return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No Postmark Server Token is configured.' } }, 503);
+            }
+            creds = { apiKey: token };
+            break;
+        }
+        case 'mailgun': {
+            const key = env.MAILGUN_API_KEY;
+            const domain = env.MAILGUN_DOMAIN;
+            if (!key || !domain) {
+                await logTest(c.env, tenantId, uid, 'email', false, 'Mailgun API key and domain are both required.', provider);
+                return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'Mailgun API key and domain are both required.' } }, 503);
+            }
+            creds = { apiKey: key, domain };
+            break;
+        }
+    }
 
-export type IntegrationsApi = typeof integrationsRoutes;
-export default integrationsRoutes;
+    try {
+        const adapter = resolveEmailProvider(provider, creds);
+        const result = adapter.validateCredentials
+            ? await adapter.validateCredentials()
+            : { ok: true as const };
+
+        if (result.ok) {
+            await logTest(c.env, tenantId, uid, 'email', true, `${provider} credentials valid.`, provider);
+            return c.json({ success: true as const, data: { ok: true as const } }, 200);
+        }
+        await logTest(c.env, tenantId, uid, 'email', false, (result as { ok: false; error: string }).error, provider);
+        return c.json({
+            success: false as const,
+            error: { code: 'EMAIL_KEY_INVALID', message: (result as { ok: false; error: string }).error },
+        }, 502);
+    } catch (err) {
+        // Never 500 — surface as 502 with a safe message; do NOT log the key.
+        logger.warn('[email-validate] unexpected error during credential check', {
+            tenantId,
+            provider,
+            error: err instanceof Error ? err.message : String(err),
+        });
+        await logTest(c.env, tenantId, uid, 'email', false, 'Credential validation failed unexpectedly.', provider);
+        return c.json({
+            success: false as const,
+            error: { code: 'EMAIL_KEY_INVALID', message: 'Credential validation failed unexpectedly.' },
+        }, 502);
+    }
+});
+// Its own file; chained here so the typed client reaches it as
+// `api.integrations.overview` without a second router on this base path.
+app.route('/overview', integrationsOverviewRoutes);
+
+/** Registration order, mounts included. Drives `IntegrationsApi`; a test pins it to what `app` really registered. */
+export const integrationsRouteParts = [
+    statusRoute,
+    testResultsRoute,
+    stripeTestRoute,
+    stripeWebhookLogRoute,
+    resendTestRoute,
+    emailValidateRoute,
+    mounted('/overview', integrationsOverviewRoutes, integrationsOverviewRouteConfigs),
+] as const;
+
+export type IntegrationsApi = ApiOf<typeof integrationsRouteParts>;
+export default app;

@@ -22,6 +22,7 @@
 
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { flattenReportDefects } from '../lib/repair-defects';
 import { generatePdfFromUrl } from '../lib/pdf';
@@ -108,263 +109,277 @@ const sourceRoute = createRoute(withMcpMetadata({
 // Router
 // ---------------------------------------------------------------------------
 
-const repairBuilderRoutes = createApiRouter()
-    .openapi(sourceRoute, async (c) => {
-        const { id } = c.req.valid('param');
+const app = createApiRouter();
+app.openapi(sourceRoute, async (c) => {
+    const { id } = c.req.valid('param');
 
-        // --- Auth gate ---
-        const access = await resolveBuilderAccess(c, id);
-        if (!access) {
-            return c.json(
-                { success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } },
-                401,
-            );
-        }
-        const { tenantId, creator } = access;
+    // --- Auth gate ---
+    const access = await resolveBuilderAccess(c, id);
+    if (!access) {
+        return c.json(
+            { success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } },
+            401,
+        );
+    }
+    const { tenantId, creator } = access;
 
-        // --- Publish + tenant-flag gate ---
-        const gateResult = await runBuilderGate(c, id, tenantId);
-        if (gateResult) return gateResult;
+    // --- Publish + tenant-flag gate ---
+    const gateResult = await runBuilderGate(c, id, tenantId);
+    if (gateResult) return gateResult;
 
-        // --- Data fetch ---
-        // B1: use listMineWithItems so mine[].items is populated and the builder
-        // page can rehydrate initialSelected/initialDrafts/initialItemIds on reload
-        // without re-adding items (which would inflate creditTotal).
-        const [defects, mine, quickPhrases] = await Promise.all([
-            flattenReportDefects(c.var.services.inspection, id, tenantId),
-            c.var.services.repairRequest.listMineWithItems(tenantId, id, creator),
-            loadQuickPhrases(c, tenantId),
-        ]);
+    // --- Data fetch ---
+    // B1: use listMineWithItems so mine[].items is populated and the builder
+    // page can rehydrate initialSelected/initialDrafts/initialItemIds on reload
+    // without re-adding items (which would inflate creditTotal).
+    const [defects, mine, quickPhrases] = await Promise.all([
+        flattenReportDefects(c.var.services.inspection, id, tenantId),
+        c.var.services.repairRequest.listMineWithItems(tenantId, id, creator),
+        loadQuickPhrases(c, tenantId),
+    ]);
 
-        return c.json({ success: true as const, data: { defects, mine, quickPhrases } }, 200);
-    })
+    return c.json({ success: true as const, data: { defects, mine, quickPhrases } }, 200);
+});
 
-    // POST /repair-builder/:tenant/:id — create list
-    .openapi(createListRoute, async (c) => {
-        const { id } = c.req.valid('param');
+// POST /repair-builder/:tenant/:id — create list
+app.openapi(createListRoute, async (c) => {
+    const { id } = c.req.valid('param');
 
-        const access = await resolveBuilderAccess(c, id);
-        if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
-        const { tenantId, creator } = access;
-        // IA-35 / IA-73 — creating a list is a write; a read-only agent is refused.
-        if (access.accessLevel !== 'readwrite') {
-            return c.json({ success: false as const, error: { code: 'FORBIDDEN', message: 'Read-only access to the repair list.' } }, 403);
-        }
+    const access = await resolveBuilderAccess(c, id);
+    if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
+    const { tenantId, creator } = access;
+    // IA-35 / IA-73 — creating a list is a write; a read-only agent is refused.
+    if (access.accessLevel !== 'readwrite') {
+        return c.json({ success: false as const, error: { code: 'FORBIDDEN', message: 'Read-only access to the repair list.' } }, 403);
+    }
 
-        const gateResult = await runBuilderGate(c, id, tenantId);
-        if (gateResult) return gateResult;
+    const gateResult = await runBuilderGate(c, id, tenantId);
+    if (gateResult) return gateResult;
 
-        const rr = await c.var.services.repairRequest.create(tenantId, id, creator);
-        return c.json({ success: true as const, data: rr }, 200);
-    })
+    const rr = await c.var.services.repairRequest.create(tenantId, id, creator);
+    return c.json({ success: true as const, data: rr }, 200);
+});
 
-    // GET /repair-builder/:tenant/:id/lists/:rrId — get list + items + creditTotal
-    .openapi(getListRoute, async (c) => {
-        const { id, rrId } = c.req.valid('param');
+// GET /repair-builder/:tenant/:id/lists/:rrId — get list + items + creditTotal
+app.openapi(getListRoute, async (c) => {
+    const { id, rrId } = c.req.valid('param');
 
-        const access = await resolveBuilderAccess(c, id);
-        if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
-        const { tenantId } = access;
+    const access = await resolveBuilderAccess(c, id);
+    if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
+    const { tenantId } = access;
 
-        const gateResult = await runBuilderGate(c, id, tenantId);
-        if (gateResult) return gateResult;
+    const gateResult = await runBuilderGate(c, id, tenantId);
+    if (gateResult) return gateResult;
 
-        // I1: scope get() to (tenantId, inspectionId) so a rrId from a different
-        // inspection within the same tenant is rejected with 404.
-        const result = await c.var.services.repairRequest.get(tenantId, id, rrId);
-        if (!result) {
-            return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Repair request not found.' } }, 404);
-        }
-        const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, id, rrId);
-        return c.json({ success: true as const, data: { request: result.request, items: result.items, creditTotal } }, 200);
-    })
+    // I1: scope get() to (tenantId, inspectionId) so a rrId from a different
+    // inspection within the same tenant is rejected with 404.
+    const result = await c.var.services.repairRequest.get(tenantId, id, rrId);
+    if (!result) {
+        return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Repair request not found.' } }, 404);
+    }
+    const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, id, rrId);
+    return c.json({ success: true as const, data: { request: result.request, items: result.items, creditTotal } }, 200);
+});
 
-    // POST /repair-builder/:tenant/:id/lists/:rrId/items — add item
-    .openapi(addItemRoute, async (c) => {
-        const { id, rrId } = c.req.valid('param');
-        const body = c.req.valid('json');
+// POST /repair-builder/:tenant/:id/lists/:rrId/items — add item
+app.openapi(addItemRoute, async (c) => {
+    const { id, rrId } = c.req.valid('param');
+    const body = c.req.valid('json');
 
-        const access = await resolveBuilderAccess(c, id);
-        if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
-        const { tenantId, creator } = access;
+    const access = await resolveBuilderAccess(c, id);
+    if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
+    const { tenantId, creator } = access;
 
-        const gateResult = await runBuilderGate(c, id, tenantId);
-        if (gateResult) return gateResult;
+    const gateResult = await runBuilderGate(c, id, tenantId);
+    if (gateResult) return gateResult;
 
-        // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
-        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
-        if (guardResult) return guardResult;
+    // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
+    const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
+    if (guardResult) return guardResult;
 
-        // #275 — after the edit guard, so an unauthorized caller never learns
-        // anything about this field. Refuses the TAG, not the write.
-        const tagGuard = runAssertMayAuthorTag(c, creator, body.repairActionTag);
-        if (tagGuard) return tagGuard;
+    // #275 — after the edit guard, so an unauthorized caller never learns
+    // anything about this field. Refuses the TAG, not the write.
+    const tagGuard = runAssertMayAuthorTag(c, creator, body.repairActionTag);
+    if (tagGuard) return tagGuard;
 
-        // Map Zod-output (undefined optional) to service ItemInput (null optional)
-        // to satisfy exactOptionalPropertyTypes.
-        const item = await c.var.services.repairRequest.addItem(tenantId, rrId, {
-            findingKey:           body.findingKey,
-            sectionTitle:         body.sectionTitle,
-            itemLabel:            body.itemLabel,
-            defectTitle:          body.defectTitle ?? null,
-            location:             body.location ?? null,
-            category:             body.category ?? null,
-            trade:                body.trade ?? null,
-            commentSnapshot:      body.commentSnapshot ?? null,
-            requestedCreditCents: body.requestedCreditCents ?? null,
-            note:                 body.note ?? null,
-            repairActionTag:      body.repairActionTag ?? null,
-        });
-        return c.json({ success: true as const, data: item }, 200);
-    })
+    // Map Zod-output (undefined optional) to service ItemInput (null optional)
+    // to satisfy exactOptionalPropertyTypes.
+    const item = await c.var.services.repairRequest.addItem(tenantId, rrId, {
+        findingKey:           body.findingKey,
+        sectionTitle:         body.sectionTitle,
+        itemLabel:            body.itemLabel,
+        defectTitle:          body.defectTitle ?? null,
+        location:             body.location ?? null,
+        category:             body.category ?? null,
+        trade:                body.trade ?? null,
+        commentSnapshot:      body.commentSnapshot ?? null,
+        requestedCreditCents: body.requestedCreditCents ?? null,
+        note:                 body.note ?? null,
+        repairActionTag:      body.repairActionTag ?? null,
+    });
+    return c.json({ success: true as const, data: item }, 200);
+});
 
-    // PATCH /repair-builder/:tenant/:id/lists/:rrId/items/:itemId — update item
-    .openapi(updateItemRoute, async (c) => {
-        const { id, rrId, itemId } = c.req.valid('param');
-        const body = c.req.valid('json');
+// PATCH /repair-builder/:tenant/:id/lists/:rrId/items/:itemId — update item
+app.openapi(updateItemRoute, async (c) => {
+    const { id, rrId, itemId } = c.req.valid('param');
+    const body = c.req.valid('json');
 
-        const access = await resolveBuilderAccess(c, id);
-        if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
-        const { tenantId, creator } = access;
+    const access = await resolveBuilderAccess(c, id);
+    if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
+    const { tenantId, creator } = access;
 
-        const gateResult = await runBuilderGate(c, id, tenantId);
-        if (gateResult) return gateResult;
+    const gateResult = await runBuilderGate(c, id, tenantId);
+    if (gateResult) return gateResult;
 
-        // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
-        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
-        if (guardResult) return guardResult;
+    // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
+    const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
+    if (guardResult) return guardResult;
 
-        // #275 — same boundary as the POST, same order relative to the edit guard.
-        const tagGuard = runAssertMayAuthorTag(c, creator, body.repairActionTag);
-        if (tagGuard) return tagGuard;
+    // #275 — same boundary as the POST, same order relative to the edit guard.
+    const tagGuard = runAssertMayAuthorTag(c, creator, body.repairActionTag);
+    if (tagGuard) return tagGuard;
 
-        // Map Zod-output optional fields to service patch type (null not undefined).
-        const patch: Parameters<typeof c.var.services.repairRequest.updateItem>[4] = {};
-        if (body.requestedCreditCents !== undefined) patch.requestedCreditCents = body.requestedCreditCents ?? null;
-        if (body.note !== undefined) patch.note = body.note ?? null;
-        if (body.sortOrder !== undefined) patch.sortOrder = body.sortOrder;
-        // Absent leaves the stored tag alone; an explicit null clears it.
-        if (body.repairActionTag !== undefined) patch.repairActionTag = body.repairActionTag ?? null;
-        // I1: pass inspectionId so the service guards against cross-inspection writes.
-        await c.var.services.repairRequest.updateItem(tenantId, id, rrId, itemId, patch);
-        return c.json({ success: true as const }, 200);
-    })
+    // Map Zod-output optional fields to service patch type (null not undefined).
+    const patch: Parameters<typeof c.var.services.repairRequest.updateItem>[4] = {};
+    if (body.requestedCreditCents !== undefined) patch.requestedCreditCents = body.requestedCreditCents ?? null;
+    if (body.note !== undefined) patch.note = body.note ?? null;
+    if (body.sortOrder !== undefined) patch.sortOrder = body.sortOrder;
+    // Absent leaves the stored tag alone; an explicit null clears it.
+    if (body.repairActionTag !== undefined) patch.repairActionTag = body.repairActionTag ?? null;
+    // I1: pass inspectionId so the service guards against cross-inspection writes.
+    await c.var.services.repairRequest.updateItem(tenantId, id, rrId, itemId, patch);
+    return c.json({ success: true as const }, 200);
+});
 
-    // DELETE /repair-builder/:tenant/:id/lists/:rrId/items/:itemId — remove item
-    .openapi(removeItemRoute, async (c) => {
-        const { id, rrId, itemId } = c.req.valid('param');
+// DELETE /repair-builder/:tenant/:id/lists/:rrId/items/:itemId — remove item
+app.openapi(removeItemRoute, async (c) => {
+    const { id, rrId, itemId } = c.req.valid('param');
 
-        const access = await resolveBuilderAccess(c, id);
-        if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
-        const { tenantId, creator } = access;
+    const access = await resolveBuilderAccess(c, id);
+    if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
+    const { tenantId, creator } = access;
 
-        const gateResult = await runBuilderGate(c, id, tenantId);
-        if (gateResult) return gateResult;
+    const gateResult = await runBuilderGate(c, id, tenantId);
+    if (gateResult) return gateResult;
 
-        // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
-        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
-        if (guardResult) return guardResult;
+    // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
+    const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
+    if (guardResult) return guardResult;
 
-        // I1: pass inspectionId so the service guards against cross-inspection deletes.
-        await c.var.services.repairRequest.removeItem(tenantId, id, rrId, itemId);
-        return c.json({ success: true as const }, 200);
-    })
+    // I1: pass inspectionId so the service guards against cross-inspection deletes.
+    await c.var.services.repairRequest.removeItem(tenantId, id, rrId, itemId);
+    return c.json({ success: true as const }, 200);
+});
 
-    // PATCH /repair-builder/:tenant/:id/lists/:rrId — set/clear intro
-    .openapi(setIntroRoute, async (c) => {
-        const { id, rrId } = c.req.valid('param');
-        const { customIntro } = c.req.valid('json');
+// PATCH /repair-builder/:tenant/:id/lists/:rrId — set/clear intro
+app.openapi(setIntroRoute, async (c) => {
+    const { id, rrId } = c.req.valid('param');
+    const { customIntro } = c.req.valid('json');
 
-        const access = await resolveBuilderAccess(c, id);
-        if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
-        const { tenantId, creator } = access;
+    const access = await resolveBuilderAccess(c, id);
+    if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
+    const { tenantId, creator } = access;
 
-        const gateResult = await runBuilderGate(c, id, tenantId);
-        if (gateResult) return gateResult;
+    const gateResult = await runBuilderGate(c, id, tenantId);
+    if (gateResult) return gateResult;
 
-        // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
-        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
-        if (guardResult) return guardResult;
+    // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
+    const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
+    if (guardResult) return guardResult;
 
-        // I1: pass inspectionId so the service guards against cross-inspection writes.
-        await c.var.services.repairRequest.setIntro(tenantId, id, rrId, customIntro ?? null);
-        return c.json({ success: true as const }, 200);
-    })
+    // I1: pass inspectionId so the service guards against cross-inspection writes.
+    await c.var.services.repairRequest.setIntro(tenantId, id, rrId, customIntro ?? null);
+    return c.json({ success: true as const }, 200);
+});
 
-    // -------------------------------------------------------------------------
-    // Share routes (Task 5) — public, publish-gated
-    // -------------------------------------------------------------------------
+// -------------------------------------------------------------------------
+// Share routes (Task 5) — public, publish-gated
+// -------------------------------------------------------------------------
 
-    // GET /repair-request/share/:shareToken — share view data
-    .openapi(shareViewRoute, async (c) => {
-        const { shareToken } = c.req.valid('param');
+// GET /repair-request/share/:shareToken — share view data
+app.openapi(shareViewRoute, async (c) => {
+    const { shareToken } = c.req.valid('param');
 
-        const gateResult = await runShareGate(c, shareToken);
-        if (gateResult instanceof Response) return gateResult;
+    const gateResult = await runShareGate(c, shareToken);
+    if (gateResult instanceof Response) return gateResult;
 
-        const { request, items, tenantId, propertyAddress } = gateResult;
-        // Share routes use the RR's own inspectionId (already validated by runShareGate).
-        const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.inspectionId, request.id);
+    const { request, items, tenantId, propertyAddress } = gateResult;
+    // Share routes use the RR's own inspectionId (already validated by runShareGate).
+    const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.inspectionId, request.id);
 
-        return c.json({
-            success: true as const,
-            data: {
-                propertyAddress,
-                customIntro: request.customIntro,
-                items,
-                creditTotal,
-            },
-        }, 200);
-    })
+    return c.json({
+        success: true as const,
+        data: {
+            propertyAddress,
+            customIntro: request.customIntro,
+            items,
+            creditTotal,
+        },
+    }, 200);
+});
 
-    // GET /repair-request/share/:shareToken/pdf — render PDF
-    .openapi(sharePdfRoute, async (c) => {
-        const { shareToken } = c.req.valid('param');
+// GET /repair-request/share/:shareToken/pdf — render PDF
+app.openapi(sharePdfRoute, async (c) => {
+    const { shareToken } = c.req.valid('param');
 
-        const gateResult = await runShareGate(c, shareToken);
-        if (gateResult instanceof Response) return gateResult;
+    const gateResult = await runShareGate(c, shareToken);
+    if (gateResult instanceof Response) return gateResult;
 
-        const baseUrl = getBaseUrl(c);
-        const pageUrl = `${baseUrl}/repair-request/${shareToken}`;
-        const pdfBuffer = await generatePdfFromUrl(c.env.BROWSER, pageUrl);
+    const baseUrl = getBaseUrl(c);
+    const pageUrl = `${baseUrl}/repair-request/${shareToken}`;
+    const pdfBuffer = await generatePdfFromUrl(c.env.BROWSER, pageUrl);
 
-        return new Response(pdfBuffer, {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/pdf',
-                'Content-Disposition': 'attachment; filename="repair-request.pdf"',
-            },
-        });
-    })
+    return new Response(pdfBuffer, {
+        status: 200,
+        headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'attachment; filename="repair-request.pdf"',
+        },
+    });
+});
 
-    // POST /repair-request/share/:shareToken/email — send share link
-    .openapi(shareEmailRoute, async (c) => {
-        const { shareToken } = c.req.valid('param');
-        const body = c.req.valid('json');
+// POST /repair-request/share/:shareToken/email — send share link
+app.openapi(shareEmailRoute, async (c) => {
+    const { shareToken } = c.req.valid('param');
+    const body = c.req.valid('json');
 
-        const gateResult = await runShareGate(c, shareToken);
-        if (gateResult instanceof Response) return gateResult;
+    const gateResult = await runShareGate(c, shareToken);
+    if (gateResult instanceof Response) return gateResult;
 
-        const { propertyAddress, tenantId } = gateResult;
+    const { propertyAddress, tenantId } = gateResult;
 
-        await checkRateLimit(c, 'book');
+    await checkRateLimit(c, 'book');
 
-        const baseUrl = getBaseUrl(c);
+    const baseUrl = getBaseUrl(c);
 
-        // The route owns the LINK; the email service owns the email. Building
-        // the HTML here is what left this send unbranded, uneditable and
-        // unclassified while every registry-backed send was none of those.
-        // The share token names the tenant, so its service is asked for by id.
-        const email = await c.var.services.emailFor(tenantId);
-        await email.sendRepairRequestShare(body.to, {
-            propertyAddress: propertyAddress || '',
-            shareUrl: `${baseUrl}/repair-request/${shareToken}`,
-            message: body.message,
-        });
-
-        return c.json({ success: true as const }, 200);
+    // The route owns the LINK; the email service owns the email. Building
+    // the HTML here is what left this send unbranded, uneditable and
+    // unclassified while every registry-backed send was none of those.
+    // The share token names the tenant, so its service is asked for by id.
+    const email = await c.var.services.emailFor(tenantId);
+    await email.sendRepairRequestShare(body.to, {
+        propertyAddress: propertyAddress || '',
+        shareUrl: `${baseUrl}/repair-request/${shareToken}`,
+        message: body.message,
     });
 
-export type RepairBuilderApi = typeof repairBuilderRoutes;
+    return c.json({ success: true as const }, 200);
+});
 
-export default repairBuilderRoutes;
+/** Registration order. Drives `RepairBuilderApi`; a test pins it to what `app` really registered. */
+export const repairBuilderRouteConfigs = [
+    sourceRoute,
+    createListRoute,
+    getListRoute,
+    addItemRoute,
+    updateItemRoute,
+    removeItemRoute,
+    setIntroRoute,
+    shareViewRoute,
+    sharePdfRoute,
+    shareEmailRoute,
+] as const;
+
+export type RepairBuilderApi = ApiOf<typeof repairBuilderRouteConfigs>;
+
+export default app;

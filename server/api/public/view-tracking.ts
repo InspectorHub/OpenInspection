@@ -90,26 +90,32 @@ const state = (at: number | null) => ({
     data: { objected: at != null, objectedAt: at == null ? null : new Date(at).toISOString() },
 });
 
-const viewTrackingRoutes = createApiRouter()
-    .openapi(getRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const who = await resolvePortalRecipient(c, id);
-        if (!who) return c.json(unauthorized, 401);
-        const at = await readViewTrackingObjection(getDrizzle(c), who.tenantId, who.accessTokenId);
-        return c.json(state(at), 200);
-    })
-    .openapi(postRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { objected } = c.req.valid('json');
-        const who = await resolvePortalRecipient(c, id);
-        if (!who) return c.json(unauthorized, 401);
-        // Writes `view_tracking_objected_at` and nothing else — see the header.
-        const at = await writeViewTrackingObjection(
-            getDrizzle(c), who.tenantId, who.accessTokenId, objected,
-        );
-        return c.json(state(at), 200);
-    });
+const app = createApiRouter();
+app.openapi(getRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const who = await resolvePortalRecipient(c, id);
+    if (!who) return c.json(unauthorized, 401);
+    const at = await readViewTrackingObjection(getDrizzle(c), who.tenantId, who.accessTokenId);
+    return c.json(state(at), 200);
+});
+app.openapi(postRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { objected } = c.req.valid('json');
+    const who = await resolvePortalRecipient(c, id);
+    if (!who) return c.json(unauthorized, 401);
+    // Writes `view_tracking_objected_at` and nothing else — see the header.
+    const at = await writeViewTrackingObjection(
+        getDrizzle(c), who.tenantId, who.accessTokenId, objected,
+    );
+    return c.json(state(at), 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const viewTrackingRouteConfigs = [
+    getRoute,
+    postRoute,
+] as const;
 
 // Mounted inside `server/api/public-report.ts`, so `PublicReportApi` already
 // carries the RPC shape; a second exported router type would be dead surface.
-export default viewTrackingRoutes;
+export default app;

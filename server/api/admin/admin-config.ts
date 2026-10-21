@@ -305,167 +305,182 @@ const togglePdfPipelineRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-const adminConfigRoutes = createApiRouter()
-    .openapi(getConfigRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const svc = c.var.services.branding;
-        const integrationConfig = await svc.getIntegrationConfig(tenantId);
-        // C-15: the legacy `tenant_configs.secrets` store is retired. Masked
-        // secrets are served by GET /api/secrets (canonical `secrets_enc`);
-        // the field is kept (empty) for response-shape compatibility.
-        return c.json({ success: true, data: { integrationConfig, secrets: {} } }, 200);
-    })
-    .openapi(updateIntegrationConfigRoute, async (c) => {
-        const body = c.req.valid('json');
-        await c.var.services.branding.updateIntegrationConfig(c.get('tenantId'), body as unknown as import('../../services/branding.service').IntegrationConfig);
-        auditFromContext(c, 'config.integration.update', 'tenant_config');
-        return c.json({ success: true }, 200);
-    })
-    .openapi(getWidgetOriginsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const origins = await c.var.services.widget.getAllowedOrigins(tenantId);
-        return c.json({ success: true as const, data: { origins } }, 200);
-    })
-    .openapi(setWidgetOriginsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { origins } = c.req.valid('json');
-        await c.var.services.widget.setAllowedOrigins(tenantId, origins);
-        return c.json({ success: true as const, data: { origins } }, 200);
-    })
-    .openapi(getStripeConnectRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { accountId } = await c.var.services.admin.getStripeConnect(tenantId);
-        return c.json({ success: true as const, data: { accountId } }, 200);
-    })
-    .openapi(setStripeConnectRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { accountId } = c.req.valid('json');
-        await c.var.services.admin.setStripeConnect(tenantId, accountId);
-        auditFromContext(c, 'config.integration.update', 'tenant_config', { metadata: { stripeConnect: 'set' } });
-        return c.json({ success: true as const, data: { accountId } }, 200);
-    })
-    .openapi(deleteStripeConnectRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        await c.var.services.admin.setStripeConnect(tenantId, null);
-        auditFromContext(c, 'config.integration.update', 'tenant_config', { metadata: { stripeConnect: 'cleared' } });
-        return c.json({ success: true as const, data: { accountId: null } }, 200);
-    })
-    .openapi(getEarningsSummaryRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const summary = await c.var.services.invoice.getEarningsSummary(tenantId);
-        return c.json({ success: true as const, data: summary }, 200);
-    })
-    .openapi(icsTokenRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
+const app = createApiRouter();
+app.openapi(getConfigRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const svc = c.var.services.branding;
+    const integrationConfig = await svc.getIntegrationConfig(tenantId);
+    // C-15: the legacy `tenant_configs.secrets` store is retired. Masked
+    // secrets are served by GET /api/secrets (canonical `secrets_enc`);
+    // the field is kept (empty) for response-shape compatibility.
+    return c.json({ success: true, data: { integrationConfig, secrets: {} } }, 200);
+});
+app.openapi(updateIntegrationConfigRoute, async (c) => {
+    const body = c.req.valid('json');
+    await c.var.services.branding.updateIntegrationConfig(c.get('tenantId'), body as unknown as import('../../services/branding.service').IntegrationConfig);
+    auditFromContext(c, 'config.integration.update', 'tenant_config');
+    return c.json({ success: true }, 200);
+});
+app.openapi(getWidgetOriginsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const origins = await c.var.services.widget.getAllowedOrigins(tenantId);
+    return c.json({ success: true as const, data: { origins } }, 200);
+});
+app.openapi(setWidgetOriginsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { origins } = c.req.valid('json');
+    await c.var.services.widget.setAllowedOrigins(tenantId, origins);
+    return c.json({ success: true as const, data: { origins } }, 200);
+});
+app.openapi(getStripeConnectRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { accountId } = await c.var.services.admin.getStripeConnect(tenantId);
+    return c.json({ success: true as const, data: { accountId } }, 200);
+});
+app.openapi(setStripeConnectRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { accountId } = c.req.valid('json');
+    await c.var.services.admin.setStripeConnect(tenantId, accountId);
+    auditFromContext(c, 'config.integration.update', 'tenant_config', { metadata: { stripeConnect: 'set' } });
+    return c.json({ success: true as const, data: { accountId } }, 200);
+});
+app.openapi(deleteStripeConnectRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    await c.var.services.admin.setStripeConnect(tenantId, null);
+    auditFromContext(c, 'config.integration.update', 'tenant_config', { metadata: { stripeConnect: 'cleared' } });
+    return c.json({ success: true as const, data: { accountId: null } }, 200);
+});
+app.openapi(getEarningsSummaryRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const summary = await c.var.services.invoice.getEarningsSummary(tenantId);
+    return c.json({ success: true as const, data: summary }, 200);
+});
+app.openapi(icsTokenRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
 
-        const configs = await db
-            .select()
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .limit(1);
+    const configs = await db
+        .select()
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .limit(1);
 
-        let token = configs[0]?.icsToken ?? null;
+    let token = configs[0]?.icsToken ?? null;
 
-        if (!token) {
-            token = crypto.randomUUID().replace(/-/g, '');
-            if (configs[0]) {
-                await db
-                    .update(tenantConfigs)
-                    .set({ icsToken: token, updatedAt: new Date() })
-                    .where(eq(tenantConfigs.tenantId, tenantId));
-            } else {
-                await db.insert(tenantConfigs).values({
-                    tenantId,
-                    icsToken: token,
-                    updatedAt: new Date(),
-                });
-            }
-        }
-
-        const baseUrl = getBaseUrl(c);
-        return c.json({ success: true as const, data: { url: `${baseUrl}/api/ics/${token}` } }, 200);
-    })
-    .openapi(brSmokeRoute, async (c) => {
-        const { url } = c.req.valid('query');
-        const probedUrl = url ?? 'https://example.com';
-        const browser = c.env.BROWSER;
-
-        if (!browser) {
-            return c.json({
-                success: true as const,
-                data: {
-                    bindingPresent: false,
-                    probedUrl,
-                    status: null,
-                    ok: false,
-                    contentType: null,
-                    contentLength: null,
-                    durationMs: 0,
-                    error: null,
-                    hint: 'env.BROWSER not bound. Add [browser] binding = "BROWSER" to wrangler.jsonc and redeploy.',
-                },
-            }, 200);
-        }
-
-        const start = Date.now();
-        let status: number | null = null;
-        let contentType: string | null = null;
-        let contentLength: number | null = null;
-        let error: string | null = null;
-        let body: ArrayBuffer | null = null;
-
-        try {
-            const res = await browser.quickAction('pdf', { url: probedUrl });
-            status = res.status;
-            contentType = res.headers.get('content-type');
-            const buf = await res.arrayBuffer();
-            body = buf;
-            contentLength = Math.min(buf.byteLength, 1_048_576);
-        } catch (e) {
-            error = (e as Error).message;
-        }
-
-        const durationMs = Date.now() - start;
-        const ok = status !== null && status >= 200 && status < 300
-            && (contentType?.includes('application/pdf') ?? false);
-
-        let hint: string;
-        if (error) {
-            hint = `Call threw before returning: ${error}. Likely a TypeError (binding misconfigured) or compatibility_date too old (need >= "2026-03-24" for .quickAction()).`;
-        } else if (status === 404) {
-            const bodyPreview = body ? new TextDecoder().decode(body.slice(0, 64)) : '';
-            hint = bodyPreview.startsWith('Not Found')
-                ? 'Browser Run NOT provisioned for this account. Enable Browser Run in the CF dashboard, then re-probe.'
-                : `Probed URL returned 404 from origin (not from BR). Try a known-good URL like https://example.com.`;
-        } else if (ok) {
-            hint = `Browser Run is live. Returned a ${contentLength}-byte PDF in ${durationMs} ms. Safe to enable the per-tenant pipeline.`;
+    if (!token) {
+        token = crypto.randomUUID().replace(/-/g, '');
+        if (configs[0]) {
+            await db
+                .update(tenantConfigs)
+                .set({ icsToken: token, updatedAt: new Date() })
+                .where(eq(tenantConfigs.tenantId, tenantId));
         } else {
-            hint = `Unexpected response — status=${status}, content-type=${contentType}. Inspect manually before enabling the pipeline.`;
+            await db.insert(tenantConfigs).values({
+                tenantId,
+                icsToken: token,
+                updatedAt: new Date(),
+            });
         }
+    }
 
-        logger.info('br-smoke probe', { probedUrl, status, contentType, contentLength, durationMs, ok });
+    const baseUrl = getBaseUrl(c);
+    return c.json({ success: true as const, data: { url: `${baseUrl}/api/ics/${token}` } }, 200);
+});
+app.openapi(brSmokeRoute, async (c) => {
+    const { url } = c.req.valid('query');
+    const probedUrl = url ?? 'https://example.com';
+    const browser = c.env.BROWSER;
 
+    if (!browser) {
         return c.json({
             success: true as const,
-            data: { bindingPresent: true, probedUrl, status, ok, contentType, contentLength, durationMs, error, hint },
+            data: {
+                bindingPresent: false,
+                probedUrl,
+                status: null,
+                ok: false,
+                contentType: null,
+                contentLength: null,
+                durationMs: 0,
+                error: null,
+                hint: 'env.BROWSER not bound. Add [browser] binding = "BROWSER" to wrangler.jsonc and redeploy.',
+            },
         }, 200);
-    })
-    .openapi(togglePdfPipelineRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { enabled } = c.req.valid('json');
+    }
 
-        const brandingService = c.var.services.branding;
-        await brandingService.updateBranding(tenantId, { enablePdfPipeline: enabled });
+    const start = Date.now();
+    let status: number | null = null;
+    let contentType: string | null = null;
+    let contentLength: number | null = null;
+    let error: string | null = null;
+    let body: ArrayBuffer | null = null;
 
-        auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
-            metadata: { field: 'enablePdfPipeline', enabled },
-        });
+    try {
+        const res = await browser.quickAction('pdf', { url: probedUrl });
+        status = res.status;
+        contentType = res.headers.get('content-type');
+        const buf = await res.arrayBuffer();
+        body = buf;
+        contentLength = Math.min(buf.byteLength, 1_048_576);
+    } catch (e) {
+        error = (e as Error).message;
+    }
 
-        return c.json({
-            success: true as const,
-            data: { tenantId, enabled },
-        }, 200);
+    const durationMs = Date.now() - start;
+    const ok = status !== null && status >= 200 && status < 300
+        && (contentType?.includes('application/pdf') ?? false);
+
+    let hint: string;
+    if (error) {
+        hint = `Call threw before returning: ${error}. Likely a TypeError (binding misconfigured) or compatibility_date too old (need >= "2026-03-24" for .quickAction()).`;
+    } else if (status === 404) {
+        const bodyPreview = body ? new TextDecoder().decode(body.slice(0, 64)) : '';
+        hint = bodyPreview.startsWith('Not Found')
+            ? 'Browser Run NOT provisioned for this account. Enable Browser Run in the CF dashboard, then re-probe.'
+            : `Probed URL returned 404 from origin (not from BR). Try a known-good URL like https://example.com.`;
+    } else if (ok) {
+        hint = `Browser Run is live. Returned a ${contentLength}-byte PDF in ${durationMs} ms. Safe to enable the per-tenant pipeline.`;
+    } else {
+        hint = `Unexpected response — status=${status}, content-type=${contentType}. Inspect manually before enabling the pipeline.`;
+    }
+
+    logger.info('br-smoke probe', { probedUrl, status, contentType, contentLength, durationMs, ok });
+
+    return c.json({
+        success: true as const,
+        data: { bindingPresent: true, probedUrl, status, ok, contentType, contentLength, durationMs, error, hint },
+    }, 200);
+});
+app.openapi(togglePdfPipelineRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { enabled } = c.req.valid('json');
+
+    const brandingService = c.var.services.branding;
+    await brandingService.updateBranding(tenantId, { enablePdfPipeline: enabled });
+
+    auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
+        metadata: { field: 'enablePdfPipeline', enabled },
     });
 
-export default adminConfigRoutes;
+    return c.json({
+        success: true as const,
+        data: { tenantId, enabled },
+    }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminConfigRouteConfigs = [
+    getConfigRoute,
+    updateIntegrationConfigRoute,
+    getWidgetOriginsRoute,
+    setWidgetOriginsRoute,
+    getStripeConnectRoute,
+    setStripeConnectRoute,
+    deleteStripeConnectRoute,
+    getEarningsSummaryRoute,
+    icsTokenRoute,
+    brSmokeRoute,
+    togglePdfPipelineRoute,
+] as const;
+
+export default app;

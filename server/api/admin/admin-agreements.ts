@@ -204,160 +204,170 @@ const inspectorSignRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-const adminAgreementsRoutes = createApiRouter()
-    .openapi(listAgreementsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const agreementService = c.var.services.agreement;
-        return c.json({ success: true, data: await agreementService.listAgreements(tenantId) }, 200);
-    })
-    .openapi(createAgreementRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const agreementService = c.var.services.agreement;
-        const agreement = await agreementService.createAgreement(tenantId, body.name, body.content);
-        return c.json({ success: true, data: { agreement: agreement } }, 201);
-    })
-    // #84 — both writes below can silently switch cancellation-fee charging off,
-    // and both are MCP tools whose caller sees nothing but this body. The
-    // `effects` block is OBSERVED around the write by the shared helper, never
-    // recomputed from the id, and is serialised BEFORE `data` so it survives the
-    // MCP result slice on a workspace with a long agreement.
-    .openapi(updateAgreementRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const body = c.req.valid('json');
-        const agreementService = c.var.services.agreement;
-        const { result: agreement, effects } = await withAgreementWriteEffects(
-            c.var.services.branding,
-            tenantId,
-            () => agreementService.updateAgreement(id, tenantId, body.name, body.content),
-        );
-        return c.json({ success: true as const, effects, data: { agreement } }, 200);
-    })
-    .openapi(deleteAgreementRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const agreementService = c.var.services.agreement;
-        const { effects } = await withAgreementWriteEffects(
-            c.var.services.branding,
-            tenantId,
-            () => agreementService.deleteAgreement(id, tenantId),
-        );
-        return c.json({ success: true as const, effects }, 200);
-    })
-    .openapi(sendAgreementRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const body = c.req.valid('json');
-        const svc = c.var.services.agreement;
-        const tenantSlug = await resolveTenantSlug(c, tenantId);
+const app = createApiRouter();
+app.openapi(listAgreementsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const agreementService = c.var.services.agreement;
+    return c.json({ success: true, data: await agreementService.listAgreements(tenantId) }, 200);
+});
+app.openapi(createAgreementRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const agreementService = c.var.services.agreement;
+    const agreement = await agreementService.createAgreement(tenantId, body.name, body.content);
+    return c.json({ success: true, data: { agreement: agreement } }, 201);
+});
+// #84 — both writes below can silently switch cancellation-fee charging off,
+// and both are MCP tools whose caller sees nothing but this body. The
+// `effects` block is OBSERVED around the write by the shared helper, never
+// recomputed from the id, and is serialised BEFORE `data` so it survives the
+// MCP result slice on a workspace with a long agreement.
+app.openapi(updateAgreementRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const agreementService = c.var.services.agreement;
+    const { result: agreement, effects } = await withAgreementWriteEffects(
+        c.var.services.branding,
+        tenantId,
+        () => agreementService.updateAgreement(id, tenantId, body.name, body.content),
+    );
+    return c.json({ success: true as const, effects, data: { agreement } }, 200);
+});
+app.openapi(deleteAgreementRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const agreementService = c.var.services.agreement;
+    const { effects } = await withAgreementWriteEffects(
+        c.var.services.branding,
+        tenantId,
+        () => agreementService.deleteAgreement(id, tenantId),
+    );
+    return c.json({ success: true as const, effects }, 200);
+});
+app.openapi(sendAgreementRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const body = c.req.valid('json');
+    const svc = c.var.services.agreement;
+    const tenantSlug = await resolveTenantSlug(c, tenantId);
 
-        // One send model: normalize any recipient set into `signers`. A single
-        // `clientEmail` recipient becomes a one-signer envelope (completionPolicy
-        // 'one'); an explicit `signers` list keeps its policy (default 'all').
-        const signers =
-            body.signers && body.signers.length > 0
-                ? body.signers.map((s) => ({
-                    name: s.name,
-                    email: s.email,
-                    ...(s.role ? { role: s.role } : {}),
-                    ...(s.contactId !== undefined ? { contactId: s.contactId } : {}),
-                }))
-                : body.clientEmail
-                    ? [{ name: body.clientName ?? body.clientEmail, email: body.clientEmail, role: 'client' as const }]
-                    : [];
+    // One send model: normalize any recipient set into `signers`. A single
+    // `clientEmail` recipient becomes a one-signer envelope (completionPolicy
+    // 'one'); an explicit `signers` list keeps its policy (default 'all').
+    const signers =
+        body.signers && body.signers.length > 0
+            ? body.signers.map((s) => ({
+                name: s.name,
+                email: s.email,
+                ...(s.role ? { role: s.role } : {}),
+                ...(s.contactId !== undefined ? { contactId: s.contactId } : {}),
+            }))
+            : body.clientEmail
+                ? [{ name: body.clientName ?? body.clientEmail, email: body.clientEmail, role: 'client' as const }]
+                : [];
 
-        if (signers.length === 0) {
-            throw Errors.BadRequest('Provide clientEmail or a non-empty signers list.');
-        }
-        // inspection_id is required for every envelope (schema-enforced; see SendAgreementSchema).
-        const inspectionId = body.inspectionId;
-        if (!inspectionId) {
-            throw Errors.BadRequest('inspectionId is required to send an agreement.');
-        }
+    if (signers.length === 0) {
+        throw Errors.BadRequest('Provide clientEmail or a non-empty signers list.');
+    }
+    // inspection_id is required for every envelope (schema-enforced; see SendAgreementSchema).
+    const inspectionId = body.inspectionId;
+    if (!inspectionId) {
+        throw Errors.BadRequest('inspectionId is required to send an agreement.');
+    }
 
-        const completionPolicy =
-            body.completionPolicy ?? (signers.length === 1 ? 'one' : 'all');
+    const completionPolicy =
+        body.completionPolicy ?? (signers.length === 1 ? 'one' : 'all');
 
-        const env = await svc.findOrCreate(tenantId, inspectionId, { agreementId: body.agreementId, signers, completionPolicy });
+    const env = await svc.findOrCreate(tenantId, inspectionId, { agreementId: body.agreementId, signers, completionPolicy });
 
-        const sigInspector = await lookupSenderSignature(c, tenantId);
-        const signerRows = await svc.listSigners(tenantId, env.requestId);
+    const sigInspector = await lookupSenderSignature(c, tenantId);
+    const signerRows = await svc.listSigners(tenantId, env.requestId);
 
-        // Audit: envelope created (best-effort).
-        try {
-            await c.var.services.auditLog.append(tenantId, env.requestId, 'request.created', {
-                actorId: c.get('user')?.sub ?? null,
-                agreementId: body.agreementId,
-                envelopeId: env.requestId,
-                inspectionId,
-                signerCount: signerRows.length,
-                tenantId,
-                tsMs: Date.now(),
-            });
-        } catch (e) {
-            logger.warn('audit.append.created.failed', { requestId: env.requestId, error: (e as Error).message });
-        }
-
-        // Email each signer their own persistent link (per-signer token →
-        // per-signer URL). Shared with the inspection-workspace send (IA-65) so
-        // the two cannot drift into mailing different links again.
-        await emailSignersTheirLinks(c, {
-            tenantId,
+    // Audit: envelope created (best-effort).
+    try {
+        await c.var.services.auditLog.append(tenantId, env.requestId, 'request.created', {
+            actorId: c.get('user')?.sub ?? null,
+            agreementId: body.agreementId,
+            envelopeId: env.requestId,
             inspectionId,
-            tenantSlug,
-            requestId: env.requestId,
-            agreementName: 'Agreement',
-            senderSignature: sigInspector,
-            signers: signerRows,
-        });
-
-        try {
-            await c.var.services.auditLog.append(tenantId, env.requestId, 'request.sent', {
-                envelopeId: env.requestId,
-                recipientCount: signerRows.length,
-                tsMs: Date.now(),
-            });
-        } catch (e) {
-            logger.warn('audit.append.sent.failed', { requestId: env.requestId, error: (e as Error).message });
-        }
-
-        auditFromContext(c, 'agreement.send', 'agreement_request', {
-            metadata: { agreementId: body.agreementId, inspectionId, signers: signerRows.length },
-        });
-        return c.json({
-            success: true as const,
-            data: {
-                requestId: env.requestId,
-                signers: signerRows.map((s: typeof schema.agreementSigners.$inferSelect) => ({
-                    id: s.id, name: s.name, email: s.email, role: s.role, status: s.status,
-                })),
-            },
-        }, 200);
-    })
-    .openapi(inspectorSignRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { signatureBase64 } = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const userId = c.get('user')?.sub ?? '';
-        // Pre-signing writes onto an inspection's agreement: one outside the caller's set is not found.
-        await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
-        try {
-            await applyInspectorPreSign(c.env.DB, tenantId, id, userId, signatureBase64);
-        } catch (e) {
-            const msg = (e as Error).message;
-            if (msg.includes('not found')) throw Errors.NotFound(msg);
-            if (msg.includes('can only pre-sign')) {
-                return c.json({ success: false, error: { code: 'invalid_state', message: msg } }, 409);
-            }
-            throw e;
-        }
-        const signing = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
-        const auditLog = new AuditLogService(c.env.DB, signing);
-        await auditLog.append(tenantId, id, 'agreement.inspector_signed', {
-            inspectorUserId: userId,
+            signerCount: signerRows.length,
+            tenantId,
             tsMs: Date.now(),
         });
-        return c.json({ success: true as const }, 200);
+    } catch (e) {
+        logger.warn('audit.append.created.failed', { requestId: env.requestId, error: (e as Error).message });
+    }
+
+    // Email each signer their own persistent link (per-signer token →
+    // per-signer URL). Shared with the inspection-workspace send (IA-65) so
+    // the two cannot drift into mailing different links again.
+    await emailSignersTheirLinks(c, {
+        tenantId,
+        inspectionId,
+        tenantSlug,
+        requestId: env.requestId,
+        agreementName: 'Agreement',
+        senderSignature: sigInspector,
+        signers: signerRows,
     });
 
-export default adminAgreementsRoutes;
+    try {
+        await c.var.services.auditLog.append(tenantId, env.requestId, 'request.sent', {
+            envelopeId: env.requestId,
+            recipientCount: signerRows.length,
+            tsMs: Date.now(),
+        });
+    } catch (e) {
+        logger.warn('audit.append.sent.failed', { requestId: env.requestId, error: (e as Error).message });
+    }
+
+    auditFromContext(c, 'agreement.send', 'agreement_request', {
+        metadata: { agreementId: body.agreementId, inspectionId, signers: signerRows.length },
+    });
+    return c.json({
+        success: true as const,
+        data: {
+            requestId: env.requestId,
+            signers: signerRows.map((s: typeof schema.agreementSigners.$inferSelect) => ({
+                id: s.id, name: s.name, email: s.email, role: s.role, status: s.status,
+            })),
+        },
+    }, 200);
+});
+app.openapi(inspectorSignRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { signatureBase64 } = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const userId = c.get('user')?.sub ?? '';
+    // Pre-signing writes onto an inspection's agreement: one outside the caller's set is not found.
+    await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
+    try {
+        await applyInspectorPreSign(c.env.DB, tenantId, id, userId, signatureBase64);
+    } catch (e) {
+        const msg = (e as Error).message;
+        if (msg.includes('not found')) throw Errors.NotFound(msg);
+        if (msg.includes('can only pre-sign')) {
+            return c.json({ success: false, error: { code: 'invalid_state', message: msg } }, 409);
+        }
+        throw e;
+    }
+    const signing = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+    const auditLog = new AuditLogService(c.env.DB, signing);
+    await auditLog.append(tenantId, id, 'agreement.inspector_signed', {
+        inspectorUserId: userId,
+        tsMs: Date.now(),
+    });
+    return c.json({ success: true as const }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminAgreementsRouteConfigs = [
+    listAgreementsRoute,
+    createAgreementRoute,
+    updateAgreementRoute,
+    deleteAgreementRoute,
+    sendAgreementRoute,
+    inspectorSignRoute,
+] as const;
+
+export default app;

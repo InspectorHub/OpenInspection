@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import type { ContactType } from '../lib/db/schema/contact';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
@@ -220,106 +221,118 @@ const revokeContactAccessRoute = createRoute(withMcpMetadata({
     operationId: "revokeContactAccess",
 }, { scopes: ['write'], tier: 'extended', capability: 'manageContacts' }));
 
-const contactRoutes = createApiRouter()
-    .openapi(listContactsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const q = c.req.valid('query');
-        const opts: { type?: ContactType; search?: string; archived?: 'exclude' | 'only'; limit: number; offset: number } =
-            { limit: q.limit, offset: q.offset, archived: q.archived };
-        if (q.type) opts.type = q.type;
-        if (q.search) opts.search = q.search;
-        const rows = await c.var.services.contact.listContacts(tenantId, opts, await resolveInspectionScope(c));
-        return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
-    })
-    .openapi(restoreContactRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
-        const { restored } = await c.var.services.contact.restoreContact(id, tenantId);
-        return c.json({ success: true as const, data: { restored } }, 200);
-    })
-    .openapi(getContactDetailRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const detail = await c.var.services.contact.getContactDetail(id, tenantId, await resolveInspectionScope(c));
-        if (!detail) return c.json({ success: false, error: { message: 'Contact not found', code: 'NOT_FOUND' } }, 404);
-        return c.json({ success: true as const, data: {
-            ...detail,
-            // The price on each inspection row is that inspection's money; the cumulative
-            // revenue is the company's books. Each is projected for its own capability.
-            inspections: await moneyView(c, detail.inspections, 'inspectionFees'),
-            stats: await moneyView(c, detail.stats, 'companyFinance'),
-        } }, 200);
-    })
-    .openapi(createContactRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const data = c.req.valid('json');
-        const user = c.get('user');
-        const contact = await c.var.services.contact.createContact(tenantId, {
-            ...data,
-            createdByUserId: user?.sub ?? null,
-        });
-        if (c.env.QBO_CLIENT_ID) {
-            c.executionCtx.waitUntil(
-                c.var.services.qbo.upsertCustomer(tenantId, contact),
-            );
-        }
-        return c.json({ success: true as const, data: { contact } }, 201);
-    })
-    .openapi(updateContactRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const raw = c.req.valid('json');
-        await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id as string);
-        // Strip undefined keys to satisfy exactOptionalPropertyTypes.
-        //
-        // `'x' in raw` rather than `raw.x !== undefined` for every nullable
-        // field: an explicit null is how a caller CLEARS one, and testing for
-        // undefined would silently discard the clear. `locale` needs that most
-        // — putting a contact back to "no stated preference" is the whole
-        // correction path.
-        const data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null; locale: string | null }> = {};
-        if (raw.type !== undefined) data.type = raw.type;
-        if (raw.name !== undefined) data.name = raw.name;
-        if ('email' in raw) data.email = raw.email ?? null;
-        if ('phone' in raw) data.phone = raw.phone ?? null;
-        if ('agency' in raw) data.agency = raw.agency ?? null;
-        if ('notes' in raw) data.notes = raw.notes ?? null;
-        if ('locale' in raw) data.locale = raw.locale ?? null;
-        const contact = await c.var.services.contact.updateContact(id as string, tenantId, data);
-        if (c.env.QBO_CLIENT_ID) {
-            c.executionCtx.waitUntil(
-                c.var.services.qbo.upsertCustomer(tenantId, contact),
-            );
-        }
-        return c.json({ success: true as const, data: { contact } }, 200);
-    })
-    .openapi(deleteContactRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id as string);
-        await c.var.services.contact.deleteContact(id as string, tenantId);
-        return c.json({ success: true }, 200);
-    })
-    .openapi(listContactAccessRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const access = await c.var.services.contact.listAccess(id, tenantId, await resolveInspectionScope(c));
-        if (access === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);
-        return c.json({ success: true as const, data: { access } }, 200);
-    })
-    .openapi(revokeContactAccessRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const { inspectionIds } = c.req.valid('json');
-        const revoked = await c.var.services.contact.revokeAccess(
-            id, tenantId, await resolveInspectionScope(c),
-            ...(inspectionIds ? [inspectionIds] as const : [] as const),
-        );
-        if (revoked === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);
-        return c.json({ success: true as const, data: { revoked } }, 200);
+const app = createApiRouter();
+app.openapi(listContactsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const q = c.req.valid('query');
+    const opts: { type?: ContactType; search?: string; archived?: 'exclude' | 'only'; limit: number; offset: number } =
+        { limit: q.limit, offset: q.offset, archived: q.archived };
+    if (q.type) opts.type = q.type;
+    if (q.search) opts.search = q.search;
+    const rows = await c.var.services.contact.listContacts(tenantId, opts, await resolveInspectionScope(c));
+    return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
+});
+app.openapi(restoreContactRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
+    const { restored } = await c.var.services.contact.restoreContact(id, tenantId);
+    return c.json({ success: true as const, data: { restored } }, 200);
+});
+app.openapi(getContactDetailRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const detail = await c.var.services.contact.getContactDetail(id, tenantId, await resolveInspectionScope(c));
+    if (!detail) return c.json({ success: false, error: { message: 'Contact not found', code: 'NOT_FOUND' } }, 404);
+    return c.json({ success: true as const, data: {
+        ...detail,
+        // The price on each inspection row is that inspection's money; the cumulative
+        // revenue is the company's books. Each is projected for its own capability.
+        inspections: await moneyView(c, detail.inspections, 'inspectionFees'),
+        stats: await moneyView(c, detail.stats, 'companyFinance'),
+    } }, 200);
+});
+app.openapi(createContactRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const data = c.req.valid('json');
+    const user = c.get('user');
+    const contact = await c.var.services.contact.createContact(tenantId, {
+        ...data,
+        createdByUserId: user?.sub ?? null,
     });
+    if (c.env.QBO_CLIENT_ID) {
+        c.executionCtx.waitUntil(
+            c.var.services.qbo.upsertCustomer(tenantId, contact),
+        );
+    }
+    return c.json({ success: true as const, data: { contact } }, 201);
+});
+app.openapi(updateContactRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const raw = c.req.valid('json');
+    await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id as string);
+    // Strip undefined keys to satisfy exactOptionalPropertyTypes.
+    //
+    // `'x' in raw` rather than `raw.x !== undefined` for every nullable
+    // field: an explicit null is how a caller CLEARS one, and testing for
+    // undefined would silently discard the clear. `locale` needs that most
+    // — putting a contact back to "no stated preference" is the whole
+    // correction path.
+    const data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null; locale: string | null }> = {};
+    if (raw.type !== undefined) data.type = raw.type;
+    if (raw.name !== undefined) data.name = raw.name;
+    if ('email' in raw) data.email = raw.email ?? null;
+    if ('phone' in raw) data.phone = raw.phone ?? null;
+    if ('agency' in raw) data.agency = raw.agency ?? null;
+    if ('notes' in raw) data.notes = raw.notes ?? null;
+    if ('locale' in raw) data.locale = raw.locale ?? null;
+    const contact = await c.var.services.contact.updateContact(id as string, tenantId, data);
+    if (c.env.QBO_CLIENT_ID) {
+        c.executionCtx.waitUntil(
+            c.var.services.qbo.upsertCustomer(tenantId, contact),
+        );
+    }
+    return c.json({ success: true as const, data: { contact } }, 200);
+});
+app.openapi(deleteContactRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await requireVisibleContact(getDrizzle(c), await resolveInspectionScope(c), tenantId, id as string);
+    await c.var.services.contact.deleteContact(id as string, tenantId);
+    return c.json({ success: true }, 200);
+});
+app.openapi(listContactAccessRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const access = await c.var.services.contact.listAccess(id, tenantId, await resolveInspectionScope(c));
+    if (access === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);
+    return c.json({ success: true as const, data: { access } }, 200);
+});
+app.openapi(revokeContactAccessRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const { inspectionIds } = c.req.valid('json');
+    const revoked = await c.var.services.contact.revokeAccess(
+        id, tenantId, await resolveInspectionScope(c),
+        ...(inspectionIds ? [inspectionIds] as const : [] as const),
+    );
+    if (revoked === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);
+    return c.json({ success: true as const, data: { revoked } }, 200);
+});
 
-export type ContactsApi = typeof contactRoutes;
+/** Registration order. Drives `ContactsApi`; a test pins it to what `app` really registered. */
+export const contactRouteConfigs = [
+    listContactsRoute,
+    restoreContactRoute,
+    getContactDetailRoute,
+    createContactRoute,
+    updateContactRoute,
+    deleteContactRoute,
+    listContactAccessRoute,
+    revokeContactAccessRoute,
+] as const;
 
-export default contactRoutes;
+export type ContactsApi = ApiOf<typeof contactRouteConfigs>;
+
+export default app;

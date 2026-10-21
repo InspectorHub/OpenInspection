@@ -262,143 +262,154 @@ const erasureLogRoute = createRoute(withMcpMetadata({
     description: 'Returns the tenant-scoped append-only erasure accountability record (Track I-a). Newest first, capped at 50. Exposes subject_email + status + counts + parsed decisions only.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const adminDataRoutes = createApiRouter()
-    .openapi(exportDataRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const adminService = c.var.services.admin;
-        const data = await adminService.getExport(tenantId);
+const app = createApiRouter();
+app.openapi(exportDataRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const adminService = c.var.services.admin;
+    const data = await adminService.getExport(tenantId);
 
-        auditFromContext(c, 'data.export', 'bulk_export');
-        // Only inspection rows carry company money; templates are customer JSON.
-        return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data, inspections: await moneyView(c, data.inspections, 'companyFinance') } }, 200);
-    })
-    .openapi(inviteMemberRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        if (body.templateId) throw Errors.BadRequest('This route does not apply permission templates. Use POST /api/team/invite with templateId.');
-        const adminService = c.var.services.admin;
-        const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role ?? 'inspector', c.get('userRole'), await capabilitiesFor(c));
+    auditFromContext(c, 'data.export', 'bulk_export');
+    // Only inspection rows carry company money; templates are customer JSON.
+    return c.json({ success: true, data: { exportedAt: new Date().toISOString(), tenantId, ...data, inspections: await moneyView(c, data.inspections, 'companyFinance') } }, 200);
+});
+app.openapi(inviteMemberRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    if (body.templateId) throw Errors.BadRequest('This route does not apply permission templates. Use POST /api/team/invite with templateId.');
+    const adminService = c.var.services.admin;
+    const { inviteId, expiresAt } = await adminService.createInvite(tenantId, body.email, body.role ?? 'inspector', c.get('userRole'), await capabilitiesFor(c));
 
-        const inviteLink = inviteAcceptUrl(c, inviteId);
+    const inviteLink = inviteAcceptUrl(c, inviteId);
 
-        const emailPromise = c.var.services.email.sendInvitation(body.email, inviteLink)
-            .catch((e: unknown) => {
-                // The invite row and link are already created; the admin has the
-                // inviteLink in the response and can share it manually. But we
-                // want to distinguish a platform-level refusal (domain unverified,
-                // quota exhausted, address suppressed) from a transient failure so
-                // ops can act on it rather than assuming everything is fine.
-                if (e instanceof AppError) {
-                    logger.warn('admin.invite.email.refused', { code: e.code });
-                } else {
-                    logger.error('admin.invite.email.failed', {}, e instanceof Error ? e : undefined);
-                }
-            });
-        c.executionCtx.waitUntil(emailPromise);
-
-        return c.json({ success: true, data: { inviteLink, expiresAt: expiresAt.toISOString() } }, 201);
-    })
-    .openapi(listMembersRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const adminService = c.var.services.admin;
-        const members = await adminService.getMembers(tenantId);
-
-        // Map Date to string for schema compatibility.
-        const formattedMembers = members.members.map((m: MemberWithCalendarSync) => ({
-            ...m,
-            createdAt: safeISODate(m.createdAt)
-        }));
-
-        return c.json({ success: true, data: formattedMembers }, 200);
-    })
-    .openapi(getAuditLogsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { limit, cursor, action, entityType } = c.req.valid('query');
-        const adminService = c.var.services.admin;
-        const result = await adminService.getAuditLogs(tenantId, {
-            limit: parseInt(limit || '50'),
-            cursor,
-            action,
-            entityType
-        } as Parameters<typeof adminService.getAuditLogs>[1]);
-
-        // Map Date to string for schema compatibility
-        const formattedResult = {
-            ...result,
-            items: result.logs.map((log: (typeof result.logs)[number]) => ({
-                ...log,
-                createdAt: safeISODate(log.createdAt)
-            }))
-        };
-
-        auditFromContext(c, 'audit.view', 'audit_log');
-
-        return c.json({ success: true, data: formattedResult }, 200);
-    })
-    .openapi(postAuditLogRoute, async (c) => {
-        const { action, resourceType, resourceId, detail } = c.req.valid('json');
-        auditFromContext(c, action, resourceType, {
-            entityId: resourceId,
-            ...(detail ? { metadata: detail } : {}),
-        });
-        return c.json({ success: true }, 200);
-    })
-    .openapi(eraseDataRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const adminService = c.var.services.admin;
-        const counts = await adminService.eraseClientData(tenantId, body.clientEmail, {
-            requestedBy: c.get('user')?.sub,
-        });
-
-        auditFromContext(c, 'data.delete', 'client', {
-            metadata: { clientEmail: body.clientEmail, ...counts },
-        });
-
-        return c.json({ success: true, data: { message: 'Client data erased successfully.', ...counts } }, 200);
-    })
-    .openapi(erasureLogRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
-
-        const rows = await db
-            .select({
-                id:              erasureLog.id,
-                subjectEmail:    erasureLog.subjectEmail,
-                status:          erasureLog.status,
-                retainedCount:   erasureLog.retainedCount,
-                anonymizedCount: erasureLog.anonymizedCount,
-                deletedCount:    erasureLog.deletedCount,
-                decisionsJson:   erasureLog.decisionsJson,
-                createdAt:       erasureLog.createdAt,
-            })
-            .from(erasureLog)
-            .where(eq(erasureLog.tenantId, tenantId))
-            .orderBy(descDz(erasureLog.createdAt))
-            .limit(50);
-
-        const data = rows.map((r) => {
-            // decisions_json is written by the orchestrator; tolerate corruption.
-            let decisions: unknown[] = [];
-            try {
-                const parsed = JSON.parse(r.decisionsJson);
-                if (Array.isArray(parsed)) decisions = parsed;
-            } catch {
-                decisions = [];
+    const emailPromise = c.var.services.email.sendInvitation(body.email, inviteLink)
+        .catch((e: unknown) => {
+            // The invite row and link are already created; the admin has the
+            // inviteLink in the response and can share it manually. But we
+            // want to distinguish a platform-level refusal (domain unverified,
+            // quota exhausted, address suppressed) from a transient failure so
+            // ops can act on it rather than assuming everything is fine.
+            if (e instanceof AppError) {
+                logger.warn('admin.invite.email.refused', { code: e.code });
+            } else {
+                logger.error('admin.invite.email.failed', {}, e instanceof Error ? e : undefined);
             }
-            return {
-                id:              r.id,
-                subjectEmail:    r.subjectEmail,
-                status:          r.status,
-                retainedCount:   r.retainedCount,
-                anonymizedCount: r.anonymizedCount,
-                deletedCount:    r.deletedCount,
-                decisions,
-                createdAt:       r.createdAt.getTime(),
-            };
         });
+    c.executionCtx.waitUntil(emailPromise);
 
-        return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true, data: { inviteLink, expiresAt: expiresAt.toISOString() } }, 201);
+});
+app.openapi(listMembersRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const adminService = c.var.services.admin;
+    const members = await adminService.getMembers(tenantId);
+
+    // Map Date to string for schema compatibility.
+    const formattedMembers = members.members.map((m: MemberWithCalendarSync) => ({
+        ...m,
+        createdAt: safeISODate(m.createdAt)
+    }));
+
+    return c.json({ success: true, data: formattedMembers }, 200);
+});
+app.openapi(getAuditLogsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { limit, cursor, action, entityType } = c.req.valid('query');
+    const adminService = c.var.services.admin;
+    const result = await adminService.getAuditLogs(tenantId, {
+        limit: parseInt(limit || '50'),
+        cursor,
+        action,
+        entityType
+    } as Parameters<typeof adminService.getAuditLogs>[1]);
+
+    // Map Date to string for schema compatibility
+    const formattedResult = {
+        ...result,
+        items: result.logs.map((log: (typeof result.logs)[number]) => ({
+            ...log,
+            createdAt: safeISODate(log.createdAt)
+        }))
+    };
+
+    auditFromContext(c, 'audit.view', 'audit_log');
+
+    return c.json({ success: true, data: formattedResult }, 200);
+});
+app.openapi(postAuditLogRoute, async (c) => {
+    const { action, resourceType, resourceId, detail } = c.req.valid('json');
+    auditFromContext(c, action, resourceType, {
+        entityId: resourceId,
+        ...(detail ? { metadata: detail } : {}),
+    });
+    return c.json({ success: true }, 200);
+});
+app.openapi(eraseDataRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const adminService = c.var.services.admin;
+    const counts = await adminService.eraseClientData(tenantId, body.clientEmail, {
+        requestedBy: c.get('user')?.sub,
     });
 
-export default adminDataRoutes;
+    auditFromContext(c, 'data.delete', 'client', {
+        metadata: { clientEmail: body.clientEmail, ...counts },
+    });
+
+    return c.json({ success: true, data: { message: 'Client data erased successfully.', ...counts } }, 200);
+});
+app.openapi(erasureLogRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
+
+    const rows = await db
+        .select({
+            id:              erasureLog.id,
+            subjectEmail:    erasureLog.subjectEmail,
+            status:          erasureLog.status,
+            retainedCount:   erasureLog.retainedCount,
+            anonymizedCount: erasureLog.anonymizedCount,
+            deletedCount:    erasureLog.deletedCount,
+            decisionsJson:   erasureLog.decisionsJson,
+            createdAt:       erasureLog.createdAt,
+        })
+        .from(erasureLog)
+        .where(eq(erasureLog.tenantId, tenantId))
+        .orderBy(descDz(erasureLog.createdAt))
+        .limit(50);
+
+    const data = rows.map((r) => {
+        // decisions_json is written by the orchestrator; tolerate corruption.
+        let decisions: unknown[] = [];
+        try {
+            const parsed = JSON.parse(r.decisionsJson);
+            if (Array.isArray(parsed)) decisions = parsed;
+        } catch {
+            decisions = [];
+        }
+        return {
+            id:              r.id,
+            subjectEmail:    r.subjectEmail,
+            status:          r.status,
+            retainedCount:   r.retainedCount,
+            anonymizedCount: r.anonymizedCount,
+            deletedCount:    r.deletedCount,
+            decisions,
+            createdAt:       r.createdAt.getTime(),
+        };
+    });
+
+    return c.json({ success: true as const, data }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminDataRouteConfigs = [
+    exportDataRoute,
+    inviteMemberRoute,
+    listMembersRoute,
+    getAuditLogsRoute,
+    postAuditLogRoute,
+    eraseDataRoute,
+    erasureLogRoute,
+] as const;
+
+export default app;

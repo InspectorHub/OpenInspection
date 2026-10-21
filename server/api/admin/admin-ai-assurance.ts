@@ -51,20 +51,25 @@ const aiAssuranceRoute = createRoute(withMcpMetadata({
     description: 'Returns the tenant-scoped AI accountability record: one row per model call with the prompt version, model and credential source recorded at call time, joined to every human review citing it. Read-only, newest first, paged backwards with the returned nextBefore cursor.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const adminAiAssuranceRoutes = createApiRouter()
-    .openapi(aiAssuranceRoute, async (c) => {
-        // tenantId comes from the verified JWT via the shared helper, never from
-        // the query — the only inputs this route accepts are page bounds.
-        const tenantId = getTenantId(c);
-        const { limit, before } = c.req.valid('query');
+const app = createApiRouter();
+app.openapi(aiAssuranceRoute, async (c) => {
+    // tenantId comes from the verified JWT via the shared helper, never from
+    // the query — the only inputs this route accepts are page bounds.
+    const tenantId = getTenantId(c);
+    const { limit, before } = c.req.valid('query');
 
-        const page = await readAiAssurance(getDrizzle(c), {
-            tenantId,
-            limit,
-            ...(before !== undefined ? { before } : {}),
-        });
-
-        return c.json({ success: true as const, data: page }, 200);
+    const page = await readAiAssurance(getDrizzle(c), {
+        tenantId,
+        limit,
+        ...(before !== undefined ? { before } : {}),
     });
 
-export default adminAiAssuranceRoutes;
+    return c.json({ success: true as const, data: page }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminAiAssuranceRouteConfigs = [
+    aiAssuranceRoute,
+] as const;
+
+export default app;

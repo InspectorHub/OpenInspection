@@ -180,99 +180,106 @@ async function loadOwnBatch(
 }
 
 
-const adminDataImportRoutes = createApiRouter()
-    .openapi(importDataRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { batchId, bundle } = c.req.valid('json');
+const app = createApiRouter();
+app.openapi(importDataRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { batchId, bundle } = c.req.valid('json');
 
-        // Before anything is parsed: a run nobody authorised a person to read
-        // does not receive what a person produced from reading it. Reading the
-        // file happens in object storage, where no code of ours is watching —
-        // so what this buys is that breaking the rule leaves a FAILURE rather
-        // than passing silently.
-        const { batch } = await loadOwnBatch(c, batchId, tenantId, { requireWaiting: false });
-        assertStaffAccessAuthorized(batch);
+    // Before anything is parsed: a run nobody authorised a person to read
+    // does not receive what a person produced from reading it. Reading the
+    // file happens in object storage, where no code of ours is watching —
+    // so what this buys is that breaking the rule leaves a FAILURE rather
+    // than passing silently.
+    const { batch } = await loadOwnBatch(c, batchId, tenantId, { requireWaiting: false });
+    assertStaffAccessAuthorized(batch);
 
-        const stage = new MigrationStageService(c.env.DB);
-        const result = await stage.stageIntoBatch({
-            tenantId,
-            batchId,
-            bundle,
-            limits: limitsFor(c.var.profile),
-        });
-
-        const byEntity = { template: 0, contact: 0, member: 0 };
-        for (const row of result.rows) byEntity[row.entity]++;
-
-        await new MigrationAssistanceService(c.env)
-            .notifyDelivered(c.var.services.email, tenantId, batchId);
-
-        // A converted file landing on a run that has been waiting for one. This
-        // is the only event on the pipeline that is OURS rather than the
-        // operator's, which is why it has a name of its own rather than sharing
-        // `data.import` with starter-content installs.
-        //
-        // ⚠️ THAT SENTENCE WAS HALF TRUE WHEN IT WAS WRITTEN, and it is worth
-        // saying which half. The event NAME was ours; the ACTOR recorded was
-        // not. `auditFromContext` files the row under the signed-in user, and on
-        // this route that is the workspace's own administrator — so a row saying
-        // "we delivered a conversion" named the customer instead of the person
-        // who did it. The row is now honest on BOTH counts, and it took a
-        // different route to get there: this handler still records the tenant
-        // user, correctly, because a person signed into the workspace really did
-        // press it. The DEPLOYMENT OPERATOR delivers over the command seam
-        // instead (`cmd.migration.deliver`, applied in
-        // portal/apply-migration-commands.ts), where the actor travels inside
-        // the signature and lands in `platform_actor_id` with `user_id` null.
-        // Two doors, two actors, and neither can be mistaken for the other.
-        auditFromContext(c, 'migration.delivered', 'migration_batch', {
-            entityId: batchId,
-            metadata: { rows: result.rows.length, byEntity },
-        });
-
-        return c.json({
-            success: true as const,
-            data: { batchId, rows: result.rows.length, byEntity },
-        }, 200);
-    })
-    .openapi(declineImportRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { batchId, reason } = c.req.valid('json');
-
-        await new MigrationStageService(c.env.DB).declineBatch({ tenantId, batchId, reason });
-
-        // The reason is on the run, not in the audit metadata: metadata is
-        // redacted on the way in, and a redacted reason is not a reason.
-        auditFromContext(c, 'migration.declined', 'migration_batch', { entityId: batchId });
-
-        await new MigrationAssistanceService(c.env)
-            .notifyDeclined(c.var.services.email, tenantId, batchId, reason);
-
-        return c.json({
-            success: true as const,
-            data: { batchId, status: MIGRATION_BATCH_STATUS.DECLINED },
-        }, 200);
-    })
-    .openapi(acknowledgeImportRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { batchId } = c.req.valid('json');
-
-        const { db, batch } = await loadOwnBatch(c, batchId, tenantId, { requireWaiting: true });
-        // The same precondition the delivery route applies, for the same
-        // reason: acknowledging a run is the moment a person says they have
-        // picked the file up.
-        assertStaffAccessAuthorized(batch);
-
-        const manifest = JSON.parse(batch.manifest) as Record<string, unknown>;
-        manifest.acknowledgedAt = new Date().toISOString();
-        await db.update(migrationBatches)
-            .set({ manifest: JSON.stringify(manifest) })
-            .where(and(eq(migrationBatches.id, batchId), eq(migrationBatches.tenantId, tenantId)));
-
-        const notified = await new MigrationAssistanceService(c.env)
-            .notifyReceived(c.var.services.email, tenantId, batchId);
-
-        return c.json({ success: true as const, data: { batchId, notified } }, 200);
+    const stage = new MigrationStageService(c.env.DB);
+    const result = await stage.stageIntoBatch({
+        tenantId,
+        batchId,
+        bundle,
+        limits: limitsFor(c.var.profile),
     });
 
-export default adminDataImportRoutes;
+    const byEntity = { template: 0, contact: 0, member: 0 };
+    for (const row of result.rows) byEntity[row.entity]++;
+
+    await new MigrationAssistanceService(c.env)
+        .notifyDelivered(c.var.services.email, tenantId, batchId);
+
+    // A converted file landing on a run that has been waiting for one. This
+    // is the only event on the pipeline that is OURS rather than the
+    // operator's, which is why it has a name of its own rather than sharing
+    // `data.import` with starter-content installs.
+    //
+    // ⚠️ THAT SENTENCE WAS HALF TRUE WHEN IT WAS WRITTEN, and it is worth
+    // saying which half. The event NAME was ours; the ACTOR recorded was
+    // not. `auditFromContext` files the row under the signed-in user, and on
+    // this route that is the workspace's own administrator — so a row saying
+    // "we delivered a conversion" named the customer instead of the person
+    // who did it. The row is now honest on BOTH counts, and it took a
+    // different route to get there: this handler still records the tenant
+    // user, correctly, because a person signed into the workspace really did
+    // press it. The DEPLOYMENT OPERATOR delivers over the command seam
+    // instead (`cmd.migration.deliver`, applied in
+    // portal/apply-migration-commands.ts), where the actor travels inside
+    // the signature and lands in `platform_actor_id` with `user_id` null.
+    // Two doors, two actors, and neither can be mistaken for the other.
+    auditFromContext(c, 'migration.delivered', 'migration_batch', {
+        entityId: batchId,
+        metadata: { rows: result.rows.length, byEntity },
+    });
+
+    return c.json({
+        success: true as const,
+        data: { batchId, rows: result.rows.length, byEntity },
+    }, 200);
+});
+app.openapi(declineImportRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { batchId, reason } = c.req.valid('json');
+
+    await new MigrationStageService(c.env.DB).declineBatch({ tenantId, batchId, reason });
+
+    // The reason is on the run, not in the audit metadata: metadata is
+    // redacted on the way in, and a redacted reason is not a reason.
+    auditFromContext(c, 'migration.declined', 'migration_batch', { entityId: batchId });
+
+    await new MigrationAssistanceService(c.env)
+        .notifyDeclined(c.var.services.email, tenantId, batchId, reason);
+
+    return c.json({
+        success: true as const,
+        data: { batchId, status: MIGRATION_BATCH_STATUS.DECLINED },
+    }, 200);
+});
+app.openapi(acknowledgeImportRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { batchId } = c.req.valid('json');
+
+    const { db, batch } = await loadOwnBatch(c, batchId, tenantId, { requireWaiting: true });
+    // The same precondition the delivery route applies, for the same
+    // reason: acknowledging a run is the moment a person says they have
+    // picked the file up.
+    assertStaffAccessAuthorized(batch);
+
+    const manifest = JSON.parse(batch.manifest) as Record<string, unknown>;
+    manifest.acknowledgedAt = new Date().toISOString();
+    await db.update(migrationBatches)
+        .set({ manifest: JSON.stringify(manifest) })
+        .where(and(eq(migrationBatches.id, batchId), eq(migrationBatches.tenantId, tenantId)));
+
+    const notified = await new MigrationAssistanceService(c.env)
+        .notifyReceived(c.var.services.email, tenantId, batchId);
+
+    return c.json({ success: true as const, data: { batchId, notified } }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminDataImportRouteConfigs = [
+    importDataRoute,
+    declineImportRoute,
+    acknowledgeImportRoute,
+] as const;
+
+export default app;

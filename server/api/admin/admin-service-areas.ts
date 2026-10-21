@@ -70,84 +70,91 @@ const replaceServiceAreasRoute = createRoute(withMcpMetadata({
     description: 'Replaces the inspector ZIP list wholesale. Sending an empty array clears the territory, which means they serve every area again.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const adminServiceAreasRoutes = createApiRouter()
-    .openapi(getServiceAreasRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { userId } = c.req.valid('query');
-        const rows = await getDrizzle(c).select({ zipPrefix: inspectorServiceAreas.zipPrefix })
-            .from(inspectorServiceAreas)
-            .where(and(
-                eq(inspectorServiceAreas.tenantId, tenantId),
-                eq(inspectorServiceAreas.userId, userId),
-            )).all();
-        return c.json({
-            success: true as const,
-            data: { userId, zipPrefixes: rows.map(r => r.zipPrefix).sort() },
-        }, 200);
-    })
-    .openapi(getAllServiceAreasRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const rows = await getDrizzle(c).select({
-            userId: inspectorServiceAreas.userId,
-            zipPrefix: inspectorServiceAreas.zipPrefix,
-        }).from(inspectorServiceAreas)
-            .where(eq(inspectorServiceAreas.tenantId, tenantId)).all();
-        const byUser = new Map<string, string[]>();
-        for (const row of rows) {
-            const list = byUser.get(row.userId) ?? [];
-            list.push(row.zipPrefix);
-            byUser.set(row.userId, list);
-        }
-        return c.json({
-            success: true as const,
-            data: [...byUser.entries()]
-                .map(([userId, zipPrefixes]) => ({ userId, zipPrefixes: zipPrefixes.sort() }))
-                .sort((a, b) => a.userId.localeCompare(b.userId)),
-        }, 200);
-    })
-    .openapi(replaceServiceAreasRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { userId, zipPrefixes } = c.req.valid('json');
-        const db = getDrizzle(c);
-
-        // The inspector must belong to THIS tenant. Without this a tampered
-        // userId would write territory rows keyed to a stranger, and the
-        // eligibility filter would then read them back under our tenant id.
-        const member = await db.select({ id: users.id }).from(users)
-            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId))).get();
-        if (!member) throw Errors.NotFound('Inspector not found.');
-
-        // De-duplicate before writing: the unique index would reject a repeat
-        // and a client that typed "78701, 78701" meant one ZIP, not an error.
-        const unique = [...new Set(zipPrefixes)].sort();
-
-        await db.delete(inspectorServiceAreas).where(and(
+const app = createApiRouter();
+app.openapi(getServiceAreasRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { userId } = c.req.valid('query');
+    const rows = await getDrizzle(c).select({ zipPrefix: inspectorServiceAreas.zipPrefix })
+        .from(inspectorServiceAreas)
+        .where(and(
             eq(inspectorServiceAreas.tenantId, tenantId),
             eq(inspectorServiceAreas.userId, userId),
-        ));
-        if (unique.length > 0) {
-            const now = new Date();
-            // D1 binds 100 parameters per statement and each row binds 5, so
-            // chunk rather than trusting the list to stay short.
-            const CHUNK = 20;
-            for (let i = 0; i < unique.length; i += CHUNK) {
-                await db.insert(inspectorServiceAreas).values(
-                    unique.slice(i, i + CHUNK).map(zipPrefix => ({
-                        id: crypto.randomUUID(),
-                        tenantId,
-                        userId,
-                        zipPrefix,
-                        createdAt: now,
-                    })),
-                );
-            }
+        )).all();
+    return c.json({
+        success: true as const,
+        data: { userId, zipPrefixes: rows.map(r => r.zipPrefix).sort() },
+    }, 200);
+});
+app.openapi(getAllServiceAreasRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const rows = await getDrizzle(c).select({
+        userId: inspectorServiceAreas.userId,
+        zipPrefix: inspectorServiceAreas.zipPrefix,
+    }).from(inspectorServiceAreas)
+        .where(eq(inspectorServiceAreas.tenantId, tenantId)).all();
+    const byUser = new Map<string, string[]>();
+    for (const row of rows) {
+        const list = byUser.get(row.userId) ?? [];
+        list.push(row.zipPrefix);
+        byUser.set(row.userId, list);
+    }
+    return c.json({
+        success: true as const,
+        data: [...byUser.entries()]
+            .map(([userId, zipPrefixes]) => ({ userId, zipPrefixes: zipPrefixes.sort() }))
+            .sort((a, b) => a.userId.localeCompare(b.userId)),
+    }, 200);
+});
+app.openapi(replaceServiceAreasRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { userId, zipPrefixes } = c.req.valid('json');
+    const db = getDrizzle(c);
+
+    // The inspector must belong to THIS tenant. Without this a tampered
+    // userId would write territory rows keyed to a stranger, and the
+    // eligibility filter would then read them back under our tenant id.
+    const member = await db.select({ id: users.id }).from(users)
+        .where(and(eq(users.id, userId), eq(users.tenantId, tenantId))).get();
+    if (!member) throw Errors.NotFound('Inspector not found.');
+
+    // De-duplicate before writing: the unique index would reject a repeat
+    // and a client that typed "78701, 78701" meant one ZIP, not an error.
+    const unique = [...new Set(zipPrefixes)].sort();
+
+    await db.delete(inspectorServiceAreas).where(and(
+        eq(inspectorServiceAreas.tenantId, tenantId),
+        eq(inspectorServiceAreas.userId, userId),
+    ));
+    if (unique.length > 0) {
+        const now = new Date();
+        // D1 binds 100 parameters per statement and each row binds 5, so
+        // chunk rather than trusting the list to stay short.
+        const CHUNK = 20;
+        for (let i = 0; i < unique.length; i += CHUNK) {
+            await db.insert(inspectorServiceAreas).values(
+                unique.slice(i, i + CHUNK).map(zipPrefix => ({
+                    id: crypto.randomUUID(),
+                    tenantId,
+                    userId,
+                    zipPrefix,
+                    createdAt: now,
+                })),
+            );
         }
+    }
 
-        auditFromContext(c, 'config.service_areas.replace', 'inspector_service_areas', {
-            entityId: userId,
-            metadata: { zipPrefixes: unique },
-        });
-        return c.json({ success: true as const, data: { userId, zipPrefixes: unique } }, 200);
+    auditFromContext(c, 'config.service_areas.replace', 'inspector_service_areas', {
+        entityId: userId,
+        metadata: { zipPrefixes: unique },
     });
+    return c.json({ success: true as const, data: { userId, zipPrefixes: unique } }, 200);
+});
 
-export default adminServiceAreasRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminServiceAreasRouteConfigs = [
+    getServiceAreasRoute,
+    getAllServiceAreasRoute,
+    replaceServiceAreasRoute,
+] as const;
+
+export default app;

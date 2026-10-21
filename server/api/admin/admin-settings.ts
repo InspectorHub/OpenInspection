@@ -366,386 +366,402 @@ const patchCommunicationRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-const adminSettingsRoutes = createApiRouter()
-    .openapi(getAttentionThresholdsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
-        const row = await db.select({ thresholds: tenantConfigs.attentionThresholds })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .limit(1);
-        const thresholds = row[0]?.thresholds ?? ATTENTION_THRESHOLDS_DEFAULTS;
-        return c.json({ success: true as const, data: { thresholds } }, 200);
-    })
-    .openapi(updateAttentionThresholdsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const db = getDrizzle(c);
+const app = createApiRouter();
+app.openapi(getAttentionThresholdsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
+    const row = await db.select({ thresholds: tenantConfigs.attentionThresholds })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .limit(1);
+    const thresholds = row[0]?.thresholds ?? ATTENTION_THRESHOLDS_DEFAULTS;
+    return c.json({ success: true as const, data: { thresholds } }, 200);
+});
+app.openapi(updateAttentionThresholdsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const db = getDrizzle(c);
 
-        const existing = await db.select({ tenantId: tenantConfigs.tenantId })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .limit(1);
+    const existing = await db.select({ tenantId: tenantConfigs.tenantId })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .limit(1);
 
-        if (existing.length === 0) {
-            await db.insert(tenantConfigs).values({
-                tenantId,
-                attentionThresholds: body,
-                updatedAt: new Date(),
-            });
+    if (existing.length === 0) {
+        await db.insert(tenantConfigs).values({
+            tenantId,
+            attentionThresholds: body,
+            updatedAt: new Date(),
+        });
+    } else {
+        await db.update(tenantConfigs)
+            .set({ attentionThresholds: body, updatedAt: new Date() })
+            .where(eq(tenantConfigs.tenantId, tenantId));
+    }
+    auditFromContext(c, 'config.attention_thresholds.update', 'tenant_config', { metadata: { ...body } });
+    return c.json({ success: true as const, data: { thresholds: body } }, 200);
+});
+app.openapi(getDashboardColumnsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const columns = await c.var.services.dashboardPrefs.getColumnPrefs(tenantId);
+    return c.json({ success: true as const, data: { columns } }, 200);
+});
+app.openapi(updateDashboardColumnsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const columns = await c.var.services.dashboardPrefs.setColumnPrefs(tenantId, body.columns);
+    auditFromContext(c, 'config.dashboard_columns.update', 'tenant_config', { metadata: { columns } });
+    return c.json({ success: true as const, data: { columns } }, 200);
+});
+app.openapi(tenantConfigGetRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    // getBranding needs explicit defaults (it returns them when no config row
+    // exists); we only read config flags here, so the branding defaults are
+    // throwaway placeholders. Without this arg a brand-new tenant with no
+    // tenant_configs row would TypeError on undefined defaults.
+    const config = await c.var.services.branding.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown> | undefined;
+    // Best-effort slug for hosted legal URL preview; unit stubs often omit
+    // a real D1 tenants table — empty slug just omits the absolute URLs.
+    const slug = await resolveTenantSlug(c, tenantId).catch(() => '');
+    const legalMode = ((config?.legalMode as LegalMode | undefined) ?? 'hosted');
+    const customPrivacyUrl = (config?.customPrivacyUrl as string | null | undefined) ?? null;
+    const customTermsUrl = (config?.customTermsUrl as string | null | undefined) ?? null;
+    const privacyBody = (config?.privacyBody as string | null | undefined) ?? null;
+    const termsBody = (config?.termsBody as string | null | undefined) ?? null;
+    const baseUrl = getBaseUrl(c);
+    const hosted = slug
+        ? resolveTenantLegalUrls(slug, baseUrl, { legalMode: 'hosted' })
+        : { privacyUrl: null as string | null, termsUrl: null as string | null };
+    const effective = slug
+        ? resolveTenantLegalUrls(slug, baseUrl, { legalMode, customPrivacyUrl, customTermsUrl })
+        : { privacyUrl: null as string | null, termsUrl: null as string | null };
+    return c.json({
+        success: true as const,
+        data: {
+            conciergeReviewRequired: config?.conciergeReviewRequired ?? false,
+            blockUnsignedAgreement: config?.blockUnsignedAgreement ?? false,
+            allowInspectorChoice: config?.allowInspectorChoice ?? false,
+            agreementRetentionYears: config?.agreementRetentionYears ?? 6,
+            reportPdfRetentionYears: resolveReportPdfRetentionYears(config),
+            reportViewCountingEnabled: config?.reportViewCountingEnabled ?? false,
+            offlineMaxDays: (config?.offlineMaxDays as number | undefined) ?? 30,
+            reviewUrl: config?.reviewUrl ?? null,
+            smsMode: (config?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform',
+            companyPhone: (config?.companyPhone as string | null) ?? null,
+            videoMode: (config?.videoMode as 'r2' | 'stream') ?? 'r2',
+            smsByoProvider: (config?.smsByoProvider as 'twilio' | 'telnyx' | null) ?? null,
+            managedProvider: (config?.managedProvider as 'twilio' | 'telnyx') ?? 'twilio',
+            emailByoProvider: (config?.emailByoProvider as 'resend' | 'sendgrid' | 'postmark' | 'mailgun' | null) ?? 'resend',
+            bookingSlotMode: config?.bookingSlotMode === 'open' ? 'open' : 'fixed',
+            bookingSlotIntervalMin: ([15, 30, 60] as const).includes(
+                config?.bookingSlotIntervalMin as 15 | 30 | 60,
+            )
+                ? (config?.bookingSlotIntervalMin as 15 | 30 | 60)
+                : 30,
+            holidayRegion: (config?.holidayRegion as string | null | undefined) ?? null,
+            holidayPublicPolicy: (['open', 'block', 'advisory'] as const).includes(
+                config?.holidayPublicPolicy as 'open' | 'block' | 'advisory',
+            )
+                ? (config?.holidayPublicPolicy as 'open' | 'block' | 'advisory')
+                : 'open',
+            holidayInternalPolicy: config?.holidayInternalPolicy === 'block' ? 'block' : 'advisory',
+            bookingConflictPolicy: config?.bookingConflictPolicy === 'block' ? 'block' : 'advisory',
+            legalMode,
+            customPrivacyUrl,
+            customTermsUrl,
+            privacyBody,
+            termsBody,
+            hostedPrivacyUrl: hosted.privacyUrl,
+            hostedTermsUrl: hosted.termsUrl,
+            effectivePrivacyUrl: effective.privacyUrl,
+            effectiveTermsUrl: effective.termsUrl,
+        },
+    }, 200);
+});
+app.openapi(tenantConfigPatchRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+
+    const update: Partial<typeof tenantConfigs.$inferInsert> = {};
+    if (body.conciergeReviewRequired !== undefined) {
+        update.conciergeReviewRequired = body.conciergeReviewRequired;
+    }
+    if (body.blockUnsignedAgreement !== undefined) {
+        update.blockUnsignedAgreement = body.blockUnsignedAgreement;
+    }
+    if (body.allowInspectorChoice !== undefined) {
+        update.allowInspectorChoice = body.allowInspectorChoice;
+    }
+    if (body.reportViewCountingEnabled !== undefined) {
+        update.reportViewCountingEnabled = body.reportViewCountingEnabled;
+    }
+    if (body.reportPdfRetentionYears !== undefined) {
+        update.reportPdfRetentionYears = body.reportPdfRetentionYears;
+    }
+    if (body.agreementRetentionYears !== undefined) {
+        update.agreementRetentionYears = body.agreementRetentionYears;
+    }
+    if (body.offlineMaxDays !== undefined) {
+        update.offlineMaxDays = body.offlineMaxDays;
+    }
+    if (body.reviewUrl !== undefined) {
+        update.reviewUrl = body.reviewUrl || null;
+    }
+    if (body.smsMode !== undefined) {
+        const profile = c.var.profile;
+        // The real question is whether the `managed_*` SMS modes EXIST on
+        // this deployment — i.e. whether anyone can file a 10DLC brand and
+        // campaign on the tenant's behalf. That is `hasManagedCompliance`,
+        // and it is what the settings page reads to decide whether to offer
+        // the choice. `mode === 'standalone'` was a proxy that happens to
+        // agree today; reading the capability is what keeps the two agreeing
+        // when a deployment stops matching the proxy.
+        if (!profile.hasManagedCompliance) {
+            // No managed path exists here: ignore any submitted mode and
+            // force BYO, which is the only one that can work.
+            update.smsMode = 'own';
         } else {
-            await db.update(tenantConfigs)
-                .set({ attentionThresholds: body, updatedAt: new Date() })
-                .where(eq(tenantConfigs.tenantId, tenantId));
+            // SaaS: the schema already excludes 'platform' via z.enum(['own','managed_dedicated']).
+            // This guard is the server-side double-check against e.g. a direct API call.
+            if ((body.smsMode as string) === 'platform') {
+                throw Errors.BadRequest('Platform SMS is reserved for first-party use.', 'platform_mode_not_allowed');
+            }
+            update.smsMode = body.smsMode;
         }
-        auditFromContext(c, 'config.attention_thresholds.update', 'tenant_config', { metadata: { ...body } });
-        return c.json({ success: true as const, data: { thresholds: body } }, 200);
-    })
-    .openapi(getDashboardColumnsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const columns = await c.var.services.dashboardPrefs.getColumnPrefs(tenantId);
-        return c.json({ success: true as const, data: { columns } }, 200);
-    })
-    .openapi(updateDashboardColumnsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const columns = await c.var.services.dashboardPrefs.setColumnPrefs(tenantId, body.columns);
-        auditFromContext(c, 'config.dashboard_columns.update', 'tenant_config', { metadata: { columns } });
-        return c.json({ success: true as const, data: { columns } }, 200);
-    })
-    .openapi(tenantConfigGetRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        // getBranding needs explicit defaults (it returns them when no config row
-        // exists); we only read config flags here, so the branding defaults are
-        // throwaway placeholders. Without this arg a brand-new tenant with no
-        // tenant_configs row would TypeError on undefined defaults.
-        const config = await c.var.services.branding.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown> | undefined;
-        // Best-effort slug for hosted legal URL preview; unit stubs often omit
-        // a real D1 tenants table — empty slug just omits the absolute URLs.
-        const slug = await resolveTenantSlug(c, tenantId).catch(() => '');
-        const legalMode = ((config?.legalMode as LegalMode | undefined) ?? 'hosted');
-        const customPrivacyUrl = (config?.customPrivacyUrl as string | null | undefined) ?? null;
-        const customTermsUrl = (config?.customTermsUrl as string | null | undefined) ?? null;
-        const privacyBody = (config?.privacyBody as string | null | undefined) ?? null;
-        const termsBody = (config?.termsBody as string | null | undefined) ?? null;
-        const baseUrl = getBaseUrl(c);
-        const hosted = slug
-            ? resolveTenantLegalUrls(slug, baseUrl, { legalMode: 'hosted' })
-            : { privacyUrl: null as string | null, termsUrl: null as string | null };
-        const effective = slug
-            ? resolveTenantLegalUrls(slug, baseUrl, { legalMode, customPrivacyUrl, customTermsUrl })
-            : { privacyUrl: null as string | null, termsUrl: null as string | null };
-        return c.json({
-            success: true as const,
-            data: {
-                conciergeReviewRequired: config?.conciergeReviewRequired ?? false,
-                blockUnsignedAgreement: config?.blockUnsignedAgreement ?? false,
-                allowInspectorChoice: config?.allowInspectorChoice ?? false,
-                agreementRetentionYears: config?.agreementRetentionYears ?? 6,
-                reportPdfRetentionYears: resolveReportPdfRetentionYears(config),
-                reportViewCountingEnabled: config?.reportViewCountingEnabled ?? false,
-                offlineMaxDays: (config?.offlineMaxDays as number | undefined) ?? 30,
-                reviewUrl: config?.reviewUrl ?? null,
-                smsMode: (config?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform',
-                companyPhone: (config?.companyPhone as string | null) ?? null,
-                videoMode: (config?.videoMode as 'r2' | 'stream') ?? 'r2',
-                smsByoProvider: (config?.smsByoProvider as 'twilio' | 'telnyx' | null) ?? null,
-                managedProvider: (config?.managedProvider as 'twilio' | 'telnyx') ?? 'twilio',
-                emailByoProvider: (config?.emailByoProvider as 'resend' | 'sendgrid' | 'postmark' | 'mailgun' | null) ?? 'resend',
-                bookingSlotMode: config?.bookingSlotMode === 'open' ? 'open' : 'fixed',
-                bookingSlotIntervalMin: ([15, 30, 60] as const).includes(
-                    config?.bookingSlotIntervalMin as 15 | 30 | 60,
-                )
-                    ? (config?.bookingSlotIntervalMin as 15 | 30 | 60)
-                    : 30,
-                holidayRegion: (config?.holidayRegion as string | null | undefined) ?? null,
-                holidayPublicPolicy: (['open', 'block', 'advisory'] as const).includes(
-                    config?.holidayPublicPolicy as 'open' | 'block' | 'advisory',
-                )
-                    ? (config?.holidayPublicPolicy as 'open' | 'block' | 'advisory')
-                    : 'open',
-                holidayInternalPolicy: config?.holidayInternalPolicy === 'block' ? 'block' : 'advisory',
-                bookingConflictPolicy: config?.bookingConflictPolicy === 'block' ? 'block' : 'advisory',
-                legalMode,
-                customPrivacyUrl,
-                customTermsUrl,
-                privacyBody,
-                termsBody,
-                hostedPrivacyUrl: hosted.privacyUrl,
-                hostedTermsUrl: hosted.termsUrl,
-                effectivePrivacyUrl: effective.privacyUrl,
-                effectiveTermsUrl: effective.termsUrl,
-            },
-        }, 200);
-    })
-    .openapi(tenantConfigPatchRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
+    }
+    if (body.companyPhone !== undefined) {
+        update.companyPhone = body.companyPhone || null;
+    }
+    if (body.videoMode !== undefined) {
+        update.videoMode = body.videoMode;
+    }
+    if (body.smsByoProvider !== undefined) {
+        update.smsByoProvider = body.smsByoProvider;
+    }
+    if (body.managedProvider !== undefined) {
+        update.managedProvider = body.managedProvider;
+    }
+    if (body.emailByoProvider !== undefined) {
+        update.emailByoProvider = body.emailByoProvider;
+    }
+    if (body.bookingSlotMode !== undefined) {
+        update.bookingSlotMode = body.bookingSlotMode;
+    }
+    if (body.bookingSlotIntervalMin !== undefined) {
+        update.bookingSlotIntervalMin = body.bookingSlotIntervalMin;
+    }
+    if (body.holidayRegion !== undefined) {
+        const previous = await c.var.services.branding.getBranding(tenantId, {
+            companyName: '', primaryColor: '', supportEmail: '',
+        }) as Record<string, unknown> | undefined;
+        const wasOff = !previous?.holidayRegion;
+        update.holidayRegion = body.holidayRegion;
+        // First enable: default public block + internal advisory unless explicitly patched.
+        if (wasOff && body.holidayRegion !== null) {
+            const defaults = defaultPoliciesOnFirstEnable();
+            if (body.holidayPublicPolicy === undefined) update.holidayPublicPolicy = defaults.holidayPublicPolicy;
+            if (body.holidayInternalPolicy === undefined) update.holidayInternalPolicy = defaults.holidayInternalPolicy;
+        }
+    }
+    if (body.holidayPublicPolicy !== undefined) {
+        update.holidayPublicPolicy = body.holidayPublicPolicy;
+    }
+    if (body.holidayInternalPolicy !== undefined) {
+        update.holidayInternalPolicy = body.holidayInternalPolicy;
+    }
+    if (body.bookingConflictPolicy !== undefined) {
+        update.bookingConflictPolicy = body.bookingConflictPolicy;
+    }
+    if (body.legalMode !== undefined) {
+        update.legalMode = body.legalMode;
+    }
+    if (body.customPrivacyUrl !== undefined) {
+        update.customPrivacyUrl = body.customPrivacyUrl || null;
+    }
+    if (body.customTermsUrl !== undefined) {
+        update.customTermsUrl = body.customTermsUrl || null;
+    }
+    if (body.privacyBody !== undefined) {
+        update.privacyBody = body.privacyBody?.trim() ? body.privacyBody : null;
+    }
+    if (body.termsBody !== undefined) {
+        update.termsBody = body.termsBody?.trim() ? body.termsBody : null;
+    }
 
-        const update: Partial<typeof tenantConfigs.$inferInsert> = {};
-        if (body.conciergeReviewRequired !== undefined) {
-            update.conciergeReviewRequired = body.conciergeReviewRequired;
-        }
-        if (body.blockUnsignedAgreement !== undefined) {
-            update.blockUnsignedAgreement = body.blockUnsignedAgreement;
-        }
-        if (body.allowInspectorChoice !== undefined) {
-            update.allowInspectorChoice = body.allowInspectorChoice;
-        }
-        if (body.reportViewCountingEnabled !== undefined) {
-            update.reportViewCountingEnabled = body.reportViewCountingEnabled;
-        }
-        if (body.reportPdfRetentionYears !== undefined) {
-            update.reportPdfRetentionYears = body.reportPdfRetentionYears;
-        }
-        if (body.agreementRetentionYears !== undefined) {
-            update.agreementRetentionYears = body.agreementRetentionYears;
-        }
-        if (body.offlineMaxDays !== undefined) {
-            update.offlineMaxDays = body.offlineMaxDays;
-        }
-        if (body.reviewUrl !== undefined) {
-            update.reviewUrl = body.reviewUrl || null;
-        }
-        if (body.smsMode !== undefined) {
-            const profile = c.var.profile;
-            // The real question is whether the `managed_*` SMS modes EXIST on
-            // this deployment — i.e. whether anyone can file a 10DLC brand and
-            // campaign on the tenant's behalf. That is `hasManagedCompliance`,
-            // and it is what the settings page reads to decide whether to offer
-            // the choice. `mode === 'standalone'` was a proxy that happens to
-            // agree today; reading the capability is what keeps the two agreeing
-            // when a deployment stops matching the proxy.
-            if (!profile.hasManagedCompliance) {
-                // No managed path exists here: ignore any submitted mode and
-                // force BYO, which is the only one that can work.
-                update.smsMode = 'own';
-            } else {
-                // SaaS: the schema already excludes 'platform' via z.enum(['own','managed_dedicated']).
-                // This guard is the server-side double-check against e.g. a direct API call.
-                if ((body.smsMode as string) === 'platform') {
-                    throw Errors.BadRequest('Platform SMS is reserved for first-party use.', 'platform_mode_not_allowed');
-                }
-                update.smsMode = body.smsMode;
+    const legalTouched =
+        body.legalMode !== undefined
+        || body.customPrivacyUrl !== undefined
+        || body.customTermsUrl !== undefined;
+    if (legalTouched) {
+        const previous = await c.var.services.branding.getBranding(tenantId, {
+            companyName: '', primaryColor: '', supportEmail: '',
+        }) as Record<string, unknown> | undefined;
+        const nextMode = (update.legalMode ?? previous?.legalMode ?? 'hosted') as LegalMode;
+        if (nextMode === 'custom') {
+            const privacy = (update.customPrivacyUrl !== undefined
+                ? update.customPrivacyUrl
+                : previous?.customPrivacyUrl) as string | null | undefined;
+            const terms = (update.customTermsUrl !== undefined
+                ? update.customTermsUrl
+                : previous?.customTermsUrl) as string | null | undefined;
+            if (!privacy?.trim() || !terms?.trim()) {
+                throw Errors.BadRequest(
+                    'Custom Privacy and Terms URLs are both required when using your own website.',
+                    'legal_custom_urls_required',
+                );
             }
         }
-        if (body.companyPhone !== undefined) {
-            update.companyPhone = body.companyPhone || null;
-        }
-        if (body.videoMode !== undefined) {
-            update.videoMode = body.videoMode;
-        }
-        if (body.smsByoProvider !== undefined) {
-            update.smsByoProvider = body.smsByoProvider;
-        }
-        if (body.managedProvider !== undefined) {
-            update.managedProvider = body.managedProvider;
-        }
-        if (body.emailByoProvider !== undefined) {
-            update.emailByoProvider = body.emailByoProvider;
-        }
-        if (body.bookingSlotMode !== undefined) {
-            update.bookingSlotMode = body.bookingSlotMode;
-        }
-        if (body.bookingSlotIntervalMin !== undefined) {
-            update.bookingSlotIntervalMin = body.bookingSlotIntervalMin;
-        }
-        if (body.holidayRegion !== undefined) {
-            const previous = await c.var.services.branding.getBranding(tenantId, {
-                companyName: '', primaryColor: '', supportEmail: '',
-            }) as Record<string, unknown> | undefined;
-            const wasOff = !previous?.holidayRegion;
-            update.holidayRegion = body.holidayRegion;
-            // First enable: default public block + internal advisory unless explicitly patched.
-            if (wasOff && body.holidayRegion !== null) {
-                const defaults = defaultPoliciesOnFirstEnable();
-                if (body.holidayPublicPolicy === undefined) update.holidayPublicPolicy = defaults.holidayPublicPolicy;
-                if (body.holidayInternalPolicy === undefined) update.holidayInternalPolicy = defaults.holidayInternalPolicy;
-            }
-        }
-        if (body.holidayPublicPolicy !== undefined) {
-            update.holidayPublicPolicy = body.holidayPublicPolicy;
-        }
-        if (body.holidayInternalPolicy !== undefined) {
-            update.holidayInternalPolicy = body.holidayInternalPolicy;
-        }
-        if (body.bookingConflictPolicy !== undefined) {
-            update.bookingConflictPolicy = body.bookingConflictPolicy;
-        }
-        if (body.legalMode !== undefined) {
-            update.legalMode = body.legalMode;
-        }
-        if (body.customPrivacyUrl !== undefined) {
-            update.customPrivacyUrl = body.customPrivacyUrl || null;
-        }
-        if (body.customTermsUrl !== undefined) {
-            update.customTermsUrl = body.customTermsUrl || null;
-        }
-        if (body.privacyBody !== undefined) {
-            update.privacyBody = body.privacyBody?.trim() ? body.privacyBody : null;
-        }
-        if (body.termsBody !== undefined) {
-            update.termsBody = body.termsBody?.trim() ? body.termsBody : null;
-        }
+    }
 
-        const legalTouched =
-            body.legalMode !== undefined
-            || body.customPrivacyUrl !== undefined
-            || body.customTermsUrl !== undefined;
-        if (legalTouched) {
-            const previous = await c.var.services.branding.getBranding(tenantId, {
-                companyName: '', primaryColor: '', supportEmail: '',
-            }) as Record<string, unknown> | undefined;
-            const nextMode = (update.legalMode ?? previous?.legalMode ?? 'hosted') as LegalMode;
-            if (nextMode === 'custom') {
-                const privacy = (update.customPrivacyUrl !== undefined
-                    ? update.customPrivacyUrl
-                    : previous?.customPrivacyUrl) as string | null | undefined;
-                const terms = (update.customTermsUrl !== undefined
-                    ? update.customTermsUrl
-                    : previous?.customTermsUrl) as string | null | undefined;
-                if (!privacy?.trim() || !terms?.trim()) {
-                    throw Errors.BadRequest(
-                        'Custom Privacy and Terms URLs are both required when using your own website.',
-                        'legal_custom_urls_required',
-                    );
-                }
-            }
-        }
-
-        if (Object.keys(update).length === 0) {
-            return c.json({ success: true as const, data: { ok: true as const } }, 200);
-        }
-        await c.var.services.branding.updateBranding(tenantId, update);
-
-        // A publish is recorded AFTER the write succeeds, and only for a body
-        // that actually changed (the service compares the content hash and
-        // no-ops on a match). Recording before the write would register a
-        // version of text that may never have gone live; recording on every
-        // PATCH would mint a version each time a tenant saved an unrelated
-        // setting, and a registry that grows a row per form submission stops
-        // meaning "the document changed" almost immediately.
-        //
-        // Non-fatal by design: the version row is evidence about a save, not
-        // part of it. Failing the settings save because the historian fell over
-        // would lose the change the tenant actually asked for.
-        for (const doc of ['privacy', 'terms'] as const) {
-            const key = doc === 'privacy' ? 'privacyBody' : 'termsBody';
-            if (update[key] === undefined) continue;
-            try {
-                await c.var.services.legalVersion.recordPublish({
-                    tenantId,
-                    doc,
-                    body: (update[key] as string | null) ?? null,
-                    userId: c.get('user')?.sub ?? null,
-                });
-            } catch (err) {
-                logger.error('[legal] failed to record a published version', { doc },
-                    err instanceof Error ? err : undefined);
-            }
-        }
-
-        auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
-            metadata: update,
-        });
+    if (Object.keys(update).length === 0) {
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(listEventTypesRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const data = await c.var.services.event.listEventTypes(tenantId);
-        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
-    })
-    .openapi(createEventTypeRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = await guardMoneyWrite(c, c.req.valid('json'), null);
-        const data = await c.var.services.event.createEventType(tenantId, body);
-        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
-    })
-    .openapi(updateEventTypeRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const before = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id) ?? null;
-        const body = await guardMoneyWrite(c, c.req.valid('json'), before);
-        await c.var.services.event.updateEventType(tenantId, id, body);
-        const fresh = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id);
-        if (!fresh) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Event type not found' } }, 404);
-        return c.json({ success: true as const, data: await moneyView(c, fresh, 'inspectionFees') }, 200);
-    })
-    .openapi(deleteEventTypeRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await c.var.services.event.deactivateEventType(tenantId, id);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(getCommunicationRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const user = c.get('user');
-        const cfg = await c.var.services.branding.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>;
-        // Resend is "configured" if a key is in env OR stored in tenant secrets.
-        // C-15: reads the CANONICAL `secrets_enc` store (ENV-name keys).
-        let resendConfigured = !!c.env.RESEND_API_KEY;
-        if (!resendConfigured) {
-            try {
-                const { loadTenantSecrets } = await import('../../lib/secrets-cache');
-                const dec = (await loadTenantSecrets(
-                    c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET,
-                    c.env.JWT_SECRET_PREVIOUS,
-                ).catch(() => null)) ?? ({} as Record<string, string | undefined>);
-                resendConfigured = !!dec.RESEND_API_KEY;
-            } catch { /* no decryptable secrets — leave false */ }
-        }
-        const icsToken = cfg.icsToken as string | null | undefined;
-        // Any provider: these fields report whether THIS user has a calendar
-        // connected at all. `googleOAuthConfigured` below is the one that is
-        // genuinely Google-specific — it gates the Google button.
-        const googleCalendarConnected = user?.sub
-            ? await userHasCalendarConnection(c.env.DB, tenantId, user.sub)
-            : false;
-        const calendarRow = user?.sub && googleCalendarConnected
-            ? await getCalendarConnection(c.env.DB, tenantId, user.sub)
-            : null;
-        const integrationCfg = await c.var.services.branding.getIntegrationConfig(tenantId);
-        const googleOAuthMode: 'platform' | 'own' = integrationCfg.googleOAuthMode === 'own' ? 'own' : 'platform';
-        const { isGoogleOAuthConfigured } = await import('../../lib/calendar/resolve-google-oauth');
-        const googleOAuthConfigured = await isGoogleOAuthConfigured(c.env, tenantId);
-        return c.json({
-            success: true as const,
-            data: {
-                senderEmail: (cfg.senderEmail as string | null) ?? null,
-                replyTo: (cfg.replyTo as string | null) ?? null,
-                emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
-                senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
-                companyName: (cfg.companyName as string | null) ?? null,
-                legalName: (await c.var.services.branding.getBrand(tenantId)).legalName,
-                pointOfContact: (cfg.pointOfContact as 'inspector' | 'company') ?? 'company',
-                resendConfigured,
-                templates: [],
-                icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
-                googleCalendarConnected,
-                googleCalendarCapability: calendarRow?.capabilities ?? null,
-                googleOAuthConfigured,
-                googleOAuthMode,
-            },
-        }, 200);
-    })
-    .openapi(patchCommunicationRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const check = validateCommunicationPatch({ pointOfContact: body.pointOfContact, replyTo: body.replyTo });
-        if (!check.ok) throw Errors.BadRequest(check.error);
-        await c.var.services.branding.updateBranding(tenantId, {
-            senderEmail: body.senderEmail,
-            replyTo: body.replyTo,
-            emailMode: body.emailMode,
-            senderDisplayName: body.senderDisplayName,
-            pointOfContact: body.pointOfContact,
-        });
-        if (body.googleOAuthMode) {
-            await c.var.services.branding.updateIntegrationConfig(tenantId, {
-                googleOAuthMode: body.googleOAuthMode,
+    }
+    await c.var.services.branding.updateBranding(tenantId, update);
+
+    // A publish is recorded AFTER the write succeeds, and only for a body
+    // that actually changed (the service compares the content hash and
+    // no-ops on a match). Recording before the write would register a
+    // version of text that may never have gone live; recording on every
+    // PATCH would mint a version each time a tenant saved an unrelated
+    // setting, and a registry that grows a row per form submission stops
+    // meaning "the document changed" almost immediately.
+    //
+    // Non-fatal by design: the version row is evidence about a save, not
+    // part of it. Failing the settings save because the historian fell over
+    // would lose the change the tenant actually asked for.
+    for (const doc of ['privacy', 'terms'] as const) {
+        const key = doc === 'privacy' ? 'privacyBody' : 'termsBody';
+        if (update[key] === undefined) continue;
+        try {
+            await c.var.services.legalVersion.recordPublish({
+                tenantId,
+                doc,
+                body: (update[key] as string | null) ?? null,
+                userId: c.get('user')?.sub ?? null,
             });
+        } catch (err) {
+            logger.error('[legal] failed to record a published version', { doc },
+                err instanceof Error ? err : undefined);
         }
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    });
+    }
 
-export default adminSettingsRoutes;
+    auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
+        metadata: update,
+    });
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(listEventTypesRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const data = await c.var.services.event.listEventTypes(tenantId);
+    return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
+});
+app.openapi(createEventTypeRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = await guardMoneyWrite(c, c.req.valid('json'), null);
+    const data = await c.var.services.event.createEventType(tenantId, body);
+    return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
+});
+app.openapi(updateEventTypeRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const before = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id) ?? null;
+    const body = await guardMoneyWrite(c, c.req.valid('json'), before);
+    await c.var.services.event.updateEventType(tenantId, id, body);
+    const fresh = (await c.var.services.event.listEventTypes(tenantId)).find((t: { id: string }) => t.id === id);
+    if (!fresh) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Event type not found' } }, 404);
+    return c.json({ success: true as const, data: await moneyView(c, fresh, 'inspectionFees') }, 200);
+});
+app.openapi(deleteEventTypeRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.event.deactivateEventType(tenantId, id);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(getCommunicationRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const user = c.get('user');
+    const cfg = await c.var.services.branding.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>;
+    // Resend is "configured" if a key is in env OR stored in tenant secrets.
+    // C-15: reads the CANONICAL `secrets_enc` store (ENV-name keys).
+    let resendConfigured = !!c.env.RESEND_API_KEY;
+    if (!resendConfigured) {
+        try {
+            const { loadTenantSecrets } = await import('../../lib/secrets-cache');
+            const dec = (await loadTenantSecrets(
+                c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET,
+                c.env.JWT_SECRET_PREVIOUS,
+            ).catch(() => null)) ?? ({} as Record<string, string | undefined>);
+            resendConfigured = !!dec.RESEND_API_KEY;
+        } catch { /* no decryptable secrets — leave false */ }
+    }
+    const icsToken = cfg.icsToken as string | null | undefined;
+    // Any provider: these fields report whether THIS user has a calendar
+    // connected at all. `googleOAuthConfigured` below is the one that is
+    // genuinely Google-specific — it gates the Google button.
+    const googleCalendarConnected = user?.sub
+        ? await userHasCalendarConnection(c.env.DB, tenantId, user.sub)
+        : false;
+    const calendarRow = user?.sub && googleCalendarConnected
+        ? await getCalendarConnection(c.env.DB, tenantId, user.sub)
+        : null;
+    const integrationCfg = await c.var.services.branding.getIntegrationConfig(tenantId);
+    const googleOAuthMode: 'platform' | 'own' = integrationCfg.googleOAuthMode === 'own' ? 'own' : 'platform';
+    const { isGoogleOAuthConfigured } = await import('../../lib/calendar/resolve-google-oauth');
+    const googleOAuthConfigured = await isGoogleOAuthConfigured(c.env, tenantId);
+    return c.json({
+        success: true as const,
+        data: {
+            senderEmail: (cfg.senderEmail as string | null) ?? null,
+            replyTo: (cfg.replyTo as string | null) ?? null,
+            emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
+            senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
+            companyName: (cfg.companyName as string | null) ?? null,
+            legalName: (await c.var.services.branding.getBrand(tenantId)).legalName,
+            pointOfContact: (cfg.pointOfContact as 'inspector' | 'company') ?? 'company',
+            resendConfigured,
+            templates: [],
+            icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
+            googleCalendarConnected,
+            googleCalendarCapability: calendarRow?.capabilities ?? null,
+            googleOAuthConfigured,
+            googleOAuthMode,
+        },
+    }, 200);
+});
+app.openapi(patchCommunicationRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const check = validateCommunicationPatch({ pointOfContact: body.pointOfContact, replyTo: body.replyTo });
+    if (!check.ok) throw Errors.BadRequest(check.error);
+    await c.var.services.branding.updateBranding(tenantId, {
+        senderEmail: body.senderEmail,
+        replyTo: body.replyTo,
+        emailMode: body.emailMode,
+        senderDisplayName: body.senderDisplayName,
+        pointOfContact: body.pointOfContact,
+    });
+    if (body.googleOAuthMode) {
+        await c.var.services.branding.updateIntegrationConfig(tenantId, {
+            googleOAuthMode: body.googleOAuthMode,
+        });
+    }
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminSettingsRouteConfigs = [
+    getAttentionThresholdsRoute,
+    updateAttentionThresholdsRoute,
+    getDashboardColumnsRoute,
+    updateDashboardColumnsRoute,
+    tenantConfigGetRoute,
+    tenantConfigPatchRoute,
+    listEventTypesRoute,
+    createEventTypeRoute,
+    updateEventTypeRoute,
+    deleteEventTypeRoute,
+    getCommunicationRoute,
+    patchCommunicationRoute,
+] as const;
+
+export default app;
