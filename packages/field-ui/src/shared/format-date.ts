@@ -1,5 +1,5 @@
-import { formatTime } from '@core/field-ui/shared/format';
-import { cachedDateTimeFormat } from '@core/field-ui/shared/intl-cache';
+import { formatTime } from './format';
+import { cachedDateTimeFormat } from './intl-cache';
 import {
     DEFAULT_DISPLAY_PREFS,
     type DateFormat,

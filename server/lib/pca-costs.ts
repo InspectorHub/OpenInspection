@@ -1,7 +1,7 @@
 /**
  * Commercial PCA Phase C — pure, IO-free cost computation. Reused by
  * HTML / PDF / CSV / xlsx / Word. All money is integer cents; conversion to a
- * `$` string happens only at the render/export edge (app/lib/money.ts formatCents).
+ * `$` string happens only at the render/export edge (packages/field-ui/src/shared/money.ts formatCents).
  *
  * Two tables (ASTM E2018 + real-PCA parity):
  *  - TABLE 1: Deferred Maintenance / Opinion of Cost — Immediate + Short-Term.

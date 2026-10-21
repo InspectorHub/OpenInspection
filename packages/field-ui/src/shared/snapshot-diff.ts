@@ -21,7 +21,7 @@
  * `tests/unit/collab/snapshot-diff.spec.ts`.
  */
 
-import type { ItemEntry, ResultsProjection } from '@core/field-ui/shared/results-doc.types';
+import type { ItemEntry, ResultsProjection } from './results-doc.types';
 
 /** The precisely-diffed scalar fields of an `ItemEntry`. Mirrors the field
  *  union of `applyItemPatch` — a version "Recover" writes each one back, so a

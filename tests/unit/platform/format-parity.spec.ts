@@ -1,5 +1,5 @@
 // Guards that the server-side formatter (server/lib/format.ts) stays byte-identical
-// to the app-side twin (app/lib/format.ts). The app<->server import boundary forbids
+// to the app-side twin (packages/field-ui/src/shared/format.ts). The app<->server import boundary forbids
 // sharing one module, so this parity test is the executable coupling that fails the
 // build if the two ever drift.
 import { describe, it, expect } from 'vitest';
