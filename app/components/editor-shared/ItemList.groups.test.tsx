@@ -2,7 +2,7 @@
 import { render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
 import { ItemList } from '~/components/editor-shared/ItemList';
-import type { EditorGroup } from '~/lib/editor/statutory-groups';
+import type { EditorGroup } from '@core/field-ui/shared/statutory-groups';
 
 /**
  * Items as a form-shaped template hands them over: a flat run whose only clue

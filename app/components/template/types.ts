@@ -2,7 +2,7 @@
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-import type { ItemChoice } from '../../../server/types/template-schema';
+import type { ItemChoice } from '@core/field-ui/shared/template-schema';
 
 export type PropertyType = 'single-family' | 'multi-unit' | 'commercial';
 
@@ -66,7 +66,7 @@ export interface TemplateItem {
   isSafety?: boolean;
   /** Prose remedy. No defaultEstimateMin / defaultEstimateMax beside it — the
    *  template write schema rejects a repair price (see
-   *  `server/types/template-schema.ts`). */
+   *  `packages/field-ui/src/shared/template-schema.ts`). */
   defaultRecommendation?: string;
   ratingOptions?: string[];
   tabs?: {

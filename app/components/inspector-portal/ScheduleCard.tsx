@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, Button, Modal } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { toLocalInputValue, fromLocalInputValue } from "~/lib/datetime-local";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";

@@ -12,12 +12,12 @@ import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { RECOMMENDATION_CATEGORY_IDS } from '../../lib/recommendation-categories';
 import { deleteRepairPriceKeys } from '../../lib/repair-price-keys';
-import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../../types/defect-fields';
+import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '@core/field-ui/shared/defect-fields.types';
 import { listUnresolved } from '../../lib/mustache';
 import type { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../../lib/validations/inspection.schema';
 import type { Severity } from '../../lib/validations/rating-system.schema';
-import type { DefectCommentState } from '../../types/inspection-item-state';
-import type { CannedDefect, TemplateSchemaV2 } from '../../types/template-schema';
+import type { DefectCommentState } from '@core/field-ui/shared/inspection-item-state';
+import type { CannedDefect, TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
 /**
  * An inspection's own frozen structure — the ONE way to read it.

@@ -2,7 +2,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
 import { ItemList } from '~/components/editor-shared/ItemList';
-import type { EditorGroup } from '~/lib/editor/statutory-groups';
+import type { EditorGroup } from '@core/field-ui/shared/statutory-groups';
 
 const items = [
   { id: 'a',   label: 'Sealed Roof Deck', type: 'boolean', parentId: null },

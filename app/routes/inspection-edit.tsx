@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import { INSPECTION_STATUS } from "~/lib/status";
 import { findRatingLevel, ratingAdvanceDecision } from "@core/field-ui/shared/rating-levels";
-import { makeCustomDefect } from "~/lib/custom-defects";
+import { makeCustomDefect } from "@core/field-ui/shared/custom-defects";
 import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/hooks/useInspection";
 import { findingKey } from "~/hooks/findings/shared";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
@@ -80,7 +80,7 @@ import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/Bread
 import { UnitsManager } from "~/components/editor/UnitsManager";
 import { CostItemsHost } from "~/components/editor/CostItemsHost";
 import type { ResultMap } from "~/hooks/useInspection";
-import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
+import type { PublishReadiness, PublishBlockingDefect } from "@core/field-ui/shared/types";
 import { Button, IconButton, SegmentedControl, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 

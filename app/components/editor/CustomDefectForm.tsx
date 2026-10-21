@@ -1,6 +1,6 @@
 import { Button } from "@core/shared-ui";
-import { BUILT_IN_DEFECT_CATEGORIES, type CustomDefectCategory } from "../../lib/custom-defects";
-import { DEFECT_TRADE_OPTIONS, type DefectTrade } from "../../lib/defect-fields";
+import { BUILT_IN_DEFECT_CATEGORIES, type CustomDefectCategory } from "@core/field-ui/shared/custom-defects";
+import { DEFECT_TRADE_OPTIONS, type DefectTrade } from "@core/field-ui/shared/defect-fields";
 import { m } from "~/paraglide/messages";
 
 export interface CustomDefectFormProps {

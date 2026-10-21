@@ -7,7 +7,7 @@
  * Videos carry `mediaType: 'video'` + a Cloudflare Stream `streamUid` (Stream
  * owns the bytes; there is no R2 object, so `key` is '').
  */
-import type { MediaEntry } from '../../types/inspection-item-state';
+import type { MediaEntry } from './inspection-item-state';
 
 /**
  * Resolve a media entry's type. Anything that is not explicitly 'video'

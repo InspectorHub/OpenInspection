@@ -33,7 +33,7 @@
  * A fact left in this set after it becomes per-inspection produces a gate that
  * blocks work nobody can unblock yet.
  */
-import type { StatutoryInspectionField } from '../../types/statutory-declaration';
+import type { StatutoryInspectionField } from '@core/field-ui/shared/statutory-declaration';
 
 /**
  * Facts read from the workspace or the inspector's own profile, never from the

@@ -1,7 +1,7 @@
 import { Form, useLoaderData, useNavigation, redirect } from "react-router";
 import type { Route } from "./+types/concierge-confirm-token";
 import { createApi } from "~/lib/api-client.server";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { ErrorState } from "~/components/ErrorState";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
 import { LazyViewerTimeZoneNotice } from "~/components/public/LazyViewerTimeZoneNotice";

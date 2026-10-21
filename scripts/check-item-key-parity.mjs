@@ -52,7 +52,7 @@ const DECLARED_SKIPS = {
         options:       'lives on the seven non-rich member schemas',
         type:          'the discriminator; declared per member',
     },
-    'app/lib/editor/structure-ops.ts': {},
+    'packages/field-ui/src/shared/structure-ops.ts': {},
     'app/lib/editor/serialize-template.ts': {},
     'app/components/template/types.ts': {},
     'app/components/form/FormField.tsx': {
@@ -110,7 +110,7 @@ function directMembers(src, opener) {
 
 /** Keys of the authority interface, in declaration order. */
 function authorityKeys() {
-    return directMembers(read('server/types/template-schema.ts'), 'export interface TemplateItem {');
+    return directMembers(read('packages/field-ui/src/shared/template-schema.ts'), 'export interface TemplateItem {');
 }
 
 const MIRRORS = [
@@ -119,9 +119,9 @@ const MIRRORS = [
         keys: () => directMembers(read('server/lib/validations/template.schema.ts'), 'const BaseItemFields = {'),
     },
     {
-        file: 'app/lib/editor/structure-ops.ts',
+        file: 'packages/field-ui/src/shared/structure-ops.ts',
         keys: () => {
-            const src = read('app/lib/editor/structure-ops.ts');
+            const src = read('packages/field-ui/src/shared/structure-ops.ts');
             const body = /const ITEM_KEYS = new Set<string>\(\[([\s\S]*?)\]\);/.exec(src)?.[1] ?? '';
             return [...body.matchAll(/'([A-Za-z][A-Za-z0-9]*)'/g)].map((m) => m[1]);
         },

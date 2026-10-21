@@ -4,7 +4,7 @@ import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Banner, Select } from "@core/shared-ui";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { propertyGroupKey, inspectionDateValue } from "~/lib/property-groups";
 import { agentMayReadRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";

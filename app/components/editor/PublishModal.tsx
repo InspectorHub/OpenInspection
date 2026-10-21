@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Modal, Button, Banner, buttonClasses, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
-import { formatShapedDateTime } from "~/lib/format-date";
+import { formatShapedDateTime } from "@core/field-ui/shared/format-date";
 import { useSessionContext, useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
 
 /**

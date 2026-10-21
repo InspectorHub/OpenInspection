@@ -22,7 +22,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { StatutoryDetailsService } from '../../services/statutory/details.service';
 import { Errors } from '../../lib/errors';
 import * as schema from '../../lib/db/schema';
-import type { StatutoryFormDeclaration } from '../../types/template-schema';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/template-schema';
 
 /**
  * Every field optional and nullable, and NO `.default()` anywhere.

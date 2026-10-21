@@ -14,7 +14,7 @@ import type {
     ItemOptions,
     CannedInfoComment,
     CannedDefect,
-} from '../.././../server/types/template-schema';
+} from './template-schema';
 import {
     subtreeOf, deleteSubtree, duplicateSubtree, moveSubtreeAmongSiblings,
     reorderSubtree, remapParentIds,

@@ -18,7 +18,7 @@ import { CredentialService } from '../credential.service';
 import { itemResultsFor } from '../../lib/statutory/item-results';
 import { calendarDayForForm } from '../../lib/statutory/value-parts';
 import { decodeSignatureDataUri, type SignatureImage } from '../../lib/statutory/signature-image';
-import type { StatutoryFormDeclaration } from '../../types/template-schema';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/template-schema';
 import type { StatutoryInspectionFacts } from '../../lib/statutory/values';
 import type { StatutoryItemResult } from '../../lib/statutory/resolve-source';
 

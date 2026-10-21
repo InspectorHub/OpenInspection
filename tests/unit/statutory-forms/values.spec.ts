@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { collectStatutoryValues } from '../../../server/lib/statutory/values';
-import type { FieldGroup, StatutoryFormDeclaration, TemplateSchemaV2 } from '../../../server/types/template-schema';
+import type { FieldGroup, StatutoryFormDeclaration, TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
 const SNAPSHOT = {
     schemaVersion: 2,

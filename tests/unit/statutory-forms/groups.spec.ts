@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { FieldGroup } from '../../../server/types/template-schema';
+import type { FieldGroup } from '@core/field-ui/shared/template-schema';
 import {
     validateGroups, groupFieldName, expectedGroupFields, refuseOverCapacity,
 } from '../../../server/lib/statutory/groups';

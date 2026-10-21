@@ -3,8 +3,8 @@ import {
     deriveEditorGroups,
     formBoundItemIds,
     declaresStatutoryForm,
-} from '~/lib/editor/statutory-groups';
-import type { StatutoryFormDeclaration } from '../../../server/types/template-schema';
+} from './statutory-groups';
+import type { StatutoryFormDeclaration } from './template-schema';
 
 /**
  * A declaration shaped like the Citizens four-point form: two printed panel

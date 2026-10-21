@@ -4,7 +4,7 @@ import {
     DEFAULT_DISPLAY_PREFS,
     type DateFormat,
     type TimeFormat,
-} from '../../server/lib/session/display-prefs';
+} from './display-prefs';
 
 /**
  * The three axes this formatter needs, all supplied by the caller.

@@ -21,13 +21,13 @@ import {
     DEFECT_TRADE_LABELS,
     DEFECT_DEADLINE_LABELS,
     DEFECT_TIMEFRAME_LABELS,
-} from '../../server/types/defect-fields';
+} from './defect-fields.types';
 
 export type {
     DefectTrade,
     DefectDeadline,
     DefectTimeframe,
-} from '../../server/types/defect-fields';
+} from './defect-fields.types';
 
 export { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS };
 

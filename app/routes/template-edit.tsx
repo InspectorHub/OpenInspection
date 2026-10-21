@@ -20,7 +20,7 @@ import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { ItemList } from "~/components/editor-shared/ItemList";
 import { TemplatePropertyTypePanel } from "~/components/template/TemplatePropertyTypePanel";
 import { serializeTemplateMeta, serializeSectionMeta } from "~/lib/editor/template-meta";
-import * as ops from "~/lib/editor/structure-ops";
+import * as ops from "@core/field-ui/shared/structure-ops";
 import { serializeItemForSave } from "~/lib/editor/serialize-template";
 import type { PropertyType } from "~/components/template/types";
 import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";

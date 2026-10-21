@@ -3,7 +3,7 @@ import {
     DEFECT_TRADES, DEFECT_DEADLINES, DEFECT_TIMEFRAMES,
     isDefectTrade, isDefectDeadline, isDefectTimeframe,
     DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS,
-} from '../../../server/types/defect-fields';
+} from '@core/field-ui/shared/defect-fields.types';
 
 describe('defect-fields vocabularies', () => {
     it('exports 20 trades, 6 deadlines, 6 timeframes', () => {

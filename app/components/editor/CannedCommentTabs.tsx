@@ -9,9 +9,9 @@ import {
   DEFECT_TRADE_LABELS,
   DEFECT_DEADLINE_LABELS,
   DEFECT_TIMEFRAME_LABELS,
-} from "../../lib/defect-fields";
-import type { CustomDefect, CustomDefectCategory } from "../../lib/custom-defects";
-import type { DefectTrade } from "../../lib/defect-fields";
+} from "@core/field-ui/shared/defect-fields";
+import type { CustomDefect, CustomDefectCategory } from "@core/field-ui/shared/custom-defects";
+import type { DefectTrade } from "@core/field-ui/shared/defect-fields";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */

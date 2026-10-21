@@ -1,5 +1,5 @@
 import { Icon, Button, Modal } from '@core/shared-ui';
-import type { PublishReadiness, PublishBlockingDefect } from '../../lib/types';
+import type { PublishReadiness, PublishBlockingDefect } from '@core/field-ui/shared/types';
 import { m } from '~/paraglide/messages';
 
 export interface PublishGateModalProps {

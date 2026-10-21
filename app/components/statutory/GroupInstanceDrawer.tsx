@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Drawer, Input, Banner } from "@core/shared-ui";
-import type { EditorGroup } from "~/lib/editor/statutory-groups";
+import type { EditorGroup } from "@core/field-ui/shared/statutory-groups";
 import { m } from "~/paraglide/messages";
 
 /**

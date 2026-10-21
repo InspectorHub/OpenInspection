@@ -32,7 +32,7 @@
 import type {
     TemplateSchemaV2, TemplateSection, TemplateItem,
     CannedInfoComment, CannedDefect,
-} from '../../../types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 import {
     DEFAULT_IMPORTED_DEFECT_CATEGORY,
     DEFAULT_IMPORTED_RATING_OPTIONS,

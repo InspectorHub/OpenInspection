@@ -68,7 +68,7 @@ export function findI18nViolations(source, filename) {
       out.push(
         `${filename}:${i + 1} formats a date with no locale, so it reads the ` +
           `BROWSER's locale and timezone rather than the tenant's or the user's ` +
-          `(#270); use app/lib/format-date.ts (formatShapedDate / ` +
+          `(#270); use @core/field-ui/shared/format-date (formatShapedDate / ` +
           `formatShapedDateTime / formatInspectionDateTime) with a resolved ` +
           `locale, zone and shape, or annotate '// i18n-lint-ok: <reason>'`,
       );
@@ -82,8 +82,6 @@ export function findI18nViolations(source, filename) {
 // design), and tz.ts (Intl.DateTimeFormat('en-US') is offset math, not content).
 const SCOPE = ['app', 'server'];
 const EXCLUDE = [
-  'app/lib/format.ts',
-  'app/lib/format-date.ts',
   'server/lib/format.ts',
   'server/lib/tz.ts',
   'app/lib/timezones.ts',

@@ -21,7 +21,7 @@ import { applyMigrations as replayMigrations } from './migration-replay';
 import { unsuppliableRequiredFields } from '../../server/services/statutory/install-gaps';
 import { fieldMap as trecMap } from '../../server/lib/statutory/forms/tx-trec-rei-7-6';
 import trecTemplate from '../../server/data/seed-templates/trec-rei-7-6.json';
-import type { StatutoryFormDeclaration } from '../../server/types/template-schema';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/template-schema';
 
 const b = env as unknown as { DB: D1Database };
 const migrationSql = import.meta.glob('../../migrations/*.sql', {

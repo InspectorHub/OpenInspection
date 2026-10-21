@@ -13,7 +13,7 @@ import { inspectorSignature } from '../lib/inspector-signature';
 import { r2Keys } from '../lib/r2-keys';
 import { isValidTimeZone } from '../lib/tz';
 import { isValidLocale } from '../lib/locale';
-import { DATE_FORMATS, TIME_FORMATS } from '../lib/session/display-prefs';
+import { DATE_FORMATS, TIME_FORMATS } from '@core/field-ui/shared/display-prefs';
 import { getDrizzle } from '../lib/route-helpers';
 import { r2Put } from '../lib/r2/objects';
 import { FL_1802_QUALIFICATION_CATEGORIES } from '../lib/statutory/qualification-categories';

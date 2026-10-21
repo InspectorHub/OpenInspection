@@ -22,7 +22,7 @@ import { gatedSectionRegistry } from '../../lib/pca-section-registry';
 import { buildReportOutline } from '../../lib/report-outline';
 import { resolveProfile } from '../../lib/report-style/resolve';
 import type { Deviation } from '../../lib/pca-deviations';
-import type { DefectCommentState } from '../../types/inspection-item-state';
+import type { DefectCommentState } from '@core/field-ui/shared/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, requireTemplateSnapshot } from './shared';
 import { RECOMMENDATION_CATEGORY_LABELS } from '../../lib/recommendation-categories';
 import { reportContentHash, resolveRenderedReportId, resolveResultsRow, type TranslationIdentity } from './report-grain';

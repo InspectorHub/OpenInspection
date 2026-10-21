@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
-import type { InspectionDateTimeFormat } from "~/lib/format-date";
+import type { InspectionDateTimeFormat } from "@core/field-ui/shared/format-date";
 import { m } from "~/paraglide/messages";
 
 // IA-64 — the read side of change traceability. Templates and comments are

@@ -3,7 +3,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PublishGateModal } from './PublishGateModal';
-import type { PublishReadiness } from '../../lib/types';
+import type { PublishReadiness } from '@core/field-ui/shared/types';
 
 const defect = {
   sectionTitle: 'Roof', itemLabel: 'Flashing', cannedTitle: 'Loose flashing',

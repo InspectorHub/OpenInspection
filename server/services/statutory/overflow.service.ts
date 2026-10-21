@@ -27,7 +27,7 @@
  */
 import { and, eq } from 'drizzle-orm';
 import { statutoryFormEntries } from '../../lib/db/schema';
-import type { FieldGroup } from '../../types/template-schema';
+import type { FieldGroup } from '@core/field-ui/shared/template-schema';
 import type { StatutoryGroupInstances } from '../../lib/statutory/values';
 
 /**

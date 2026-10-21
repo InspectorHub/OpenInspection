@@ -1,4 +1,4 @@
-import type { ItemChoice } from "../../server/types/template-schema";
+import type { ItemChoice } from "./template-schema";
 
 export interface PublishBlockingDefect {
     sectionId:    string;

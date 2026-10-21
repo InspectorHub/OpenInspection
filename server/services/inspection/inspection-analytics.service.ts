@@ -4,7 +4,7 @@ import { contacts } from '../../lib/db/schema/contact';
 import { parseFindingKey } from '@core/field-ui/shared/finding-key';
 import { getEffectivePriceCents } from '../../lib/effective-price';
 import { RECOMMENDATION_CATEGORY_LABELS } from '../../lib/recommendation-categories';
-import { DEFECT_TRADE_LABELS, isDefectTrade } from '../../types/defect-fields';
+import { DEFECT_TRADE_LABELS, isDefectTrade } from '@core/field-ui/shared/defect-fields.types';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../../lib/status/report-status';
 import { visibleInspectionsCondition, type InspectionScope } from '../../lib/inspection/visibility';

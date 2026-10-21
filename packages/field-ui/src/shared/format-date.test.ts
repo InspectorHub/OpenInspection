@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatInspectionDateTime } from '~/lib/format-date';
+import { formatInspectionDateTime } from './format-date';
 
 /** Today's rendering: US order, 12-hour clock, English. */
 const EN_US = { locale: 'en-US' as const };

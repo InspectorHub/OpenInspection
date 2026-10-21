@@ -1,5 +1,5 @@
-import { DATE_FORMATS, TIME_FORMATS } from "../../server/lib/session/display-prefs";
-import { formatShapedDate } from "./format-date";
+import { DATE_FORMATS, TIME_FORMATS } from "@core/field-ui/shared/display-prefs";
+import { formatShapedDate } from "@core/field-ui/shared/format-date";
 import { formatTime } from "@core/field-ui/shared/format";
 
 /**

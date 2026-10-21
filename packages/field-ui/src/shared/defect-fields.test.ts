@@ -6,7 +6,7 @@ import {
     DEFECT_TRADE_LABELS,
     DEFECT_DEADLINE_LABELS,
     DEFECT_TIMEFRAME_LABELS,
-} from '../../server/types/defect-fields';
+} from './defect-fields.types';
 import {
     DEFECT_TRADE_OPTIONS,
     DEFECT_DEADLINE_OPTIONS,

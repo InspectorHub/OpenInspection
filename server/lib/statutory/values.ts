@@ -85,7 +85,7 @@ import type {
     FieldGroup,
     StatutoryFormDeclaration,
     TemplateSchemaV2,
-} from '../../types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 import {
     applyDependencies, refuseConditionalOverflowDestination, refuseUnusableDependencies,
 } from './applicability';

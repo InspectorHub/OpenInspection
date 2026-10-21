@@ -14,7 +14,7 @@
  *  follow-up if the embedded approach proves limiting.)
  */
 import type { DefectCategory } from './template-schema';
-import type { DefectTrade, DefectDeadline, DefectTimeframe } from './defect-fields';
+import type { DefectTrade, DefectDeadline, DefectTimeframe } from './defect-fields.types';
 
 /**
  * Plan 7 — unified media entry (photo OR video). A missing `mediaType`

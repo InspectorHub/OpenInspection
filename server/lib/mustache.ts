@@ -8,8 +8,8 @@
  * their literal `{{key}}` token so the publish-readiness gate can detect
  * them via {@link listUnresolved}.
  *
- * Mirrored verbatim at `app/lib/mustache.ts` so the live preview
- * and PDF pipeline produce identical output.
+ * Mirrored verbatim at `packages/field-ui/src/shared/mustache.ts` so the live
+ * preview and PDF pipeline produce identical output.
  */
 
 const TOKEN_RE = /\{\{\s*([a-zA-Z][a-zA-Z0-9_-]*)\s*\}\}/g;

@@ -1,5 +1,5 @@
 import { GroupInstanceDrawer } from "./GroupInstanceDrawer";
-import type { EditorGroup } from "~/lib/editor/statutory-groups";
+import type { EditorGroup } from "@core/field-ui/shared/statutory-groups";
 
 /**
  * The drawer that records one more instance of a repeated block than the form

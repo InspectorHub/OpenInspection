@@ -25,7 +25,7 @@
  * tell him what to do next. The second refusal adds the box that was tried,
  * because otherwise he has no way to know one was.
  */
-import type { FieldGroup } from '../../types/template-schema';
+import type { FieldGroup } from '@core/field-ui/shared/template-schema';
 
 function fail(reason: string): never {
     throw new Error(`statutory group: ${reason}`);

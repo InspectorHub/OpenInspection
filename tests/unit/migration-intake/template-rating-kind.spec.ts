@@ -27,7 +27,7 @@ import { defaultMappingFor } from '../../../server/lib/migration-intake/adapters
 import { intakeSourceFromBytes } from '../../../server/lib/migration-intake/adapters/source';
 import { parseMigrationBundle } from '../../../server/lib/validations/migration-bundle.schema';
 import { zipOf } from '../helpers/zip-fixture';
-import type { TemplateItem } from '../../../server/types/template-schema';
+import type { TemplateItem } from '@core/field-ui/shared/template-schema';
 
 const TPL = `<?xml version="1.0" encoding="UTF-8"?>
 <java version="10.0.2" class="java.beans.XMLDecoder">

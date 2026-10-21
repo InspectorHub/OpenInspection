@@ -8,7 +8,7 @@
 import { ROLE, ROLES, type Role } from '../auth/roles';
 import { ROLE_KINDS } from '../people/role-kinds';
 import type { PermissionOverrides } from '../auth/capabilities';
-import type { TemplateSchemaV2 } from '../../types/template-schema';
+import type { TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
 export const MIGRATION_ENTITY_KINDS = ['template', 'contact', 'member'] as const;
 export type EntityKind = typeof MIGRATION_ENTITY_KINDS[number];

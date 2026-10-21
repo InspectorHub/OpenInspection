@@ -18,7 +18,7 @@ import type {
     StatutoryValueSource,
     TemplateSchemaV2,
     TemplateItem,
-} from '../../types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 import type { StatutoryValue } from './field-map';
 import { composeItemComments } from './item-comments';
 import type { ItemCommentStates, ItemCommentTabs } from './item-comments';

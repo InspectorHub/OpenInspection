@@ -16,7 +16,7 @@ import { hasCycle, itemDepths, MAX_ITEM_DEPTH } from '@core/field-ui/shared/temp
 
 // Widened (Authoring unification Plan-4 module K): CannedDefect.category
 // references a tenant defect_categories.id (or a legacy seed name) rather
-// than a hard-coded 3-value enum — see server/types/template-schema.ts.
+// than a hard-coded 3-value enum — see packages/field-ui/src/shared/template-schema.ts.
 const DefectCategorySchema = z.string().min(1);
 
 /** The canonical property-type vocabulary. Exported because the marketplace
@@ -77,7 +77,7 @@ const ItemOptionsSchema = z.object({
  * the stored answer to a mapping's `whenValue` byte for byte, so a label that
  * reached the results would print a blank official document. Widening `choices`
  * rather than adding a parallel `choiceLabels` map is what keeps the two from
- * being able to disagree — see `ItemChoice` in `server/types/template-schema.ts`.
+ * being able to disagree — see `ItemChoice` in `packages/field-ui/src/shared/template-schema.ts`.
  *
  * `.strict()` on the object half so a caller sending `{ value, title }` is
  * refused by name rather than having the label silently dropped, which would

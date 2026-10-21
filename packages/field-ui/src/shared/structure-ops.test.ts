@@ -13,8 +13,8 @@ import {
     duplicateItem,
     deleteItem,
     moveItem,
-} from '~/lib/editor/structure-ops';
-import type { ItemType } from '~/lib/editor/structure-ops';
+} from './structure-ops';
+import type { ItemType } from './structure-ops';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers

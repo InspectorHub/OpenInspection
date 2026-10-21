@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { refuseIndexInsidePrintedRange } from '../../../server/services/statutory/overflow.service';
-import type { FieldGroup } from '../../../server/types/template-schema';
+import type { FieldGroup } from '@core/field-ui/shared/template-schema';
 
 /**
  * Which instances may be recorded in the overflow store, and which may not.

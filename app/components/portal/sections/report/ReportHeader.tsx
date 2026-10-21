@@ -20,7 +20,7 @@
  */
 import { m } from "~/paraglide/messages";
 import { brandFormat, type TenantBrand } from "~/lib/brand";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { CredentialBadges, type CredentialItem } from "./CredentialBadges";
 import { REPORT_HEADING_STYLE } from "./types";
 

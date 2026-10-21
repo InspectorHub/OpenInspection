@@ -11,7 +11,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
-import type { ItemAttribute } from "../../lib/types";
+import type { ItemAttribute } from "@core/field-ui/shared/types";
 
 /** Three of the thirteen hazard boxes the Citizens four-point form prints. */
 const HAZARDS: ItemAttribute = {

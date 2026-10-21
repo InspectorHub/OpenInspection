@@ -2,7 +2,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { GroupInstanceDrawer } from '~/components/statutory/GroupInstanceDrawer';
-import type { EditorGroup } from '~/lib/editor/statutory-groups';
+import type { EditorGroup } from '@core/field-ui/shared/statutory-groups';
 
 const GROUP: EditorGroup = {
     id: 'electrical_panel',

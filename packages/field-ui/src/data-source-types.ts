@@ -232,7 +232,7 @@ export interface PropertyMetaField {
 /** The loader returns the `commercial:<subtype>`-keyed subset of METADATA_PRESETS. */
 export type CommercialPresets = Record<string, PropertyMetaField[]>;
 
-/** Source today: `AutoAdvanceMode` in app/lib/rating-levels.ts. Replaced by Task 3. */
+/** Duplicate of `AutoAdvanceMode` in `shared/rating-levels.ts`; collapsing the two is a later task. */
 export type AutoAdvanceMode = 'always' | 'keyboard' | 'off';
 
 /** Source today: `ReportLinkTtl` in server/lib/report-link-ttl.ts. Replaced by Task 3. */

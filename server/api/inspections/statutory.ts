@@ -65,7 +65,7 @@ import { statutoryNoticeFor, formatEffectiveDate } from '../../lib/statutory/dis
 import { Errors } from '../../lib/errors';
 import { refusalToUser } from '../../lib/statutory/refusal-to-user';
 import * as schema from '../../lib/db/schema';
-import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
+import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 import { resolveProducibleStatutoryForm } from '../../services/statutory/producible';
 import { watermarkAsPreview } from '../../lib/statutory/preview-watermark';
 import { statutoryCoverageFor } from '../../services/statutory/coverage';

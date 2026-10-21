@@ -1,6 +1,6 @@
 import { formatPriceCents, type WizardStepId } from "~/lib/wizard-steps";
 import type { NewInspectionSummary } from "~/lib/wizard-review";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 

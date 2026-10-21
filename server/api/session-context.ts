@@ -13,7 +13,7 @@ import {
     isTimeFormat,
     type DateFormat,
     type TimeFormat,
-} from '../lib/session/display-prefs';
+} from '@core/field-ui/shared/display-prefs';
 import { Errors } from '../lib/errors';
 import { sessionMarker } from '../lib/session-marker';
 import { logger } from '../lib/logger';

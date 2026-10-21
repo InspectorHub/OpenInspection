@@ -19,7 +19,7 @@
  * day somebody rebinds it as a literal the refusal is exactly right. Narrowing
  * the pattern to exempt the name would trade a live check for a spelling.
  */
-import type { StatutoryFormDeclaration } from '../../types/template-schema';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/template-schema';
 
 /**
  * Field-name shapes that name a person rather than a property.

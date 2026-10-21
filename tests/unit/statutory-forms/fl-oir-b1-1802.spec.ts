@@ -13,7 +13,7 @@ import type {
     StatutoryFieldDependencies,
     StatutoryFormDeclaration,
     StatutoryValueSource,
-} from '../../../server/types/statutory-declaration';
+} from '@core/field-ui/shared/statutory-declaration';
 
 /**
  * Florida OIR-B1-1802 Rev. 04/26.

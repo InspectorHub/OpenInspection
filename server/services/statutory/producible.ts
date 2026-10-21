@@ -36,7 +36,7 @@ import { logger } from '../../lib/logger';
 import * as schema from '../../lib/db/schema';
 import { StatutoryOverflowService } from './overflow.service';
 import { gatherStatutoryInputs } from './statutory-inputs';
-import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
+import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 import type { StatutoryInputs } from './statutory-inputs';
 import type { StatutoryGroupInstances } from '../../lib/statutory/values';
 

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { DateFormat, TimeFormat } from "../../server/lib/session/display-prefs";
+import type { DateFormat, TimeFormat } from "@core/field-ui/shared/display-prefs";
 
 /**
  * A-10 — tenant brand shared by every public surface (profile / booking /

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PLATFORM_SUBTYPES, METADATA_PRESETS, getSubtypeDef, getMetadataPreset, normalizePropertyType } from '@core/field-ui/shared/commercial-subtypes';
 import { sectionApplies, getApplicableSections } from '../../../server/lib/section-applicability';
-import type { TemplateSection } from '../../../server/types/template-schema';
+import type { TemplateSection } from '@core/field-ui/shared/template-schema';
 
 describe('PLATFORM_SUBTYPES', () => {
     it('has 6 entries', () => {

@@ -18,7 +18,7 @@ import { InvoiceService } from '../invoice.service';
 import { PeopleService } from '../people.service';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import type { AgreementService } from '../agreement.service';
-import type { TemplateSchemaV2 } from '../../types/template-schema';
+import type { TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 import {
     fireAutomation,
     resolvePublishTrigger,

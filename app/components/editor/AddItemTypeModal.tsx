@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Modal, Button } from "@core/shared-ui";
-import type { ItemType } from "~/lib/editor/structure-ops";
+import type { ItemType } from "@core/field-ui/shared/structure-ops";
 import { m } from "~/paraglide/messages";
 
 export interface AddItemTypeModalProps {

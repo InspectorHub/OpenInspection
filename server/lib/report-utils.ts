@@ -3,7 +3,7 @@
  * Supports both dynamic rating levels and legacy 3-level format.
  */
 import { findingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
-import { DEFECT_TRADE_LABELS, isDefectTrade } from '../types/defect-fields';
+import { DEFECT_TRADE_LABELS, isDefectTrade } from '@core/field-ui/shared/defect-fields.types';
 
 export interface RatingLevel {
   id: string;

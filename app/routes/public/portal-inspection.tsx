@@ -27,7 +27,7 @@ import type { Route } from "./+types/portal-inspection";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandFormat, EMPTY_BRAND } from "~/lib/brand";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import ClientPortalHub, {
   hubSectionNavHref,
   type HubSection,

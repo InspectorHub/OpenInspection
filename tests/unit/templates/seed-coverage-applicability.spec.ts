@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getApplicableSections } from '../../../server/lib/section-applicability';
 import { SYSTEM_COVERAGE } from '../../../server/lib/system-coverage';
-import type { TemplateSection } from '../../../server/types/template-schema';
+import type { TemplateSection } from '@core/field-ui/shared/template-schema';
 
 function loadSeed(name: string): TemplateSection[] {
   const raw = JSON.parse(readFileSync(join(__dirname, '../../../server/data/seed-templates', name), 'utf8'));

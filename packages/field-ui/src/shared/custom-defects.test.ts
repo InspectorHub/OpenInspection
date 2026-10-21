@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterCannedEntries, makeCustomDefect, deriveDefectTitle, appendCustomDefect } from '~/lib/custom-defects';
+import { filterCannedEntries, makeCustomDefect, deriveDefectTitle, appendCustomDefect } from './custom-defects';
 
 /**
  * B-20 — the Defects tab offered only the template's canned list: no search,

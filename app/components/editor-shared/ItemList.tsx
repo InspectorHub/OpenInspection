@@ -4,7 +4,7 @@ import type { EditorMode } from "./editor-mode";
 import { useSortableReorder } from "./useSortableReorder";
 import { InlineRename } from "./InlineRename";
 import { findingKey } from "~/hooks/findings/shared";
-import type { EditorGroup } from "~/lib/editor/statutory-groups";
+import type { EditorGroup } from "@core/field-ui/shared/statutory-groups";
 import { m } from "~/paraglide/messages";
 import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "@core/field-ui/shared/template-hierarchy";
 import { useItemRowMenu } from "~/hooks/useItemRowMenu";

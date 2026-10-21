@@ -1,5 +1,5 @@
 import { z } from '@hono/zod-openapi';
-import { DATE_FORMATS, TIME_FORMATS } from '../session/display-prefs';
+import { DATE_FORMATS, TIME_FORMATS } from '@core/field-ui/shared/display-prefs';
 import { resolvedCapabilitySchema } from './admin/compliance';
 
 /**

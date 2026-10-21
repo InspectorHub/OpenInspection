@@ -4,7 +4,7 @@ import {
     deriveEditorGroups,
     formBoundItemIds,
     type EditorGroup,
-} from "~/lib/editor/statutory-groups";
+} from "@core/field-ui/shared/statutory-groups";
 import { formCompleteness, type FormCompleteness } from "~/lib/editor/form-completeness";
 
 /**

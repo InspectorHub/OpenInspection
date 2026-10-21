@@ -4,8 +4,8 @@ import { findingKey } from "~/hooks/findings/shared";
 import {
   addSection, duplicateSection, deleteSection, moveSection, reorderSection, renameSection,
   addItem, duplicateItem, deleteItem, moveItem, renameItem,
-} from "~/lib/editor/structure-ops";
-import type { Snapshot, ItemType } from "~/lib/editor/structure-ops";
+} from "@core/field-ui/shared/structure-ops";
+import type { Snapshot, ItemType } from "@core/field-ui/shared/structure-ops";
 import { subtreeOf } from "@core/field-ui/shared/template-hierarchy";
 import { m } from "~/paraglide/messages";
 

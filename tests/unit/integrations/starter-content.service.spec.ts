@@ -16,7 +16,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { seedStarterContent } from '../../../server/services/starter-content.service';
 import { CONTRACTOR_TYPES } from '../../../server/services/starter-content/fixtures/contractor-types';
-import { DEFECT_TRADES } from '../../../server/types/defect-fields';
+import { DEFECT_TRADES } from '@core/field-ui/shared/defect-fields.types';
 
 describe('seedStarterContent', () => {
     let testDb: BetterSQLite3Database<typeof schema>;

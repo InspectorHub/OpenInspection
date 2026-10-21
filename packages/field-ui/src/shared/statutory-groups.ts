@@ -25,7 +25,7 @@
 import type {
     FieldGroup,
     StatutoryFormDeclaration,
-} from '../../../server/types/template-schema';
+} from './template-schema';
 
 /** One slot the authority's page actually prints. */
 interface EditorGroupSlot {

@@ -25,7 +25,7 @@
  * `typeof c === 'string' ? c : c.value` written out by hand is a place where
  * somebody eventually writes `.label`, and it reads as correct.
  */
-import type { ItemChoice } from '../types/template-schema';
+import type { ItemChoice } from './template-schema';
 
 /** The token stored in the results and matched against a form's `whenValue`. */
 export function choiceValue(choice: ItemChoice): string {

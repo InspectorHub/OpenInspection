@@ -4,7 +4,7 @@ import type { ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { useCapability, useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import {
   deleteFacts,
