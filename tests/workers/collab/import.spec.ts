@@ -20,7 +20,7 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as decoding from 'lib0/decoding';
 import * as encoding from 'lib0/encoding';
 import { INSPECTION_RESULTS_TEST_DDL } from '../../helpers/inline-ddl';
-import { seedResultsDoc, applyItemPatch, projectResults } from '../../../server/lib/collab/results-doc';
+import { seedResultsDoc, applyItemPatch, projectResults } from '@core/field-ui/shared/results-doc';
 import { MAX_IMPORT_BYTES, trialApply } from '../../../server/durable-objects/inspection-doc-import';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
 import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';

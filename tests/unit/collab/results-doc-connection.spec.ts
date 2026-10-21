@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * Unit tests for app/lib/collab/results-doc-connection.ts
+ * Unit tests for packages/field-ui/src/collab/results-doc-connection.ts
  *
  * Uses fake-indexeddb (imported below, not via a global setup file — that loaded
  * the polyfill for all 561 specs to serve three) and a minimal WebSocket stub to
@@ -20,11 +20,11 @@ import {
     connectResultsDoc,
     deleteResultsDb,
     reconnectDelayMs,
-} from '../../../app/lib/collab/results-doc-connection';
+} from '@core/field-ui/collab/results-doc-connection';
 import {
     seedResultsDoc,
     applyItemPatch,
-} from '../../../server/lib/collab/results-doc';
+} from '@core/field-ui/shared/results-doc';
 
 // ─── Frame helpers (ported from collab-multiclient.spec.ts) ──────────────────
 

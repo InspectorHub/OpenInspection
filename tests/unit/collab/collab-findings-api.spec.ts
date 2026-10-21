@@ -1,12 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
-import { seedResultsDoc, projectResults } from '../../../server/lib/collab/results-doc';
+import { seedResultsDoc, projectResults } from '@core/field-ui/shared/results-doc';
 import { findingKey } from '@core/field-ui/shared/finding-key';
-import { readResultMap, type ResultMap } from '../../../app/lib/collab/results-binding';
+import { readResultMap, type ResultMap } from '@core/field-ui/collab/results-binding';
 import {
     buildCollabFindingsApi,
     type CollabFindingsDeps,
-} from '../../../app/lib/collab/collab-findings-api';
+} from '@core/field-ui/collab/collab-findings-api';
 
 // ─── Harness ───────────────────────────────────────────────────────────────────
 

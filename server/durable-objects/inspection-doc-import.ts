@@ -10,7 +10,7 @@
 
 import * as Y from 'yjs';
 import { logger } from '../lib/logger';
-import { replacePhotoByPendingId } from '../lib/collab/results-doc';
+import { replacePhotoByPendingId } from '@core/field-ui/shared/results-doc';
 import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 
 /**

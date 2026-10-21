@@ -19,7 +19,7 @@
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 import * as Y from 'yjs';
-import { applyItemPatch, seedResultsDoc } from '../../server/lib/collab/results-doc';
+import { applyItemPatch, seedResultsDoc } from '@core/field-ui/shared/results-doc';
 import { buildPackage } from '../unit/helpers/offline-package-fixture';
 import { csrfHeaders } from './helpers/csrf';
 

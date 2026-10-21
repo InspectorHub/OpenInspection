@@ -24,7 +24,7 @@ import {
     projectResults,
     appendPhoto,
     upsertCanned,
-} from '../../server/lib/collab/results-doc';
+} from '@core/field-ui/shared/results-doc';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
 import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 

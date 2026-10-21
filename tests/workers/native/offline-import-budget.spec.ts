@@ -18,7 +18,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import * as Y from 'yjs';
 import app from '../../../server/index';
 import { NATIVE_SCOPE, type NativeProps } from '../../../server/lib/auth/native-token';
-import { seedResultsDoc, pushPendingPhoto } from '../../../server/lib/collab/results-doc';
+import { seedResultsDoc, pushPendingPhoto } from '@core/field-ui/shared/results-doc';
 import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 import { DEFAULT_IMPORT_LIMITS } from '@core/offline-package';
 import { estimateSubrequests } from '../../../server/lib/native/import-limits';

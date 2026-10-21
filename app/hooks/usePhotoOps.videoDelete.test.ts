@@ -12,7 +12,7 @@ const toasts = vi.hoisted(() => [] as Array<{ message: string; variant?: string 
 vi.mock("~/hooks/useToast", () => ({ pushToast: (t: { message: string; variant?: string }) => toasts.push(t) }));
 
 import * as Y from "yjs";
-import { seedResultsDoc, pushPendingPhoto, projectResults } from "../../server/lib/collab/results-doc";
+import { seedResultsDoc, pushPendingPhoto, projectResults } from "@core/field-ui/shared/results-doc";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 
 function makeCtx() {

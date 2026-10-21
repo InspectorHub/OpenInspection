@@ -11,7 +11,7 @@ import { reportVersions } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { RECOMMENDATION_CATEGORY_IDS } from '../../lib/recommendation-categories';
-import { deleteRepairPriceKeys } from '../../lib/repair-price-keys';
+import { deleteRepairPriceKeys } from '@core/field-ui/shared/repair-price-keys';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '@core/field-ui/shared/defect-fields.types';
 import { listUnresolved } from '../../lib/mustache';
 import type { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../../lib/validations/inspection.schema';
@@ -166,7 +166,7 @@ export function resolveCoverUrl(
  *     unknown slugs are dropped (set to null) so an outdated client doesn't
  *     poison the JSON payload.
  *   - repair-price keys are removed outright, on the item entry and on every
- *     defect row, canned or custom (`server/lib/repair-price-keys.ts`).
+ *     defect row, canned or custom (`packages/field-ui/src/shared/repair-price-keys.ts`).
  *
  * The price keys are DELETED, not normalized. Normalizing one is the sanitizer
  * saying the key belongs here and only its value was wrong — the shape of an

@@ -18,7 +18,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import * as Y from 'yjs';
 import app from '../../../server/index';
 import { NATIVE_SCOPE, type NativeProps } from '../../../server/lib/auth/native-token';
-import { seedResultsDoc, applyItemPatch } from '../../../server/lib/collab/results-doc';
+import { seedResultsDoc, applyItemPatch } from '@core/field-ui/shared/results-doc';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
 import { applyMigrations } from '../migration-replay';
 import { buildPackage } from '../../unit/helpers/offline-package-fixture';

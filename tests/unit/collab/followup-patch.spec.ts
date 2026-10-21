@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
-import { loadResultsProjection, projectResults } from '../../../server/lib/collab/results-doc';
+import { loadResultsProjection, projectResults } from '@core/field-ui/shared/results-doc';
 import { applyFollowupPatch, resolveCarriedFindingKey } from '../../../server/lib/collab/followup-patch';
 import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 

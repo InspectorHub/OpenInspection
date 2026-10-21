@@ -21,7 +21,7 @@
  *
  * ⚠️ WHAT THIS DOES NOT REACH: every other device or browser profile that opened
  * the same inspection. There is no channel to them and no record of which ones
- * hold a copy. `app/lib/collab/offline-purge.ts` enumerates the limits.
+ * hold a copy. `packages/field-ui/src/collab/offline-purge.ts` enumerates the limits.
  *
  * Takes a list of ids so a caller that deletes several can queue them together.
  * The inspection page, which deletes exactly one, is the caller today; the list
@@ -29,7 +29,7 @@
  * the server confirmed.
  */
 import { useCallback, useEffect, useState } from "react";
-import { purgeInspectionOfflineData } from "~/lib/collab/offline-purge";
+import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
 
 /** The shape this hook reads off the page's delete fetcher. */
 export interface DeleteFetcherLike {

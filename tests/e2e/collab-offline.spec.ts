@@ -6,7 +6,7 @@
  * CRDT merge on reconnect. This is the online regression's complement — it
  * exercises the offline branches gated on `!navigator.onLine` and the
  * `window 'online'` / socket-close reconnect path in
- * `app/lib/collab/results-doc-connection.ts`.
+ * `packages/field-ui/src/collab/results-doc-connection.ts`.
  *
  * Scenario (two real clients = two browser contexts, both logged in, same
  * inspection editor, both synced):

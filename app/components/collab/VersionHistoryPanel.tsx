@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type * as Y from "yjs";
 import { Modal, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
-import { applyItemPatch } from "../../../server/lib/collab/results-doc";
+import { applyItemPatch } from "@core/field-ui/shared/results-doc";
 import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
 import { diffProjections, type FindingDiff, type ScalarField } from "@core/field-ui/shared/snapshot-diff";
 import { VersionCompare } from "~/components/collab/VersionCompare";

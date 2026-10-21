@@ -17,13 +17,13 @@ import {
   setPhotoCrop as bindingSetPhotoCrop,
   setPhotoAnnotation as bindingSetPhotoAnnotation,
   markPhotoPending as bindingMarkPhotoPending,
-} from "~/lib/collab/results-binding";
+} from "@core/field-ui/collab/results-binding";
 import { pushToast } from "~/hooks/useToast";
 import { freeVideoMedia, videoEntryIdentity } from "~/lib/video-media-delete";
 import { removeMediaBy as bindingRemoveMediaBy } from "../../server/lib/collab/results-doc-media";
 import { m } from "~/paraglide/messages";
-import { enqueueMedia } from "~/lib/collab/media-upload-queue";
-import { getPendingMedia } from "~/lib/collab/media-pending-store";
+import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
+import { getPendingMedia } from "@core/field-ui/collab/media-pending-store";
 import type { PhotoEntry } from "@core/field-ui/shared/results-doc.types";
 
 /** #181 PR-G — offline detection. The legacy app/lib/offline helper was removed

@@ -19,7 +19,7 @@ import {
   upsertRecommendation,
   loadResultsProjection,
   removeFindingKeys,
-} from '../../../server/lib/collab/results-doc';
+} from '@core/field-ui/shared/results-doc';
 import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 
 const FK = '_default:s1:i1';

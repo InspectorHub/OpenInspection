@@ -23,10 +23,10 @@ import {
     drainMediaQueue,
     type MediaUploader,
     type UploadResult,
-} from '~/lib/collab/media-upload-queue';
-import type { PendingMediaRecord } from '~/lib/collab/media-pending-store';
-import { resolvePendingPhoto } from '~/lib/collab/results-binding';
-import { readResultMap } from '~/lib/collab/results-binding';
+} from '@core/field-ui/collab/media-upload-queue';
+import type { PendingMediaRecord } from '@core/field-ui/collab/media-pending-store';
+import { resolvePendingPhoto } from '@core/field-ui/collab/results-binding';
+import { readResultMap } from '@core/field-ui/collab/results-binding';
 import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 
 /** Resolve the CURRENT index of `photoKey` in the doc's photo array for `fk`. */

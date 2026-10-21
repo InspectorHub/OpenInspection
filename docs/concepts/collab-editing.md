@@ -78,7 +78,7 @@ question, not a correctness one.
 
 ## The projection model
 
-`server/lib/collab/results-doc.ts` is pure Yjs (no React, no server deps) and owns
+`packages/field-ui/src/shared/results-doc.ts` is pure Yjs (no React, no server deps) and owns
 the document shape + the projection that is its exact inverse:
 
 - `projectResults(doc)` → the plain-JSON `ResultMap` written to `inspection_results.data`.
@@ -164,8 +164,8 @@ queue (`app/lib/offline/*`, `useOfflineQueue`/`useOfflineWrite`), the conflict U
 |---|---|
 | `server/durable-objects/inspection-doc.ts` | the DO: Y.Doc host, WS sync, persist, snapshots/restore |
 | `server/api/inspections/collab.ts` | authorized WS + snapshot/restore routes |
-| `server/lib/collab/results-doc.ts` | pure Yjs doc model + `projectResults` / `loadResultsProjection` |
-| `app/lib/collab/results-doc-connection.ts` | browser Y.Doc ↔ DO connection (offline + restore resync) |
-| `app/lib/collab/use-results-doc.ts` | React hook over the connection |
-| `app/lib/collab/results-binding.ts` | doc ↔ editor write-API bridge |
+| `packages/field-ui/src/shared/results-doc.ts` | pure Yjs doc model + `projectResults` / `loadResultsProjection` |
+| `packages/field-ui/src/collab/results-doc-connection.ts` | browser Y.Doc ↔ DO connection (offline + restore resync) |
+| `packages/field-ui/src/collab/use-results-doc.ts` | React hook over the connection |
+| `packages/field-ui/src/collab/results-binding.ts` | doc ↔ editor write-API bridge |
 | `app/components/collab/VersionHistoryPanel.tsx` | version-history UI |

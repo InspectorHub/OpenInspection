@@ -72,7 +72,7 @@ export interface CannedState {
  * `estimateSnapshotMin` / `estimateSnapshotMax` are LEGACY and OPTIONAL: they
  * exist on findings recorded while repair items still carried a catalogue
  * price. Nothing writes them any more — the editor's authoring type
- * (`AttachedRepairItem`, app/hooks/findings/shared.ts) has no such field, and a
+ * (`AttachedRepairItem`, packages/field-ui/src/shared/findings-shared.ts) has no such field, and a
  * repair item snapshots scope, not a figure. They stay declared so a document
  * written before the change still parses; do not reintroduce them as a write
  * path (`scripts/check-price-capability.mjs` holds the line).

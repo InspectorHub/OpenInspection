@@ -45,7 +45,7 @@ import {
     seedResultsDoc,
     loadResultsProjection,
     removeFindingKeys,
-} from '../lib/collab/results-doc';
+} from '@core/field-ui/shared/results-doc';
 import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 import { followupResponse } from '../lib/collab/followup-patch';
 import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
@@ -64,7 +64,7 @@ const MSG_SYNC = 0;
  * Framing byte for the restore control frame (a bare signal, no body). The DO
  * broadcasts this after a version restore so live clients drop their local
  * state and resync from scratch. The literal `2` is duplicated client-side in
- * `app/lib/collab/results-doc-connection.ts` (MSG_RESTORE) — there is no shared
+ * `packages/field-ui/src/collab/results-doc-connection.ts` (MSG_RESTORE) — there is no shared
  * package; keep the two in sync (mirrors the duplicated MSG_SYNC = 0 pattern).
  */
 const MSG_RESTORE = 2;

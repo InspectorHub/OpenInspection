@@ -11,7 +11,7 @@ import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
 import {
     seedResultsDoc, pushPendingPhoto, appendPhoto, projectResults, replacePhotoByPendingId, loadResultsProjection,
-} from '../../../server/lib/collab/results-doc';
+} from '@core/field-ui/shared/results-doc';
 import { validatePendingMap, resolvePendingKeys, MAX_PENDING_ENTRIES } from '../../../server/durable-objects/inspection-doc-import';
 import { resolvePendingInDo } from '../../../server/lib/collab/resolve-pending-route';
 import { followupResponse } from '../../../server/lib/collab/followup-patch';

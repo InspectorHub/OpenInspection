@@ -5,7 +5,7 @@ import {
   type FindingsOptions,
   type AttachedRepairItem,
 } from "./findings/shared";
-import { buildCollabFindingsApi, type CollabFindingsApi } from "~/lib/collab/collab-findings-api";
+import { buildCollabFindingsApi, type CollabFindingsApi } from "@core/field-ui/collab/collab-findings-api";
 import type { useFetcher } from "react-router";
 
 // Re-exported so existing imports (`~/hooks/useFindings`) keep resolving. The

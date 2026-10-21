@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRevalidator } from "react-router";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { purgeInspectionOfflineData } from "~/lib/collab/offline-purge";
+import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
 import { MAX_DELETE_BATCH } from "~/lib/inspection-delete-limit";
 import type { DeleteInspectionsResult } from "~/lib/inspection-delete.server";
 import { m } from "~/paraglide/messages";

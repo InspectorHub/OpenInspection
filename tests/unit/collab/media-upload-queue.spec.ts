@@ -2,8 +2,8 @@
 /**
  * Unit tests for the offline media pending store + upload queue (#181 PR-G).
  *
- *   app/lib/collab/media-pending-store.ts
- *   app/lib/collab/media-upload-queue.ts
+ *   packages/field-ui/src/collab/media-pending-store.ts
+ *   packages/field-ui/src/collab/media-upload-queue.ts
  *
  * Uses fake-indexeddb — no server. Imported here rather than through a global
  * setup file, which would load the polyfill for all 561 specs to serve three.
@@ -17,13 +17,13 @@ import {
     listPendingMedia,
     deletePendingMedia,
     type PendingMediaRecord,
-} from '../../../app/lib/collab/media-pending-store';
+} from '@core/field-ui/collab/media-pending-store';
 import {
     enqueueMedia,
     drainMediaQueue,
     type MediaUploader,
     type UploadResult,
-} from '../../../app/lib/collab/media-upload-queue';
+} from '@core/field-ui/collab/media-upload-queue';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

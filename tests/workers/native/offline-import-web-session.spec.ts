@@ -18,7 +18,7 @@ import * as Y from 'yjs';
 import app from '../../../server/index';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { collabDocName } from '../../../server/lib/collab/doc-name';
-import { seedResultsDoc, applyItemPatch, projectResults } from '../../../server/lib/collab/results-doc';
+import { seedResultsDoc, applyItemPatch, projectResults } from '@core/field-ui/shared/results-doc';
 import { isNeverBlocked } from '../../../server/lib/native/client-version';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
 import { applyMigrations } from '../migration-replay';

@@ -13,7 +13,7 @@ import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
 import * as decoding from 'lib0/decoding';
 import { INSPECTION_RESULTS_TEST_DDL } from '../../helpers/inline-ddl';
-import { seedResultsDoc, pushPendingPhoto, appendPhoto, projectResults } from '../../../server/lib/collab/results-doc';
+import { seedResultsDoc, pushPendingPhoto, appendPhoto, projectResults } from '@core/field-ui/shared/results-doc';
 import { MAX_PENDING_ENTRIES } from '../../../server/durable-objects/inspection-doc-import';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
 import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';

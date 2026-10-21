@@ -18,7 +18,7 @@ import {
     addPhotoToCannedDefect,
     addPhotoToCustomDefect,
     appendNote,
-} from '../../../app/lib/collab/results-binding';
+} from '@core/field-ui/collab/results-binding';
 
 // ─── Group 1: Round-trip scalar ───────────────────────────────────────────────
 

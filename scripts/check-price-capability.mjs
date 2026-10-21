@@ -115,7 +115,7 @@ const MONEY_FIELD_SHAPE =
  */
 const FIELD_FILES = [
     "packages/field-ui/src/shared/results-doc.types.ts",
-    "app/hooks/findings/shared.ts",
+    "app/hooks/findings/shared.ts", "packages/field-ui/src/shared/findings-shared.ts",
     "packages/field-ui/src/shared/template-schema.ts",
     // The template's TS type and its Zod schema are two declarations of one
     // authoring surface, and only the second one decides what the API accepts.

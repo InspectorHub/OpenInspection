@@ -17,21 +17,21 @@ import {
     seedResultsDoc,
     projectResults,
     appendPhoto,
-} from '../../../server/lib/collab/results-doc';
+} from '@core/field-ui/shared/results-doc';
 import {
     appendPendingPhoto,
     markPhotoPending,
     resolvePendingPhoto,
-} from '../../../app/lib/collab/results-binding';
+} from '@core/field-ui/collab/results-binding';
 import {
     enqueueMedia,
     drainMediaQueue,
     type MediaUploader,
-} from '../../../app/lib/collab/media-upload-queue';
+} from '@core/field-ui/collab/media-upload-queue';
 import {
     listPendingMedia,
     deletePendingMedia,
-} from '../../../app/lib/collab/media-pending-store';
+} from '@core/field-ui/collab/media-pending-store';
 
 const FK = '_default:s1:i1';
 

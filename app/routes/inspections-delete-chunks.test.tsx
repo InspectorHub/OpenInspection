@@ -11,7 +11,7 @@ import { render, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
 
 const purge = vi.hoisted(() => vi.fn(async () => undefined));
-vi.mock("~/lib/collab/offline-purge", () => ({ purgeInspectionOfflineData: purge }));
+vi.mock("@core/field-ui/collab/offline-purge", () => ({ purgeInspectionOfflineData: purge }));
 
 import InspectionsPage, { shouldRevalidate } from "~/routes/inspections";
 

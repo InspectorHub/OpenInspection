@@ -14,12 +14,12 @@
  */
 
 import type * as Y from 'yjs';
-import { findingKey } from '@core/field-ui/shared/finding-key';
-import { cloneByScope } from '../../hooks/findings/shared';
+import { findingKey } from '../shared/finding-key';
+import { cloneByScope } from '../shared/findings-shared';
 import type {
     AttachedRepairItem,
     CustomCommentEntry,
-} from '../../hooks/findings/shared';
+} from '../shared/findings-shared';
 import type { ResultMap } from './results-binding';
 import {
     setRating as bindingSetRating,

@@ -21,7 +21,7 @@ import app from '../../../server/index';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { NATIVE_SCOPE, type NativeProps } from '../../../server/lib/auth/native-token';
 import { collabDocName } from '../../../server/lib/collab/doc-name';
-import { seedResultsDoc, applyItemPatch, pushPendingPhoto, projectResults } from '../../../server/lib/collab/results-doc';
+import { seedResultsDoc, applyItemPatch, pushPendingPhoto, projectResults } from '@core/field-ui/shared/results-doc';
 import type { InspectionDocDO } from '../../../server/durable-objects/inspection-doc';
 import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 import { InspectionService } from '../../../server/services/inspection.service';

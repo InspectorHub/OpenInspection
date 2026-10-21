@@ -30,7 +30,7 @@ const { purgeInspectionOfflineData } = vi.hoisted(() => ({
         attempted: true,
     })),
 }));
-vi.mock("~/lib/collab/offline-purge", () => ({ purgeInspectionOfflineData }));
+vi.mock("@core/field-ui/collab/offline-purge", () => ({ purgeInspectionOfflineData }));
 
 import InspectionsPage from "~/routes/inspections";
 

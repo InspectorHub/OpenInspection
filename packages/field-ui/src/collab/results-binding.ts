@@ -7,7 +7,7 @@
  */
 
 import type * as Y from 'yjs';
-import { findingKey, parseFindingKey } from '@core/field-ui/shared/finding-key';
+import { findingKey, parseFindingKey } from '../shared/finding-key';
 import {
     projectResults,
     applyItemPatch,
@@ -25,8 +25,8 @@ import {
     upsertCustomComment,
     upsertRecommendation,
     removeRecommendation,
-} from '../../../server/lib/collab/results-doc';
-import type { PhotoEntry, RepairItemSnapshot } from '@core/field-ui/shared/results-doc.types';
+} from '../shared/results-doc';
+import type { PhotoEntry, RepairItemSnapshot } from '../shared/results-doc.types';
 
 // ─── ResultMap type ──────────────────────────────────────────────────────────
 //

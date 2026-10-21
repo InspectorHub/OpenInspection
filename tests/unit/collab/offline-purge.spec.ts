@@ -23,11 +23,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import * as Y from "yjs";
 import { IndexeddbPersistence } from "y-indexeddb";
 
-import { purgeInspectionOfflineData } from "../../../app/lib/collab/offline-purge";
+import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
 import {
     putPendingMedia,
     listPendingMedia,
-} from "../../../app/lib/collab/media-pending-store";
+} from "@core/field-ui/collab/media-pending-store";
 
 const DELETED = "a1f069f7-0000-4000-8000-000000000001";
 const SURVIVOR = "e7cf4375-0000-4000-8000-000000000002";
