@@ -1,7 +1,8 @@
 /**
- * The two event reads and the event delete are OpenAPI routes of the events router; the two creates and the status
- * change stay plain handlers. Money redaction and the money-write guard are covered by event-money.spec.ts; this file
- * pins the role gates of the converted routes, their bodies, and that the plain handlers kept answering next to them.
+ * The two event reads and the event delete are OpenAPI routes of the events router, and so are the two creates and
+ * the status change, which still read and validate their own body (events-write-openapi-routes.spec.ts). Money
+ * redaction and the money-write guard are covered by event-money.spec.ts; this file pins the role gates of the reads
+ * and the delete, their bodies, and that the handlers that parse their own body kept answering their own 400.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
@@ -85,7 +86,7 @@ describe('events OpenAPI routes', () => {
         });
     });
 
-    describe('the plain handlers beside them', () => {
+    describe('the handlers that parse their own body', () => {
         it('POST /api/event-types still validates its own body and answers its own 400', async () => {
             const createEventType = vi.fn();
             const res = await buildApp({ createEventType }).request('/api/event-types', {
@@ -107,7 +108,7 @@ describe('events OpenAPI routes', () => {
         });
     });
 
-    it('lists the three converted operations as extended tier, reads read scope and the delete write scope', () => {
+    it('lists the three read-side operations as extended tier, reads read scope and the delete write scope', () => {
         const doc = buildOpenApiDocument(buildApp({}), { openapi: '3.0.0', info: { version: 'test', title: 't' } });
         const paths = doc.paths as Record<string, Record<string, Record<string, unknown>>>;
         const types = paths['/api/event-types']?.get;
@@ -116,8 +117,5 @@ describe('events OpenAPI routes', () => {
         expect([types?.operationId, events?.operationId, del?.operationId]).toEqual(['listVisitEventTypes', 'listInspectionEvents', 'deleteInspectionEvent']);
         expect([types?.['x-scopes'], events?.['x-scopes'], del?.['x-scopes']]).toEqual([['read'], ['read'], ['write']]);
         for (const op of [types, events, del]) expect(op?.['x-tier']).toBe('extended');
-        // The plain handlers are not documented.
-        expect(paths['/api/event-types']?.post).toBeUndefined();
-        expect(paths['/api/events/{id}']?.put).toBeUndefined();
     });
 });

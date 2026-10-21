@@ -18,7 +18,9 @@ type Keys<T> = Exclude<keyof T, '$url' | '$path'>;
 
 /**
  * Every path the inspections router served when it was one chain of `.route('/', child)` calls, read from the
- * declaration the chain produced before the conversion (126 distinct paths).
+ * declaration the chain produced before the conversion (126 distinct paths), less the two native collab routes
+ * (`/:id/collab/ws`, `/:id/collab/import`: a WebSocket upgrade and a binary body, neither reachable through the typed
+ * client) and plus `/:id/sign`, which became an OpenAPI route: 125 paths.
  */
 type ChainPaths =
     | '/'
@@ -30,13 +32,11 @@ type ChainPaths =
     | '/:id/cancellation-quote'
     | '/:id/clone'
     | '/:id/collab/followup'
-    | '/:id/collab/import'
     | '/:id/collab/restore'
     | '/:id/collab/restructure'
     | '/:id/collab/snapshots'
     | '/:id/collab/snapshots/:seq'
     | '/:id/collab/ticket'
-    | '/:id/collab/ws'
     | '/:id/communication'
     | '/:id/complete'
     | '/:id/compliance'
@@ -114,6 +114,7 @@ type ChainPaths =
     | '/:id/services'
     | '/:id/services/:lineId'
     | '/:id/share-agent'
+    | '/:id/sign'
     | '/:id/statutory-details'
     | '/:id/statutory-form'
     | '/:id/statutory-form.pdf'
@@ -200,10 +201,25 @@ describe('InspectionsApi client', () => {
     });
 
     it('exposes a route of a sub-router that is still a chain, typed from its own schema', () => {
-        // collab (and core, agreements, agreement-sign) cannot list their routes: they hold native handlers.
-        expectTypeOf<Client[':id']['collab']['ws']>().toHaveProperty('$get');
+        // core and agreements cannot list their routes: they hold native handlers.
+        expectTypeOf<Client[':id']['agreement']>().toHaveProperty('$get');
         // The retired HTML report route is a native handler too, so it is its own router, mounted with legacyMounted.
         expectTypeOf<Client[':id']['report']>().toHaveProperty('$get');
+    });
+
+    it('types the collab JSON routes and the in-person sign route from their declared responses', () => {
+        // The WebSocket upgrade and the binary import are native handlers of the collab router and are not in the client.
+        expectTypeOf<Keys<Client[':id']['collab']>>().toEqualTypeOf<'followup' | 'restore' | 'restructure' | 'snapshots' | 'ticket'>();
+        expectTypeOf<Keys<Client[':id']['collab']['snapshots']>>().toEqualTypeOf<'$get' | '$post' | ':seq'>();
+        // The refusals are plain text, so the client can tell collab-off (501) from a refusal.
+        type Restructure = InferResponseType<Client[':id']['collab']['restructure']['$post'], 501>;
+        expectTypeOf<Restructure>().toEqualTypeOf<string>();
+        expectTypeOf<InferResponseType<Client[':id']['collab']['restructure']['$post'], 200>>().toEqualTypeOf<{ ok: true }>();
+        expectTypeOf<InferResponseType<Client[':id']['collab']['restore']['$post'], 400>>().toEqualTypeOf<{ error: string }>();
+        // Bodies are read by the handlers themselves, so no json input is declared.
+        expectTypeOf<keyof InferRequestType<Client[':id']['collab']['restore']['$post']>>().toEqualTypeOf<'param'>();
+        expectTypeOf<keyof InferRequestType<Client[':id']['sign']['$post']>>().toEqualTypeOf<'param'>();
+        expectTypeOf<InferResponseType<Client[':id']['sign']['$post'], 400>['error']['code']>().toEqualTypeOf<string>();
     });
 
     it('does not expose methods or paths that nothing registered', () => {

@@ -457,6 +457,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/inspections/agreement-sign.ts',
+        tuple: 'agreementSignRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/agreement-sign');
+            return { app: m.default, configs: m.agreementSignRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/inspections/bulk.ts',
         tuple: 'bulkRouteConfigs',
         load: async () => {
@@ -470,6 +478,15 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/inspections/cancellation');
             return { app: m.default, configs: m.cancellationRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspections/collab.ts',
+        tuple: 'collabRouteConfigs',
+        native: ['get /:id/collab/ws', 'post /:id/collab/import'],
+        load: async () => {
+            const m = await import('../../../server/api/inspections/collab');
+            return { app: m.default, configs: m.collabRouteConfigs };
         },
     },
     {

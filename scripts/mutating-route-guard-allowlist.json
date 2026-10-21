@@ -90,7 +90,7 @@
       "category": "authenticated-any-role",
       "reason": "acts only on the caller's own calendar connection (user.sub); agents are refused centrally by api-access-policy; same decision as DELETE /disconnect (2026-10-16)"
     },
-    "server/api/calendar.ts::PUT /connections/:id/calendars": {
+    "server/api/calendar.ts::PUT /connections/{id}/calendars": {
       "category": "authenticated-any-role",
       "reason": "the handler requires the connection to be the caller's own (loadOpenCalendarConnection by user.sub); agents are refused centrally by api-access-policy; same decision as DELETE /disconnect (2026-10-16)"
     },

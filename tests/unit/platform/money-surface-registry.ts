@@ -74,6 +74,8 @@ export const MONEY_SURFACE: Record<string, Disposition> = {
     // Company settings that hold amounts
     'GET /api/event-types': redact('inspectionFees', 'events.ts'),
     'GET /api/inspections/{inspectionId}/events': redact('inspectionFees', 'events.ts'),
+    'POST /api/event-types': redact('inspectionFees', 'events.ts'),
+    'POST /api/inspections/{inspectionId}/events': redact('inspectionFees', 'events.ts'),
     'GET /api/admin/event-types': redact('inspectionFees', 'admin/admin-settings.ts'),
     'POST /api/admin/event-types': redact('inspectionFees', 'admin/admin-settings.ts'),
     'PATCH /api/admin/event-types/{id}': redact('inspectionFees', 'admin/admin-settings.ts'),

@@ -33,8 +33,8 @@ type Keys<T> = Exclude<keyof T, '$url' | '$path'>;
 
 // Compile-time only (run by `npm run test:types`). `CalendarApi` (mounted at /api/calendar) is derived from
 // `calendarRouteParts`: the blocks, items and ICS link sub-routers are listed with their route configs (`mounted`), the
-// router holding the save-set PUT and the OAuth router with `legacyMounted` (they register plain Hono handlers, which a
-// route list cannot express). A mount left out of the list, or one that moves a path, fails here. The path keys were read
+// OAuth router with `legacyMounted` (it registers plain Hono handlers, which a route list cannot express), and the save-set
+// PUT is a route of the list. A mount left out of the list, or one that moves a path, fails here. The path keys were read
 // from the declaration the chained router produced before the conversion (13 distinct paths).
 describe('CalendarApi client', () => {
     it('serves exactly the paths the chained router served', () => {
@@ -102,8 +102,8 @@ describe('CalendarApi client', () => {
         expectTypeOf<NotSignedIn>().toEqualTypeOf<{ success: false; error: { message: string } }>();
     });
 
-    it('exposes the plain handlers, typed from their own inferred schema', () => {
-        // The save-set PUT and the OAuth pair are mounted with legacyMounted.
+    it('exposes the plain OAuth handlers and the save-set PUT', () => {
+        // The OAuth pair is mounted with legacyMounted; the save-set PUT is a route of the list.
         expectTypeOf<Client['connect']>().toHaveProperty('$get');
         expectTypeOf<Client['callback']>().toHaveProperty('$get');
         expectTypeOf<Keys<Client['connections'][':id']['calendars']>>().toEqualTypeOf<'$put'>();

@@ -40,6 +40,9 @@ import { parseReinspectionStatuses } from '../../lib/reinspection-status';
 import { forwardCollabImport } from '../../lib/collab/import-route';
 import { authorizeCollab, collabStub } from '../../lib/collab/authorize';
 import { mayEditReports } from '../../lib/inspection/report-authoring-guard';
+import {
+    collabFollowupRoute, collabRestoreRoute, collabRestructureRoute, collabSnapshotCaptureRoute, collabSnapshotGetRoute, collabSnapshotListRoute,
+} from './collab-route-defs';
 
 const issueCollabTicketRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/collab/ticket', operationId: 'issueCollabTicket', tags: ['client'],
@@ -49,10 +52,11 @@ const issueCollabTicketRoute = createRoute(withMcpMetadata({
     responses: { 200: { description: 'One-time ticket', content: { 'application/json': { schema: CollabTicketResponseSchema } } } },
 }, { scopes: ['write'], tier: 'excluded' }));
 
-const collabRoutes = createApiRouter()
-    // Native identity only, and the same checks as the socket itself: a ticket is
-    // never issued for an inspection the caller could not open.
-    .openapi(issueCollabTicketRoute, async (c) => {
+const collabRoutes = createApiRouter();
+
+// Native identity only, and the same checks as the socket itself: a ticket is
+// never issued for an inspection the caller could not open.
+collabRoutes.openapi(issueCollabTicketRoute, async (c) => {
         if (!c.get('nativeClient')) throw Errors.Unauthorized('Native session required');
         const auth = await authorizeCollab(c);
         if (!auth.ok) {
@@ -71,35 +75,9 @@ const collabRoutes = createApiRouter()
             tenantId: auth.tenantId, userId: auth.userId, role, inspectionId: auth.inspectionId,
         });
         return c.json({ success: true as const, data: { ticket, expiresIn: WS_TICKET_TTL_S } }, 200);
-    })
-    .get('/:id/collab/ws', async (c) => {
-        // ── (0) WebSocket protocol check (ws-only) ────────────────────────────
-        if (c.req.header('Upgrade') !== 'websocket') {
-            return new Response('expected websocket upgrade', { status: 426 });
-        }
-
-        const auth = await authorizeCollab(c);
-        if (!auth.ok) return auth.response;
-        // The socket is the live editor: opening it needs `editReports`. A socket
-        // that is already open is not closed when the capability is withdrawn.
-        if (!(await mayEditReports(c))) return new Response('forbidden', { status: 403 });
-
-        // ── Forward the WS upgrade to the INSPECTION_DOC Durable Object ────────
-        const stub = collabStub(c, auth.tenantId, auth.reportId);
-        const fwd = new Request('https://do.local/ws', {
-            method:  'GET',
-            headers: {
-                'Upgrade':         'websocket',
-                'x-tenant-id':     auth.tenantId,
-                'x-inspection-id': auth.inspectionId,
-                'x-report-id':     auth.reportId,
-                'x-user-id':       auth.userId,
-            },
-        });
-        return stub.fetch(fwd);
-    })
-    // ── GET /:id/collab/snapshots — list version history ──────────────────────
-    .get('/:id/collab/snapshots', async (c) => {
+    });
+// ── GET /:id/collab/snapshots — list version history ──────────────────────
+collabRoutes.openapi(collabSnapshotListRoute, async (c) => {
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
@@ -114,13 +92,13 @@ const collabRoutes = createApiRouter()
             },
         });
         return stub.fetch(fwd);
-    })
-    // ── GET /:id/collab/snapshots/:seq — one snapshot's full projection ───────
-    // H2's compare/recover UI diffs two snapshots → it needs each one's full
-    // `projection` (the list route omits it). Mirrors the list route's auth +
-    // tenant-scoped DO addressing; the :seq param is Zod-validated as a
-    // non-negative int before it is forwarded (the DO re-guards as well).
-    .get('/:id/collab/snapshots/:seq', async (c) => {
+    });
+// ── GET /:id/collab/snapshots/:seq — one snapshot's full projection ───────
+// H2's compare/recover UI diffs two snapshots → it needs each one's full
+// `projection` (the list route omits it). Mirrors the list route's auth +
+// tenant-scoped DO addressing; the :seq param is Zod-validated as a
+// non-negative int before it is forwarded (the DO re-guards as well).
+collabRoutes.openapi(collabSnapshotGetRoute, async (c) => {
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
@@ -140,9 +118,9 @@ const collabRoutes = createApiRouter()
             },
         });
         return stub.fetch(fwd);
-    })
-    // ── POST /:id/collab/snapshots — capture an on-demand snapshot ─────────────
-    .post('/:id/collab/snapshots', async (c) => {
+    });
+// ── POST /:id/collab/snapshots — capture an on-demand snapshot ─────────────
+collabRoutes.openapi(collabSnapshotCaptureRoute, async (c) => {
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
@@ -157,9 +135,9 @@ const collabRoutes = createApiRouter()
             },
         });
         return stub.fetch(fwd);
-    })
-    // ── POST /:id/collab/restore — doc-replacement restore to a snapshot ───────
-    .post('/:id/collab/restore', async (c) => {
+    });
+// ── POST /:id/collab/restore — doc-replacement restore to a snapshot ───────
+collabRoutes.openapi(collabRestoreRoute, async (c) => {
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
@@ -188,14 +166,14 @@ const collabRoutes = createApiRouter()
             body: JSON.stringify({ seq: parsed.data.seq }),
         });
         return stub.fetch(fwd);
-    })
-    // ── POST /:id/collab/restructure — converge DO doc after templateSnapshot change (D8) ──
-    // Called after the templateSnapshot PATCH has already landed in D1. The DO
-    // re-reads the updated snapshot, diffs the current results keys, seeds
-    // additions, removes deletions, persists, and broadcasts MSG_RESTORE so every
-    // connected client drops its local state and resyncs. Reuses the same
-    // fail-closed auth as /restore (no additional permission check needed).
-    .post('/:id/collab/restructure', async (c) => {
+    });
+// ── POST /:id/collab/restructure — converge DO doc after templateSnapshot change (D8) ──
+// Called after the templateSnapshot PATCH has already landed in D1. The DO
+// re-reads the updated snapshot, diffs the current results keys, seeds
+// additions, removes deletions, persists, and broadcasts MSG_RESTORE so every
+// connected client drops its local state and resyncs. Reuses the same
+// fail-closed auth as /restore (no additional permission check needed).
+collabRoutes.openapi(collabRestructureRoute, async (c) => {
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
@@ -210,18 +188,18 @@ const collabRoutes = createApiRouter()
             },
         });
         return stub.fetch(fwd);
-    })
-    // ── POST /:id/collab/followup — record a carried item's follow-up verdict ──
-    // #119. The one write this feature was missing: `createReinspection` seeds
-    // every carried item with `followupStatus: null`, the report renders it and
-    // the next round's pre-selection is computed from it, and until now no
-    // surface could set it. It travels through the DO rather than straight to D1
-    // because the Y.Doc is the only write path for a finding — see
-    // `server/lib/collab/followup-patch.ts`.
-    //
-    // Same fail-closed auth as /restore: whoever may edit the document may
-    // record the verdict, which is the same permission the rating buttons carry.
-    .post('/:id/collab/followup', async (c) => {
+    });
+// ── POST /:id/collab/followup — record a carried item's follow-up verdict ──
+// #119. The one write this feature was missing: `createReinspection` seeds
+// every carried item with `followupStatus: null`, the report renders it and
+// the next round's pre-selection is computed from it, and until now no
+// surface could set it. It travels through the DO rather than straight to D1
+// because the Y.Doc is the only write path for a finding — see
+// `server/lib/collab/followup-patch.ts`.
+//
+// Same fail-closed auth as /restore: whoever may edit the document may
+// record the verdict, which is the same permission the rating buttons carry.
+collabRoutes.openapi(collabFollowupRoute, async (c) => {
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
 
@@ -269,16 +247,49 @@ const collabRoutes = createApiRouter()
             body: JSON.stringify(parsed.data),
         });
         return stub.fetch(fwd);
-    })
-    // ── POST /:id/collab/import — apply an offline client's Yjs update ─────────
-    // Raw bytes, so no zod body schema; see `forwardCollabImport` for how the
-    // size is bounded. The DO snapshots first and refuses what it cannot undo.
-    // Idempotent by construction: re-applying a Yjs update changes nothing, so
-    // a retry after any failure is safe without an Idempotency-Key.
-    .post('/:id/collab/import', async (c) => {
+    });
+// The WebSocket upgrade and the binary import stay plain handlers (see NATIVE_NON_OPENAPI_CONTRACT). They come
+// after the OpenAPI routes, which are the ones listed in `collabRouteConfigs`; no method and path pair is shared
+// with the routes above, so the order does not change what is dispatched.
+collabRoutes.get('/:id/collab/ws', async (c) => {
+        // ── (0) WebSocket protocol check (ws-only) ────────────────────────────
+        if (c.req.header('Upgrade') !== 'websocket') {
+            return new Response('expected websocket upgrade', { status: 426 });
+        }
+
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) return auth.response;
+        // The socket is the live editor: opening it needs `editReports`. A socket
+        // that is already open is not closed when the capability is withdrawn.
+        if (!(await mayEditReports(c))) return new Response('forbidden', { status: 403 });
+
+        // ── Forward the WS upgrade to the INSPECTION_DOC Durable Object ────────
+        const stub = collabStub(c, auth.tenantId, auth.reportId);
+        const fwd = new Request('https://do.local/ws', {
+            method:  'GET',
+            headers: {
+                'Upgrade':         'websocket',
+                'x-tenant-id':     auth.tenantId,
+                'x-inspection-id': auth.inspectionId,
+                'x-report-id':     auth.reportId,
+                'x-user-id':       auth.userId,
+            },
+        });
+        return stub.fetch(fwd);
+    });
+// ── POST /:id/collab/import — apply an offline client's Yjs update ─────────
+// Raw bytes, so no zod body schema; see `forwardCollabImport` for how the
+// size is bounded. The DO snapshots first and refuses what it cannot undo.
+// Idempotent by construction: re-applying a Yjs update changes nothing, so
+// a retry after any failure is safe without an Idempotency-Key.
+collabRoutes.post('/:id/collab/import', async (c) => {
         const auth = await authorizeCollab(c);
         if (!auth.ok) return auth.response;
         return forwardCollabImport(c, { ...auth, stub: collabStub(c, auth.tenantId, auth.reportId) });
     });
+
+export const collabRouteConfigs = [
+    issueCollabTicketRoute, collabSnapshotListRoute, collabSnapshotGetRoute, collabSnapshotCaptureRoute, collabRestoreRoute, collabRestructureRoute, collabFollowupRoute,
+] as const;
 
 export default collabRoutes;

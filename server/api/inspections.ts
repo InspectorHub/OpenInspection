@@ -42,10 +42,10 @@ import agreementsRoutes from './inspections/agreements';
 // idempotency gate can resolve its path the same way it resolves every other —
 // a router reached only through another router's re-export is a route the gate
 // can see declared and cannot place.
-import agreementSignRoutes from './inspections/agreement-sign';
+import agreementSignRoutes, { agreementSignRouteConfigs } from './inspections/agreement-sign';
 import coreRoutes from './inspections/core';
 import resultsRoutes, { resultsRouteConfigs } from './inspections/results';
-import collabRoutes from './inspections/collab';
+import collabRoutes, { collabRouteConfigs } from './inspections/collab';
 import costExportRoutes, { costExportRouteConfigs } from './inspections/cost-export';
 import costItemRoutes, { costItemRouteConfigs } from './inspections/cost-items';
 import complianceRoutes, { complianceRouteConfigs } from './inspections/compliance';
@@ -139,12 +139,12 @@ export const inspectionsRouteParts = [
     mounted('/', sendSmsRoutes, sendSmsRouteConfigs),
     mounted('/', communicationRoutes, communicationRouteConfigs),
     legacyMounted('/', agreementsRoutes),
-    legacyMounted('/', agreementSignRoutes),
+    mounted('/', agreementSignRoutes, agreementSignRouteConfigs),
     mounted('/', hierarchyRoutes, hierarchyRouteConfigs),
     mounted('/', costExportRoutes, costExportRouteConfigs),
     mounted('/', costItemRoutes, costItemRouteConfigs),
     mounted('/', complianceRoutes, complianceRouteConfigs),
-    legacyMounted('/', collabRoutes),
+    mounted('/', collabRoutes, collabRouteConfigs),
     mounted('/', peopleRoutes, peopleRouteConfigs),
     mounted('/', inspectionServiceRoutes, inspectionServiceRouteConfigs),
     mounted('/', inspectionReportRoutes, inspectionReportRouteConfigs),

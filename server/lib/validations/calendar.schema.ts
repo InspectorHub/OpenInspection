@@ -83,3 +83,22 @@ export const CalendarIcsLinksResponseSchema = z.object({
         companyPath: z.string().nullable().describe('Path of the company-wide feed; null unless the caller is an owner or manager and the feed exists.'),
     }).describe('Subscribe feed paths.'),
 }).openapi('CalendarIcsLinksResponse');
+
+/** PUT /api/calendar/connections/{id}/calendars: the read set and write target as saved. */
+export const CalendarReadSetSavedSchema = z.object({
+    success: z.literal(true).describe('Always true on success.'),
+    data: z.object({
+        readCalendarIds: z.array(z.string()).describe('The calendars whose busy time is now read, Primary always included.'),
+        writeCalendarId: z.string().describe('The calendar new events are now written to.'),
+    }).describe('The read set and write target as saved.'),
+}).openapi('CalendarReadSetSaved');
+
+/** The error body of the save-set PUT: a message, plus a code or validation details on some answers. */
+export const CalendarReadSetErrorSchema = z.object({
+    success: z.literal(false).describe('Always false on an error.'),
+    error: z.object({
+        message: z.string().describe('Human-readable description of the error.'),
+        code: z.string().optional().describe('Stable error code, present when the read-set rules refuse the choice.'),
+        details: z.unknown().optional().describe('Field-level validation details, present when the body is not a valid read set.'),
+    }).describe('Error detail.'),
+}).openapi('CalendarReadSetError');

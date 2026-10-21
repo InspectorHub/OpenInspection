@@ -18,8 +18,9 @@
  * at this hash, on this device. `presentedBy`, `channel: 'in_person'` and
  * `attested: true` keep that distinguishable from an observation forever.
  */
-import { z } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
+import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { Errors } from '../../lib/errors';
 import { requireRole } from '../../lib/middleware/rbac';
 import { logger } from '../../lib/logger';
@@ -31,10 +32,43 @@ import { resolveAutomationCompanyName } from '../../services/automation/company-
 
 import { fireAndForget } from '../../lib/fire-and-forget';
 
+/**
+ * POST /api/inspections/{id}/sign. The handler checks the inspection first and only then reads and validates the
+ * body, answering its own 400 `{ success: false, error: { message, code } }`, so no request body is declared: a
+ * validator in front of it would answer a bad body before the 404 and in the validation envelope. It writes
+ * signature records, so it is not offered to MCP.
+ */
+const signInspectionRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/{id}/sign', tags: ['inspections'],
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: z.object({ id: z.string().describe('Id of the inspection whose agreement is signed in person.') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({
+            success: z.literal(true).describe('Always true on success.'),
+            data: z.object({
+                signed: z.literal(true).describe('Always true: the signer has signed.'),
+                alreadySigned: z.literal(true).optional().describe('Present when the signer or the envelope had already signed, so nothing was recorded.'),
+                signerId: z.string().optional().describe('Id of the signer who signed; absent when an earlier signed envelope short-circuited the call.'),
+                envelopeStatus: z.string().describe('Status of the signing envelope after the call.'),
+            }).describe('Outcome of the in-person signature.'),
+        }) } }, description: 'Signed, or already signed' },
+        400: { content: { 'application/json': { schema: z.object({
+            success: z.literal(false).describe('Always false on an error.'),
+            error: z.object({ message: z.string().describe('Human-readable description of the error.'), code: z.string().describe('Stable error code.') }).describe('Error detail.'),
+        }) } }, description: 'The signature data is not valid' },
+        409: { content: { 'application/json': { schema: z.object({
+            success: z.literal(false).describe('Always false on an error.'),
+            error: z.object({ code: z.string().describe('Stable error code.'), message: z.string().describe('Human-readable description of the error.') }).describe('Error detail.'),
+        }) } }, description: 'No agreement template is configured' },
+    },
+    operationId: 'signInspectionAgreementInPerson', summary: 'Record an in-person agreement signature',
+    description: 'Records a signature drawn on the inspector device for the inspection agreement, on the signing envelope so it carries the content snapshot, the audit chain and a receipt. The JSON body is {signatureBase64, signerId?, onBehalfOf?, onBehalfDisclaimer?}: signatureBase64 is the signature image as a data URL or raw base64, signerId defaults to the first signer who has not finished, and onBehalfOf and onBehalfDisclaimer name the party an authorized agent signs for. A body that is not valid answers 400. Signing again once the signer or the envelope has signed answers 200 with alreadySigned. Owner, manager or inspector only.',
+}, { scopes: [], tier: 'excluded' }));
+
 const agreementSignRoutes = createApiRouter();
 
-agreementSignRoutes.post('/:id/sign', requireRole('owner', 'manager', 'inspector'), async (c) => {
-        const id = c.req.param('id') as string;
+agreementSignRoutes.openapi(signInspectionRoute, async (c) => {
+        const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId');
         const db = getDrizzle(c);
         const svc = c.var.services.agreement;
@@ -65,7 +99,7 @@ agreementSignRoutes.post('/:id/sign', requireRole('owner', 'manager', 'inspector
                 eq(agreementRequests.status, 'signed'),
             )).limit(1).get();
         if (alreadySignedEnv) {
-            return c.json({ success: true, data: { signed: true, alreadySigned: true, envelopeStatus: 'signed' } }, 200);
+            return c.json({ success: true, data: { signed: true as const, alreadySigned: true as const, envelopeStatus: 'signed' } }, 200);
         }
 
         // Track I-a — on-site signing rides the envelope so every signature carries
@@ -109,7 +143,7 @@ agreementSignRoutes.post('/:id/sign', requireRole('owner', 'manager', 'inspector
 
         // Idempotent — an already-signed signer short-circuits without re-firing effects.
         if (signer.status === 'signed') {
-            return c.json({ success: true, data: { signed: true, alreadySigned: true, signerId: signer.id, envelopeStatus: envelope.status } }, 200);
+            return c.json({ success: true, data: { signed: true as const, alreadySigned: true as const, signerId: signer.id, envelopeStatus: envelope.status } }, 200);
         }
 
         // Terminal-state guard: declined / expired signers must never reach the audit append.
@@ -240,7 +274,9 @@ agreementSignRoutes.post('/:id/sign', requireRole('owner', 'manager', 'inspector
             });
         }
 
-        return c.json({ success: true, data: { signed: true, signerId: signer.id, envelopeStatus: result.envelopeStatus } }, 200);
+        return c.json({ success: true, data: { signed: true as const, signerId: signer.id, envelopeStatus: result.envelopeStatus } }, 200);
     });
+
+export const agreementSignRouteConfigs = [signInspectionRoute] as const;
 
 export default agreementSignRoutes;

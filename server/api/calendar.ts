@@ -1,4 +1,4 @@
-import { createRoute } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { legacyMounted, mounted, type ApiOf } from '../lib/api-schema';
 import { importBusyForConnection } from '../lib/calendar/sync-engine';
@@ -6,7 +6,8 @@ import { resolveReadSet, saveReadSet, resolveReadCalendarIds } from '../lib/cale
 import { SaveReadSetSchema } from '../lib/validations/calendar-read-set.schema';
 import { AppError } from '../lib/errors';
 import {
-    CalendarNotAuthenticatedSchema, CalendarReadSetResponseSchema, CalendarStatusResponseSchema, CalendarSyncResponseSchema,
+    CalendarNotAuthenticatedSchema, CalendarReadSetErrorSchema, CalendarReadSetResponseSchema, CalendarReadSetSavedSchema,
+    CalendarStatusResponseSchema, CalendarSyncResponseSchema,
 } from '../lib/validations/calendar.schema';
 import { SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { logger } from '../lib/logger';
@@ -104,58 +105,30 @@ const readSetRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['read'], tier: 'extended' }));
 
-// The one plain handler left of this router: the save-set PUT. It stays a plain handler because its 400 answers
-// `{ message, details }`, not the validation envelope, and the mutating-route allow-list keys it by file.
-const calendarNativeRoutes = createApiRouter()
-    /**
-     * PUT /api/calendar/connections/:id/calendars
-     * A-polish 10b — save the multi-read set + single write target under the
-     * locked invariants (write editable, write ∈ read, Primary always read).
-     */
-    .put('/connections/:id/calendars', async (c) => {
-        const jwtUser = c.get('user');
-        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
-        const tenantId = c.get('tenantId') as string;
-        const connId = c.req.param('id');
-        const open = await loadOpenCalendarConnection(
-            c.env.DB, tenantId, jwtUser.sub, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
-        );
-        if (!open || open.connection.id !== connId) {
-            return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 404);
-        }
-        const parsed = SaveReadSetSchema.safeParse(await c.req.json().catch(() => null));
-        if (!parsed.success) {
-            return c.json({ success: false, error: { message: 'Invalid read set', details: parsed.error.flatten() } }, 400);
-        }
-        const provider = getCalendarProvider(open.connection.provider);
-        const auth = await provider.resolveAuth({
-            tenantId, credentials: open.credentials, env: c.env,
-        });
-        if (!auth) {
-            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
-        }
-        let available;
-        try {
-            available = await provider.listCalendars({ auth });
-        } catch (e) {
-            logger.error('[calendar] listCalendars (save) failed', { tenantId }, e instanceof Error ? e : undefined);
-            return c.json({ success: false, error: { message: 'Failed to fetch Google calendars' } }, 500);
-        }
-        let resolved;
-        try {
-            resolved = resolveReadSet(available, parsed.data);
-        } catch (e) {
-            if (e instanceof AppError) {
-                return c.json({ success: false, error: { code: e.code, message: e.message } }, e.status as 400);
-            }
-            throw e;
-        }
-        await saveReadSet(getDrizzle(c), { tenantId, connectionId: connId, resolved });
-        return c.json({
-            success: true,
-            data: { readCalendarIds: resolved.readCalendarIds, writeCalendarId: resolved.writeCalendarId },
-        }, 200);
-    });
+/**
+ * PUT /api/calendar/connections/{id}/calendars: save the multi-read set and the single write target under the
+ * locked invariants (write editable, write in read, Primary always read). The handler reads and validates the body
+ * itself, after it has found the caller's own connection, so no request body is declared: a validator in front of
+ * it would answer a bad body before the 404 and in the validation envelope instead of `{ message, details }`.
+ */
+const saveReadSetRoute = createRoute(withMcpMetadata({
+    method: 'put',
+    path: '/connections/{id}/calendars',
+    operationId: 'saveCalendarReadSet',
+    tags: ['calendar'],
+    summary: 'Save the calendar read set',
+    description: 'Saves which of the signed-in user calendars are read for busy time and which one new events are written to. The JSON body is {readCalendarIds, writeCalendarId}: readCalendarIds lists at least one calendar id, writeCalendarId is one of them and must be a calendar the user can edit, and the Primary calendar is always kept in the read set. Only the caller own connection can be saved; any other id answers 404.',
+    request: { params: z.object({ id: z.string().describe('Id of the signed-in user calendar connection whose read set is saved.') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: CalendarReadSetSavedSchema } }, description: 'Read set saved' },
+        400: { content: { 'application/json': { schema: CalendarReadSetErrorSchema } }, description: 'Invalid read set, or the calendar integration is not configured' },
+        401: { content: { 'application/json': { schema: CalendarNotAuthenticatedSchema } }, description: 'Not signed in' },
+        404: { content: { 'application/json': { schema: CalendarReadSetErrorSchema } }, description: 'No such calendar connection for the caller' },
+        409: { content: { 'application/json': { schema: CalendarReadSetErrorSchema } }, description: 'The write calendar is not editable by the user or is not in the read set' },
+        500: { content: { 'application/json': { schema: CalendarReadSetErrorSchema } }, description: 'The provider calendar list could not be fetched' },
+    },
+    security: [{ bearerAuth: [] }],
+}, { scopes: [], tier: 'excluded' }));
 
 const app = createApiRouter();
 app.route('/', calendarBlockRoutes);
@@ -264,7 +237,50 @@ app.openapi(readSetRoute, async (c) => {
         },
     }, 200);
 });
-app.route('/', calendarNativeRoutes);
+app.openapi(saveReadSetRoute, async (c) => {
+    const jwtUser = c.get('user');
+    if (!jwtUser) return c.json({ success: false as const, error: { message: 'Not authenticated' } }, 401);
+    const tenantId = c.get('tenantId') as string;
+    const connId = c.req.valid('param').id;
+    const open = await loadOpenCalendarConnection(
+        c.env.DB, tenantId, jwtUser.sub, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+    );
+    if (!open || open.connection.id !== connId) {
+        return c.json({ success: false as const, error: { message: 'Google Calendar not connected' } }, 404);
+    }
+    const parsed = SaveReadSetSchema.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) {
+        return c.json({ success: false as const, error: { message: 'Invalid read set', details: parsed.error.flatten() } }, 400);
+    }
+    const provider = getCalendarProvider(open.connection.provider);
+    const auth = await provider.resolveAuth({
+        tenantId, credentials: open.credentials, env: c.env,
+    });
+    if (!auth) {
+        return c.json({ success: false as const, error: { message: 'Google Calendar integration is not configured' } }, 400);
+    }
+    let available;
+    try {
+        available = await provider.listCalendars({ auth });
+    } catch (e) {
+        logger.error('[calendar] listCalendars (save) failed', { tenantId }, e instanceof Error ? e : undefined);
+        return c.json({ success: false as const, error: { message: 'Failed to fetch Google calendars' } }, 500);
+    }
+    let resolved;
+    try {
+        resolved = resolveReadSet(available, parsed.data);
+    } catch (e) {
+        if (e instanceof AppError) {
+            return c.json({ success: false as const, error: { code: e.code, message: e.message } }, e.status as 400);
+        }
+        throw e;
+    }
+    await saveReadSet(getDrizzle(c), { tenantId, connectionId: connId, resolved });
+    return c.json({
+        success: true as const,
+        data: { readCalendarIds: resolved.readCalendarIds, writeCalendarId: resolved.writeCalendarId },
+    }, 200);
+});
 app.route('/', calendarOAuthRoutes);
 
 /** Registration order, mounts included. Drives `CalendarApi`; a test pins it to what `app` really registered. */
@@ -276,7 +292,7 @@ export const calendarRouteParts = [
     syncRoute,
     statusRoute,
     readSetRoute,
-    legacyMounted('/', calendarNativeRoutes),
+    saveReadSetRoute,
     legacyMounted('/', calendarOAuthRoutes),
 ] as const;
 

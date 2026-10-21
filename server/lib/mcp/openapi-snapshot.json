@@ -979,6 +979,31 @@
     "description": "Hard-deletes a pending tenant_invites row that belongs to the caller tenant. 404 when the token is unknown, already accepted, or belongs to another tenant."
   },
   {
+    "operationId": "captureCollabSnapshot",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/snapshots",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Capture a snapshot of a report document",
+    "description": "Takes a snapshot of the inspection report document now, for the version history. No body. Callers on the inspection roster only."
+  },
+  {
     "operationId": "changeMyPassword",
     "method": "POST",
     "pathTemplate": "/api/auth/change-password",
@@ -2062,6 +2087,31 @@
     },
     "summary": "Create a cost item for an inspection",
     "description": "Create a new commercial PCA cost line item on the inspection. When findingKey is set and no explicit cost/remedy is given, the line is best-effort seeded from the finding's recommendation snapshot."
+  },
+  {
+    "operationId": "createInspectionEvent",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{inspectionId}/events",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "inspectionId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection the visit is scheduled on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection the visit is scheduled on."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Schedule a visit on an inspection",
+    "description": "Schedules a visit (event) of an event type on one inspection. The JSON body is {eventTypeId, scheduledAt, durationMin, inspectorId?, priceCents?, notes?}: scheduledAt is an ISO 8601 date-time, durationMin a positive whole number of minutes, and priceCents defaults to 0. A body that is not valid answers 400 with the field errors. A price is refused without the inspection-fees capability."
   },
   {
     "operationId": "createInspectionExportWord",
@@ -5687,6 +5737,20 @@
     "description": "Save the company's non-sensitive integration settings (appBaseUrl, turnstileSiteKey, googleClientId, streamCustomerSubdomain). The body is merged into what is stored: keys that are sent overwrite, keys that are left out are kept, and a key sent as an empty string is removed. The values are stored as plaintext, so secrets never go through this route. The change is audit-logged. Idempotent for the same body. Restricted to the owner."
   },
   {
+    "operationId": "createVisitEventType",
+    "method": "POST",
+    "pathTemplate": "/api/event-types",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Create a visit event type",
+    "description": "Creates an event type the company schedules visits with. The JSON body is {name, slug, defaultDurationMin?, defaultPriceCents?, color?, sortOrder?, followUpDelayHours?}: name and slug are required, slug is lowercase letters, digits and underscores, color is a six-digit hex value, and the omitted fields take 30 minutes, a price of 0, #6366f1, sort order 0 and the stored follow-up default. A body that is not valid answers 400 with the field errors. Owner or manager only; a price is refused without the inspection-fees capability."
+  },
+  {
     "operationId": "createWidgetEvent",
     "method": "POST",
     "pathTemplate": "/api/public/widget/event",
@@ -7950,6 +8014,41 @@
     },
     "summary": "Get the signed-in native client session",
     "description": "Returns the identity behind a native access token and the tenant offline access limit, which the device uses to decide when to lock local data. When the request carries X-Client-Platform and X-Client-Version, the server also notes that this version was seen."
+  },
+  {
+    "operationId": "getCollabSnapshot",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/collab/snapshots/{seq}",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        },
+        {
+          "name": "seq",
+          "in": "path",
+          "required": true,
+          "description": "Snapshot sequence number, a whole number of zero or more.",
+          "schema": {
+            "type": "string",
+            "description": "Snapshot sequence number, a whole number of zero or more."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get one snapshot of a report document",
+    "description": "Returns one snapshot in full, including the projection of the report document, so two versions can be compared. A sequence number the document has no snapshot for answers 404 from the Durable Object with a plain-text body. Callers on the inspection roster only."
   },
   {
     "operationId": "getCommunicationConfig",
@@ -11329,6 +11428,31 @@
     },
     "summary": "List the client conversation for an inspection",
     "description": "Client-portal read of the message thread between the caller and the inspector, oldest first. It marks the staff messages in that thread read. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
+  },
+  {
+    "operationId": "listCollabSnapshots",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/collab/snapshots",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the version history of a report document",
+    "description": "Lists the snapshots kept for the inspection report document, taken automatically and on demand, without their contents. Callers on the inspection roster only; the response is the Durable Object answer unchanged."
   },
   {
     "operationId": "listComplianceAiAssurance",
@@ -17790,6 +17914,31 @@
     "description": "Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields."
   },
   {
+    "operationId": "recordCollabFollowup",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/followup",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Record the follow-up verdict of a carried item",
+    "description": "Records the follow-up verdict of one item carried into a re-inspection. The JSON body is {itemId, status, notes?}: status is a follow-up status key of the company, or null to clear the answer, and notes of at most 4000 characters replace the note when present. Callers on the inspection roster only."
+  },
+  {
     "operationId": "recordInvoiceOfflinePayment",
     "method": "POST",
     "pathTemplate": "/api/invoices/{id}/payments",
@@ -18947,6 +19096,31 @@
     "description": "A PURE READ. Resolves the signed token to the company, the one notification it covers, and whether that notification is already off for this address. Writes nothing — link scanners and mail clients fetch every URL in an email, so acting here would unsubscribe people who never opened the message."
   },
   {
+    "operationId": "restoreCollabSnapshot",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/restore",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Restore a report document to a snapshot",
+    "description": "Replaces the live report document with a snapshot and makes every connected editor reload it. The JSON body is {seq}, the whole-number sequence number of the snapshot to restore. A sequence number the document has no snapshot for answers 404 from the Durable Object with a plain-text body. Callers on the inspection roster only."
+  },
+  {
     "operationId": "restoreContact",
     "method": "POST",
     "pathTemplate": "/api/contacts/{id}/restore",
@@ -18973,6 +19147,31 @@
     },
     "summary": "Restore an archived contact",
     "description": "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued. For a caller whose access is limited to the inspections assigned to them, a contact outside that set is answered as not found."
+  },
+  {
+    "operationId": "restructureCollabDocument",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/restructure",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Converge a report document after a template change",
+    "description": "Called after the template snapshot of the inspection changed: the live document is diffed against the new snapshot, added items are seeded, removed ones are dropped, and every connected editor resyncs. No body. Callers on the inspection roster only."
   },
   {
     "operationId": "resubmitSmsCompliance",
@@ -19327,6 +19526,31 @@
     },
     "summary": "Store this workspace's AI endpoint, model and switch",
     "description": "Blank values mean UNSET and are stored as null, which is how a workspace clears a destination. Turning the switch off keeps the endpoint and model — the control says so, and this is what makes that true. Every save bumps a version so anything holding a resolved endpoint can tell it is stale. A save that enables AI while the model or endpoint is blank, with nothing to fall back on, is refused with 422 naming the field."
+  },
+  {
+    "operationId": "saveCalendarReadSet",
+    "method": "PUT",
+    "pathTemplate": "/api/calendar/connections/{id}/calendars",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the signed-in user calendar connection whose read set is saved.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the signed-in user calendar connection whose read set is saved."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Save the calendar read set",
+    "description": "Saves which of the signed-in user calendars are read for busy time and which one new events are written to. The JSON body is {readCalendarIds, writeCalendarId}: readCalendarIds lists at least one calendar id, writeCalendarId is one of them and must be a calendar the user can edit, and the Primary calendar is always kept in the read set. Only the caller own connection can be saved; any other id answers 404."
   },
   {
     "operationId": "saveEmailTemplate",
@@ -20096,6 +20320,31 @@
     },
     "summary": "Switch one notification off for this address",
     "description": "Records the recipient's own choice for the ONE notification the token names, on the email channel, against the same `notification_preferences` row the signed-in screen writes. Needs no session. Two-directional on purpose — a recipient with no account has no other way back."
+  },
+  {
+    "operationId": "signInspectionAgreementInPerson",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/sign",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose agreement is signed in person.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose agreement is signed in person."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Record an in-person agreement signature",
+    "description": "Records a signature drawn on the inspector device for the inspection agreement, on the signing envelope so it carries the content snapshot, the audit chain and a receipt. The JSON body is {signatureBase64, signerId?, onBehalfOf?, onBehalfDisclaimer?}: signatureBase64 is the signature image as a data URL or raw base64, signerId defaults to the first signer who has not finished, and onBehalfOf and onBehalfDisclaimer name the party an authorized agent signs for. A body that is not valid answers 400. Signing again once the signer or the envelope has signed answers 200 with alreadySigned. Owner, manager or inspector only."
   },
   {
     "operationId": "signInspectionCompliance",
@@ -21038,6 +21287,31 @@
     },
     "summary": "Update an existing inspection cost item",
     "description": "Patch any subset of fields on an existing commercial PCA cost line item, tenant-scoped and restricted to the inspection it already belongs to."
+  },
+  {
+    "operationId": "updateInspectionEventStatus",
+    "method": "PUT",
+    "pathTemplate": "/api/events/{id}",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the visit whose status changes.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the visit whose status changes."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Change the status of a visit",
+    "description": "Moves one visit to a new lifecycle status. The JSON body is {status}, one of scheduled, completed, results_received or cancelled. The status decides who may make the change, so it is checked after the body is read: office staff accounts are refused for any status, and results_received is owner or manager only. A visit of an inspection the caller cannot see answers 404."
   },
   {
     "operationId": "updateInspectionMediaAnnotation",
