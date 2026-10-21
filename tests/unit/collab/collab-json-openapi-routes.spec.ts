@@ -8,7 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import collabRoutes from '../../../server/api/inspections/collab';
 import { buildOpenApiDocument } from '../../../server/lib/openapi/build-document';
-import { parseReinspectionStatuses } from '../../../server/lib/reinspection-status';
+import { parseReinspectionStatuses } from '@core/field-ui/shared/reinspection-status';
 import type { HonoConfig } from '../../../server/types/hono';
 
 const getInspectionRoster = vi.fn();
