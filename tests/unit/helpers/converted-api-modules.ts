@@ -252,3 +252,27 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
 ];
+
+/**
+ * Whether a router file's source imports `ApiOf` or `mounted` from `lib/api-schema`, by any relative path
+ * (`../lib/api-schema`, `../../lib/api-schema`, with or without `type`). A file that does derives its client
+ * type from a tuple, whatever the tuple is called, so it has to be listed in CONVERTED_API_MODULES.
+ */
+export function importsApiSchema(source: string): boolean {
+    const importFrom = /import\s+(?:type\s+)?(\{[^}]*\}|\*\s+as\s+\w+)\s*from\s*['"]\.{1,2}\/(?:[\w.-]+\/)*api-schema['"]/g;
+    for (const match of source.matchAll(importFrom)) {
+        const specifiers = match[1] ?? '';
+        if (specifiers.startsWith('*') || /\b(?:ApiOf|mounted)\b/.test(specifiers)) return true;
+    }
+    return false;
+}
+
+/** The by-name check the scan started with: an exported `xxxRouteConfigs` / `xxxRouteParts` tuple. */
+export function exportsRouteTuple(source: string): boolean {
+    return /^export const \w+(?:RouteConfigs|RouteParts) = \[/m.test(source);
+}
+
+/** A router file the registry must list: it imports the helpers, or it exports a tuple by the usual name. */
+export function needsRegistration(source: string): boolean {
+    return importsApiSchema(source) || exportsRouteTuple(source);
+}

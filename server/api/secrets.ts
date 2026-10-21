@@ -33,7 +33,7 @@ import {
     type AiKeyAttestation,
 } from '../lib/ai/byo-attestation';
 
-const SecretsResponseSchema = z.object({
+export const SecretsResponseSchema = z.object({
     success: z.literal(true),
     data: z.record(z.string(), z.string()),
 }).openapi('SecretsResponse');
@@ -44,7 +44,7 @@ const SecretsResponseSchema = z.object({
  * It is stripped in `saveSecretsImpl` before the merge, never sealed, and never
  * stored in the shape it arrives in.
  */
-const SecretsInputSchema = z.record(
+export const SecretsInputSchema = z.record(
     z.string(),
     z.union([z.string(), AiKeyAttestationSchema]).optional(),
 ).openapi('SecretsInput');

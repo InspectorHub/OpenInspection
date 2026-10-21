@@ -204,7 +204,7 @@ const invoiceRoute = createRoute(withMcpMetadata({
 // the tenant's OWN Stripe secret key is loaded per-request into c.env by the
 // integration-secrets middleware). Returns the client secret + the tenant's
 // publishable key so the browser can mount Stripe Elements inline.
-const PayIntentSchema = z.object({
+export const PayIntentSchema = z.object({
     clientSecret: z.string(),
     publishableKey: z.string(),
     amountCents: z.number(),
@@ -235,7 +235,7 @@ const payIntentRoute = createRoute(withMcpMetadata({
 // Public report-gate (③-A.2). The "report blocked, here's why + CTA" page,
 // resolved by tenant slug + id (no token — pre-report). Returns only
 // non-sensitive gate fields (reason + branding + inspector contact + amount).
-const ReportGateResponseSchema = z.object({
+export const ReportGateResponseSchema = z.object({
     reason: z.enum(['payment', 'agreement']),
     companyName: z.string(),
     primaryColor: z.string().nullable(),
