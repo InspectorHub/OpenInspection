@@ -1,5 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lt } from 'drizzle-orm';
@@ -75,121 +76,126 @@ const eventsRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['read'], tier: 'primary' }));
 
-const calendarEventsRoutes = createApiRouter()
-    .openapi(eventsRoute, async (c) => {
-    const { start, end } = c.req.valid('query');
-    const tenantId = c.get('tenantId') as string;
-    const jwtUser = c.get('user');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const db = drizzle(c.env.DB as any);
+const app = createApiRouter();
+app.openapi(eventsRoute, async (c) => {
+const { start, end } = c.req.valid('query');
+const tenantId = c.get('tenantId') as string;
+const jwtUser = c.get('user');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = drizzle(c.env.DB as any);
 
-    // Local inspections — date is stored as 'YYYY-MM-DD' text
-    const startDate = start.slice(0, 10);
-    const endDate = end.slice(0, 10);
+// Local inspections — date is stored as 'YYYY-MM-DD' text
+const startDate = start.slice(0, 10);
+const endDate = end.slice(0, 10);
 
-    const rows = await db
-        .select()
-        .from(inspections)
-        .where(and(
-            eq(inspections.tenantId, tenantId),
-            gte(inspections.date, startDate),
-            lt(inspections.date, endDate),
-            // Only the inspections the caller can see, the same set as their inspection list.
-            visibleInspectionsCondition(db, await resolveInspectionScope(c), tenantId),
-        ));
+const rows = await db
+    .select()
+    .from(inspections)
+    .where(and(
+        eq(inspections.tenantId, tenantId),
+        gte(inspections.date, startDate),
+        lt(inspections.date, endDate),
+        // Only the inspections the caller can see, the same set as their inspection list.
+        visibleInspectionsCondition(db, await resolveInspectionScope(c), tenantId),
+    ));
 
-    const events: unknown[] = rows.map((r) => {
-        // Iter-2 bug #5 — drafts must render on the calendar with a visual
-        // pill so inspectors can see un-confirmed work without clicking
-        // through. See server/lib/calendar-event-style.ts.
-        const style = getCalendarEventStyle(r.status);
-        return {
-            id: r.id,
-            title: `${style.titlePrefix}${r.propertyAddress}`,
-            start: r.date,
-            allDay: true,
-            url: `/inspections/${r.id}/edit`,
-            color: style.color,
-            extendedProps: {
-                source: 'local',
-                status: r.status,
-                isDraft: style.isDraft,
-            },
-        };
-    });
-
-    // Google Calendar events — best-effort; failures don't break local events
-    const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
-    const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
-    if (jwtUser?.sub && oauthCreds) {
-        try {
-            const open = await loadOpenCalendarConnection(
-                c.env.DB,
-                tenantId,
-                jwtUser.sub,
-                c.env.JWT_SECRET,
-                c.env.JWT_SECRET_PREVIOUS,
-            );
-            // This view wants event TITLES, which the provider contract's
-            // `listBusy` deliberately does not carry, so it still speaks to
-            // Google directly. That makes it the one remaining caller outside
-            // `calendar/google.ts` that touches OAuth material — narrow the
-            // stored payload to the OAuth member rather than casting, so a
-            // CalDAV connection simply contributes no events here instead of
-            // producing a request with an undefined refresh token.
-            const oauthPayload = open && 'refreshToken' in open.credentials ? open.credentials : null;
-            if (open && oauthPayload?.refreshToken) {
-                const cacheKey = `gcal_access:${jwtUser.sub}`;
-                let accessToken: string | null = c.env.TENANT_CACHE
-                    ? await c.env.TENANT_CACHE.get(cacheKey)
-                    : null;
-                if (!accessToken) {
-                    accessToken = await refreshGoogleToken(
-                        oauthCreds.clientId,
-                        oauthCreds.clientSecret,
-                        oauthPayload.refreshToken,
-                    );
-                    if (c.env.TENANT_CACHE) {
-                        await c.env.TENANT_CACHE.put(cacheKey, accessToken, { expirationTtl: 3500 });
-                    }
-                }
-                const calId = encodeURIComponent(open.connection.calendarId);
-                // Google API requires full RFC3339 timestamps. Convert YYYY-MM-DD inputs.
-                const toRfc3339 = (s: string): string =>
-                    /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00Z` : new Date(s).toISOString();
-                const params = new URLSearchParams({
-                    timeMin: toRfc3339(start),
-                    timeMax: toRfc3339(end),
-                    singleEvents: 'true',
-                    orderBy: 'startTime',
-                });
-                const gcalRes = await fetch(`${GOOGLE_CALENDAR_API}/calendars/${calId}/events?${params}`, {
-                    headers: { Authorization: `Bearer ${accessToken}` },
-                });
-                if (gcalRes.ok) {
-                    const gcalData = await gcalRes.json() as { items?: GoogleEvent[] };
-                    for (const ev of gcalData.items ?? []) {
-                        events.push({
-                            id: `gcal-${ev.id}`,
-                            title: ev.summary ?? '(No title)',
-                            start: ev.start?.dateTime ?? ev.start?.date,
-                            end: ev.end?.dateTime ?? ev.end?.date,
-                            color: '#9CA3AF',
-                            extendedProps: { source: 'google' },
-                        });
-                    }
-                }
-            }
-        } catch (err) {
-            logger.error('[calendar-events] Google Calendar fetch failed', {
-                userId: jwtUser.sub,
-            }, err instanceof Error ? err : undefined);
-        }
-    }
-
-    return c.json(events);
+const events: unknown[] = rows.map((r) => {
+    // Iter-2 bug #5 — drafts must render on the calendar with a visual
+    // pill so inspectors can see un-confirmed work without clicking
+    // through. See server/lib/calendar-event-style.ts.
+    const style = getCalendarEventStyle(r.status);
+    return {
+        id: r.id,
+        title: `${style.titlePrefix}${r.propertyAddress}`,
+        start: r.date,
+        allDay: true,
+        url: `/inspections/${r.id}/edit`,
+        color: style.color,
+        extendedProps: {
+            source: 'local',
+            status: r.status,
+            isDraft: style.isDraft,
+        },
+    };
 });
 
-export type CalendarEventsApi = typeof calendarEventsRoutes;
+// Google Calendar events — best-effort; failures don't break local events
+const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+if (jwtUser?.sub && oauthCreds) {
+    try {
+        const open = await loadOpenCalendarConnection(
+            c.env.DB,
+            tenantId,
+            jwtUser.sub,
+            c.env.JWT_SECRET,
+            c.env.JWT_SECRET_PREVIOUS,
+        );
+        // This view wants event TITLES, which the provider contract's
+        // `listBusy` deliberately does not carry, so it still speaks to
+        // Google directly. That makes it the one remaining caller outside
+        // `calendar/google.ts` that touches OAuth material — narrow the
+        // stored payload to the OAuth member rather than casting, so a
+        // CalDAV connection simply contributes no events here instead of
+        // producing a request with an undefined refresh token.
+        const oauthPayload = open && 'refreshToken' in open.credentials ? open.credentials : null;
+        if (open && oauthPayload?.refreshToken) {
+            const cacheKey = `gcal_access:${jwtUser.sub}`;
+            let accessToken: string | null = c.env.TENANT_CACHE
+                ? await c.env.TENANT_CACHE.get(cacheKey)
+                : null;
+            if (!accessToken) {
+                accessToken = await refreshGoogleToken(
+                    oauthCreds.clientId,
+                    oauthCreds.clientSecret,
+                    oauthPayload.refreshToken,
+                );
+                if (c.env.TENANT_CACHE) {
+                    await c.env.TENANT_CACHE.put(cacheKey, accessToken, { expirationTtl: 3500 });
+                }
+            }
+            const calId = encodeURIComponent(open.connection.calendarId);
+            // Google API requires full RFC3339 timestamps. Convert YYYY-MM-DD inputs.
+            const toRfc3339 = (s: string): string =>
+                /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00Z` : new Date(s).toISOString();
+            const params = new URLSearchParams({
+                timeMin: toRfc3339(start),
+                timeMax: toRfc3339(end),
+                singleEvents: 'true',
+                orderBy: 'startTime',
+            });
+            const gcalRes = await fetch(`${GOOGLE_CALENDAR_API}/calendars/${calId}/events?${params}`, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (gcalRes.ok) {
+                const gcalData = await gcalRes.json() as { items?: GoogleEvent[] };
+                for (const ev of gcalData.items ?? []) {
+                    events.push({
+                        id: `gcal-${ev.id}`,
+                        title: ev.summary ?? '(No title)',
+                        start: ev.start?.dateTime ?? ev.start?.date,
+                        end: ev.end?.dateTime ?? ev.end?.date,
+                        color: '#9CA3AF',
+                        extendedProps: { source: 'google' },
+                    });
+                }
+            }
+        }
+    } catch (err) {
+        logger.error('[calendar-events] Google Calendar fetch failed', {
+            userId: jwtUser.sub,
+        }, err instanceof Error ? err : undefined);
+    }
+}
 
-export default calendarEventsRoutes;
+return c.json(events);
+});
+
+/** Registration order. Drives `CalendarEventsApi`; a test pins it to what `app` really registered. */
+export const calendarEventsRouteConfigs = [
+    eventsRoute,
+] as const;
+
+export type CalendarEventsApi = ApiOf<typeof calendarEventsRouteConfigs>;
+
+export default app;

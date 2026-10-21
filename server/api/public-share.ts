@@ -10,6 +10,7 @@
 
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema';
@@ -50,43 +51,48 @@ const shareTokenRoute = createRoute(withMcpMetadata({
     description: "Public route behind the report viewer's Share button: mints a view-only link to a published report that expires after 30 days. No login is needed, but the caller must prove it can already see the report by passing its existing portal or agent-view access token in the token query parameter; without a valid token for this inspection the answer is 404, the same as for an unknown inspection. Returns 403 when the report has not been published. The result is a new token and the full report URL (?view=agent&token=...). Nothing is emailed, and every call mints another token while earlier ones keep working until they expire."
 }, { scopes: [], tier: 'extended' }));
 
-const publicShareRoutes = createApiRouter()
-    .openapi(shareTokenRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { token } = c.req.valid('query');
+const app = createApiRouter();
+app.openapi(shareTokenRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { token } = c.req.valid('query');
 
-        // Authorize by an EXISTING access proof for THIS inspection — the same
-        // portal token (or legacy agent-view bridge) the report-data endpoints
-        // accept — and take the AUTHORITATIVE tenantId from it. The tenant is no
-        // longer trusted from the URL-derived middleware value, which provided no
-        // protection (it was resolved from the inspection id itself).
-        let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
-        if (!tenantId && token) {
-            const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
-            if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
-        }
-        if (!tenantId) throw Errors.NotFound('Inspection not found');
+    // Authorize by an EXISTING access proof for THIS inspection — the same
+    // portal token (or legacy agent-view bridge) the report-data endpoints
+    // accept — and take the AUTHORITATIVE tenantId from it. The tenant is no
+    // longer trusted from the URL-derived middleware value, which provided no
+    // protection (it was resolved from the inspection id itself).
+    let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
+    if (!tenantId && token) {
+        const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
+        if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
+    }
+    if (!tenantId) throw Errors.NotFound('Inspection not found');
 
-        const db = getDrizzle(c);
-        const insp = await db.select({
-            status: inspections.status,
-            reportStatus: inspections.reportStatus,
-        }).from(inspections)
-            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
-            .get();
-        if (!insp) throw Errors.NotFound('Inspection not found');
-        if (!isReportPublished(insp.reportStatus)) {
-            throw Errors.Forbidden('Report has not been published yet');
-        }
+    const db = getDrizzle(c);
+    const insp = await db.select({
+        status: inspections.status,
+        reportStatus: inspections.reportStatus,
+    }).from(inspections)
+        .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+        .get();
+    if (!insp) throw Errors.NotFound('Inspection not found');
+    if (!isReportPublished(insp.reportStatus)) {
+        throw Errors.Forbidden('Report has not been published yet');
+    }
 
-        const shareToken = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
-        const baseUrl = c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`;
-        const tenantSlug = c.get('requestedTenantSlug') ?? '';
-        const url = `${baseUrl}/report/${tenantSlug}/${id}?view=agent&token=${shareToken}`;
-        logger.info('Public share-token minted', { inspectionId: id, tenantId });
-        return sendSuccess(c, { token: shareToken, url });
-    });
+    const shareToken = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
+    const baseUrl = c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`;
+    const tenantSlug = c.get('requestedTenantSlug') ?? '';
+    const url = `${baseUrl}/report/${tenantSlug}/${id}?view=agent&token=${shareToken}`;
+    logger.info('Public share-token minted', { inspectionId: id, tenantId });
+    return sendSuccess(c, { token: shareToken, url });
+});
 
-export type PublicShareApi = typeof publicShareRoutes;
+/** Registration order. Drives `PublicShareApi`; a test pins it to what `app` really registered. */
+export const publicShareRouteConfigs = [
+    shareTokenRoute,
+] as const;
 
-export default publicShareRoutes;
+export type PublicShareApi = ApiOf<typeof publicShareRouteConfigs>;
+
+export default app;

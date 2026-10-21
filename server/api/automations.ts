@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import {
     AutomationListResponseSchema, AutomationLogListResponseSchema,
@@ -83,40 +84,49 @@ const deleteRoute = createRoute(withMcpMetadata({
         + "the second time. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
-const automationsRoutes = createApiRouter()
-    .openapi(listRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        await c.var.services.automation.ensureSeeds(tenantId);
-        const rows = await c.var.services.automation.list(tenantId);
-        return c.json({ success: true, data: rows });
-    })
-    .openapi(createAutomationRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const data = c.req.valid('json');
-        const row = await c.var.services.automation.create(tenantId, data);
-        return c.json({ success: true, data: row }, 201);
-    })
-    .openapi(getRecentLogsRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { limit } = c.req.valid('query');
-        const rows = await c.var.services.automation.listRecentLogs(tenantId, limit ?? 50);
-        return c.json({ success: true, data: rows });
-    })
-    .openapi(updateRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { id } = c.req.valid('param');
-        const data = c.req.valid('json');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod partial() adds undefined to values, incompatible with exactOptionalPropertyTypes
-        const row = await c.var.services.automation.update(tenantId, id, data as any);
-        return c.json({ success: true, data: row });
-    })
-    .openapi(deleteRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { id } = c.req.valid('param');
-        await c.var.services.automation.delete(tenantId, id);
-        return c.json({ success: true });
-    });
+const app = createApiRouter();
+app.openapi(listRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    await c.var.services.automation.ensureSeeds(tenantId);
+    const rows = await c.var.services.automation.list(tenantId);
+    return c.json({ success: true, data: rows });
+});
+app.openapi(createAutomationRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const data = c.req.valid('json');
+    const row = await c.var.services.automation.create(tenantId, data);
+    return c.json({ success: true, data: row }, 201);
+});
+app.openapi(getRecentLogsRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { limit } = c.req.valid('query');
+    const rows = await c.var.services.automation.listRecentLogs(tenantId, limit ?? 50);
+    return c.json({ success: true, data: rows });
+});
+app.openapi(updateRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const data = c.req.valid('json');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Zod partial() adds undefined to values, incompatible with exactOptionalPropertyTypes
+    const row = await c.var.services.automation.update(tenantId, id, data as any);
+    return c.json({ success: true, data: row });
+});
+app.openapi(deleteRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    await c.var.services.automation.delete(tenantId, id);
+    return c.json({ success: true });
+});
 
-export type AutomationsApi = typeof automationsRoutes;
+/** Registration order. Drives `AutomationsApi`; a test pins it to what `app` really registered. */
+export const automationsRouteConfigs = [
+    listRoute,
+    createAutomationRoute,
+    getRecentLogsRoute,
+    updateRoute,
+    deleteRoute,
+] as const;
 
-export default automationsRoutes;
+export type AutomationsApi = ApiOf<typeof automationsRouteConfigs>;
+
+export default app;

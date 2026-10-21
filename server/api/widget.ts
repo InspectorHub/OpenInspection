@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
 const recordEventRoute = createRoute(withMcpMetadata({
@@ -34,22 +35,27 @@ const recordEventRoute = createRoute(withMcpMetadata({
     description: "Public, unauthenticated beacon that the embedded booking widget calls from a visitor's browser to report what happened in the widget. The company is resolved from the request's tenant context, and the event is recorded as a widget.<event> entry in that company's audit log only when the request's Origin header matches the company's widget origin allowlist. Anything else (no company, no Origin header, empty allowlist, origin not on the list) is dropped silently and still answers 200 with success true, so a 200 does not prove the event was stored. The submitted metadata is stored as sent, together with the origin. Not idempotent: each accepted call adds an entry."
 }, { scopes: [], tier: 'excluded' }));
 
-const widgetRoutes = createApiRouter()
-    .openapi(recordEventRoute, async (c) => {
-        const tenantId = c.get('resolvedTenantId') || c.get('tenantId');
-        if (!tenantId) {
-            return c.json({ success: true }, 200);
-        }
-        const origin = c.req.header('origin');
-        const ok = await c.var.services.widget.isOriginAllowed(tenantId, origin ?? null);
-        if (!ok) {
-            // Silently drop unauthorised events (no signal for attackers, no DB noise)
-            return c.json({ success: true }, 200);
-        }
-        const { event, metadata } = c.req.valid('json');
-        await c.var.services.widget.recordEvent(tenantId, event, { ...(metadata ?? {}), origin });
+const app = createApiRouter();
+app.openapi(recordEventRoute, async (c) => {
+    const tenantId = c.get('resolvedTenantId') || c.get('tenantId');
+    if (!tenantId) {
         return c.json({ success: true }, 200);
-    });
+    }
+    const origin = c.req.header('origin');
+    const ok = await c.var.services.widget.isOriginAllowed(tenantId, origin ?? null);
+    if (!ok) {
+        // Silently drop unauthorised events (no signal for attackers, no DB noise)
+        return c.json({ success: true }, 200);
+    }
+    const { event, metadata } = c.req.valid('json');
+    await c.var.services.widget.recordEvent(tenantId, event, { ...(metadata ?? {}), origin });
+    return c.json({ success: true }, 200);
+});
 
-export type WidgetApi = typeof widgetRoutes;
-export default widgetRoutes;
+/** Registration order. Drives `WidgetApi`; a test pins it to what `app` really registered. */
+export const widgetRouteConfigs = [
+    recordEventRoute,
+] as const;
+
+export type WidgetApi = ApiOf<typeof widgetRouteConfigs>;
+export default app;

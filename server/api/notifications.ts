@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import {
     ListNotificationsQuerySchema,
     ListNotificationsResponseSchema,
@@ -131,51 +132,60 @@ const archiveRoute = createRoute(withMcpMetadata({
     description: "Archives one of the calling user's notifications so it no longer appears in the default list; it is not erased and can still be listed with includeArchived=1. Only the caller's own notifications are affected, and an unknown id is silently ignored (still returns ok)."
 }, { scopes: ['write'], tier: 'primary' }));
 
-const notificationsRoutes = createApiRouter()
-    .openapi(listRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const userId   = requireUserId(c);
-        const q = c.req.valid('query');
-        const opts: ListOptions = {
-            ...(q.unread === '1' ? { unread: true } : {}),
-            ...(q.includeArchived === '1' ? { includeArchived: true } : {}),
-            ...(q.limit ? { limit: q.limit } : {}),
-            ...(q.cursor ? { cursor: q.cursor } : {}),
-        };
-        const result = await c.var.services.notification.list(tenantId, userId, opts);
-        return c.json({
-            success: true as const,
-            data: result.items.map(dto),
-            meta: { nextCursor: result.nextCursor },
-        }, 200);
-    })
-    .openapi(unreadCountRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const userId   = requireUserId(c);
-        const count = await c.var.services.notification.unreadCount(tenantId, userId);
-        return c.json({ success: true as const, data: { count } }, 200);
-    })
-    .openapi(markReadRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const userId   = requireUserId(c);
-        const { ids } = c.req.valid('json');
-        await c.var.services.notification.markRead(tenantId, userId, ids);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(markAllRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const userId   = requireUserId(c);
-        await c.var.services.notification.markAllRead(tenantId, userId);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(archiveRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const userId   = requireUserId(c);
-        const { id } = c.req.valid('param');
-        await c.var.services.notification.archive(tenantId, userId, id);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    });
+const app = createApiRouter();
+app.openapi(listRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const userId   = requireUserId(c);
+    const q = c.req.valid('query');
+    const opts: ListOptions = {
+        ...(q.unread === '1' ? { unread: true } : {}),
+        ...(q.includeArchived === '1' ? { includeArchived: true } : {}),
+        ...(q.limit ? { limit: q.limit } : {}),
+        ...(q.cursor ? { cursor: q.cursor } : {}),
+    };
+    const result = await c.var.services.notification.list(tenantId, userId, opts);
+    return c.json({
+        success: true as const,
+        data: result.items.map(dto),
+        meta: { nextCursor: result.nextCursor },
+    }, 200);
+});
+app.openapi(unreadCountRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const userId   = requireUserId(c);
+    const count = await c.var.services.notification.unreadCount(tenantId, userId);
+    return c.json({ success: true as const, data: { count } }, 200);
+});
+app.openapi(markReadRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const userId   = requireUserId(c);
+    const { ids } = c.req.valid('json');
+    await c.var.services.notification.markRead(tenantId, userId, ids);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(markAllRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const userId   = requireUserId(c);
+    await c.var.services.notification.markAllRead(tenantId, userId);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(archiveRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const userId   = requireUserId(c);
+    const { id } = c.req.valid('param');
+    await c.var.services.notification.archive(tenantId, userId, id);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
 
-export type NotificationsApi = typeof notificationsRoutes;
+/** Registration order. Drives `NotificationsApi`; a test pins it to what `app` really registered. */
+export const notificationsRouteConfigs = [
+    listRoute,
+    unreadCountRoute,
+    markReadRoute,
+    markAllRoute,
+    archiveRoute,
+] as const;
 
-export default notificationsRoutes;
+export type NotificationsApi = ApiOf<typeof notificationsRouteConfigs>;
+
+export default app;

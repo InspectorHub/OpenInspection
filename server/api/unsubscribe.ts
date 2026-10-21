@@ -46,6 +46,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
@@ -158,48 +159,54 @@ async function resolveLink(
     return { grant, cls, subjects };
 }
 
-const unsubscribeRoutes = createApiRouter()
-    .openapi(resolveRoute, async (c) => {
-        const db = getDrizzle(c);
-        const { token } = c.req.valid('query');
-        const { grant, cls, subjects } = await resolveLink(db, c.env.JWT_SECRET, token);
+const app = createApiRouter();
+app.openapi(resolveRoute, async (c) => {
+    const db = getDrizzle(c);
+    const { token } = c.req.valid('query');
+    const { grant, cls, subjects } = await resolveLink(db, c.env.JWT_SECRET, token);
 
-        // The name the recipient recognises is the company's, not the platform's
-        // — they were emailed by an inspection company, and a page headed with
-        // the software's name would read as a different organisation entirely.
-        const cfg = await db.select({ companyName: tenantConfigs.companyName })
-            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, grant.tenantId)).get();
+    // The name the recipient recognises is the company's, not the platform's
+    // — they were emailed by an inspection company, and a page headed with
+    // the software's name would read as a different organisation entirely.
+    const cfg = await db.select({ companyName: tenantConfigs.companyName })
+        .from(tenantConfigs).where(eq(tenantConfigs.tenantId, grant.tenantId)).get();
 
-        return c.json({
-            success: true as const,
-            data: {
-                companyName: cfg?.companyName ?? 'this company',
-                label: cls.label,
-                classId: cls.id,
-                muted: await isPreferenceMuted(db, grant.tenantId, cls.id, 'email', subjects),
-            },
-        }, 200);
-    })
-    .openapi(setRoute, async (c) => {
-        const db = getDrizzle(c);
-        const { token, enabled } = c.req.valid('json');
-        const { grant, subjects } = await resolveLink(db, c.env.JWT_SECRET, token);
+    return c.json({
+        success: true as const,
+        data: {
+            companyName: cfg?.companyName ?? 'this company',
+            label: cls.label,
+            classId: cls.id,
+            muted: await isPreferenceMuted(db, grant.tenantId, cls.id, 'email', subjects),
+        },
+    }, 200);
+});
+app.openapi(setRoute, async (c) => {
+    const db = getDrizzle(c);
+    const { token, enabled } = c.req.valid('json');
+    const { grant, subjects } = await resolveLink(db, c.env.JWT_SECRET, token);
 
-        // EVERY subject the address stands for, because one person can be both a
-        // user and a contact and they are the same human. Muting one of the two
-        // would be a control that half-works, which is worse than none.
-        for (const s of subjects) {
-            await writeChoice(db, {
-                tenantId: grant.tenantId,
-                subjectKind: s.kind,
-                subjectId: s.id,
-                classId: grant.classId,
-                channel: 'email',
-                enabled,
-            });
-        }
-        return c.json({ success: true as const, enabled }, 200);
-    });
+    // EVERY subject the address stands for, because one person can be both a
+    // user and a contact and they are the same human. Muting one of the two
+    // would be a control that half-works, which is worse than none.
+    for (const s of subjects) {
+        await writeChoice(db, {
+            tenantId: grant.tenantId,
+            subjectKind: s.kind,
+            subjectId: s.id,
+            classId: grant.classId,
+            channel: 'email',
+            enabled,
+        });
+    }
+    return c.json({ success: true as const, enabled }, 200);
+});
 
-export default unsubscribeRoutes;
-export type UnsubscribeApi = typeof unsubscribeRoutes;
+/** Registration order. Drives `UnsubscribeApi`; a test pins it to what `app` really registered. */
+export const unsubscribeRouteConfigs = [
+    resolveRoute,
+    setRoute,
+] as const;
+
+export default app;
+export type UnsubscribeApi = ApiOf<typeof unsubscribeRouteConfigs>;

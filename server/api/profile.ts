@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { drizzle } from 'drizzle-orm/d1';
 import { CredentialService } from '../services/credential.service';
 import { and, eq } from 'drizzle-orm';
@@ -168,142 +169,149 @@ const photoUploadRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'excluded' }));
 
-const profileRoutes = createApiRouter()
-    .openapi(getProfileRoute, async (c) => {
-        const userId = c.get('user')?.sub;
-        const tenantId = c.get('tenantId');
-        if (!userId || !tenantId) throw Errors.Unauthorized();
+const app = createApiRouter();
+app.openapi(getProfileRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
 
-        const row = await drizzle(c.env.DB as never).select({
-            name: users.name,
-            email: users.email,
-            phone: users.phone,
-            slug: users.slug,
-            photoUrl: users.photoUrl,
-            signatureEnabled: users.signatureEnabled,
-            timezone: users.timezone,
-            locale: users.locale,
-            dateFormat: users.dateFormat,
-            timeFormat: users.timeFormat,
-            statutoryLicenseType: users.statutoryLicenseType,
-            statutoryQualification: users.statutoryQualification,
-            // The drawn signature itself. Settings said "Signature saved" and
-            // showed the reader nothing — so the one thing they might want to
-            // check, that the right mark was captured, was the one thing the
-            // page would not tell them.
-            savedSignature: users.defaultSignatureBase64,
-        }).from(users)
-          .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
-          .get();
+    const row = await drizzle(c.env.DB as never).select({
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        slug: users.slug,
+        photoUrl: users.photoUrl,
+        signatureEnabled: users.signatureEnabled,
+        timezone: users.timezone,
+        locale: users.locale,
+        dateFormat: users.dateFormat,
+        timeFormat: users.timeFormat,
+        statutoryLicenseType: users.statutoryLicenseType,
+        statutoryQualification: users.statutoryQualification,
+        // The drawn signature itself. Settings said "Signature saved" and
+        // showed the reader nothing — so the one thing they might want to
+        // check, that the right mark was captured, was the one thing the
+        // page would not tell them.
+        savedSignature: users.defaultSignatureBase64,
+    }).from(users)
+      .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
+      .get();
 
-        if (!row) throw Errors.NotFound('User not found');
+    if (!row) throw Errors.NotFound('User not found');
 
-        const host = new URL(c.req.url).host;
-        const tenantSlug = c.get('requestedTenantSlug') ?? null;
-        // The preview MUST carry credentials, or it shows a signature the
-        // reader will never receive. `inspectorSignature` has accepted them
-        // since Spec B; no caller ever supplied them, so the feature was wired
-        // and dead — the badges render nowhere despite the settings copy
-        // promising "shown on your reports, emails, and booking page".
-        const credentials = await new CredentialService(c.env.DB).listRenderable(tenantId, userId);
+    const host = new URL(c.req.url).host;
+    const tenantSlug = c.get('requestedTenantSlug') ?? null;
+    // The preview MUST carry credentials, or it shows a signature the
+    // reader will never receive. `inspectorSignature` has accepted them
+    // since Spec B; no caller ever supplied them, so the feature was wired
+    // and dead — the badges render nowhere despite the settings copy
+    // promising "shown on your reports, emails, and booking page".
+    const credentials = await new CredentialService(c.env.DB).listRenderable(tenantId, userId);
 
-        const signaturePreviewHtml = (row.name ?? '').trim()
-          ? inspectorSignature({
-              name: row.name, email: row.email, phone: row.phone,
-              tenantSlug, credentials,
-              // RELATIVE badge URLs. `host` here is the in-process API
-              // request's, which in local dev is a different port than the
-              // browser is on, so absolutizing against it pointed every badge
-              // at a port with nothing behind it. The preview is drawn on this
-              // app's own origin; letting the browser resolve them is both
-              // simpler and immune to that whole class of mismatch.
-            }, host, { assetOrigin: '' }).html
-          : '';
+    const signaturePreviewHtml = (row.name ?? '').trim()
+      ? inspectorSignature({
+          name: row.name, email: row.email, phone: row.phone,
+          tenantSlug, credentials,
+          // RELATIVE badge URLs. `host` here is the in-process API
+          // request's, which in local dev is a different port than the
+          // browser is on, so absolutizing against it pointed every badge
+          // at a port with nothing behind it. The preview is drawn on this
+          // app's own origin; letting the browser resolve them is both
+          // simpler and immune to that whole class of mismatch.
+        }, host, { assetOrigin: '' }).html
+      : '';
 
-        return c.json({
-            success: true as const,
-            data: { ...row, signatureEnabled: row.signatureEnabled, signaturePreviewHtml },
-        }, 200);
-    })
-    .openapi(patchProfileRoute, async (c) => {
-        const userId = c.get('user')?.sub;
-        const tenantId = c.get('tenantId');
-        if (!userId || !tenantId) throw Errors.Unauthorized();
+    return c.json({
+        success: true as const,
+        data: { ...row, signatureEnabled: row.signatureEnabled, signaturePreviewHtml },
+    }, 200);
+});
+app.openapi(patchProfileRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
 
-        const body = c.req.valid('json');
-        const updates: Record<string, unknown> = {};
+    const body = c.req.valid('json');
+    const updates: Record<string, unknown> = {};
 
-        if (body.name !== undefined) updates.name = body.name;
-        if (body.phone !== undefined) updates.phone = body.phone;
-        if (body.signatureEnabled !== undefined) updates.signatureEnabled = body.signatureEnabled;
-        // Per-user timezone override: empty string clears it (NULL = inherit tenant).
-        if (body.timezone !== undefined) updates.timezone = body.timezone === '' ? null : body.timezone;
-        // Per-user locale override: empty string clears it (NULL = inherit tenant).
-        if (body.locale !== undefined) updates.locale = body.locale === '' ? null : body.locale;
-        // #270 — per-user date/time SHAPE override, same '' = clear convention.
-        if (body.dateFormat !== undefined) updates.dateFormat = body.dateFormat === '' ? null : body.dateFormat;
-        if (body.timeFormat !== undefined) updates.timeFormat = body.timeFormat === '' ? null : body.timeFormat;
-        // Same '' = clear convention. Trimmed, because a licence class that is
-        // one space would print as a blank box on an authority's form while
-        // reading as answered everywhere in this software.
-        if (body.statutoryLicenseType !== undefined) {
-            updates.statutoryLicenseType = body.statutoryLicenseType.trim() || null;
-        }
-        if (body.statutoryQualification !== undefined) {
-            updates.statutoryQualification = body.statutoryQualification.trim() || null;
-        }
-        // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
-        // Agent slug writes go through POST /api/agent/profile (separate endpoint).
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.phone !== undefined) updates.phone = body.phone;
+    if (body.signatureEnabled !== undefined) updates.signatureEnabled = body.signatureEnabled;
+    // Per-user timezone override: empty string clears it (NULL = inherit tenant).
+    if (body.timezone !== undefined) updates.timezone = body.timezone === '' ? null : body.timezone;
+    // Per-user locale override: empty string clears it (NULL = inherit tenant).
+    if (body.locale !== undefined) updates.locale = body.locale === '' ? null : body.locale;
+    // #270 — per-user date/time SHAPE override, same '' = clear convention.
+    if (body.dateFormat !== undefined) updates.dateFormat = body.dateFormat === '' ? null : body.dateFormat;
+    if (body.timeFormat !== undefined) updates.timeFormat = body.timeFormat === '' ? null : body.timeFormat;
+    // Same '' = clear convention. Trimmed, because a licence class that is
+    // one space would print as a blank box on an authority's form while
+    // reading as answered everywhere in this software.
+    if (body.statutoryLicenseType !== undefined) {
+        updates.statutoryLicenseType = body.statutoryLicenseType.trim() || null;
+    }
+    if (body.statutoryQualification !== undefined) {
+        updates.statutoryQualification = body.statutoryQualification.trim() || null;
+    }
+    // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
+    // Agent slug writes go through POST /api/agent/profile (separate endpoint).
 
-        if (Object.keys(updates).length > 0) {
-            await drizzle(c.env.DB as never).update(users)
-                .set(updates)
-                .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-        }
-
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(photoUploadRoute, async (c) => {
-        const userId = c.get('user')?.sub;
-        const tenantId = c.get('tenantId');
-        if (!userId || !tenantId) throw Errors.Unauthorized();
-
-        if (!c.env.PHOTOS) throw Errors.BadRequest('Photo storage not available');
-
-        const fd = await c.req.parseBody();
-        const file = fd['photo'];
-        if (!(file instanceof File)) throw Errors.BadRequest('photo missing');
-        if (file.size > MAX_PHOTO_BYTES) {
-            throw Errors.BadRequest(`photo > ${Math.round(MAX_PHOTO_BYTES / 1_000_000)}MB`);
-        }
-        if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type)) {
-            throw Errors.BadRequest('photo must be jpg, png, or webp');
-        }
-
-        const ext = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
-        // Tenant-prefixed key keeps cross-tenant photos isolated even though the
-        // serving route at /photos/:key is public — keys are unguessable + scoped.
-        const key = r2Keys.inspectorPhoto(tenantId, userId, ext);
-        const buf = new Uint8Array(await file.arrayBuffer());
-        await r2Put(c.env.PHOTOS, key, buf, { httpMetadata: { contentType: file.type } });
-
-        // A RELATIVE path, stored. Every consumer of `users.photo_url` is a
-        // browser surface — this page, the public booking page, concierge,
-        // presence — so each already has the right origin and nothing needs one
-        // baked in. The absolute form was built from the request's host, which
-        // for an in-process API call is not the host the browser is on: the
-        // photo saved fine and then rendered as a broken image, pointing at a
-        // port nobody was serving. An absolute URL is also a hostage to the
-        // deploy origin never changing, for no benefit here.
-        const photoUrl = `/photos/${key}`;
-        await getDrizzle(c).update(users)
-            .set({ photoUrl })
+    if (Object.keys(updates).length > 0) {
+        await drizzle(c.env.DB as never).update(users)
+            .set(updates)
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+    }
 
-        logger.info('profile.photo.upload', { userId, tenantId, size: file.size, type: file.type });
-        return c.json({ success: true as const, data: { photoUrl } }, 200);
-    });
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(photoUploadRoute, async (c) => {
+    const userId = c.get('user')?.sub;
+    const tenantId = c.get('tenantId');
+    if (!userId || !tenantId) throw Errors.Unauthorized();
 
-export type ProfileApi = typeof profileRoutes;
+    if (!c.env.PHOTOS) throw Errors.BadRequest('Photo storage not available');
 
-export default profileRoutes;
+    const fd = await c.req.parseBody();
+    const file = fd['photo'];
+    if (!(file instanceof File)) throw Errors.BadRequest('photo missing');
+    if (file.size > MAX_PHOTO_BYTES) {
+        throw Errors.BadRequest(`photo > ${Math.round(MAX_PHOTO_BYTES / 1_000_000)}MB`);
+    }
+    if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type)) {
+        throw Errors.BadRequest('photo must be jpg, png, or webp');
+    }
+
+    const ext = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
+    // Tenant-prefixed key keeps cross-tenant photos isolated even though the
+    // serving route at /photos/:key is public — keys are unguessable + scoped.
+    const key = r2Keys.inspectorPhoto(tenantId, userId, ext);
+    const buf = new Uint8Array(await file.arrayBuffer());
+    await r2Put(c.env.PHOTOS, key, buf, { httpMetadata: { contentType: file.type } });
+
+    // A RELATIVE path, stored. Every consumer of `users.photo_url` is a
+    // browser surface — this page, the public booking page, concierge,
+    // presence — so each already has the right origin and nothing needs one
+    // baked in. The absolute form was built from the request's host, which
+    // for an in-process API call is not the host the browser is on: the
+    // photo saved fine and then rendered as a broken image, pointing at a
+    // port nobody was serving. An absolute URL is also a hostage to the
+    // deploy origin never changing, for no benefit here.
+    const photoUrl = `/photos/${key}`;
+    await getDrizzle(c).update(users)
+        .set({ photoUrl })
+        .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+
+    logger.info('profile.photo.upload', { userId, tenantId, size: file.size, type: file.type });
+    return c.json({ success: true as const, data: { photoUrl } }, 200);
+});
+
+/** Registration order. Drives `ProfileApi`; a test pins it to what `app` really registered. */
+export const profileRouteConfigs = [
+    getProfileRoute,
+    patchProfileRoute,
+    photoUploadRoute,
+] as const;
+
+export type ProfileApi = ApiOf<typeof profileRouteConfigs>;
+
+export default app;

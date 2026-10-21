@@ -1,5 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
+import type { ApiOf } from '../../lib/api-schema';
 import { requireRole } from '../../lib/middleware/rbac';
 import {
     ContactImportPreviewSchema, ContactImportPreviewResponseSchema,
@@ -47,19 +48,25 @@ const importRoute = createRoute(withMcpMetadata({
     description: 'Bulk-inserts contacts from a previously-previewed CSV blob using the user-confirmed column mapping. Two-phase (B-29+): every row is validated first (name, email format, in-file duplicate emails) and ANY error returns the full error list with ZERO rows written; valid files insert atomically in one chunked db.batch. Blank names and already-existing emails are skips, not errors.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-const contactsImportRoutes = createApiRouter()
-    .openapi(importPreviewRoute, async (c) => {
-        const { csv } = c.req.valid('json');
-        const data = parseCsvPreview(csv);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(importRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { csv, mapping } = c.req.valid('json');
-        const db = getDrizzle(c);
-        const data = await importContacts(db, tenantId, csv, mapping);
-        return c.json({ success: true as const, data }, 200);
-    });
+const app = createApiRouter();
+app.openapi(importPreviewRoute, async (c) => {
+    const { csv } = c.req.valid('json');
+    const data = parseCsvPreview(csv);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(importRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { csv, mapping } = c.req.valid('json');
+    const db = getDrizzle(c);
+    const data = await importContacts(db, tenantId, csv, mapping);
+    return c.json({ success: true as const, data }, 200);
+});
 
-export type ContactsImportApi = typeof contactsImportRoutes;
-export default contactsImportRoutes;
+/** Registration order. Drives `ContactsImportApi`; a test pins it to what `app` really registered. */
+export const contactsImportRouteConfigs = [
+    importPreviewRoute,
+    importRoute,
+] as const;
+
+export type ContactsImportApi = ApiOf<typeof contactsImportRouteConfigs>;
+export default app;

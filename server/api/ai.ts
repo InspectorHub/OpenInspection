@@ -1,5 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { checkRateLimit } from '../lib/rate-limit';
@@ -183,76 +184,85 @@ const contentReviewRoute = createRoute(withMcpMetadata({
     description: "Record that a named user reviewed the output of one AI call attached to one artifact. Idempotent on (person, artifact, call): a retry is a no-op, and a second REVIEWER is a second row rather than a duplicate. Requires the editReports capability; office staff never have it.",
 }, { scopes: ['write'], tier: 'extended', capability: 'editReports' }));
 
-const aiRoutes = createApiRouter()
-    .openapi(commentAssistRoute, async (c) => {
-        const { text, context } = c.req.valid('json');
-        const service = c.var.services.ai;
+const app = createApiRouter();
+app.openapi(commentAssistRoute, async (c) => {
+    const { text, context } = c.req.valid('json');
+    const service = c.var.services.ai;
 
-        const data = await service.generateProfessionalComment(text, context);
-        return c.json({ success: true, data }, 200);
-    })
-    .openapi(autoSummaryRoute, async (c) => {
-        const { inspectionId } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const service = c.var.services.ai;
-        // The summary is built from the inspection's own notes: one outside the caller's set is not found.
-        await requireVisibleInspection(getDrizzle(c), await resolveInspectionScope(c), tenantId, inspectionId);
+    const data = await service.generateProfessionalComment(text, context);
+    return c.json({ success: true, data }, 200);
+});
+app.openapi(autoSummaryRoute, async (c) => {
+    const { inspectionId } = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    const service = c.var.services.ai;
+    // The summary is built from the inspection's own notes: one outside the caller's set is not found.
+    await requireVisibleInspection(getDrizzle(c), await resolveInspectionScope(c), tenantId, inspectionId);
 
-        const data = await service.generateInspectionSummary(tenantId, inspectionId);
-        return c.json({ success: true, data }, 200);
-    })
-    .openapi(commentEditRoute, async (c) => {
-        await checkRateLimit(c, 'ai-comment-edit');
-        const input = c.req.valid('json');
-        // Strip undefined optional fields so service stays exactOptionalPropertyTypes-clean.
-        const payload = {
-            itemLabel:       input.itemLabel,
-            sectionTitle:    input.sectionTitle,
-            tab:             input.tab,
-            originalComment: input.originalComment,
-            instruction:     input.instruction,
-            ...(input.category !== undefined ? { category: input.category } : {}),
-            ...(input.location !== undefined ? { location: input.location } : {}),
-        };
-        const data = await c.var.services.ai.rewriteComment(payload);
-        return c.json({ success: true, data }, 200);
-    })
-    .openapi(suggestCommentRoute, async (c) => {
-        const input = c.req.valid('json');
-        // Same strip as rewriteComment above. `SuggestCommentPromptArgs` declares
-        // rating/yearBuilt/sqft as ABSENT-able, and the prompt renderer tests them
-        // for truthiness — so an omitted field and an explicitly-undefined one
-        // produce the identical prompt. Build the argument without the keys the
-        // caller did not send rather than widening the prompt contract.
-        const params = {
-            itemName:    input.itemName,
-            sectionName: input.sectionName,
-            ...(input.rating    !== undefined ? { rating:    input.rating }    : {}),
-            ...(input.yearBuilt !== undefined ? { yearBuilt: input.yearBuilt } : {}),
-            ...(input.sqft      !== undefined ? { sqft:      input.sqft }      : {}),
-        };
-        const data = await c.var.services.ai.suggestComment(params);
-        return c.json({ success: true, data });
-    })
-    .openapi(contentReviewRoute, async (c) => {
-        const body = c.req.valid('json');
-        // The reviewer is WHOEVER IS AUTHENTICATED, never a field in the body.
-        // A client-supplied reviewer id would let one account file a review in
-        // another person's name, and naming the person IS the claim this row
-        // exists to make.
-        const reviewedBy = (c.get('user') as { sub?: string } | undefined)?.sub;
-        if (!reviewedBy) throw Errors.Unauthorized('A review must name the person who made it.');
-        await recordContentReview({
-            db: c.env.DB,
-            tenantId: c.get('tenantId'),
-            artifactType: body.artifactType,
-            artifactId: body.artifactId,
-            reviewedBy,
-            aiCallId: body.aiCallId,
-        });
-        return c.json({ success: true, data: { reviewed: true as const } }, 200);
+    const data = await service.generateInspectionSummary(tenantId, inspectionId);
+    return c.json({ success: true, data }, 200);
+});
+app.openapi(commentEditRoute, async (c) => {
+    await checkRateLimit(c, 'ai-comment-edit');
+    const input = c.req.valid('json');
+    // Strip undefined optional fields so service stays exactOptionalPropertyTypes-clean.
+    const payload = {
+        itemLabel:       input.itemLabel,
+        sectionTitle:    input.sectionTitle,
+        tab:             input.tab,
+        originalComment: input.originalComment,
+        instruction:     input.instruction,
+        ...(input.category !== undefined ? { category: input.category } : {}),
+        ...(input.location !== undefined ? { location: input.location } : {}),
+    };
+    const data = await c.var.services.ai.rewriteComment(payload);
+    return c.json({ success: true, data }, 200);
+});
+app.openapi(suggestCommentRoute, async (c) => {
+    const input = c.req.valid('json');
+    // Same strip as rewriteComment above. `SuggestCommentPromptArgs` declares
+    // rating/yearBuilt/sqft as ABSENT-able, and the prompt renderer tests them
+    // for truthiness — so an omitted field and an explicitly-undefined one
+    // produce the identical prompt. Build the argument without the keys the
+    // caller did not send rather than widening the prompt contract.
+    const params = {
+        itemName:    input.itemName,
+        sectionName: input.sectionName,
+        ...(input.rating    !== undefined ? { rating:    input.rating }    : {}),
+        ...(input.yearBuilt !== undefined ? { yearBuilt: input.yearBuilt } : {}),
+        ...(input.sqft      !== undefined ? { sqft:      input.sqft }      : {}),
+    };
+    const data = await c.var.services.ai.suggestComment(params);
+    return c.json({ success: true, data });
+});
+app.openapi(contentReviewRoute, async (c) => {
+    const body = c.req.valid('json');
+    // The reviewer is WHOEVER IS AUTHENTICATED, never a field in the body.
+    // A client-supplied reviewer id would let one account file a review in
+    // another person's name, and naming the person IS the claim this row
+    // exists to make.
+    const reviewedBy = (c.get('user') as { sub?: string } | undefined)?.sub;
+    if (!reviewedBy) throw Errors.Unauthorized('A review must name the person who made it.');
+    await recordContentReview({
+        db: c.env.DB,
+        tenantId: c.get('tenantId'),
+        artifactType: body.artifactType,
+        artifactId: body.artifactId,
+        reviewedBy,
+        aiCallId: body.aiCallId,
     });
+    return c.json({ success: true, data: { reviewed: true as const } }, 200);
+});
 
-export type AiApi = typeof aiRoutes;
+/** Registration order. Drives `AiApi`; a test pins it to what `app` really registered. */
+export const aiRouteConfigs = [
+    commentAssistRoute,
+    autoSummaryRoute,
+    commentEditRoute,
+    suggestCommentRoute,
+    contentReviewRoute,
+] as const;
 
-export default aiRoutes;
+export type AiApi = ApiOf<typeof aiRouteConfigs>;
+
+export default app;

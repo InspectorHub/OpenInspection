@@ -7,6 +7,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema/tenant';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
@@ -105,68 +106,76 @@ const liveLinkCountRoute = createRoute(withMcpMetadata({
     description: 'Counts the report links across the tenant that would be affected by applying an expiry to the existing backlog. Rendered into the confirm control so the operator sees the blast radius before acting, not after. Available to owner and manager roles.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-const inspectionPrefsRoutes = createApiRouter()
-    .openapi(liveLinkCountRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const liveLinks = await c.var.services.portalAccess.countLiveLinksForTenant(tenantId);
-        return c.json({ liveLinks }, 200);
+const app = createApiRouter();
+app.openapi(liveLinkCountRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const liveLinks = await c.var.services.portalAccess.countLiveLinksForTenant(tenantId);
+    return c.json({ liveLinks }, 200);
+});
+app.openapi(bulkExpiryRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { ttl } = c.req.valid('json');
+    const expiresAt = reportLinkExpiresAt(ttl, Date.now());
+    const affected = await c.var.services.portalAccess.setExpiryForTenant(tenantId, expiresAt);
+    return c.json({ affected, expiresAt }, 200);
+});
+app.openapi(getRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const db = drizzle(c.env.DB as never);
+    const row = await db.select({
+        prefs:               tenantConfigs.inspectionPrefs,
+        requireDefectFields: tenantConfigs.requireDefectFields,
     })
-    .openapi(bulkExpiryRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { ttl } = c.req.valid('json');
-        const expiresAt = reportLinkExpiresAt(ttl, Date.now());
-        const affected = await c.var.services.portalAccess.setExpiryForTenant(tenantId, expiresAt);
-        return c.json({ affected, expiresAt }, 200);
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
+    // requireDefectFields rides this endpoint but lives in its own column
+    // (the publish-readiness service reads it without JSON parsing).
+    const merged = {
+        ...withDefaults(row?.prefs ?? null),
+        requireDefectFields: row?.requireDefectFields ?? 'none',
+    };
+    return c.json(merged, 200);
+});
+app.openapi(patchRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const patch = c.req.valid('json');
+    // The external access policy governs what clients and agents can open, so
+    // it is a company decision, not an editor preference.
+    if (('agentRepairAccess' in patch || 'reportLinkTtl' in patch) && !isAdminRole(c.get('userRole'))) {
+        throw deniedNeedsRole(c, ['owner', 'manager'], 'The external access policy is a company decision');
+    }
+    const db = drizzle(c.env.DB as never);
+    const existing = await db.select({
+        prefs:               tenantConfigs.inspectionPrefs,
+        requireDefectFields: tenantConfigs.requireDefectFields,
     })
-    .openapi(getRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const db = drizzle(c.env.DB as never);
-        const row = await db.select({
-            prefs:               tenantConfigs.inspectionPrefs,
-            requireDefectFields: tenantConfigs.requireDefectFields,
-        })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-        // requireDefectFields rides this endpoint but lives in its own column
-        // (the publish-readiness service reads it without JSON parsing).
-        const merged = {
-            ...withDefaults(row?.prefs ?? null),
-            requireDefectFields: row?.requireDefectFields ?? 'none',
-        };
-        return c.json(merged, 200);
-    })
-    .openapi(patchRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const patch = c.req.valid('json');
-        // The external access policy governs what clients and agents can open, so
-        // it is a company decision, not an editor preference.
-        if (('agentRepairAccess' in patch || 'reportLinkTtl' in patch) && !isAdminRole(c.get('userRole'))) {
-            throw deniedNeedsRole(c, ['owner', 'manager'], 'The external access policy is a company decision');
-        }
-        const db = drizzle(c.env.DB as never);
-        const existing = await db.select({
-            prefs:               tenantConfigs.inspectionPrefs,
-            requireDefectFields: tenantConfigs.requireDefectFields,
-        })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-        const merged = {
-            ...withDefaults(existing?.prefs ?? null),
-            requireDefectFields: existing?.requireDefectFields ?? 'none',
-            ...patch,
-        };
-        // Re-validate merged in case the patch claimed a valid field but the merged result violates max constraints.
-        const parsed = InspectionPrefsSchema.parse(merged);
-        // Split storage: requireDefectFields → its own column; everything else → the JSON blob.
-        const { requireDefectFields, ...jsonPrefs } = parsed;
-        await db.update(tenantConfigs)
-            .set({ inspectionPrefs: jsonPrefs, requireDefectFields })
-            .where(eq(tenantConfigs.tenantId, tenantId));
-        return c.json(parsed, 200);
-    });
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
+    const merged = {
+        ...withDefaults(existing?.prefs ?? null),
+        requireDefectFields: existing?.requireDefectFields ?? 'none',
+        ...patch,
+    };
+    // Re-validate merged in case the patch claimed a valid field but the merged result violates max constraints.
+    const parsed = InspectionPrefsSchema.parse(merged);
+    // Split storage: requireDefectFields → its own column; everything else → the JSON blob.
+    const { requireDefectFields, ...jsonPrefs } = parsed;
+    await db.update(tenantConfigs)
+        .set({ inspectionPrefs: jsonPrefs, requireDefectFields })
+        .where(eq(tenantConfigs.tenantId, tenantId));
+    return c.json(parsed, 200);
+});
 
-export type InspectionPrefsApi = typeof inspectionPrefsRoutes;
+/** Registration order. Drives `InspectionPrefsApi`; a test pins it to what `app` really registered. */
+export const inspectionPrefsRouteConfigs = [
+    liveLinkCountRoute,
+    bulkExpiryRoute,
+    getRoute,
+    patchRoute,
+] as const;
 
-export default inspectionPrefsRoutes;
+export type InspectionPrefsApi = ApiOf<typeof inspectionPrefsRouteConfigs>;
+
+export default app;

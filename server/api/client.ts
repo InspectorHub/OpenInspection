@@ -67,54 +67,62 @@ const visibleInspectionsRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['read'], tier: 'excluded' }));
 
-export const clientRoutes = createApiRouter()
-    .openapi(getClientCompatRoute, (c) => {
-        const { platform } = c.req.valid('query');
-        const policy = readVersionPolicy(c.env, platform);
-        return c.json({ success: true as const, data: { ...policy, serverContractVersion: SERVER_CONTRACT_VERSION } }, 200);
-    })
-    .openapi(getClientSessionRoute, async (c) => {
-        const user = c.get('user');
-        const tenantId = c.get('tenantId');
-        if (!c.get('nativeClient') || !user || !tenantId) throw Errors.Unauthorized('Native session required');
-        const db = getDrizzle(c);
-        const row = await db.select({ days: tenantConfigs.offlineMaxDays })
-            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-        // The app calls this on every start and refresh, which makes it the place to learn which
-        // versions are still in use. Throttled and bounded inside; never fails the response.
-        await recordNativeClientSeen(db, tenantId, c.req.header('X-Client-Platform'), c.req.header('X-Client-Version'));
-        return c.json({ success: true as const, data: {
-            userId: user.sub, tenantId, role: user.role, offlineMaxDays: row?.days ?? DEFAULT_OFFLINE_MAX_DAYS,
-        } }, 200);
-    })
-    .openapi(visibleInspectionsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!c.get('nativeClient') || !c.get('user') || !tenantId) throw Errors.Unauthorized('Native session required');
-        const { ids } = c.req.valid('json');
-        const max = readVisibleIdsLimit(c.env);
-        if (ids.length === 0 || ids.length > max || !ids.every((id) => VISIBLE_ID_PATTERN.test(id))) {
-            throw Errors.UnprocessableEntity(
-                ids.length > max
-                    ? `Too many ids: ${ids.length} sent, at most ${max} per request.`
-                    : 'ids must hold 1 or more ids of 1 to 64 characters from A-Z, a-z, 0-9, underscore and hyphen.',
-                { limits: { ids: max } },
-            );
+export const clientRoutes = createApiRouter();
+clientRoutes.openapi(getClientCompatRoute, (c) => {
+    const { platform } = c.req.valid('query');
+    const policy = readVersionPolicy(c.env, platform);
+    return c.json({ success: true as const, data: { ...policy, serverContractVersion: SERVER_CONTRACT_VERSION } }, 200);
+});
+clientRoutes.openapi(getClientSessionRoute, async (c) => {
+    const user = c.get('user');
+    const tenantId = c.get('tenantId');
+    if (!c.get('nativeClient') || !user || !tenantId) throw Errors.Unauthorized('Native session required');
+    const db = getDrizzle(c);
+    const row = await db.select({ days: tenantConfigs.offlineMaxDays })
+        .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+    // The app calls this on every start and refresh, which makes it the place to learn which
+    // versions are still in use. Throttled and bounded inside; never fails the response.
+    await recordNativeClientSeen(db, tenantId, c.req.header('X-Client-Platform'), c.req.header('X-Client-Version'));
+    return c.json({ success: true as const, data: {
+        userId: user.sub, tenantId, role: user.role, offlineMaxDays: row?.days ?? DEFAULT_OFFLINE_MAX_DAYS,
+    } }, 200);
+});
+clientRoutes.openapi(visibleInspectionsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!c.get('nativeClient') || !c.get('user') || !tenantId) throw Errors.Unauthorized('Native session required');
+    const { ids } = c.req.valid('json');
+    const max = readVisibleIdsLimit(c.env);
+    if (ids.length === 0 || ids.length > max || !ids.every((id) => VISIBLE_ID_PATTERN.test(id))) {
+        throw Errors.UnprocessableEntity(
+            ids.length > max
+                ? `Too many ids: ${ids.length} sent, at most ${max} per request.`
+                : 'ids must hold 1 or more ids of 1 to 64 characters from A-Z, a-z, 0-9, underscore and hyphen.',
+            { limits: { ids: max } },
+        );
+    }
+    const scope = await resolveInspectionScope(c);
+    const visible = await findVisibleInspectionIds(getDrizzle(c), scope, tenantId, ids);
+    return c.json({ success: true as const, data: { visible } }, 200);
+});
+clientRoutes.openapi(importOfflinePackageRoute, async (c) => {
+    const limits = readImportLimits(c.env);
+    const body = await readBoundedBody(c.req.raw, limits.compressedBytes, 400);
+    if (!body.ok) {
+        if (body.status === 413) {
+            const declared = Number(c.req.header('content-length'));
+            throw packageTooLarge({ limit: 'compressedBytes', max: limits.compressedBytes, actual: declared }, limits);
         }
-        const scope = await resolveInspectionScope(c);
-        const visible = await findVisibleInspectionIds(getDrizzle(c), scope, tenantId, ids);
-        return c.json({ success: true as const, data: { visible } }, 200);
-    })
-    .openapi(importOfflinePackageRoute, async (c) => {
-        const limits = readImportLimits(c.env);
-        const body = await readBoundedBody(c.req.raw, limits.compressedBytes, 400);
-        if (!body.ok) {
-            if (body.status === 413) {
-                const declared = Number(c.req.header('content-length'));
-                throw packageTooLarge({ limit: 'compressedBytes', max: limits.compressedBytes, actual: declared }, limits);
-            }
-            const message = { 400: 'Invalid Content-Length or body', 411: 'Content-Length is required' }[body.status];
-            throw new AppError(body.status, ErrorCode.BAD_REQUEST, message);
-        }
-        const data = await importOfflinePackage(c, body.bytes, limits);
-        return c.json({ success: true as const, data }, 200);
-    });
+        const message = { 400: 'Invalid Content-Length or body', 411: 'Content-Length is required' }[body.status];
+        throw new AppError(body.status, ErrorCode.BAD_REQUEST, message);
+    }
+    const data = await importOfflinePackage(c, body.bytes, limits);
+    return c.json({ success: true as const, data }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `clientRoutes` really registered. */
+export const clientRouteConfigs = [
+    getClientCompatRoute,
+    getClientSessionRoute,
+    visibleInspectionsRoute,
+    importOfflinePackageRoute,
+] as const;

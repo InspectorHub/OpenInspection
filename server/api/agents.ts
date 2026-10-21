@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { Errors } from '../lib/errors';
 import { requireRole } from '../lib/middleware/rbac';
@@ -100,62 +101,68 @@ const revokeRoute = createRoute(withMcpMetadata({
     operationId: "revokeAgent"
 }, { scopes: ['write'], tier: 'extended' }));
 
-const agentsRoutes = createApiRouter()
-    .openapi(listLinksRoute, async (c) => {
-        await requireRole('owner', 'manager', 'inspector')(c, async () => {});
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized();
-        const db = getDrizzle(c);
-        // IA-104 — the "links" are contact rows carrying an account binding.
-        // `id` is the contact id, which is what POST /{linkId}/revoke now
-        // takes. Only bound rows are listed: an ordinary agent contact with no
-        // account is not a link, it is just a contact, and it belongs on
-        // /contacts rather than here.
-        const rows = await db
-            .select({
-                id:          contacts.id,
-                agentUserId: contacts.agentUserId,
-                agentName:   users.name,
-                agentEmail:  users.email,
-                createdAt:   contacts.agentLinkedAt,
-                revokedAt:   contacts.agentRevokedAt,
-            })
-            .from(contacts)
-            .leftJoin(users, eq(users.id, contacts.agentUserId))
-            // A caller who sees only their assignments sees only the agents on those inspections (or ones they added).
-            .where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.agentUserId), visibleContactsCondition(db, await resolveInspectionScope(c), tenantId)))
-            .orderBy(desc(contacts.agentLinkedAt))
-            .all();
-        const links = rows.map((r) => {
-            const created = r.createdAt instanceof Date ? r.createdAt.getTime() : (r.createdAt ? Number(r.createdAt) : null);
-            const revoked = r.revokedAt instanceof Date ? r.revokedAt.getTime() : (r.revokedAt ? Number(r.revokedAt) : null);
-            return {
-                id:          r.id,
-                agentUserId: r.agentUserId ?? '',
-                agentName:   r.agentName ?? null,
-                agentEmail:  r.agentEmail ?? null,
-                // Derived rather than stored: the old `status` column had three
-                // values but only ever held two, since nothing wrote 'pending'.
-                status:      (revoked ? 'revoked' : 'active') as 'active' | 'revoked',
-                createdAt:   created,
-                revokedAt:   revoked,
-            };
-        });
-        return c.json({ success: true as const, data: { links } }, 200);
-    })
-    .openapi(revokeRoute, async (c) => {
-        await requireRole('owner', 'manager', 'inspector')(c, async () => {});
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized();
-        const { linkId } = c.req.valid('param');
-        // A link outside the caller's set answers exactly like an id that is not a contact here.
-        const inSet = await getDrizzle(c).select({ id: contacts.id }).from(contacts)
-            .where(and(eq(contacts.id, linkId), eq(contacts.tenantId, tenantId), visibleContactsCondition(getDrizzle(c), await resolveInspectionScope(c), tenantId))).get();
-        if (!inSet) throw Errors.NotFound('Link not found');
-        await c.var.services.agent.revokeLink(linkId, tenantId);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
+const app = createApiRouter();
+app.openapi(listLinksRoute, async (c) => {
+    await requireRole('owner', 'manager', 'inspector')(c, async () => {});
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized();
+    const db = getDrizzle(c);
+    // IA-104 — the "links" are contact rows carrying an account binding.
+    // `id` is the contact id, which is what POST /{linkId}/revoke now
+    // takes. Only bound rows are listed: an ordinary agent contact with no
+    // account is not a link, it is just a contact, and it belongs on
+    // /contacts rather than here.
+    const rows = await db
+        .select({
+            id:          contacts.id,
+            agentUserId: contacts.agentUserId,
+            agentName:   users.name,
+            agentEmail:  users.email,
+            createdAt:   contacts.agentLinkedAt,
+            revokedAt:   contacts.agentRevokedAt,
+        })
+        .from(contacts)
+        .leftJoin(users, eq(users.id, contacts.agentUserId))
+        // A caller who sees only their assignments sees only the agents on those inspections (or ones they added).
+        .where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.agentUserId), visibleContactsCondition(db, await resolveInspectionScope(c), tenantId)))
+        .orderBy(desc(contacts.agentLinkedAt))
+        .all();
+    const links = rows.map((r) => {
+        const created = r.createdAt instanceof Date ? r.createdAt.getTime() : (r.createdAt ? Number(r.createdAt) : null);
+        const revoked = r.revokedAt instanceof Date ? r.revokedAt.getTime() : (r.revokedAt ? Number(r.revokedAt) : null);
+        return {
+            id:          r.id,
+            agentUserId: r.agentUserId ?? '',
+            agentName:   r.agentName ?? null,
+            agentEmail:  r.agentEmail ?? null,
+            // Derived rather than stored: the old `status` column had three
+            // values but only ever held two, since nothing wrote 'pending'.
+            status:      (revoked ? 'revoked' : 'active') as 'active' | 'revoked',
+            createdAt:   created,
+            revokedAt:   revoked,
+        };
     });
+    return c.json({ success: true as const, data: { links } }, 200);
+});
+app.openapi(revokeRoute, async (c) => {
+    await requireRole('owner', 'manager', 'inspector')(c, async () => {});
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized();
+    const { linkId } = c.req.valid('param');
+    // A link outside the caller's set answers exactly like an id that is not a contact here.
+    const inSet = await getDrizzle(c).select({ id: contacts.id }).from(contacts)
+        .where(and(eq(contacts.id, linkId), eq(contacts.tenantId, tenantId), visibleContactsCondition(getDrizzle(c), await resolveInspectionScope(c), tenantId))).get();
+    if (!inSet) throw Errors.NotFound('Link not found');
+    await c.var.services.agent.revokeLink(linkId, tenantId);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
 
-export type AgentsApi = typeof agentsRoutes;
+/** Registration order. Drives `AgentsApi`; a test pins it to what `app` really registered. */
+export const agentsRouteConfigs = [
+    listLinksRoute,
+    revokeRoute,
+] as const;
 
-export default agentsRoutes;
+export type AgentsApi = ApiOf<typeof agentsRouteConfigs>;
+
+export default app;

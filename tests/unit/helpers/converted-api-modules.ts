@@ -84,6 +84,13 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/admin/admin-defect-categories.ts',
+        load: async () => {
+            const m = await import('../../../server/api/admin/admin-defect-categories');
+            return { app: m.default, configs: m.adminDefectCategoriesRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/admin/admin-esign.ts',
         load: async () => {
             const m = await import('../../../server/api/admin/admin-esign');
@@ -140,10 +147,73 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/admin/branding.ts',
+        load: async () => {
+            const m = await import('../../../server/api/admin/branding');
+            return { app: m.default, configs: m.adminBrandingRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/agents.ts',
+        load: async () => {
+            const m = await import('../../../server/api/agents');
+            return { app: m.default, configs: m.agentsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/ai.ts',
+        load: async () => {
+            const m = await import('../../../server/api/ai');
+            return { app: m.default, configs: m.aiRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/analytics.ts',
+        load: async () => {
+            const m = await import('../../../server/api/analytics');
+            return { app: m.default, configs: m.analyticsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/automations.ts',
+        load: async () => {
+            const m = await import('../../../server/api/automations');
+            return { app: m.default, configs: m.automationsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/availability.ts',
+        load: async () => {
+            const m = await import('../../../server/api/availability');
+            return { app: m.availabilityRoutes, configs: m.availabilityRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/billing.ts',
         load: async () => {
             const m = await import('../../../server/api/billing');
             return { app: m.default, configs: m.billingRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/calendar-events.ts',
+        load: async () => {
+            const m = await import('../../../server/api/calendar-events');
+            return { app: m.default, configs: m.calendarEventsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/client.ts',
+        load: async () => {
+            const m = await import('../../../server/api/client');
+            return { app: m.clientRoutes, configs: m.clientRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/concierge.ts',
+        load: async () => {
+            const m = await import('../../../server/api/concierge');
+            return { app: m.default, configs: m.conciergeRouteConfigs };
         },
     },
     {
@@ -154,10 +224,73 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/contacts/import.ts',
+        load: async () => {
+            const m = await import('../../../server/api/contacts/import');
+            return { app: m.default, configs: m.contactsImportRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/contractor-types.ts',
+        load: async () => {
+            const m = await import('../../../server/api/contractor-types');
+            return { app: m.default, configs: m.contractorTypesRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/credentials.ts',
+        load: async () => {
+            const m = await import('../../../server/api/credentials');
+            return { app: m.default, configs: m.credentialsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/email-templates.ts',
+        load: async () => {
+            const m = await import('../../../server/api/email-templates');
+            return { app: m.default, configs: m.emailTemplateRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/evidence.ts',
+        load: async () => {
+            const m = await import('../../../server/api/evidence');
+            return { app: m.default, configs: m.evidenceRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspection-prefs.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspection-prefs');
+            return { app: m.default, configs: m.inspectionPrefsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspection-requests.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspection-requests');
+            return { app: m.default, configs: m.inspectionRequestsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/integrations-ai.ts',
+        load: async () => {
+            const m = await import('../../../server/api/integrations-ai');
+            return { app: m.default, configs: m.integrationsAiRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/integrations-overview.ts',
         load: async () => {
             const m = await import('../../../server/api/integrations-overview');
             return { app: m.default, configs: m.integrationsOverviewRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/integrations-test-steps.ts',
+        load: async () => {
+            const m = await import('../../../server/api/integrations-test-steps');
+            return { app: m.default, configs: m.integrationsTestStepsRouteConfigs };
         },
     },
     {
@@ -182,6 +315,13 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/mcp-grants.ts',
+        load: async () => {
+            const m = await import('../../../server/api/mcp-grants');
+            return { app: m.default, configs: m.mcpGrantsRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/message-templates.ts',
         load: async () => {
             const m = await import('../../../server/api/message-templates');
@@ -196,10 +336,52 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/notification-preferences.ts',
+        load: async () => {
+            const m = await import('../../../server/api/notification-preferences');
+            return { app: m.default, configs: m.notificationPreferenceRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/notifications.ts',
+        load: async () => {
+            const m = await import('../../../server/api/notifications');
+            return { app: m.default, configs: m.notificationsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/places.ts',
+        load: async () => {
+            const m = await import('../../../server/api/places');
+            return { app: m.default, configs: m.placesRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/profile.ts',
+        load: async () => {
+            const m = await import('../../../server/api/profile');
+            return { app: m.default, configs: m.profileRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/public-report.ts',
         load: async () => {
             const m = await import('../../../server/api/public-report');
             return { app: m.default, configs: m.publicReportRouteParts };
+        },
+    },
+    {
+        file: 'server/api/public-share.ts',
+        load: async () => {
+            const m = await import('../../../server/api/public-share');
+            return { app: m.default, configs: m.publicShareRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/public-slug.ts',
+        load: async () => {
+            const m = await import('../../../server/api/public-slug');
+            return { app: m.default, configs: m.publicSlugRouteConfigs };
         },
     },
     {
@@ -231,10 +413,38 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/recommendations.ts',
+        load: async () => {
+            const m = await import('../../../server/api/recommendations');
+            return { app: m.default, configs: m.recommendationsRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/repair-builder.ts',
         load: async () => {
             const m = await import('../../../server/api/repair-builder');
             return { app: m.default, configs: m.repairBuilderRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/role-profiles.ts',
+        load: async () => {
+            const m = await import('../../../server/api/role-profiles');
+            return { app: m.default, configs: m.roleProfilesRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/schedule-day-slots.ts',
+        load: async () => {
+            const m = await import('../../../server/api/schedule-day-slots');
+            return { app: m.default, configs: m.scheduleDaySlotsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/schedule-week-summary.ts',
+        load: async () => {
+            const m = await import('../../../server/api/schedule-week-summary');
+            return { app: m.default, configs: m.scheduleWeekSummaryRouteParts };
         },
     },
     {
@@ -245,10 +455,31 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/unsubscribe.ts',
+        load: async () => {
+            const m = await import('../../../server/api/unsubscribe');
+            return { app: m.default, configs: m.unsubscribeRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/usage.ts',
         load: async () => {
             const m = await import('../../../server/api/usage');
             return { app: m.default, configs: m.usageRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/users.ts',
+        load: async () => {
+            const m = await import('../../../server/api/users');
+            return { app: m.default, configs: m.userRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/widget.ts',
+        load: async () => {
+            const m = await import('../../../server/api/widget');
+            return { app: m.default, configs: m.widgetRouteConfigs };
         },
     },
 ];

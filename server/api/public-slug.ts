@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { SlugAvailabilityResponseSchema } from '../lib/validations/profile.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
@@ -49,36 +50,41 @@ const checkSlugRoute = createRoute(withMcpMetadata({
     description: "Public, unauthenticated check of whether a booking slug can be claimed. Returns available true, or false with a reason: reserved (on the reserved list), taken (another user already has it), or invalid (no company could be resolved from the request). For a taken slug in the inspector namespace, up to 3 alternative suggestions are included. The inspector namespace (default) checks within the company resolved from the request's tenant context; the agent namespace checks across all agent accounts, with no company needed, and the value is lower-cased first. Read-only; it does not reserve the slug."
 }, { scopes: [], tier: 'extended' }));
 
-const publicSlugRoutes = createApiRouter()
-    .openapi(checkSlugRoute, async (c) => {
-        const { value, namespace } = c.req.valid('query');
+const app = createApiRouter();
+app.openapi(checkSlugRoute, async (c) => {
+    const { value, namespace } = c.req.valid('query');
 
-        if (namespace === 'agent') {
-            // Global agent-slug check: reserved blacklist OR another agent user
-            // with this slug. tenant resolution irrelevant.
-            const slug = value.trim().toLowerCase();
-            const db = getDrizzle(c);
-            const reserved = await db.select({ slug: slugReservations.slug })
-                .from(slugReservations)
-                .where(eq(slugReservations.slug, slug))
-                .get();
-            if (reserved) return c.json({ success: true as const, data: { available: false, reason: 'reserved' as const } }, 200);
-            const taken = await db.select({ id: users.id })
-                .from(users)
-                .where(and(eq(users.slug, slug), isNull(users.tenantId), eq(users.role, 'agent')))
-                .get();
-            if (taken) return c.json({ success: true as const, data: { available: false, reason: 'taken' as const } }, 200);
-            return c.json({ success: true as const, data: { available: true as const } }, 200);
-        }
+    if (namespace === 'agent') {
+        // Global agent-slug check: reserved blacklist OR another agent user
+        // with this slug. tenant resolution irrelevant.
+        const slug = value.trim().toLowerCase();
+        const db = getDrizzle(c);
+        const reserved = await db.select({ slug: slugReservations.slug })
+            .from(slugReservations)
+            .where(eq(slugReservations.slug, slug))
+            .get();
+        if (reserved) return c.json({ success: true as const, data: { available: false, reason: 'reserved' as const } }, 200);
+        const taken = await db.select({ id: users.id })
+            .from(users)
+            .where(and(eq(users.slug, slug), isNull(users.tenantId), eq(users.role, 'agent')))
+            .get();
+        if (taken) return c.json({ success: true as const, data: { available: false, reason: 'taken' as const } }, 200);
+        return c.json({ success: true as const, data: { available: true as const } }, 200);
+    }
 
-        const tenantId = c.get('resolvedTenantId') || c.get('tenantId');
-        if (!tenantId) {
-            return c.json({ success: true as const, data: { available: false, reason: 'invalid' as const } }, 200);
-        }
-        const result = await c.var.services.user.checkSlug(tenantId, value);
-        return c.json({ success: true as const, data: result }, 200);
-    });
+    const tenantId = c.get('resolvedTenantId') || c.get('tenantId');
+    if (!tenantId) {
+        return c.json({ success: true as const, data: { available: false, reason: 'invalid' as const } }, 200);
+    }
+    const result = await c.var.services.user.checkSlug(tenantId, value);
+    return c.json({ success: true as const, data: result }, 200);
+});
 
-export type PublicSlugApi = typeof publicSlugRoutes;
+/** Registration order. Drives `PublicSlugApi`; a test pins it to what `app` really registered. */
+export const publicSlugRouteConfigs = [
+    checkSlugRoute,
+] as const;
 
-export default publicSlugRoutes;
+export type PublicSlugApi = ApiOf<typeof publicSlugRouteConfigs>;
+
+export default app;

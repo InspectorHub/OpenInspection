@@ -55,39 +55,44 @@ const daySlotsRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['read'], tier: 'extended', capability: 'scheduleOthers' }));
 
-const scheduleDaySlotsRoutes = createApiRouter()
-    .openapi(daySlotsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { date, userIds } = c.req.valid('query');
-        const db = getDrizzle(c);
+const app = createApiRouter();
+app.openapi(daySlotsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { date, userIds } = c.req.valid('query');
+    const db = getDrizzle(c);
 
-        const cfg = await db.select({
-            bookingSlotIntervalMin: tenantConfigs.bookingSlotIntervalMin,
-        })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
+    const cfg = await db.select({
+        bookingSlotIntervalMin: tenantConfigs.bookingSlotIntervalMin,
+    })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
 
-        const service = new BookingService(c.env.DB);
-        const allQualified = await service.getQualifiedInspectorIds(tenantId, []);
-        // Narrowing INTERSECTS with the qualified set rather than replacing it:
-        // an id the caller invented, or one belonging to somebody who cannot
-        // take this work, must not become a free inspector by being asked for.
-        const qualified = userIds
-            ? allQualified.filter((id) => userIds.includes(id))
-            : allQualified;
+    const service = new BookingService(c.env.DB);
+    const allQualified = await service.getQualifiedInspectorIds(tenantId, []);
+    // Narrowing INTERSECTS with the qualified set rather than replacing it:
+    // an id the caller invented, or one belonging to somebody who cannot
+    // take this work, must not become a free inspector by being asked for.
+    const qualified = userIds
+        ? allQualified.filter((id) => userIds.includes(id))
+        : allQualified;
 
-        const { slots, holidayAdvisory } = await service.getTenantSlots(tenantId, date, [], qualified);
+    const { slots, holidayAdvisory } = await service.getTenantSlots(tenantId, date, [], qualified);
 
-        return c.json({
-            success: true as const,
-            data: {
-                date,
-                intervalMin: cfg?.bookingSlotIntervalMin ?? 30,
-                slots,
-                holidayAdvisory: holidayAdvisory ?? null,
-            },
-        }, 200);
-    });
+    return c.json({
+        success: true as const,
+        data: {
+            date,
+            intervalMin: cfg?.bookingSlotIntervalMin ?? 30,
+            slots,
+            holidayAdvisory: holidayAdvisory ?? null,
+        },
+    }, 200);
+});
 
-export default scheduleDaySlotsRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const scheduleDaySlotsRouteConfigs = [
+    daySlotsRoute,
+] as const;
+
+export default app;

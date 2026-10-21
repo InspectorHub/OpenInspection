@@ -2,6 +2,7 @@ import { createRoute } from '@hono/zod-openapi';
 import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { createApiRouter } from '../lib/openapi-router';
+import { mounted, type ApiOf } from '../lib/api-schema';
 import { availability, availabilityOverrides } from '../lib/db/schema';
 import {
     loadCustomHolidaysInRange,
@@ -17,7 +18,7 @@ import {
 import { BookingService } from '../services/booking.service';
 import { canViewOthersCalendar } from '../lib/calendar/view-others';
 import { getDrizzle } from '../lib/route-helpers';
-import scheduleDaySlotsRoutes from './schedule-day-slots';
+import scheduleDaySlotsRoutes, { scheduleDaySlotsRouteConfigs } from './schedule-day-slots';
 
 const WEEK_LENGTH = 7;
 const DAY_MS = 86_400_000;
@@ -70,101 +71,107 @@ const weekSummaryRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['read'], tier: 'primary' }));
 
-const scheduleWeekSummaryRoutes = createApiRouter()
-    .openapi(weekSummaryRoute, async (c) => {
-        const user = c.get('user');
-        const tenantId = c.get('tenantId');
-        const query = c.req.valid('query');
+const app = createApiRouter();
+app.openapi(weekSummaryRoute, async (c) => {
+    const user = c.get('user');
+    const tenantId = c.get('tenantId');
+    const query = c.req.valid('query');
 
-        // Anyone who may not open other calendars is summarized against themselves, whatever userId they ask for.
-        const scopedUserId = await canViewOthersCalendar(c) ? query.userId : user.sub;
+    // Anyone who may not open other calendars is summarized against themselves, whatever userId they ask for.
+    const scopedUserId = await canViewOthersCalendar(c) ? query.userId : user.sub;
 
-        const dates = Array.from(
-            { length: WEEK_LENGTH },
-            (_, i) => addCivilDays(query.start, i),
-        );
-        const start = dates[0];
-        const end = dates[WEEK_LENGTH - 1];
+    const dates = Array.from(
+        { length: WEEK_LENGTH },
+        (_, i) => addCivilDays(query.start, i),
+    );
+    const start = dates[0];
+    const end = dates[WEEK_LENGTH - 1];
 
-        const service = new BookingService(c.env.DB);
-        const db = getDrizzle(c);
+    const service = new BookingService(c.env.DB);
+    const db = getDrizzle(c);
 
-        // Day-invariant setup resolved once for the whole week rather than per day.
-        const [allQualified, holidayConfig, customHolidays] = await Promise.all([
-            service.getQualifiedInspectorIds(tenantId, []),
-            loadTenantHolidayConfig(c.env.DB, tenantId),
-            loadCustomHolidaysInRange(c.env.DB, tenantId, start, end),
+    // Day-invariant setup resolved once for the whole week rather than per day.
+    const [allQualified, holidayConfig, customHolidays] = await Promise.all([
+        service.getQualifiedInspectorIds(tenantId, []),
+        loadTenantHolidayConfig(c.env.DB, tenantId),
+        loadCustomHolidaysInRange(c.env.DB, tenantId, start, end),
+    ]);
+    const qualified = scopedUserId
+        ? allQualified.filter((id) => id === scopedUserId)
+        : allQualified;
+
+    const closedDates = resolveCompanyClosedDatesInRange({
+        region: holidayConfig.holidayRegion,
+        customRows: customHolidays,
+        startDate: start,
+        endDate: end,
+    });
+
+    // One range read each, then grouped in memory — a day counts as
+    // configured when a recurring window covers its weekday or an additive
+    // override opens it. This distinction is what separates `full` (hours
+    // exist, nothing bookable) from `unconfigured` (no hours at all); the
+    // slot engine collapses both to an empty slot list.
+    const [windows, overrides] = qualified.length === 0
+        ? [[], []]
+        : await Promise.all([
+            db.select({ dayOfWeek: availability.dayOfWeek })
+                .from(availability)
+                .where(and(
+                    eq(availability.tenantId, tenantId),
+                    inArray(availability.inspectorId, qualified),
+                )).all(),
+            db.select({
+                date: availabilityOverrides.date,
+                isAvailable: availabilityOverrides.isAvailable,
+            })
+                .from(availabilityOverrides)
+                .where(and(
+                    eq(availabilityOverrides.tenantId, tenantId),
+                    inArray(availabilityOverrides.inspectorId, qualified),
+                    gte(availabilityOverrides.date, start),
+                    lte(availabilityOverrides.date, end),
+                )).all(),
         ]);
-        const qualified = scopedUserId
-            ? allQualified.filter((id) => id === scopedUserId)
-            : allQualified;
 
-        const closedDates = resolveCompanyClosedDatesInRange({
-            region: holidayConfig.holidayRegion,
-            customRows: customHolidays,
-            startDate: start,
-            endDate: end,
-        });
+    const configuredDays = new Set(windows.map((w) => w.dayOfWeek));
+    const openedDates = new Set(
+        overrides.filter((o) => o.isAvailable).map((o) => o.date),
+    );
 
-        // One range read each, then grouped in memory — a day counts as
-        // configured when a recurring window covers its weekday or an additive
-        // override opens it. This distinction is what separates `full` (hours
-        // exist, nothing bookable) from `unconfigured` (no hours at all); the
-        // slot engine collapses both to an empty slot list.
-        const [windows, overrides] = qualified.length === 0
-            ? [[], []]
-            : await Promise.all([
-                db.select({ dayOfWeek: availability.dayOfWeek })
-                    .from(availability)
-                    .where(and(
-                        eq(availability.tenantId, tenantId),
-                        inArray(availability.inspectorId, qualified),
-                    )).all(),
-                db.select({
-                    date: availabilityOverrides.date,
-                    isAvailable: availabilityOverrides.isAvailable,
-                })
-                    .from(availabilityOverrides)
-                    .where(and(
-                        eq(availabilityOverrides.tenantId, tenantId),
-                        inArray(availabilityOverrides.inspectorId, qualified),
-                        gte(availabilityOverrides.date, start),
-                        lte(availabilityOverrides.date, end),
-                    )).all(),
-            ]);
+    const days = await Promise.all(dates.map(async (date): Promise<{
+        date: string;
+        status: DayStatus;
+        label?: string;
+    }> => {
+        const holidayName = closedDates.get(date);
+        if (holidayName) {
+            return { date, status: 'closed', label: holidayName };
+        }
+        const configured = configuredDays.has(civilDayOfWeek(date))
+            || openedDates.has(date);
+        if (!configured) {
+            return { date, status: 'unconfigured' };
+        }
+        // qualified is precomputed above, so the slot engine never re-resolves it.
+        const { slots } = await service.getTenantSlots(tenantId, date, [], qualified);
+        return { date, status: slots.some((s) => s.available) ? 'open' : 'full' };
+    }));
 
-        const configuredDays = new Set(windows.map((w) => w.dayOfWeek));
-        const openedDates = new Set(
-            overrides.filter((o) => o.isAvailable).map((o) => o.date),
-        );
+    return c.json({ success: true as const, data: { days } }, 200);
+});
+// Both /api/schedule routes are composed here rather than mounted twice in
+// server/index.ts: two `.route('/api/schedule', …)` calls work at runtime
+// but the RPC TYPE keeps only the first, so the BFF client silently loses
+// every route on the second router. One mount, one type.
+app.route('/', scheduleDaySlotsRoutes);
 
-        const days = await Promise.all(dates.map(async (date): Promise<{
-            date: string;
-            status: DayStatus;
-            label?: string;
-        }> => {
-            const holidayName = closedDates.get(date);
-            if (holidayName) {
-                return { date, status: 'closed', label: holidayName };
-            }
-            const configured = configuredDays.has(civilDayOfWeek(date))
-                || openedDates.has(date);
-            if (!configured) {
-                return { date, status: 'unconfigured' };
-            }
-            // qualified is precomputed above, so the slot engine never re-resolves it.
-            const { slots } = await service.getTenantSlots(tenantId, date, [], qualified);
-            return { date, status: slots.some((s) => s.available) ? 'open' : 'full' };
-        }));
+/** Registration order, mounts included. Drives `ScheduleApi`; a test pins it to what `app` really registered. */
+export const scheduleWeekSummaryRouteParts = [
+    weekSummaryRoute,
+    mounted('/', scheduleDaySlotsRoutes, scheduleDaySlotsRouteConfigs),
+] as const;
 
-        return c.json({ success: true as const, data: { days } }, 200);
-    })
-    // Both /api/schedule routes are composed here rather than mounted twice in
-    // server/index.ts: two `.route('/api/schedule', …)` calls work at runtime
-    // but the RPC TYPE keeps only the first, so the BFF client silently loses
-    // every route on the second router. One mount, one type.
-    .route('/', scheduleDaySlotsRoutes);
+export type ScheduleApi = ApiOf<typeof scheduleWeekSummaryRouteParts>;
 
-export type ScheduleApi = typeof scheduleWeekSummaryRoutes;
-
-export default scheduleWeekSummaryRoutes;
+export default app;

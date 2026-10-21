@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
@@ -97,89 +98,95 @@ const detailsRoute = createRoute(withMcpMetadata({
     description: "Authenticated proxy that resolves one Google Places placeId (from the autocomplete route) to a structured address: formatted address, street, city, state, ZIP, county (each nullable) and latitude and longitude. meta.cached says whether it came from the 60 day cache keyed by placeId. Pass the same session token used for the autocomplete calls. Fails with 400 when the deployment has no Google Places key or Google cannot resolve the place. The route applies no role check of its own beyond a signed-in session."
 }, { scopes: ['read'], tier: 'extended' }));
 
-const placesRoutes = createApiRouter()
-    .openapi(autocompleteRoute, async (c) => {
-    const apiKey = c.env.GOOGLE_PLACES_API_KEY;
-    if (!apiKey) throw Errors.BadRequest('Address autocomplete unavailable: GOOGLE_PLACES_API_KEY not configured');
+const app = createApiRouter();
+app.openapi(autocompleteRoute, async (c) => {
+const apiKey = c.env.GOOGLE_PLACES_API_KEY;
+if (!apiKey) throw Errors.BadRequest('Address autocomplete unavailable: GOOGLE_PLACES_API_KEY not configured');
 
-    const { q, session } = c.req.valid('query');
-    const cacheKey = `places:auto:${await sha256Hex(q.toLowerCase().trim())}`;
+const { q, session } = c.req.valid('query');
+const cacheKey = `places:auto:${await sha256Hex(q.toLowerCase().trim())}`;
 
-    if (c.env.TENANT_CACHE) {
-        const cached = await c.env.TENANT_CACHE.get(cacheKey, 'json') as {
-            results: Array<{ placeId: string; description: string; mainText: string; secondaryText: string }>
-        } | null;
-        if (cached) {
-            return c.json({ success: true, data: cached.results, meta: { cached: true } }, 200);
-        }
+if (c.env.TENANT_CACHE) {
+    const cached = await c.env.TENANT_CACHE.get(cacheKey, 'json') as {
+        results: Array<{ placeId: string; description: string; mainText: string; secondaryText: string }>
+    } | null;
+    if (cached) {
+        return c.json({ success: true, data: cached.results, meta: { cached: true } }, 200);
     }
+}
 
-    const url = new URL(`${GOOGLE_BASE}/autocomplete/json`);
-    url.searchParams.set('input', q);
-    url.searchParams.set('sessiontoken', session);
-    url.searchParams.set('types', 'address');
-    url.searchParams.set('components', 'country:us');
-    url.searchParams.set('key', apiKey);
+const url = new URL(`${GOOGLE_BASE}/autocomplete/json`);
+url.searchParams.set('input', q);
+url.searchParams.set('sessiontoken', session);
+url.searchParams.set('types', 'address');
+url.searchParams.set('components', 'country:us');
+url.searchParams.set('key', apiKey);
 
-    const res = await fetch(url.toString());
-    if (!res.ok) {
-        logger.error('[places.autocomplete] google api error', { status: res.status });
-        throw Errors.BadRequest('Autocomplete temporarily unavailable');
+const res = await fetch(url.toString());
+if (!res.ok) {
+    logger.error('[places.autocomplete] google api error', { status: res.status });
+    throw Errors.BadRequest('Autocomplete temporarily unavailable');
+}
+const data = await res.json() as {
+    status: string;
+    predictions?: Array<{
+        place_id: string;
+        description: string;
+        structured_formatting?: { main_text?: string; secondary_text?: string };
+    }>;
+};
+
+if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+    logger.error('[places.autocomplete] google api status', { status: data.status });
+    throw Errors.BadRequest('Autocomplete failed');
+}
+
+const results = (data.predictions || []).map(p => ({
+    placeId: p.place_id,
+    description: p.description,
+    mainText: p.structured_formatting?.main_text || p.description,
+    secondaryText: p.structured_formatting?.secondary_text || '',
+}));
+
+if (c.env.TENANT_CACHE) {
+    await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify({ results }), { expirationTtl: 60 * 60 });
+}
+
+return c.json({ success: true, data: results, meta: { cached: false } }, 200);
+});
+app.openapi(detailsRoute, async (c) => {
+const apiKey = c.env.GOOGLE_PLACES_API_KEY;
+if (!apiKey) throw Errors.BadRequest('Address details unavailable: GOOGLE_PLACES_API_KEY not configured');
+
+const { placeId, session } = c.req.valid('query');
+const cacheKey = placeDetailsCacheKey(placeId);
+
+if (c.env.TENANT_CACHE) {
+    const cached = await c.env.TENANT_CACHE.get(cacheKey, 'json') as ResolvedPlace | null;
+    if (cached) {
+        return c.json({ success: true, data: cached, meta: { cached: true } }, 200);
     }
-    const data = await res.json() as {
-        status: string;
-        predictions?: Array<{
-            place_id: string;
-            description: string;
-            structured_formatting?: { main_text?: string; secondary_text?: string };
-        }>;
-    };
+}
 
-    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-        logger.error('[places.autocomplete] google api status', { status: data.status });
-        throw Errors.BadRequest('Autocomplete failed');
-    }
+// The fetch + field mask + component mapping live in lib/places/geocode.ts
+// so booking fulfilment and Settings can geocode too — this route was the
+// only way to reach that logic, which is exactly why nothing else did.
+const payload = await fetchPlaceDetails(apiKey, placeId, session);
+if (!payload) throw Errors.BadRequest('Address details temporarily unavailable');
 
-    const results = (data.predictions || []).map(p => ({
-        placeId: p.place_id,
-        description: p.description,
-        mainText: p.structured_formatting?.main_text || p.description,
-        secondaryText: p.structured_formatting?.secondary_text || '',
-    }));
+if (c.env.TENANT_CACHE) {
+    await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(payload), { expirationTtl: 60 * 24 * 60 * 60 });
+}
 
-    if (c.env.TENANT_CACHE) {
-        await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify({ results }), { expirationTtl: 60 * 60 });
-    }
-
-    return c.json({ success: true, data: results, meta: { cached: false } }, 200);
-})
-    .openapi(detailsRoute, async (c) => {
-    const apiKey = c.env.GOOGLE_PLACES_API_KEY;
-    if (!apiKey) throw Errors.BadRequest('Address details unavailable: GOOGLE_PLACES_API_KEY not configured');
-
-    const { placeId, session } = c.req.valid('query');
-    const cacheKey = placeDetailsCacheKey(placeId);
-
-    if (c.env.TENANT_CACHE) {
-        const cached = await c.env.TENANT_CACHE.get(cacheKey, 'json') as ResolvedPlace | null;
-        if (cached) {
-            return c.json({ success: true, data: cached, meta: { cached: true } }, 200);
-        }
-    }
-
-    // The fetch + field mask + component mapping live in lib/places/geocode.ts
-    // so booking fulfilment and Settings can geocode too — this route was the
-    // only way to reach that logic, which is exactly why nothing else did.
-    const payload = await fetchPlaceDetails(apiKey, placeId, session);
-    if (!payload) throw Errors.BadRequest('Address details temporarily unavailable');
-
-    if (c.env.TENANT_CACHE) {
-        await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(payload), { expirationTtl: 60 * 24 * 60 * 60 });
-    }
-
-    return c.json({ success: true, data: payload, meta: { cached: false } }, 200);
+return c.json({ success: true, data: payload, meta: { cached: false } }, 200);
 });
 
-export type PlacesApi = typeof placesRoutes;
+/** Registration order. Drives `PlacesApi`; a test pins it to what `app` really registered. */
+export const placesRouteConfigs = [
+    autocompleteRoute,
+    detailsRoute,
+] as const;
 
-export default placesRoutes;
+export type PlacesApi = ApiOf<typeof placesRouteConfigs>;
+
+export default app;
