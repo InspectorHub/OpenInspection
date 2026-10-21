@@ -41,27 +41,32 @@ const resetMemberTwoFactorRoute = createRoute(withMcpMetadata({
  * one route on that router that is neither seat administration nor an invite —
  * it is account recovery, and it is the only one guarded on `owner` alone.
  */
-const teamTwoFactorRoutes = createApiRouter()
-    .openapi(resetMemberTwoFactorRoute, async (c) => {
+const app = createApiRouter();
+app.openapi(resetMemberTwoFactorRoute, async (c) => {
 
-        const tenantId = c.get('tenantId');
-        const user = c.get('user');
-        const { id: memberId } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const user = c.get('user');
+    const { id: memberId } = c.req.valid('param');
 
-        const { email } = await c.var.services.team.resetMemberTwoFactor(
-            tenantId, memberId, user?.sub as string,
-        );
+    const { email } = await c.var.services.team.resetMemberTwoFactor(
+        tenantId, memberId, user?.sub as string,
+    );
 
-        // AUDITED, because it is the one action that lowers somebody else's
-        // authentication requirement and leaves no other trace: the member's
-        // row afterwards is indistinguishable from one that never enrolled.
-        // Recorded AFTER the write, so a refused reset writes nothing.
-        auditFromContext(c, 'user.two_factor_reset', 'user', {
-            entityId: memberId,
-            metadata: { email },
-        });
+    // AUDITED, because it is the one action that lowers somebody else's
+    // authentication requirement and leaves no other trace: the member's
+    // row afterwards is indistinguishable from one that never enrolled.
+    // Recorded AFTER the write, so a refused reset writes nothing.
+    auditFromContext(c, 'user.two_factor_reset', 'user', {
+        entityId: memberId,
+        metadata: { email },
+    });
 
-        return c.json({ success: true as const, data: { reset: true as const } }, 200);
-    })
+    return c.json({ success: true as const, data: { reset: true as const } }, 200);
+});
 
-export default teamTwoFactorRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const teamTwoFactorRouteConfigs = [
+    resetMemberTwoFactorRoute,
+] as const;
+
+export default app;

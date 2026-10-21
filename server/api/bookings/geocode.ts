@@ -59,64 +59,68 @@ const publicGeocodeRoute = createRoute(withMcpMetadata({
     description: "Public, unauthenticated address autocomplete for the booking page, proxying Google Places so the API key never reaches the browser. Returns at most 5 US address suggestions (label, line1, and best-effort city, state and ZIP split from the suggestion text, plus a placeId). Queries shorter than 3 characters return an empty list without calling Google. When the deployment has no Places key, or Google fails or answers unexpectedly, the call still returns 200 with an empty list and a reason of NO_API_KEY or UPSTREAM_ERROR in meta, so a client should fall back to free-text address entry. Rate-limited with the booking limiter."
 }, { scopes: ['read'], tier: 'extended' }));
 
-const publicGeocodeRoutes = createApiRouter()
-    .openapi(publicGeocodeRoute, async (c) => {
-        await checkRateLimit(c, 'book');
-        const { q } = c.req.valid('query');
-        if (q.length < 3) {
-            return c.json({ success: true, data: [] }, 200);
-        }
-        const apiKey = c.env.GOOGLE_PLACES_API_KEY;
-        if (!apiKey) {
-            return c.json({ success: true, data: [], meta: { reason: 'NO_API_KEY' as const } }, 200);
-        }
+const app = createApiRouter();
+app.openapi(publicGeocodeRoute, async (c) => {
+    await checkRateLimit(c, 'book');
+    const { q } = c.req.valid('query');
+    if (q.length < 3) {
+        return c.json({ success: true, data: [] }, 200);
+    }
+    const apiKey = c.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) {
+        return c.json({ success: true, data: [], meta: { reason: 'NO_API_KEY' as const } }, 200);
+    }
 
-        try {
-            const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
-            url.searchParams.set('input', q);
-            url.searchParams.set('types', 'address');
-            url.searchParams.set('components', 'country:us');
-            url.searchParams.set('key', apiKey);
-            const res = await fetch(url.toString());
-            if (!res.ok) {
-                logger.warn('[public.geocode] upstream error', { status: res.status });
-                return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
-            }
-            const j = await res.json() as {
-                status: string;
-                predictions?: Array<{
-                    place_id: string;
-                    description: string;
-                    terms?: Array<{ value: string }>;
-                    structured_formatting?: { main_text?: string; secondary_text?: string };
-                }>;
-            };
-            if (j.status !== 'OK' && j.status !== 'ZERO_RESULTS') {
-                logger.warn('[public.geocode] upstream status', { status: j.status });
-                return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
-            }
-            // Best-effort split of secondary_text into city / state / zip — Google
-            // Places returns "City, ST 12345" for US addresses. We do a lenient
-            // regex split; clients should treat these as hints, not authoritative.
-            const data = (j.predictions ?? []).slice(0, 5).map(p => {
-                const main = p.structured_formatting?.main_text || p.description;
-                const secondary = p.structured_formatting?.secondary_text || '';
-                const m = secondary.match(/^([^,]+),\s*([A-Z]{2})\s*(\d{5})?/);
-                return {
-                    label:   p.description,
-                    line1:   main,
-                    city:    m?.[1] ?? null,
-                    state:   m?.[2] ?? null,
-                    zip:     m?.[3] ?? null,
-                    placeId: p.place_id,
-                };
-            });
-            return c.json({ success: true, data }, 200);
-        } catch (e) {
-            logger.error('[public.geocode] exception', {}, e instanceof Error ? e : undefined);
+    try {
+        const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
+        url.searchParams.set('input', q);
+        url.searchParams.set('types', 'address');
+        url.searchParams.set('components', 'country:us');
+        url.searchParams.set('key', apiKey);
+        const res = await fetch(url.toString());
+        if (!res.ok) {
+            logger.warn('[public.geocode] upstream error', { status: res.status });
             return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
         }
-    })
-;
+        const j = await res.json() as {
+            status: string;
+            predictions?: Array<{
+                place_id: string;
+                description: string;
+                terms?: Array<{ value: string }>;
+                structured_formatting?: { main_text?: string; secondary_text?: string };
+            }>;
+        };
+        if (j.status !== 'OK' && j.status !== 'ZERO_RESULTS') {
+            logger.warn('[public.geocode] upstream status', { status: j.status });
+            return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
+        }
+        // Best-effort split of secondary_text into city / state / zip — Google
+        // Places returns "City, ST 12345" for US addresses. We do a lenient
+        // regex split; clients should treat these as hints, not authoritative.
+        const data = (j.predictions ?? []).slice(0, 5).map(p => {
+            const main = p.structured_formatting?.main_text || p.description;
+            const secondary = p.structured_formatting?.secondary_text || '';
+            const m = secondary.match(/^([^,]+),\s*([A-Z]{2})\s*(\d{5})?/);
+            return {
+                label:   p.description,
+                line1:   main,
+                city:    m?.[1] ?? null,
+                state:   m?.[2] ?? null,
+                zip:     m?.[3] ?? null,
+                placeId: p.place_id,
+            };
+        });
+        return c.json({ success: true, data }, 200);
+    } catch (e) {
+        logger.error('[public.geocode] exception', {}, e instanceof Error ? e : undefined);
+        return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);
+    }
+});
 
-export default publicGeocodeRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const publicGeocodeRouteConfigs = [
+    publicGeocodeRoute,
+] as const;
+
+export default app;

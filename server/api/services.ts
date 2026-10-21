@@ -1,5 +1,6 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { z } from 'zod';
 import { requireRole } from '../lib/middleware/rbac';
 import { capabilitiesFor, requireCapability } from '../lib/middleware/require-capability';
@@ -16,317 +17,372 @@ import {
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-export const servicesRoutes = createApiRouter()
-    // GET /api/services
-    .openapi(createRoute(withMcpMetadata({
-        method: 'get', path: '/',
-        tags: ["services"], summary: "List services for current tenant",
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        responses: { 200: { content: { 'application/json': { schema: ServiceListResponseSchema } }, description: 'OK' } },
-        operationId: "listServices",
-        description: "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the inspection-fees capability. Owner, manager or inspector."
-    }, { scopes: ['read'], tier: 'primary' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        // The catalogue and the caller's capabilities do not depend on each other: one wait, not two.
-        const [rows, caps] = await Promise.all([c.var.services.service.listServices(tenantId), capabilitiesFor(c)]);
-        // IA-95 — the catalog carries `price`, and this route admits inspectors,
-        // who may hold the inspection-fees capability or not: the wizard needs the price list
-        // to price a line, and a caller without it must not receive a price. Writing the
-        // catalogue stays with `companyFinance`.
-        return c.json({ success: true, data: redactMoney(rows, caps, 'inspectionFees') });
-    })
-    // POST /api/services/discount/validate — MUST be before /:id routes
-    .openapi(createRoute(withMcpMetadata({
-        method: 'post', path: '/discount/validate',
-        tags: ["services"], summary: "Validate service for current tenant",
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        request: { body: { content: { 'application/json': { schema: ValidateDiscountSchema.describe('The code to check and the subtotal to price it against.') } } } },
-        responses: { 200: { content: { 'application/json': { schema: createApiResponseSchema(ValidateDiscountResponseSchema) } }, description: 'Validation result' } },
-        operationId: "validateService",
-        description: "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { code, subtotal } = c.req.valid('json');
-        const result = await c.var.services.service.validateDiscountCode(tenantId, code, subtotal);
-        return c.json({ success: true, data: result });
-    })
-    // POST /api/services/discount-codes
-    .openapi(createRoute(withMcpMetadata({
-        method: 'post', path: '/discount-codes',
-        tags: ["services"], summary: "Create service discount codes",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: { body: { content: { 'application/json': { schema: CreateDiscountCodeSchema.describe('The new discount code and its limits.') } } } },
-        responses: { 201: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Created' } },
-        operationId: "createServiceDiscountCodes",
-        description: "Create a discount code for the company. The code is stored in upper case, starts active with zero uses, and can carry a use limit and an expiry time. The response is only a success flag, so list the codes to read back the new id. Nothing is written to the audit log and each call creates another code. Restricted to owners and managers."
-    }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const data = c.req.valid('json');
-        await c.var.services.service.createDiscountCode(tenantId, data);
-        return c.json({ success: true }, 201);
-    })
-    // GET /api/services/discount-codes — MUST be before /:id routes
-    .openapi(createRoute(withMcpMetadata({
-        method: 'get', path: '/discount-codes',
-        tags: ["services"], summary: "List service discount codes",
-        middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-        responses: { 200: { content: { 'application/json': { schema: DiscountCodeListResponseSchema } }, description: 'OK' } },
-        operationId: "listServiceDiscountCodes",
-        description: "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
-    }, { scopes: ['read'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const rows = await c.var.services.service.listDiscountCodes(tenantId);
-        return c.json({ success: true, data: rows });
-    })
-    // PUT /api/services/discount-codes/:id — MUST be before /:id routes
-    .openapi(createRoute(withMcpMetadata({
-        method: 'put', path: '/discount-codes/{id}',
-        tags: ["services"], summary: "Update service discount code",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: {
-            params: z.object({ id: z.string().describe('Discount code to update.') }),
-            body: { content: { 'application/json': { schema: UpdateDiscountCodeSchema.describe('The discount code fields to change; omitted fields are left as they are.') } } },
-        },
-        responses: { 200: { content: { 'application/json': { schema: DiscountCodeResponseSchema } }, description: 'Updated' } },
-        operationId: "updateServiceDiscountCode",
-        description: "Update a discount code. Despite the PUT verb it is a partial update: only the fields sent change, and the updated code is returned. Setting active false retires a code without deleting it, null maxUses or expiresAt removes that limit, and the use count cannot be edited. The code text is stored as sent, unlike create which upper-cases it. Returns 404 for an unknown code. Restricted to owners and managers."
-    }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const data = c.req.valid('json');
-        const row = await c.var.services.service.updateDiscountCode(tenantId, id, data);
-        return c.json({ success: true, data: row });
-    })
-    // DELETE /api/services/discount-codes/:id — MUST be before /:id routes
-    .openapi(createRoute(withMcpMetadata({
-        method: 'delete', path: '/discount-codes/{id}',
-        tags: ["services"], summary: "Delete service discount code",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: { params: z.object({ id: z.string().describe('Discount code to delete.') }) },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
-        operationId: "deleteServiceDiscountCode",
-        description: "Permanently delete a discount code (a hard delete, unlike deleting a service). To stop a code being accepted while keeping its record, update it with active false instead. Returns 404 for an unknown code and nothing is written to the audit log. Restricted to owners and managers."
-    }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await c.var.services.service.deleteDiscountCode(tenantId, id);
-        return c.json({ success: true });
-    })
-    // POST /api/services
-    .openapi(createRoute(withMcpMetadata({
-        method: 'post', path: '/',
-        tags: ["services"], summary: "Create service for current tenant",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: { body: { content: { 'application/json': { schema: CreateServiceSchema.describe('The new catalog service.') } } } },
-        responses: { 201: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'Created' } },
-        operationId: "createService",
-        description: "Creates an active service in the catalog. Owner or manager only. Price is integer cents; durationMinutes, template, agreement, sort order and a per-service deposit policy are optional. Returns the created service."
-    }, { scopes: ['write'], tier: 'primary', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const data = c.req.valid('json');
-        const row = await c.var.services.service.createService(tenantId, data);
-        return c.json({ success: true, data: row }, 201);
-    })
-    // GET /api/services/inspectors-by-service — the restriction lists of many services at once.
-    // Registered before the /{id}/... routes so no service id can shadow it.
-    .openapi(createRoute(withMcpMetadata({
-        method: 'get', path: '/inspectors-by-service',
-        tags: ["services"], summary: "List inspector restrictions for many services",
-        middleware: [requireRole('owner', 'manager')] as const,
-        request: { query: BulkServiceIdsQuerySchema },
-        responses: {
-            200: { content: { 'application/json': { schema: ServiceInspectorMapResponseSchema } }, description: 'OK - service id to restricted inspector user ids' },
-        },
-        operationId: "listServiceInspectorsBulk",
-        description: "Returns the inspector restriction list of each requested service in one call (ids is a comma-separated list of at most 90). Same answer as the per-service restriction read, for each service of the company: an empty list means all non-agent staff are qualified. An id that is not a service of the company is left out of the answer. Admin or owner only.",
-    }, { scopes: ['read'], tier: 'excluded' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { ids } = c.req.valid('query');
-        return c.json({ success: true, data: await c.var.services.service.getServiceInspectorsBulk(tenantId, ids) });
-    })
-    // GET /api/services/pay-rules-by-service — the pay rules of many services at once.
-    .openapi(createRoute(withMcpMetadata({
-        method: 'get', path: '/pay-rules-by-service',
-        tags: ["services"], summary: "List pay rules for many services",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: { query: BulkServiceIdsQuerySchema },
-        responses: {
-            200: { content: { 'application/json': { schema: PayRuleMapResponseSchema } }, description: 'OK - service id to its pay rules, the service default first' },
-        },
-        operationId: "listServicePayRulesBulk",
-        description: "Returns the pay rules of each requested service in one call (ids is a comma-separated list of at most 90). Same answer as the per-service pay rule list, for each service of the company: the service default first, then per-inspector rules, and an empty list where pay splits are off. An id that is not a service of the company is left out of the answer. Restricted to owners and managers holding the company-finance capability.",
-    }, { scopes: ['read'], tier: 'excluded', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { ids } = c.req.valid('query');
-        return c.json({ success: true, data: await c.var.services.service.listPayRulesBulk(tenantId, ids) });
-    })
-    // GET /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
-    .openapi(createRoute(withMcpMetadata({
-        method: 'get', path: '/{id}/inspectors',
-        tags: ["services"], summary: "Get qualified inspector restriction list for a service",
-        middleware: [requireRole('owner', 'manager')] as const,
-        request: {
-            params: z.object({ id: z.string().describe('Service ID') }),
-        },
-        responses: {
-            200: { content: { 'application/json': { schema: ServiceInspectorListResponseSchema } }, description: 'OK — empty userIds means all staff are qualified' },
-        },
-        operationId: "getServiceInspectors",
-        description: "Returns the inspector restriction list for a service. An empty userIds array means all non-agent staff are qualified (no restriction rows). Admin or owner only.",
-    }, { scopes: ['read'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const userIds = await c.var.services.service.getServiceInspectors(tenantId, id);
-        return c.json({ success: true, data: { userIds } });
-    })
-    // PUT /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
-    .openapi(createRoute(withMcpMetadata({
-        method: 'put', path: '/{id}/inspectors',
-        tags: ["services"], summary: "Replace inspector restriction list for a service",
-        middleware: [requireRole('owner', 'manager')] as const,
-        request: {
-            params: z.object({ id: z.string().describe('Service ID') }),
-            body: { content: { 'application/json': { schema: SetServiceInspectorsSchema } } },
-        },
-        responses: {
-            200: { content: { 'application/json': { schema: SetServiceInspectorsResponseSchema } }, description: 'OK — count of restriction rows now in effect' },
-        },
-        operationId: "setServiceInspectors",
-        description: "Full-replace the qualified inspector list for a service. An empty userIds array clears all restrictions (back to all-qualified). Every userId must be a non-deleted, non-agent member of the caller's tenant. Admin or owner only.",
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const { userIds } = c.req.valid('json');
-        const count = await c.var.services.service.setServiceInspectors(tenantId, id, userIds);
-        return c.json({ success: true, data: { count } });
-    })
-    // --- Pay rules (#278) --------------------------------------------------
-    // Mounted here rather than under a pay-splits router because a rule is
-    // CATALOGUE configuration — it belongs to a service, not to an inspection —
-    // and this is where the service's other per-service settings already live.
-    // `/{id}/pay-rules` mirrors the `/{id}/inspectors` pair exactly: same
-    // arity, same `{id}` param name, registered before the bare `/{id}` routes.
-    // Write access is owner/manager, matching every other write on this router:
-    // deciding what a person is paid is company configuration, not field work.
-    // Same line as the catalogue writes: `companyFinance`.
-    // GET /api/services/:id/pay-rules
-    .openapi(createRoute(withMcpMetadata({
-        method: 'get', path: '/{id}/pay-rules',
-        tags: ["services"], summary: "List pay rules for a service",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: { params: z.object({ id: z.string().describe('Service ID') }) },
-        responses: {
-            200: { content: { 'application/json': { schema: PayRuleListResponseSchema } }, description: 'OK — the service default first, then per-inspector rules' },
-        },
-        operationId: "listServicePayRules",
-        description: "Returns what inspectors earn on this catalogue service. A rule with a null userId is the service default, applied to any inspector without one of their own. An empty list means pay splits are OFF for this service: nothing is populated when an inspection is assigned.",
-    }, { scopes: ['read'], tier: 'extended', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const rows = await c.var.services.service.listPayRules(tenantId, id);
-        return c.json({ success: true, data: rows });
-    })
-    // POST /api/services/:id/pay-rules
-    .openapi(createRoute(withMcpMetadata({
-        method: 'post', path: '/{id}/pay-rules',
-        tags: ["services"], summary: "Add a pay rule to a service",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: {
-            params: z.object({ id: z.string().describe('Service ID') }),
-            body: { content: { 'application/json': { schema: CreatePayRuleSchema } } },
-        },
-        responses: {
-            201: { content: { 'application/json': { schema: PayRuleResponseSchema } }, description: 'Created' },
-            409: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'A default rule, or a rule for that inspector, already exists on this service' },
-        },
-        operationId: "createServicePayRule",
-        description: "Writes what an inspector earns on this service. Percentages are BASIS POINTS (percentBps: 6000 = 60%) and fixed amounts are integer cents (amountCents) — the field name carries the unit, and the payload is strict, so a rule written in the wrong unit is refused rather than stored a hundred times too small. Omit userId for the service default. At most one default and one rule per inspector exist per service; a duplicate is 409.",
-    }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const input = c.req.valid('json');
-        const row = await c.var.services.service.createPayRule(tenantId, id, input);
-        return c.json({ success: true, data: row }, 201);
-    })
-    // PUT /api/services/:id/pay-rules/:ruleId
-    .openapi(createRoute(withMcpMetadata({
-        method: 'put', path: '/{id}/pay-rules/{ruleId}',
-        tags: ["services"], summary: "Replace the rate of a pay rule",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: {
-            params: z.object({
-                id: z.string().describe('Service ID'),
-                ruleId: z.string().describe('Pay rule ID'),
-            }),
-            body: { content: { 'application/json': { schema: UpdatePayRuleSchema } } },
-        },
-        responses: {
-            200: { content: { 'application/json': { schema: PayRuleResponseSchema } }, description: 'OK' },
-        },
-        operationId: "updateServicePayRule",
-        description: "Changes the rate of an existing pay rule, including switching between the three types. The inspector the rule applies to is not editable here — that would move the rule into a different uniqueness slot, so it is a delete plus a create. Editing a rule never restates pay that was already recorded: splits are a frozen record, and an explicit refresh is what re-derives them.",
-    }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id, ruleId } = c.req.valid('param');
-        const input = c.req.valid('json');
-        const row = await c.var.services.service.updatePayRule(tenantId, id, ruleId, input);
-        return c.json({ success: true, data: row });
-    })
-    // DELETE /api/services/:id/pay-rules/:ruleId
-    .openapi(createRoute(withMcpMetadata({
-        method: 'delete', path: '/{id}/pay-rules/{ruleId}',
-        tags: ["services"], summary: "Delete a pay rule",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: {
-            params: z.object({
-                id: z.string().describe('Service ID'),
-                ruleId: z.string().describe('Pay rule ID'),
-            }),
-        },
-        responses: {
-            200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' },
-        },
-        operationId: "deleteServicePayRule",
-        description: "Removes a pay rule. Deleting the last rule on a service turns pay splits off for it — future inspections populate nothing. Splits already recorded are left alone.",
-    }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id, ruleId } = c.req.valid('param');
-        await c.var.services.service.deletePayRule(tenantId, id, ruleId);
-        return c.json({ success: true });
-    })
-    // PUT /api/services/:id
-    .openapi(createRoute(withMcpMetadata({
-        method: 'put', path: '/{id}',
-        tags: ["services"], summary: "Replace service for current tenant",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: {
-            params: z.object({ id: z.string().describe('Service to update.') }),
-            body: { content: { 'application/json': { schema: UpdateServiceSchema.describe('The service fields to change; omitted fields are left as they are.') } } },
-        },
-        responses: { 200: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'OK' } },
-        operationId: "replaceService",
-        description: "Update a catalog service. Despite the PUT verb it is a partial update: only the fields sent change, and the updated service is returned. Sending active true reactivates a service that was deleted. Returns 404 for an unknown id. Nothing is written to the audit log. Restricted to owners and managers."
-    }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const data = c.req.valid('json');
-        const row = await c.var.services.service.updateService(tenantId, id, data);
-        return c.json({ success: true, data: row });
-    })
-    // DELETE /api/services/:id
-    .openapi(createRoute(withMcpMetadata({
-        method: 'delete', path: '/{id}',
-        tags: ["services"], summary: "Delete service for current tenant",
-        middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
-        request: { params: z.object({ id: z.string().describe('Id of the service to deactivate.') }) },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
-        operationId: "deleteService",
-        description: "Soft-deletes a service by marking it inactive: it disappears from the catalog list but existing inspections keep their snapshotted service lines. Owner or manager only. Fails with not found for an unknown id."
-    }, { scopes: ['write'], tier: 'primary', capability: 'companyFinance' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await c.var.services.service.deleteService(tenantId, id);
-        return c.json({ success: true });
-    });
+const deleteServiceRoute = createRoute(withMcpMetadata({
+    method: 'delete', path: '/{id}',
+    tags: ["services"], summary: "Delete service for current tenant",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: { params: z.object({ id: z.string().describe('Id of the service to deactivate.') }) },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
+    operationId: "deleteService",
+    description: "Soft-deletes a service by marking it inactive: it disappears from the catalog list but existing inspections keep their snapshotted service lines. Owner or manager only. Fails with not found for an unknown id."
+}, { scopes: ['write'], tier: 'primary', capability: 'companyFinance' }));
 
-export type ServicesApi = typeof servicesRoutes;
+const replaceServiceRoute = createRoute(withMcpMetadata({
+    method: 'put', path: '/{id}',
+    tags: ["services"], summary: "Replace service for current tenant",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Service to update.') }),
+        body: { content: { 'application/json': { schema: UpdateServiceSchema.describe('The service fields to change; omitted fields are left as they are.') } } },
+    },
+    responses: { 200: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'OK' } },
+    operationId: "replaceService",
+    description: "Update a catalog service. Despite the PUT verb it is a partial update: only the fields sent change, and the updated service is returned. Sending active true reactivates a service that was deleted. Returns 404 for an unknown id. Nothing is written to the audit log. Restricted to owners and managers."
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
+
+const deleteServicePayRuleRoute = createRoute(withMcpMetadata({
+    method: 'delete', path: '/{id}/pay-rules/{ruleId}',
+    tags: ["services"], summary: "Delete a pay rule",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: {
+        params: z.object({
+            id: z.string().describe('Service ID'),
+            ruleId: z.string().describe('Pay rule ID'),
+        }),
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' },
+    },
+    operationId: "deleteServicePayRule",
+    description: "Removes a pay rule. Deleting the last rule on a service turns pay splits off for it — future inspections populate nothing. Splits already recorded are left alone.",
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
+
+const updateServicePayRuleRoute = createRoute(withMcpMetadata({
+    method: 'put', path: '/{id}/pay-rules/{ruleId}',
+    tags: ["services"], summary: "Replace the rate of a pay rule",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: {
+        params: z.object({
+            id: z.string().describe('Service ID'),
+            ruleId: z.string().describe('Pay rule ID'),
+        }),
+        body: { content: { 'application/json': { schema: UpdatePayRuleSchema } } },
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: PayRuleResponseSchema } }, description: 'OK' },
+    },
+    operationId: "updateServicePayRule",
+    description: "Changes the rate of an existing pay rule, including switching between the three types. The inspector the rule applies to is not editable here — that would move the rule into a different uniqueness slot, so it is a delete plus a create. Editing a rule never restates pay that was already recorded: splits are a frozen record, and an explicit refresh is what re-derives them.",
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
+
+const createServicePayRuleRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/{id}/pay-rules',
+    tags: ["services"], summary: "Add a pay rule to a service",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Service ID') }),
+        body: { content: { 'application/json': { schema: CreatePayRuleSchema } } },
+    },
+    responses: {
+        201: { content: { 'application/json': { schema: PayRuleResponseSchema } }, description: 'Created' },
+        409: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'A default rule, or a rule for that inspector, already exists on this service' },
+    },
+    operationId: "createServicePayRule",
+    description: "Writes what an inspector earns on this service. Percentages are BASIS POINTS (percentBps: 6000 = 60%) and fixed amounts are integer cents (amountCents) — the field name carries the unit, and the payload is strict, so a rule written in the wrong unit is refused rather than stored a hundred times too small. Omit userId for the service default. At most one default and one rule per inspector exist per service; a duplicate is 409.",
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
+
+const listServicePayRulesRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/{id}/pay-rules',
+    tags: ["services"], summary: "List pay rules for a service",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: { params: z.object({ id: z.string().describe('Service ID') }) },
+    responses: {
+        200: { content: { 'application/json': { schema: PayRuleListResponseSchema } }, description: 'OK — the service default first, then per-inspector rules' },
+    },
+    operationId: "listServicePayRules",
+    description: "Returns what inspectors earn on this catalogue service. A rule with a null userId is the service default, applied to any inspector without one of their own. An empty list means pay splits are OFF for this service: nothing is populated when an inspection is assigned.",
+}, { scopes: ['read'], tier: 'extended', capability: 'companyFinance' }));
+
+const setServiceInspectorsRoute = createRoute(withMcpMetadata({
+    method: 'put', path: '/{id}/inspectors',
+    tags: ["services"], summary: "Replace inspector restriction list for a service",
+    middleware: [requireRole('owner', 'manager')] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Service ID') }),
+        body: { content: { 'application/json': { schema: SetServiceInspectorsSchema } } },
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: SetServiceInspectorsResponseSchema } }, description: 'OK — count of restriction rows now in effect' },
+    },
+    operationId: "setServiceInspectors",
+    description: "Full-replace the qualified inspector list for a service. An empty userIds array clears all restrictions (back to all-qualified). Every userId must be a non-deleted, non-agent member of the caller's tenant. Admin or owner only.",
+}, { scopes: ['write'], tier: 'extended' }));
+
+const getServiceInspectorsRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/{id}/inspectors',
+    tags: ["services"], summary: "Get qualified inspector restriction list for a service",
+    middleware: [requireRole('owner', 'manager')] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Service ID') }),
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: ServiceInspectorListResponseSchema } }, description: 'OK — empty userIds means all staff are qualified' },
+    },
+    operationId: "getServiceInspectors",
+    description: "Returns the inspector restriction list for a service. An empty userIds array means all non-agent staff are qualified (no restriction rows). Admin or owner only.",
+}, { scopes: ['read'], tier: 'extended' }));
+
+const listServicePayRulesBulkRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/pay-rules-by-service',
+    tags: ["services"], summary: "List pay rules for many services",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: { query: BulkServiceIdsQuerySchema },
+    responses: {
+        200: { content: { 'application/json': { schema: PayRuleMapResponseSchema } }, description: 'OK - service id to its pay rules, the service default first' },
+    },
+    operationId: "listServicePayRulesBulk",
+    description: "Returns the pay rules of each requested service in one call (ids is a comma-separated list of at most 90). Same answer as the per-service pay rule list, for each service of the company: the service default first, then per-inspector rules, and an empty list where pay splits are off. An id that is not a service of the company is left out of the answer. Restricted to owners and managers holding the company-finance capability.",
+}, { scopes: ['read'], tier: 'excluded', capability: 'companyFinance' }));
+
+const listServiceInspectorsBulkRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/inspectors-by-service',
+    tags: ["services"], summary: "List inspector restrictions for many services",
+    middleware: [requireRole('owner', 'manager')] as const,
+    request: { query: BulkServiceIdsQuerySchema },
+    responses: {
+        200: { content: { 'application/json': { schema: ServiceInspectorMapResponseSchema } }, description: 'OK - service id to restricted inspector user ids' },
+    },
+    operationId: "listServiceInspectorsBulk",
+    description: "Returns the inspector restriction list of each requested service in one call (ids is a comma-separated list of at most 90). Same answer as the per-service restriction read, for each service of the company: an empty list means all non-agent staff are qualified. An id that is not a service of the company is left out of the answer. Admin or owner only.",
+}, { scopes: ['read'], tier: 'excluded' }));
+
+const createServiceRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/',
+    tags: ["services"], summary: "Create service for current tenant",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: { body: { content: { 'application/json': { schema: CreateServiceSchema.describe('The new catalog service.') } } } },
+    responses: { 201: { content: { 'application/json': { schema: ServiceResponseSchema } }, description: 'Created' } },
+    operationId: "createService",
+    description: "Creates an active service in the catalog. Owner or manager only. Price is integer cents; durationMinutes, template, agreement, sort order and a per-service deposit policy are optional. Returns the created service."
+}, { scopes: ['write'], tier: 'primary', capability: 'companyFinance' }));
+
+const deleteServiceDiscountCodeRoute = createRoute(withMcpMetadata({
+    method: 'delete', path: '/discount-codes/{id}',
+    tags: ["services"], summary: "Delete service discount code",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: { params: z.object({ id: z.string().describe('Discount code to delete.') }) },
+    responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Deleted' } },
+    operationId: "deleteServiceDiscountCode",
+    description: "Permanently delete a discount code (a hard delete, unlike deleting a service). To stop a code being accepted while keeping its record, update it with active false instead. Returns 404 for an unknown code and nothing is written to the audit log. Restricted to owners and managers."
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
+
+const updateServiceDiscountCodeRoute = createRoute(withMcpMetadata({
+    method: 'put', path: '/discount-codes/{id}',
+    tags: ["services"], summary: "Update service discount code",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: {
+        params: z.object({ id: z.string().describe('Discount code to update.') }),
+        body: { content: { 'application/json': { schema: UpdateDiscountCodeSchema.describe('The discount code fields to change; omitted fields are left as they are.') } } },
+    },
+    responses: { 200: { content: { 'application/json': { schema: DiscountCodeResponseSchema } }, description: 'Updated' } },
+    operationId: "updateServiceDiscountCode",
+    description: "Update a discount code. Despite the PUT verb it is a partial update: only the fields sent change, and the updated code is returned. Setting active false retires a code without deleting it, null maxUses or expiresAt removes that limit, and the use count cannot be edited. The code text is stored as sent, unlike create which upper-cases it. Returns 404 for an unknown code. Restricted to owners and managers."
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
+
+const listServiceDiscountCodesRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/discount-codes',
+    tags: ["services"], summary: "List service discount codes",
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    responses: { 200: { content: { 'application/json': { schema: DiscountCodeListResponseSchema } }, description: 'OK' } },
+    operationId: "listServiceDiscountCodes",
+    description: "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
+}, { scopes: ['read'], tier: 'extended' }));
+
+const createServiceDiscountCodesRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/discount-codes',
+    tags: ["services"], summary: "Create service discount codes",
+    middleware: [requireRole('owner', 'manager'), requireCapability('companyFinance')] as const,
+    request: { body: { content: { 'application/json': { schema: CreateDiscountCodeSchema.describe('The new discount code and its limits.') } } } },
+    responses: { 201: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Created' } },
+    operationId: "createServiceDiscountCodes",
+    description: "Create a discount code for the company. The code is stored in upper case, starts active with zero uses, and can carry a use limit and an expiry time. The response is only a success flag, so list the codes to read back the new id. Nothing is written to the audit log and each call creates another code. Restricted to owners and managers."
+}, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
+
+const validateServiceRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/discount/validate',
+    tags: ["services"], summary: "Validate service for current tenant",
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { body: { content: { 'application/json': { schema: ValidateDiscountSchema.describe('The code to check and the subtotal to price it against.') } } } },
+    responses: { 200: { content: { 'application/json': { schema: createApiResponseSchema(ValidateDiscountResponseSchema) } }, description: 'Validation result' } },
+    operationId: "validateService",
+    description: "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors."
+}, { scopes: ['write'], tier: 'extended' }));
+
+const listServicesRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/',
+    tags: ["services"], summary: "List services for current tenant",
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    responses: { 200: { content: { 'application/json': { schema: ServiceListResponseSchema } }, description: 'OK' } },
+    operationId: "listServices",
+    description: "Lists the company's active services (the bookable catalog), ordered by sort order then name. Inactive (deleted) services are not returned. Price is in integer cents and is omitted from the response for callers without the inspection-fees capability. Owner, manager or inspector."
+}, { scopes: ['read'], tier: 'primary' }));
+
+export const servicesRoutes = createApiRouter();
+// GET /api/services
+servicesRoutes.openapi(listServicesRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    // The catalogue and the caller's capabilities do not depend on each other: one wait, not two.
+    const [rows, caps] = await Promise.all([c.var.services.service.listServices(tenantId), capabilitiesFor(c)]);
+    // IA-95 — the catalog carries `price`, and this route admits inspectors,
+    // who may hold the inspection-fees capability or not: the wizard needs the price list
+    // to price a line, and a caller without it must not receive a price. Writing the
+    // catalogue stays with `companyFinance`.
+    return c.json({ success: true, data: redactMoney(rows, caps, 'inspectionFees') });
+});
+// POST /api/services/discount/validate — MUST be before /:id routes
+servicesRoutes.openapi(validateServiceRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { code, subtotal } = c.req.valid('json');
+    const result = await c.var.services.service.validateDiscountCode(tenantId, code, subtotal);
+    return c.json({ success: true, data: result });
+});
+// POST /api/services/discount-codes
+servicesRoutes.openapi(createServiceDiscountCodesRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const data = c.req.valid('json');
+    await c.var.services.service.createDiscountCode(tenantId, data);
+    return c.json({ success: true }, 201);
+});
+// GET /api/services/discount-codes — MUST be before /:id routes
+servicesRoutes.openapi(listServiceDiscountCodesRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const rows = await c.var.services.service.listDiscountCodes(tenantId);
+    return c.json({ success: true, data: rows });
+});
+// PUT /api/services/discount-codes/:id — MUST be before /:id routes
+servicesRoutes.openapi(updateServiceDiscountCodeRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const data = c.req.valid('json');
+    const row = await c.var.services.service.updateDiscountCode(tenantId, id, data);
+    return c.json({ success: true, data: row });
+});
+// DELETE /api/services/discount-codes/:id — MUST be before /:id routes
+servicesRoutes.openapi(deleteServiceDiscountCodeRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.service.deleteDiscountCode(tenantId, id);
+    return c.json({ success: true });
+});
+// POST /api/services
+servicesRoutes.openapi(createServiceRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const data = c.req.valid('json');
+    const row = await c.var.services.service.createService(tenantId, data);
+    return c.json({ success: true, data: row }, 201);
+});
+// GET /api/services/inspectors-by-service — the restriction lists of many services at once.
+// Registered before the /{id}/... routes so no service id can shadow it.
+servicesRoutes.openapi(listServiceInspectorsBulkRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { ids } = c.req.valid('query');
+    return c.json({ success: true, data: await c.var.services.service.getServiceInspectorsBulk(tenantId, ids) });
+});
+// GET /api/services/pay-rules-by-service — the pay rules of many services at once.
+servicesRoutes.openapi(listServicePayRulesBulkRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { ids } = c.req.valid('query');
+    return c.json({ success: true, data: await c.var.services.service.listPayRulesBulk(tenantId, ids) });
+});
+// GET /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
+servicesRoutes.openapi(getServiceInspectorsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const userIds = await c.var.services.service.getServiceInspectors(tenantId, id);
+    return c.json({ success: true, data: { userIds } });
+});
+// PUT /api/services/:id/inspectors — registered before the /{id} param routes for clarity; different path arity, no shadowing risk
+servicesRoutes.openapi(setServiceInspectorsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const { userIds } = c.req.valid('json');
+    const count = await c.var.services.service.setServiceInspectors(tenantId, id, userIds);
+    return c.json({ success: true, data: { count } });
+});
+// --- Pay rules (#278) --------------------------------------------------
+// Mounted here rather than under a pay-splits router because a rule is
+// CATALOGUE configuration — it belongs to a service, not to an inspection —
+// and this is where the service's other per-service settings already live.
+// `/{id}/pay-rules` mirrors the `/{id}/inspectors` pair exactly: same
+// arity, same `{id}` param name, registered before the bare `/{id}` routes.
+// Write access is owner/manager, matching every other write on this router:
+// deciding what a person is paid is company configuration, not field work.
+// Same line as the catalogue writes: `companyFinance`.
+// GET /api/services/:id/pay-rules
+servicesRoutes.openapi(listServicePayRulesRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const rows = await c.var.services.service.listPayRules(tenantId, id);
+    return c.json({ success: true, data: rows });
+});
+// POST /api/services/:id/pay-rules
+servicesRoutes.openapi(createServicePayRuleRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const input = c.req.valid('json');
+    const row = await c.var.services.service.createPayRule(tenantId, id, input);
+    return c.json({ success: true, data: row }, 201);
+});
+// PUT /api/services/:id/pay-rules/:ruleId
+servicesRoutes.openapi(updateServicePayRuleRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id, ruleId } = c.req.valid('param');
+    const input = c.req.valid('json');
+    const row = await c.var.services.service.updatePayRule(tenantId, id, ruleId, input);
+    return c.json({ success: true, data: row });
+});
+// DELETE /api/services/:id/pay-rules/:ruleId
+servicesRoutes.openapi(deleteServicePayRuleRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id, ruleId } = c.req.valid('param');
+    await c.var.services.service.deletePayRule(tenantId, id, ruleId);
+    return c.json({ success: true });
+});
+// PUT /api/services/:id
+servicesRoutes.openapi(replaceServiceRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const data = c.req.valid('json');
+    const row = await c.var.services.service.updateService(tenantId, id, data);
+    return c.json({ success: true, data: row });
+});
+// DELETE /api/services/:id
+servicesRoutes.openapi(deleteServiceRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.service.deleteService(tenantId, id);
+    return c.json({ success: true });
+});
+
+/** Registration order. Drives `ServicesApi`; a test pins it to what `servicesRoutes` really registered. */
+export const servicesRouteConfigs = [
+    listServicesRoute,
+    validateServiceRoute,
+    createServiceDiscountCodesRoute,
+    listServiceDiscountCodesRoute,
+    updateServiceDiscountCodeRoute,
+    deleteServiceDiscountCodeRoute,
+    createServiceRoute,
+    listServiceInspectorsBulkRoute,
+    listServicePayRulesBulkRoute,
+    getServiceInspectorsRoute,
+    setServiceInspectorsRoute,
+    listServicePayRulesRoute,
+    createServicePayRuleRoute,
+    updateServicePayRuleRoute,
+    deleteServicePayRuleRoute,
+    replaceServiceRoute,
+    deleteServiceRoute,
+] as const;
+
+export type ServicesApi = ApiOf<typeof servicesRouteConfigs>;

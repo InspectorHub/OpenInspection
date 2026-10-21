@@ -59,23 +59,28 @@ const createBookingRoute = createRoute(withMcpMetadata({
         + "(integer cents, 0 when none). Not idempotent: each call creates another booking."
 }, { scopes: ['write'], tier: 'extended' }));
 
-const createBookingRoutes = createApiRouter()
-    .openapi(createBookingRoute, async (c) => {
-        await checkRateLimit(c, 'book');
+const app = createApiRouter();
+app.openapi(createBookingRoute, async (c) => {
+    await checkRateLimit(c, 'book');
 
-        const body = c.req.valid('json');
-        // B-16 — the submitted tenant slug is authoritative, mirroring how the
-        // GET /book/:tenant/:slug page data resolves. The old context fallback
-        // (SINGLE_TENANT_ID / requestedTenantSlug) pointed at the WRONG tenant
-        // whenever the fixed tenant differed from the page's tenant, and at no
-        // tenant at all in saas mode (this path is not slug-routed).
-        const tenantRow = await getDrizzle(c)
-            .select({ id: tenants.id })
-            .from(tenants).where(eq(tenants.slug, body.tenant)).get();
-        if (!tenantRow) throw Errors.NotFound('Tenant not found.');
-        const tenantId = tenantRow.id;
+    const body = c.req.valid('json');
+    // B-16 — the submitted tenant slug is authoritative, mirroring how the
+    // GET /book/:tenant/:slug page data resolves. The old context fallback
+    // (SINGLE_TENANT_ID / requestedTenantSlug) pointed at the WRONG tenant
+    // whenever the fixed tenant differed from the page's tenant, and at no
+    // tenant at all in saas mode (this path is not slug-routed).
+    const tenantRow = await getDrizzle(c)
+        .select({ id: tenants.id })
+        .from(tenants).where(eq(tenants.slug, body.tenant)).get();
+    if (!tenantRow) throw Errors.NotFound('Tenant not found.');
+    const tenantId = tenantRow.id;
 
-        return c.var.services.booking.fulfillBooking(c, tenantId, body);
-    });
+    return c.var.services.booking.fulfillBooking(c, tenantId, body);
+});
 
-export default createBookingRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const createBookingRouteConfigs = [
+    createBookingRoute,
+] as const;
+
+export default app;

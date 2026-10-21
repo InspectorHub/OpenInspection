@@ -10,6 +10,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
@@ -129,49 +130,51 @@ const deleteTagRoute = createRoute(withMcpMetadata({
     description: "Delete a tag from the company, which also detaches it from every inspection item it was attached to. An unknown tag id is a not-found."
 }, { scopes: ['write'], tier: 'extended' }));
 
-const tagsRoutes = createApiRouter()
-    .openapi(listTagsRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        // Lazy-seed canonical tags so first-time tenants always see the five.
-        const data = await c.var.services.tag.listWithDefaults(tenantId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(createTagRoute, async (c) => {
-        const input = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const tag = await c.var.services.tag.create(tenantId, input);
-        auditFromContext(c, 'tag.created', 'tag', { entityId: tag.id, metadata: { name: tag.name } });
-        return c.json({ success: true as const, data: tag }, 200);
-    })
-    .openapi(replaceTagRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const tag = await c.var.services.tag.update(id, tenantId, patch);
-        auditFromContext(c, 'tag.updated', 'tag', { entityId: tag.id });
-        return c.json({ success: true as const, data: tag }, 200);
-    })
-    .openapi(listTagInspectionsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        // Tenant-scope guard via lookup — refuses cross-tenant ids.
-        const tag = await c.var.services.tag.get(id, tenantId);
-        if (!tag) throw Errors.NotFound('Tag not found');
-        const tagged = await c.var.services.tag.listInspectionsByTag(tenantId, id);
-        // Only the inspections the caller can see; for everyone else the list is unchanged.
-        const visible = await filterVisibleInspectionIds(getDrizzle(c), await resolveInspectionScope(c), tenantId, tagged);
-        const inspectionIds = tagged.filter((x) => visible.has(x));
-        return c.json({ success: true as const, data: { inspectionIds } }, 200);
-    })
-    .openapi(deleteTagRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        const result = await c.var.services.tag.delete(id, tenantId);
-        auditFromContext(c, 'tag.deleted', 'tag', { entityId: id });
-        return c.json({ success: true as const, data: result }, 200);
-    });
+const tagsRoutes = createApiRouter();
+tagsRoutes.openapi(listTagsRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    // Lazy-seed canonical tags so first-time tenants always see the five.
+    const data = await c.var.services.tag.listWithDefaults(tenantId);
+    return c.json({ success: true as const, data }, 200);
+});
+tagsRoutes.openapi(createTagRoute, async (c) => {
+    const input = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const tag = await c.var.services.tag.create(tenantId, input);
+    auditFromContext(c, 'tag.created', 'tag', { entityId: tag.id, metadata: { name: tag.name } });
+    return c.json({ success: true as const, data: tag }, 200);
+});
+tagsRoutes.openapi(replaceTagRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const tag = await c.var.services.tag.update(id, tenantId, patch);
+    auditFromContext(c, 'tag.updated', 'tag', { entityId: tag.id });
+    return c.json({ success: true as const, data: tag }, 200);
+});
+tagsRoutes.openapi(listTagInspectionsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    // Tenant-scope guard via lookup — refuses cross-tenant ids.
+    const tag = await c.var.services.tag.get(id, tenantId);
+    if (!tag) throw Errors.NotFound('Tag not found');
+    const tagged = await c.var.services.tag.listInspectionsByTag(tenantId, id);
+    // Only the inspections the caller can see; for everyone else the list is unchanged.
+    const visible = await filterVisibleInspectionIds(getDrizzle(c), await resolveInspectionScope(c), tenantId, tagged);
+    const inspectionIds = tagged.filter((x) => visible.has(x));
+    return c.json({ success: true as const, data: { inspectionIds } }, 200);
+});
+tagsRoutes.openapi(deleteTagRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    const result = await c.var.services.tag.delete(id, tenantId);
+    auditFromContext(c, 'tag.deleted', 'tag', { entityId: id });
+    return c.json({ success: true as const, data: result }, 200);
+});
 
-export type TagsApi = typeof tagsRoutes;
+export const tagsRouteConfigs = [listTagsRoute, createTagRoute, replaceTagRoute, listTagInspectionsRoute, deleteTagRoute] as const;
+
+export type TagsApi = ApiOf<typeof tagsRouteConfigs>;
 
 /* ─── Item-link sub-routes ────────────────────────────────────────────── */
 //

@@ -175,6 +175,34 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/audit.ts',
+        load: async () => {
+            const m = await import('../../../server/api/audit');
+            return { app: m.default, configs: m.auditRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/auth.ts',
+        load: async () => {
+            const m = await import('../../../server/api/auth');
+            return { app: m.default, configs: m.coreAuthRouteParts };
+        },
+    },
+    {
+        file: 'server/api/auth/profile.ts',
+        load: async () => {
+            const m = await import('../../../server/api/auth/profile');
+            return { app: m.default, configs: m.profileRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/auth/totp.ts',
+        load: async () => {
+            const m = await import('../../../server/api/auth/totp');
+            return { app: m.default, configs: m.totpRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/automations.ts',
         load: async () => {
             const m = await import('../../../server/api/automations');
@@ -193,6 +221,27 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/billing');
             return { app: m.default, configs: m.billingRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/bookings.ts',
+        load: async () => {
+            const m = await import('../../../server/api/bookings');
+            return { app: m.bookingsRoutes, configs: m.bookingsRouteParts };
+        },
+    },
+    {
+        file: 'server/api/bookings/create.ts',
+        load: async () => {
+            const m = await import('../../../server/api/bookings/create');
+            return { app: m.default, configs: m.createBookingRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/bookings/geocode.ts',
+        load: async () => {
+            const m = await import('../../../server/api/bookings/geocode');
+            return { app: m.default, configs: m.publicGeocodeRouteConfigs };
         },
     },
     {
@@ -270,6 +319,13 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/inspection-requests');
             return { app: m.default, configs: m.inspectionRequestsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/inspection-sync.ts',
+        load: async () => {
+            const m = await import('../../../server/api/inspection-sync');
+            return { app: m.default, configs: m.syncRouteConfigs };
         },
     },
     {
@@ -490,6 +546,27 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/messages-threads.ts',
+        load: async () => {
+            const m = await import('../../../server/api/messages-threads');
+            return { app: m.messageThreadRoutes, configs: m.messageThreadRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/messages.ts',
+        load: async () => {
+            const m = await import('../../../server/api/messages');
+            return { app: m.default, configs: m.messageRouteParts };
+        },
+    },
+    {
+        file: 'server/api/metrics.ts',
+        load: async () => {
+            const m = await import('../../../server/api/metrics');
+            return { app: m.default, configs: m.metricsRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/migration-intake.ts',
         load: async () => {
             const m = await import('../../../server/api/migration-intake');
@@ -543,6 +620,13 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/public-slug');
             return { app: m.default, configs: m.publicSlugRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/public/deposit-intent.ts',
+        load: async () => {
+            const m = await import('../../../server/api/public/deposit-intent');
+            return { app: m.default, configs: m.depositIntentRouteConfigs };
         },
     },
     {
@@ -613,6 +697,48 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/secrets');
             return { app: m.default, configs: m.secretsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/services.ts',
+        load: async () => {
+            const m = await import('../../../server/api/services');
+            return { app: m.servicesRoutes, configs: m.servicesRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/tags.ts',
+        load: async () => {
+            const m = await import('../../../server/api/tags');
+            return { app: m.default, configs: m.tagsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/team-defaults.ts',
+        load: async () => {
+            const m = await import('../../../server/api/team-defaults');
+            return { app: m.default, configs: m.teamDefaultsRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/team-permission-templates.ts',
+        load: async () => {
+            const m = await import('../../../server/api/team-permission-templates');
+            return { app: m.default, configs: m.teamPermissionTemplateRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/team-two-factor.ts',
+        load: async () => {
+            const m = await import('../../../server/api/team-two-factor');
+            return { app: m.default, configs: m.teamTwoFactorRouteConfigs };
+        },
+    },
+    {
+        file: 'server/api/team.ts',
+        load: async () => {
+            const m = await import('../../../server/api/team');
+            return { app: m.default, configs: m.teamRouteParts };
         },
     },
     {

@@ -116,48 +116,56 @@ const archiveTemplateRoute = createRoute(withMcpMetadata({
     description: 'Archives a company template so it can no longer be applied and its name can be used again. Nothing is deleted and nobody who received the template is changed. Built-in templates cannot be archived (400). Writes a permission_template.archive audit entry. Restricted to owners and managers.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const teamPermissionTemplateRoutes = createApiRouter()
-    .openapi(listTemplatesRoute, async (c) => {
-        const company = await new PermissionTemplateService(c.env.DB).list(c.get('tenantId'));
-        const builtIn = SYSTEM_TEMPLATES.map((t) => ({
-            id: t.key, system: true as const, name: t.name, description: t.description, baseRole: t.baseRole,
-            overrides: resolveTemplate(t.key).permissionOverrides ?? {},
-        }));
-        return c.json({
-            success: true as const,
-            data: { templates: [...builtIn, ...company.map(toListEntry)], maxCompanyTemplates: MAX_COMPANY_TEMPLATES },
-        }, 200);
-    })
-    .openapi(createTemplateRoute, async (c) => {
-        const body = c.req.valid('json');
-        const actor = await actorOf(c);
-        const created = await auditRefusedGrant(c, 'template', body.baseRole, () =>
-            new PermissionTemplateService(c.env.DB).create(c.get('tenantId'), actor, body, actor.userId ?? null));
-        auditFromContext(c, 'permission_template.create', 'permission_template', {
-            entityId: created.id, metadata: { name: created.name, baseRole: created.baseRole },
-        });
-        return c.json({ success: true as const, data: toListEntry(created) }, 201);
-    })
-    .openapi(updateTemplateRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const body = c.req.valid('json');
-        refuseBuiltIn(id);
-        const actor = await actorOf(c);
-        const updated = await auditRefusedGrant(c, 'template', body.baseRole, () =>
-            new PermissionTemplateService(c.env.DB).update(c.get('tenantId'), actor, id, body));
-        auditFromContext(c, 'permission_template.update', 'permission_template', {
-            entityId: id, metadata: { name: updated.name, baseRole: updated.baseRole },
-        });
-        return c.json({ success: true as const, data: toListEntry(updated) }, 200);
-    })
-    .openapi(archiveTemplateRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        refuseBuiltIn(id);
-        const archived = await new PermissionTemplateService(c.env.DB).archive(c.get('tenantId'), id);
-        auditFromContext(c, 'permission_template.archive', 'permission_template', {
-            entityId: id, metadata: { name: archived.name, baseRole: archived.baseRole },
-        });
-        return c.json({ success: true as const, data: { archived: true as const } }, 200);
+const app = createApiRouter();
+app.openapi(listTemplatesRoute, async (c) => {
+    const company = await new PermissionTemplateService(c.env.DB).list(c.get('tenantId'));
+    const builtIn = SYSTEM_TEMPLATES.map((t) => ({
+        id: t.key, system: true as const, name: t.name, description: t.description, baseRole: t.baseRole,
+        overrides: resolveTemplate(t.key).permissionOverrides ?? {},
+    }));
+    return c.json({
+        success: true as const,
+        data: { templates: [...builtIn, ...company.map(toListEntry)], maxCompanyTemplates: MAX_COMPANY_TEMPLATES },
+    }, 200);
+});
+app.openapi(createTemplateRoute, async (c) => {
+    const body = c.req.valid('json');
+    const actor = await actorOf(c);
+    const created = await auditRefusedGrant(c, 'template', body.baseRole, () =>
+        new PermissionTemplateService(c.env.DB).create(c.get('tenantId'), actor, body, actor.userId ?? null));
+    auditFromContext(c, 'permission_template.create', 'permission_template', {
+        entityId: created.id, metadata: { name: created.name, baseRole: created.baseRole },
     });
+    return c.json({ success: true as const, data: toListEntry(created) }, 201);
+});
+app.openapi(updateTemplateRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    refuseBuiltIn(id);
+    const actor = await actorOf(c);
+    const updated = await auditRefusedGrant(c, 'template', body.baseRole, () =>
+        new PermissionTemplateService(c.env.DB).update(c.get('tenantId'), actor, id, body));
+    auditFromContext(c, 'permission_template.update', 'permission_template', {
+        entityId: id, metadata: { name: updated.name, baseRole: updated.baseRole },
+    });
+    return c.json({ success: true as const, data: toListEntry(updated) }, 200);
+});
+app.openapi(archiveTemplateRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    refuseBuiltIn(id);
+    const archived = await new PermissionTemplateService(c.env.DB).archive(c.get('tenantId'), id);
+    auditFromContext(c, 'permission_template.archive', 'permission_template', {
+        entityId: id, metadata: { name: archived.name, baseRole: archived.baseRole },
+    });
+    return c.json({ success: true as const, data: { archived: true as const } }, 200);
+});
 
-export default teamPermissionTemplateRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const teamPermissionTemplateRouteConfigs = [
+    listTemplatesRoute,
+    createTemplateRoute,
+    updateTemplateRoute,
+    archiveTemplateRoute,
+] as const;
+
+export default app;

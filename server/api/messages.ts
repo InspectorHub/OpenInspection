@@ -26,6 +26,7 @@ import { mayActOnInspection, assertMayActOnInspection } from '../lib/inspection/
 import { Hono, type Context, type Next } from 'hono';
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import { mounted, type ApiOf } from '../lib/api-schema';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
@@ -36,7 +37,7 @@ import { buildPortalUrl } from '../lib/portal-urls';
 import { getBaseUrl, resolveTenantSlug } from '../lib/url';
 import type { HonoConfig } from '../types/hono';
 import { r2Keys } from '../lib/r2-keys';
-import { messageThreadRoutes } from './messages-threads';
+import { messageThreadRoutes, messageThreadRouteConfigs } from './messages-threads';
 import { resolveInspectionScope } from '../lib/inspection/visibility';
 import { r2Get } from '../lib/r2/objects';
 
@@ -290,15 +291,17 @@ export const inspectorMessageRoutes = createApiRouter()
 // Company inbox thread routes live in ./messages-threads (Track D); they
 // compose onto this same /api/messages mount below.
 
-const messageRoutes = createApiRouter()
-    .openapi(unreadRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const count = await c.var.services.message.unreadCountForTenant(tenantId, await resolveInspectionScope(c));
-        return c.json({ success: true, data: { count } }, 200);
-    })
-    .route('/', messageThreadRoutes);
+const messageRoutes = createApiRouter();
+messageRoutes.openapi(unreadRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const count = await c.var.services.message.unreadCountForTenant(tenantId, await resolveInspectionScope(c));
+    return c.json({ success: true, data: { count } }, 200);
+});
+messageRoutes.route('/', messageThreadRoutes);
 
-export type MessagesApi = typeof messageRoutes;
+export const messageRouteParts = [unreadRoute, mounted('/', messageThreadRoutes, messageThreadRouteConfigs)] as const;
+
+export type MessagesApi = ApiOf<typeof messageRouteParts>;
 export type InspectorMessagesApi = typeof inspectorMessageRoutes;
 
 // ── Client router (resolveClientActor-gated; mounted at /api/public) ──────────

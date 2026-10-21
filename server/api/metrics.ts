@@ -10,6 +10,7 @@
 // null says "not yours to see".
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { capabilitiesFor } from '../lib/middleware/require-capability';
 import { MetricsQuerySchema, MetricsApiResponseSchema } from '../lib/validations/metrics.schema';
@@ -22,8 +23,7 @@ import { inclusiveUpperBound, resolveMetricsWindow } from '../lib/metrics-window
 import { getDrizzle } from '../lib/route-helpers';
 import { resolveInspectionScope, visibleInspectionsCondition } from '../lib/inspection/visibility';
 
-const metricsRoutes = createApiRouter()
-    .openapi(createRoute(withMcpMetadata({
+const listMetricsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["metrics"],
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
@@ -32,177 +32,185 @@ const metricsRoutes = createApiRouter()
     operationId: "listMetrics",
     summary: "List metrics for current tenant",
     description: "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, referral sources, per-inspector pay and attributed revenue, service mix, and paid/unpaid split. A caller without the company-finance capability receives only their own inspector row and null company figures. Omitting both bounds returns the trailing three months. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
-}, { scopes: ['read'], tier: 'extended' })), async (c) => {
-    const tenantId = c.get('tenantId');
-    const { from, to } = resolveMetricsWindow(c.req.valid('query'));
-    const db = getDrizzle(c);
-    const caps = await capabilitiesFor(c);
-    const self = c.get('user')?.sub ?? '';
-    // `financial` decides whether the caller may see money; the visibility scope decides whether they may
-    // see other people's work. They are independent, and the company view needs both: a restricted
-    // inspector who also holds `companyFinance` still gets their own row and null company figures.
-    const scope = await resolveInspectionScope(c);
-    const companyView = caps.companyFinance && scope.kind === 'all';
+}, { scopes: ['read'], tier: 'extended' }));
 
-    // Both bounds are inclusive. `inspections.date` may hold a bare civil date
-    // or a full ISO instant, so the upper bound carries a sentinel that sorts
-    // after every time-of-day on that day — see inclusiveUpperBound.
-    const inWindow = and(gte(inspections.date, from), lte(inspections.date, inclusiveUpperBound(to)));
+const app = createApiRouter();
+app.openapi(listMetricsRoute, async (c) => {
+const tenantId = c.get('tenantId');
+const { from, to } = resolveMetricsWindow(c.req.valid('query'));
+const db = getDrizzle(c);
+const caps = await capabilitiesFor(c);
+const self = c.get('user')?.sub ?? '';
+// `financial` decides whether the caller may see money; the visibility scope decides whether they may
+// see other people's work. They are independent, and the company view needs both: a restricted
+// inspector who also holds `companyFinance` still gets their own row and null company figures.
+const scope = await resolveInspectionScope(c);
+const companyView = caps.companyFinance && scope.kind === 'all';
 
-    // Monthly revenue + count
-    const monthly = await db.select({
-        month:   sql<string>`strftime('%Y-%m', ${inspections.date})`,
-        revenue: sumEffectivePriceCentsSql,
-        count:   sql<number>`count(*)`,
-    })
-        .from(inspections)
-        // The only company figure a caller outside the company view still receives is the inspection
-        // count taken from this series, so it is cut to what they can see.
-        .where(and(eq(inspections.tenantId, tenantId), inWindow, visibleInspectionsCondition(db, scope, tenantId)))
-        .groupBy(sql`strftime('%Y-%m', ${inspections.date})`)
-        .orderBy(sql`strftime('%Y-%m', ${inspections.date})`);
+// Both bounds are inclusive. `inspections.date` may hold a bare civil date
+// or a full ISO instant, so the upper bound carries a sentinel that sorts
+// after every time-of-day on that day — see inclusiveUpperBound.
+const inWindow = and(gte(inspections.date, from), lte(inspections.date, inclusiveUpperBound(to)));
 
-    const totalRevenue     = monthly.reduce((s, r) => s + Number(r.revenue || 0), 0);
-    const totalInspections = monthly.reduce((s, r) => s + Number(r.count || 0), 0);
-    const avgOrderValue    = totalInspections > 0 ? Math.round(totalRevenue / totalInspections) : 0;
+// Monthly revenue + count
+const monthly = await db.select({
+    month:   sql<string>`strftime('%Y-%m', ${inspections.date})`,
+    revenue: sumEffectivePriceCentsSql,
+    count:   sql<number>`count(*)`,
+})
+    .from(inspections)
+    // The only company figure a caller outside the company view still receives is the inspection
+    // count taken from this series, so it is cut to what they can see.
+    .where(and(eq(inspections.tenantId, tenantId), inWindow, visibleInspectionsCondition(db, scope, tenantId)))
+    .groupBy(sql`strftime('%Y-%m', ${inspections.date})`)
+    .orderBy(sql`strftime('%Y-%m', ${inspections.date})`);
 
-    // Top referrers — attribution reads the explicit referred_by_contact_id
-    // column (Task 9, two-layer role model), not the buyer_agent seat. Any
-    // contact can be the referrer, so "agent" here means "referrer" and a
-    // past client shows up under their own name.
-    const topAgents = await db.select({
-        agentId:   inspections.referredByContactId,
-        agentName: contacts.name,
-        count:     sql<number>`count(*)`,
-        revenue:   sumEffectivePriceCentsSql,
-    })
-        .from(inspections)
-        .leftJoin(contacts, and(
-            eq(contacts.id, inspections.referredByContactId),
-            eq(contacts.tenantId, inspections.tenantId),
-        ))
-        .where(and(
-            eq(inspections.tenantId, tenantId),
-            inWindow,
-            sql`${inspections.referredByContactId} is not null`,
-        ))
-        .groupBy(inspections.referredByContactId)
-        .orderBy(sql`count(*) desc`)
-        .limit(10)
-        .then(rows => rows.map(r => ({
-            agentId:   r.agentId ?? null,
-            agentName: r.agentName || r.agentId || 'Unknown',
-            kind:      'contact' as const,
-            count:     Number(r.count),
-            revenue:   Number(r.revenue || 0),
-        })));
+const totalRevenue     = monthly.reduce((s, r) => s + Number(r.revenue || 0), 0);
+const totalInspections = monthly.reduce((s, r) => s + Number(r.count || 0), 0);
+const avgOrderValue    = totalInspections > 0 ? Math.round(totalRevenue / totalInspections) : 0;
 
-    // The coarse bucket. `referred_by_contact_id` is the precise axis — a real
-    // contact row — and `referral_source` is free text ("Google", "repeat
-    // client"). They are different KINDS of answer, so they are not merged into
-    // one column; but the contact-keyed query filters `is not null`, which
-    // silently DROPPED every source-only row, and for a one-person firm those
-    // are usually the only rows there are. "Who sends me work" is the single
-    // number a solo tenant can act on next month.
-    const referralSources = await db.select({
-        source:  inspections.referralSource,
-        count:   sql<number>`count(*)`,
-        revenue: sumEffectivePriceCentsSql,
-    })
-        .from(inspections)
-        .where(and(
-            eq(inspections.tenantId, tenantId),
-            inWindow,
-            sql`${inspections.referredByContactId} is null`,
-            sql`coalesce(trim(${inspections.referralSource}), '') <> ''`,
-        ))
-        .groupBy(inspections.referralSource)
-        .orderBy(sql`count(*) desc`)
-        .limit(10)
-        .then(rows => rows.map(r => ({
-            agentId:   null,
-            agentName: r.source ?? 'Unknown',
-            kind:      'source' as const,
-            count:     Number(r.count),
-            revenue:   Number(r.revenue || 0),
-        })));
+// Top referrers — attribution reads the explicit referred_by_contact_id
+// column (Task 9, two-layer role model), not the buyer_agent seat. Any
+// contact can be the referrer, so "agent" here means "referrer" and a
+// past client shows up under their own name.
+const topAgents = await db.select({
+    agentId:   inspections.referredByContactId,
+    agentName: contacts.name,
+    count:     sql<number>`count(*)`,
+    revenue:   sumEffectivePriceCentsSql,
+})
+    .from(inspections)
+    .leftJoin(contacts, and(
+        eq(contacts.id, inspections.referredByContactId),
+        eq(contacts.tenantId, inspections.tenantId),
+    ))
+    .where(and(
+        eq(inspections.tenantId, tenantId),
+        inWindow,
+        sql`${inspections.referredByContactId} is not null`,
+    ))
+    .groupBy(inspections.referredByContactId)
+    .orderBy(sql`count(*) desc`)
+    .limit(10)
+    .then(rows => rows.map(r => ({
+        agentId:   r.agentId ?? null,
+        agentName: r.agentName || r.agentId || 'Unknown',
+        kind:      'contact' as const,
+        count:     Number(r.count),
+        revenue:   Number(r.revenue || 0),
+    })));
 
-    // Service breakdown. Joined to inspections so it obeys the same window as
-    // every other figure here — it used to filter on tenant alone, which was
-    // invisible while nothing rendered it (IA-82) and would now read as an
-    // all-time card sitting inside a page about a chosen date range.
-    const serviceBreakdown = await db.select({
-        serviceName: inspectionServices.nameSnapshot,
-        count:       sql<number>`count(*)`,
-        revenue:     sql<number>`sum(coalesce(${inspectionServices.priceOverride}, ${inspectionServices.priceSnapshot}))`,
-    })
-        .from(inspectionServices)
-        .innerJoin(inspections, and(
-            eq(inspections.id, inspectionServices.inspectionId),
-            eq(inspections.tenantId, inspectionServices.tenantId),
-        ))
-        // Soft-deleted lines are history; revenue must not count them.
-        .where(and(eq(inspectionServices.tenantId, tenantId), eq(inspectionServices.active, true), inWindow))
-        .groupBy(inspectionServices.nameSnapshot)
-        .orderBy(sql`count(*) desc`)
-        .limit(10);
+// The coarse bucket. `referred_by_contact_id` is the precise axis — a real
+// contact row — and `referral_source` is free text ("Google", "repeat
+// client"). They are different KINDS of answer, so they are not merged into
+// one column; but the contact-keyed query filters `is not null`, which
+// silently DROPPED every source-only row, and for a one-person firm those
+// are usually the only rows there are. "Who sends me work" is the single
+// number a solo tenant can act on next month.
+const referralSources = await db.select({
+    source:  inspections.referralSource,
+    count:   sql<number>`count(*)`,
+    revenue: sumEffectivePriceCentsSql,
+})
+    .from(inspections)
+    .where(and(
+        eq(inspections.tenantId, tenantId),
+        inWindow,
+        sql`${inspections.referredByContactId} is null`,
+        sql`coalesce(trim(${inspections.referralSource}), '') <> ''`,
+    ))
+    .groupBy(inspections.referralSource)
+    .orderBy(sql`count(*) desc`)
+    .limit(10)
+    .then(rows => rows.map(r => ({
+        agentId:   null,
+        agentName: r.source ?? 'Unknown',
+        kind:      'source' as const,
+        count:     Number(r.count),
+        revenue:   Number(r.revenue || 0),
+    })));
 
-    // Payment summary
-    const paymentSummary = await db.select({
-        status:  inspections.paymentStatus,
-        revenue: sumEffectivePriceCentsSql,
-    })
-        .from(inspections)
-        .where(and(eq(inspections.tenantId, tenantId), inWindow))
-        .groupBy(inspections.paymentStatus);
+// Service breakdown. Joined to inspections so it obeys the same window as
+// every other figure here — it used to filter on tenant alone, which was
+// invisible while nothing rendered it (IA-82) and would now read as an
+// all-time card sitting inside a page about a chosen date range.
+const serviceBreakdown = await db.select({
+    serviceName: inspectionServices.nameSnapshot,
+    count:       sql<number>`count(*)`,
+    revenue:     sql<number>`sum(coalesce(${inspectionServices.priceOverride}, ${inspectionServices.priceSnapshot}))`,
+})
+    .from(inspectionServices)
+    .innerJoin(inspections, and(
+        eq(inspections.id, inspectionServices.inspectionId),
+        eq(inspections.tenantId, inspectionServices.tenantId),
+    ))
+    // Soft-deleted lines are history; revenue must not count them.
+    .where(and(eq(inspectionServices.tenantId, tenantId), eq(inspectionServices.active, true), inWindow))
+    .groupBy(inspectionServices.nameSnapshot)
+    .orderBy(sql`count(*) desc`)
+    .limit(10);
 
-    const paidAmt   = Number(paymentSummary.find(r => r.status === 'paid')?.revenue ?? 0);
-    const unpaidAmt = Number(paymentSummary.find(r => r.status === 'unpaid')?.revenue ?? 0);
+// Payment summary
+const paymentSummary = await db.select({
+    status:  inspections.paymentStatus,
+    revenue: sumEffectivePriceCentsSql,
+})
+    .from(inspections)
+    .where(and(eq(inspections.tenantId, tenantId), inWindow))
+    .groupBy(inspections.paymentStatus);
 
-    // Per-inspector: counts split lead/helper, PAY and ATTRIBUTED REVENUE as two
-    // labelled figures, and a MEDIAN turnaround with its basis. See
-    // services/metrics/inspector-metrics.ts for why each of those is the shape
-    // it is — the reasoning is long and belongs next to the arithmetic.
-    const everyInspector = await perInspectorMetrics(db, tenantId, { from, to });
+const paidAmt   = Number(paymentSummary.find(r => r.status === 'paid')?.revenue ?? 0);
+const unpaidAmt = Number(paymentSummary.find(r => r.status === 'unpaid')?.revenue ?? 0);
 
-    // The scoping rule, and the reason it is here rather than in a redactor: a
-    // caller without `companyFinance` is not being shown a censored version of the
-    // company's numbers, they are being shown THEIR OWN row. A colleague's pay
-    // is absent from the payload, not hidden inside it.
-    const byInspector = companyView
-        ? everyInspector
-        : everyInspector
-            .filter(r => r.inspectorId === self)
-            // Attributed revenue is the company's side of the line. Pay is not.
-            .map(r => ({ ...r, attributedRevenueCents: null }));
+// Per-inspector: counts split lead/helper, PAY and ATTRIBUTED REVENUE as two
+// labelled figures, and a MEDIAN turnaround with its basis. See
+// services/metrics/inspector-metrics.ts for why each of those is the shape
+// it is — the reasoning is long and belongs next to the arithmetic.
+const everyInspector = await perInspectorMetrics(db, tenantId, { from, to });
 
-    return c.json({
-        success: true,
-        data: {
-            from,
-            to,
-            scope: companyView ? ('all' as const) : ('self' as const),
-            totalRevenue: companyView ? totalRevenue : null,
-            totalInspections,
-            avgOrderValue: companyView ? avgOrderValue : null,
-            monthly: companyView
-                ? monthly.map(r => ({ month: r.month, revenue: Number(r.revenue || 0), count: Number(r.count) }))
-                : [],
-            // "Which agent sends the most work" is commercially sensitive in a
-            // multi-inspector firm — same gate as attributed revenue.
-            topAgents: companyView ? [...topAgents, ...referralSources] : [],
-            byInspector,
-            serviceBreakdown: companyView
-                ? serviceBreakdown.map(r => ({
-                    serviceName: r.serviceName,
-                    count:       Number(r.count),
-                    revenue:     Number(r.revenue || 0),
-                }))
-                : [],
-            paymentSummary: companyView ? { paid: paidAmt, unpaid: unpaidAmt, overdue: 0 } : null,
-        },
-    });
+// The scoping rule, and the reason it is here rather than in a redactor: a
+// caller without `companyFinance` is not being shown a censored version of the
+// company's numbers, they are being shown THEIR OWN row. A colleague's pay
+// is absent from the payload, not hidden inside it.
+const byInspector = companyView
+    ? everyInspector
+    : everyInspector
+        .filter(r => r.inspectorId === self)
+        // Attributed revenue is the company's side of the line. Pay is not.
+        .map(r => ({ ...r, attributedRevenueCents: null }));
+
+return c.json({
+    success: true,
+    data: {
+        from,
+        to,
+        scope: companyView ? ('all' as const) : ('self' as const),
+        totalRevenue: companyView ? totalRevenue : null,
+        totalInspections,
+        avgOrderValue: companyView ? avgOrderValue : null,
+        monthly: companyView
+            ? monthly.map(r => ({ month: r.month, revenue: Number(r.revenue || 0), count: Number(r.count) }))
+            : [],
+        // "Which agent sends the most work" is commercially sensitive in a
+        // multi-inspector firm — same gate as attributed revenue.
+        topAgents: companyView ? [...topAgents, ...referralSources] : [],
+        byInspector,
+        serviceBreakdown: companyView
+            ? serviceBreakdown.map(r => ({
+                serviceName: r.serviceName,
+                count:       Number(r.count),
+                revenue:     Number(r.revenue || 0),
+            }))
+            : [],
+        paymentSummary: companyView ? { paid: paidAmt, unpaid: unpaidAmt, overdue: 0 } : null,
+    },
+});
 });
 
-export type MetricsApi = typeof metricsRoutes;
-export default metricsRoutes;
+/** Registration order. Drives `MetricsApi`; a test pins it to what `app` really registered. */
+export const metricsRouteConfigs = [
+    listMetricsRoute,
+] as const;
+
+export type MetricsApi = ApiOf<typeof metricsRouteConfigs>;
+export default app;

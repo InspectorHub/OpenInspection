@@ -118,195 +118,204 @@ const login2faRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-const totpRoutes = createApiRouter()
-    .openapi(totpSetupRoute, async (c) => {
-        const me = await loadCurrentUser(c);
-        // Setup overwrites the secret and clears totpEnabled until /2fa/verify
-        // proves the new one. On an account that already has a second factor
-        // that is a disable — and /2fa/disable demands password + code for it.
-        // A session alone must not be able to strip the second factor.
-        if (me.totpEnabled) {
-            throw Errors.Conflict('Two-factor authentication is already enabled. Disable it first.');
+const app = createApiRouter();
+app.openapi(totpSetupRoute, async (c) => {
+    const me = await loadCurrentUser(c);
+    // Setup overwrites the secret and clears totpEnabled until /2fa/verify
+    // proves the new one. On an account that already has a second factor
+    // that is a disable — and /2fa/disable demands password + code for it.
+    // A session alone must not be able to strip the second factor.
+    if (me.totpEnabled) {
+        throw Errors.Conflict('Two-factor authentication is already enabled. Disable it first.');
+    }
+    const totpSvc = c.var.services.totp;
+
+    const secret = totpSvc.generateSecret();
+    const recoveryCodes = totpSvc.generateRecoveryCodes(8);
+    const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
+    const otpAuthUrl = totpSvc.buildOtpAuthUrl({ accountName: me.email, issuer: TOTP_ISSUER, secret });
+    const qrCodeDataUri = await totpSvc.qrCodeDataUri(otpAuthUrl);
+
+    // Persist the secret + recovery hashes immediately, but keep totpEnabled=false until
+    // the user proves they can produce a valid code via /2fa/verify. This way an abandoned
+    // setup never locks anyone out.
+    const db = getDrizzle(c);
+    await db.update(users).set({
+        totpSecret: secret,
+        totpRecoveryCodes: JSON.stringify(recoveryHashes),
+        totpEnabled: false,
+        totpVerifiedAt: null,
+    }).where(eq(users.id, me.id));
+
+    return c.json({
+        success: true,
+        data: { secret, qrCodeDataUri, recoveryCodes }
+    }, 200);
+});
+app.openapi(totpVerifyRoute, async (c) => {
+    await checkRateLimit(c, 'totp');
+    // A 6-digit code is a 1e6 space; without this an attacker holding a
+    // session and password brute-forces the second factor at full speed.
+    const me = await loadCurrentUser(c);
+    if (!me.totpSecret) throw Errors.BadRequest('No pending 2FA setup. Call /2fa/setup first.');
+
+    const { code } = c.req.valid('json');
+    const ok = c.var.services.totp.verifyCode(me.totpSecret, code);
+    if (!ok) throw Errors.BadRequest('Invalid verification code');
+
+    const db = getDrizzle(c);
+    await db.update(users).set({
+        totpEnabled: true,
+        totpVerifiedAt: new Date(),
+    }).where(eq(users.id, me.id));
+
+    return c.json({ success: true }, 200);
+});
+app.openapi(totpDisableRoute, async (c) => {
+    await checkRateLimit(c, 'totp');
+    // A 6-digit code is a 1e6 space; without this an attacker holding a
+    // session and password brute-forces the second factor at full speed.
+    const me = await loadCurrentUser(c);
+    const { password, code } = c.req.valid('json');
+
+    const [pwOk] = await verifyPassword(password, me.passwordHash);
+    if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
+
+    if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
+
+    const totpSvc = c.var.services.totp;
+    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+    let updatedHashes: string[] | null = null;
+    if (!codeOk && me.totpRecoveryCodes) {
+        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+        const result = await totpSvc.consumeRecoveryCode(code, hashes);
+        codeOk = result.matched;
+        if (result.matched) updatedHashes = result.remainingHashes;
+    }
+    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
+
+    const db = getDrizzle(c);
+    await db.update(users).set({
+        totpSecret: null,
+        totpEnabled: false,
+        totpRecoveryCodes: null,
+        totpVerifiedAt: null,
+    }).where(eq(users.id, me.id));
+
+    // updatedHashes intentionally discarded — we are wiping all 2FA state anyway.
+    void updatedHashes;
+    return c.json({ success: true }, 200);
+});
+app.openapi(totpRegenRoute, async (c) => {
+    await checkRateLimit(c, 'totp');
+    // A 6-digit code is a 1e6 space; without this an attacker holding a
+    // session and password brute-forces the second factor at full speed.
+    const me = await loadCurrentUser(c);
+    const { password, code } = c.req.valid('json');
+
+    const [pwOk] = await verifyPassword(password, me.passwordHash);
+    if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
+
+    if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
+
+    const totpSvc = c.var.services.totp;
+    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+    if (!codeOk && me.totpRecoveryCodes) {
+        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+        const result = await totpSvc.consumeRecoveryCode(code, hashes);
+        codeOk = result.matched;
+        // We are about to overwrite recovery codes wholesale, so consuming the matched code
+        // here doesn't need to be persisted separately.
+    }
+    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
+
+    const recoveryCodes = totpSvc.generateRecoveryCodes(8);
+    const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
+
+    const db = getDrizzle(c);
+    await db.update(users).set({
+        totpRecoveryCodes: JSON.stringify(recoveryHashes),
+    }).where(eq(users.id, me.id));
+
+    // QR code is irrelevant on regenerate; surface an empty string to keep the schema stable.
+    return c.json({
+        success: true,
+        data: { secret: me.totpSecret, qrCodeDataUri: '', recoveryCodes }
+    }, 200);
+});
+app.openapi(login2faRoute, async (c) => {
+    await checkRateLimit(c, 'login');
+
+    const { challengeToken, code } = c.req.valid('json');
+    const keyring = await c.var.keyringPromise!;
+
+    let payload: Record<string, unknown>;
+    try {
+        payload = await verifyJwt(challengeToken, keyring);
+    } catch {
+        throw Errors.Unauthorized('Invalid or expired challenge');
+    }
+    if (payload['t'] !== 'challenge' || typeof payload['sub'] !== 'string') {
+        throw Errors.Unauthorized('Invalid challenge token');
+    }
+    const userId = payload['sub'] as string;
+
+    const db = getDrizzle(c);
+    // Excludes soft-deleted (removed member) rows — this is the second
+    // half of the login flow, so it must honor the same active-user gate
+    // as validateCredentials.
+    const me = await db.select().from(users).where(and(eq(users.id, userId), isNull(users.deletedAt))).get();
+    if (!me || !me.totpEnabled || !me.totpSecret) {
+        throw Errors.Unauthorized('Invalid challenge token');
+    }
+
+    const totpSvc = c.var.services.totp;
+    let codeOk = totpSvc.verifyCode(me.totpSecret, code);
+    if (!codeOk && me.totpRecoveryCodes) {
+        const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
+        const result = await totpSvc.consumeRecoveryCode(code, hashes);
+        if (result.matched) {
+            codeOk = true;
+            // Single-use semantics: persist remaining hashes immediately, before we issue
+            // the session cookie. If the DB write fails we don't want to grant a session.
+            await db.update(users).set({
+                totpRecoveryCodes: JSON.stringify(result.remainingHashes),
+            }).where(eq(users.id, me.id));
         }
-        const totpSvc = c.var.services.totp;
+    }
+    if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
 
-        const secret = totpSvc.generateSecret();
-        const recoveryCodes = totpSvc.generateRecoveryCodes(8);
-        const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
-        const otpAuthUrl = totpSvc.buildOtpAuthUrl({ accountName: me.email, issuer: TOTP_ISSUER, secret });
-        const qrCodeDataUri = await totpSvc.qrCodeDataUri(otpAuthUrl);
+    const now = Math.floor(Date.now() / 1000);
+    const sessionToken = await signJwt({
+        sub: me.id,
+        'custom:tenantId': me.tenantId,
+        'custom:userRole': me.role,
+        role: me.role,
+        iat: now,
+        exp: now + 60 * 60 * 24,
+    }, keyring);
 
-        // Persist the secret + recovery hashes immediately, but keep totpEnabled=false until
-        // the user proves they can produce a valid code via /2fa/verify. This way an abandoned
-        // setup never locks anyone out.
-        const db = getDrizzle(c);
-        await db.update(users).set({
-            totpSecret: secret,
-            totpRecoveryCodes: JSON.stringify(recoveryHashes),
-            totpEnabled: false,
-            totpVerifiedAt: null,
-        }).where(eq(users.id, me.id));
+    setCookie(c, AUTH_COOKIE_NAME, sessionToken, authCookieOptions());
 
-        return c.json({
-            success: true,
-            data: { secret, qrCodeDataUri, recoveryCodes }
-        }, 200);
-    })
-    .openapi(totpVerifyRoute, async (c) => {
-        await checkRateLimit(c, 'totp');
-        // A 6-digit code is a 1e6 space; without this an attacker holding a
-        // session and password brute-forces the second factor at full speed.
-        const me = await loadCurrentUser(c);
-        if (!me.totpSecret) throw Errors.BadRequest('No pending 2FA setup. Call /2fa/setup first.');
+    // Token Relay BFF, exactly as the password step in server/api/auth.ts:
+    // the login page calls this in-process and its client does not forward
+    // Set-Cookie, so the only way it can open a session is to receive the
+    // JWT in the body. Only the BFF sends this header; a browser caller
+    // gets the cookie and never the token.
+    const isBff = c.req.header('x-token-relay') === '1';
+    return c.json({
+        success: true,
+        data: { redirect: '/inspections', ...(isBff ? { token: sessionToken } : {}) },
+    }, 200);
+});
 
-        const { code } = c.req.valid('json');
-        const ok = c.var.services.totp.verifyCode(me.totpSecret, code);
-        if (!ok) throw Errors.BadRequest('Invalid verification code');
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const totpRouteConfigs = [
+    totpSetupRoute,
+    totpVerifyRoute,
+    totpDisableRoute,
+    totpRegenRoute,
+    login2faRoute,
+] as const;
 
-        const db = getDrizzle(c);
-        await db.update(users).set({
-            totpEnabled: true,
-            totpVerifiedAt: new Date(),
-        }).where(eq(users.id, me.id));
-
-        return c.json({ success: true }, 200);
-    })
-    .openapi(totpDisableRoute, async (c) => {
-        await checkRateLimit(c, 'totp');
-        // A 6-digit code is a 1e6 space; without this an attacker holding a
-        // session and password brute-forces the second factor at full speed.
-        const me = await loadCurrentUser(c);
-        const { password, code } = c.req.valid('json');
-
-        const [pwOk] = await verifyPassword(password, me.passwordHash);
-        if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
-
-        if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
-
-        const totpSvc = c.var.services.totp;
-        let codeOk = totpSvc.verifyCode(me.totpSecret, code);
-        let updatedHashes: string[] | null = null;
-        if (!codeOk && me.totpRecoveryCodes) {
-            const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
-            const result = await totpSvc.consumeRecoveryCode(code, hashes);
-            codeOk = result.matched;
-            if (result.matched) updatedHashes = result.remainingHashes;
-        }
-        if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
-
-        const db = getDrizzle(c);
-        await db.update(users).set({
-            totpSecret: null,
-            totpEnabled: false,
-            totpRecoveryCodes: null,
-            totpVerifiedAt: null,
-        }).where(eq(users.id, me.id));
-
-        // updatedHashes intentionally discarded — we are wiping all 2FA state anyway.
-        void updatedHashes;
-        return c.json({ success: true }, 200);
-    })
-    .openapi(totpRegenRoute, async (c) => {
-        await checkRateLimit(c, 'totp');
-        // A 6-digit code is a 1e6 space; without this an attacker holding a
-        // session and password brute-forces the second factor at full speed.
-        const me = await loadCurrentUser(c);
-        const { password, code } = c.req.valid('json');
-
-        const [pwOk] = await verifyPassword(password, me.passwordHash);
-        if (!pwOk) throw Errors.Unauthorized('Invalid credentials');
-
-        if (!me.totpEnabled || !me.totpSecret) throw Errors.BadRequest('2FA is not enabled');
-
-        const totpSvc = c.var.services.totp;
-        let codeOk = totpSvc.verifyCode(me.totpSecret, code);
-        if (!codeOk && me.totpRecoveryCodes) {
-            const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
-            const result = await totpSvc.consumeRecoveryCode(code, hashes);
-            codeOk = result.matched;
-            // We are about to overwrite recovery codes wholesale, so consuming the matched code
-            // here doesn't need to be persisted separately.
-        }
-        if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
-
-        const recoveryCodes = totpSvc.generateRecoveryCodes(8);
-        const recoveryHashes = await Promise.all(recoveryCodes.map(rc => totpSvc.hashCode(rc)));
-
-        const db = getDrizzle(c);
-        await db.update(users).set({
-            totpRecoveryCodes: JSON.stringify(recoveryHashes),
-        }).where(eq(users.id, me.id));
-
-        // QR code is irrelevant on regenerate; surface an empty string to keep the schema stable.
-        return c.json({
-            success: true,
-            data: { secret: me.totpSecret, qrCodeDataUri: '', recoveryCodes }
-        }, 200);
-    })
-    .openapi(login2faRoute, async (c) => {
-        await checkRateLimit(c, 'login');
-
-        const { challengeToken, code } = c.req.valid('json');
-        const keyring = await c.var.keyringPromise!;
-
-        let payload: Record<string, unknown>;
-        try {
-            payload = await verifyJwt(challengeToken, keyring);
-        } catch {
-            throw Errors.Unauthorized('Invalid or expired challenge');
-        }
-        if (payload['t'] !== 'challenge' || typeof payload['sub'] !== 'string') {
-            throw Errors.Unauthorized('Invalid challenge token');
-        }
-        const userId = payload['sub'] as string;
-
-        const db = getDrizzle(c);
-        // Excludes soft-deleted (removed member) rows — this is the second
-        // half of the login flow, so it must honor the same active-user gate
-        // as validateCredentials.
-        const me = await db.select().from(users).where(and(eq(users.id, userId), isNull(users.deletedAt))).get();
-        if (!me || !me.totpEnabled || !me.totpSecret) {
-            throw Errors.Unauthorized('Invalid challenge token');
-        }
-
-        const totpSvc = c.var.services.totp;
-        let codeOk = totpSvc.verifyCode(me.totpSecret, code);
-        if (!codeOk && me.totpRecoveryCodes) {
-            const hashes = JSON.parse(me.totpRecoveryCodes) as string[];
-            const result = await totpSvc.consumeRecoveryCode(code, hashes);
-            if (result.matched) {
-                codeOk = true;
-                // Single-use semantics: persist remaining hashes immediately, before we issue
-                // the session cookie. If the DB write fails we don't want to grant a session.
-                await db.update(users).set({
-                    totpRecoveryCodes: JSON.stringify(result.remainingHashes),
-                }).where(eq(users.id, me.id));
-            }
-        }
-        if (!codeOk) throw Errors.Unauthorized('Invalid verification code');
-
-        const now = Math.floor(Date.now() / 1000);
-        const sessionToken = await signJwt({
-            sub: me.id,
-            'custom:tenantId': me.tenantId,
-            'custom:userRole': me.role,
-            role: me.role,
-            iat: now,
-            exp: now + 60 * 60 * 24,
-        }, keyring);
-
-        setCookie(c, AUTH_COOKIE_NAME, sessionToken, authCookieOptions());
-
-        // Token Relay BFF, exactly as the password step in server/api/auth.ts:
-        // the login page calls this in-process and its client does not forward
-        // Set-Cookie, so the only way it can open a session is to receive the
-        // JWT in the body. Only the BFF sends this header; a browser caller
-        // gets the cookie and never the token.
-        const isBff = c.req.header('x-token-relay') === '1';
-        return c.json({
-            success: true,
-            data: { redirect: '/inspections', ...(isBff ? { token: sessionToken } : {}) },
-        }, 200);
-    });
-
-export default totpRoutes;
+export default app;
