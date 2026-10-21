@@ -59,6 +59,9 @@ type RouteSchema<R extends RouteConfig, Base extends string> =
     { [K in MergePath<Base, RoutePath<R['path']>>]: { [K2 in MethodKey<R['method']>]: EndpointOf<R, K> } };
 
 type Router = ReturnType<typeof createApiRouter>;
+/** Any router, whatever schema it has accumulated. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRouter = Hono<any, any, any>;
 
 /**
  * A router mounted with `app.route(prefix, router)`. `parts` is the mounted router's own parts list (its
@@ -70,8 +73,19 @@ export interface Mounted<Prefix extends string, Parts extends readonly RoutePart
     readonly parts: Parts;
 }
 
+/**
+ * A router mounted with `app.route(prefix, router)` that is still written as a chain (or otherwise cannot list
+ * its routes): its schema is read from the router's own type, so nothing about it can drift from the tuple.
+ * Use `mounted()` instead whenever the child exports its parts.
+ */
+export interface LegacyMounted<Prefix extends string, R extends AnyRouter> {
+    readonly prefix: Prefix;
+    readonly router: R;
+    readonly legacy: true;
+}
+
 /** One entry of a router's parts list: a route it registers, or a router it mounts. */
-export type RoutePart = RouteConfig | Mounted<string, readonly RoutePart[]>;
+export type RoutePart = RouteConfig | Mounted<string, readonly RoutePart[]> | LegacyMounted<string, AnyRouter>;
 
 /**
  * Records one `app.route(prefix, router)` in a parts list. `parts` is the mounted router's own list
@@ -86,6 +100,17 @@ export function mounted<const Prefix extends string, const Parts extends readonl
 }
 
 /**
+ * Records one `app.route(prefix, router)` of a child that has no parts list. Its client schema is the child's own.
+ */
+export function legacyMounted<const Prefix extends string, const R extends AnyRouter>(prefix: Prefix, router: R): LegacyMounted<Prefix, R> {
+    return { prefix, router, legacy: true };
+}
+
+/** The schema type argument of a router. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SchemaOfRouter<R> = R extends Hono<any, infer S extends Schema, any> ? S : never;
+
+/**
  * Folds the parts, left to right, the way the chain would have: a route is `Acc & RouteSchema`
  * (OpenAPIHono.openapi), a mount is `MergeSchemaPath<child, MergePath<base, prefix>> & Acc`
  * (OpenAPIHono.route).
@@ -94,6 +119,8 @@ type PartsSchema<Parts extends readonly RoutePart[], Base extends string, Acc ex
     Parts extends readonly [infer Head extends RoutePart, ...infer Tail extends readonly RoutePart[]]
         ? Head extends Mounted<infer Prefix, infer Sub>
             ? PartsSchema<Tail, Base, MergeSchemaPath<PartsSchema<Sub, '/'>, MergePath<Base, Prefix>> & Acc>
+            : Head extends LegacyMounted<infer Prefix, infer R>
+            ? PartsSchema<Tail, Base, MergeSchemaPath<SchemaOfRouter<R>, MergePath<Base, Prefix>> & Acc>
             : Head extends RouteConfig
                 ? PartsSchema<Tail, Base, Acc & RouteSchema<Head, Base>>
                 : never

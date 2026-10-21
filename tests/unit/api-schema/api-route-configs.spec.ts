@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { mergePath } from 'hono/utils/url';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../../server/lib/openapi-router';
-import { mounted } from '../../../server/lib/api-schema';
+import { legacyMounted, mounted } from '../../../server/lib/api-schema';
 import type { Mounted, RoutePart } from '../../../server/lib/api-schema';
 import { CONVERTED_API_MODULES, importsApiSchema, needsRegistration } from '../helpers/converted-api-modules';
 
@@ -32,6 +32,7 @@ type Router = ReturnType<typeof createApiRouter>;
 type AnyMounted = Mounted<string, readonly RoutePart[]>;
 
 const isMounted = (part: RoutePart): part is AnyMounted => 'parts' in part;
+const isLegacy = (part: RoutePart): part is Extract<RoutePart, { legacy: true }> => 'legacy' in part;
 
 function registered(app: Router): string[] {
     return app.openAPIRegistry.definitions.flatMap((d) => (d.type === 'route' ? [`${d.route.method} ${d.route.path}`] : []));
@@ -47,9 +48,17 @@ function dispatched(app: Router): string[] {
 
 /** What `registered` must return for a parts list: mounts expanded in place, prefixes merged the library's way. */
 function expected(parts: readonly RoutePart[], prefix = '/'): string[] {
-    return parts.flatMap((part) =>
-        isMounted(part) ? expected(part.parts, mergePath(prefix, part.prefix)) : [`${part.method} ${mergePath(prefix, part.path)}`],
-    );
+    return parts.flatMap((part) => {
+        if (isMounted(part)) return expected(part.parts, mergePath(prefix, part.prefix));
+        // A legacy mount lists no routes of its own; what it contributes is whatever the child router registered.
+        if (isLegacy(part)) {
+            return registered(part.router as Router).map((key) => {
+                const [method, path] = key.split(' ');
+                return `${method} ${mergePath(prefix, mergePath(part.prefix, path ?? '/'))}`;
+            });
+        }
+        return [`${part.method} ${mergePath(prefix, part.path)}`];
+    });
 }
 
 /** The same list as Hono's route table spells it (`{id}` is `:id`). */
@@ -118,6 +127,15 @@ describe('the comparison used below can say no', () => {
             expect(expected(parts)).toEqual(['post /b/{id}', 'get /x/a', 'get /x', 'get /a']);
             expect(expected(parts)).toEqual(registered(app));
             expect(expectedDispatch(parts)).toEqual(dispatched(app));
+        });
+
+        it('expands a legacy mount into whatever the child registered, and rejects one at the wrong prefix', () => {
+            const app = tinyParent();
+            const legacy = [routeB, legacyMounted('/x', child), routeA] as const;
+            expect(expected(legacy)).toEqual(registered(app));
+            expect(expectedDispatch(legacy)).toEqual(dispatched(app));
+            expect(expected([routeB, legacyMounted('/y', child), routeA])).not.toEqual(registered(app));
+            expect(expected([routeB, routeA])).not.toEqual(registered(app));
         });
 
         it('rejects a mount that is missing from the parts', () => {
