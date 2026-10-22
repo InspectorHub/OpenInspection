@@ -3,7 +3,7 @@ import {
   serializeAnnotations, deserializeAnnotations,
   serializeMeasureDoc, deserializeMeasureDoc,
   type Annotation,
-} from '~/components/media-studio/annotations';
+} from './annotations';
 
 describe('measure annotation variant', () => {
   it('round-trips a measure shape (two points + unit)', () => {

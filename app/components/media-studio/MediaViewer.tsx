@@ -1,6 +1,6 @@
-import { PhotoLightbox } from "./PhotoLightbox";
+import { PhotoLightbox } from "@core/field-ui/components/media-studio/PhotoLightbox";
 import { VideoPlayer } from "./VideoPlayer";
-import { fullResUrl } from "./cropImage";
+import { fullResUrl } from "@core/field-ui/components/media-studio/cropImage";
 import { resolveMediaType } from "@core/field-ui/shared/media-type";
 import type { GalleryPhoto } from "@core/field-ui/shared/inspection-media";
 import { m } from "~/paraglide/messages";

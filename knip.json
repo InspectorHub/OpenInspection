@@ -65,6 +65,8 @@
     "@inlang/plugin-message-format",
     "@core/shared-ui",
     "@core/api-types",
-    "@core/offline-package"
+    "@core/offline-package",
+    "react-photo-album",
+    "yet-another-react-lightbox"
   ]
 }

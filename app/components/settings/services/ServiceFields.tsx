@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { Select } from "@core/shared-ui";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import { m } from "~/paraglide/messages";
 
 /**

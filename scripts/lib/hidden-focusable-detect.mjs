@@ -148,7 +148,7 @@ export function detectHiddenFocusable(src) {
                 violations.push({
                     line: tag.line,
                     rule: 'parked-not-inert',
-                    message: `<${tag.name}> parks a panel off-screen (translate-*-full) without inert; see app/components/MobileBottomDrawer.tsx`,
+                    message: `<${tag.name}> parks a panel off-screen (translate-*-full) without inert; see packages/field-ui/src/components/MobileBottomDrawer.tsx`,
                 });
             }
         }

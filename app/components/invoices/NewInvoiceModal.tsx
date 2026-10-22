@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";

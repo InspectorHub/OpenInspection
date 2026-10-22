@@ -1,5 +1,5 @@
 import { Button } from "@core/shared-ui";
-import { MobileBottomDrawer } from "~/components/MobileBottomDrawer";
+import { MobileBottomDrawer } from "@core/field-ui/components/MobileBottomDrawer";
 import { m } from "~/paraglide/messages";
 
 export interface MobileFinishDrawerProps {

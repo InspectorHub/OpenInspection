@@ -9,8 +9,8 @@ import { render, cleanup, act, screen } from "@testing-library/react";
 
 const bakeCrop = vi.hoisted(() => vi.fn());
 
-vi.mock("./cropImage", async () => {
-    const actual = await vi.importActual<typeof import("./cropImage")>("./cropImage");
+vi.mock("@core/field-ui/components/media-studio/cropImage", async () => {
+    const actual = await vi.importActual<typeof import("@core/field-ui/components/media-studio/cropImage")>("@core/field-ui/components/media-studio/cropImage");
     return { ...actual, bakeCrop };
 });
 

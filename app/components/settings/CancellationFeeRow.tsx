@@ -1,5 +1,5 @@
 import { SegmentedControl } from "@core/shared-ui";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import type { FeeChoice } from "~/lib/cancellation-policy-form";
 import { m } from "~/paraglide/messages";
 

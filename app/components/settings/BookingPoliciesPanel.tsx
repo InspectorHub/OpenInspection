@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { SegmentedControl, pendingProps, PENDING_CLASS } from "@core/shared-ui";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import {
   depositChoiceOf,
   depositPolicyFromChoice,

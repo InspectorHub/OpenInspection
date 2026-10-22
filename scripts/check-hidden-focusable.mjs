@@ -9,7 +9,7 @@
  *    [@media(hover:none)]:opacity-100, so touch devices never see it;
  *  - an element whose className holds translate-y-full / translate-x-full / -translate-x-full
  *    (a panel parked off-screen) without `inert` on the same element. See
- *    app/components/MobileBottomDrawer.tsx.
+ *    packages/field-ui/src/components/MobileBottomDrawer.tsx.
  *
  * Exception: a comment `hidden-focusable-allow: <reason>` inside the tag or just above it
  * (exempts exactly the next opening tag); the reason is mandatory. Baseline: scripts/hidden-focusable-baseline.json

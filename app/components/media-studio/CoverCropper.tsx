@@ -1,5 +1,5 @@
 import { PhotoCropper, type PhotoCrop } from "./PhotoCropper";
-import type { PixelCrop } from "./cropImage";
+import type { PixelCrop } from "@core/field-ui/components/media-studio/cropImage";
 import { m } from "~/paraglide/messages";
 
 type Aspect = "3:2" | "16:9" | "1.91:1" | "4:3";

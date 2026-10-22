@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import Cropper from "react-easy-crop";
 import { useLayer, PENDING_CLASS, pendingProps } from "@core/shared-ui";
-import { bakeCrop, normalizeRotation, type BakeFormat, type PixelCrop } from "./cropImage";
+import { bakeCrop, normalizeRotation, type BakeFormat, type PixelCrop } from "@core/field-ui/components/media-studio/cropImage";
 import { m } from "~/paraglide/messages";
 
 const RATIOS: Record<string, number> = {

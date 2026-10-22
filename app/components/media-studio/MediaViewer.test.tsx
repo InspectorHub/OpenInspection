@@ -23,7 +23,7 @@ import { MediaViewer } from "~/components/media-studio/MediaViewer";
 import type { GalleryPhoto } from "@core/field-ui/shared/inspection-media";
 
 /** The lightbox is a third-party surface; this suite is about what it is HANDED. */
-vi.mock("~/components/media-studio/PhotoLightbox", () => ({
+vi.mock("@core/field-ui/components/media-studio/PhotoLightbox", () => ({
     PhotoLightbox: ({
         slides,
         index,

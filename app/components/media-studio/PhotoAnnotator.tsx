@@ -8,11 +8,11 @@ import {
   serializeMeasureDoc,
   type Annotation,
   type Point,
-} from "./annotations";
+} from "@core/field-ui/components/media-studio/annotations";
 import { AnnotationToolbar, type ToolId } from "./AnnotationToolbar";
 import { AnnotatorPlaceholder } from "./AnnotatorPlaceholder";
 import { MeasureCalibration } from "./MeasureCalibration";
-import { usePhotoSource } from "./usePhotoSource";
+import { usePhotoSource } from "@core/field-ui/components/media-studio/usePhotoSource";
 import { m } from "~/paraglide/messages";
 
 const STROKE = 4; // logical px (natural-resolution); divided by scale when rendered

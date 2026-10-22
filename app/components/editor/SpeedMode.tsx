@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Icon, Button, useLayer } from '@core/shared-ui';
 import { usePointerGesture } from '@core/field-ui/hooks/usePointerGesture';
-import { MobileBottomDrawer } from '../MobileBottomDrawer';
+import { MobileBottomDrawer } from '@core/field-ui/components/MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
 import { shouldShowSpeedModeCoach, markSpeedModeCoached } from '@core/field-ui/shared/speedmode-coach';
 import { m } from "~/paraglide/messages";

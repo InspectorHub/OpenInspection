@@ -5,7 +5,7 @@ import { applyItemPatch } from "@core/field-ui/shared/results-doc";
 import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
 import { diffProjections, type FindingDiff, type ScalarField } from "@core/field-ui/shared/snapshot-diff";
 import { VersionCompare } from "~/components/collab/VersionCompare";
-import { useReturnFocusAfterCompare } from "~/components/collab/useReturnFocusAfterCompare";
+import { useReturnFocusAfterCompare } from "@core/field-ui/components/collab/useReturnFocusAfterCompare";
 import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { formatShapedDate, type InspectionDateTimeFormat } from "@core/field-ui/shared/format-date";
 import { m } from "~/paraglide/messages";

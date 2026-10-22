@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Button, useActionLatch } from "@core/shared-ui";
 import { formatDollars } from "@core/field-ui/shared/money";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import { CostExportButtons } from "~/components/CostExportButtons";
 import type { CostItemView } from "~/components/portal/sections/report/types";
 import { submitCostItem } from "~/components/editor/cost-items-api";

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { formatDollars, parseCurrencyToCents } from "@core/field-ui/shared/money";
+import { formatDollars, parseCurrencyToCents } from "../shared/money";
 
 /**
  * Reusable currency input. Money is stored as integer **cents**; the user only

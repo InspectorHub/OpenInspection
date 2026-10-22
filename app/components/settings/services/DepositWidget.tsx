@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import { formatCents } from "@core/field-ui/shared/money";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";

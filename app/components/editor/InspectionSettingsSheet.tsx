@@ -3,7 +3,7 @@ import { useFetcher } from "react-router";
 import { Drawer, Button, useActionLatch } from "@core/shared-ui";
 import { TemplateCombobox } from "~/components/TemplateCombobox";
 import { CoverCropper, coverCropFor, type StoredCoverCrop } from "~/components/media-studio/CoverCropper";
-import { fullResUrl } from "~/components/media-studio/cropImage";
+import { fullResUrl } from "@core/field-ui/components/media-studio/cropImage";
 import { ORIGINAL_QUALITY_KEY } from "@core/field-ui/shared/original-quality";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";

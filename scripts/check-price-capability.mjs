@@ -131,7 +131,7 @@ const FIELD_FILES = [
 const SOURCE_ROOTS = ["server", "app", "packages"];
 
 /** The single money-entry control. Its absence would silently empty surface 3. */
-const MONEY_CONTROL_FILE = "app/components/MoneyInput.tsx";
+const MONEY_CONTROL_FILE = "packages/field-ui/src/components/MoneyInput.tsx";
 const MONEY_CONTROL_USE = /<MoneyInput[\s/>]/;
 
 /**
@@ -262,7 +262,7 @@ const INVENTORY = [
       reason: "Service catalogue: the tenant's list price." },
     { kind: "control", id: "app/components/settings/EventTypeFields.tsx", disposition: "allowed",
       reason: "Booking: default fee per event type." },
-    { kind: "control", id: "app/components/MoneyInput.test.tsx", disposition: "allowed",
+    { kind: "control", id: "packages/field-ui/src/components/MoneyInput.test.tsx", disposition: "allowed",
       reason: "The control's own test." },
 ];
 

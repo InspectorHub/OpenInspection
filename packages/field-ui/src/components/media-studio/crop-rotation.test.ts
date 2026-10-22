@@ -8,7 +8,7 @@
  * saves a corner of the paper it was written on.
  */
 import { describe, it, expect } from 'vitest';
-import { normalizeRotation, rotatedBounds } from '~/components/media-studio/cropImage';
+import { normalizeRotation, rotatedBounds } from './cropImage';
 
 describe('normalizeRotation', () => {
   it('folds a left turn past zero into the equivalent positive angle', () => {

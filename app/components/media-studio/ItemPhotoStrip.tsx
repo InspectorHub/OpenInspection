@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Sortable from "sortablejs";
 import { Button, pendingProps, PENDING_CLASS } from "@core/shared-ui";
-import { resolvePhotoDisplayKey } from "./photo-display-key";
+import { resolvePhotoDisplayKey } from "@core/field-ui/components/media-studio/photo-display-key";
 import { m } from "~/paraglide/messages";
 
 export interface StripPhoto {
