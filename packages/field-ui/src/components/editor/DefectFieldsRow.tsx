@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import {
     DEFECT_TRADE_OPTIONS, DEFECT_DEADLINE_OPTIONS, DEFECT_TIMEFRAME_OPTIONS,
     type DefectTrade, type DefectDeadline, type DefectTimeframe,
-} from '@core/field-ui/shared/defect-fields';
-import { m } from '~/paraglide/messages';
+} from '../../shared/defect-fields';
+import { m } from '../../i18n';
 
 export interface DefectFieldsValue {
     location?: string | null;

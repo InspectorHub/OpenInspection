@@ -2,7 +2,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi, beforeEach, afterEach } from "vitest";
 import { UnitsManager, type UnitsManagerProps } from "~/components/editor/UnitsManager";
-import type { UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";
+import type { UnitScopeRow } from "@core/field-ui/components/editor/BreadcrumbDropdown";
 
 const units: UnitScopeRow[] = [
   { id: "u1", name: "Unit 101", kind: "unit", type: "unit", parentUnitId: null, sortOrder: 0 },

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { CommentLibraryList } from "../../../app/components/editor/CommentLibraryList";
+import { CommentLibraryList } from "./CommentLibraryList";
 
 const rows = [
   { id: "1", text: "Roof covering serviceable." },

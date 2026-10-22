@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
-import { FullscreenToggle } from '~/components/editor/FullscreenToggle';
+import { FullscreenToggle } from './FullscreenToggle';
 
 /**
  * FullscreenToggle — verifies the toggle button renders correct aria-pressed

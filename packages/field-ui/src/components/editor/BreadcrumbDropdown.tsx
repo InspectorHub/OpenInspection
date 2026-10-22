@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Button, Popover } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 /**
  * Commercial PCA Phase U (Batch C2b) — a flat unit row as it arrives from

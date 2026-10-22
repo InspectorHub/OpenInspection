@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { hasOpenLayer, Modal } from "@core/shared-ui";
-import { AddMediaChooser } from "~/components/editor/AddMediaChooser";
+import { AddMediaChooser } from "@core/field-ui/components/editor/AddMediaChooser";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { VersionCompare } from "~/components/collab/VersionCompare";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";

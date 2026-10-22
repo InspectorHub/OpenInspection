@@ -1,5 +1,5 @@
-import { formatRelativeTime } from "@core/field-ui/shared/format";
-import { m } from "~/paraglide/messages";
+import { formatRelativeTime } from "../../shared/format";
+import { m } from "../../i18n";
 
 export interface CommentLibraryListProps {
   /** `lastUsedAt` is the ISO string the comments API serializes, not epoch ms. */

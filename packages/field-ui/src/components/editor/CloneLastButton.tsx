@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button, MenuItem } from '@core/shared-ui';
-import { m } from '~/paraglide/messages';
+import { m } from '../../i18n';
 
 export type CloneScope = 'rating' | 'rating_notes' | 'all';
 

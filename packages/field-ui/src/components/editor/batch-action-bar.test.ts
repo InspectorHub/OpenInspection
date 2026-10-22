@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
-import { BatchActionBar } from '~/components/editor/BatchActionBar';
+import { BatchActionBar } from './BatchActionBar';
 
 /**
  * BatchActionBar — verifies the consolidated batch-mode control bar renders

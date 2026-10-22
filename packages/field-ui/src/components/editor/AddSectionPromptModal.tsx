@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { Modal, Button } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 /**
  * D8 — "Add section" title prompt modal.

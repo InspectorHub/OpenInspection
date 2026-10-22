@@ -96,7 +96,7 @@ export interface DefectCategory {
   color: string;
 }
 
-/** Mirrors `UnitScopeRow` in app/components/editor/BreadcrumbDropdown.tsx. */
+/** Mirrors `UnitScopeRow` in packages/field-ui/src/components/editor/BreadcrumbDropdown.tsx. */
 export interface InspectionUnit {
   id: string;
   name: string;

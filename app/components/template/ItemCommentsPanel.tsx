@@ -3,7 +3,7 @@ import { Icon } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import type { TemplateItem, TemplateSection } from "./types";
 import { CannedCommentRow } from "@core/field-ui/components/editor-shared/CannedCommentRow";
-import { CommentTypeahead } from "../editor/CommentTypeahead";
+import { CommentTypeahead } from "@core/field-ui/components/editor/CommentTypeahead";
 import { useCommentTypeahead } from "@core/field-ui/hooks/useCommentTypeahead";
 import {
   flattenItemTabs,

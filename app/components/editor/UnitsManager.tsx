@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { useFetcher } from "react-router";
 import { Drawer, Modal, Button, Input, IconButton, SegmentedControl } from "@core/shared-ui";
-import type { UnitScopeRow } from "./BreadcrumbDropdown";
+import type { UnitScopeRow } from "@core/field-ui/components/editor/BreadcrumbDropdown";
 import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 

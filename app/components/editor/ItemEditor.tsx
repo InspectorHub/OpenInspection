@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@core/shared-ui";
-import { CommentTypeahead } from "./CommentTypeahead";
+import { CommentTypeahead } from "@core/field-ui/components/editor/CommentTypeahead";
 import { useCommentTypeahead } from "@core/field-ui/hooks/useCommentTypeahead";
 import {
   flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
 } from "@core/field-ui/shared/comment-typeahead";
 import { AiAssistPanel } from "./AiAssistPanel";
 import { NotesFieldHeader } from "./NotesFieldHeader";
-import { CloneLastButton } from "./CloneLastButton";
-import type { DefectFieldsValue } from "./DefectFieldsRow";
+import { CloneLastButton } from "@core/field-ui/components/editor/CloneLastButton";
+import type { DefectFieldsValue } from "@core/field-ui/components/editor/DefectFieldsRow";
 import { ItemAttributesPanel, type ItemAttributeValue } from "@core/field-ui/components/editor/ItemAttributesPanel";
 import { RatingButtonRow } from "./RatingButtonRow";
 import {

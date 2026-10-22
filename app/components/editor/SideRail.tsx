@@ -4,7 +4,7 @@ import { renderTemplate } from "@core/field-ui/shared/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "@core/field-ui/shared/defect-fields";
 import { photoDisplayName, withDownload } from "@core/field-ui/shared/photo-name";
 import { PhotoGallery } from "~/components/media-studio/PhotoGallery";
-import { CommentLibraryList } from "./CommentLibraryList";
+import { CommentLibraryList } from "@core/field-ui/components/editor/CommentLibraryList";
 import { CannedCommentRow } from "@core/field-ui/components/editor-shared/CannedCommentRow";
 import type { EditorMode } from "@core/field-ui/components/editor-shared/editor-mode";
 import { m } from "~/paraglide/messages";

@@ -1,8 +1,8 @@
 import { TabStrip, Button } from "@core/shared-ui";
 import { CannedCommentRow } from "@core/field-ui/components/editor-shared/CannedCommentRow";
-import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
+import { DefectFieldsRow, type DefectFieldsValue } from "@core/field-ui/components/editor/DefectFieldsRow";
 import { RepairItemsPanel } from "./RepairItemsPanel";
-import { CustomDefectForm } from "./CustomDefectForm";
+import { CustomDefectForm } from "@core/field-ui/components/editor/CustomDefectForm";
 import type { AttachedRepairItem } from "../../hooks/useFindings";
 import { renderTemplate } from "@core/field-ui/shared/mustache";
 import {

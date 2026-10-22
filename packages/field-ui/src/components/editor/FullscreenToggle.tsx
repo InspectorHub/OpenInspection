@@ -1,5 +1,5 @@
 import { IconButton } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 export interface FullscreenToggleProps {
   active: boolean;

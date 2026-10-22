@@ -1,5 +1,5 @@
 import { SegmentedControl } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 interface CommercialSubtypeOption {
  id: string;

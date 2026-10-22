@@ -1,5 +1,5 @@
 import { useLayer } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 export interface AddMediaChooserProps {
  onClose: () => void;

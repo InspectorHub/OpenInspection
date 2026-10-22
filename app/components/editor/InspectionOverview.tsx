@@ -4,7 +4,7 @@ import { StatutoryDetailsHost } from "~/components/statutory/StatutoryDetailsHos
 import { StatutoryCoveragePanel } from "~/components/statutory/StatutoryCoveragePanel";
 import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
 import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
-import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
+import { CommercialReportControls, type ReportTier } from "@core/field-ui/components/editor/CommercialReportControls";
 import { PropertyTypeControl } from "~/components/editor/PropertyTypeControl";
 
 /**

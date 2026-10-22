@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { AddItemTypeModal } from "~/components/editor/AddItemTypeModal";
+import { AddItemTypeModal } from "./AddItemTypeModal";
 
 function html(open: boolean): string {
   return renderToStaticMarkup(

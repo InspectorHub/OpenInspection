@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi } from "vitest";
-import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";
+import { BreadcrumbDropdown, type UnitScopeRow } from "./BreadcrumbDropdown";
 
 const units: UnitScopeRow[] = [
   { id: "u1", name: "Unit 101", kind: "unit", type: "unit", parentUnitId: null, sortOrder: 1 },

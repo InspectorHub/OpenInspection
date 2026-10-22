@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { Drawer, IconButton, SegmentedControl } from "@core/shared-ui";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
-import { CommentLibraryList } from "./CommentLibraryList";
+import { CommentLibraryList } from "@core/field-ui/components/editor/CommentLibraryList";
 import { m } from "~/paraglide/messages";
 
 export interface CommentLibraryDrawerProps {
