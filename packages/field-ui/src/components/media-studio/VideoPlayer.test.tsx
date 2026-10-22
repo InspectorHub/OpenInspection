@@ -15,8 +15,19 @@
  * when a field is missing. They are asserted here by name.
  */
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
-import { VideoPlayer, streamIframeSrc } from "~/components/media-studio/VideoPlayer";
+import { render as renderBare } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { FieldDataSourceProvider } from "../../context";
+import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
+import { VideoPlayer, streamIframeSrc } from "./VideoPlayer";
+
+/** The player asks the data source where a video lives; a null answer means "no such video". */
+const dataSource = createFakeDataSource({
+    data: createEmptyEditorData(),
+    urls: { videoObject: (id, ref) => (ref ? `/api/inspections/${id}/media/video/r2-object/${ref}` : null) },
+});
+const render = (ui: ReactElement) =>
+    renderBare(<FieldDataSourceProvider dataSource={dataSource}>{ui}</FieldDataSourceProvider>);
 
 const STREAM = { streamUid: "abc123", streamCustomerSubdomain: "customer-xyz" };
 const R2 = { inspectionId: "insp-1", mediaId: "media-9" };
@@ -84,6 +95,34 @@ describe("VideoPlayer fails closed rather than guessing", () => {
             <VideoPlayer provider="stream" {...STREAM} readyToStream={false} />,
         );
         expect(getByTestId("video-processing").textContent).not.toContain("NaN");
+    });
+});
+
+describe("VideoPlayer asks the data source for the video location", () => {
+    it("uses whatever urls.videoObject answers, for the source and the poster", () => {
+        const host = createFakeDataSource({
+            data: createEmptyEditorData(),
+            urls: { videoObject: (id, ref) => `https://host.example/v/${id}/${ref}` },
+        });
+        const { container } = renderBare(
+            <FieldDataSourceProvider dataSource={host}>
+                <VideoPlayer provider="r2" {...R2} />
+            </FieldDataSourceProvider>,
+        );
+        const video = container.querySelector("video");
+        expect(video?.getAttribute("src")).toBe("https://host.example/v/insp-1/media-9");
+        expect(video?.getAttribute("poster")).toBe("https://host.example/v/insp-1/media-9/poster");
+    });
+
+    it("keeps the unavailable branch when the data source answers null", () => {
+        const host = createFakeDataSource({ data: createEmptyEditorData(), urls: { videoObject: () => null } });
+        const { getByTestId, container } = renderBare(
+            <FieldDataSourceProvider dataSource={host}>
+                <VideoPlayer provider="r2" {...R2} />
+            </FieldDataSourceProvider>,
+        );
+        expect(getByTestId("video-unavailable")).toBeTruthy();
+        expect(container.querySelector("video")).toBeNull();
     });
 });
 

@@ -4,7 +4,14 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { createElement, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { VideoPlayer, streamIframeSrc } from '~/components/media-studio/VideoPlayer';
+import { FieldDataSourceProvider } from '../../context';
+import { createEmptyEditorData, createFakeDataSource } from '../../testing/fake-data-source';
+import { VideoPlayer, streamIframeSrc } from './VideoPlayer';
+
+const dataSource = createFakeDataSource({
+  data: createEmptyEditorData(),
+  urls: { videoObject: (id, ref) => (ref ? `/api/inspections/${id}/media/video/r2-object/${ref}` : null) },
+});
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -14,7 +21,7 @@ function mount(node: React.ReactElement) {
   document.body.appendChild(container);
   root = createRoot(container);
   act(() => {
-    root!.render(node);
+    root!.render(createElement(FieldDataSourceProvider, { dataSource }, node));
   });
 }
 

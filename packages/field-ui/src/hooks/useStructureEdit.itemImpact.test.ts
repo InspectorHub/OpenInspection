@@ -1,15 +1,21 @@
 // @vitest-environment happy-dom
+import { createElement } from "react";
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook as renderHookBare, act } from "@testing-library/react";
+import { FieldDataSourceProvider } from "../context";
+import { createEmptyEditorData, createFakeDataSource } from "../testing/fake-data-source";
+import { useStructureEdit } from "./useStructureEdit";
+import type { UseStructureEditOptions } from "./useStructureEdit";
 
-// useStructureEdit's only react-router dependency is useFetcher; stub it so the
-// hook renders without a data-router provider. The itemImpact tally is pure
-// state math and never touches the fetcher.
-vi.mock("react-router", () => ({
-  useFetcher: () => ({ submit: vi.fn(), state: "idle", data: undefined }),
-}));
-
-import { useStructureEdit } from "~/hooks/useStructureEdit";
+// The itemImpact tally is pure state math; the hook only needs a data source in scope to be mounted.
+const dataSource = createFakeDataSource({ data: createEmptyEditorData() });
+const wrapper = ({ children }: { children: ReactNode }) =>
+  createElement(FieldDataSourceProvider, { dataSource }, children);
+function renderHook(build: () => ReturnType<typeof useStructureEdit>) {
+  return renderHookBare(build, { wrapper });
+}
+const withId = (o: Omit<UseStructureEditOptions, "inspectionId">): UseStructureEditOptions => ({ inspectionId: "insp-1", ...o });
 
 const snapshot = {
   sections: [{ id: "s1", title: "Section 1", items: [{ id: "i1", label: "Item 1", type: "rich" }] }],
@@ -23,7 +29,7 @@ describe("useStructureEdit — Phase U itemImpact scoping", () => {
       "_default:s1:i1": { rating: "x", notes: "hi", photos: [{}, {}] },
     };
     const { result } = renderHook(() =>
-      useStructureEdit({ rawSnapshot: snapshot, collabEditing: false, results }),
+      useStructureEdit(withId({ rawSnapshot: snapshot, collabEditing: false, results })),
     );
     act(() => result.current.deleteItem("s1", "i1"));
     expect(result.current.deletePending?.impact).toEqual({ items: 1, ratings: 1, notes: 1, photos: 2 });
@@ -32,7 +38,7 @@ describe("useStructureEdit — Phase U itemImpact scoping", () => {
   it("falls back to the bare itemId slot in the common view (activeUnitId null)", () => {
     const results = { i1: { rating: "x", notes: "", photos: [{}] } };
     const { result } = renderHook(() =>
-      useStructureEdit({ rawSnapshot: snapshot, collabEditing: false, results }),
+      useStructureEdit(withId({ rawSnapshot: snapshot, collabEditing: false, results })),
     );
     act(() => result.current.deleteItem("s1", "i1"));
     expect(result.current.deletePending?.impact).toEqual({ items: 1, ratings: 1, notes: 0, photos: 1 });
@@ -46,7 +52,7 @@ describe("useStructureEdit — Phase U itemImpact scoping", () => {
       i1: { rating: "z", notes: "bare", photos: [{}, {}, {}, {}] },
     };
     const { result } = renderHook(() =>
-      useStructureEdit({ rawSnapshot: snapshot, collabEditing: false, results, activeUnitId: "u1" }),
+      useStructureEdit(withId({ rawSnapshot: snapshot, collabEditing: false, results, activeUnitId: "u1" })),
     );
     act(() => result.current.deleteItem("s1", "i1"));
     // photos:1 (u1's), not 3 (_default) or 4 (bare) — proves the scope.
@@ -60,7 +66,7 @@ describe("useStructureEdit — Phase U itemImpact scoping", () => {
       "_default:s1:i1": { rating: "y", notes: "d", photos: [{}] },
     };
     const { result } = renderHook(() =>
-      useStructureEdit({ rawSnapshot: snapshot, collabEditing: false, results, activeUnitId: "u1" }),
+      useStructureEdit(withId({ rawSnapshot: snapshot, collabEditing: false, results, activeUnitId: "u1" })),
     );
     act(() => result.current.deleteItem("s1", "i1"));
     expect(result.current.deletePending?.impact).toEqual({ items: 1, ratings: 0, notes: 0, photos: 0 });
@@ -86,7 +92,7 @@ describe("useStructureEdit — Phase U itemImpact scoping", () => {
       "_default:s1:i1b": { rating: "", notes: "", photos: [] },
     };
     const { result } = renderHook(() =>
-      useStructureEdit({ rawSnapshot: nested, collabEditing: false, results }),
+      useStructureEdit(withId({ rawSnapshot: nested, collabEditing: false, results })),
     );
     act(() => result.current.deleteItem("s1", "i1"));
     expect(result.current.deletePending?.impact).toEqual({ items: 3, ratings: 2, notes: 1, photos: 3 });
@@ -105,7 +111,7 @@ describe("useStructureEdit — Phase U itemImpact scoping", () => {
       }],
     };
     const { result } = renderHook(() =>
-      useStructureEdit({ rawSnapshot: nested, collabEditing: false, results: {} }),
+      useStructureEdit(withId({ rawSnapshot: nested, collabEditing: false, results: {} })),
     );
     act(() => result.current.deleteItem("s1", "i1a"));
     expect(result.current.deletePending?.impact.items).toBe(1);

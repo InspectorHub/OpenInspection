@@ -10,7 +10,8 @@
  * Fail closed: for Stream, when the subdomain is absent we render a
  * "Video unavailable" panel rather than a fabricated/broken subdomain.
  */
-import { m } from "~/paraglide/messages";
+import { useFieldDataSource } from "../../context";
+import { m } from "../../i18n";
 
 export interface VideoPlayerProps {
   provider: "stream" | "r2";
@@ -43,9 +44,12 @@ export function VideoPlayer({
   inspectionId,
   mediaId,
 }: VideoPlayerProps) {
+  const { urls } = useFieldDataSource();
   // ── R2 branch ──────────────────────────────────────────────────────────────
   if (provider === "r2") {
-    if (!inspectionId || !mediaId) {
+    // The host answers null for an empty reference; both missing-id and null read as "unavailable".
+    const objectURL = inspectionId && mediaId ? urls.videoObject(inspectionId, mediaId) : null;
+    if (!objectURL) {
       return (
         <div
           data-testid="video-unavailable"
@@ -56,7 +60,6 @@ export function VideoPlayer({
       );
     }
 
-    const objectURL = `/api/inspections/${inspectionId}/media/video/r2-object/${mediaId}`;
     const posterURL = `${objectURL}/poster`;
 
     return (

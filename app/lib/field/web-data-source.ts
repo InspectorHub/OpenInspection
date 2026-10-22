@@ -6,6 +6,7 @@ import { createWebUrls } from "./web-urls";
 import { webIsOnline, webNotify, webOnOnlineChange } from "./web-env";
 import { createWebExecute, type WebExecute } from "./web-transport";
 import { createWebPrefs } from "./web-prefs";
+import { createWebVideo } from "./web-video";
 
 /**
  * What the composed data source reads and calls. Every member is a function, so the host can
@@ -78,7 +79,7 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
         collab,
         media: { store: webMediaStore, uploader },
         urls: createWebUrls(),
-        resources: { prefs: createWebPrefs() },
+        resources: { prefs: createWebPrefs(), video: createWebVideo() },
         platform: "web",
     };
 }

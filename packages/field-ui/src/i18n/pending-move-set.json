@@ -26,12 +26,9 @@
   "app/components/inspection/PcaNarrativePanel.tsx",
   "app/components/media-studio/AvatarCropper.tsx",
   "app/components/media-studio/LogoUploader.tsx",
-  "app/components/media-studio/MediaViewer.tsx",
   "app/components/media-studio/PhotoGallery.tsx",
-  "app/components/media-studio/PosterPicker.tsx",
   "app/components/media-studio/SignaturePad.tsx",
   "app/components/media-studio/VideoCapture.tsx",
-  "app/components/media-studio/VideoPlayer.tsx",
   "app/components/media-studio/signaturePad.logic.ts",
   "app/components/statutory/StatutoryDeliverable.tsx",
   "app/components/statutory/StatutoryDetailsHost.tsx",
@@ -41,6 +38,5 @@
   "app/hooks/useCannedComments.ts",
   "app/hooks/useMediaDrain.ts",
   "app/hooks/usePdfExport.ts",
-  "app/hooks/usePhotoOps.ts",
-  "app/hooks/useStructureEdit.ts"
+  "app/hooks/usePhotoOps.ts"
 ]

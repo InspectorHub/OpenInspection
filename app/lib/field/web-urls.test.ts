@@ -74,7 +74,7 @@ describe("call sites still build the same fragments", () => {
             "app/components/editor/EditorHeader.tsx",
             ["/report-view/${tenantSlug}/${state.inspection.id}", "/api/inspections/${state.inspection.id}/pdf?type=full"],
         ],
-        ["app/components/media-studio/VideoPlayer.tsx", ["/api/inspections/${inspectionId}/media/video/r2-object/${mediaId}"]],
+        ["packages/field-ui/src/components/media-studio/VideoPlayer.tsx", ["urls.videoObject(inspectionId, mediaId)"]],
         [
             "packages/field-ui/src/hooks/usePresence.ts",
             ["dataSource.urls.presenceSocket(inspectionId)"],

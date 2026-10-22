@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { PhotoGrid } from "@core/field-ui/components/media-studio/PhotoGrid";
-import { MediaViewer, type MediaAction } from "./MediaViewer";
+import { MediaViewer, type MediaAction } from "@core/field-ui/components/media-studio/MediaViewer";
 import type { GalleryPhoto } from "@core/field-ui/shared/inspection-media";
 import { m } from "~/paraglide/messages";
 

@@ -80,3 +80,37 @@ describe("createWebExecute with no inspection id", () => {
         expect(fetchImpl).not.toHaveBeenCalled();
     });
 });
+
+describe("createWebExecute with a stalled connection", () => {
+    it("abandons a request that never settles and answers a failure, so a queue of writes cannot wedge behind it", async () => {
+        // A fetch that honours the abort signal and otherwise never answers.
+        const fetchImpl = vi.fn<typeof fetch>().mockImplementation(
+            (_url, init) =>
+                new Promise((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => reject(new DOMException("The operation timed out.", "TimeoutError")));
+                }),
+        );
+        const result = await createWebExecute({ fetchImpl, timeoutMs: 30 })("insp-1", SAMPLES.complete);
+        expect(result.ok).toBe(false);
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        expect(fetchImpl.mock.calls[0]?.[1]?.signal).toBeDefined();
+    });
+
+    it("gives a command that uploads an image a longer default limit than a plain one", async () => {
+        const seen: number[] = [];
+        const spy = vi.spyOn(AbortSignal, "timeout").mockImplementation((ms: number) => {
+            seen.push(ms);
+            return new AbortController().signal;
+        });
+        try {
+            const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ ok: true }));
+            const execute = createWebExecute({ fetchImpl });
+            await execute("insp-1", SAMPLES.complete);
+            await execute("insp-1", SAMPLES["upload-cover"]);
+            expect(seen).toHaveLength(2);
+            expect(seen[1]!).toBeGreaterThan(seen[0]!);
+        } finally {
+            spy.mockRestore();
+        }
+    });
+});

@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type * as Y from "yjs";
 import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "@core/field-ui/components/media-studio/photo-display-key";
-import type { MediaAction } from "~/components/media-studio/MediaViewer";
-import { streamThumbUrl } from "~/components/media-studio/PosterPicker";
+import type { MediaAction } from "@core/field-ui/components/media-studio/MediaViewer";
+import { streamThumbUrl } from "@core/field-ui/components/media-studio/PosterPicker";
 import type { GalleryPhoto } from "@core/field-ui/shared/inspection-media";
 import { findingKey } from "@core/field-ui/hooks/findings/shared";
 import type { PhotoCrop } from "@core/field-ui/components/media-studio/PhotoCropper";

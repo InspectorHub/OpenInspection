@@ -1,9 +1,9 @@
-import { PhotoLightbox } from "@core/field-ui/components/media-studio/PhotoLightbox";
+import { PhotoLightbox } from "./PhotoLightbox";
 import { VideoPlayer } from "./VideoPlayer";
-import { fullResUrl } from "@core/field-ui/components/media-studio/cropImage";
-import { resolveMediaType } from "@core/field-ui/shared/media-type";
-import type { GalleryPhoto } from "@core/field-ui/shared/inspection-media";
-import { m } from "~/paraglide/messages";
+import { fullResUrl } from "./cropImage";
+import { resolveMediaType } from "../../shared/media-type";
+import type { GalleryPhoto } from "../../shared/inspection-media";
+import { m } from "../../i18n";
 
 export type MediaAction = "crop" | "annotate" | "rotate" | "cover" | "caption" | "revert" | "delete" | "poster";
 

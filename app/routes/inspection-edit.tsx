@@ -55,8 +55,8 @@ import { resolveActivePropertyPreset } from "~/lib/property-preset";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper, coverCropFor } from "@core/field-ui/components/media-studio/CoverCropper";
 import { PhotoCropper } from "@core/field-ui/components/media-studio/PhotoCropper";
-import { MediaViewer } from "~/components/media-studio/MediaViewer";
-import { PosterPicker } from "~/components/media-studio/PosterPicker";
+import { MediaViewer } from "@core/field-ui/components/media-studio/MediaViewer";
+import { PosterPicker } from "@core/field-ui/components/media-studio/PosterPicker";
 import { VideoCapture } from "~/components/media-studio/VideoCapture";
 import { fullResUrl } from "@core/field-ui/components/media-studio/cropImage";
 import { preprocessImage } from "@core/field-ui/components/media-studio/preprocessImage";
@@ -67,7 +67,7 @@ import { StructureDeleteModal } from "@core/field-ui/components/editor/Structure
 import { AddSectionPromptModal } from "@core/field-ui/components/editor/AddSectionPromptModal";
 import { AddItemTypeModal } from "@core/field-ui/components/editor/AddItemTypeModal";
 import { SaveTemplateModal } from "@core/field-ui/components/editor/SaveTemplateModal";
-import { useStructureEdit } from "~/hooks/useStructureEdit";
+import { useStructureEdit } from "@core/field-ui/hooks/useStructureEdit";
 import { UnsavedChangesBlocker } from "@core/field-ui/components/editor/UnsavedChangesBlocker";
 import { PublishModal, type PublishExtras } from "~/components/editor/PublishModal";
 import { SignModal } from "~/components/editor/SignModal";
@@ -770,7 +770,7 @@ function InspectionEditPage() {
       inspectionDate={String(state.inspection.date ?? "").slice(0, 10)} /></div>
   ) : null;
  const structure = useStructureEdit({
-  rawSnapshot: loaderData.templateSnapshot,
+  inspectionId: String(state.inspection.id), rawSnapshot: loaderData.templateSnapshot,
   collabEditing: loaderData.collabEditing,
   results: state.results,
   templateId: (state.inspection.templateId as string | null | undefined) ?? null,

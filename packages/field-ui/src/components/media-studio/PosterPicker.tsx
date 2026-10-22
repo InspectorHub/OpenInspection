@@ -1,15 +1,15 @@
 import { useState } from "react";
-import { useFetcher } from "react-router";
-import { PENDING_CLASS, pendingProps, useLayer } from "@core/shared-ui";
-import { framesForDuration } from "@core/field-ui/shared/poster-timestamp";
-import { m } from "~/paraglide/messages";
+import { PENDING_CLASS, pendingProps, useActionLatch, useLayer } from "@core/shared-ui";
+import { useFieldDataSource } from "../../context";
+import { framesForDuration } from "../../shared/poster-timestamp";
+import { m } from "../../i18n";
 
 /**
  * Plan 7 — poster-frame picker (filmstrip → Stream `thumbnailTimestampPct`).
  *
  * A bottom sheet showing N evenly-spaced Cloudflare Stream thumbnail frames for
- * a video. Tap a frame → "Set poster" POSTs the chosen `posterPct` (0..1) to the
- * video poster endpoint via an RR fetcher (BFF rule — never a raw fetch).
+ * a video. Tap a frame → "Set poster" sends the chosen `posterPct` (0..1) through
+ * the data source's `resources.video.setPoster` (a host without it cannot set one).
  *
  * The Stream thumbnail URL needs the account's customer subdomain. The host
  * reads `env.STREAM_CUSTOMER_SUBDOMAIN` server-side and threads it through loader
@@ -55,24 +55,21 @@ export function PosterPicker({
     0,
   );
   const [selected, setSelected] = useState(initial);
-  const fetcher = useFetcher();
-  const saving = fetcher.state !== "idle";
+  const video = useFieldDataSource().resources.video;
+  const [saving, setSaving] = useState(false);
+  const latch = useActionLatch(saving);
 
   const unavailable = !streamCustomerSubdomain;
 
-  const setPoster = () => {
-    const f = frames[selected];
-    // busy-controls-allow: the poster endpoint sets thumbnailTimestampPct on the Stream video and posterPct on the pool row to the posted absolute value (videoPosterRoute, MediaVideoService.setPoster), so a repeat rewrites the same value and creates no row or object
-    fetcher.submit(
-      JSON.stringify({ streamUid, posterPct: f.pct }),
-      {
-        method: "POST",
-        action: `/api/inspections/${inspectionId}/media/video/poster`,
-        encType: "application/json",
-      } as Parameters<typeof fetcher.submit>[1],
-    );
-    onClose();
-  };
+  const setPoster = () =>
+    latch(() => {
+      const f = frames[selected];
+      if (!video) return;
+      setSaving(true);
+      // Same-frame guard above. The answer is not shown: the sheet closes at once, as it always has.
+      void video.setPoster(inspectionId, { streamUid, posterPct: f.pct }).then(() => setSaving(false), () => setSaving(false));
+      onClose();
+    });
 
   // Full-screen overlay: it takes Escape (and the scroll lock) so a dialog under it stays put.
   useLayer(true, { onEscape: onClose, lockScroll: true });
@@ -135,7 +132,7 @@ export function PosterPicker({
           </button>
           <button
             type="button"
-            {...pendingProps(unavailable || saving, setPoster)}
+            {...pendingProps(unavailable || saving || !video, setPoster)}
             className={`min-h-[44px] rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-ih-fg-inverse hover:bg-ih-primary-600 ${PENDING_CLASS}`}
           >
             {m.media_poster_set()}

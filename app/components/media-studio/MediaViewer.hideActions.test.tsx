@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MediaViewerToolbar, type MediaAction } from "./MediaViewer";
+import { MediaViewerToolbar, type MediaAction } from "@core/field-ui/components/media-studio/MediaViewer";
 import { GALLERY_UNHANDLED_ACTIONS } from "./PhotoGallery";
 
 const names = () => screen.getAllByRole("button").map((b) => b.textContent);

@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useFetcher } from "react-router";
-import { findingKey } from "@core/field-ui/hooks/findings/shared";
+import { findingKey } from "./findings/shared";
 import {
   addSection, duplicateSection, deleteSection, moveSection, reorderSection, renameSection,
   addItem, duplicateItem, deleteItem, moveItem, renameItem,
-} from "@core/field-ui/shared/structure-ops";
-import type { Snapshot, ItemType } from "@core/field-ui/shared/structure-ops";
-import { subtreeOf } from "@core/field-ui/shared/template-hierarchy";
-import { m } from "~/paraglide/messages";
+} from "../shared/structure-ops";
+import type { Snapshot, ItemType } from "../shared/structure-ops";
+import { subtreeOf } from "../shared/template-hierarchy";
+import { useFieldCommand } from "../context";
+import { useLatestWinsCommand } from "./useLatestWinsCommand";
+import { m } from "../i18n";
 
 /** Impact data shown in the StructureDeleteModal — for a section OR a single item. */
 interface DeletePending {
@@ -25,6 +26,8 @@ interface AddItemPending {
 }
 
 export interface UseStructureEditOptions {
+  /** The inspection the structure edits belong to. */
+  inspectionId: string;
   /** Raw template snapshot from loaderData (refreshes after each applyStructure revalidation). */
   rawSnapshot: unknown;
   /** Whether collaborative editing is active (controls the collab flag on the restructure submit). */
@@ -126,7 +129,7 @@ export interface UseStructureEditReturn {
 /**
  * D8 — structural section editing wiring.
  *
- * Holds the snapshot ref + structureFetcher + all section CRUD handlers
+ * Holds the snapshot ref + the restructure runner + all section CRUD handlers
  * (add / duplicate / delete / move) and the two modal state pieces
  * (StructureDeleteModal and the "Add section" title prompt).
  *
@@ -134,6 +137,7 @@ export interface UseStructureEditReturn {
  * and to make the pattern reusable for upcoming item-level structural ops.
  */
 export function useStructureEdit({
+  inspectionId,
   rawSnapshot,
   collabEditing,
   results,
@@ -149,7 +153,10 @@ export function useStructureEdit({
     snapshotRef.current = rawSnapshot as Snapshot;
   }, [rawSnapshot]);
 
-  const structureFetcher = useFetcher();
+  // Restructure replaces the whole snapshot, so the NEWEST must win (one in flight, only the newest queued).
+  // Saving to a template is a separate one-shot write on its own channel: neither cancels the other.
+  const { submit: submitRestructure } = useLatestWinsCommand(inspectionId);
+  const { run: saveTemplate } = useFieldCommand(inspectionId);
 
   // Kept in a ref so applyStructure's identity is stable even though the caller
   // passes a fresh onApply closure each render.
@@ -167,16 +174,9 @@ export function useStructureEdit({
       // recompute from the pre-first-op snapshot and silently drop the first.
       // The rawSnapshot effect reconciles back to server truth on revalidation.
       snapshotRef.current = next;
-      structureFetcher.submit(
-        {
-          intent: "restructure",
-          snapshot: JSON.stringify(next),
-          collab: collabEditing ? "1" : "0",
-        },
-        { method: "post" },
-      );
+      void submitRestructure({ type: "restructure", snapshot: next, collab: collabEditing });
     },
-    [structureFetcher, collabEditing],
+    [submitRestructure, collabEditing],
   );
 
   // StructureDeleteModal state — opened when a section/item delete fires.
@@ -371,18 +371,18 @@ export function useStructureEdit({
     const pending = saveTemplatePending;
     setSaveTemplatePending(null);
     if (!pending) return;
-    const fields: Record<string, string> = {
-      intent: "save-structure-template",
-      mode: pending.mode,
-      snapshot: JSON.stringify(snapshotRef.current),
-    };
-    if (pending.mode === "new") {
-      fields.name = saveTemplateName.trim() || m.helper_structure_custom_template_default();
-    } else {
-      fields.templateId = templateId ?? "";
-    }
-    structureFetcher.submit(fields, { method: "post" });
-  }, [saveTemplatePending, saveTemplateName, templateId, structureFetcher]);
+    const snapshot = snapshotRef.current;
+    void saveTemplate(
+      pending.mode === "new"
+        ? {
+            type: "save-structure-template",
+            mode: "new",
+            snapshot,
+            name: saveTemplateName.trim() || m.helper_structure_custom_template_default(),
+          }
+        : { type: "save-structure-template", mode: "back", snapshot, templateId: templateId ?? "" },
+    );
+  }, [saveTemplatePending, saveTemplateName, templateId, saveTemplate]);
 
   return {
     snapshotRef,

@@ -20,6 +20,8 @@ import { decodeResult, encodeCommand } from "./web-commands";
 export interface WebExecuteOptions {
     fetchImpl?: typeof fetch;
     endpoint?: (inspectionId: string) => string;
+    /** Overrides the default time limit of a command (tests). */
+    timeoutMs?: number;
 }
 
 export type WebExecute = <C extends FieldCommand>(
@@ -28,9 +30,23 @@ export type WebExecute = <C extends FieldCommand>(
     opts?: ExecuteOptions,
 ) => Promise<CommandResult<CommandData<C>>>;
 
+/** Longest a command may take before it is abandoned and answered as a failure: a stalled connection must not wedge a queue of writes behind it. */
+const COMMAND_TIMEOUT_MS = 60_000;
+/** Commands that upload an image get longer: a photo over a slow mobile link is legitimately slow. */
+const UPLOAD_TIMEOUT_MS = 180_000;
+
+function signalFor(ms: number): AbortSignal | undefined {
+    if (typeof AbortSignal === "undefined") return undefined;
+    if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(ms);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), ms);
+    return controller.signal;
+}
+
 export function createWebExecute({
     fetchImpl = (input, init) => fetch(input, init),
     endpoint = (id) => `/resources/inspection-editor-command/${encodeURIComponent(id)}`,
+    timeoutMs,
 }: WebExecuteOptions = {}): WebExecute {
     return async function execute<C extends FieldCommand>(
         inspectionId: string,
@@ -41,8 +57,10 @@ export function createWebExecute({
         try {
             const { form } = encodeCommand(cmd);
             if (opts?.idempotencyKey) form.append(IDEMPOTENCY_FIELD, opts.idempotencyKey);
+            const hasBinary = [...form.values()].some((v) => typeof v !== "string");
+            const signal = signalFor(timeoutMs ?? (hasBinary ? UPLOAD_TIMEOUT_MS : COMMAND_TIMEOUT_MS));
             // busy-controls-allow: the guard is useFieldCommand (packages/field-ui/src/context.tsx), the only sanctioned caller of this function; it drops an overlapping call before it reaches here
-            const res = await fetchImpl(endpoint(inspectionId), { method: "POST", credentials: "include", body: form });
+            const res = await fetchImpl(endpoint(inspectionId), { method: "POST", credentials: "include", body: form, ...(signal ? { signal } : {}) });
             const contentType = res.headers.get("content-type");
             const body: unknown = contentType?.toLowerCase().includes("json") ? await res.json().catch(() => null) : null;
             return decodeResult(cmd, res.status, body, { redirected: res.redirected, contentType });

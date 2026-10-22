@@ -38,6 +38,7 @@ describe("createWebFieldDataSource", () => {
         const ds = make();
         expect(typeof ds.resources.prefs?.load).toBe("function");
         expect(typeof ds.resources.prefs?.patch).toBe("function");
+        expect(typeof ds.resources.video?.setPoster).toBe("function");
     });
 
     it("execute goes through the transport when an inspection is present", async () => {
