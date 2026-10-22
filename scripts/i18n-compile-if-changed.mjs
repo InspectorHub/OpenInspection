@@ -25,6 +25,11 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { dirname, join } from 'node:path';
 
 const OUT_DIR = 'app/paraglide';
+// The editor package compiles its own runtime from its own project, which reads
+// the same root `messages/`. Its settings are an input (they choose which modules
+// it carries) and its output must exist, or the skip would leave type-check
+// without the generated declarations.
+const FIELD_UI_OUT_DIR = 'packages/field-ui/src/i18n/generated';
 // The stamp is written to TWO places, and either one is enough to skip.
 //
 //   app/paraglide/.inputs-hash  — inside the output, so anything that caches or
@@ -40,7 +45,7 @@ const OUT_DIR = 'app/paraglide';
 //     Vite's output is byte-equivalent (same project, outdir, strategy,
 //     outputStructure and emitTsDeclarations), so trusting this copy is sound.
 const STAMPS = ['app/paraglide/.inputs-hash', 'node_modules/.cache/i18n-inputs-hash'];
-const INPUT_DIRS = ['messages', 'project.inlang'];
+const INPUT_DIRS = ['messages', 'project.inlang', 'packages/field-ui/project.inlang'];
 const force = process.argv.includes('--force');
 
 /** Every input file, sorted, so the hash does not depend on directory order. */
@@ -90,8 +95,8 @@ const hash = inputHash();
 if (force) {
     console.log('[i18n] --force: compiling.');
     compile();
-} else if (!existsSync(OUT_DIR)) {
-    console.log(`[i18n] ${OUT_DIR} missing — compiling.`);
+} else if (!existsSync(OUT_DIR) || !existsSync(FIELD_UI_OUT_DIR)) {
+    console.log(`[i18n] ${existsSync(OUT_DIR) ? FIELD_UI_OUT_DIR : OUT_DIR} missing — compiling.`);
     compile();
 } else {
     const seen = STAMPS.map((p) => {

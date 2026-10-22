@@ -36,6 +36,6 @@
     "yjs": "^13.6.0"
   },
   "scripts": {
-    "build": "tsup"
+    "build": "paraglide-js compile --project ./project.inlang --outdir ./src/i18n/generated --strategy globalVariable baseLocale --output-structure locale-modules --emit-ts-declarations && tsup"
   }
 }

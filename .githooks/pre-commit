@@ -82,7 +82,8 @@ CONFIG_STAGED=$(echo "$STAGED" | grep -E '^(tsconfig|package\.json|package-lock\
 #    (The api tier never needed either: tsconfig.api.json includes server/** alone.)
 needs_paraglide() {
     [ -d app/paraglide ] || return 0
-    echo "$STAGED" | grep -qE '^(messages/|project\.inlang/)'
+    [ -d packages/field-ui/src/i18n/generated ] || return 0
+    echo "$STAGED" | grep -qE '^(messages/|project\.inlang/|packages/field-ui/project\.inlang/)'
 }
 needs_typegen() {
     [ -d .react-router/types ] || return 0

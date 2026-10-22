@@ -77,6 +77,9 @@
     // allowJs or the .gitignore (paraglide's own .gitignore excludes the whole
     // outdir, so these are gitignored but still present after i18n:compile).
     "app/paraglide/**/*.d.ts",
+    // The editor package's own compiled messages (gitignored, present after
+    // i18n:compile), listed for the same reason as the app copy above.
+    "packages/field-ui/src/i18n/generated/**/*.d.ts",
     "workers/**/*.ts",
     "vite.config.ts",
     // The worker entry's `typeof import("../server/index")` pulls the server
