@@ -44,7 +44,7 @@
   "scripts/check-statutory-fidelity.mjs": 527,
   "app/components/settings/ManagedComplianceWizard.tsx": 520,
   "scripts/check-price-capability.mjs": 514,
-  "app/routes/inspection-edit/action.server.ts": 511,
+  "app/routes/inspection-edit/action.server.ts": 513,
   "app/components/collab/VersionHistoryPanel.tsx": 503,
   "server/services/inspection/shared.ts": 500,
   "server/services/portal-access.service.ts": 500,

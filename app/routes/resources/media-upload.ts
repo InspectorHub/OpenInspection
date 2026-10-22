@@ -19,18 +19,10 @@
 import type { Route } from "./+types/media-upload";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { isPathSegment } from "~/lib/path-segment";
 
 function fail(status: number, error: string): Response {
     return Response.json({ error }, { status });
-}
-
-/**
- * True for a value that is safe to paste into one URL path segment. The typed client does not encode the
- * params it is given, so a client-supplied id with a slash, `..`, `?`, `#` or a percent escape could steer the
- * forwarded call to another path. Real ids (UUIDs, template item ids) never contain these characters.
- */
-function isPathSegment(value: string): boolean {
-    return value !== "." && value !== ".." && !/[/\\?#%]/.test(value);
 }
 
 function text(fd: FormData, name: string): string {
