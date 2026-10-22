@@ -10,7 +10,7 @@ import { PageHeader, Button, Select } from "@core/shared-ui";
 import type { Contact } from "~/components/contacts/contacts-helpers";
 import { ContactModal } from "~/components/contacts/ContactModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { ROLE_KINDS, type RoleKind } from "../../server/lib/people/role-kinds";

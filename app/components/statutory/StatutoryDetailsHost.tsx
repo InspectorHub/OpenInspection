@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { StatutoryDetailsPanel, type StatutoryDetailsValues } from "./StatutoryDetailsPanel";
+import { StatutoryDetailsPanel, type StatutoryDetailsValues } from "@core/field-ui/components/statutory/StatutoryDetailsPanel";
 
 /**
  * The statutory details panel, with the write it makes.

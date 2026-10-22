@@ -41,7 +41,7 @@ function konvaSsrStub(): Plugin {
     resolveId(source) {
       if (source !== "react-konva") return null;
       if (this.environment?.name !== "ssr") return null;
-      return path.resolve(__dirname, "app/components/media-studio/react-konva.ssr-stub.tsx");
+      return path.resolve(__dirname, "packages/field-ui/src/components/media-studio/react-konva.ssr-stub.tsx");
     },
   };
 }

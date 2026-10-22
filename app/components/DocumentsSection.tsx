@@ -14,7 +14,7 @@
  */
 import { useRef, useState } from "react";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";

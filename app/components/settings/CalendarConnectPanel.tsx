@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRevalidator, useSearchParams } from "react-router";
 import { Banner, RadioCardGroup, pendingProps, PENDING_CLASS } from "@core/shared-ui";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { GoogleSignInButton } from "~/components/GoogleSignInButton";
 import { CalendarGlyph } from "~/components/settings/CalendarGlyph";
 import { calendarOAuthErrorToast } from "~/lib/calendar-oauth-errors";

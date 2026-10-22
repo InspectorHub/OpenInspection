@@ -5,7 +5,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { hasOpenLayer, Modal } from "@core/shared-ui";
 import { AddMediaChooser } from "@core/field-ui/components/editor/AddMediaChooser";
 import { KeyboardHud } from "@core/field-ui/components/editor/KeyboardHud";
-import { VersionCompare } from "~/components/collab/VersionCompare";
+import { VersionCompare } from "@core/field-ui/components/collab/VersionCompare";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
 
 afterEach(() => {

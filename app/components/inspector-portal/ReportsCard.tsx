@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, Pill, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import type { action } from "~/routes/inspector-portal";

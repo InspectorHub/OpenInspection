@@ -18,7 +18,7 @@ vi.mock('~/hooks/useSessionContext', () => ({
   useInspectionDateTimeFormat: () => ({ locale: 'en-US', dateFormat: 'us', timeFormat: '12h' }),
 }));
 
-import { VersionCompare } from '~/components/collab/VersionCompare';
+import { VersionCompare } from '@core/field-ui/components/collab/VersionCompare';
 import { VersionHistoryPanel } from '~/components/collab/VersionHistoryPanel';
 import type { FindingDiff } from '@core/field-ui/shared/snapshot-diff';
 

@@ -4,7 +4,7 @@ import { Button, IconButton, Icon } from "@core/shared-ui";
 import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { ProgressStripText } from "@core/field-ui/components/editor/ProgressStripText";
-import { TemplateMenu } from "~/components/editor/TemplateMenu";
+import { TemplateMenu } from "@core/field-ui/components/editor/TemplateMenu";
 import { PreviewMenu } from "@core/field-ui/components/editor/PreviewMenu";
 import { HEADER_OVERFLOW } from "@core/field-ui/components/editor/header-visibility";
 import { runWithPending } from "@core/field-ui/components/editor/publish-pending";

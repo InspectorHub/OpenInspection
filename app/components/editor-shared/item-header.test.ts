@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { ItemHeader } from "~/components/editor-shared/ItemHeader";
+import { ItemHeader } from "@core/field-ui/components/editor-shared/ItemHeader";
 
 function html(props: Record<string, unknown>): string {
   return renderToStaticMarkup(createElement(ItemHeader, props as never));

@@ -21,7 +21,7 @@ import { render, screen, within } from "@testing-library/react";
 import {
     StatutoryCoveragePanel,
     type StatutoryCoverageData,
-} from "~/components/statutory/StatutoryCoveragePanel";
+} from "@core/field-ui/components/statutory/StatutoryCoveragePanel";
 
 const HREF = "/api/inspections/insp-1/statutory-form/preview.pdf";
 

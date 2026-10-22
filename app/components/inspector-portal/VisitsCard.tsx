@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, Button, Pill, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { isAdminRole, isStaffRole } from "~/lib/access";
 import { AddVisitModal } from "./AddVisitModal";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";

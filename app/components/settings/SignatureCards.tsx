@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
 import { SignaturePad } from "~/components/SignaturePad";
-import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
+import { PhotoCropper } from "@core/field-ui/components/media-studio/PhotoCropper";
 import { blobToDataUri, validateSignatureFile, SIGNATURE_MAX_LONG_EDGE } from "~/lib/image-upload";
 import { useNotificationSaveToast } from "~/hooks/useNotificationSaveToast";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";

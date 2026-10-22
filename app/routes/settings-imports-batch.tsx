@@ -4,7 +4,7 @@ import { Banner, Card, EmptyState, Pill, buttonClasses } from "@core/shared-ui";
 
 import type { Route } from "./+types/settings-imports-batch";
 import { AccessDenied } from "~/components/AccessDenied";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { AssistanceStage } from "~/components/imports/AssistanceStage";
 import { ImportStage } from "~/components/imports/ImportStage";

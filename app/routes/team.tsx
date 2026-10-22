@@ -7,7 +7,7 @@ import { SeatBanner } from "~/components/SeatBanner";
 import { InviteSeatDrawer, drawerActorOf } from "~/components/modals/InviteSeatDrawer";
 import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
 import { TeamRolesReference } from "~/components/TeamRolesReference";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { InviteLinkModal, type InviteLinkTarget } from "~/components/modals/InviteLinkModal";
 import { ResetTwoFactorDialog, type ResetTwoFactorTarget } from "~/components/modals/ResetTwoFactorDialog";
 import { RemoveMemberDialog } from "~/components/modals/RemoveMemberDialog";

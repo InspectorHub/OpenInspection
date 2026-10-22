@@ -5,8 +5,8 @@ import type { MediaAction } from "~/components/media-studio/MediaViewer";
 import { streamThumbUrl } from "~/components/media-studio/PosterPicker";
 import type { GalleryPhoto } from "@core/field-ui/shared/inspection-media";
 import { findingKey } from "~/hooks/findings/shared";
-import type { PhotoCrop } from "~/components/media-studio/PhotoCropper";
-import type { StoredCoverCrop } from "~/components/media-studio/CoverCropper";
+import type { PhotoCrop } from "@core/field-ui/components/media-studio/PhotoCropper";
+import type { StoredCoverCrop } from "@core/field-ui/components/media-studio/CoverCropper";
 import type { useInspectionState } from "~/hooks/useInspection";
 import type { useFindings } from "~/hooks/useFindings";
 import {

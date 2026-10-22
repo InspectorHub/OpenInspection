@@ -36,7 +36,7 @@
     "vitest.typecheck.config.ts",
     "vitest.workers.config.ts",
     "vite.config.ts",
-    "app/components/media-studio/react-konva.ssr-stub.tsx",
+    "packages/field-ui/src/components/media-studio/react-konva.ssr-stub.tsx",
     "server/lib/compliance/retention-policy.ts",
     "packages/shared-ui/src/index.ts",
     "packages/field-ui/src/index.ts",

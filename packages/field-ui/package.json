@@ -28,9 +28,12 @@
     "*.css"
   ],
   "peerDependencies": {
+    "konva": "^10.2.5",
     "lib0": "^0.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-easy-crop": "^6.0.2",
+    "react-konva": "^19.2.5",
     "react-photo-album": "^3.6.0",
     "sortablejs": "^1.15.7",
     "yet-another-react-lightbox": "^3.32.0",

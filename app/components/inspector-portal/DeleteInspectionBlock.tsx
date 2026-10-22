@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { Card, Button, Checkbox } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { CancelInspectionModal } from "./CancelInspectionModal";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useOfflinePurgeOnDelete } from "~/hooks/useOfflinePurgeOnDelete";
 import { useCapability } from "~/hooks/useSessionContext";

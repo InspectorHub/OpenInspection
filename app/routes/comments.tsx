@@ -6,7 +6,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination, Checkbox } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { usePagination } from "~/hooks/usePagination";
 import { CommentEditor } from "~/components/CommentEditor";
 import { EntityAuditTrail } from "~/components/audit/EntityAuditTrail";

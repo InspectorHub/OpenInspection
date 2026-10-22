@@ -1,6 +1,6 @@
 import { Banner } from "@core/shared-ui";
 import type { PackageSummary } from "@core/offline-package";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
 
 /**

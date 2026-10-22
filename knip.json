@@ -20,7 +20,7 @@
     "vitest.typecheck.config.ts",
     "vitest.workers.config.ts",
     "vite.config.ts",
-    "app/components/media-studio/react-konva.ssr-stub.tsx",
+    "packages/field-ui/src/components/media-studio/react-konva.ssr-stub.tsx",
     "server/lib/compliance/retention-policy.ts",
     "**/*.test.{ts,tsx}",
     "**/*.spec.{ts,tsx}",
@@ -67,6 +67,10 @@
     "@core/api-types",
     "@core/offline-package",
     "react-photo-album",
-    "yet-another-react-lightbox"
+    "yet-another-react-lightbox",
+    "react-easy-crop",
+    "react-konva",
+    "konva",
+    "sortablejs"
   ]
 }

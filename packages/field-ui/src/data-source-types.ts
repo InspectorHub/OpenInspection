@@ -82,7 +82,7 @@ export interface TemplateSchema {
 /** Mirrors `ResultMap` in app/hooks/useInspection.ts. */
 export type ResultMap = Record<string, Record<string, unknown>>;
 
-/** Mirrors `TagPin` in app/components/editor/TagChipRow.tsx. */
+/** Mirrors `TagPin` in packages/field-ui/src/components/editor/TagChipRow.tsx. */
 export interface TagLibraryEntry {
   id: string;
   name: string;

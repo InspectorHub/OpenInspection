@@ -5,7 +5,7 @@
  * event-driven PhotoStudio ("open-photo-studio" CustomEvent, a role=dialog with
  * aria-label "Photo annotation studio", an <svg ellipse>, and a PUT
  * /media/{mediaId}/annotations save). That component has been REPLACED by the
- * react-konva PhotoAnnotator (app/components/media-studio/PhotoAnnotator.tsx):
+ * react-konva PhotoAnnotator (packages/field-ui/src/components/media-studio/PhotoAnnotator.tsx):
  *   - it renders shapes to a <canvas> via Konva (Stage/Layer/Circle/Arrow), so
  *     there is NO <svg ellipse> — annotation shapes are not DOM nodes and can't
  *     be asserted with a Playwright selector;

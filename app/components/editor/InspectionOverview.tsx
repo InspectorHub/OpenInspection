@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { StatutoryDetailsHost } from "~/components/statutory/StatutoryDetailsHost";
-import { StatutoryCoveragePanel } from "~/components/statutory/StatutoryCoveragePanel";
+import { StatutoryCoveragePanel } from "@core/field-ui/components/statutory/StatutoryCoveragePanel";
 import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
 import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
 import { CommercialReportControls, type ReportTier } from "@core/field-ui/components/editor/CommercialReportControls";

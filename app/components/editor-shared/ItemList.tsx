@@ -9,7 +9,7 @@ import { m } from "~/paraglide/messages";
 import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "@core/field-ui/shared/template-hierarchy";
 import { useItemRowMenu } from "@core/field-ui/hooks/useItemRowMenu";
 import { ItemRowIndent } from "@core/field-ui/components/editor-shared/ItemRowIndent";
-import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtreeDeleteModal";
+import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "@core/field-ui/components/editor-shared/ItemSubtreeDeleteModal";
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
 // label, or rating dot. Desktop reveals on hover; touch always shows them.

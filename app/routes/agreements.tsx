@@ -6,7 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState, Banner, Pill, Table } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { AgreementTemplateModal } from "~/components/agreements/AgreementTemplateModal";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import type { AgreementTemplateSaveResult } from "~/routes/resources/agreement-templates";
 import { AGREEMENT_TEMPLATES_ACTION } from "~/routes/resources/agreement-templates";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";

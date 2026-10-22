@@ -18,7 +18,7 @@ import {
  type CannedTabId,
  type LibraryMatch,
 } from "./CannedCommentTabs";
-import { ItemPhotoStrip, type StripPhoto } from "../media-studio/ItemPhotoStrip";
+import { ItemPhotoStrip, type StripPhoto } from "@core/field-ui/components/media-studio/ItemPhotoStrip";
 import type { AttachedRepairItem } from "../../hooks/useFindings";
 import type { ItemAttribute } from "@core/field-ui/shared/types";
 import { shouldTriggerSlash } from "@core/field-ui/shared/slash-trigger";
@@ -26,7 +26,7 @@ import { findRatingLevel, type EditorRatingLevel } from "@core/field-ui/shared/r
 import { findRatingContradictions } from "@core/field-ui/shared/contradiction-lint";
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "@core/field-ui/shared/custom-defects";
 import type { DefectTrade } from "@core/field-ui/shared/defect-fields";
-import { ItemHeading } from "./ItemHeading";
+import { ItemHeading } from "@core/field-ui/components/editor/ItemHeading";
 import { FollowupPanel, hasCarriedBaseline } from "./FollowupPanel";
 import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
 import { m } from "~/paraglide/messages";

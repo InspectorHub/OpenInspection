@@ -7,7 +7,7 @@ import { createRoutesStub } from "react-router";
 import { InspectionSettingsSheet } from "./InspectionSettingsSheet";
 
 // The real cropper needs canvas; a stub that just exposes onSave is enough to reach the submit.
-vi.mock("~/components/media-studio/CoverCropper", () => ({
+vi.mock("@core/field-ui/components/media-studio/CoverCropper", () => ({
   coverCropFor: () => null,
   CoverCropper: ({ onSave }: { onSave: (b: Blob, c: unknown) => void }) => (
     <button type="button" data-testid="crop-save" onClick={() => onSave(new Blob(["x"]), { aspect: "1:1", orientation: "landscape", pixels: { x: 0, y: 0, width: 1, height: 1 } })}>save crop</button>

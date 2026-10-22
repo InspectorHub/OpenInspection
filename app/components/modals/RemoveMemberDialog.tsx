@@ -1,6 +1,6 @@
 import { Link, useInRouterContext } from "react-router";
 import { Banner, Select } from "@core/shared-ui";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
 
 /**

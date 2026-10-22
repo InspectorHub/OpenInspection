@@ -3,7 +3,7 @@ import { useRevalidator } from "react-router";
 import { Button, Modal, SegmentedControl } from "@core/shared-ui";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { formatDateTime } from "@core/field-ui/shared/format";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 
