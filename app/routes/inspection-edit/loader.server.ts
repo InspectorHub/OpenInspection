@@ -2,7 +2,7 @@ import type { Route } from "../+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { unwrapResultsResponse } from "~/lib/results";
-import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
+import type { RatingLevel, ResultMap } from "@core/field-ui/hooks/useInspection";
 import { resolvePcaNarrative } from "@core/field-ui/shared/pca-narrative";
 import { RELIANCE_TEMPLATES } from "@core/field-ui/shared/pca-reliance-text";
 import { METADATA_PRESETS, type PropertyMetaField } from "@core/field-ui/shared/commercial-subtypes";

@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
-import { ItemList } from '~/components/editor-shared/ItemList';
-import type { EditorGroup } from '@core/field-ui/shared/statutory-groups';
+import { ItemList } from './ItemList';
+import type { EditorGroup } from '../../shared/statutory-groups';
 
 /**
  * Items as a form-shaped template hands them over: a flat run whose only clue

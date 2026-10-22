@@ -3,7 +3,7 @@
  * ResultMap, and provides write helpers that mirror the editor's existing hook
  * signatures so Task 9 can swap them in 1:1.
  *
- * NO React import. NO import of app/hooks/useInspection.ts (React-heavy).
+ * NO React import. NO import of packages/field-ui/src/hooks/useInspection.ts (React-heavy).
  */
 
 import type * as Y from 'yjs';
@@ -30,11 +30,11 @@ import type { PhotoEntry, RepairItemSnapshot } from '../shared/results-doc.types
 
 // ─── ResultMap type ──────────────────────────────────────────────────────────
 //
-// Must stay structurally identical to `ResultMap` in `app/hooks/useInspection.ts`.
+// Must stay structurally identical to `ResultMap` in `packages/field-ui/src/hooks/useInspection.ts`.
 // It is a plain alias — no drift risk because the type is Record<string, Record<string, unknown>>.
 // We define it locally to keep this file React-free.
 
-/** Structural alias of `ResultMap` from `app/hooks/useInspection.ts`. Do not let this drift. */
+/** Structural alias of `ResultMap` from `packages/field-ui/src/hooks/useInspection.ts`. Do not let this drift. */
 export type ResultMap = Record<string, Record<string, unknown>>;
 
 // ─── Read model ───────────────────────────────────────────────────────────────

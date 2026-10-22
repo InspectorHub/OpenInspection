@@ -26,7 +26,7 @@
   "server/api/public-report.ts": 642,
   "app/components/inspection-edit/CompliancePanel.tsx": 638,
   "server/api/auth.ts": 617,
-  "app/hooks/useInspection.ts": 600,
+  "packages/field-ui/src/hooks/useInspection.ts": 600,
   "server/services/concierge.service.ts": 599,
   "server/api/bookings/agreement.ts": 583,
   "scripts/check-agent-terms-classification.mjs": 572,

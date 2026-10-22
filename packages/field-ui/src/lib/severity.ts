@@ -1,4 +1,4 @@
-import { m } from "~/paraglide/messages";
+import { m } from "../i18n";
 
 /** The single severity vocabulary shared by rating levels AND comments (spec §4.F, §9 #1). */
 export type Severity = 'good' | 'marginal' | 'significant' | 'minor';

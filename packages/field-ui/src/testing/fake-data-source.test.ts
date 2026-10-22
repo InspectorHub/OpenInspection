@@ -246,7 +246,9 @@ describe('createFakeDataSource', () => {
       expect(first.pinnedTagIds).toEqual([]);
 
       const res = await ds.resources.prefs!.patch({ autoAdvance: 'off', pinnedTagIds: ['t1'] });
-      expect(res).toEqual({ ok: true });
+      expect(res.ok).toBe(true);
+      // The echo is the merged result, as a real host answers.
+      expect(res.data).toMatchObject({ autoAdvance: 'off', pinnedTagIds: ['t1'] });
       const second = await ds.resources.prefs!.load();
       expect(second.autoAdvance).toBe('off');
       expect(second.pinnedTagIds).toEqual(['t1']);

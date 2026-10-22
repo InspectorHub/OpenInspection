@@ -6,8 +6,8 @@ import { useState } from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { vi } from 'vitest';
 import { Modal } from '@core/shared-ui';
-import { ItemList } from '~/components/editor-shared/ItemList';
-import { SectionRail } from '~/components/editor-shared/SectionRail';
+import { ItemList } from './ItemList';
+import { SectionRail } from './SectionRail';
 
 const items = [
   { id: 'i1', label: 'Roof Covering', type: 'rich' },

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from "vitest";
 import { renderHook } from "@testing-library/react";
-import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
+import { useInspectionState, type InspectionSchema } from "./useInspection";
 
 /**
  * Phase U (Batch C2a) — the results pre-fill stub loop seeds per-unit stubs for

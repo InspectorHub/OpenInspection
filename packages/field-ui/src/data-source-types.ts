@@ -5,7 +5,7 @@
  * `scripts/check-field-ui-boundary.mjs`). Types that live in `./shared` are
  * re-exported from there, so the contract and the editor logic share one
  * definition. The shapes the editor reads that still live in the host
- * (`app/hooks/useInspection.ts`, the inspection-edit loader, server libraries)
+ * (`packages/field-ui/src/hooks/useInspection.ts`, the inspection-edit loader, server libraries)
  * are declared here from what `app/routes/inspection-edit/loader.server.ts`
  * returns and what `app/routes/inspection-edit.tsx` reads off it.
  */
@@ -17,7 +17,7 @@ import type { AutoAdvanceMode } from './shared/rating-levels';
 
 export type { PropertyMetaField, PcaNarrative, AutoAdvanceMode };
 
-/** Mirrors `Inspection` in app/hooks/useInspection.ts. */
+/** Mirrors `Inspection` in packages/field-ui/src/hooks/useInspection.ts. */
 export interface EditorInspection {
   id: string;
   propertyAddress?: string;
@@ -38,7 +38,7 @@ export interface EditorInspection {
   [key: string]: unknown;
 }
 
-/** Mirrors `RatingLevel` in app/hooks/useInspection.ts. */
+/** Mirrors `RatingLevel` in packages/field-ui/src/hooks/useInspection.ts. */
 export interface RatingLevel {
   id: string;
   label: string;
@@ -57,7 +57,7 @@ export interface RatingLevel {
  */
 export type TemplateItemBody = Record<string, unknown>;
 
-/** Mirrors `SchemaItem` in app/hooks/useInspection.ts. */
+/** Mirrors `SchemaItem` in packages/field-ui/src/hooks/useInspection.ts. */
 export interface SchemaItem extends TemplateItemBody {
   id: string;
   label: string;
@@ -65,7 +65,7 @@ export interface SchemaItem extends TemplateItemBody {
   type: string;
 }
 
-/** Mirrors `SchemaSection` in app/hooks/useInspection.ts. */
+/** Mirrors `SchemaSection` in packages/field-ui/src/hooks/useInspection.ts. */
 export interface SchemaSection {
   id: string;
   title: string;
@@ -79,7 +79,7 @@ export interface TemplateSchema {
   sections: SchemaSection[];
 }
 
-/** Mirrors `ResultMap` in app/hooks/useInspection.ts. */
+/** Mirrors `ResultMap` in packages/field-ui/src/hooks/useInspection.ts. */
 export type ResultMap = Record<string, Record<string, unknown>>;
 
 /** Mirrors `TagPin` in packages/field-ui/src/components/editor/TagChipRow.tsx. */
@@ -209,7 +209,7 @@ export type ReportLinkTtl = 'never' | { count: number; unit: 'days' | 'months' |
 
 /**
  * The tenant's inspection-editor preferences, as `useInspectionPrefs` reads and
- * patches them (app/hooks/useInspectionPrefs.ts, `InspectionPrefs`).
+ * patches them (packages/field-ui/src/hooks/useInspectionPrefs.ts, `InspectionPrefs`).
  */
 export interface InspectionPrefs {
   cloneDefault: 'rating' | 'rating_notes' | 'all';

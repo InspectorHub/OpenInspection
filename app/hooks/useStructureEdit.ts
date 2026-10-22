@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
-import { findingKey } from "~/hooks/findings/shared";
+import { findingKey } from "@core/field-ui/hooks/findings/shared";
 import {
   addSection, duplicateSection, deleteSection, moveSection, reorderSection, renameSection,
   addItem, duplicateItem, deleteItem, moveItem, renameItem,

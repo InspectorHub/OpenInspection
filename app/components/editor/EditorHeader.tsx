@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import type { useInspectionState } from "~/hooks/useInspection";
+import type { useInspectionState } from "@core/field-ui/hooks/useInspection";
 import { Button, IconButton, Icon } from "@core/shared-ui";
 import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";

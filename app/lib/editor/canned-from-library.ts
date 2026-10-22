@@ -6,7 +6,7 @@
  * do not). Kept pure so the wiring in the route is unit-testable without a DOM.
  */
 import type { CannedComment } from "~/components/template/types";
-import type { Severity } from "~/lib/severity";
+import type { Severity } from "@core/field-ui/lib/severity";
 
 export type CannedTab = "information" | "limitations" | "defects";
 

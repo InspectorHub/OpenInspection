@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@core/shared-ui";
-import type { PresenceUser, PresenceStatus } from "~/hooks/usePresence";
-import { m } from "~/paraglide/messages";
+import type { PresenceUser, PresenceStatus } from "../../hooks/usePresence";
+import { m } from "../../i18n";
 
 interface FooterBarProps {
   connected?: boolean;

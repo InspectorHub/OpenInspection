@@ -184,12 +184,17 @@ export interface FieldUrls {
 export interface FieldResources {
   /**
    * The tenant's editor preferences (auto-advance, pinned tags, required defect
-   * fields, ...). Owner: `useInspectionPrefs` moves into the package in Task 5/8
-   * and reads this instead of `/resources/inspection-prefs`. Absent means the host
+   * fields, ...). Owner: `useInspectionPrefs`, which reads and saves through this
+   * (the web host serves it from `/resources/inspection-prefs`). Absent means the host
    * has no preference store, and the editor uses its built-in defaults.
-   * `patch` takes a partial delta; a not-ok result means the host did not save it.
+   * `patch` takes a partial delta; a not-ok result means the host did not save it, and
+   * an ok result carries the host's validated, merged preferences as `data`, which the
+   * editor adopts in place of its optimistic copy.
    */
-  prefs?: { load(): Promise<InspectionPrefs>; patch(delta: Partial<InspectionPrefs>): Promise<CommandResult> };
+  prefs?: {
+    load(): Promise<InspectionPrefs>;
+    patch(delta: Partial<InspectionPrefs>): Promise<CommandResult<InspectionPrefs>>;
+  };
   commentsLibrary?: { list(): Promise<unknown>; save(entry: unknown): Promise<CommandResult>; remove(id: string): Promise<CommandResult> };
   costItems?: { list(inspectionId: string): Promise<unknown>; save(payload: unknown): Promise<CommandResult> };
   repairItems?: { list(inspectionId: string): Promise<unknown> };

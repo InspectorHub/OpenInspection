@@ -1,12 +1,11 @@
 import { useCallback } from "react";
-import type { ResultMap } from "./useInspection";
+import type { ResultMap } from "../data-source-types";
 import {
   findingKey,
   type FindingsOptions,
   type AttachedRepairItem,
 } from "./findings/shared";
-import { buildCollabFindingsApi, type CollabFindingsApi } from "@core/field-ui/collab/collab-findings-api";
-import type { useFetcher } from "react-router";
+import { buildCollabFindingsApi, type CollabFindingsApi } from "../collab/collab-findings-api";
 
 // Re-exported so existing imports (`~/hooks/useFindings`) keep resolving. The
 // type/helper definitions live in ./findings/shared; consumers and tests see
@@ -30,7 +29,6 @@ export {
 export function useFindings(
   results: ResultMap,
   setResults: (fn: (prev: ResultMap) => ResultMap) => void,
-  _fetcher: ReturnType<typeof useFetcher>,
   options: FindingsOptions,
 ) {
   const { sectionIdForItem, setDirty, setSaveStatus } = options;

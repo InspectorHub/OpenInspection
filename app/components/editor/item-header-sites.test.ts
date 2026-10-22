@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { ItemEditor } from "~/components/editor/ItemEditor";
-import { ItemList } from "~/components/editor-shared/ItemList";
+import { ItemList } from "@core/field-ui/components/editor-shared/ItemList";
 
 describe("item header sites (behavior-preserving)", () => {
   it("ItemEditor still shows the section eyebrow + item label", () => {

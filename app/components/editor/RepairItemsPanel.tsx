@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@core/shared-ui";
-import type { AttachedRepairItem } from "~/hooks/useFindings";
+import type { AttachedRepairItem } from "@core/field-ui/hooks/useFindings";
 import { m } from "~/paraglide/messages";
 
 interface RepairItemOption {

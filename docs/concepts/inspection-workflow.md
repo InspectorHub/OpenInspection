@@ -152,5 +152,5 @@ Public booking: the page is a React Router route at `/book/:tenant`, and its dat
 | `server/services/inspection.service.ts` | Core business logic |
 | `server/lib/validations/template.schema.ts` | Template v2 schema validation |
 | `app/routes/inspection-edit.tsx` | 3-pane inspection editor (single fill surface) |
-| `app/hooks/useInspection.ts` | Inspection state management |
+| `packages/field-ui/src/hooks/useInspection.ts` | Inspection state management |
 | `app/hooks/useCannedComments.ts` | Comment picker logic |

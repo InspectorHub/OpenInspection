@@ -35,8 +35,8 @@ export interface WebFieldHostProps {
 }
 
 /**
- * Mounts `FieldDataSourceProvider` for a web editor route. Nothing reads it yet, so mounting it
- * changes no behaviour.
+ * Mounts `FieldDataSourceProvider` for a web editor route. The converted hooks in the package
+ * (presence, scope loading, preferences) read it; unconverted components do not.
  *
  * The data source is built ONCE per mount. Everything that changes between renders (loader data,
  * the router's navigate and revalidator, the session context, PDF export state) is read through

@@ -4,22 +4,22 @@ import { INSPECTION_STATUS } from "~/lib/status";
 import { ORIGINAL_QUALITY_KEY } from "@core/field-ui/shared/original-quality";
 import { findRatingLevel, ratingAdvanceDecision } from "@core/field-ui/shared/rating-levels";
 import { makeCustomDefect } from "@core/field-ui/shared/custom-defects";
-import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/hooks/useInspection";
-import { findingKey } from "~/hooks/findings/shared";
+import { useInspectionState, type InspectionSchema, type ItemFilter } from "@core/field-ui/hooks/useInspection";
+import { findingKey } from "@core/field-ui/hooks/findings/shared";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useEnsureHuman } from "~/components/OutboundVerification";
 import { EditorHumanCheck } from "~/components/editor/EditorHumanCheck";
 import { InspectionFieldHost } from "~/components/field/WebFieldHost";
-import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
+import { useFindings, type AttachedRepairItem } from "@core/field-ui/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
-import { useScopeLoader } from "~/hooks/useScopeLoader";
-import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
+import { useScopeLoader } from "@core/field-ui/hooks/useScopeLoader";
+import { useInspectionPrefs } from "@core/field-ui/hooks/useInspectionPrefs";
 import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "@core/field-ui/hooks/useKeyboard";
 import { useCannedComments } from "~/hooks/useCannedComments";
 import { useUnsavedChanges, unsavedChangesAtRisk } from "~/hooks/useUnsavedChanges";
-import { usePresence } from "~/hooks/usePresence";
+import { usePresence } from "@core/field-ui/hooks/usePresence";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { useResultsDoc } from "@core/field-ui/collab/use-results-doc";
 import { useMediaDrain } from "~/hooks/useMediaDrain";
@@ -29,10 +29,10 @@ import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
 import { webMediaStore } from "~/lib/field/web-media-store";
 import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
 import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
-import { SectionRail } from "~/components/editor-shared/SectionRail";
+import { SectionRail } from "@core/field-ui/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { FullscreenToggle } from "@core/field-ui/components/editor/FullscreenToggle";
-import { ItemList } from "~/components/editor-shared/ItemList";
+import { ItemList } from "@core/field-ui/components/editor-shared/ItemList";
 import { useStatutoryGroups, useStatutoryFormProgress, useStructuralEditingAllowed } from "@core/field-ui/hooks/useStatutoryGroups";
 import { useCompletedRevalidation } from "@core/field-ui/hooks/useCompletedRevalidation";
 import { AddGroupInstanceHost } from "@core/field-ui/components/statutory/AddGroupInstanceHost";
@@ -43,7 +43,7 @@ import { TagChipRow, type TagPin } from "@core/field-ui/components/editor/TagChi
 import type { DefectFieldsValue } from "@core/field-ui/components/editor/DefectFieldsRow";
 import { SideRail } from "~/components/editor/SideRail";
 import { SpeedMode } from "@core/field-ui/components/editor/SpeedMode";
-import { FooterBar } from "~/components/editor/FooterBar";
+import { FooterBar } from "@core/field-ui/components/editor/FooterBar";
 import { BatchActionBar } from "@core/field-ui/components/editor/BatchActionBar";
 import { capturePriorRatings } from "~/lib/editor/batch-undo";
 import { reorderItemBySwap } from "~/lib/editor/reorder-by-swap";
@@ -83,7 +83,7 @@ import { MobileBottomDrawer } from "@core/field-ui/components/MobileBottomDrawer
 import { BreadcrumbDropdown, type UnitScopeRow } from "@core/field-ui/components/editor/BreadcrumbDropdown";
 import { UnitsManager } from "~/components/editor/UnitsManager";
 import { CostItemsHost } from "~/components/editor/CostItemsHost";
-import type { ResultMap } from "~/hooks/useInspection";
+import type { ResultMap } from "@core/field-ui/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "@core/field-ui/shared/types";
 import { Button, IconButton, SegmentedControl, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
@@ -163,18 +163,12 @@ export default function InspectionEditRoute() {
 function InspectionEditPage() {
  const loaderData = useLoaderData<typeof loader>();
  const displayLocale = useDisplayLocale();
- const fetcher = useFetcher();
- // B-17: notes commit on blur and rating click fire in the same gesture;
- // sharing one fetcher made the rating submit CANCEL the in-flight notes
- // submit (React Router aborts the previous submission on re-submit) — the
- // note was silently lost. Notes get their own fetcher instance.
- const notesFetcher = useFetcher();
  // FE-2: photo uploads also get a dedicated fetcher — sharing the mutation
  // fetcher would let an autosave abort an in-flight upload (and vice versa).
  const uploadFetcher = useFetcher();
  // Publish gets its own fetcher so a publish precondition failure (e.g. "not
  // completed") is NOT swallowed by the generic autosave "Save failed" toast
- // (which only watches fetcher/notesFetcher/uploadFetcher). The real server
+ // (which only watches uploadFetcher). The real server
  // message is surfaced inline in the publish modal instead.
  // #106 — publishing is the tier-1 surface: it mints a report version, signs
  // it and notifies the client, and a double click would do all three twice.
@@ -236,13 +230,11 @@ function InspectionEditPage() {
   propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify(facts) }, { method: "POST" });
  }, [propertyFactsFetcher]);
  // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
- // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
- // results-slice fetcher (scope switch → merge missing findings).
+ // (create/rename/delete/duplicate/bulk/mode-switch).
  // #106 - the units panel is presentational and takes the guard as a prop;
  // this route owns the fetcher because it also watches it to revalidate.
  const { fetcher: unitsFetcher, submit: submitUnits, busy: unitsBusy } =
   useGuardedSubmit<{ ok: boolean; intent?: string }>();
- const scopeFetcher = useFetcher<{ ok: boolean; intent?: string; scope?: string; results?: ResultMap }>();
  const navigate = useNavigate();
  // Task 16 — split the single photo input into a camera capture input
  // (single file, capture=environment — "Take photo") and a library input
@@ -338,12 +330,11 @@ function InspectionEditPage() {
  /* Findings (CRUD) */
  /* ---------------------------------------------------------------- */
 
- const findings = useFindings(state.results, state.setResults, fetcher, {
+ const findings = useFindings(state.results, state.setResults, {
  sectionIdForItem: state.sectionIdForItem,
  setDirty: state.setDirty,
  setSaveStatus: state.setSaveStatus,
  inspectionId: String(state.inspection.id),
- notesFetcher,
     // #181 — every write routes through the Y.Doc. The doc is briefly null on
     // the SSR / first-paint window before the connection initialises.
     collab: collab?.doc ? { doc: collab.doc } : undefined,
@@ -570,21 +561,15 @@ function InspectionEditPage() {
  const collabSynced = Boolean(collab?.synced);
 
  // Scope switch is fetch-if-missing, tracked in useScopeLoader (which owns the
- // merged/in-flight bookkeeping + the shared-fetcher abort race). This wrapper
+ // merged/in-flight bookkeeping + the overlapping-load race). This wrapper
  // just also sets the active-unit UI state.
- const submitScope = useCallback(
-  // busy-controls-allow: load-scope is a read relay (GET of one scope's results, no write), so a repeat only refetches the same slice
-  (scope: string) => scopeFetcher.submit({ intent: "load-scope", scope }, { method: "POST" }),
-  [scopeFetcher],
- );
  const mergeScopeSlice = useCallback(
   (slice: ResultMap) => state.setResults((prev) => ({ ...prev, ...slice })),
   [state.setResults],
  );
  const loadScope = useScopeLoader({
+  inspectionId: String(state.inspection.id),
   collabSynced,
-  fetcherData: scopeFetcher.data,
-  submit: submitScope,
   onSlice: mergeScopeSlice,
  });
  const requestScope = useCallback(
@@ -635,7 +620,6 @@ function InspectionEditPage() {
 
  const presence = usePresence({
   inspectionId: String(state.inspection.id),
-  userId: "current-user", // will be replaced with real user ID later
   userName: "Inspector",
   enabled: true,
  });
@@ -907,10 +891,8 @@ function InspectionEditPage() {
  // FE-2: uploadFetcher participates too — otherwise a photo upload leaves
  // dirty=true forever and the beforeunload blocker traps the inspector.
  const submitting =
- fetcher.state !== "idle" || notesFetcher.state !== "idle" || uploadFetcher.state !== "idle";
+ uploadFetcher.state !== "idle";
  const failed =
- (fetcher.data as { ok?: boolean } | undefined)?.ok === false ||
- (notesFetcher.data as { ok?: boolean } | undefined)?.ok === false ||
  (uploadFetcher.data as { ok?: boolean } | undefined)?.ok === false;
  if (submitting) {
  state.setSaveStatus("saving");
@@ -929,7 +911,7 @@ function InspectionEditPage() {
  return () => clearTimeout(timer);
  }
  }
- }, [fetcher.state, notesFetcher.state, uploadFetcher.state]);
+ }, [uploadFetcher.state]);
 
  /* ---------------------------------------------------------------- */
  /* Publish result — surface the real server reason (e.g. "not       */

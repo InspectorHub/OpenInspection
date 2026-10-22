@@ -1,5 +1,3 @@
-import type { useFetcher } from "react-router";
-
 const DEFAULT_UNIT = "_default";
 
 /** Build a composite key: `unitId:sectionId:itemId` */
@@ -11,7 +9,7 @@ export function findingKey(
   return `${unitId || DEFAULT_UNIT}:${sectionId}:${itemId}`;
 }
 
-export type { AttachedRepairItem } from '@core/field-ui/shared/findings-shared';
+export type { AttachedRepairItem } from '../../shared/findings-shared';
 
 /* ------------------------------------------------------------------ */
 /*  Options                                                            */
@@ -22,13 +20,6 @@ export interface FindingsOptions {
   setDirty: (v: boolean) => void;
   setSaveStatus: (s: "idle" | "saving" | "saved" | "error") => void;
   inspectionId: string;
-  /**
-   * Notes commit (textarea blur) and the next mutation (rating click) fire in
-   * the same gesture. On a shared fetcher, React Router aborts the in-flight
-   * notes submission when the rating submits — the note is lost. Callers pass a
-   * dedicated fetcher for notes commits.
-   */
-  notesFetcher?: ReturnType<typeof useFetcher>;
   /** #181 — the editor routes every write through the Yjs doc (collab). */
   collab?: { doc: import("yjs").Doc };
   /**

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
-import { SectionRail } from '~/components/editor-shared/SectionRail';
+import { SectionRail } from './SectionRail';
 
 const sections = [
   { id: 's1', title: 'Roof', items: [{ id: 'i1' }, { id: 'i2' }] },

@@ -158,7 +158,7 @@ const DEFAULT_PREFS: InspectionPrefs = {
 /** The `prefs` resource, in memory. Pass it as `resources.prefs`. */
 export interface FakePrefs {
   load(): Promise<InspectionPrefs>;
-  patch(delta: Partial<InspectionPrefs>): Promise<CommandResult>;
+  patch(delta: Partial<InspectionPrefs>): Promise<CommandResult<InspectionPrefs>>;
   /** Every delta passed to a successful `patch`, in call order. */
   readonly patches: readonly Partial<InspectionPrefs>[];
   /** Make every later `patch` answer `{ ok: false, error }` and store nothing. */
@@ -181,7 +181,7 @@ export function createFakePrefs(initial: Partial<InspectionPrefs> = {}): FakePre
       if (failure !== null) return { ok: false, error: failure };
       patches.push(delta);
       current = { ...current, ...delta };
-      return { ok: true };
+      return { ok: true, data: { ...current, pinnedTagIds: [...current.pinnedTagIds] } };
     },
   };
 }

@@ -11,7 +11,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi } from 'vitest';
 import { usePhotoOps } from '~/hooks/usePhotoOps';
-import { findingKey } from '~/hooks/findings/shared';
+import { findingKey } from '@core/field-ui/hooks/findings/shared';
 
 function makeCtx(activeUnitId: string | null) {
   let results: Record<string, Record<string, unknown>> = {};

@@ -1,15 +1,15 @@
 import { useState, useRef, type KeyboardEvent } from "react";
 import { Button, IconButton, MenuItem, Popover } from "@core/shared-ui";
-import type { EditorMode } from "@core/field-ui/components/editor-shared/editor-mode";
-import { useSortableReorder } from "@core/field-ui/components/editor-shared/useSortableReorder";
-import { InlineRename } from "@core/field-ui/components/editor-shared/InlineRename";
-import { findingKey } from "~/hooks/findings/shared";
-import type { EditorGroup } from "@core/field-ui/shared/statutory-groups";
-import { m } from "~/paraglide/messages";
-import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "@core/field-ui/shared/template-hierarchy";
-import { useItemRowMenu } from "@core/field-ui/hooks/useItemRowMenu";
-import { ItemRowIndent } from "@core/field-ui/components/editor-shared/ItemRowIndent";
-import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "@core/field-ui/components/editor-shared/ItemSubtreeDeleteModal";
+import type { EditorMode } from "./editor-mode";
+import { useSortableReorder } from "./useSortableReorder";
+import { InlineRename } from "./InlineRename";
+import { findingKey } from "../../hooks/findings/shared";
+import type { EditorGroup } from "../../shared/statutory-groups";
+import { m } from "../../i18n";
+import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "../../shared/template-hierarchy";
+import { useItemRowMenu } from "../../hooks/useItemRowMenu";
+import { ItemRowIndent } from "./ItemRowIndent";
+import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtreeDeleteModal";
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
 // label, or rating dot. Desktop reveals on hover; touch always shows them.

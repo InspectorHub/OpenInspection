@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
-import type { Severity } from "~/lib/severity";
+import type { Severity } from "@core/field-ui/lib/severity";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */

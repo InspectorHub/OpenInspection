@@ -3,7 +3,7 @@ import { CannedCommentRow } from "@core/field-ui/components/editor-shared/Canned
 import { DefectFieldsRow, type DefectFieldsValue } from "@core/field-ui/components/editor/DefectFieldsRow";
 import { RepairItemsPanel } from "./RepairItemsPanel";
 import { CustomDefectForm } from "@core/field-ui/components/editor/CustomDefectForm";
-import type { AttachedRepairItem } from "../../hooks/useFindings";
+import type { AttachedRepairItem } from "@core/field-ui/hooks/useFindings";
 import { renderTemplate } from "@core/field-ui/shared/mustache";
 import {
   DEFECT_TRADE_LABELS,

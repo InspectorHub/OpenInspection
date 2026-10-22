@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useFieldDataSource } from "../context";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -27,17 +28,18 @@ const MAX_BACKOFF = 30_000;
 
 /**
  * React-side presence client. Connects to the WebSocket presence channel
- * for multi-inspector collaboration. Reconnects with exponential backoff,
+ * for multi-inspector collaboration. The socket URL and the user id come from the
+ * host's data source (`urls.presenceSocket`, `session().userId`). Reconnects with exponential backoff,
  * sends heartbeat every 30s, exposes a reactive roster.
  */
 export function usePresence(options: {
   inspectionId: string;
-  userId: string;
   userName: string;
   photoUrl?: string | null;
   enabled?: boolean;
 }) {
-  const { inspectionId, userId, userName, photoUrl, enabled = true } = options;
+  const { inspectionId, userName, photoUrl, enabled = true } = options;
+  const dataSource = useFieldDataSource();
   const [roster, setRoster] = useState<PresenceUser[]>([]);
   const [connected, setConnected] = useState(false);
   // FE-5: a fresh page used to flash "Disconnected" until the first WS open —
@@ -59,8 +61,8 @@ export function usePresence(options: {
     if (closedRef.current || !enabled) return;
     if (!inspectionId) return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/inspections/${inspectionId}/presence/ws`;
+    const wsUrl = dataSource.urls.presenceSocket(inspectionId);
+    const { userId } = dataSource.session();
 
     try {
       const ws = new WebSocket(wsUrl);
@@ -125,7 +127,7 @@ export function usePresence(options: {
         );
       }
     }
-  }, [inspectionId, userId, userName, photoUrl, enabled, send]);
+  }, [dataSource, inspectionId, userName, photoUrl, enabled, send]);
 
   const setFocus = useCallback(
     (itemId: string | null) => {

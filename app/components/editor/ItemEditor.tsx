@@ -19,7 +19,7 @@ import {
  type LibraryMatch,
 } from "./CannedCommentTabs";
 import { ItemPhotoStrip, type StripPhoto } from "@core/field-ui/components/media-studio/ItemPhotoStrip";
-import type { AttachedRepairItem } from "../../hooks/useFindings";
+import type { AttachedRepairItem } from "@core/field-ui/hooks/useFindings";
 import type { ItemAttribute } from "@core/field-ui/shared/types";
 import { shouldTriggerSlash } from "@core/field-ui/shared/slash-trigger";
 import { findRatingLevel, type EditorRatingLevel } from "@core/field-ui/shared/rating-levels";

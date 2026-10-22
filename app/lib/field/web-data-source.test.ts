@@ -34,6 +34,12 @@ describe("createWebFieldDataSource", () => {
         await expect(make({ transport }).load("insp-1", "u1")).rejects.toThrow("nope");
     });
 
+    it("serves the editor preferences resource", () => {
+        const ds = make();
+        expect(typeof ds.resources.prefs?.load).toBe("function");
+        expect(typeof ds.resources.prefs?.patch).toBe("function");
+    });
+
     it("execute goes through the transport when an inspection is present", async () => {
         const transport = vi.fn(async () => ({ ok: true })) as unknown as WebExecute;
         await make({ transport }).execute("insp-1", { type: "complete" } as never, { idempotencyKey: "k" });

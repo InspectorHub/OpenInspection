@@ -8,8 +8,8 @@ import { PageHeader, Card, Button, EmptyState, pendingProps, PENDING_CLASS } fro
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { RatingSystemEditor, type EditorSystem } from "~/components/RatingSystemEditor";
-import type { Severity } from "~/lib/severity";
-import { SEVERITY_LABEL } from "~/lib/severity";
+import type { Severity } from "@core/field-ui/lib/severity";
+import { SEVERITY_LABEL } from "@core/field-ui/lib/severity";
 import { m } from "~/paraglide/messages";
 import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 

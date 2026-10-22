@@ -8,8 +8,8 @@ import type {
   ActiveView,
   ItemFilter,
 } from "../useInspection";
-import type { Severity } from "~/lib/severity";
-import { m } from "~/paraglide/messages";
+import type { Severity } from "../../lib/severity";
+import { m } from "../../i18n";
 
 /**
  * Pure helpers + shared context type for the composed `useInspectionState`

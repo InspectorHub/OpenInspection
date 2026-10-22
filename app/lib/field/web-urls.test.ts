@@ -44,6 +44,20 @@ describe("presenceSocket", () => {
             "ws://localhost:8787/api/inspections/i1/presence/ws",
         );
     });
+    it("equals what usePresence built from window.location before it read the data source", () => {
+        // The formula the hook used (verbatim from the old call site), evaluated for each scheme.
+        const old = (loc: { protocol: string; host: string }, id: string) => {
+            const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
+            return `${protocol}//${loc.host}/api/inspections/${id}/presence/ws`;
+        };
+        for (const loc of [
+            { protocol: "https:", host: "app.inspectorhub.io" },
+            { protocol: "http:", host: "localhost:8787" },
+            { protocol: "http:", host: "192.168.1.20:8787" },
+        ]) {
+            expect(createWebUrls(loc).presenceSocket("insp-9")).toBe(old(loc, "insp-9"));
+        }
+    });
     it("throws a clear error on the server when no location was injected", () => {
         expect(typeof window).toBe("undefined");
         expect(() => createWebUrls().presenceSocket("i1")).toThrow(/browser location/);
@@ -62,8 +76,8 @@ describe("call sites still build the same fragments", () => {
         ],
         ["app/components/media-studio/VideoPlayer.tsx", ["/api/inspections/${inspectionId}/media/video/r2-object/${mediaId}"]],
         [
-            "app/hooks/usePresence.ts",
-            ['window.location.protocol === "https:" ? "wss:" : "ws:"', "//${window.location.host}/api/inspections/${inspectionId}/presence/ws"],
+            "packages/field-ui/src/hooks/usePresence.ts",
+            ["dataSource.urls.presenceSocket(inspectionId)"],
         ],
         ["app/routes/inspection-edit.tsx", ["/api/inspections/${loaderData.inspection.id}/statutory-form/preview.pdf"]],
         ["app/components/editor/PublishModal.tsx", ["/inspections/:id/edit"]],

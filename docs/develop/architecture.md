@@ -352,7 +352,7 @@ The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on 
 
 - **React Router v8 SSR**: Routes in `app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
 - **React components**: `app/components/`, organized by domain (inspection, template, booking, media-studio, portal, …). Counts are not written here because they go stale between releases; `ls app/components` is the answer.
-- **Hooks**: `app/hooks/` holds the state hooks the editor is built from — `useInspection`, `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`, and the `findings/` and `inspection/` sub-hook directories.
+- **Hooks**: `app/hooks/` holds the state hooks the editor is built from — `useInspection`, `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`, and the `findings/` and `inspection/` sub-hook directories. `useInspection`, `useFindings`, `useKeyboard`, `usePresence`, `useScopeLoader`, `useInspectionPrefs` and the `findings/` and `inspection/` sub-hooks now live in `packages/field-ui/src/hooks/`.
 - **Design tokens**: Tailwind v4 with Design System 0523 tokens in `app/styles/tailwind.css`.
 - **Shared UI**: `packages/shared-ui/` provides the design-system components (Button, Pill, Card, …) consumed by the frontend; its `src/index.ts` is the list.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
@@ -498,7 +498,7 @@ A finding carries two independent classifications, and collapsing them into one
 is the recurring mistake.
 
 **`severity` is how bad it is.** One vocabulary, four words —
-`good | marginal | significant | minor` — declared in `app/lib/severity.ts` and
+`good | marginal | significant | minor` — declared in `packages/field-ui/src/lib/severity.ts` and
 in `server/lib/validations/rating-system.schema.ts`. A rating level carries it;
 a canned comment carries it (`comments.severity`); the editor's library filter
 matches the two **structurally**, by reading the active level's own `severity`

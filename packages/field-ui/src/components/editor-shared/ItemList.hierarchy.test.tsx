@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { render, screen } from '@testing-library/react';
 import { vi } from 'vitest';
-import { ItemList } from '~/components/editor-shared/ItemList';
+import { ItemList } from './ItemList';
 
 const nested = [
   { id: 'a',   label: 'Sealed Roof Deck', type: 'boolean', parentId: null },
