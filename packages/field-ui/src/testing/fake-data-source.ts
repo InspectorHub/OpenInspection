@@ -4,6 +4,7 @@ import type {
   CommandDataMap,
   CommandResult,
   EditorData,
+  ExecuteOptions,
   FieldCommand,
   FieldDataSource,
   FieldResources,
@@ -12,6 +13,9 @@ import type {
   SessionInfo,
 } from '../data-source';
 import type { InspectionPrefs, PcaNarrative } from '../data-source-types';
+
+export { createFakeTemplateSearch, createFakeVersionHistory, createFakeVideo } from './fake-resources';
+export type { FakeTemplateSearch, FakeVersionHistory, FakeVideo } from './fake-resources';
 
 export interface FakeSeed {
   data: EditorData;
@@ -27,6 +31,8 @@ export interface FakeSeed {
 export interface ExecutedCommand {
   inspectionId: string;
   cmd: FieldCommand;
+  /** Present only when the caller passed `ExecuteOptions.idempotencyKey`. */
+  idempotencyKey?: string;
 }
 
 /** A `FieldDataSource` backed by memory, with hooks for tests to inspect and perturb it. */
@@ -37,6 +43,8 @@ export interface FakeDataSource extends FieldDataSource {
   readonly purged: readonly string[];
   readonly reloadCount: number;
   readonly exitCount: number;
+  /** Every `notify` call, in call order. */
+  readonly notifications: readonly { message: string; variant: 'info' | 'success' | 'error' | undefined }[];
   /**
    * Make every later command of this type answer `{ ok: false, error }`. A response
    * registered with `respondWith` for the same command still rides along as `data`,
@@ -57,6 +65,12 @@ const DEFAULT_SESSION: SessionInfo = {
   streamCustomerSubdomain: null,
   collabEditing: false,
   userId: 'fake-user',
+  locale: 'en-US',
+  timeZone: null,
+  dateFormat: 'us',
+  timeFormat: '12h',
+  tenantDateFormat: 'us',
+  tenantTimeFormat: '12h',
   // The package never interprets a role (`SessionInfo.role` is the host's string), so the
   // fake uses a neutral value instead of one of the engine's role names.
   role: 'fake-role',
@@ -78,6 +92,8 @@ const DEFAULT_URLS: FieldUrls = {
   reportPdf: () => null,
   statutoryPreviewPdf: () => null,
   videoObject: () => null,
+  presenceSocket: (inspectionId) => `ws://fake.invalid/api/inspections/${inspectionId}/presence/ws`,
+  editorPath: (inspectionId) => `/inspections/${inspectionId}/edit`,
 };
 
 const EMPTY_PCA_NARRATIVE: PcaNarrative = {
@@ -173,6 +189,7 @@ export function createFakePrefs(initial: Partial<InspectionPrefs> = {}): FakePre
 export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
   const commands: ExecutedCommand[] = [];
   const purged: string[] = [];
+  const notifications: { message: string; variant: 'info' | 'success' | 'error' | undefined }[] = [];
   const failures = new Map<FieldCommand['type'], string>();
   const responses = new Map<string, unknown>();
   const records = new Map<string, PendingMediaRecord>();
@@ -188,6 +205,9 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
     },
     get purged() {
       return purged;
+    },
+    get notifications() {
+      return notifications;
     },
     get reloadCount() {
       return reloadCount;
@@ -219,10 +239,24 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
         collabEditing: pick(o.collabEditing, DEFAULT_SESSION.collabEditing),
         userId: pick(o.userId, DEFAULT_SESSION.userId),
         role: pick(o.role, DEFAULT_SESSION.role),
+        locale: pick(o.locale, DEFAULT_SESSION.locale),
+        timeZone: pick(o.timeZone, DEFAULT_SESSION.timeZone),
+        dateFormat: pick(o.dateFormat, DEFAULT_SESSION.dateFormat),
+        timeFormat: pick(o.timeFormat, DEFAULT_SESSION.timeFormat),
+        tenantDateFormat: pick(o.tenantDateFormat, DEFAULT_SESSION.tenantDateFormat),
+        tenantTimeFormat: pick(o.tenantTimeFormat, DEFAULT_SESSION.tenantTimeFormat),
       };
     },
-    execute: async <C extends FieldCommand>(inspectionId: string, cmd: C): Promise<CommandResult<CommandData<C>>> => {
-      commands.push({ inspectionId, cmd });
+    execute: async <C extends FieldCommand>(
+      inspectionId: string,
+      cmd: C,
+      opts?: ExecuteOptions,
+    ): Promise<CommandResult<CommandData<C>>> => {
+      commands.push(
+        opts?.idempotencyKey === undefined
+          ? { inspectionId, cmd }
+          : { inspectionId, cmd, idempotencyKey: opts.idempotencyKey },
+      );
       const error = failures.get(cmd.type);
       const data = responses.get(commandKey(cmd));
       const result: CommandResult<unknown> = error === undefined ? { ok: true } : { ok: false, error };
@@ -230,6 +264,9 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
       // The one place the fake meets the per-command typing: `respondWith` already
       // constrained `data` to this command's `CommandDataMap` entry.
       return result as CommandResult<CommandData<C>>;
+    },
+    notify: (message, variant) => {
+      notifications.push({ message, variant });
     },
     reload: () => {
       reloadCount += 1;

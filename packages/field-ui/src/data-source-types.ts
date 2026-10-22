@@ -260,3 +260,21 @@ export interface CostItemView {
   bucket: 'immediate' | 'short_term' | 'long_term';
   sectionRef: string | null; photoRef: string | null; sortOrder: number;
 }
+
+/** One template row of the template picker. Mirrors the rows `/resources/template-search` returns. */
+export interface TemplateSummary {
+  id: string;
+  name: string;
+}
+
+/**
+ * One page of the template picker's search. Mirrors the loader of
+ * `app/routes/resources/template-search.tsx`. The host pages by page number
+ * (25 rows per page), not by offset, so the contract does too.
+ */
+export interface TemplateSearchResult {
+  templates: TemplateSummary[];
+  hasMore: boolean;
+  page: number;
+  totalPages: number;
+}

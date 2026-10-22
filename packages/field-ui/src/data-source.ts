@@ -1,4 +1,6 @@
 import type * as Y from 'yjs';
+import type { ReactNode } from 'react';
+import type { DateFormat, TimeFormat } from './shared/display-prefs';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
 import type { PendingMediaStore, MediaUploader } from './media-types';
 import type {
@@ -17,6 +19,7 @@ import type {
   StatutoryDetails,
   TagLibraryEntry,
   TemplateSchema,
+  TemplateSearchResult,
   TemplateSnapshot,
   UnitProgress,
   RelianceText,
@@ -82,6 +85,45 @@ export interface SessionInfo {
   /** Replaces the editor's hard-coded presence user id. */
   userId: string;
   role: string;
+  /**
+   * The VIEWER's display language: user override, else the tenant default, else
+   * 'en-US' (`useDisplayLocale`). Language follows the viewer on every surface.
+   */
+  locale: string;
+  /**
+   * The VIEWER's display time zone (IANA id): user override, else the tenant's.
+   * Null when the host has none to give; the package then falls back to 'UTC',
+   * which is where `useDisplayTimeZone` ends (the tenant column is NOT NULL
+   * DEFAULT 'UTC', so the web host never answers null).
+   */
+  timeZone: string | null;
+  /**
+   * The VIEWER's date order, resolved per field (user, else tenant, else 'us'),
+   * for workspace chrome (`useChromeDateTimeFormat`). Never use it for a date a
+   * second party also reads.
+   */
+  dateFormat: DateFormat;
+  /** The VIEWER's clock, resolved like `dateFormat`. */
+  timeFormat: TimeFormat;
+  /**
+   * The TENANT's date order, ignoring any personal override: the shape for
+   * inspection, report and appointment dates (`useInspectionDateTimeFormat` /
+   * `useTenantFormatPrefs`). Resolved with the same fallback as `dateFormat`.
+   */
+  tenantDateFormat: DateFormat;
+  /** The TENANT's clock; see `tenantDateFormat`. */
+  tenantTimeFormat: TimeFormat;
+}
+
+/**
+ * Per-call options of `execute`. The key is the write's idempotency key: the
+ * host adapter forwards it as the `Idempotency-Key` (the web host writes it into
+ * the `idempotencyKey` form field the route action relays). `useFieldCommand`
+ * owns its lifetime; calling `execute` directly without one is allowed and simply
+ * is not idempotent.
+ */
+export interface ExecuteOptions {
+  idempotencyKey?: string;
 }
 
 export type {
@@ -125,6 +167,13 @@ export interface FieldUrls {
   reportPdf(inspectionId: string): string | null;
   statutoryPreviewPdf(inspectionId: string): string | null;
   videoObject(inspectionId: string, ref: string): string | null;
+  /**
+   * The collaborative-presence WebSocket URL (absolute `ws:`/`wss:`). Today
+   * `usePresence` builds it from `window.location`.
+   */
+  presenceSocket(inspectionId: string): string;
+  /** The in-app path of this inspection's editor (the publish dialog reads `window.location.pathname`). */
+  editorPath(inspectionId: string): string;
 }
 
 /**
@@ -148,16 +197,47 @@ export interface FieldResources {
   settingsSheet?: { load(inspectionId: string): Promise<unknown> };
   aiAssist?: { run(input: { intent: 'assist' | 'review'; payload: unknown }): Promise<CommandResult> };
   publishReadiness?: { check(inspectionId: string): Promise<unknown> };
+  /** The template picker's search. Typed from the existing route loader (see `TemplateSearchResult`). */
+  templateSearch?: { search(input: { q: string; page: number }): Promise<TemplateSearchResult> };
   versionHistory?: {
+    // Payloads stay `unknown` until the batch that converts VersionHistoryPanel types them.
     list(inspectionId: string): Promise<unknown>;
     get(inspectionId: string, seq: number): Promise<unknown>;
     restore(inspectionId: string, seq: number): Promise<CommandResult>;
+    /** The "Save version now" POST. */
+    capture(inspectionId: string): Promise<CommandResult>;
   };
   video?: {
+    // `createUpload`/`finalize` payloads stay `unknown` until the batch that converts VideoCapture types them.
     createUpload(inspectionId: string): Promise<unknown>;
     uploadPoster(inspectionId: string, blob: Blob): Promise<CommandResult>;
+    /** Pick the poster frame of a Stream video; `posterPct` is 0..1. */
+    setPoster(inspectionId: string, input: { streamUid: string; posterPct: number }): Promise<CommandResult>;
     finalize(inspectionId: string, payload: unknown): Promise<CommandResult>;
     remove(inspectionId: string, ref: string): Promise<CommandResult>;
+  };
+}
+
+/**
+ * Host-supplied UI, injected through `FieldDataSourceProvider` rather than read
+ * from the data source: the package renders the entry point, the host owns the
+ * implementation.
+ */
+export interface FieldHostSlots {
+  /** The theme switch shown in the header (the web host passes `ThemeSegmentControl`). Absent hides it. */
+  renderThemeControl?: (props: { className?: string }) => ReactNode;
+  /**
+   * PDF export, kept in the host (it needs the host's download machinery).
+   * `run` starts the export for the inspection; the rest is what the header
+   * reads off `usePdfExport`. Absent hides the PDF entry points.
+   */
+  pdf?: {
+    run(inspectionId: string): void;
+    busy: boolean;
+    /** The last failure's sentence, or null. */
+    error: string | null;
+    /** Button text: the host's `pdfActionLabel`, which swaps in "Generating" / "Retry in N s". */
+    actionLabel(defaultLabel: string): string;
   };
 }
 
@@ -165,7 +245,9 @@ export interface FieldDataSource {
   load(inspectionId: string, scope?: string): Promise<EditorData>;
   session(): SessionInfo;
   /** The answer's `data` is typed from the command (see `CommandDataMap`). */
-  execute<C extends FieldCommand>(inspectionId: string, cmd: C): Promise<CommandResult<CommandData<C>>>;
+  execute<C extends FieldCommand>(inspectionId: string, cmd: C, opts?: ExecuteOptions): Promise<CommandResult<CommandData<C>>>;
+  /** Show a transient message (replaces the host's toast inside the package). */
+  notify(message: string, variant?: 'info' | 'success' | 'error'): void;
   reload(): void;
   exit(): void;
   isOnline(): boolean;

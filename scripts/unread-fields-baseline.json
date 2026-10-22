@@ -274,5 +274,25 @@
   "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.exitCount": {
     "kind": "record",
     "reason": "How many times the editor asked the host to leave on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/data-source.ts#FieldResources.templateSearch": {
+    "kind": "deferred",
+    "reason": "Optional contract member. Its consumer (the template picker) is still in app/ and moves into the package in a later Plan B Task 5 batch; until then nothing in app/ or server/ reads it through this type. Owed: wire it there, and the entry goes."
+  },
+  "packages/field-ui/src/data-source.ts#FieldHostSlots.renderThemeControl": {
+    "kind": "deferred",
+    "reason": "Optional contract member. Its consumer (EditorHeader, which still renders the theme control itself) is still in app/ and moves into the package in a later Plan B Task 5 batch; until then nothing in app/ or server/ reads it through this type. Owed: wire it there, and the entry goes."
+  },
+  "packages/field-ui/src/testing/fake-resources.ts#FakeTemplateSearch.searches": {
+    "kind": "record",
+    "reason": "The ordered list of template searches the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-resources.ts#FakeVersionHistory.restores": {
+    "kind": "record",
+    "reason": "The version numbers the editor asked to restore on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-resources.ts#FakeVideo.posters": {
+    "kind": "record",
+    "reason": "The poster choices the editor sent on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
   }
 }

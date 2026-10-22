@@ -1,7 +1,14 @@
 import * as Y from 'yjs';
 import { describe, expect, it, vi } from 'vitest';
 import type { EditorData, PendingMediaRecord } from '../data-source';
-import { createEmptyEditorData, createFakeDataSource, createFakePrefs } from './fake-data-source';
+import {
+  createEmptyEditorData,
+  createFakeDataSource,
+  createFakePrefs,
+  createFakeTemplateSearch,
+  createFakeVersionHistory,
+  createFakeVideo,
+} from './fake-data-source';
 
 function editorData(overrides: Partial<EditorData> = {}): EditorData {
   return createEmptyEditorData(overrides);
@@ -300,5 +307,39 @@ describe('createFakeDataSource', () => {
       expect(some.resources.aiAssist).toBeDefined();
       expect(some.resources.costItems).toBeUndefined();
     });
+  });
+});
+
+describe('new resource fakes and session fields', () => {
+  it('records template searches, version captures and poster picks, with configurable results', async () => {
+    const search = createFakeTemplateSearch();
+    expect(await search.search({ q: 'a', page: 2 })).toEqual({ templates: [], hasMore: false, page: 1, totalPages: 1 });
+    search.setResult({ templates: [{ id: 't1', name: 'T' }], hasMore: true, page: 2, totalPages: 3 });
+    expect((await search.search({ q: '', page: 1 })).templates).toHaveLength(1);
+    expect(search.searches).toEqual([{ q: 'a', page: 2 }, { q: '', page: 1 }]);
+
+    const history = createFakeVersionHistory();
+    expect(await history.capture('i1')).toEqual({ ok: true });
+    history.failCapture('nope');
+    expect(await history.capture('i2')).toEqual({ ok: false, error: 'nope' });
+    expect(history.captures).toEqual(['i1', 'i2']);
+
+    const video = createFakeVideo();
+    expect(await video.setPoster('i1', { streamUid: 's', posterPct: 0.5 })).toEqual({ ok: true });
+    expect(video.posters).toEqual([{ inspectionId: 'i1', streamUid: 's', posterPct: 0.5 }]);
+  });
+
+  it('overrides session fields without erasing defaults, and records the idempotency key only when given', async () => {
+    const ds = createFakeDataSource({
+      data: editorData(),
+      session: { locale: 'es-MX', timeZone: 'America/Denver', tenantDateFormat: 'eu', dateFormat: undefined },
+    });
+    expect(ds.session()).toMatchObject({ locale: 'es-MX', timeZone: 'America/Denver', tenantDateFormat: 'eu', dateFormat: 'us' });
+    await ds.execute('i1', { type: 'complete' });
+    await ds.execute('i1', { type: 'complete' }, { idempotencyKey: 'k1' });
+    expect(ds.commands).toEqual([
+      { inspectionId: 'i1', cmd: { type: 'complete' } },
+      { inspectionId: 'i1', cmd: { type: 'complete' }, idempotencyKey: 'k1' },
+    ]);
   });
 });
