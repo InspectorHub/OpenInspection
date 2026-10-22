@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Button, MenuItem, Popover } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 export interface PreviewMenuProps {
   /** Open the full web report in a new tab. Null when the tenant slug is unknown. */

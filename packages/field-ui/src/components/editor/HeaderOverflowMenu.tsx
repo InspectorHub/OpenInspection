@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Button, Icon, MenuItem, Popover } from "@core/shared-ui";
-import { HEADER_OVERFLOW } from "@core/field-ui/components/editor/header-visibility";
-import { m } from "~/paraglide/messages";
+import { HEADER_OVERFLOW } from "./header-visibility";
+import { m } from "../../i18n";
 
 export interface HeaderOverflowMenuProps {
   /** Opens the manual sign modal. Mirrors the `xl` Sign button. */

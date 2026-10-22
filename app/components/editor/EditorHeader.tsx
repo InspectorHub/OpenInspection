@@ -3,12 +3,12 @@ import type { useInspectionState } from "~/hooks/useInspection";
 import { Button, IconButton, Icon } from "@core/shared-ui";
 import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
-import { ProgressStripText } from "~/components/editor/ProgressStripText";
+import { ProgressStripText } from "@core/field-ui/components/editor/ProgressStripText";
 import { TemplateMenu } from "~/components/editor/TemplateMenu";
-import { PreviewMenu } from "~/components/editor/PreviewMenu";
+import { PreviewMenu } from "@core/field-ui/components/editor/PreviewMenu";
 import { HEADER_OVERFLOW } from "@core/field-ui/components/editor/header-visibility";
 import { runWithPending } from "@core/field-ui/components/editor/publish-pending";
-import { HeaderOverflowMenu } from "~/components/editor/HeaderOverflowMenu";
+import { HeaderOverflowMenu } from "@core/field-ui/components/editor/HeaderOverflowMenu";
 import { m } from "~/paraglide/messages";
 
 type EditorState = ReturnType<typeof useInspectionState>;

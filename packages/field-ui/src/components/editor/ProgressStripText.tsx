@@ -1,4 +1,4 @@
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 export interface ProgressStripTextProps {
     rated:       number;

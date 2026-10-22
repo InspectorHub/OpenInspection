@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MenuItem, useLayer } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 interface DockTile {
   id: string;

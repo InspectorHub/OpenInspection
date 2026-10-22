@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi } from "vitest";
-import { ItemPaneEmptyState, firstItemToOpen } from "~/components/editor/ItemPaneEmptyState";
+import { ItemPaneEmptyState, firstItemToOpen } from "./ItemPaneEmptyState";
 
 const items = [
   { id: "i1", label: "Roof covering" },

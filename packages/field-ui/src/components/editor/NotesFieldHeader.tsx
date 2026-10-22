@@ -1,5 +1,5 @@
 import { Button } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 /** Past this the meter turns bad-toned; the note is not blocked, only flagged. */
 const NOTES_SOFT_LIMIT = 2000;

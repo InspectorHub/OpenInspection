@@ -1,6 +1,6 @@
 import { IconButton, useLayer } from "@core/shared-ui";
-import { useIsMobile } from "@core/field-ui/hooks/useBreakpoint";
-import { m } from "~/paraglide/messages";
+import { useIsMobile } from "../../hooks/useBreakpoint";
+import { m } from "../../i18n";
 
 interface ShortcutColumn {
   title: string;

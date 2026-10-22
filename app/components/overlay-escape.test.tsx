@@ -4,7 +4,7 @@ import { render, cleanup, fireEvent } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { hasOpenLayer, Modal } from "@core/shared-ui";
 import { AddMediaChooser } from "@core/field-ui/components/editor/AddMediaChooser";
-import { KeyboardHud } from "~/components/editor/KeyboardHud";
+import { KeyboardHud } from "@core/field-ui/components/editor/KeyboardHud";
 import { VersionCompare } from "~/components/collab/VersionCompare";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
 

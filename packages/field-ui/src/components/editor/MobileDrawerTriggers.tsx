@@ -1,4 +1,4 @@
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 /**
  * `actions` has no trigger in this nav — it opens from the app bar's own
