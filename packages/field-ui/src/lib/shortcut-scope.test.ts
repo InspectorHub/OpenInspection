@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { singleKeyShortcutsAllowed } from '~/lib/shortcut-scope';
+import { singleKeyShortcutsAllowed } from './shortcut-scope';
 
 describe('singleKeyShortcutsAllowed', () => {
     it('allows when focus is on body', () => {

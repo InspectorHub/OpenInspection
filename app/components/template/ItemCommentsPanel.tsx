@@ -4,7 +4,7 @@ import { m } from "~/paraglide/messages";
 import type { TemplateItem, TemplateSection } from "./types";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import { CommentTypeahead } from "../editor/CommentTypeahead";
-import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
+import { useCommentTypeahead } from "@core/field-ui/hooks/useCommentTypeahead";
 import {
   flattenItemTabs,
   fragmentBeforeCaret,

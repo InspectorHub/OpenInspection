@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { rangeIds } from '~/lib/editor/batch-range';
+import { rangeIds } from './batch-range';
 const ids = ['a','b','c','d'];
 describe('rangeIds', () => {
   it('inclusive forward range', () => expect(rangeIds(ids,'a','c')).toEqual(['a','b','c']));

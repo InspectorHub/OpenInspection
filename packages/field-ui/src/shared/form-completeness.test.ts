@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formCompleteness } from '~/lib/editor/form-completeness';
+import { formCompleteness } from './form-completeness';
 
 /**
  * How much of the form is answered, computed from what the editor already has.

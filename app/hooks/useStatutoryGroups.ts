@@ -5,7 +5,7 @@ import {
     formBoundItemIds,
     type EditorGroup,
 } from "@core/field-ui/shared/statutory-groups";
-import { formCompleteness, type FormCompleteness } from "~/lib/editor/form-completeness";
+import { formCompleteness, type FormCompleteness } from "@core/field-ui/shared/form-completeness";
 
 /**
  * The repeated blocks this inspection's form prints, or none.

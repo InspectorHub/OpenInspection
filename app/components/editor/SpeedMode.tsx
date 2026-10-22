@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Icon, Button, useLayer } from '@core/shared-ui';
-import { usePointerGesture } from '../../hooks/usePointerGesture';
+import { usePointerGesture } from '@core/field-ui/hooks/usePointerGesture';
 import { MobileBottomDrawer } from '../MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
 import { shouldShowSpeedModeCoach, markSpeedModeCoached } from '@core/field-ui/shared/speedmode-coach';

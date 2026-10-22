@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { removeMediaBy } from '../../../server/lib/collab/results-doc-media';
+import { removeMediaBy } from '@core/field-ui/shared/results-doc-media';
 import * as Y from 'yjs';
 import {
   seedResultsDoc,

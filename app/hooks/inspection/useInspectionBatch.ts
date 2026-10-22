@@ -26,7 +26,7 @@ export function useInspectionBatch(
   /* -------------------------------- batch --------------------------------- */
 
   // Single-item toggle. Shift-click range-select is the separate canonical
-  // path (`batchSelectRange` / `batch-range.ts`), driven by ItemList's own
+  // path (`batchSelectRange` / `packages/field-ui/src/shared/batch-range.ts`), driven by ItemList's own
   // last-clicked ref — there is intentionally no range branch here.
   const toggleBatchSelect = useCallback(
     (itemId: string) => {

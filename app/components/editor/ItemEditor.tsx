@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@core/shared-ui";
 import { CommentTypeahead } from "./CommentTypeahead";
-import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
+import { useCommentTypeahead } from "@core/field-ui/hooks/useCommentTypeahead";
 import {
   flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
 } from "@core/field-ui/shared/comment-typeahead";

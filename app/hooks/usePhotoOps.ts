@@ -19,8 +19,8 @@ import {
   markPhotoPending as bindingMarkPhotoPending,
 } from "@core/field-ui/collab/results-binding";
 import { pushToast } from "~/hooks/useToast";
-import { freeVideoMedia, videoEntryIdentity } from "~/lib/video-media-delete";
-import { removeMediaBy as bindingRemoveMediaBy } from "../../server/lib/collab/results-doc-media";
+import { freeVideoMedia, videoEntryIdentity } from "@core/field-ui/lib/video-media-delete";
+import { removeMediaBy as bindingRemoveMediaBy } from "@core/field-ui/shared/results-doc-media";
 import { m } from "~/paraglide/messages";
 import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
 import { webMediaStore } from "~/lib/field/web-media-store";

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { escapeWillBeHandled } from "@core/shared-ui";
-import { singleKeyShortcutsAllowed } from "../lib/shortcut-scope";
+import { singleKeyShortcutsAllowed } from "@core/field-ui/lib/shortcut-scope";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */

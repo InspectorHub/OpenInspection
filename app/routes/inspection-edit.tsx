@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import { INSPECTION_STATUS } from "~/lib/status";
+import { ORIGINAL_QUALITY_KEY } from "@core/field-ui/shared/original-quality";
 import { findRatingLevel, ratingAdvanceDecision } from "@core/field-ui/shared/rating-levels";
 import { makeCustomDefect } from "@core/field-ui/shared/custom-defects";
 import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/hooks/useInspection";
@@ -100,7 +101,6 @@ export function meta() {
  * so the choice survives reloads and is read at all three photo entry points
  * (item picker, burst commit, offline replay) from one source of truth.
  */
-export const ORIGINAL_QUALITY_KEY = "oi.uploads.originalQuality";
 export function originalQualityEnabled(): boolean {
  try {
  return typeof localStorage !== "undefined" && localStorage.getItem(ORIGINAL_QUALITY_KEY) === "1";

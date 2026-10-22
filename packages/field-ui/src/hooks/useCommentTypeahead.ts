@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { rankTypeaheadMatches, type TypeaheadEntry } from "@core/field-ui/shared/comment-typeahead";
+import { rankTypeaheadMatches, type TypeaheadEntry } from "../shared/comment-typeahead";
 
 export function useCommentTypeahead(
   entries: TypeaheadEntry[],

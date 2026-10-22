@@ -241,3 +241,22 @@ export interface OutboundCoolingWindow {
   unlockAtMs: number;
   turnstileSiteKey: string | null;
 }
+
+/** The Appendix narrative blocks of a commercial (PCA) report; same shape as `PcaNarrative`. */
+export type PcaNarrativeData = PcaNarrative;
+
+/**
+ * One cost line of a commercial report, client-side mirror of the server's
+ * pca-costs shape (server code is not importable here).
+ */
+export interface CostItemView {
+  id: string; system: string; component: string; location: string;
+  action: 'repair' | 'replace' | 'further_study';
+  costMethod: 'unit' | 'lump_sum';
+  quantity: number | null; uom: string | null;
+  unitCostCents: number | null; lumpSumCents: number | null;
+  eul: number | null; effAge: number | null; rul: number | null;
+  suggestedRemedy: string;
+  bucket: 'immediate' | 'short_term' | 'long_term';
+  sectionRef: string | null; photoRef: string | null; sortOrder: number;
+}

@@ -1,5 +1,5 @@
 import React from "react";
-import { cn } from "../../../packages/shared-ui/src/cn";
+import { cn } from "@core/shared-ui";
 
 export type RatingTone = "ok" | "warn" | "bad" | "info" | "neutral";
 

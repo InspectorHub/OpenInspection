@@ -3,7 +3,7 @@ import { findingKey } from "./findings/shared";
 import { backfillLevelDescriptions } from "./inspection/helpers";
 import type { InspectionContext } from "./inspection/helpers";
 import type { Severity } from "~/lib/severity";
-import { rangeIds } from "~/lib/editor/batch-range";
+import { rangeIds } from "@core/field-ui/shared/batch-range";
 import { formatDate } from "@core/field-ui/shared/format";
 import { useInspectionProgress } from "./inspection/useInspectionProgress";
 import { useInspectionNavigation } from "./inspection/useInspectionNavigation";
