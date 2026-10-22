@@ -76,7 +76,7 @@ export interface ResultsDocPersistence {
 }
 
 /** Host-supplied factory: open a persistence store for `doc` under `name`. */
-export type ResultsDocPersistenceFactory = (name: string, doc: Y.Doc) => ResultsDocPersistence;
+type ResultsDocPersistenceFactory = (name: string, doc: Y.Doc) => ResultsDocPersistence;
 
 export interface ConnectOptions {
     /** Host persistence factory (IndexedDB on the web). Required. */

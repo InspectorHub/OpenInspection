@@ -11,8 +11,7 @@ export function findingKey(
   return `${unitId || DEFAULT_UNIT}:${sectionId}:${itemId}`;
 }
 
-export type { CustomCommentEntry, AttachedRepairItem } from '@core/field-ui/shared/findings-shared';
-export { cloneByScope } from '@core/field-ui/shared/findings-shared';
+export type { AttachedRepairItem } from '@core/field-ui/shared/findings-shared';
 
 /* ------------------------------------------------------------------ */
 /*  Options                                                            */

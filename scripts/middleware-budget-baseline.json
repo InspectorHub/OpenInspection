@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 162,
-    "dollarMethods": 590,
+    "files": 163,
+    "dollarMethods": 593,
     "apiWorker": 9
   },
   "fanOut": {
@@ -461,6 +461,10 @@
     },
     "app/routes/resources/marketplace-uninstall.tsx": {
       "dollarMethods": 2,
+      "apiWorker": 0
+    },
+    "app/routes/resources/media-upload.ts": {
+      "dollarMethods": 3,
       "apiWorker": 0
     },
     "app/routes/resources/places.tsx": {

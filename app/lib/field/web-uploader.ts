@@ -22,7 +22,7 @@ import { readResultMap } from "@core/field-ui/collab/results-binding";
 import type { PhotoEntry } from "@core/field-ui/shared/results-doc.types";
 
 /** The BFF route every upload goes to. */
-export const MEDIA_UPLOAD_ENDPOINT = "/resources/media-upload";
+const MEDIA_UPLOAD_ENDPOINT = "/resources/media-upload";
 
 /** Resolve the CURRENT index of `photoKey` in the doc's photo array for `findingKey`. */
 function currentPhotoIndex(doc: Y.Doc, findingKey: string, photoKey: string): number {
