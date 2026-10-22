@@ -24,7 +24,7 @@ import * as ops from "@core/field-ui/shared/structure-ops";
 import { serializeItemForSave } from "~/lib/editor/serialize-template";
 import type { PropertyType } from "~/components/template/types";
 import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
-import { useCannedComments } from "~/hooks/useCannedComments";
+import { useCannedComments } from "@core/field-ui/hooks/useCannedComments";
 import { buildCannedFromText, TAB_SEVERITY, type CannedTab } from "~/lib/editor/canned-from-library";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
@@ -153,7 +153,8 @@ const NEW_RICH_ITEM = {
   options: { choices: [] as string[] },
 };
 
-export default function TemplateEditPage() {
+export default function TemplateEditPage() { return <TemplateFieldHost><TemplateEditPageBody /></TemplateFieldHost>; }
+function TemplateEditPageBody() {
   const { id, name: initialName, version: initialVersion, schema: initial, defectCategories, defaultProfileId: initialDefaultProfileId, statutoryFormId } = useLoaderData<typeof loader>();
   // #106 - Save writes the whole template schema and bumps its version.
   const { fetcher, submit, busy: saving } = useGuardedSubmit();
@@ -454,7 +455,6 @@ export default function TemplateEditPage() {
   );
 
   return (
-    <TemplateFieldHost>
     <div className="flex flex-col h-screen bg-ih-bg-app">
       {/* A platform-supplied statutory template. Said once, at the top, rather
           than disabling forty controls individually: the server refuses every
@@ -692,7 +692,6 @@ export default function TemplateEditPage() {
         }}
       />
     </div>
-    </TemplateFieldHost>
   );
 }
 

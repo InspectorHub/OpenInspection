@@ -41,6 +41,25 @@ describe("createWebFieldDataSource", () => {
         expect(typeof ds.resources.video?.setPoster).toBe("function");
     });
 
+    it("serves the canned-comment library, in the editor and in a host with no inspection", () => {
+        for (const ds of [make(), make({ current: () => null })]) {
+            expect(typeof ds.resources.commentsLibrary?.list).toBe("function");
+            expect(typeof ds.resources.commentsLibrary?.touch).toBe("function");
+            expect(typeof ds.resources.commentsLibrary?.save).toBe("function");
+            expect(typeof ds.resources.commentsLibrary?.edit).toBe("function");
+        }
+    });
+
+    it("hands the live results document to the media uploader, which answers instead of throwing", async () => {
+        const ds = make();
+        const rec = {
+            kind: "crop", pendingId: "p", inspectionId: "insp-1", createdAt: 1, blob: new Blob(["c"]),
+            meta: { findingKey: "_default:s:i", itemId: "i", photoIndex: 0, photoKey: "k", crop: { aspect: "free", orientation: "landscape", x: 0, y: 0, width: 1, height: 1 } },
+        } as const;
+        // No document: the crop cannot be addressed, so it fails without a network call.
+        expect(await ds.media.uploader("insp-1", null).upload(rec)).toMatchObject({ ok: false });
+    });
+
     it("execute goes through the transport when an inspection is present", async () => {
         const transport = vi.fn(async () => ({ ok: true })) as unknown as WebExecute;
         await make({ transport }).execute("insp-1", { type: "complete" } as never, { idempotencyKey: "k" });

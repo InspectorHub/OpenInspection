@@ -8,10 +8,16 @@
  * `activeUnitId === null` it keeps the legacy dual-key echo (composite + bare).
  * collabDoc is null so the hook's mount-time photo scanning short-circuits.
  */
+import { createElement, type ReactNode } from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { vi } from 'vitest';
-import { usePhotoOps } from '~/hooks/usePhotoOps';
-import { findingKey } from '@core/field-ui/hooks/findings/shared';
+import { FieldDataSourceProvider } from '../context';
+import { createEmptyEditorData, createFakeDataSource } from '../testing/fake-data-source';
+import { usePhotoOps } from './usePhotoOps';
+import { findingKey } from './findings/shared';
+
+const ds = createFakeDataSource({ data: createEmptyEditorData() });
+const wrapper = ({ children }: { children: ReactNode }) => createElement(FieldDataSourceProvider, { dataSource: ds }, children);
 
 function makeCtx(activeUnitId: string | null) {
   let results: Record<string, Record<string, unknown>> = {};
@@ -38,7 +44,7 @@ function makeCtx(activeUnitId: string | null) {
 
 test('patchItemPhotos under a unit keys ONLY the unit composite — no bare-itemId leak', () => {
   const { ctx, getResults } = makeCtx('u1');
-  const { result } = renderHook(() => usePhotoOps(ctx));
+  const { result } = renderHook(() => usePhotoOps(ctx), { wrapper });
   act(() => {
     result.current.patchItemPhotos('i1', () => [{ key: 'p1' }]);
   });
@@ -52,7 +58,7 @@ test('patchItemPhotos under a unit keys ONLY the unit composite — no bare-item
 
 test('patchItemPhotos in the common scope keeps the legacy dual-key echo', () => {
   const { ctx, getResults } = makeCtx(null);
-  const { result } = renderHook(() => usePhotoOps(ctx));
+  const { result } = renderHook(() => usePhotoOps(ctx), { wrapper });
   act(() => {
     result.current.patchItemPhotos('i1', () => [{ key: 'p1' }]);
   });
@@ -64,7 +70,7 @@ test('patchItemPhotos in the common scope keeps the legacy dual-key echo', () =>
 
 test('patchItemPhotos no-ops under a unit when the section is unresolvable (no bare leak)', () => {
   const { ctx, getResults } = makeCtx('u1');
-  const { result } = renderHook(() => usePhotoOps(ctx));
+  const { result } = renderHook(() => usePhotoOps(ctx), { wrapper });
   act(() => {
     // 'ghost' has no section → under a unit this must NOT write the bare slot.
     result.current.patchItemPhotos('ghost', () => [{ key: 'p1' }]);

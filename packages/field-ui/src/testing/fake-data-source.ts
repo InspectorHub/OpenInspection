@@ -14,8 +14,8 @@ import type {
 } from '../data-source';
 import type { InspectionPrefs, PcaNarrative } from '../data-source-types';
 
-export { createFakeTemplateSearch, createFakeVersionHistory, createFakeVideo } from './fake-resources';
-export type { FakeTemplateSearch, FakeVersionHistory, FakeVideo } from './fake-resources';
+export { createFakeCommentsLibrary, createFakeTemplateSearch, createFakeVersionHistory, createFakeVideo } from './fake-resources';
+export type { FakeCommentsLibrary, FakeTemplateSearch, FakeVersionHistory, FakeVideo } from './fake-resources';
 
 export interface FakeSeed {
   data: EditorData;
@@ -44,7 +44,16 @@ export interface FakeDataSource extends FieldDataSource {
   readonly reloadCount: number;
   readonly exitCount: number;
   /** Every `notify` call, in call order. */
-  readonly notifications: readonly { message: string; variant: 'info' | 'success' | 'error' | undefined }[];
+  readonly notifications: readonly {
+    message: string;
+    variant: 'info' | 'success' | 'error' | undefined;
+    /** Present only when the caller passed `NotifyOptions.durationMs`. */
+    durationMs?: number;
+  }[];
+  /** Every `media.uploader(...).upload` call, in call order. `hadDoc` is whether a results document was passed. */
+  readonly uploads: readonly { inspectionId: string; rec: PendingMediaRecord; hadDoc: boolean }[];
+  /** Make every later upload answer `{ ok: false, error }`. */
+  failUpload(error: string): void;
   /**
    * Make every later command of this type answer `{ ok: false, error }`. A response
    * registered with `respondWith` for the same command still rides along as `data`,
@@ -189,7 +198,9 @@ export function createFakePrefs(initial: Partial<InspectionPrefs> = {}): FakePre
 export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
   const commands: ExecutedCommand[] = [];
   const purged: string[] = [];
-  const notifications: { message: string; variant: 'info' | 'success' | 'error' | undefined }[] = [];
+  const notifications: { message: string; variant: 'info' | 'success' | 'error' | undefined; durationMs?: number }[] = [];
+  const uploads: { inspectionId: string; rec: PendingMediaRecord; hadDoc: boolean }[] = [];
+  let uploadFailure: string | null = null;
   const failures = new Map<FieldCommand['type'], string>();
   const responses = new Map<string, unknown>();
   const records = new Map<string, PendingMediaRecord>();
@@ -208,6 +219,12 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
     },
     get notifications() {
       return notifications;
+    },
+    get uploads() {
+      return uploads;
+    },
+    failUpload(error) {
+      uploadFailure = error;
     },
     get reloadCount() {
       return reloadCount;
@@ -265,8 +282,10 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
       // constrained `data` to this command's `CommandDataMap` entry.
       return result as CommandResult<CommandData<C>>;
     },
-    notify: (message, variant) => {
-      notifications.push({ message, variant });
+    notify: (message, variant, opts) => {
+      notifications.push(
+        opts?.durationMs === undefined ? { message, variant } : { message, variant, durationMs: opts.durationMs },
+      );
     },
     reload: () => {
       reloadCount += 1;
@@ -317,8 +336,11 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
         },
         objectUrl: async (pendingId) => (records.has(pendingId) ? `blob:fake/${pendingId}` : null),
       },
-      uploader: () => ({
-        upload: async (rec) => ({ ok: true, key: `uploaded/${rec.pendingId}` }),
+      uploader: (inspectionId, doc) => ({
+        upload: async (rec) => {
+          uploads.push({ inspectionId, rec, hadDoc: doc !== null });
+          return uploadFailure === null ? { ok: true, key: `uploaded/${rec.pendingId}` } : { ok: false, error: uploadFailure };
+        },
       }),
     },
     urls: { ...DEFAULT_URLS, ...seed.urls },

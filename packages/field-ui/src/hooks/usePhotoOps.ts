@@ -1,14 +1,14 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type * as Y from "yjs";
-import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "@core/field-ui/components/media-studio/photo-display-key";
-import type { MediaAction } from "@core/field-ui/components/media-studio/MediaViewer";
-import { streamThumbUrl } from "@core/field-ui/components/media-studio/PosterPicker";
-import type { GalleryPhoto } from "@core/field-ui/shared/inspection-media";
-import { findingKey } from "@core/field-ui/hooks/findings/shared";
-import type { PhotoCrop } from "@core/field-ui/components/media-studio/PhotoCropper";
-import type { StoredCoverCrop } from "@core/field-ui/components/media-studio/CoverCropper";
-import type { useInspectionState } from "@core/field-ui/hooks/useInspection";
-import type { useFindings } from "@core/field-ui/hooks/useFindings";
+import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "../components/media-studio/photo-display-key";
+import type { MediaAction } from "../components/media-studio/MediaViewer";
+import { streamThumbUrl } from "../components/media-studio/PosterPicker";
+import type { GalleryPhoto } from "../shared/inspection-media";
+import { findingKey } from "./findings/shared";
+import type { PhotoCrop } from "../components/media-studio/PhotoCropper";
+import type { StoredCoverCrop } from "../components/media-studio/CoverCropper";
+import type { useInspectionState } from "./useInspection";
+import type { useFindings } from "./useFindings";
 import {
   reorderPhotos as bindingReorderPhotos,
   movePhoto as bindingMovePhoto,
@@ -17,21 +17,15 @@ import {
   setPhotoCrop as bindingSetPhotoCrop,
   setPhotoAnnotation as bindingSetPhotoAnnotation,
   markPhotoPending as bindingMarkPhotoPending,
-} from "@core/field-ui/collab/results-binding";
-import { pushToast } from "~/hooks/useToast";
-import { freeVideoMedia, videoEntryIdentity } from "@core/field-ui/lib/video-media-delete";
-import { removeMediaBy as bindingRemoveMediaBy } from "@core/field-ui/shared/results-doc-media";
-import { m } from "~/paraglide/messages";
-import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
-import { webMediaStore } from "~/lib/field/web-media-store";
-import type { PhotoEntry } from "@core/field-ui/shared/results-doc.types";
-
-/** #181 PR-G — offline detection. The legacy app/lib/offline helper was removed
- * (Task 15); a bare `navigator.onLine === false` check is the offline gate. SSR
- * has no navigator, so guard the global access. */
-function isOffline(): boolean {
-  return typeof navigator !== "undefined" && navigator.onLine === false;
-}
+} from "../collab/results-binding";
+import { useFieldDataSource } from "../context";
+import { freeVideoMedia, videoEntryIdentity } from "../lib/video-media-delete";
+import { removeMediaBy as bindingRemoveMediaBy } from "../shared/results-doc-media";
+import { m } from "../i18n";
+import { enqueueMedia } from "../collab/media-upload-queue";
+import type { PendingMediaRecord } from "../media-types";
+import type { PhotoEntry } from "../shared/results-doc.types";
+import { guardedSave } from "./photo-save-guard";
 
 /**
  * The photo / media-operations cluster of the inspection editor. Behavior-
@@ -82,6 +76,13 @@ export function usePhotoOps(ctx: {
     setPhotoStudioTotal,
     setPhotoStudioOpen,
   } = ctx;
+  const dataSource = useFieldDataSource();
+  const { urls } = dataSource;
+  /* Photo writes in flight, by kind + finding + photo. A crop or annotation save that repeats
+   * while the first is still being queued or uploaded is dropped: the first one already applied
+   * its optimistic edit, and a second bake of the same photo would race it. Released when the
+   * save settles. A ref, set synchronously, so two calls in one frame send one. */
+  const mediaSavesInFlight = useRef<Set<string>>(new Set());
 
   // Media Studio — gallery "Set as cover" opens an editor-level CoverCropper.
   const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
@@ -172,7 +173,7 @@ export function usePhotoOps(ctx: {
     void (async () => {
       for (const id of pendingIds) {
         if (pendingUrls[id]) continue; // already have a URL for this id
-        const url = await webMediaStore.objectUrl(id); // null: gone, or not a real Blob
+        const url = await dataSource.media.store.objectUrl(id); // null: gone, or not a real Blob
         if (cancelled) { if (url) URL.revokeObjectURL(url); break; }
         if (url) created[id] = url;
       }
@@ -201,7 +202,7 @@ export function usePhotoOps(ctx: {
     };
     // `pendingUrls` is read but intentionally excluded: including it would re-run
     // on every URL we add and loop. New ids arrive via `pendingIds`.
-  }, [pendingIds]);
+  }, [pendingIds, dataSource]);
 
   // Revoke all objectURLs on unmount. `pendingUrlsRef` mirrors the latest map so
   // the unmount cleanup revokes everything without re-subscribing per change.
@@ -235,7 +236,7 @@ export function usePhotoOps(ctx: {
           const url = hasLocal
             ? localUrl as string
             : baseKey
-              ? `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(baseKey)}`
+              ? urls.photo(state.inspection.id, baseKey)
               : "";
           return {
             key: baseKey || p.pendingId,
@@ -256,7 +257,7 @@ export function usePhotoOps(ctx: {
         const dk = resolvePhotoDisplayKey(p);
         return {
           key: dk,
-          url: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(dk)}`,
+          url: urls.photo(state.inspection.id, dk),
           label: "",
           itemId,
           photoIndex: i,
@@ -272,7 +273,7 @@ export function usePhotoOps(ctx: {
           durationSec: p.durationSec,
         };
       }),
-    [getItemPhotos, state.inspection.id, pendingUrls],
+    [getItemPhotos, state.inspection.id, pendingUrls, urls],
   );
 
   /* Task 8 — open the viewer for an item at index i. */
@@ -424,7 +425,7 @@ export function usePhotoOps(ctx: {
           else {
             void freeVideoMedia(state.inspection.id, videoRef).then((freed) => {
               if (freed) removeEntry();
-              else if (freed === false) pushToast({ message: m.editor_video_delete_failed(), variant: "error", durationMs: 6000 });
+              else if (freed === false) dataSource.notify(m.editor_video_delete_failed(), "error", { durationMs: 6000 });
             });
           }
           return;
@@ -442,7 +443,7 @@ export function usePhotoOps(ctx: {
         // base is croppedKey || originalKey — NEVER annotatedKey (that would
         // double-bake the existing annotation).
         const annotateBaseKey = photo.croppedKey || photo.originalKey || photo.key;
-        setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(annotateBaseKey)}`);
+        setPhotoStudioUrl(urls.photo(state.inspection.id, annotateBaseKey));
         setPhotoStudioKey(photo.key);
         setPhotoStudioIndex(idx);
         setPhotoStudioTotal(0);
@@ -458,7 +459,7 @@ export function usePhotoOps(ctx: {
         setPhotoCropTarget({
           itemId,
           photoIndex: idx,
-          sourceUrl: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(originalKey)}`,
+          sourceUrl: urls.photo(state.inspection.id, originalKey),
           hasAnnotation: !!photo.annotated,
           sectionId,
         });
@@ -485,7 +486,7 @@ export function usePhotoOps(ctx: {
       // rotate / caption — routed here but not yet implemented (not Plan 4).
       // TODO rotate/caption on item photos.
     },
-    [patchItemPhotos, state.inspection.id, state.currentSection, collabDoc, docFindingKey],
+    [patchItemPhotos, state.inspection.id, state.currentSection, collabDoc, docFindingKey, dataSource, urls],
   );
 
   /* Plan 4 (Task 8/9) — persist a baked crop for the targeted photo. When online,
@@ -503,6 +504,10 @@ export function usePhotoOps(ctx: {
       const originalKey = current?.key;
       const fk = docFindingKey(itemId, sectionId);
 
+      // A repeat of a save still in flight for this photo is dropped before it does anything.
+      const saveKey = `crop|${fk ?? itemId}|${originalKey ?? photoIndex}`;
+      if (mediaSavesInFlight.current.has(saveKey)) return;
+
       // Optimistic local apply for instant feedback (the doc drives the real UI
       // once the bake returns / drains + we write it back).
       patchItemPhotos(itemId, (photos) =>
@@ -512,54 +517,41 @@ export function usePhotoOps(ctx: {
             : p,
         ),
       );
+      if (!fk || !originalKey) return;
+      const rec: PendingMediaRecord = {
+        pendingId: crypto.randomUUID(),
+        inspectionId: String(state.inspection.id),
+        kind: "crop",
+        blob,
+        meta: { findingKey: fk, itemId, photoIndex, photoKey: originalKey, crop: cropTransform, ...(sectionId ? { sectionId } : {}) },
+        createdAt: Date.now(),
+      };
 
       // #181 PR-G — offline: persist the baked crop locally + mark the doc photo
       // pending-crop (KEEP the base key so the report still serves the original).
       // The drain (on reconnect) uploads the derivative and swaps in croppedKey.
-      if (isOffline()) {
-        if (collabDoc && fk && originalKey) {
-          const pendingId = crypto.randomUUID();
-          void enqueueMedia(webMediaStore, {
-            pendingId,
-            inspectionId: String(state.inspection.id),
-            kind: "crop",
-            blob,
-            meta: { findingKey: fk, itemId, photoIndex, photoKey: originalKey, crop: cropTransform, ...(sectionId ? { sectionId } : {}) },
-            createdAt: Date.now(),
-          }).then(() => {
-            bindingMarkPhotoPending(collabDoc, fk, originalKey, pendingId, "crop", {
-              crop: cropTransform,
-            });
-          });
+      if (!dataSource.isOnline()) {
+        if (collabDoc) {
+          guardedSave(mediaSavesInFlight.current, saveKey, () =>
+            enqueueMedia(dataSource.media.store, rec).then(() => {
+              bindingMarkPhotoPending(collabDoc, fk, originalKey, rec.pendingId, "crop", { crop: cropTransform });
+            }),
+          );
         }
         return;
       }
 
-      const fd = new FormData();
-      fd.append("image", new File([blob], "cropped.jpg", { type: "image/jpeg" }));
-      fd.append("crop", JSON.stringify(cropTransform));
-      if (sectionId) fd.append("sectionId", sectionId);
-      void (async () => {
-        const res = await fetch(
-          `/api/inspections/${state.inspection.id}/items/${itemId}/photos/${photoIndex}/crop`,
-          { method: "POST", credentials: "include", body: fd },
-        );
-        const body = (await res.json().catch(() => null)) as { data?: { croppedKey?: string } } | null;
-        const croppedKey = body?.data?.croppedKey;
-        if (collabDoc && fk && originalKey && croppedKey) {
-          bindingSetPhotoCrop(
-            collabDoc,
-            fk,
-            originalKey,
-            croppedKey,
-            cropTransform,
-            current as PhotoEntry,
-          );
+      // Online: the data source's uploader bakes the crop. A save that returns no key changes
+      // nothing further: no toast, no revalidate — the doc drives the UI.
+      const uploader = dataSource.media.uploader(String(state.inspection.id), collabDoc);
+      guardedSave(mediaSavesInFlight.current, saveKey, async () => {
+        const res = await uploader.upload(rec);
+        if (collabDoc && res.ok) {
+          bindingSetPhotoCrop(collabDoc, fk, originalKey, res.key, cropTransform, current as PhotoEntry);
         }
-        // No revalidate — the doc drives the UI.
-      })();
+      });
     },
-    [patchItemPhotos, state.inspection.id, collabDoc, docFindingKey, getItemPhotos],
+    [patchItemPhotos, state.inspection.id, collabDoc, docFindingKey, getItemPhotos, dataSource],
   );
 
   /* #181 — collab-aware annotation save. Returns true when it HANDLED the save
@@ -580,47 +572,41 @@ export function usePhotoOps(ctx: {
       const originalKey = getItemPhotos(itemId)[photoIndex]?.key;
       const fk = docFindingKey(itemId, sectionId);
 
+      // A repeat of a save still in flight for this photo is dropped (and counts as handled).
+      const saveKey = `annotate|${fk ?? itemId}|${originalKey ?? photoIndex}`;
+      if (mediaSavesInFlight.current.has(saveKey)) return true;
+      if (!fk || !originalKey) return true;
+      const rec: PendingMediaRecord = {
+        pendingId: crypto.randomUUID(),
+        inspectionId: String(state.inspection.id),
+        kind: "annotate",
+        blob,
+        meta: { findingKey: fk, itemId, photoIndex, photoKey: originalKey, nodesJson, ...(sectionId ? { sectionId } : {}) },
+        createdAt: Date.now(),
+      };
+
       // #181 PR-G — offline: persist the baked annotation PNG locally + mark the
       // doc photo pending-annotate (KEEP base/cropped key — annotation layers on
       // top; the report serves the base until the derivative drains).
-      if (isOffline()) {
-        if (fk && originalKey) {
-          const pendingId = crypto.randomUUID();
-          void enqueueMedia(webMediaStore, {
-            pendingId,
-            inspectionId: String(state.inspection.id),
-            kind: "annotate",
-            blob,
-            meta: { findingKey: fk, itemId, photoIndex, photoKey: originalKey, nodesJson, ...(sectionId ? { sectionId } : {}) },
-            createdAt: Date.now(),
-          }).then(() => {
-            bindingMarkPhotoPending(collabDoc, fk, originalKey, pendingId, "annotate", {
-              annotationsJson: nodesJson,
-            });
-          });
-        }
+      if (!dataSource.isOnline()) {
+        guardedSave(mediaSavesInFlight.current, saveKey, () =>
+          enqueueMedia(dataSource.media.store, rec).then(() => {
+            bindingMarkPhotoPending(collabDoc, fk, originalKey, rec.pendingId, "annotate", { annotationsJson: nodesJson });
+          }),
+        );
         return true;
       }
 
-      const fd = new FormData();
-      fd.append("nodes", nodesJson);
-      if (sectionId) fd.append("sectionId", sectionId);
-      fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
-      void (async () => {
-        const res = await fetch(
-          `/api/inspections/${state.inspection.id}/items/${itemId}/photos/${photoIndex}/annotation`,
-          { method: "POST", credentials: "include", body: fd },
-        );
-        const body = (await res.json().catch(() => null)) as { data?: { annotatedKey?: string } } | null;
-        const annotatedKey = body?.data?.annotatedKey;
-        if (fk && originalKey && annotatedKey) {
-          bindingSetPhotoAnnotation(collabDoc, fk, originalKey, annotatedKey, nodesJson);
-        }
-        // No revalidate — the doc drives the UI under collab.
-      })();
+      // Online: the data source's uploader bakes the annotation; no key back changes nothing
+      // further. No revalidate — the doc drives the UI under collab.
+      const uploader = dataSource.media.uploader(String(state.inspection.id), collabDoc);
+      guardedSave(mediaSavesInFlight.current, saveKey, async () => {
+        const res = await uploader.upload(rec);
+        if (res.ok) bindingSetPhotoAnnotation(collabDoc, fk, originalKey, res.key, nodesJson);
+      });
       return true;
     },
-    [collabDoc, docFindingKey, getItemPhotos, state.inspection.id],
+    [collabDoc, docFindingKey, getItemPhotos, state.inspection.id, dataSource],
   );
 
   /* #181 PR-G — resolve a pending entry's local blob URL for the strip/viewer.

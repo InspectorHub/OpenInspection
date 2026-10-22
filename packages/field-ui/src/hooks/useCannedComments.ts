@@ -1,5 +1,7 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
-import type { Severity } from "@core/field-ui/lib/severity";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useFieldDataSource } from "../context";
+import type { CommentsLibraryQuery, CommentsLibraryRow } from "../data-source-types";
+import type { Severity } from "../lib/severity";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -84,21 +86,21 @@ function buildLibrary(): CommentEntry[] {
 }
 
 /* ------------------------------------------------------------------ */
-/*  BFF channel (Track H / C-12)                                       */
+/*  Library resource (Track H / C-12)                                  */
 /* ------------------------------------------------------------------ */
 
-// Every server call rides the BFF resource route (RR loader/action does the
-// token relay) — client code never fetches `/api/...` directly. The promise
+// Every server call goes through the data source's `resources.commentsLibrary`
+// (the web host serves it from the BFF resource route, which does the token
+// relay). A host without one has an empty server library. The promise
 // contracts the editor relies on (`fetchFiltered(...).then(...)`) are kept.
-const LIBRARY_ROUTE = "/resources/comments-library";
 
-function mapRow(r: Record<string, unknown>): CommentEntry {
+function mapRow(r: CommentsLibraryRow): CommentEntry {
   return {
-    id: r.id as string,
+    id: r.id,
     severity: ((r.severity as Severity) || "all"),
-    section: (r.section as string) || null,
-    category: (r.category as string) || null,
-    text: r.text as string,
+    section: r.section || null,
+    category: r.category || null,
+    text: r.text,
     source: "snippet" as const,
   };
 }
@@ -112,6 +114,11 @@ export function useCannedComments(options: {
   severityForRatingId: (ratingId: string | null | undefined) => Severity | "all";
 }) {
   const { inspectionId, severityForRatingId } = options;
+  const library = useFieldDataSource().resources.commentsLibrary;
+  /* Same-frame guards for the two library writes: a save already in flight for the same entry is
+   * shared, not sent twice, and a touch already in flight for the same id is not repeated. */
+  const saveInFlight = useRef<Map<string, Promise<boolean>>>(new Map());
+  const touchInFlight = useRef<Set<string>>(new Set());
   const [userSnippets, setUserSnippets] = useState<CommentEntry[]>([]);
   const [localSnippets, setLocalSnippets] = useState<CommentEntry[]>([]);
 
@@ -150,17 +157,13 @@ export function useCannedComments(options: {
     }
   }, []);
 
-  const loadServerRows = useCallback(async (params?: URLSearchParams): Promise<Array<Record<string, unknown>>> => {
+  const loadServerRows = useCallback(async (query?: CommentsLibraryQuery): Promise<CommentsLibraryRow[]> => {
     try {
-      const qs = params && params.size > 0 ? `?${params}` : "";
-      const res = await fetch(`${LIBRARY_ROUTE}${qs}`, { credentials: "include" });
-      if (!res.ok) return [];
-      const body = (await res.json()) as { comments?: Array<Record<string, unknown>> };
-      return body.comments ?? [];
+      return (await library?.list(query)) ?? [];
     } catch {
       return [];
     }
-  }, []);
+  }, [library]);
 
   const fetchFiltered = useCallback(
     async (ctx: {
@@ -169,18 +172,16 @@ export function useCannedComments(options: {
       severity?: string;
       search?: string;
     }) => {
-      const params = new URLSearchParams();
-      params.set("sort", sort);
-      params.set("filterMode", filterMode);
-      if (ctx.search) params.set("search", ctx.search);
+      const query: CommentsLibraryQuery = { sort, filterMode };
+      if (ctx.search) query.search = ctx.search;
       // Track H: severity rides regardless of filter mode (the modal's severity
       // chips set it explicitly); section/itemLabel stay auto-only context.
-      if (ctx.severity) params.set("severity", ctx.severity);
+      if (ctx.severity) query.severity = ctx.severity;
       if (filterMode === "auto") {
-        if (ctx.itemLabel) params.set("itemLabel", ctx.itemLabel);
-        if (ctx.section) params.set("section", ctx.section);
+        if (ctx.itemLabel) query.itemLabel = ctx.itemLabel;
+        if (ctx.section) query.section = ctx.section;
       }
-      return loadServerRows(params);
+      return loadServerRows(query);
     },
     [sort, filterMode, loadServerRows],
   );
@@ -192,11 +193,7 @@ export function useCannedComments(options: {
     async (query: string): Promise<CommentEntry[]> => {
       const q = query.trim();
       if (q.length < 2) return [];
-      const params = new URLSearchParams();
-      params.set("search", q);
-      params.set("filterMode", "all");
-      params.set("sort", "relevance");
-      const rows = await loadServerRows(params);
+      const rows = await loadServerRows({ search: q, filterMode: "all", sort: "relevance" });
       return rows.map(mapRow);
     },
     [loadServerRows],
@@ -204,15 +201,15 @@ export function useCannedComments(options: {
 
   const touchSnippet = useCallback((id: string) => {
     // Fire-and-forget; no UI dependency on the response.
-    try {
-      const form = new FormData();
-      form.set("intent", "touch");
-      form.set("id", id);
-      fetch(LIBRARY_ROUTE, { method: "POST", credentials: "include", body: form });
-    } catch {
-      /* noop */
-    }
-  }, []);
+    if (!library || touchInFlight.current.has(id)) return;
+    touchInFlight.current.add(id);
+    void library
+      .touch(id)
+      .catch(() => undefined)
+      .finally(() => {
+        touchInFlight.current.delete(id);
+      });
+  }, [library]);
 
   // Load user snippets from server. (Pre-Track-H this unwrapped a
   // `data.comments` shape the API never returned, so server snippets silently
@@ -324,58 +321,60 @@ export function useCannedComments(options: {
 
   /** Save current notes as a snippet (server-first, localStorage fallback) */
   const saveSnippet = useCallback(
-    async (
+    (
       text: string,
       severity: Severity | "all",
       section: string,
       title?: string,
       itemLabel?: string,
-    ) => {
-      try {
-        const form = new FormData();
-        form.set("intent", "save");
-        form.set("text", text);
-        form.set("severity", severity);
-        form.set("section", section || "");
-        form.set("category", title || "");
-        form.set("itemLabel", itemLabel || "");
-        const res = await fetch(LIBRARY_ROUTE, {
-          method: "POST",
-          credentials: "include",
-          body: form,
-        });
-        if (res.ok) {
-          const body = (await res.json()) as { ok?: boolean };
-          if (body.ok) {
+    ): Promise<boolean> => {
+      const flightKey = JSON.stringify([text, severity, section, title, itemLabel]);
+      const running = saveInFlight.current.get(flightKey);
+      if (running) return running;
+      const attempt = (async (): Promise<boolean> => {
+        try {
+          const res = await library?.save({
+            text,
+            severity,
+            section: section || "",
+            category: title || "",
+            itemLabel: itemLabel || "",
+          });
+          if (res?.ok) {
             // Reload user snippets through the same channel.
             const rows = await loadServerRows();
             setUserSnippets(rows.map(mapRow));
             return true;
           }
+        } catch {
+          /* fallback to local */
         }
-      } catch {
-        /* fallback to local */
-      }
 
-      // localStorage fallback
-      try {
-        const existing: CommentEntry[] = JSON.parse(
-          localStorage.getItem("oi:snippets") || "[]",
-        );
-        if (existing.some((c) => c.text === text)) return false;
-        existing.unshift({
-          severity,
-          text,
-          source: "snippet",
-        });
-        localStorage.setItem("oi:snippets", JSON.stringify(existing));
-        setLocalSnippets(existing);
-        return true;
-      } catch {
-        return false;
-      }
+        // localStorage fallback
+        try {
+          const existing: CommentEntry[] = JSON.parse(
+            localStorage.getItem("oi:snippets") || "[]",
+          );
+          if (existing.some((c) => c.text === text)) return false;
+          existing.unshift({
+            severity,
+            text,
+            source: "snippet",
+          });
+          localStorage.setItem("oi:snippets", JSON.stringify(existing));
+          setLocalSnippets(existing);
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+      saveInFlight.current.set(flightKey, attempt);
+      void attempt.finally(() => {
+        saveInFlight.current.delete(flightKey);
+      });
+      return attempt;
     },
-    [loadServerRows],
+    [library, loadServerRows],
   );
 
   return {

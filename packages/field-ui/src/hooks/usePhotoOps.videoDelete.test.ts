@@ -8,12 +8,12 @@
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const toasts = vi.hoisted(() => [] as Array<{ message: string; variant?: string }>);
-vi.mock("~/hooks/useToast", () => ({ pushToast: (t: { message: string; variant?: string }) => toasts.push(t) }));
-
+import { createElement, type ReactNode } from "react";
 import * as Y from "yjs";
-import { seedResultsDoc, pushPendingPhoto, projectResults } from "@core/field-ui/shared/results-doc";
-import { usePhotoOps } from "~/hooks/usePhotoOps";
+import { FieldDataSourceProvider } from "../context";
+import { createEmptyEditorData, createFakeDataSource, type FakeDataSource } from "../testing/fake-data-source";
+import { seedResultsDoc, pushPendingPhoto, projectResults } from "../shared/results-doc";
+import { usePhotoOps } from "./usePhotoOps";
 
 function makeCtx() {
   const setResults = vi.fn();
@@ -35,14 +35,17 @@ const VIDEO = { key: "v1", url: "", label: "Clip", itemId: "i1", photoIndex: 0, 
 
 let answer: () => Response | Promise<Response>;
 let calls: Array<[string, string | undefined]>;
+let ds: FakeDataSource;
+const wrapper = ({ children }: { children: ReactNode }) => createElement(FieldDataSourceProvider, { dataSource: ds }, children);
 beforeEach(() => {
-  toasts.length = 0; calls = [];
+  ds = createFakeDataSource({ data: createEmptyEditorData() });
+  calls = [];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => { calls.push([url, init?.method]); return answer(); }));
 });
 afterEach(() => vi.unstubAllGlobals());
 
 const run = async (setup = makeCtx()) => {
-  const { result } = renderHook(() => usePhotoOps(setup.ctx));
+  const { result } = renderHook(() => usePhotoOps(setup.ctx), { wrapper });
   await act(async () => { result.current.onViewerAction("delete", VIDEO); await new Promise((r) => setTimeout(r, 30)); });
   return setup;
 };
@@ -53,14 +56,14 @@ describe("usePhotoOps video delete", () => {
     const { setResults } = await run();
     expect(calls).toEqual([["/api/inspections/insp1/media/video/uid-1", "DELETE"]]);
     await waitFor(() => expect(setResults).toHaveBeenCalled());
-    expect(toasts).toEqual([]);
+    expect(ds.notifications).toEqual([]);
   });
 
   it("treats a video that is already gone (404) as deleted", async () => {
     answer = () => new Response("{}", { status: 404 });
     const { setResults } = await run();
     await waitFor(() => expect(setResults).toHaveBeenCalled());
-    expect(toasts).toEqual([]);
+    expect(ds.notifications).toEqual([]);
   });
 
   it.each([
@@ -70,15 +73,17 @@ describe("usePhotoOps video delete", () => {
     answer = a;
     const { setResults } = await run();
     expect(setResults).not.toHaveBeenCalled();
-    expect(toasts).toHaveLength(1);
-    expect(toasts[0]!.variant).toBe("error");
-    expect(toasts[0]!.message).toMatch(/could not be deleted/i);
+    expect(ds.notifications).toHaveLength(1);
+    expect(ds.notifications[0]!.variant).toBe("error");
+    expect(ds.notifications[0]!.message).toMatch(/could not be deleted/i);
+    // The toast kept its 6 s display time (the web host's error default is 8 s).
+    expect(ds.notifications[0]!.durationMs).toBe(6000);
   });
 
   it("removes the entry by its key, not by the position it had when the delete started", async () => {
     answer = () => new Response("{}", { status: 200 });
     const { ctx, setResults } = makeCtx();
-    const { result } = renderHook(() => usePhotoOps(ctx));
+    const { result } = renderHook(() => usePhotoOps(ctx), { wrapper });
     await act(async () => { result.current.onViewerAction("delete", VIDEO); await new Promise((r) => setTimeout(r, 30)); });
     // Between the click and the answer another photo was added above the video.
     const updater = setResults.mock.calls[0]![0] as (prev: Record<string, unknown>) => Record<string, { photos: Array<{ key: string }> }>;
@@ -90,7 +95,7 @@ describe("usePhotoOps video delete", () => {
     let release: () => void = () => {};
     answer = () => new Promise<Response>((resolve) => { release = () => resolve(new Response("{}", { status: 200 })); });
     const { ctx, setResults } = makeCtx();
-    const { result } = renderHook(() => usePhotoOps(ctx));
+    const { result } = renderHook(() => usePhotoOps(ctx), { wrapper });
     await act(async () => { result.current.onViewerAction("delete", VIDEO); result.current.onViewerAction("delete", VIDEO); });
     expect(calls).toHaveLength(1);
     await act(async () => { release(); await new Promise((r) => setTimeout(r, 30)); });
@@ -100,7 +105,7 @@ describe("usePhotoOps video delete", () => {
   it("after a failed delete the same video can be deleted again", async () => {
     answer = () => new Response("{}", { status: 500 });
     const setup = makeCtx();
-    const { result } = renderHook(() => usePhotoOps(setup.ctx));
+    const { result } = renderHook(() => usePhotoOps(setup.ctx), { wrapper });
     await act(async () => { result.current.onViewerAction("delete", VIDEO); await new Promise((r) => setTimeout(r, 30)); });
     answer = () => new Response("{}", { status: 200 });
     await act(async () => { result.current.onViewerAction("delete", VIDEO); await new Promise((r) => setTimeout(r, 30)); });
@@ -111,7 +116,7 @@ describe("usePhotoOps video delete", () => {
   it("a keyless video is freed on the server, then removed by what was freed, not by the position it had at click time", async () => {
     answer = () => new Response("{}", { status: 200 });
     const { ctx, setResults } = makeCtx();
-    const { result } = renderHook(() => usePhotoOps(ctx));
+    const { result } = renderHook(() => usePhotoOps(ctx), { wrapper });
     const keyless = { ...(VIDEO as object), key: "", photoIndex: 1 } as never;
     await act(async () => { result.current.onViewerAction("delete", keyless); await new Promise((r) => setTimeout(r, 30)); });
     expect(calls).toEqual([["/api/inspections/insp1/media/video/uid-1", "DELETE"]]);
@@ -130,7 +135,7 @@ describe("usePhotoOps video delete", () => {
     pushPendingPhoto(doc, "_default:s1:i1", { key: "", pendingId: "b", mediaType: "video", provider: "stream", streamUid: "uid-2" });
     const setup = makeCtx();
     (setup.ctx as unknown as { collabDoc: Y.Doc }).collabDoc = doc;
-    const { result } = renderHook(() => usePhotoOps(setup.ctx));
+    const { result } = renderHook(() => usePhotoOps(setup.ctx), { wrapper });
     const keyless = { ...(VIDEO as object), key: "", photoIndex: 0 } as never;
     await act(async () => { result.current.onViewerAction("delete", keyless); await new Promise((r) => setTimeout(r, 30)); });
     await waitFor(() => expect((projectResults(doc)["_default:s1:i1"].photos ?? []).map((p) => p.streamUid)).toEqual(["uid-2"]));
@@ -139,10 +144,10 @@ describe("usePhotoOps video delete", () => {
   it("a keyless entry whose delete fails stays and says so", async () => {
     answer = () => new Response("{}", { status: 500 });
     const { ctx, setResults } = makeCtx();
-    const { result } = renderHook(() => usePhotoOps(ctx));
+    const { result } = renderHook(() => usePhotoOps(ctx), { wrapper });
     const keyless = { ...(VIDEO as object), key: "", photoIndex: 0 } as never;
     await act(async () => { result.current.onViewerAction("delete", keyless); await new Promise((r) => setTimeout(r, 30)); });
     expect(setResults).not.toHaveBeenCalled();
-    expect(toasts).toHaveLength(1);
+    expect(ds.notifications).toHaveLength(1);
   });
 });

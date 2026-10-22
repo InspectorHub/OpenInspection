@@ -17,7 +17,7 @@
  */
 import type * as Y from "yjs";
 import type { MediaUploader, UploadResult } from "@core/field-ui/collab/media-upload-queue";
-import type { PendingMediaRecord } from "@core/field-ui/media-types";
+import type { MediaUploader as FieldMediaUploader, PendingMediaRecord } from "@core/field-ui/media-types";
 import { readResultMap } from "@core/field-ui/collab/results-binding";
 import type { PhotoEntry } from "@core/field-ui/shared/results-doc.types";
 
@@ -31,15 +31,32 @@ function currentPhotoIndex(doc: Y.Doc, findingKey: string, photoKey: string): nu
     return photos.findIndex((p) => p.key === photoKey);
 }
 
+/**
+ * Longest an upload may take before it is abandoned and treated as failed (the queue keeps the record and retries; an online
+ * crop answers a failure). A photo over a slow mobile link is legitimately slow, so this is generous, but it must exist: a request that
+ * never settles would hold a same-frame guard (or a drain) forever.
+ */
+const UPLOAD_TIMEOUT_MS = 180_000;
+
+function uploadSignal(): AbortSignal | undefined {
+    if (typeof AbortSignal === "undefined") return undefined;
+    if (typeof AbortSignal.timeout === "function") return AbortSignal.timeout(UPLOAD_TIMEOUT_MS);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+    return controller.signal;
+}
+
 async function post(fd: FormData): Promise<{ ok: boolean; status: number; body: { data?: Record<string, string | undefined> } | null }> {
-    const res = await fetch(MEDIA_UPLOAD_ENDPOINT, { method: "POST", credentials: "include", body: fd });
+    const signal = uploadSignal();
+    const res = await fetch(MEDIA_UPLOAD_ENDPOINT, { method: "POST", credentials: "include", body: fd, ...(signal ? { signal } : {}) });
     const body = res.ok
         ? ((await res.json().catch(() => null)) as { data?: Record<string, string | undefined> } | null)
         : null;
     return { ok: res.ok, status: res.status, body };
 }
 
-export function createWebUploader(inspectionId: string, doc: Y.Doc): MediaUploader {
+/** `doc` is null when the host has no results document yet; a crop or annotation then fails, a photo does not need one. */
+export function createWebUploader(inspectionId: string, doc: Y.Doc | null): MediaUploader {
     return {
         async upload(rec: PendingMediaRecord): Promise<UploadResult> {
             const fd = new FormData();
@@ -57,6 +74,7 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc): MediaUpload
             }
 
             // crop / annotate: resolve the CURRENT photo index by base key.
+            if (!doc) throw new Error("no results document to resolve the photo in");
             const index = currentPhotoIndex(doc, rec.meta.findingKey, rec.meta.photoKey);
             if (index < 0) throw new Error("base photo no longer present");
             fd.append("photoIndex", String(index));
@@ -79,6 +97,26 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc): MediaUpload
             const annotatedKey = res.body?.data?.annotatedKey;
             if (!annotatedKey) throw new Error("annotation returned no annotatedKey");
             return { annotatedKey };
+        },
+    };
+}
+
+/**
+ * The `FieldDataSource.media.uploader` for the web: the same upload, answered the way the
+ * package contract asks (`{ ok, key }`, never a throw). The key is the stored photo key, the
+ * `croppedKey` or the `annotatedKey`, by the record's kind.
+ */
+export function createWebMediaUploader(inspectionId: string, doc: Y.Doc | null): FieldMediaUploader {
+    const inner = createWebUploader(inspectionId, doc);
+    return {
+        async upload(rec: PendingMediaRecord) {
+            try {
+                const result = await inner.upload(rec);
+                const key = rec.kind === "photo" ? result.key : rec.kind === "crop" ? result.croppedKey : result.annotatedKey;
+                return key ? { ok: true as const, key } : { ok: false as const, error: "upload returned no key" };
+            } catch (err) {
+                return { ok: false as const, error: err instanceof Error && err.message ? err.message : "upload failed" };
+            }
         },
     };
 }

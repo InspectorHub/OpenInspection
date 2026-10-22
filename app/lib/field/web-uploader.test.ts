@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as Y from "yjs";
 import { seedResultsDoc, appendPhoto } from "@core/field-ui/shared/results-doc";
 import type { PendingMediaRecord } from "@core/field-ui/media-types";
-import { createWebUploader } from "./web-uploader";
+import { createWebMediaUploader, createWebUploader } from "./web-uploader";
 
 const FK = "_default:s1:i1";
 const ENDPOINT = "/resources/media-upload";
@@ -135,6 +135,24 @@ describe("web uploader: same-origin BFF only", () => {
 });
 
 describe("web uploader: failures leave the record queued (throw)", () => {
+    it("every upload request carries an abort signal, and a request that never settles is abandoned as a failure", async () => {
+        // A fetch that honours the signal and otherwise never answers; the signal is shortened so the test does not wait minutes.
+        const spy = vi.spyOn(AbortSignal, "timeout").mockImplementation(() => AbortSignal.abort(new DOMException("The operation timed out.", "TimeoutError")));
+        try {
+            fetchMock.mockImplementation(
+                (_url: string, init: RequestInit) =>
+                    new Promise((_resolve, reject) => {
+                        init.signal?.addEventListener("abort", () => reject(init.signal?.reason ?? new Error("aborted")));
+                        if (init.signal?.aborted) reject(init.signal.reason ?? new Error("aborted"));
+                    }),
+            );
+            await expect(createWebUploader("insp-1", docWithPhotos()).upload(photoRec())).rejects.toBeDefined();
+            expect(spy).toHaveBeenCalledWith(180_000);
+            expect(lastCall().init.signal).toBeDefined();
+        } finally {
+            spy.mockRestore();
+        }
+    });
     it("a non-OK photo answer throws", async () => {
         fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, 500));
         await expect(createWebUploader("insp-1", docWithPhotos()).upload(photoRec())).rejects.toThrow("upload failed: 500");
@@ -160,6 +178,50 @@ describe("web uploader: failures leave the record queued (throw)", () => {
         const up = createWebUploader("insp-1", doc);
         await expect(up.upload(cropRec())).rejects.toThrow("base photo no longer present");
         await expect(up.upload(annotRec())).rejects.toThrow("base photo no longer present");
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
+
+describe("createWebMediaUploader: the package contract (answers, never throws)", () => {
+    it("answers { ok, key } with the key of the record's kind", async () => {
+        fetchMock.mockImplementation(async () => jsonResponse({ data: { key: "k1", croppedKey: "c1", annotatedKey: "a1" } }));
+        const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+        expect(await up.upload(photoRec())).toEqual({ ok: true, key: "k1" });
+        expect(await up.upload(cropRec())).toEqual({ ok: true, key: "c1" });
+        expect(await up.upload(annotRec())).toEqual({ ok: true, key: "a1" });
+    });
+
+    it("sends the same BFF request as the queue uploader", async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ data: { croppedKey: "r2/c.jpg" } }));
+        const doc = docWithPhotos("r2/other.jpg", "r2/base.jpg");
+        await createWebMediaUploader("insp-1", doc).upload(cropRec());
+        const { url, form } = lastCall();
+        expect(url).toBe(ENDPOINT);
+        expect(form.get("photoIndex")).toBe("1");
+        expect(form.get("kind")).toBe("crop");
+    });
+
+    it("answers { ok: false, error } instead of throwing: a refused request, a missing key, a vanished photo", async () => {
+        const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+        fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, 500));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "upload failed: 500" });
+        fetchMock.mockResolvedValue(jsonResponse({ data: {} }));
+        expect(await up.upload(cropRec())).toEqual({ ok: false, error: "crop returned no croppedKey" });
+        fetchMock.mockRejectedValue(new TypeError("offline"));
+        expect(await up.upload(annotRec())).toEqual({ ok: false, error: "offline" });
+        fetchMock.mockReset();
+        const gone = createWebMediaUploader("insp-1", docWithPhotos("r2/someone-else.jpg"));
+        expect(await gone.upload(cropRec())).toEqual({ ok: false, error: "base photo no longer present" });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("without a results document a photo still uploads, a crop and an annotation fail without sending", async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ data: { key: "k1" } }));
+        const up = createWebMediaUploader("insp-1", null);
+        expect(await up.upload(photoRec())).toEqual({ ok: true, key: "k1" });
+        fetchMock.mockClear();
+        expect(await up.upload(cropRec())).toEqual({ ok: false, error: "no results document to resolve the photo in" });
+        expect(await up.upload(annotRec())).toEqual({ ok: false, error: "no results document to resolve the photo in" });
         expect(fetchMock).not.toHaveBeenCalled();
     });
 });

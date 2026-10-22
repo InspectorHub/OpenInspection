@@ -69,7 +69,7 @@ describe("call sites still build the same fragments", () => {
     const sites: Array<[string, string[]]> = [
         ["app/components/editor/ItemEditor.tsx", ["/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(k)}"]],
         ["app/components/editor/SideRail.tsx", ["/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}"]],
-        ["app/hooks/usePhotoOps.ts", ["/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent("]],
+        ["packages/field-ui/src/hooks/usePhotoOps.ts", ["urls.photo(state.inspection.id, baseKey)", "urls.photo(state.inspection.id, dk)", "urls.photo(state.inspection.id, annotateBaseKey)", "urls.photo(state.inspection.id, originalKey)"]],
         [
             "app/components/editor/EditorHeader.tsx",
             ["/report-view/${tenantSlug}/${state.inspection.id}", "/api/inspections/${state.inspection.id}/pdf?type=full"],

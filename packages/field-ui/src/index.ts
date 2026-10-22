@@ -16,6 +16,7 @@ export type {
   FieldUrls,
   MediaFileResult,
   MediaUploader,
+  NotifyOptions,
   PendingMediaRecord,
   PendingMediaStore,
   PhotoAnnotateMeta,
@@ -29,6 +30,9 @@ export type {
 export type {
   AutoAdvanceMode,
   CommercialPresets,
+  CommentsLibraryEntry,
+  CommentsLibraryQuery,
+  CommentsLibraryRow,
   CompliancePanelData,
   CostItemView,
   DefectCategory,

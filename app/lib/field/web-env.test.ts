@@ -46,4 +46,14 @@ describe("webNotify", () => {
             { message: "d", variant: "neutral", durationMs: 2500 },
         ]);
     });
+
+    it("lets a call replace the variant's default display time", () => {
+        const push = vi.fn();
+        webNotify("video", "error", push, { durationMs: 6000 });
+        webNotify("plain", "error", push, {});
+        expect(push.mock.calls.map((c) => c[0])).toEqual([
+            { message: "video", variant: "error", durationMs: 6000 },
+            { message: "plain", variant: "error", durationMs: 8000 },
+        ]);
+    });
 });

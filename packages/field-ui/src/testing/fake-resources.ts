@@ -1,5 +1,10 @@
 import type { FieldResources } from '../data-source';
-import type { TemplateSearchResult } from '../data-source-types';
+import type {
+  CommentsLibraryEntry,
+  CommentsLibraryQuery,
+  CommentsLibraryRow,
+  TemplateSearchResult,
+} from '../data-source-types';
 
 /** The `templateSearch` resource: answers `result` (an empty single page by default) and records each input. */
 export interface FakeTemplateSearch {
@@ -86,5 +91,64 @@ export function createFakeVideo(): FakeVideo {
     },
     finalize: async () => ({ ok: true }),
     remove: async () => ({ ok: true }),
+  };
+}
+
+type CommentsLibraryResource = NonNullable<FieldResources['commentsLibrary']>;
+
+/** The `commentsLibrary` resource: lists `rows`, records every list, touch, save and edit. */
+export interface FakeCommentsLibrary extends CommentsLibraryResource {
+  /** The query of every `list`, in call order (`undefined` when none was passed). */
+  readonly lists: readonly (CommentsLibraryQuery | undefined)[];
+  readonly touches: readonly string[];
+  /** The entry of every stored `save`, in call order. */
+  saved(): readonly CommentsLibraryEntry[];
+  /** The id and entry of every `edit`, in call order. */
+  edited(): readonly { id: string; entry: CommentsLibraryEntry }[];
+  /** Replace the rows every later `list` answers. */
+  setRows(rows: CommentsLibraryRow[]): void;
+  /** Make every later `save` answer `{ ok: false, error }` and store nothing. */
+  failSave(error: string): void;
+}
+
+export function createFakeCommentsLibrary(initial: CommentsLibraryRow[] = []): FakeCommentsLibrary {
+  let rows = initial;
+  let saveFailure: string | null = null;
+  const lists: (CommentsLibraryQuery | undefined)[] = [];
+  const touches: string[] = [];
+  const saves: CommentsLibraryEntry[] = [];
+  const edits: { id: string; entry: CommentsLibraryEntry }[] = [];
+  return {
+    get lists() {
+      return lists;
+    },
+    get touches() {
+      return touches;
+    },
+    saved: () => saves,
+    edited: () => edits,
+    setRows(next) {
+      rows = next;
+    },
+    failSave(error) {
+      saveFailure = error;
+    },
+    list: async (query) => {
+      lists.push(query);
+      return rows;
+    },
+    touch: async (id) => {
+      touches.push(id);
+      return { ok: true };
+    },
+    save: async (entry) => {
+      if (saveFailure !== null) return { ok: false, error: saveFailure };
+      saves.push(entry);
+      return { ok: true };
+    },
+    edit: async (id, entry) => {
+      edits.push({ id, entry });
+      return { ok: true };
+    },
   };
 }

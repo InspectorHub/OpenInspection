@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { EditorData, PendingMediaRecord } from '../data-source';
 import {
   createEmptyEditorData,
+  createFakeCommentsLibrary,
   createFakeDataSource,
   createFakePrefs,
   createFakeTemplateSearch,
@@ -156,7 +157,7 @@ describe('createFakeDataSource', () => {
 
     it('the uploader answers ok with a key', async () => {
       const ds = createFakeDataSource({ data: editorData() });
-      const res = await ds.media.uploader('insp-1').upload(record('a', 'insp-1'));
+      const res = await ds.media.uploader('insp-1', null).upload(record('a', 'insp-1'));
       expect(res.ok).toBe(true);
     });
   });
@@ -343,5 +344,38 @@ describe('new resource fakes and session fields', () => {
       { inspectionId: 'i1', cmd: { type: 'complete' } },
       { inspectionId: 'i1', cmd: { type: 'complete' }, idempotencyKey: 'k1' },
     ]);
+  });
+});
+
+describe('media uploader, notify durations and the commentsLibrary fake', () => {
+  it('records each upload with whether a doc was passed, and can be made to fail', async () => {
+    const ds = createFakeDataSource({ data: editorData() });
+    const rec = record('a', 'insp-1');
+    expect(await ds.media.uploader('insp-1', new Y.Doc()).upload(rec)).toEqual({ ok: true, key: 'uploaded/a' });
+    expect(await ds.media.uploader('insp-1', null).upload(rec)).toEqual({ ok: true, key: 'uploaded/a' });
+    expect(ds.uploads.map((u) => [u.inspectionId, u.hadDoc])).toEqual([['insp-1', true], ['insp-1', false]]);
+    ds.failUpload('HTTP_500');
+    expect(await ds.media.uploader('insp-1', null).upload(rec)).toEqual({ ok: false, error: 'HTTP_500' });
+  });
+
+  it('records a notify display time only when one was given', () => {
+    const ds = createFakeDataSource({ data: editorData() });
+    ds.notify('a', 'error');
+    ds.notify('b', 'error', { durationMs: 6000 });
+    expect(ds.notifications).toEqual([{ message: 'a', variant: 'error' }, { message: 'b', variant: 'error', durationMs: 6000 }]);
+  });
+
+  it('createFakeCommentsLibrary lists its rows and records touches, saves and edits', async () => {
+    const lib = createFakeCommentsLibrary([{ id: 'c1', text: 'T', category: null, severity: null, section: null }]);
+    expect(await lib.list({ search: 's' })).toHaveLength(1);
+    expect(await lib.list()).toHaveLength(1);
+    expect(lib.lists).toEqual([{ search: 's' }, undefined]);
+    const entry = { text: 'x', severity: 'all', section: '', category: '', itemLabel: '' };
+    expect(await lib.touch('c1')).toEqual({ ok: true });
+    expect(await lib.save(entry)).toEqual({ ok: true });
+    expect(await lib.edit('c1', entry)).toEqual({ ok: true });
+    lib.failSave('no');
+    expect(await lib.save(entry)).toEqual({ ok: false, error: 'no' });
+    expect([lib.touches, lib.saved(), lib.edited()]).toEqual([['c1'], [entry], [{ id: 'c1', entry }]]);
   });
 });

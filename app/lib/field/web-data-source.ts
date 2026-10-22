@@ -1,10 +1,11 @@
 import type { CollabConnector, EditorData, FieldDataSource, SessionInfo } from "@core/field-ui/data-source";
-import type { MediaUploader } from "@core/field-ui/media-types";
+import { createWebMediaUploader } from "./web-uploader";
 import { webMediaStore } from "./web-media-store";
 import { webSessionInfo, type SessionContextLike, type SessionLoaderBits } from "./web-session";
 import { createWebUrls } from "./web-urls";
 import { webIsOnline, webNotify, webOnOnlineChange } from "./web-env";
 import { createWebExecute, type WebExecute } from "./web-transport";
+import { createWebCommentsLibrary } from "./web-comments-library";
 import { createWebPrefs } from "./web-prefs";
 import { createWebVideo } from "./web-video";
 
@@ -38,14 +39,6 @@ const collab: CollabConnector = {
     },
 };
 
-function uploader(): MediaUploader {
-    return {
-        upload() {
-            return Promise.reject(new Error(notWired("Media upload")));
-        },
-    };
-}
-
 /**
  * Compose the web `FieldDataSource`. Nothing browser-only is touched here: the media store opens
  * IndexedDB on first use, `createWebUrls` reads `window` only inside `presenceSocket`, and the
@@ -71,15 +64,15 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
         },
         session: (): SessionInfo => webSessionInfo(parts.sessionContext(), parts.sessionBits()),
         execute,
-        notify: (message, variant) => webNotify(message, variant),
+        notify: (message, variant, opts) => webNotify(message, variant, undefined, opts),
         reload: () => parts.reload(),
         exit: () => parts.exit(),
         isOnline: webIsOnline,
         onOnlineChange: webOnOnlineChange,
         collab,
-        media: { store: webMediaStore, uploader },
+        media: { store: webMediaStore, uploader: createWebMediaUploader },
         urls: createWebUrls(),
-        resources: { prefs: createWebPrefs(), video: createWebVideo() },
+        resources: { prefs: createWebPrefs(), video: createWebVideo(), commentsLibrary: createWebCommentsLibrary() },
         platform: "web",
     };
 }

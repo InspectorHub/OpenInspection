@@ -19,7 +19,7 @@
   "app/routes/template-edit.tsx": 718,
   "server/services/inspection/inspection-analytics.service.ts": 702,
   "scripts/check-platform-defaults.mjs": 701,
-  "app/hooks/usePhotoOps.ts": 662,
+  "packages/field-ui/src/hooks/usePhotoOps.ts": 648,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/components/editor/ItemEditor.tsx": 651,
   "packages/field-ui/src/components/media-studio/PhotoAnnotator.tsx": 646,

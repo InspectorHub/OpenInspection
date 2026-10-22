@@ -251,10 +251,6 @@
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
-  "packages/field-ui/src/data-source.ts#FieldResources.commentsLibrary": {
-    "kind": "deferred",
-    "reason": "Optional host capability declared on the FieldDataSource contract. The editor components that consume resources.commentsLibrary are still in app/ and move into the package in Plan B Task 5 (hooks and components move); until they do, nothing in app/ or server/ reads it through this type. Owed: wire it there, and the entry goes."
-  },
   "packages/field-ui/src/data-source.ts#FieldResources.mediaPool": {
     "kind": "deferred",
     "reason": "Optional host capability declared on the FieldDataSource contract. The editor components that consume resources.mediaPool are still in app/ and move into the package in Plan B Task 5 (hooks and components move); until they do, nothing in app/ or server/ reads it through this type. Owed: wire it there, and the entry goes."

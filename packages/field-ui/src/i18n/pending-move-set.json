@@ -35,8 +35,5 @@
   "app/components/statutory/StatutoryFormNotice.tsx",
   "app/components/statutory/StatutoryReadinessCard.tsx",
   "app/components/statutory/StatutorySourceRow.tsx",
-  "app/hooks/useCannedComments.ts",
-  "app/hooks/useMediaDrain.ts",
-  "app/hooks/usePdfExport.ts",
-  "app/hooks/usePhotoOps.ts"
+  "app/hooks/usePdfExport.ts"
 ]

@@ -120,14 +120,24 @@ describe("WebFieldHost", () => {
         await screen.findByText("list page");
     });
 
-    it("rejects collab and media upload loudly rather than doing nothing", async () => {
+    it("rejects collab loudly rather than doing nothing, and serves a media uploader that answers instead of throwing", async () => {
         let ds: FieldDataSource | null = null;
         mount(loaderPayload(), (d) => { ds = d; });
         await screen.findByText("probe");
         expect(() => ds!.collab.connect("i", {})).toThrow(/not wired/);
         await expect(ds!.collab.purge("i")).rejects.toThrow(/not wired/);
-        const uploader = ds!.media.uploader("i");
-        await expect(uploader.upload({} as Parameters<typeof uploader.upload>[0])).rejects.toThrow(/not wired/);
+        // With no results document a crop cannot be addressed: a not-ok answer, no request.
+        const fetchSpy = vi.spyOn(globalThis, "fetch");
+        const uploader = ds!.media.uploader("i", null);
+        const crop = { aspect: "free", orientation: "landscape" as const, x: 0, y: 0, width: 1, height: 1 };
+        await expect(
+            uploader.upload({
+                kind: "crop", pendingId: "p", inspectionId: "i", createdAt: 1, blob: new Blob(["c"]),
+                meta: { findingKey: "_default:s:i", itemId: "i", photoIndex: 0, photoKey: "k", crop },
+            }),
+        ).resolves.toMatchObject({ ok: false });
+        expect(fetchSpy).not.toHaveBeenCalled();
+        fetchSpy.mockRestore();
     });
 
     it("on the template host, load and execute reject clearly and the session still works", async () => {

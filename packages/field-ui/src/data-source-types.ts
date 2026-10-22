@@ -278,3 +278,46 @@ export interface TemplateSearchResult {
   page: number;
   totalPages: number;
 }
+
+/**
+ * The filters of a canned-comment library read. Every member is optional and an absent or
+ * empty one is not sent. The host serialises the members in their insertion order, so a
+ * caller that sets `sort` before `search` sends them in that order.
+ */
+export interface CommentsLibraryQuery {
+  search?: string;
+  /** 'relevance' or a host-defined sort name. */
+  sort?: string;
+  /** 'auto' narrows by the item context below; 'all' ignores it. */
+  filterMode?: string;
+  itemLabel?: string;
+  section?: string;
+  severity?: string;
+  pageSize?: string;
+}
+
+/** One library row as the host answers it. `lastUsedAt` is present when the host tracks use. */
+export interface CommentsLibraryRow {
+  id: string;
+  text: string;
+  category: string | null;
+  severity: string | null;
+  section: string | null;
+  libraryId?: string | null;
+  useCount?: number;
+  lastUsedAt?: string | null;
+}
+
+/**
+ * What a library save or edit carries. An empty string for `section`, `category` or `itemLabel`
+ * means "none". `severity` is a rating severity or 'all'; the host stores anything else as none.
+ */
+export interface CommentsLibraryEntry {
+  text: string;
+  severity: string;
+  section: string;
+  category: string;
+  itemLabel: string;
+  repairSummary?: string;
+  recommendedContractorTypeId?: string;
+}

@@ -17,6 +17,9 @@ import type {
   RevisionStatus,
   StatutoryCoverage,
   StatutoryDetails,
+  CommentsLibraryEntry,
+  CommentsLibraryQuery,
+  CommentsLibraryRow,
   TagLibraryEntry,
   TemplateSchema,
   TemplateSearchResult,
@@ -115,6 +118,11 @@ export interface SessionInfo {
   tenantTimeFormat: TimeFormat;
 }
 
+/** Per-call options of `notify`. `durationMs` replaces the host's default display time for the variant. */
+export interface NotifyOptions {
+  durationMs?: number;
+}
+
 /**
  * Per-call options of `execute`. The key is the write's idempotency key: the
  * host adapter forwards it as the `Idempotency-Key` (the web host writes it into
@@ -195,7 +203,18 @@ export interface FieldResources {
     load(): Promise<InspectionPrefs>;
     patch(delta: Partial<InspectionPrefs>): Promise<CommandResult<InspectionPrefs>>;
   };
-  commentsLibrary?: { list(): Promise<unknown>; save(entry: unknown): Promise<CommandResult>; remove(id: string): Promise<CommandResult> };
+  /**
+   * The tenant's canned-comment library. Owner: `useCannedComments` (the web host serves it from
+   * `/resources/comments-library`). `list` never rejects: a failed read answers `[]`. `save` creates
+   * an entry, `edit` replaces one, `touch` records one use; a not-ok answer means the host did not
+   * store it. There is no remove: the library page deletes through its own route.
+   */
+  commentsLibrary?: {
+    list(query?: CommentsLibraryQuery): Promise<CommentsLibraryRow[]>;
+    touch(id: string): Promise<CommandResult>;
+    save(entry: CommentsLibraryEntry): Promise<CommandResult>;
+    edit(id: string, entry: CommentsLibraryEntry): Promise<CommandResult>;
+  };
   costItems?: { list(inspectionId: string): Promise<unknown>; save(payload: unknown): Promise<CommandResult> };
   repairItems?: { list(inspectionId: string): Promise<unknown> };
   mediaPool?: { list(inspectionId: string): Promise<unknown> };
@@ -252,13 +271,21 @@ export interface FieldDataSource {
   /** The answer's `data` is typed from the command (see `CommandDataMap`). */
   execute<C extends FieldCommand>(inspectionId: string, cmd: C, opts?: ExecuteOptions): Promise<CommandResult<CommandData<C>>>;
   /** Show a transient message (replaces the host's toast inside the package). */
-  notify(message: string, variant?: 'info' | 'success' | 'error'): void;
+  notify(message: string, variant?: 'info' | 'success' | 'error', opts?: NotifyOptions): void;
   reload(): void;
   exit(): void;
   isOnline(): boolean;
   onOnlineChange(cb: (online: boolean) => void): () => void;
   collab: CollabConnector;
-  media: { store: PendingMediaStore; uploader(inspectionId: string): MediaUploader };
+  media: {
+    store: PendingMediaStore;
+    /**
+     * `doc` is the live results document, or null when the host has none yet. A crop or
+     * annotation addresses its photo by index, so the uploader resolves the CURRENT index from
+     * `doc` at upload time and answers `{ ok: false }` when `doc` is null or the photo is gone.
+     */
+    uploader(inspectionId: string, doc: Y.Doc | null): MediaUploader;
+  };
   urls: FieldUrls;
   resources: FieldResources;
   platform: 'web' | 'ios' | 'android';

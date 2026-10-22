@@ -1,3 +1,4 @@
+import type { NotifyOptions } from "@core/field-ui/data-source";
 import { pushToast } from "~/hooks/useToast";
 
 /** The slice of `pushToast` this module uses; injectable so tests need no toast host. */
@@ -40,6 +41,7 @@ export function webNotify(
     message: string,
     variant: "info" | "success" | "error" = "info",
     push: PushToast = pushToast,
+    opts?: NotifyOptions,
 ): void {
-    push({ message, variant: VARIANT[variant], durationMs: DURATION_MS[variant] });
+    push({ message, variant: VARIANT[variant], durationMs: opts?.durationMs ?? DURATION_MS[variant] });
 }
