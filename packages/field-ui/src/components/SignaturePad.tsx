@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { PENDING_CLASS, pendingProps } from "@core/shared-ui";
+import { m } from "../i18n";
 
 interface Props {
   onSubmit: (dataUri: string) => Promise<void> | void;
@@ -7,7 +8,7 @@ interface Props {
   label?: string;
 }
 
-export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
+export function SignaturePad({ onSubmit, onCancel, label }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
   const [hasInk, setHasInk] = useState(false);
@@ -64,7 +65,7 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
   const submit = async () => {
     if (inFlight.current) return;
     if (!hasInk) {
-      setError("Draw your signature first.");
+      setError(m.common_signature_pad_empty());
       return;
     }
     inFlight.current = true;
@@ -103,12 +104,12 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
           className={`text-sm text-ih-fg-3 underline ${PENDING_CLASS}`}
           {...pendingProps(busy, clear)}
         >
-          Clear
+          {m.common_clear()}
         </button>
         <div className="ml-auto flex gap-2">
           {onCancel && (
             <button type="button" className={`text-sm ${PENDING_CLASS}`} {...pendingProps(busy, onCancel)}>
-              Cancel
+              {m.common_cancel()}
             </button>
           )}
           <button
@@ -116,7 +117,7 @@ export function SignaturePad({ onSubmit, onCancel, label = "Sign" }: Props) {
             className={`text-sm font-semibold bg-ih-primary text-ih-fg-inverse px-3 py-1 rounded ${PENDING_CLASS}`}
             {...pendingProps(busy, submit)}
           >
-            {busy ? "..." : label}
+            {busy ? "..." : (label ?? m.common_signature_pad_sign())}
           </button>
         </div>
       </div>

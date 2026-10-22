@@ -1,6 +1,6 @@
 import { Modal } from "@core/shared-ui";
 import { SignaturePad } from "../SignaturePad";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 export interface SignModalProps {
  open: boolean;

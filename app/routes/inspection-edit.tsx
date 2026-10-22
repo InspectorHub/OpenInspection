@@ -73,7 +73,7 @@ import { SaveTemplateModal } from "@core/field-ui/components/editor/SaveTemplate
 import { useStructureEdit } from "@core/field-ui/hooks/useStructureEdit";
 import { UnsavedChangesBlocker } from "@core/field-ui/components/editor/UnsavedChangesBlocker";
 import { PublishModal, type PublishExtras } from "~/components/editor/PublishModal";
-import { SignModal } from "~/components/editor/SignModal";
+import { SignModal } from "@core/field-ui/components/editor/SignModal";
 import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
 import { SectionPickerModal } from "@core/field-ui/components/editor/SectionPickerModal";
 import { TagPickerModal } from "@core/field-ui/components/editor/TagPickerModal";

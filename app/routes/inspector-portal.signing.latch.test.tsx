@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("~/components/agreements/SendAgreementModal", () => ({
     SendAgreementModal: (p: SendProps) => { mocks.send = p; return null; },
 }));
-vi.mock("~/components/SignaturePad", () => ({
+vi.mock("@core/field-ui/components/SignaturePad", () => ({
     SignaturePad: (p: SigProps) => { mocks.sig = p; return null; },
 }));
 vi.mock("~/components/inspector-portal/SigningRequests", () => ({

@@ -22,5 +22,7 @@
   "common_delete_failed": "It could not be deleted. Nothing was changed; try again.",
   "common_archive_failed": "It could not be archived. Nothing was changed; try again.",
   "common_cancel_invite_failed": "The invitation could not be cancelled. It is still pending; try again.",
-  "common_resend_invite_failed": "The invitation could not be sent again. Try again."
+  "common_resend_invite_failed": "The invitation could not be sent again. Try again.",
+  "common_signature_pad_sign": "Sign",
+  "common_signature_pad_empty": "Draw your signature first."
 }

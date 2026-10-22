@@ -32,7 +32,7 @@ import { deleteInspectionViaApi } from "~/lib/inspection-delete.server";
 import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
 import { SigningRequests } from "~/components/inspector-portal/SigningRequests";
 import { StatutoryDeliverable } from "~/components/statutory/StatutoryDeliverable";
-import { SignaturePad } from "~/components/SignaturePad";
+import { SignaturePad } from "@core/field-ui/components/SignaturePad";
 import { RequestPaymentModal } from "~/components/inspector-portal/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspector-portal/PublishReportModal";
 import { CreateReinspectionModal } from "~/components/inspector-portal/CreateReinspectionModal";

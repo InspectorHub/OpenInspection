@@ -13,7 +13,6 @@
   "app/components/editor/PublishModal.tsx",
   "app/components/editor/RepairItemsPanel.tsx",
   "app/components/editor/SideRail.tsx",
-  "app/components/editor/SignModal.tsx",
   "app/components/editor/cost-items-api.ts",
   "app/components/form/FormField.tsx",
   "app/components/media-studio/AvatarCropper.tsx",
