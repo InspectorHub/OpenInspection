@@ -234,7 +234,7 @@ const INVENTORY = [
       reason: "Upper bound of the same report projection; null on every post-change finding." },
 
     // ── CONTROLS: every screen with a money input ───────────────────────────
-    { kind: "control", id: "app/components/editor/CostItemsPanel.tsx", disposition: "allowed",
+    { kind: "control", id: "packages/field-ui/src/components/editor/CostItemsPanel.tsx", disposition: "allowed",
       reason: "Commercial PCA cost table — assessor-authored, reviewed on its own terms." },
     { kind: "control", id: "app/components/inspector-portal/InvoiceCard.tsx", disposition: "allowed",
       reason: "Invoicing: what the tenant bills their client." },

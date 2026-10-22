@@ -10,6 +10,11 @@ import { createWebCommentsLibrary } from "./web-comments-library";
 import { createWebCostItems } from "./web-cost-items";
 import { createWebPrefs } from "./web-prefs";
 import { createWebVideo } from "./web-video";
+import { createWebMediaPool } from "./web-media-pool";
+import { createWebRepairItems } from "./web-repair-items";
+import { createWebSettingsSheet } from "./web-settings-sheet";
+import { createWebTemplateSearch } from "./web-template-search";
+import { createWebVersionHistory } from "./web-version-history";
 
 /**
  * What the composed data source reads and calls. Every member is a function, so the host can
@@ -80,6 +85,11 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
             commentsLibrary: createWebCommentsLibrary(),
             costItems: createWebCostItems(),
             aiAssist: createWebAiAssist(),
+            templateSearch: createWebTemplateSearch(),
+            repairItems: createWebRepairItems(),
+            mediaPool: createWebMediaPool(),
+            settingsSheet: createWebSettingsSheet(),
+            versionHistory: createWebVersionHistory(),
         },
         platform: "web",
     };

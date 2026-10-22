@@ -123,7 +123,7 @@ on-demand JSON-projection snapshots in DO storage (capped at 25, `{seq, atMs, by
   in, persists, and broadcasts a **MSG_RESTORE** control frame. Every connected
   client drops its local Y.Doc + IndexedDB and resyncs from scratch — so a restore
   converges all live clients (a plain additive update could not revert deletions).
-- UI: the **Version history** panel in the editor (`app/components/collab/VersionHistoryPanel.tsx`).
+- UI: the **Version history** panel in the editor (`packages/field-ui/src/components/collab/VersionHistoryPanel.tsx`).
 
 ## Configuration
 
@@ -168,4 +168,4 @@ queue (`app/lib/offline/*`, `useOfflineQueue`/`useOfflineWrite`), the conflict U
 | `packages/field-ui/src/collab/results-doc-connection.ts` | browser Y.Doc ↔ DO connection (offline + restore resync) |
 | `packages/field-ui/src/collab/use-results-doc.ts` | React hook over the connection |
 | `packages/field-ui/src/collab/results-binding.ts` | doc ↔ editor write-API bridge |
-| `app/components/collab/VersionHistoryPanel.tsx` | version-history UI |
+| `packages/field-ui/src/components/collab/VersionHistoryPanel.tsx` | version-history UI |

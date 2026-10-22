@@ -52,6 +52,7 @@
   "editor_fullscreen_exit_aria": "Exit fullscreen",
   "editor_fullscreen_enter_aria": "Enter fullscreen",
   "editor_settings_save_error": "Error -- try again",
+  "editor_settings_load_failed": "Could not load these settings.",
   "editor_settings_save_changes": "Save changes",
   "editor_settings_legend_template": "Template",
   "editor_settings_field_template": "Inspection template",

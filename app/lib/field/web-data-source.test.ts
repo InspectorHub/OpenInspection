@@ -57,6 +57,20 @@ describe("createWebFieldDataSource", () => {
         }
     });
 
+    it("serves every resource the moved panels read, in the editor and in a host with no inspection", () => {
+        for (const ds of [make(), make({ current: () => null })]) {
+            expect(typeof ds.resources.templateSearch?.search).toBe("function");
+            expect(typeof ds.resources.repairItems?.list).toBe("function");
+            expect(typeof ds.resources.mediaPool?.list).toBe("function");
+            expect(typeof ds.resources.settingsSheet?.load).toBe("function");
+            expect(typeof ds.resources.versionHistory?.capture).toBe("function");
+            expect(typeof ds.resources.costItems?.save).toBe("function");
+            for (const member of ["createUpload", "uploadFile", "uploadPoster", "setPoster", "finalize", "remove"] as const) {
+                expect(typeof ds.resources.video?.[member]).toBe("function");
+            }
+        }
+    });
+
     it("hands the live results document to the media uploader, which answers instead of throwing", async () => {
         const ds = make();
         const rec = {

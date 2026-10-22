@@ -17,7 +17,7 @@ import {
  type CannedDefect,
  type CannedTabId,
  type LibraryMatch,
-} from "./CannedCommentTabs";
+} from "@core/field-ui/components/editor/CannedCommentTabs";
 import { ItemPhotoStrip, type StripPhoto } from "@core/field-ui/components/media-studio/ItemPhotoStrip";
 import type { AttachedRepairItem } from "@core/field-ui/hooks/useFindings";
 import type { ItemAttribute } from "@core/field-ui/shared/types";

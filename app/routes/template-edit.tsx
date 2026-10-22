@@ -23,7 +23,7 @@ import { serializeTemplateMeta, serializeSectionMeta } from "~/lib/editor/templa
 import * as ops from "@core/field-ui/shared/structure-ops";
 import { serializeItemForSave } from "~/lib/editor/serialize-template";
 import type { PropertyType } from "~/components/template/types";
-import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
+import { CommentLibraryDrawer } from "@core/field-ui/components/editor/CommentLibraryDrawer";
 import { useCannedComments } from "@core/field-ui/hooks/useCannedComments";
 import { buildCannedFromText, TAB_SEVERITY, type CannedTab } from "~/lib/editor/canned-from-library";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";

@@ -16,6 +16,7 @@ import type { PcaNarrative } from './shared/pca-narrative';
 import type { AutoAdvanceMode } from './shared/rating-levels';
 
 export type { PropertyMetaField, PcaNarrative, AutoAdvanceMode };
+export type * from './resource-types';
 
 /** Mirrors `Inspection` in packages/field-ui/src/hooks/useInspection.ts. */
 export interface EditorInspection {
@@ -320,11 +321,6 @@ export interface CommentsLibraryEntry {
   itemLabel: string;
   repairSummary?: string;
   recommendedContractorTypeId?: string;
-}
-
-/** The cost lines of one inspection, as the host's cost-items read answers them. */
-export interface CostItemsListing {
-  items: CostItemView[];
 }
 
 /**

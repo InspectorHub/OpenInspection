@@ -143,7 +143,7 @@ describe("PropertyTypeControl", () => {
   });
 
   it("says it is checking until the read answers", async () => {
-    let answer: (listing: { items: CostItemView[] }) => void = () => undefined;
+    let answer: (listing: { items: CostItemView[]; reserveEnabled: boolean }) => void = () => undefined;
     const costItems: NonNullable<FieldResources["costItems"]> = {
       list: () => new Promise((resolve) => { answer = resolve; }),
       save: async () => ({ ok: true }),
@@ -151,7 +151,7 @@ describe("PropertyTypeControl", () => {
     const { findByTestId, findByText } = renderControl({}, [], { costItems });
     fireEvent.change(await findByTestId("property-type-select"), { target: { value: "single_family" } });
     expect(await findByText(/checking for opinion-of-cost lines/i)).toBeTruthy();
-    answer({ items: [line("c1")] });
+    answer({ items: [line("c1")], reserveEnabled: false });
     expect((await findByTestId("lossy-cost-items")).textContent).toMatch(/1 opinion-of-cost line/);
   });
 
@@ -173,7 +173,7 @@ describe("PropertyTypeControl", () => {
 
   it("a newer count replaces an older one that answers late", async () => {
     // Open, cancel, open again: the first read answers AFTER the second, and must not win.
-    const answers: Array<(listing: { items: CostItemView[] }) => void> = [];
+    const answers: Array<(listing: { items: CostItemView[]; reserveEnabled: boolean }) => void> = [];
     const costItems: NonNullable<FieldResources["costItems"]> = {
       list: () => new Promise((resolve) => { answers.push(resolve); }),
       save: async () => ({ ok: true }),
@@ -184,8 +184,8 @@ describe("PropertyTypeControl", () => {
     fireEvent.click(await findByText("Cancel"));
     fireEvent.change(select, { target: { value: "multi_unit" } });
     await waitFor(() => expect(answers).toHaveLength(2));
-    await act(async () => { answers[1]!({ items: [line("a"), line("b")] }); });
-    await act(async () => { answers[0]!({ items: [line("x"), line("y"), line("z"), line("w"), line("v")] }); });
+    await act(async () => { answers[1]!({ items: [line("a"), line("b")], reserveEnabled: false }); });
+    await act(async () => { answers[0]!({ items: [line("x"), line("y"), line("z"), line("w"), line("v")], reserveEnabled: false }); });
     expect((await findByTestId("lossy-cost-items")).textContent).toMatch(/2 opinion-of-cost lines/);
   });
 

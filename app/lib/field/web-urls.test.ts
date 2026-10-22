@@ -23,6 +23,10 @@ describe("createWebUrls golden strings", () => {
     it("reportPdf carries ?type=full", () => {
         expect(urls.reportPdf("i1")).toBe("/api/inspections/i1/pdf?type=full");
     });
+    it("costExport encodes the inspection id and names the format (the strings the export buttons built)", () => {
+        expect(urls.costExport("i 1", "csv")).toBe("/resources/cost-export?inspectionId=i%201&format=csv");
+        expect(urls.costExport("i1", "xlsx")).toBe("/resources/cost-export?inspectionId=i1&format=xlsx");
+    });
     it("statutoryPreviewPdf", () => {
         expect(urls.statutoryPreviewPdf("i1")).toBe("/api/inspections/i1/statutory-form/preview.pdf");
     });

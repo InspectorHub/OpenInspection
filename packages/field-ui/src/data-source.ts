@@ -9,10 +9,12 @@ import type {
   CommercialPresets,
   CompliancePanelData,
   CostItemsListing,
+  CostItemWrite,
   DefectCategory,
   EditorInspection,
   InspectionPrefs,
   InspectionUnit,
+  MediaPoolListing,
   OutboundCoolingWindow,
   PcaNarrative,
   RatingLevel,
@@ -29,6 +31,12 @@ import type {
   TemplateSnapshot,
   UnitProgress,
   RelianceText,
+  RepairItemOption,
+  SettingsSheetData,
+  VersionSnapshotContent,
+  VersionSnapshotEntry,
+  VideoFinalizeInput,
+  VideoUploadTicket,
 } from './data-source-types';
 
 /** Everything the editor reads on open. Mirrors the inspection-edit loader's return value. */
@@ -176,6 +184,8 @@ export interface FieldUrls {
   photo(inspectionId: string, key: string): string;
   reportPreview(tenantSlug: string, inspectionId: string): string | null;
   reportPdf(inspectionId: string): string | null;
+  /** The cost tables' download (`csv` or `xlsx`); a plain link the browser follows. */
+  costExport(inspectionId: string, format: 'csv' | 'xlsx'): string;
   statutoryPreviewPdf(inspectionId: string): string | null;
   videoObject(inspectionId: string, ref: string): string | null;
   /**
@@ -218,11 +228,25 @@ export interface FieldResources {
     save(entry: CommentsLibraryEntry): Promise<CommandResult>;
     edit(id: string, entry: CommentsLibraryEntry): Promise<CommandResult>;
   };
-  /** `list` never rejects: a failed read answers no items. `save` stays untyped until its consumer converts. */
-  costItems?: { list(inspectionId: string): Promise<CostItemsListing>; save(payload: unknown): Promise<CommandResult> };
-  repairItems?: { list(inspectionId: string): Promise<unknown> };
-  mediaPool?: { list(inspectionId: string): Promise<unknown> };
-  settingsSheet?: { load(inspectionId: string): Promise<unknown> };
+  /**
+   * The cost lines. `list` never rejects: a failed read answers no lines and no reserve fields. `save`
+   * never rejects either: a refused or unreachable write answers `{ ok: false }`, and a `create` that
+   * landed answers the stored line's id as `data.id`. The caller owns the same-frame guard: a `create`
+   * is not idempotent.
+   */
+  costItems?: {
+    list(inspectionId: string): Promise<CostItemsListing>;
+    save(inspectionId: string, write: CostItemWrite): Promise<CommandResult<{ id?: string }>>;
+  };
+  /** The tenant's repair-item catalogue (it is not per inspection). `list` never rejects: a failed read answers none. */
+  repairItems?: { list(): Promise<RepairItemOption[]> };
+  /** The inspection's photos for the gallery. `list` never rejects: a failed read answers `answered: false`. */
+  mediaPool?: { list(inspectionId: string): Promise<MediaPoolListing> };
+  /**
+   * What the inspection settings sheet reads when it opens. Never rejects; `null` means the host could not
+   * read it (the sheet then offers a retry instead of a form that would save blanks over the stored values).
+   */
+  settingsSheet?: { load(inspectionId: string): Promise<SettingsSheetData | null> };
   /**
    * AI writing assistance for an inspection note (the web host serves it from `/resources/ai-assist`).
    * Never rejects: every failure answers `{ ok: false, error }`. The caller owns the same-frame guard:
@@ -232,21 +256,41 @@ export interface FieldResources {
   publishReadiness?: { check(inspectionId: string): Promise<unknown> };
   /** The template picker's search. Typed from the existing route loader (see `TemplateSearchResult`). */
   templateSearch?: { search(input: { q: string; page: number }): Promise<TemplateSearchResult> };
+  /**
+   * Stored versions of the report content. None of them rejects. A not-ok `list` or `get` means the host
+   * could not read it (the panel shows its retry); a not-ok `restore` carries the sentence to show. The
+   * caller owns the same-frame guard: `capture` and `restore` each store a version row.
+   */
   versionHistory?: {
-    // Payloads stay `unknown` until the batch that converts VersionHistoryPanel types them.
-    list(inspectionId: string): Promise<unknown>;
-    get(inspectionId: string, seq: number): Promise<unknown>;
+    list(inspectionId: string): Promise<CommandResult<VersionSnapshotEntry[]>>;
+    get(inspectionId: string, seq: number): Promise<CommandResult<VersionSnapshotContent>>;
     restore(inspectionId: string, seq: number): Promise<CommandResult>;
     /** The "Save version now" POST. */
     capture(inspectionId: string): Promise<CommandResult>;
   };
+  /**
+   * The video upload flow, in the order the capture sheet calls it: `createUpload`, `uploadFile`, (r2)
+   * `uploadPoster`, `finalize`. None of them rejects: a failure answers `{ ok: false, error }` where `error` is
+   * the reason to show, or absent when the host has none (the sheet then shows its own sentence). A host
+   * without the video flow leaves the member out, and the capture entry point is not offered.
+   */
   video?: {
-    // `createUpload`/`finalize` payloads stay `unknown` until the batch that converts VideoCapture types them.
-    createUpload(inspectionId: string): Promise<unknown>;
-    uploadPoster(inspectionId: string, blob: Blob): Promise<CommandResult>;
+    createUpload(inspectionId: string, input: { itemId?: string }): Promise<CommandResult<VideoUploadTicket>>;
+    /**
+     * Send the clip to the ticket's `uploadURL`, reporting `0..100` progress. For r2 the answer carries the real
+     * `{ mediaId, r2Key }` the finalize needs; for stream it carries no data.
+     */
+    uploadFile(
+      ticket: VideoUploadTicket,
+      file: Blob,
+      onProgress: (pct: number) => void,
+    ): Promise<CommandResult<{ mediaId: string; r2Key: string } | undefined>>;
+    /** r2 only: store the clip's first frame as its poster. A failure is not fatal to the upload. */
+    uploadPoster(inspectionId: string, ticket: VideoUploadTicket, blob: Blob): Promise<CommandResult<{ posterKey: string }>>;
     /** Pick the poster frame of a Stream video; `posterPct` is 0..1. */
     setPoster(inspectionId: string, input: { streamUid: string; posterPct: number }): Promise<CommandResult>;
-    finalize(inspectionId: string, payload: unknown): Promise<CommandResult>;
+    /** Turn the uploaded clip into a media-pool row; `data.poolId` is that row's id. */
+    finalize(inspectionId: string, input: VideoFinalizeInput): Promise<CommandResult<{ poolId: string }>>;
     remove(inspectionId: string, ref: string): Promise<CommandResult>;
   };
 }

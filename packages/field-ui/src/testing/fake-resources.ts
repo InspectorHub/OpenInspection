@@ -6,6 +6,7 @@ import type {
   CommentsLibraryQuery,
   CommentsLibraryRow,
   CostItemView,
+  CostItemWrite,
   CostItemsListing,
   TemplateSearchResult,
 } from '../data-source-types';
@@ -32,69 +33,6 @@ export function createFakeTemplateSearch(initial?: TemplateSearchResult): FakeTe
       searches.push(input);
       return result;
     },
-  };
-}
-
-type VersionHistoryResource = NonNullable<FieldResources['versionHistory']>;
-type VideoResource = NonNullable<FieldResources['video']>;
-
-/** The `versionHistory` resource: lists nothing, records every capture and restore. */
-export interface FakeVersionHistory extends VersionHistoryResource {
-  /** Inspection ids passed to `capture`, in call order. */
-  readonly captures: readonly string[];
-  /** `{ inspectionId, seq }` passed to `restore`, in call order. */
-  readonly restores: readonly { inspectionId: string; seq: number }[];
-  /** Make every later `capture` answer `{ ok: false, error }`. */
-  failCapture(error: string): void;
-}
-
-export function createFakeVersionHistory(): FakeVersionHistory {
-  const captures: string[] = [];
-  const restores: { inspectionId: string; seq: number }[] = [];
-  let captureFailure: string | null = null;
-  return {
-    get captures() {
-      return captures;
-    },
-    get restores() {
-      return restores;
-    },
-    failCapture(error) {
-      captureFailure = error;
-    },
-    list: async () => [],
-    get: async () => null,
-    restore: async (inspectionId, seq) => {
-      restores.push({ inspectionId, seq });
-      return { ok: true };
-    },
-    capture: async (inspectionId) => {
-      captures.push(inspectionId);
-      return captureFailure === null ? { ok: true } : { ok: false, error: captureFailure };
-    },
-  };
-}
-
-/** The `video` resource: every member answers a neutral success; `setPoster` calls are recorded. */
-export interface FakeVideo extends VideoResource {
-  /** Arguments of every `setPoster`, in call order. */
-  readonly posters: readonly { inspectionId: string; streamUid: string; posterPct: number }[];
-}
-
-export function createFakeVideo(): FakeVideo {
-  const posters: { inspectionId: string; streamUid: string; posterPct: number }[] = [];
-  return {
-    get posters() {
-      return posters;
-    },
-    createUpload: async () => null,
-    uploadPoster: async () => ({ ok: true }),
-    setPoster: async (inspectionId, input) => {
-      posters.push({ inspectionId, ...input });
-      return { ok: true };
-    },
-    finalize: async () => ({ ok: true }),
-    remove: async () => ({ ok: true }),
   };
 }
 
@@ -206,28 +144,73 @@ export function createFakeAiAssist(): FakeAiAssist {
 
 type CostItemsResource = NonNullable<FieldResources['costItems']>;
 
-/** The `costItems` resource: lists `items`, records every list. `save` answers a neutral success. */
+/**
+ * The `costItems` resource: lists `items`, records every list and write. A `create` answers the id `stored-N`
+ * (N counting from 1); `update` and `delete` answer ok. `hold` keeps every later write in flight.
+ */
 export interface FakeCostItems extends CostItemsResource {
   /** Inspection ids passed to `list`, in call order. */
   readonly lists: readonly string[];
+  /** Every write passed to `save`, in call order. */
+  readonly writes: readonly { inspectionId: string; write: CostItemWrite }[];
   /** Replace the lines every later `list` answers. */
   setItems(items: CostItemView[]): void;
+  /** Replace the reserve-schedule switch every later `list` answers. */
+  setReserveEnabled(enabled: boolean): void;
+  /** Make every later `save` answer `{ ok: false }`. */
+  failSave(): void;
+  /** Keep every later `save` in flight until the returned function is called. */
+  hold(): () => void;
 }
 
 export function createFakeCostItems(initial: CostItemView[] = []): FakeCostItems {
   let items = initial;
+  let reserveEnabled = false;
+  let saveFails = false;
+  let gate: Promise<void> | null = null;
+  let stored = 0;
   const lists: string[] = [];
+  const writes: { inspectionId: string; write: CostItemWrite }[] = [];
   return {
     get lists() {
       return lists;
     },
+    get writes() {
+      return writes;
+    },
     setItems(next) {
       items = next;
     },
+    setReserveEnabled(enabled) {
+      reserveEnabled = enabled;
+    },
+    failSave() {
+      saveFails = true;
+    },
+    hold() {
+      let release: () => void = () => undefined;
+      gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return () => {
+        gate = null;
+        release();
+      };
+    },
     list: async (inspectionId): Promise<CostItemsListing> => {
       lists.push(inspectionId);
-      return { items };
+      return { items, reserveEnabled };
     },
-    save: async () => ({ ok: true }),
+    save: async (inspectionId, write) => {
+      writes.push({ inspectionId, write });
+      if (gate !== null) await gate;
+      if (saveFails) return { ok: false };
+      if (write.intent === 'create') {
+        stored += 1;
+        return { ok: true, data: { id: `stored-${stored}` } };
+      }
+      return { ok: true };
+    },
   };
 }
+

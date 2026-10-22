@@ -20,6 +20,8 @@ export function createWebUrls(location?: PresenceLocation): FieldUrls {
         reportPreview: (tenantSlug, inspectionId) =>
             tenantSlug ? `/report-view/${tenantSlug}/${inspectionId}` : null,
         reportPdf: (inspectionId) => `/api/inspections/${inspectionId}/pdf?type=full`,
+        costExport: (inspectionId, format) =>
+            `/resources/cost-export?inspectionId=${encodeURIComponent(inspectionId)}&format=${format}`,
         statutoryPreviewPdf: (inspectionId) => `/api/inspections/${inspectionId}/statutory-form/preview.pdf`,
         videoObject: (inspectionId, ref) =>
             ref ? `/api/inspections/${inspectionId}/media/video/r2-object/${ref}` : null,

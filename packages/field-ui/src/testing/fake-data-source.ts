@@ -19,17 +19,22 @@ export {
   createFakeCommentsLibrary,
   createFakeCostItems,
   createFakeTemplateSearch,
+} from './fake-resources';
+export {
+  createFakeMediaPool,
+  createFakeRepairItems,
+  createFakeSettingsSheet,
   createFakeVersionHistory,
   createFakeVideo,
-} from './fake-resources';
+} from './fake-panel-resources';
+export type { FakeAiAssist, FakeCommentsLibrary, FakeCostItems, FakeTemplateSearch } from './fake-resources';
 export type {
-  FakeAiAssist,
-  FakeCommentsLibrary,
-  FakeCostItems,
-  FakeTemplateSearch,
+  FakeMediaPool,
+  FakeRepairItems,
+  FakeSettingsSheet,
   FakeVersionHistory,
   FakeVideo,
-} from './fake-resources';
+} from './fake-panel-resources';
 
 export interface FakeSeed {
   data: EditorData;
@@ -113,6 +118,7 @@ const DEFAULT_URLS: FieldUrls = {
   photo: (inspectionId, key) => `/fake/photos/${inspectionId}/${key}`,
   reportPreview: () => null,
   reportPdf: () => null,
+  costExport: (inspectionId, format) => `/fake/cost-export/${inspectionId}.${format}`,
   statutoryPreviewPdf: () => null,
   videoObject: () => null,
   presenceSocket: (inspectionId) => `ws://fake.invalid/api/inspections/${inspectionId}/presence/ws`,

@@ -7,7 +7,10 @@ import {
   createFakeCommentsLibrary,
   createFakeCostItems,
   createFakeDataSource,
+  createFakeMediaPool,
   createFakePrefs,
+  createFakeRepairItems,
+  createFakeSettingsSheet,
   createFakeTemplateSearch,
   createFakeVersionHistory,
   createFakeVideo,
@@ -418,12 +421,57 @@ describe('the aiAssist and costItems fakes', () => {
     expect((await pending).ok).toBe(true);
   });
 
-  it('createFakeCostItems lists its lines, records each list, and can be re-seeded', async () => {
+  it('createFakeCostItems lists its lines and the reserve switch, records each list and write, and can be re-seeded', async () => {
     const costs = createFakeCostItems([{ id: 'c1' } as never]);
     expect((await costs.list('insp-1')).items).toHaveLength(1);
     costs.setItems([]);
-    expect(await costs.list('insp-2')).toEqual({ items: [] });
+    costs.setReserveEnabled(true);
+    expect(await costs.list('insp-2')).toEqual({ items: [], reserveEnabled: true });
     expect(costs.lists).toEqual(['insp-1', 'insp-2']);
-    expect(await costs.save({})).toEqual({ ok: true });
+    expect(await costs.save('insp-1', { intent: 'delete', itemId: 'c1' })).toEqual({ ok: true });
+    expect(await costs.save('insp-1', { intent: 'create', item: { id: 'tmp-1' } as never })).toEqual({ ok: true, data: { id: 'stored-1' } });
+    expect(costs.writes.map((w) => w.write.intent)).toEqual(['delete', 'create']);
+    costs.failSave();
+    expect(await costs.save('insp-1', { intent: 'delete', itemId: 'c2' })).toEqual({ ok: false });
+  });
+
+  it('createFakeVersionHistory lists, reads, captures and restores, and can fail each read and write', async () => {
+    const vh = createFakeVersionHistory([{ seq: 1, atMs: 5, byUserId: null }]);
+    expect(await vh.list('i')).toEqual({ ok: true, data: [{ seq: 1, atMs: 5, byUserId: null }] });
+    expect(await vh.get('i', 1)).toEqual({ ok: true, data: { projection: {} } });
+    expect(await vh.capture('i')).toEqual({ ok: true });
+    expect(await vh.restore('i', 1)).toEqual({ ok: true });
+    expect([vh.lists, vh.gets, vh.captures, vh.restores]).toEqual([1, [{ inspectionId: 'i', seq: 1 }], ['i'], [{ inspectionId: 'i', seq: 1 }]]);
+    vh.failList('no');
+    vh.failGet();
+    expect(await vh.list('i')).toEqual({ ok: false, error: 'no' });
+    expect(await vh.get('i', 1)).toEqual({ ok: false });
+  });
+
+  it('createFakeVideo runs the whole capture flow and records each step', async () => {
+    const video = createFakeVideo();
+    const created = await video.createUpload('i', { itemId: 'it' });
+    expect(created.ok && created.data?.provider).toBe('stream');
+    expect(await video.uploadFile(created.data!, new File(['x'], 'a.mp4'), () => undefined)).toEqual({ ok: true });
+    expect(await video.finalize('i', { provider: 'stream', streamUid: 'uid-1' })).toEqual({ ok: true, data: { poolId: 'pool-1' } });
+    expect([video.createUploads.length, video.uploadedFiles, video.finalizes.length]).toEqual([1, ['a.mp4'], 1]);
+    video.failFinalize('late');
+    expect(await video.finalize('i', { provider: 'stream', streamUid: 'u' })).toEqual({ ok: false, error: 'late' });
+  });
+
+  it('createFakeRepairItems, createFakeMediaPool and createFakeSettingsSheet answer what they were given and count reads', async () => {
+    const repair = createFakeRepairItems([{ id: 'r', name: 'n', category: null, defaultRepairSummary: 's', contractorTypeName: null }]);
+    expect(await repair.list()).toHaveLength(1);
+    expect(repair.lists).toBe(1);
+    const pool = createFakeMediaPool();
+    expect(await pool.list('i')).toEqual({ photos: [], answered: true });
+    pool.setListing({ photos: [], answered: false });
+    expect((await pool.list('j')).answered).toBe(false);
+    expect(pool.lists).toEqual(['i', 'j']);
+    const sheet = createFakeSettingsSheet();
+    expect((await sheet.load('i'))?.templates).toEqual([]);
+    sheet.setData(null);
+    expect(await sheet.load('j')).toBeNull();
+    expect(sheet.loads).toEqual(['i', 'j']);
   });
 });
