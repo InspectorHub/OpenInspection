@@ -107,6 +107,19 @@ describe("InspectionSettingsSheet", () => {
     expect(sheet.loads).toEqual(["insp-1", "insp-1"]);
   });
 
+  it("treats the empty shape a host answers for an expired session like no answer: retry, no form, no save, nothing written", async () => {
+    // `createFakeSettingsSheet()` defaults to exactly that shape: no inspection, no templates, no photos.
+    const sheet = createFakeSettingsSheet();
+    const fake = mount(sheet);
+    expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(form()).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+    expect(fake.commands).toHaveLength(0);
+    sheet.setData(DATA);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(form()).not.toBeNull());
+  });
+
   it("clearing the selected cover sends set-cover with an empty id", async () => {
     const fake = mount(createFakeSettingsSheet(DATA));
     await waitFor(() => expect(form()).not.toBeNull());

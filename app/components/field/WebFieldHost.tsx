@@ -73,7 +73,7 @@ export function WebFieldHost({ editor, children }: WebFieldHostProps) {
                 return cached.data;
             },
             sessionBits: () => bitsOf(editorRef.current),
-            sessionContext: () => sessionRef.current,
+            sessionContext: () => sessionRef.current ?? editorRef.current?.viewer ?? null,
             reload: () => {
                 void revalidatorRef.current.revalidate();
             },

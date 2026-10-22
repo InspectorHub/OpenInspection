@@ -7,7 +7,7 @@ import {
 import type { Snapshot, ItemType } from "../shared/structure-ops";
 import { subtreeOf } from "../shared/template-hierarchy";
 import { useFieldCommand } from "../context";
-import { useLatestWinsCommand } from "./useLatestWinsCommand";
+import { useRestructureSubmit } from "./useRestructureSubmit";
 import { m } from "../i18n";
 
 /** Impact data shown in the StructureDeleteModal — for a section OR a single item. */
@@ -155,7 +155,7 @@ export function useStructureEdit({
 
   // Restructure replaces the whole snapshot, so the NEWEST must win (one in flight, only the newest queued).
   // Saving to a template is a separate one-shot write on its own channel: neither cancels the other.
-  const { submit: submitRestructure } = useLatestWinsCommand(inspectionId);
+  const submitRestructure = useRestructureSubmit(inspectionId);
   const { run: saveTemplate } = useFieldCommand(inspectionId);
 
   // Kept in a ref so applyStructure's identity is stable even though the caller

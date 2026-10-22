@@ -136,5 +136,7 @@
   "editor_customdefect_save_to_library": "Guardar en mi biblioteca",
   "editor_customdefect_add": "Agregar defecto",
   "editor_cost_remove_failed": "No se pudo quitar el elemento de costo. Volvió a la lista; inténtelo de nuevo.",
+  "editor_cost_save_failed": "No se pudo guardar el elemento de costo. Compruebe que Sistema y Componente estén completos e inténtelo de nuevo.",
+  "editor_cost_unsaved_draft": "Aún no se guarda: complete Sistema y Componente. Hasta entonces esta línea no se almacena ni se cuenta.",
   "editor_video_delete_failed": "No se pudo eliminar el video. Sigue en la inspección; inténtelo de nuevo cuando tenga conexión."
 }

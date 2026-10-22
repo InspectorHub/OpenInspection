@@ -37,15 +37,35 @@ function mount(items: CostItemView[] = []): FakeCostItems {
 const addButton = () => [...document.querySelectorAll("button")].find((b) => /add/i.test(b.textContent ?? "")) as HTMLButtonElement;
 const intents = (c: FakeCostItems) => c.writes.map((w) => w.write.intent);
 
+const draftRows = () => document.querySelectorAll("li").length;
+
 describe("CostItemsPanel add item latch", () => {
-  it("two clicks in one act start ONE create, and a later click starts another", async () => {
+  it("two clicks in one act add ONE draft row (nothing is stored yet), and a later click adds another", async () => {
     const costItems = mount();
     await act(async () => { addButton().click(); addButton().click(); });
     await settle();
-    expect(intents(costItems)).toEqual(["create"]);
+    expect(draftRows()).toBe(1);
     await act(async () => { addButton().click(); });
     await settle();
-    expect(intents(costItems)).toEqual(["create", "create"]);
+    expect(draftRows()).toBe(2);
+    expect(intents(costItems)).toEqual([]);
+  });
+
+  it("two blurs in one act on a completed draft start ONE create", async () => {
+    const costItems = mount();
+    await act(async () => { addButton().click(); });
+    const [system, component] = [...document.querySelectorAll("input")] as HTMLInputElement[];
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    await act(async () => {
+      set.call(system, "roof"); system!.dispatchEvent(new Event("input", { bubbles: true }));
+      set.call(component, "membrane"); component!.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      system!.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      component!.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+    await settle();
+    expect(intents(costItems)).toEqual(["create"]);
   });
 });
 

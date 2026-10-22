@@ -6,7 +6,7 @@ import { CostExportButtons } from "../CostExportButtons";
 import { useFieldDataSource } from "../../context";
 import type { CostItemView } from "../../data-source-types";
 import { m } from "../../i18n";
-import { THRESHOLD_CENTS, blankRow, isTempId, rowTotalCents, useCostItemWrite } from "./cost-items-rows";
+import { THRESHOLD_CENTS, blankRow, hasRequiredFields, isTempId, rowTotalCents, useCostItemWrite } from "./cost-items-rows";
 
 /**
  * Commercial PCA Phase C Task 13b — the inspection-level Cost Items editor panel (ASTM E2018 Table 1 / Opinion of
@@ -28,7 +28,8 @@ export function CostItemsPanel({
   const submitCostItem = useCostItemWrite(inspectionId);
   const [rows, setRows] = useState<CostItemView[]>(items);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [removeFailed, setRemoveFailed] = useState(false);
+  // The last write the host refused, shown until a later write is confirmed.
+  const [failure, setFailure] = useState<"save" | "remove" | null>(null);
   // Temp ids removed while their `create` was still out: the server row that lands is deleted at once (no orphan).
   const pendingRemovalRef = useRef<Set<string>>(new Set());
   // Synchronous mirrors of the guards the render state (`saving`) only shows a frame late: the ids whose
@@ -43,7 +44,9 @@ export function CostItemsPanel({
   useEffect(() => { rowsRef.current = rows; });
 
   const bucketTotals = { immediate: 0, short_term: 0, long_term: 0 } as Record<CostItemView["bucket"], number>;
-  for (const row of rows) bucketTotals[row.bucket] += rowTotalCents(row);
+  // A draft that is not stored yet (no system or component) is not part of the opinion of cost.
+  const isDraft = (row: CostItemView) => isTempId(row.id) && !hasRequiredFields(row);
+  for (const row of rows) if (!isDraft(row)) bucketTotals[row.bucket] += rowTotalCents(row);
   const grandTotalCents = bucketTotals.immediate + bucketTotals.short_term + bucketTotals.long_term;
 
   function patchRow(id: string, patch: Partial<CostItemView>) {
@@ -55,6 +58,8 @@ export function CostItemsPanel({
   async function commitRow(id: string, patch?: Partial<CostItemView>) {
     const base = rowsRef.current.find((r) => r.id === id);
     if (!base) return;
+    // A draft the server would refuse is not sent: the create goes out on the commit that completes it.
+    if (isTempId(id) && !hasRequiredFields({ ...base, ...patch })) return;
     // A temp row's create must never be sent twice (a duplicate server row); a saved row's update waits its turn.
     if (writingRef.current.has(id)) {
       if (!isTempId(id)) dirtyRef.current.add(id);
@@ -69,36 +74,19 @@ export function CostItemsPanel({
       if (result.success && result.id) void submitCostItem("delete", { ...base, id: result.id });
       return;
     }
-    if (result.success) setRemoveFailed(false);
+    setFailure(result.success ? null : "save");
     if (result.success && isTempId(id) && result.id) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, id: result.id! } : r)));
     }
     if (dirtyRef.current.delete(id)) void commitRow(id);
   }
 
-  // Two clicks in one frame would add two draft rows (and start two creates) before anything re-renders.
+  // Two clicks in one frame would add two draft rows before anything re-renders.
   const addLatch = useActionLatch(false);
 
+  // A blank draft stays local: nothing is stored until its system and component are filled (see `commitRow`).
   function addRow() {
-    const draft = blankRow(rows.length);
-    setRows((prev) => [...prev, draft]);
-    // Busy while its create is out: `CostItemRow` disables its inputs, and `commitRow` refuses a second create.
-    writingRef.current.add(draft.id);
-    setSaving((s) => ({ ...s, [draft.id]: true }));
-    void submitCostItem("create", draft).then((result) => {
-      writingRef.current.delete(draft.id);
-      setSaving((s) => { const next = { ...s }; delete next[draft.id]; return next; });
-      const wasRemoved = pendingRemovalRef.current.delete(draft.id);
-      if (result.success && result.id) {
-        if (wasRemoved) {
-          // Removed while the create was out: delete the row that just landed rather than orphan it.
-          void submitCostItem("delete", { ...draft, id: result.id });
-          return;
-        }
-        setRows((cur) => cur.map((r) => (r.id === draft.id ? { ...r, id: result.id! } : r)));
-      }
-      // A failed create persisted nothing: a removed row needs no follow-up, a kept one stays a retryable temp row.
-    });
+    setRows((prev) => [...prev, blankRow(prev.length)]);
   }
 
   async function removeRow(id: string) {
@@ -107,7 +95,7 @@ export function CostItemsPanel({
     removingRef.current.add(id);
     const index = rows.findIndex((r) => r.id === id);
     const row = rows[index];
-    setRemoveFailed(false);
+    setFailure(null);
     setRows((prev) => prev.filter((r) => r.id !== id));
     if (isTempId(id)) {
       // Still-pending create for this row — queue the eventual delete
@@ -127,7 +115,7 @@ export function CostItemsPanel({
     if (result.success) return;
     // Not confirmed: the row is still on the server, so it comes back where it was.
     setRows((prev) => (prev.some((r) => r.id === id) ? prev : [...prev.slice(0, Math.max(index, 0)), row, ...prev.slice(Math.max(index, 0))]));
-    setRemoveFailed(true);
+    setFailure("remove");
   }
 
   return (
@@ -146,7 +134,7 @@ export function CostItemsPanel({
         </div>
       </div>
 
-      {removeFailed && <p role="alert" className="text-[12px] font-medium text-ih-bad-fg">{m.editor_cost_remove_failed()}</p>}
+      {failure && <p role="alert" className="text-[12px] font-medium text-ih-bad-fg">{failure === "save" ? m.editor_cost_save_failed() : m.editor_cost_remove_failed()}</p>}
 
       <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3">
         {rows.length > 0 && (
@@ -181,6 +169,7 @@ export function CostItemsPanel({
               item={row}
               reserveEnabled={reserveEnabled}
               busy={!!saving[row.id]}
+              unsaved={isDraft(row)}
               onChange={(patch) => patchRow(row.id, patch)}
               onCommit={() => commitRow(row.id)}
               onPick={(patch) => { patchRow(row.id, patch); void commitRow(row.id, patch); }}
@@ -194,11 +183,13 @@ export function CostItemsPanel({
 }
 
 function CostItemRow({
-  item, reserveEnabled, busy, onChange, onCommit, onPick, onRemove,
+  item, reserveEnabled, busy, unsaved, onChange, onCommit, onPick, onRemove,
 }: {
   item: CostItemView;
   reserveEnabled: boolean;
   busy: boolean;
+  /** A draft the server would refuse (no system or component): not stored and not in the totals yet. */
+  unsaved: boolean;
   onChange: (patch: Partial<CostItemView>) => void;
   onCommit: () => void;
   /** A value picked from a select: change and commit it together. */
@@ -402,6 +393,7 @@ function CostItemRow({
         </div>
       </div>
 
+      {unsaved && <p data-testid="cost-row-unsaved" className="text-[12px] font-medium text-ih-bad-fg">{m.editor_cost_unsaved_draft()}</p>}
       <div className="flex items-center justify-between pt-1">
         <div className="text-[12px] tabular-nums text-ih-fg-2 font-bold">
           {formatDollars(total)}

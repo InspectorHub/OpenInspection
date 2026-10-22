@@ -1,6 +1,7 @@
 import type { Route } from "../+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { viewerFromSessionContext } from "~/lib/field/web-session";
 import { unwrapResultsResponse } from "~/lib/results";
 import type { RatingLevel, ResultMap } from "@core/field-ui/hooks/useInspection";
 import { resolvePcaNarrative } from "@core/field-ui/shared/pca-narrative";
@@ -219,8 +220,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  let tenantSlug: string | null = null;
  let videoProvider: "r2" | "stream" = "r2";
  let collabEditing = false;
- // The full-screen editor is declared outside the workspace layout, so it has no
- // session context of its own; this is what lets it ask for the human check.
+ let viewer: ReturnType<typeof viewerFromSessionContext> = null;
+ // The editor sits outside the workspace layout, so it reads its own session context (human check, viewer).
  let outboundCoolingWindow: { unlockAtMs: number; turnstileSiteKey: string | null } | null = null;
  if (sessRes?.ok) {
  const sb = await sessRes.json() as {
@@ -238,6 +239,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  videoProvider = sb.data?.videoProvider ?? "r2";
  // #181 — per-tenant collab editing flag (default false until collab is GA).
  collabEditing = sb.data?.collabEditing ?? false;
+ viewer = viewerFromSessionContext(sb.data);
  }
 
  // Plan 7 — the Stream customer subdomain (env) drives video poster thumbnails
@@ -393,5 +395,5 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // Returned values are written into the page source: the snapshot goes once (top-level), and no token.
  const inspectionRow: Record<string, unknown> = { ...inspection };
  delete inspectionRow.templateSnapshot;
- return { inspection: inspectionRow, schema, results, resultId, ratingLevels, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment };
+ return { inspection: inspectionRow, schema, results, resultId, ratingLevels, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, viewer, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment };
 }

@@ -25,7 +25,7 @@ import { m } from "../i18n";
 import { enqueueMedia } from "../collab/media-upload-queue";
 import type { PendingMediaRecord } from "../media-types";
 import type { PhotoEntry } from "../shared/results-doc.types";
-import { guardedSave } from "./photo-save-guard";
+import { dropMediaSave, guardedSave } from "./photo-save-guard";
 
 /**
  * The photo / media-operations cluster of the inspection editor. Behavior-
@@ -504,9 +504,10 @@ export function usePhotoOps(ctx: {
       const originalKey = current?.key;
       const fk = docFindingKey(itemId, sectionId);
 
-      // A repeat of a save still in flight for this photo is dropped before it does anything.
+      // A repeat in flight, an unaddressable photo or no live document: dropped before anything, with a message.
       const saveKey = `crop|${fk ?? itemId}|${originalKey ?? photoIndex}`;
-      if (mediaSavesInFlight.current.has(saveKey)) return;
+      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc })) return;
+      if (!fk || !originalKey || !collabDoc) return; // narrowing only: the guard above already said why
 
       // Optimistic local apply for instant feedback (the doc drives the real UI
       // once the bake returns / drains + we write it back).
@@ -517,7 +518,6 @@ export function usePhotoOps(ctx: {
             : p,
         ),
       );
-      if (!fk || !originalKey) return;
       const rec: PendingMediaRecord = {
         pendingId: crypto.randomUUID(),
         inspectionId: String(state.inspection.id),
@@ -572,10 +572,10 @@ export function usePhotoOps(ctx: {
       const originalKey = getItemPhotos(itemId)[photoIndex]?.key;
       const fk = docFindingKey(itemId, sectionId);
 
-      // A repeat of a save still in flight for this photo is dropped (and counts as handled).
+      // A repeat of a save still in flight, or a photo that cannot be addressed, is dropped with a message (and counts as handled).
       const saveKey = `annotate|${fk ?? itemId}|${originalKey ?? photoIndex}`;
-      if (mediaSavesInFlight.current.has(saveKey)) return true;
-      if (!fk || !originalKey) return true;
+      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc })) return true;
+      if (!fk || !originalKey) return true; // narrowing only: the guard above already said why
       const rec: PendingMediaRecord = {
         pendingId: crypto.randomUUID(),
         inspectionId: String(state.inspection.id),

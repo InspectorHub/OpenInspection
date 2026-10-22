@@ -138,6 +138,18 @@ describe("createWebVideo.uploadFile", () => {
         expect(seen).toEqual([25]);
     });
 
+    it("r2: a ticket URL on the configured public origin is sent to the same path on the current origin", async () => {
+        const ticket: VideoUploadTicket = { uploadURL: "https://public.example/api/inspections/i1/media/video/r2-upload?token=a%20b", provider: "r2", ref: { provider: "r2", mediaId: "p", r2Key: "p" } };
+        await withXhr(200, JSON.stringify({ data: { mediaId: "m1", r2Key: "k1" } }), () => createWebVideo().uploadFile(ticket, new Blob(["x"]), () => undefined));
+        expect(FakeXhr.last?.url).toBe("/api/inspections/i1/media/video/r2-upload?token=a%20b");
+    });
+
+    it("stream: an external upload URL is never rewritten", async () => {
+        const ticket: VideoUploadTicket = { uploadURL: "https://upload.example/api/direct?x=1", provider: "stream", ref: { provider: "stream", streamUid: "u" } };
+        await withXhr(200, "", () => createWebVideo().uploadFile(ticket, new Blob(), () => undefined));
+        expect(FakeXhr.last?.url).toBe("https://upload.example/api/direct?x=1");
+    });
+
     it("r2: an answer without the media id and key is the unexpected-response failure", async () => {
         const ticket: VideoUploadTicket = { uploadURL: "/up", provider: "r2", ref: { provider: "r2", mediaId: "p", r2Key: "p" } };
         const result = await withXhr(200, "not json", () => createWebVideo().uploadFile(ticket, new Blob(), () => undefined));

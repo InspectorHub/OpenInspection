@@ -95,6 +95,7 @@ export function InspectionOverview({
                     commercialSubtype={(bag.commercialSubtype as string | null | undefined) ?? null}
                     reportTier={reportTier}
                     perUnitMode={bag.unitInspectionMode === "per_unit"}
+                    onSaved={(next) => onSaveField?.("propertyType", next)}
                     hasPcaNarrative={Object.values(pcaNarrative ?? {})
                         .some((v) => typeof v === "string" && v.trim().length > 0)}
                 />

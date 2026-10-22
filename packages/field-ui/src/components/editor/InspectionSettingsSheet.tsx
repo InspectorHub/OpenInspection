@@ -124,8 +124,8 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
   }, []);
 
   // Read the sheet when it opens or the inspection changes; the skeleton shows until the answer lands. The
-  // newest read wins: an answer to an earlier one is dropped. A host that cannot read it offers a retry rather
-  // than a form whose save would write blanks over the stored values.
+  // newest read wins: an answer to an earlier one is dropped. No answer, or the empty shape a host gives
+  // when the session expired (no inspection), offers a retry, not a form that would save blanks over the stored values.
   const loadSeq = useRef(0);
   const loadSheet = useCallback(() => {
     const seq = (loadSeq.current += 1);
@@ -135,7 +135,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
       .catch(() => null)
       .then((d) => {
         if (seq !== loadSeq.current) return;
-        if (d === null) {
+        if (d === null || d.inspection === null) {
           setLoadFailed(true);
           setLoading(false);
           return;

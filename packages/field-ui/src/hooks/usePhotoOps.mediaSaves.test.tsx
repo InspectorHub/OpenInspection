@@ -9,7 +9,8 @@
  *  - online: the baked key lands in the results document, nothing else happens (no toast);
  *  - offline: the blob is queued and the doc photo is marked pending, the base key is kept;
  *  - a failed online bake changes nothing and says nothing;
- *  - a repeat while the first save is still in flight sends nothing (same frame included);
+ *  - a repeat while the first save is still in flight sends nothing (same frame included) and says so;
+ *  - a save that cannot be addressed or has no live document sends nothing, shows nothing as saved and says so;
  *  - the viewer / studio urls come from `urls.photo`.
  */
 import { createElement, type ReactNode } from 'react';
@@ -130,8 +131,11 @@ describe('online crop', () => {
       hook.result.current.performPhotoCropSave(target, blob(), CROP);
     });
     expect(held.calls).toHaveLength(1);
-    // The dropped repeat did not apply a second optimistic edit either.
+    // The dropped repeat did not apply a second optimistic edit either, and the user was told.
     expect(ctx.state.setResults).toHaveBeenCalledTimes(1);
+    expect(ds.notifications).toHaveLength(1);
+    expect(ds.notifications[0]).toMatchObject({ variant: 'info' });
+    expect(ds.notifications[0]!.message).toMatch(/still saving/i);
     // A different photo is not held back by it.
     ctx.findings.getResult = () => ({ photos: [{ key: 'base.jpg' }, { key: 'other.jpg' }] });
     hook.rerender();
@@ -143,12 +147,29 @@ describe('online crop', () => {
     expect(held.calls).toHaveLength(3);
   });
 
-  it('does nothing when the photo is not at that index (no key to address)', async () => {
-    const { ds, hook } = setup();
+  it('sends nothing, shows no optimistic crop and says so when the photo is not at that index (no key to address)', async () => {
+    const { ds, hook, ctx } = setup();
     act(() => hook.result.current.performPhotoCropSave({ ...target, photoIndex: 5 }, blob(), CROP));
     await flush();
     expect(ds.uploads).toEqual([]);
     expect(await ds.media.store.list()).toEqual([]);
+    expect(ctx.state.setResults).not.toHaveBeenCalled();
+    expect(ds.notifications).toHaveLength(1);
+    expect(ds.notifications[0]).toMatchObject({ variant: 'error' });
+    expect(ds.notifications[0]!.message).toMatch(/cannot be found/i);
+    expect(ds.notifications[0]!.message).not.toMatch(/not connected/i);
+  });
+
+  it('online without a live results document: nothing is sent or shown as cropped, and the user is told', async () => {
+    const { ds, hook, ctx } = setup({ withDoc: false });
+    act(() => hook.result.current.performPhotoCropSave(target, blob(), CROP));
+    await flush();
+    expect(ds.uploads).toEqual([]);
+    expect(ctx.state.setResults).not.toHaveBeenCalled();
+    expect(ds.notifications).toHaveLength(1);
+    expect(ds.notifications[0]).toMatchObject({ variant: 'error' });
+    expect(ds.notifications[0]!.message).toMatch(/not connected/i);
+    expect(ds.notifications[0]!.message).not.toMatch(/cannot be found/i);
   });
 });
 
@@ -183,6 +204,8 @@ describe('offline crop', () => {
     act(() => hook.result.current.performPhotoCropSave(target, blob(), CROP));
     await flush();
     expect(await ds.media.store.list()).toEqual([]);
+    expect(ds.notifications).toHaveLength(1);
+    expect(ds.notifications[0]!.message).toMatch(/not connected/i);
   });
 });
 
@@ -210,6 +233,18 @@ describe('annotation', () => {
     });
     expect(photoOf(doc!)).toMatchObject({ key: 'base.jpg', annotatedKey: `uploaded/${up.rec.pendingId}`, annotationsJson: '[{"t":"rect"}]' });
     expect(ds.notifications).toEqual([]);
+  });
+
+  it('an annotation for a photo that cannot be addressed is reported as handled, sends nothing and says so', async () => {
+    const { ds, hook } = setup();
+    let handled = false;
+    act(() => { handled = hook.result.current.performPhotoAnnotationSave({ ...target, photoIndex: 5 }, blob(), '[]'); });
+    await flush();
+    expect(handled).toBe(true);
+    expect(ds.uploads).toEqual([]);
+    expect(ds.notifications).toHaveLength(1);
+    expect(ds.notifications[0]).toMatchObject({ variant: 'error' });
+    expect(ds.notifications[0]!.message).toMatch(/cannot be found/i);
   });
 
   it('a failed online bake changes nothing and says nothing, but still reports the save as handled', async () => {
@@ -246,6 +281,7 @@ describe('annotation', () => {
     });
     expect(handled).toEqual([true, true]);
     expect(held.calls).toHaveLength(1);
+    expect(ds.notifications.map((n) => n.variant)).toEqual(['info']);
     await act(async () => { held.releases[0]!({ ok: true, key: 'a.png' }); });
     await flush();
     act(() => { hook.result.current.performPhotoAnnotationSave(target, blob(), '[]'); });

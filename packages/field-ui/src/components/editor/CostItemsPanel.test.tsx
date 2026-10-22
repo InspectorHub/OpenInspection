@@ -86,10 +86,16 @@ describe("CostItemsPanel", () => {
 
       fireEvent.click(screen.getByText("+ Add cost item"));
 
-      // The initial background create fired exactly once, synchronously.
-      expect(costItems.writes).toHaveLength(1);
+      // A blank draft is not stored: nothing is sent until its system and component are filled.
+      expect(costItems.writes).toHaveLength(0);
 
       const systemInput = screen.getByPlaceholderText("e.g. roof") as HTMLInputElement;
+      fireEvent.change(systemInput, { target: { value: "roof" } });
+      fireEvent.change(screen.getByPlaceholderText("e.g. membrane"), { target: { value: "membrane" } });
+      fireEvent.blur(systemInput);
+
+      // The create fired once, and now the row is busy: its controls are disabled while it is out.
+      expect(costItems.writes).toHaveLength(1);
       expect(systemInput.disabled).toBe(true);
       // Remove is aria-disabled (pending), not native, so focus is never dropped.
       expect(screen.getByText("Remove").closest("button")!.getAttribute("aria-disabled")).toBe("true");
@@ -97,7 +103,6 @@ describe("CostItemsPanel", () => {
       // Even if a field edit manages to reach the commit handler while the row is still pending (e.g. a blur
       // that lands before React commits the `disabled` attribute), the temp-id + pending-write guard in
       // `commitRow` must refuse to fire a second `create` for this row.
-      fireEvent.change(systemInput, { target: { value: "roof" } });
       fireEvent.blur(systemInput);
       expect(costItems.writes).toHaveLength(1);
 
@@ -110,7 +115,7 @@ describe("CostItemsPanel", () => {
 
       // A subsequent edit now commits as an UPDATE against the real id — never a second create.
       const settledInput = screen.getByPlaceholderText("e.g. roof") as HTMLInputElement;
-      fireEvent.change(settledInput, { target: { value: "roof" } });
+      fireEvent.change(settledInput, { target: { value: "roof 2" } });
       fireEvent.blur(settledInput);
 
       await waitFor(() => expect(costItems.writes).toHaveLength(2));

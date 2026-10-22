@@ -24,6 +24,14 @@ export function blankRow(sortOrder: number): CostItemView {
   };
 }
 
+/**
+ * Whether a draft row can be stored yet. The server refuses a row without a system and a component, so a temp
+ * row is held back (nothing sent) until both hold something other than blanks.
+ */
+export function hasRequiredFields(item: Pick<CostItemView, "system" | "component">): boolean {
+  return item.system.trim() !== "" && item.component.trim() !== "";
+}
+
 export function isTempId(id: string): boolean {
   return id.startsWith("tmp-");
 }

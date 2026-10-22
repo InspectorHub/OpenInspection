@@ -85,12 +85,17 @@ describe("CostItemsPanel remove while a create is out", () => {
     }) as FakeCostItems;
     mount(costItems, []);
     await act(async () => { screen.getByRole("button", { name: /add/i }).click(); });
+    const system = document.querySelector("input") as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(system, { target: { value: "x" } });
+      fireEvent.change(screen.getByPlaceholderText("e.g. membrane"), { target: { value: "y" } });
+    });
+    await act(async () => { fireEvent.blur(system); });
     await settle();
     expect(seen.map((w) => w.intent)).toEqual(["create"]);
 
     const release = inner.hold();
-    const system = document.querySelector("input") as HTMLInputElement;
-    await act(async () => { fireEvent.change(system, { target: { value: "x" } }); });
+    await act(async () => { fireEvent.change(system, { target: { value: "x2" } }); });
     // The Remove button goes pending a frame after a commit starts, so the removal can only arrive in the SAME
     // frame as the blur that commits: both raw events in one act().
     await act(async () => {

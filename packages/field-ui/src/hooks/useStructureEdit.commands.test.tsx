@@ -127,3 +127,66 @@ describe('useStructureEdit write paths', () => {
     expect(calls.map((c) => c.cmd.type)).toEqual(['save-structure-template', 'restructure']);
   });
 });
+
+describe('useStructureEdit refused restructure', () => {
+  const messages = () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    const seen: Array<{ message: string; variant: string | undefined }> = [];
+    vi.spyOn(fake, 'notify').mockImplementation((message, variant) => { seen.push({ message, variant }); });
+    return { fake, seen };
+  };
+  const mountWith = (fake: FakeDataSource, answers: Array<CommandResult<undefined>>) => {
+    vi.spyOn(fake, 'execute').mockImplementation((async () => answers.shift() ?? { ok: true }) as FakeDataSource['execute']);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <FieldDataSourceProvider dataSource={fake}>{children}</FieldDataSourceProvider>
+    );
+    return renderHook(
+      () => useStructureEdit({ inspectionId: 'insp-1', rawSnapshot: raw, collabEditing: true, results: {} }),
+      { wrapper },
+    );
+  };
+
+  it("shows the host's own sentence when a restructure is refused", async () => {
+    const { fake, seen } = messages();
+    const hook = mountWith(fake, [{ ok: false, error: 'Structure saved, but live sync did not converge. Reload to continue editing.' }]);
+    act(() => hook.result.current.renameSection('s1', 'A'));
+    await flush();
+    expect(seen).toEqual([{ message: 'Structure saved, but live sync did not converge. Reload to continue editing.', variant: 'error' }]);
+  });
+
+  it('says something generic when the refusal carries no sentence, and nothing when it succeeds', async () => {
+    const { fake, seen } = messages();
+    const hook = mountWith(fake, [{ ok: false }, { ok: true }]);
+    act(() => hook.result.current.renameSection('s1', 'A'));
+    await flush();
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.message).toMatch(/structure/i);
+    act(() => hook.result.current.renameSection('s1', 'B'));
+    await flush();
+    expect(seen).toHaveLength(1);
+  });
+
+  it('a refusal that a newer edit superseded is not reported; the newest edit answers', async () => {
+    const { fake, seen } = messages();
+    const calls: Array<(r: CommandResult<undefined>) => void> = [];
+    vi.spyOn(fake, 'execute').mockImplementation(((_i: string, _c: FieldCommand) =>
+      new Promise<CommandResult<undefined>>((resolve) => calls.push(resolve))) as FakeDataSource['execute']);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <FieldDataSourceProvider dataSource={fake}>{children}</FieldDataSourceProvider>
+    );
+    const hook = renderHook(
+      () => useStructureEdit({ inspectionId: 'insp-1', rawSnapshot: raw, collabEditing: true, results: {} }),
+      { wrapper },
+    );
+    act(() => {
+      hook.result.current.renameSection('s1', 'A');
+      hook.result.current.renameSection('s2', 'B');
+    });
+    calls[0]!({ ok: false, error: 'first failed' });
+    await flush();
+    expect(seen).toEqual([]);
+    calls[1]!({ ok: false, error: 'newest failed' });
+    await flush();
+    expect(seen.map((s) => s.message)).toEqual(['newest failed']);
+  });
+});

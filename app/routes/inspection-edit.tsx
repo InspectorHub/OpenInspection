@@ -28,7 +28,8 @@ import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { useResultsDoc } from "@core/field-ui/collab/use-results-doc";
 import { useMediaDrain } from "@core/field-ui/hooks/useMediaDrain";
 import { webCollabHost } from "~/lib/field/web-collab";
-import { bindResultMap, appendPendingPhoto } from "@core/field-ui/collab/results-binding";
+import { appendPendingPhoto } from "@core/field-ui/collab/results-binding";
+import { useResultsProjection } from "@core/field-ui/hooks/useResultsProjection";
 import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
 import { webMediaStore } from "~/lib/field/web-media-store";
 import { VersionHistoryPanel } from "@core/field-ui/components/collab/VersionHistoryPanel";
@@ -268,13 +269,9 @@ function InspectionEditPage() {
  const { drain: mediaDrain } = useMediaDrain(String(loaderData.inspection.id), collab?.doc ?? null);
  drainRef.current = mediaDrain;
 
- // Once the doc is live, project it into the editor's `results`. First paint
- // uses loaderData.results (initial projection); the DO hydrated from the SAME
- // D1 blob (8.6) so swapping in the doc projection causes no flash.
- useEffect(() => {
-   if (!collab?.doc) return;
-   return bindResultMap(collab.doc, (next) => state.setResults(() => next));
- }, [collab?.doc, state.setResults]);
+ // Once the doc is live, project it into the editor's `results`. First paint uses
+ // loaderData.results; until the doc has synced its projection is merged, not adopted.
+ useResultsProjection(collab, state.setResults);
 
  /* ---------------------------------------------------------------- */
  /* Findings (CRUD) */

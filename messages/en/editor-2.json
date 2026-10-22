@@ -202,6 +202,8 @@
   "editor_publish_mark_complete_and_publish": "Mark complete and publish",
   "editor_publish_just_publish": "Just publish",
   "editor_publish_failed": "Couldn't publish the report. Please try again.",
+  "editor_structure_save_failed": "Couldn't save the structure change. Please try again.",
+  "editor_property_type_save_failed": "Couldn't change the property type. Please try again.",
   "editor_rating_aria": "Rating",
   "editor_recrop_title": "Re-crop this photo?",
   "editor_recrop_confirm": "Crop & clear",

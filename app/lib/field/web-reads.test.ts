@@ -116,7 +116,7 @@ describe("createWebVersionHistory", () => {
         expect([rUrl, rInit.method, JSON.parse(rInit.body as string)]).toEqual(["/api/inspections/i1/collab/restore", "POST", { seq: 7 }]);
         const refused = createWebVersionHistory(asFetch(async () => json({ error: "Too old" }, { status: 409 })));
         expect(await refused.restore("i", 1)).toEqual({ ok: false, error: "Too old" });
-        expect(await createWebVersionHistory(asFetch(async () => json({}, { status: 500 }))).restore("i", 1)).toEqual({ ok: false, error: "HTTP 500" });
+        expect(await createWebVersionHistory(asFetch(async () => json({}, { status: 500 }))).restore("i", 1)).toEqual({ ok: false, error: "Restore failed" });
         expect((await createWebVersionHistory(offline).capture("i")).ok).toBe(false);
     });
 });

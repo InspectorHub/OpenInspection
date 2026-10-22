@@ -1,5 +1,5 @@
 import type { SessionInfo } from "@core/field-ui/data-source";
-import { resolveDisplayPrefs } from "@core/field-ui/shared/display-prefs";
+import { isDateFormat, isTimeFormat, resolveDisplayPrefs } from "@core/field-ui/shared/display-prefs";
 import type { SessionContext } from "~/hooks/useSessionContext";
 
 /**
@@ -12,6 +12,39 @@ export interface SessionContextLike {
         sessionMarker?: string;
     };
     branding: Pick<SessionContext["branding"], "defaultTimezone" | "defaultLocale" | "dateFormat" | "timeFormat">;
+}
+
+const orNull = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
+
+/**
+ * The editor's own copy of the viewer's display values, read from the session-context answer its loader
+ * already fetches (the editor routes sit outside `routes/auth-layout`, so `useSessionContext()` is null
+ * there). Defensive on purpose: an answer that does not carry both halves is no viewer (`null`), and any
+ * single value that is missing or not recognised is left to the fallbacks in `webSessionInfo`.
+ */
+export function viewerFromSessionContext(data: unknown): SessionContextLike | null {
+    const rec = (v: unknown): Record<string, unknown> | null => (typeof v === "object" && v !== null ? (v as Record<string, unknown>) : null);
+    const root = rec(data);
+    const user = rec(root?.user);
+    const branding = rec(root?.branding);
+    if (!user || !branding) return null;
+    const marker = orNull(user.sessionMarker);
+    return {
+        user: {
+            role: typeof user.role === "string" ? user.role : "",
+            timezone: orNull(user.timezone),
+            locale: orNull(user.locale),
+            dateFormat: isDateFormat(user.dateFormat) ? user.dateFormat : null,
+            timeFormat: isTimeFormat(user.timeFormat) ? user.timeFormat : null,
+            ...(marker ? { sessionMarker: marker } : {}),
+        },
+        branding: {
+            defaultTimezone: orNull(branding.defaultTimezone) ?? "UTC",
+            defaultLocale: orNull(branding.defaultLocale) ?? "en-US",
+            dateFormat: isDateFormat(branding.dateFormat) ? branding.dateFormat : "us",
+            timeFormat: isTimeFormat(branding.timeFormat) ? branding.timeFormat : "12h",
+        },
+    };
 }
 
 /** Values the editor's own loader supplies; none of them come from the session context. */
@@ -40,14 +73,13 @@ export const STOPGAP_USER_ID = "current-user";
  * - `dateFormat` / `timeFormat` = `useChromeDateTimeFormat`: per field, viewer then tenant
  * - `tenantDateFormat` / `tenantTimeFormat` = `useTenantFormatPrefs`: tenant alone
  *
- * The editor routes sit OUTSIDE `routes/auth-layout`, so the context is null there
- * today and every one of those answers is its fallback (en-US, UTC, us, 12h). Feeding
- * real values to the editor is a separate decision with its own Chrome date check.
+ * The editor routes sit OUTSIDE `routes/auth-layout`, so `useSessionContext()` is null
+ * there; the host then hands over the viewer its loader read (`viewerFromSessionContext`).
+ * With neither, every one of those answers is its fallback (en-US, UTC, us, 12h).
  *
- * Stop-gaps, both because the editor has no session context today:
- * - `userId`: the context's opaque session marker if there is one, else
- *   `STOPGAP_USER_ID`. The marker is per-user and stable, which is what presence needs;
- *   it is not the user's database id.
+ * - `userId`: the context's opaque session marker (per-user and stable, which is what
+ *   presence needs; it is not the user's database id, which the session context does not
+ *   carry), else `STOPGAP_USER_ID` when there is no context at all.
  * - `role`: the context's role if there is one, else "" (unknown). Nothing may treat ""
  *   as a privilege level.
  */

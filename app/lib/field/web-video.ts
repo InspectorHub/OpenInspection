@@ -24,6 +24,21 @@ export const posterRoute = (inspectionId: string) => `${base(inspectionId)}/post
 
 const notWired = (what: string) => `${what} is not wired to the web data source yet; the editor still uses its own path for it.`;
 
+/**
+ * The r2 ticket's upload URL is minted against the deployment's configured public origin, which is not
+ * necessarily the origin the browser is on (a dev tunnel, a custom domain): sent as-is, the cross-origin
+ * request is blocked. A worker route (`/api/...`) is always reachable on the current origin, so it is sent as
+ * a relative path. Anything else (the Stream provider's external direct-upload URL) is left untouched.
+ */
+export function sameOriginUploadUrl(uploadURL: string): string {
+    try {
+        const url = new URL(uploadURL, "http://host.invalid");
+        return url.pathname.startsWith("/api/") ? `${url.pathname}${url.search}` : uploadURL;
+    } catch {
+        return uploadURL;
+    }
+}
+
 const networkError = (err: unknown) => (err instanceof Error && err.message ? err.message : "Network error");
 
 /**
@@ -84,7 +99,7 @@ export function createWebVideo(fetchImpl: typeof fetch = (input, init) => fetch(
                     await uploadWithProgressBody(ticket.uploadURL, file, onProgress, false);
                     return { ok: true };
                 }
-                const text = await uploadWithProgressBody(ticket.uploadURL, file, onProgress, true);
+                const text = await uploadWithProgressBody(sameOriginUploadUrl(ticket.uploadURL), file, onProgress, true);
                 let r2: { mediaId?: string; r2Key?: string } | undefined;
                 try {
                     r2 = (JSON.parse(text) as { data?: { mediaId?: string; r2Key?: string } }).data;

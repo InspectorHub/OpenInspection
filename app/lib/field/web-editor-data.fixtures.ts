@@ -18,6 +18,7 @@ export function loaderPayload(over: Partial<EditorLoaderData> = {}): EditorLoade
         streamCustomerSubdomain: "",
         videoProvider: "r2",
         collabEditing: false,
+        viewer: null,
         outboundCoolingWindow: null,
         templateSnapshot: { schemaVersion: 2, sections: [] },
         revisionStatus: null,

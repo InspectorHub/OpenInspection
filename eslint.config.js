@@ -595,7 +595,7 @@ export default tseslint.config(
         rules: {
             // DOWNGRADED from the intended 'error' (task-hooks-brief.md Tier 2) to
             // 'warn' — auditing found a genuine violation, not a false positive:
-            // app/components/editor/ItemEditor.tsx:343 calls useMemo() AFTER an
+            // packages/field-ui/src/components/editor/ItemEditor.tsx:343 calls useMemo() AFTER an
             // early `if (!item) return null;` at line 242, so the hook only runs on
             // some renders. Real bug, left unfixed here per the hard invariant (no
             // mass-fix in this task) — flagged prominently in task-hooks-report.md

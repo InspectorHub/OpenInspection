@@ -136,5 +136,7 @@
   "editor_customdefect_save_to_library": "Save to my library",
   "editor_customdefect_add": "Add defect",
   "editor_cost_remove_failed": "The cost item could not be removed. It is back in the list; try again.",
+  "editor_cost_save_failed": "The cost item could not be saved. Check that System and Component are filled in, then try again.",
+  "editor_cost_unsaved_draft": "Not saved yet: fill in System and Component. Until then this line is not stored or counted.",
   "editor_video_delete_failed": "The video could not be deleted. It is still in the inspection; try again when you are online."
 }

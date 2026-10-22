@@ -41,6 +41,7 @@ const COMMERCIAL: Props = {
   reportTier: "full_pca",
   perUnitMode: true,
   hasPcaNarrative: true,
+  onSaved: () => undefined,
 };
 
 const line = (id: string) => ({ id }) as CostItemView;

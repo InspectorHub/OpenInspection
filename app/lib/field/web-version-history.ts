@@ -5,18 +5,18 @@
  * exactly as the version panel did before it read this resource.
  *
  * Nothing here throws. A read that fails answers `{ ok: false }` (the panel shows its retry); a restore that
- * fails carries the API's own `error` sentence when it sent one, else `HTTP <status>`.
+ * fails carries the API's own `error` sentence when it sent one, else a translated one (the panel shows it).
+ * A request that could not be made says so in the user's language, never with the browser's own English text.
  */
 import type { CommandResult } from "@core/field-ui/commands";
 import type { FieldResources } from "@core/field-ui/data-source";
 import type { VersionSnapshotContent, VersionSnapshotEntry } from "@core/field-ui/data-source-types";
 import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
+import { m } from "~/paraglide/messages";
 
 type VersionHistory = NonNullable<FieldResources["versionHistory"]>;
 
 export const collabBase = (inspectionId: string) => `/api/inspections/${inspectionId}/collab`;
-
-const NETWORK_ERROR = "Network error";
 
 /** Narrow an `unknown` JSON payload to the snapshot list shape. */
 function parseSnapshots(raw: unknown): VersionSnapshotEntry[] {
@@ -34,7 +34,7 @@ function parseSnapshots(raw: unknown): VersionSnapshotEntry[] {
     return out;
 }
 
-/** The API's own sentence out of a failed answer, else `HTTP <status>`. */
+/** The API's own sentence out of a failed answer, else the translated "restore failed". */
 async function failureOf(res: Response): Promise<string> {
     try {
         const err: unknown = await res.json();
@@ -42,9 +42,9 @@ async function failureOf(res: Response): Promise<string> {
             return (err as Record<string, string>).error;
         }
     } catch {
-        // keep the HTTP status message
+        // keep the translated fallback
     }
-    return `HTTP ${res.status}`;
+    return m.editor_collab_restore_failed();
 }
 
 export function createWebVersionHistory(fetchImpl: typeof fetch = (input, init) => fetch(input, init)): VersionHistory {
@@ -80,8 +80,8 @@ export function createWebVersionHistory(fetchImpl: typeof fetch = (input, init) 
                     body: JSON.stringify({ seq }),
                 });
                 return res.ok ? { ok: true } : { ok: false, error: await failureOf(res) };
-            } catch (err) {
-                return { ok: false, error: err instanceof Error && err.message ? err.message : NETWORK_ERROR };
+            } catch {
+                return { ok: false, error: m.editor_collab_network_error() };
             }
         },
         async capture(inspectionId): Promise<CommandResult> {
@@ -92,9 +92,9 @@ export function createWebVersionHistory(fetchImpl: typeof fetch = (input, init) 
                     credentials: "same-origin",
                     headers: { Accept: "application/json" },
                 });
-                return res.ok ? { ok: true } : { ok: false, error: `HTTP ${res.status}` };
-            } catch (err) {
-                return { ok: false, error: err instanceof Error && err.message ? err.message : NETWORK_ERROR };
+                return res.ok ? { ok: true } : { ok: false, error: m.editor_collab_capture_failed() };
+            } catch {
+                return { ok: false, error: m.editor_collab_network_error() };
             }
         },
     };

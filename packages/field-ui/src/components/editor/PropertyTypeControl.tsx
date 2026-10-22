@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Modal, Select, type SelectOption } from "@core/shared-ui";
-import { useFieldCommand, useFieldDataSource } from "../../context";
+import { isIgnored, useFieldCommand, useFieldDataSource } from "../../context";
 import { m } from "../../i18n";
 import {
   INSPECTION_PROPERTY_TYPES,
@@ -23,6 +23,12 @@ interface PropertyTypeControlProps {
   perUnitMode: boolean;
   /** True when any ASTM PCA narrative block has text. */
   hasPcaNarrative: boolean;
+  /**
+   * Called with the saved classification (`null` = unclassified) once the host accepted it. The editor keeps
+   * its own copy of the inspection (fixed at mount), so the host patches it here; the select and the gates
+   * that read it follow the saved value instead of snapping back.
+   */
+  onSaved: (next: string | null) => void;
 }
 
 /**
@@ -70,9 +76,11 @@ export function PropertyTypeControl({
   reportTier,
   perUnitMode,
   hasPcaNarrative,
+  onSaved,
 }: PropertyTypeControlProps) {
   const { run, busy } = useFieldCommand(inspectionId);
-  const costItems = useFieldDataSource().resources.costItems;
+  const dataSource = useFieldDataSource();
+  const costItems = dataSource.resources.costItems;
   // A second, read-only request: the cost-item count is not in the editor loader
   // (the drawer self-loads), and it is the number the inspector most needs before
   // agreeing — money already entered. Loaded only when the modal opens, through
@@ -102,11 +110,20 @@ export function PropertyTypeControl({
    * treats an empty string as "field unchanged" and would drop the key, so
    * clearing the classification would silently do nothing.
    */
-  function save(next: string) {
+  async function save(next: string) {
+    const value = next === "" ? null : next;
     // Reuses the `save-settings` command deliberately. This IS a metadata patch
     // on the same endpoint the settings sheet uses, and a second command issuing
     // the identical PATCH would be duplication.
-    void run({ type: "save-settings", payload: { propertyType: next === "" ? null : next } });
+    const result = await run({ type: "save-settings", payload: { propertyType: value } });
+    if (isIgnored(result)) return;
+    if (!result.ok) {
+      dataSource.notify(result.error || m.editor_property_type_save_failed(), "error");
+      return;
+    }
+    // Show the saved type, then reload so the surfaces that read the loader (units, cost items) follow it.
+    if (mounted.current) onSaved(value);
+    dataSource.reload();
   }
 
   async function loadCostCount() {
@@ -133,12 +150,11 @@ export function PropertyTypeControl({
       void loadCostCount();
       return;
     }
-    save(next);
+    void save(next);
   }
 
-  // Close the confirm once the write lands and the classification the editor holds matches it.
-  // (Nothing refreshes that classification after a save today: the editor's state is fixed at
-  // mount and a POST does not revalidate, so this can stay open; see the batch notes.)
+  // Close the confirm once the write lands and the classification the editor holds matches it
+  // (`onSaved` patches that classification; a refused write leaves the confirm open to retry or cancel).
   useEffect(() => {
     if (pending !== null && !busy && propertyType === (pending === "" ? null : pending)) {
       setPending(null);
@@ -177,7 +193,7 @@ export function PropertyTypeControl({
               variant="danger"
               pending={busy}
               data-testid="property-type-confirm"
-              onClick={() => pending !== null && save(pending)}
+              onClick={() => pending !== null && void save(pending)}
             >
               {m.editor_property_type_lossy_confirm()}
             </Button>
