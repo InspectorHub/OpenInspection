@@ -49,10 +49,10 @@ import { fileURLToPath } from 'node:url';
 /** Surfaces the extraction sweep covered. Server-rendered email/PDF templates
  *  are not here: those resolve a locale per recipient and are guarded by the
  *  catalogue gate instead. */
-const SCOPE = ['app'];
+const SCOPE = ['app', 'packages/field-ui/src'];
 
 /** Generated output; the catalogue is the source, these are its compiled form. */
-const EXCLUDE_DIRS = ['app/paraglide'];
+const EXCLUDE_DIRS = ['app/paraglide', 'packages/field-ui/src/i18n/generated'];
 
 /**
  * A reason must be a WORD, not merely a non-space character.

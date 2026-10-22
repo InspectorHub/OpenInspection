@@ -80,12 +80,14 @@ export function findI18nViolations(source, filename) {
 // Scan app/ + server/. Exclude the formatter modules themselves (the canonical
 // en-US default lives there), the tz-offset picker labels (locale-neutral by
 // design), and tz.ts (Intl.DateTimeFormat('en-US') is offset math, not content).
-const SCOPE = ['app', 'server'];
+const SCOPE = ['app', 'server', 'packages/field-ui/src'];
 const EXCLUDE = [
   'server/lib/format.ts',
   'server/lib/tz.ts',
   'app/lib/timezones.ts',
 ];
+// Compiled paraglide output of the field-ui package: generated, never hand-edited.
+const EXCLUDE_DIRS = ['packages/field-ui/src/i18n/generated'];
 
 function collectFiles(path) {
   const out = [];
@@ -95,6 +97,8 @@ function collectFiles(path) {
   } catch {
     return out;
   }
+  const dirNorm = path.replace(/\\/g, '/');
+  if (EXCLUDE_DIRS.some((d) => dirNorm === d || dirNorm.startsWith(d + '/'))) return out;
   if (stat.isFile()) {
     const norm = path.replace(/\\/g, '/');
     if (!/\.(ts|tsx)$/.test(path)) return out;

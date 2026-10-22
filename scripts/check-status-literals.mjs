@@ -49,7 +49,9 @@ import {
 export { findStatusLiterals };
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
-const SCAN_DIRS = [join(ROOT, 'server'), join(ROOT, 'app')];
+const SCAN_DIRS = [join(ROOT, 'server'), join(ROOT, 'app'), join(ROOT, 'packages', 'field-ui', 'src')];
+// Compiled paraglide output of the field-ui package: generated, never hand-edited.
+const GENERATED_DIR = 'packages/field-ui/src/i18n/generated';
 const BASELINE = join(ROOT, 'scripts', 'status-literal-baseline.json');
 
 // Identifiers that denote a status column/field. The member words themselves
@@ -179,6 +181,7 @@ function walkFiles(dir, out = []) {
     for (const entry of entries) {
         if (entry === 'paraglide' || entry === 'node_modules') continue; // generated / deps
         const p = join(dir, entry);
+        if (relative(ROOT, p).replace(/\\/g, '/') === GENERATED_DIR) continue;
         const st = statSync(p);
         if (st.isDirectory()) walkFiles(p, out);
         else if (/\.tsx?$/.test(p) && !/\.(test|spec)\.tsx?$/.test(p)) out.push(p);
@@ -200,10 +203,12 @@ if (_scriptPath === _argv1 || _argv1.endsWith('/check-status-literals.mjs')) {
 
     /** @type {Map<string, string>} key -> context */
     const currentHits = new Map();
+    let filesScanned = 0;
     for (const scanDir of SCAN_DIRS) {
         for (const file of walkFiles(scanDir)) {
             const rel = relative(ROOT, file).replace(/\\/g, '/');
             if (WHITELIST.has(rel)) continue;
+            filesScanned += 1;
             const source = readFileSync(file, 'utf8');
             for (const hit of findStatusLiterals(source, { statusKeys: STATUS_KEYS, members })) {
                 const key = makeKey(rel, enclosingSymbol(source, hit.index), hit.signature);
@@ -240,7 +245,7 @@ if (_scriptPath === _argv1 || _argv1.endsWith('/check-status-literals.mjs')) {
         process.exit(1);
     }
 
-    console.log(`Status-literal gate: OK (${baseline.size} baselined, 0 new violations).`);
+    console.log(`Status-literal gate: OK (${filesScanned} files scanned, ${currentHits.size} hits, ${baseline.size} baselined, 0 new violations).`);
     if (stale.length > 0) {
         console.log(
             `  ${stale.length} stale baseline entry(s) no longer hit — run ` +

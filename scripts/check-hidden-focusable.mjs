@@ -2,7 +2,7 @@
 /**
  * Nothing a keyboard user can reach may be invisible or parked off-screen but still focusable.
  *
- * Flags, in app/**\/*.tsx and packages/shared-ui/src/**\/*.tsx (tests excluded):
+ * Flags, in app/**\/*.tsx, packages/shared-ui/src/**\/*.tsx and packages/field-ui/src/**\/*.tsx (tests excluded):
  *  - className with opacity-0 revealed only by a hover:/group-hover: opacity-N variant (any variant
  *    prefixes) and no focus reveal (focus-within:, or focus:/focus-visible: on a focusable element);
  *  - the same reveal on a button / link (or an element containing one) with no

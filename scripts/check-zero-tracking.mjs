@@ -45,9 +45,10 @@ const ROOT = process.cwd();
 
 // Client-side surfaces only. Server code may talk to anything it likes; the
 // posture is about what the BROWSER does.
-const ROOTS = ['app', 'public'];
+const ROOTS = ['app', 'public', 'packages/field-ui/src'];
 const EXT = /\.(ts|tsx|js|jsx|mjs|html)$/;
-const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.types', '.types-tsgo', 'paraglide', 'vendor', 'fonts']);
+// 'generated' is the compiled paraglide output of packages/field-ui/src/i18n (never hand-edited).
+const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.types', '.types-tsgo', 'paraglide', 'generated', 'vendor', 'fonts']);
 
 // Files that match a rule for a reason that has been looked at. Each needs a
 // sentence, not a name — a bare allowlist entry is indistinguishable from a

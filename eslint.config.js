@@ -574,7 +574,7 @@ export default tseslint.config(
         // genuine bug class (error, verified 0 violations); everything else is
         // warn-first per task-hooks-brief.md — this is existing-code surfacing,
         // not a fix-it-now gate.
-        files: ['app/**/*.{ts,tsx}', 'packages/shared-ui/src/**/*.{ts,tsx}'],
+        files: ['app/**/*.{ts,tsx}', 'packages/shared-ui/src/**/*.{ts,tsx}', 'packages/field-ui/src/**/*.{ts,tsx}'],
         plugins: {
             'react-hooks': reactHooks,
             react,

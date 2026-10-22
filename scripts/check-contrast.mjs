@@ -161,7 +161,9 @@ export { REFERENCE_SURFACE, PALETTE_DEBT, TOKEN_INVARIANTS, checkTokenInvariants
 export { MAX_SMALL_PX, KNOWN_DEBT, surfaces, findViolations, findCssRuleViolations };
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const SCAN_DIRS = [join("packages", "shared-ui", "src"), "app"];
+const SCAN_DIRS = [join("packages", "shared-ui", "src"), join("packages", "field-ui", "src"), "app"];
+/** Compiled paraglide output of the field-ui package: generated, never hand-edited. */
+const GENERATED_DIRS = [join("packages", "field-ui", "src", "i18n", "generated")];
 const CSS_PATH = join("app", "styles", "tailwind.css");
 
 /* ───────────────────────────── source scanning ──────────────────────────── */
@@ -170,7 +172,7 @@ function walk(dir, acc = []) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     if (statSync(full).isDirectory()) {
-      if (name !== "paraglide" && name !== "node_modules") walk(full, acc);
+      if (name !== "paraglide" && name !== "node_modules" && !GENERATED_DIRS.includes(relative(ROOT, full))) walk(full, acc);
     } else if (/\.tsx?$/.test(name) && !/\.d\.ts$/.test(name) && !/\.test\.tsx?$/.test(name)) {
       acc.push(full);
     }

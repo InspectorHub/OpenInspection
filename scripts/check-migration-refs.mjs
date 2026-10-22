@@ -23,7 +23,9 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const SCAN_DIRS = ["app", "server", "tests", join("packages", "shared-ui", "src")];
+const SCAN_DIRS = ["app", "server", "tests", join("packages", "shared-ui", "src"), join("packages", "field-ui", "src")];
+/** Compiled paraglide output of the field-ui package: generated, never hand-edited. */
+const GENERATED_DIRS = [join("packages", "field-ui", "src", "i18n", "generated")];
 
 /** How many lines above a violation a `migrefs-allow` comment still excuses it. */
 const ALLOW_WINDOW = 5;
@@ -50,8 +52,9 @@ function* walk(dir) {
   for (const entry of entries) {
     const p = join(dir, entry);
     const st = statSync(p);
-    if (st.isDirectory()) yield* walk(p);
-    else if (/\.tsx?$/.test(entry)) yield p;
+    if (st.isDirectory()) {
+      if (!GENERATED_DIRS.includes(relative(ROOT, p))) yield* walk(p);
+    } else if (/\.tsx?$/.test(entry)) yield p;
   }
 }
 

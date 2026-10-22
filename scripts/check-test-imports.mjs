@@ -202,6 +202,9 @@ export function analyze({ files }) {
     return { examined: files.length, clean, sites, violations, cheap, unresolved, unparsed };
 }
 
+/** Directories whose specs are policed. packages/field-ui/src holds the specs of code moved out of app/. */
+export const SPEC_ROOTS = ["app", "packages/field-ui/src"];
+
 export function specFiles(root, dir = "app") {
     const out = [];
     (function walk(d) {
@@ -217,7 +220,7 @@ export function specFiles(root, dir = "app") {
 
 function main() {
     const root = process.cwd();
-    const files = specFiles(root).map((full) => ({
+    const files = SPEC_ROOTS.flatMap((dir) => specFiles(root, dir)).map((full) => ({
         path: path.relative(root, full).split(path.sep).join("/"),
         source: readFileSync(full, "utf8"),
     }));
@@ -228,7 +231,7 @@ function main() {
     // apart, and a spec with no dynamic import at all is a PASS that is counted,
     // not a file that was skipped.
     console.log(
-        `check-test-imports: examined ${r.examined} spec file(s) under app/ — ` +
+        `check-test-imports: examined ${r.examined} spec file(s) under ${SPEC_ROOTS.join(", ")} — ` +
             `${r.clean} with no dynamic import (passing), ` +
             `${r.examined - r.clean} with at least one; ` +
             `${r.sites} dynamic import site(s) in total.`,

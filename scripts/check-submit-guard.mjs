@@ -77,6 +77,7 @@ import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative, sep, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { enclosingSymbol, normalizeSignature, makeKey, diffBaseline } from './lib/symbol-baseline.mjs';
+import { executeCallSites } from './lib/execute-call-sites.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -110,7 +111,7 @@ const AWAITING_CEILING_PATH = join(__dirname, 'submit-guard-awaiting-ceiling.jso
  */
 
 /** Client surfaces only. The posture is about what the BROWSER does. */
-const SCAN_ROOTS = ['app'];
+const SCAN_ROOTS = ['app', 'packages/field-ui/src'];
 const EXT = /\.(ts|tsx)$/;
 const SKIP_DIR = new Set(['node_modules', 'build', 'dist', '.types', '.types-tsgo', 'paraglide', '__tests__']);
 const SKIP_FILE = /\.(test|spec)\.(ts|tsx)$/;
@@ -235,8 +236,7 @@ export function findSubmitCallSites(source) {
         });
     };
 
-    for (const m of stripped.matchAll(CALL_SHAPE)) record(m.index);
-
+    for (const at of [...[...stripped.matchAll(CALL_SHAPE)].map((m) => m.index), ...executeCallSites(stripped, lines)]) record(at);
     // Second pass: the names this file DECLARES as fetchers. Only names the
     // first pass cannot already see, so nothing is counted twice and the total
     // does not move when a fetcher is renamed into or out of the `*Fetcher`

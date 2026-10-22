@@ -144,7 +144,7 @@
  *      are as visual as anything under `app/` and land on every screen at once.
  *      It is left out because the rule this gate was asked to enforce is scoped
  *      to `app/`; it is the first thing to add if the gate proves useful, and
- *      adding it means one entry in CANDIDATE_DIRS.
+ *      adding it means one entry in CANDIDATE_DIRS. field-ui/src IS one: it receives code moved out of `app/`.
  *   6. Tailwind config, design tokens, and any CSS living outside `app/`.
  *
  * FALSE POSITIVES — non-visual changes this will flag:
@@ -182,14 +182,14 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Directories whose files can be user-visible. See FALSE NEGATIVES note 5. */
-const CANDIDATE_DIRS = ['app/'];
+const CANDIDATE_DIRS = ['app/', 'packages/field-ui/src/'];
 
 /** Under CANDIDATE_DIRS but never user-visible, with the reason. */
 const EXCLUDED_PATHS = [
     { re: /\.(test|spec)\.[jt]sx?$/, why: 'test file — does not ship' },
     { re: /(^|\/)__(tests|mocks|snapshots|fixtures)__\//, why: 'test support — does not ship' },
     { re: /\.d\.ts$/, why: 'type declarations have no pixels' },
-    { re: /^app\/paraglide\//, why: 'generated i18n output — not hand-written' },
+    { re: /^(?:app\/paraglide|packages\/field-ui\/src\/i18n\/generated)\//, why: 'generated i18n output — not hand-written' },
 ];
 
 /**

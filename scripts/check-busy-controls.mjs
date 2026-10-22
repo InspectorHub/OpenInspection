@@ -2,7 +2,7 @@
 /**
  * A control that starts work must stay focusable and must not double-submit.
  *
- * Flags, in app/**\/*.tsx and packages/shared-ui/src/**\/*.tsx (tests excluded):
+ * Flags, in app/**\/*.tsx, packages/shared-ui/src/**\/*.tsx and packages/field-ui/src/**\/*.tsx (tests excluded):
  *  - <button|Button> that submits (type="submit", a `type=` expression naming "submit", or a bare
  *    <button> inside a form) with none of pending / pendingProps / disabled (aria-disabled and
  *    aria-busy alone do not stop a click or Enter);
@@ -18,6 +18,8 @@
  *    reachable from that form's own onSubmit (named in the tag, or in the handler it names, up to three hops);
  *  - a <x>Fetcher.submit( or bare fetch( call that WRITES (an explicit post / put / patch / delete, or a method that is not a
  *    literal) in a function that reaches no same-frame guard. A plain or GET submit is a search or a load.
+ *  - a <expr>.execute( call (the field-ui command channel, FieldDataSource.execute) in a function that reaches no
+ *    same-frame guard. Every execute is a write, so there is no method to read; useFieldCommand counts as a guard.
  *
  * The opening tag is parsed for real (multi-line, nested braces), not matched per line.
  * Exception: a comment `busy-controls-allow: <reason>` inside the tag or just above it (it exempts
@@ -42,6 +44,7 @@ runJsxGate({
         { rule: 'native-disable-busy', src: '<Button disabled={isSaving}>Go</Button>' },
         { rule: 'form-without-latch', src: '<Form method="post"><input /></Form>' },
         { rule: 'raw-submit-unlatched', src: 'function go() { saveFetcher.submit(fd, { method: "post" }); }' },
+        { rule: 'raw-submit-unlatched', src: 'function go() { dataSource.execute(id, cmd); }' },
     ],
     fixHint: [
         'Use <Button pending={busy}> or <button {...pendingProps(busy, onClick)} className={PENDING_CLASS}>',

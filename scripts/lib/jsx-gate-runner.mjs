@@ -1,7 +1,7 @@
 /**
  * Shared runner for the JSX ratchet gates (busy-controls, hidden-focusable).
  *
- * Walks the ROOTS below (app/ and, where it exists, packages/shared-ui/src; *.tsx, tests excluded;
+ * Walks the ROOTS below (app/ and, where they exist, packages/shared-ui/src and packages/field-ui/src; *.tsx, tests excluded;
  * tracked and untracked-but-not-ignored files alike),
  * runs a detector per file, and compares violation
  * counts per file with a { path: count } baseline. It prints BOTH numbers -- sites looked
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 /** Source roots, as directories. A root that does not exist in this repo simply lists nothing. */
-const ROOTS = ['app', 'packages/shared-ui/src'];
+const ROOTS = ['app', 'packages/shared-ui/src', 'packages/field-ui/src'];
 
 const isTest = (p) => /\.(?:test|spec)\.tsx$/.test(p) || p.includes('/__tests__/') || p.includes('/node_modules/');
 // Tracked AND untracked-but-not-ignored files: a new file is scanned from the moment it exists, not from
