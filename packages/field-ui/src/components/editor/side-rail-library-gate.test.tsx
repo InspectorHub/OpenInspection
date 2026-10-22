@@ -1,7 +1,19 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { SideRail } from "../../../app/components/editor/SideRail";
+import { SideRail as BareSideRail } from "./SideRail";
+import { FieldDataSourceProvider } from "../../context";
+import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
+
+const fake = createFakeDataSource({ data: createEmptyEditorData() });
+/** The rail reads photo URLs and the photo gallery's data off the data source. */
+function SideRail(props: Parameters<typeof BareSideRail>[0]) {
+  return (
+    <FieldDataSourceProvider dataSource={fake}>
+      <BareSideRail {...props} />
+    </FieldDataSourceProvider>
+  );
+}
 
 describe("SideRail — Library tab type gate (module E)", () => {
   it("fill mode: shows Library for a rich item", () => {

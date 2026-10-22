@@ -66,7 +66,7 @@ describe('the editor header consumes it on the Publish button', () => {
     // is not renderable in a unit test (it needs a data router and the whole
     // editor state object), and a behaviour-only test would stay green if the
     // button stopped reading the flag — which is the entire user-visible fix.
-    const SRC = readFileSync(join(process.cwd(), 'app', 'components', 'editor', 'EditorHeader.tsx'), 'utf8');
+    const SRC = readFileSync(join(process.cwd(), 'packages', 'field-ui', 'src', 'components', 'editor', 'EditorHeader.tsx'), 'utf8');
 
     it('routes the Publish click through runWithPending', () => {
         expect(SRC).toContain('runWithPending(handlePublishClick, setOpeningPublish)');

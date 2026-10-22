@@ -57,6 +57,13 @@ export interface FieldCommandRunner {
   run<C extends FieldCommand>(cmd: C): Promise<FieldRunResult<CommandData<C>>>;
   /** True from the call until the answer settles. Render state only; the guard is synchronous and separate. */
   busy: boolean;
+  /**
+   * The guard itself, read synchronously: true from the moment a `run` started (in the same frame, before any
+   * render) until it settles. Use it to decide, BEFORE changing UI state, whether a `run` would be dropped
+   * (an optimistic update that a dropped call must not make). It is the same ref `run` tests, not a second
+   * guard: `run` stays the only thing that can start a request.
+   */
+  isBusy(): boolean;
 }
 
 /**
@@ -145,5 +152,7 @@ export function useFieldCommand(inspectionId: string): FieldCommandRunner {
     [dataSource, inspectionId],
   );
 
-  return { run, busy };
+  const isBusy = useCallback(() => inFlight.current, []);
+
+  return { run, busy, isBusy };
 }

@@ -31,6 +31,7 @@ export function createWebUrls(location?: PresenceLocation): FieldUrls {
             return `${scheme}//${loc.host}/api/inspections/${inspectionId}/presence/ws`;
         },
         editorPath: (inspectionId) => `/inspections/${inspectionId}/edit`,
+        inspectionsList: () => "/inspections",
     };
 }
 

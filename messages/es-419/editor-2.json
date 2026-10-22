@@ -201,6 +201,7 @@
   "editor_publish_not_completed_prompt": "El trabajo en sitio no está marcado como completo. Publicar no lo requiere: puede hacer ambas cosas o solo publicar.",
   "editor_publish_mark_complete_and_publish": "Marcar como completo y publicar",
   "editor_publish_just_publish": "Solo publicar",
+  "editor_publish_failed": "No se pudo publicar el informe. Inténtelo de nuevo.",
   "editor_rating_aria": "Calificación",
   "editor_recrop_title": "¿Recortar de nuevo esta foto?",
   "editor_recrop_confirm": "Recortar y borrar",

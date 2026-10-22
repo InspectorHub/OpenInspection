@@ -1,35 +1,34 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Button } from "@core/shared-ui";
-import { CommentTypeahead } from "@core/field-ui/components/editor/CommentTypeahead";
-import { useCommentTypeahead } from "@core/field-ui/hooks/useCommentTypeahead";
-import {
-  flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
-} from "@core/field-ui/shared/comment-typeahead";
-import { AiAssistPanel } from "@core/field-ui/components/editor/AiAssistPanel";
-import { NotesFieldHeader } from "@core/field-ui/components/editor/NotesFieldHeader";
-import { CloneLastButton } from "@core/field-ui/components/editor/CloneLastButton";
-import type { DefectFieldsValue } from "@core/field-ui/components/editor/DefectFieldsRow";
-import { ItemAttributesPanel, type ItemAttributeValue } from "@core/field-ui/components/editor/ItemAttributesPanel";
-import { RatingButtonRow } from "@core/field-ui/components/editor/RatingButtonRow";
+import { CommentTypeahead } from "./CommentTypeahead";
+import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
+import { flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret } from "../../shared/comment-typeahead";
+import { AiAssistPanel } from "./AiAssistPanel";
+import { NotesFieldHeader } from "./NotesFieldHeader";
+import { CloneLastButton } from "./CloneLastButton";
+import type { DefectFieldsValue } from "./DefectFieldsRow";
+import { ItemAttributesPanel, type ItemAttributeValue } from "./ItemAttributesPanel";
+import { RatingButtonRow } from "./RatingButtonRow";
 import {
  CannedCommentTabs,
  type CannedInfoComment,
  type CannedDefect,
  type CannedTabId,
  type LibraryMatch,
-} from "@core/field-ui/components/editor/CannedCommentTabs";
-import { ItemPhotoStrip, type StripPhoto } from "@core/field-ui/components/media-studio/ItemPhotoStrip";
-import type { AttachedRepairItem } from "@core/field-ui/hooks/useFindings";
-import type { ItemAttribute } from "@core/field-ui/shared/types";
-import { shouldTriggerSlash } from "@core/field-ui/shared/slash-trigger";
-import { findRatingLevel, type EditorRatingLevel } from "@core/field-ui/shared/rating-levels";
-import { findRatingContradictions } from "@core/field-ui/shared/contradiction-lint";
-import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "@core/field-ui/shared/custom-defects";
-import type { DefectTrade } from "@core/field-ui/shared/defect-fields";
-import { ItemHeading } from "@core/field-ui/components/editor/ItemHeading";
-import { FollowupPanel, hasCarriedBaseline } from "@core/field-ui/components/editor/FollowupPanel";
+} from "./CannedCommentTabs";
+import { ItemPhotoStrip, type StripPhoto } from "../media-studio/ItemPhotoStrip";
+import type { AttachedRepairItem } from "../../hooks/useFindings";
+import type { ItemAttribute } from "../../shared/types";
+import { shouldTriggerSlash } from "../../shared/slash-trigger";
+import { findRatingLevel, type EditorRatingLevel } from "../../shared/rating-levels";
+import { findRatingContradictions } from "../../shared/contradiction-lint";
+import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../shared/custom-defects";
+import type { DefectTrade } from "../../shared/defect-fields";
+import { ItemHeading } from "./ItemHeading";
+import { FollowupPanel, hasCarriedBaseline } from "./FollowupPanel";
+import { useFieldDataSource } from "../../context";
 import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
-import { m } from "~/paraglide/messages";
+import { m } from "../../i18n";
 
 export type { LibraryMatch };
 
@@ -200,6 +199,7 @@ export function ItemEditor({
  pendingPhotoUrl,
  resultId,
 }: ItemEditorProps) {
+ const { urls } = useFieldDataSource();
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
  const [customFormOpen, setCustomFormOpen] = useState(false);
@@ -610,7 +610,7 @@ export function ItemEditor({
  itemId={item.id}
  photos={((result.photos as StripPhoto[]) ?? [])}
  coverKey={coverKey ?? null}
- photoUrl={(k) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(k)}`}
+ photoUrl={(k) => urls.photo(inspectionId ?? "", k)}
  onAddPhoto={() => onAddPhoto?.()}
  onOpen={(i) => onOpenPhoto?.(item.id, i)}
  onReorder={onReorderPhotos ? (order) => onReorderPhotos(item.id, order) : undefined}

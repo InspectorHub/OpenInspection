@@ -223,6 +223,36 @@ describe('useFieldCommand', () => {
     expect(screen.getByTestId('busy').textContent).toBe('false');
   });
 
+  it('isBusy reads the guard synchronously: true in the same frame as the first run, false once it settles', async () => {
+    const { fake, settle } = deferredFake();
+    const seen: boolean[] = [];
+    function Probe() {
+      const { run, isBusy } = useFieldCommand('insp-1');
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            seen.push(isBusy());
+            void run(COMPLETE);
+            seen.push(isBusy());
+          }}
+        >
+          go
+        </button>
+      );
+    }
+    renderWith(fake, <Probe />);
+    const btn = screen.getByRole('button');
+    // Two presses in ONE frame: the second sees the guard the first just took, before any render.
+    act(() => { btn.click(); btn.click(); });
+    expect(seen).toEqual([false, true, true, true]);
+    settle(0, { ok: true });
+    await flush();
+    seen.length = 0;
+    act(() => { btn.click(); });
+    expect(seen).toEqual([false, true]);
+  });
+
   it('sets no state after unmount, and the pending call still settles', async () => {
     const { fake, settle } = deferredFake();
     const results: FieldRunResult<unknown>[] = [];

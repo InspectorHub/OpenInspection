@@ -1,17 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { ItemEditor } from "~/components/editor/ItemEditor";
-import { ItemList } from "@core/field-ui/components/editor-shared/ItemList";
+import { ItemEditor } from "./ItemEditor";
+import { ItemList } from "../editor-shared/ItemList";
+import { FieldDataSourceProvider } from "../../context";
+import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
+
+const fake = createFakeDataSource({ data: createEmptyEditorData() });
 
 describe("item header sites (behavior-preserving)", () => {
   it("ItemEditor still shows the section eyebrow + item label", () => {
-    const out = renderToStaticMarkup(createElement(ItemEditor, {
+    const out = renderToStaticMarkup(createElement(FieldDataSourceProvider, { dataSource: fake }, createElement(ItemEditor, {
       item: { id: "i1", label: "Roof covering", type: "text" },
       sectionTitle: "Exterior",
       result: {},
       onRating: () => {}, onNotes: () => {}, onNotesBlur: () => {},
-    } as never));
+    } as never)));
     expect(out).toContain("Exterior");
     expect(out).toContain("Roof covering");
     expect(out).toContain("<h2");

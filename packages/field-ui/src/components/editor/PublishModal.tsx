@@ -1,30 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { Modal, Button, Banner, buttonClasses, useActionLatch } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
-import { formatShapedDateTime } from "@core/field-ui/shared/format-date";
-import { useSessionContext, useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
-
-/**
- * The fields the dialog collects that are not the auto-sign flag, as form
- * values ready to ride the publish submission.
- *
- * A named type rather than an inline one because the owning route spreads it
- * into its submit payload, and a payload whose shape only exists at the call
- * site is how a field gets collected and then silently dropped.
- */
-export type PublishExtras = Record<string, string>;
+import { m } from "../../i18n";
+import { formatShapedDateTime } from "../../shared/format-date";
+import { useFieldDataSource } from "../../context";
+import type { PublishExtras } from "../../hooks/usePublishFlow";
 
 export interface PublishModalProps {
  open: boolean;
+ /** Names this inspection's detail page in the receipt, through `urls.editorPath`. */
+ inspectionId: string;
  progress: { rated: number; total: number; pct: number };
  status: string;
  publishError: string | null;
  isSubmitting: boolean;
  onClose: () => void;
  /**
-  * The instant a new company's cooling window closes, when the host route has it.
-  * The full-screen editor sits outside the workspace layout, so the session
-  * context this modal otherwise reads is absent there; it passes its own.
+  * The instant a new company's cooling window closes, when the editor data has
+  * one (`EditorData.outboundCoolingWindow`). Null or absent shows no notice.
   */
  coolingUnlockAtMs?: number | null;
  /**
@@ -63,7 +55,7 @@ export interface PublishModalProps {
  onAutoSignToggle: (checked: boolean) => void;
 }
 
-export function PublishModal({ open, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, coolingUnlockAtMs }: PublishModalProps) {
+export function PublishModal({ open, inspectionId, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, coolingUnlockAtMs }: PublishModalProps) {
  // The order lifecycle does not gate publishing (report and order axes are
  // independent). When the on-site work is not yet marked complete, offer an
  // advisory choice — do both, or just publish — but never block.
@@ -78,10 +70,12 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  // Same `unlockAtMs` the banner reads, so the two cannot name different times;
  // it is non-null only while the window is open, and the server decides that
  // (see resolveCoolingWindowForSession) — no clock arithmetic here.
- const sessionUnlockAtMs = useSessionContext()?.outboundCoolingWindow?.unlockAtMs ?? null;
- const unlockAtMs = coolingUnlockAtMs ?? sessionUnlockAtMs;
- const timeZone = useDisplayTimeZone();
- const dtFormat = useChromeDateTimeFormat();
+ const { session, urls } = useFieldDataSource();
+ const unlockAtMs = coolingUnlockAtMs ?? null;
+ // The viewer's own zone and clock, as the workspace chrome shows them.
+ const { timeZone: sessionZone, locale, dateFormat, timeFormat } = session();
+ const timeZone = sessionZone ?? "UTC";
+ const dtFormat = { locale, dateFormat, timeFormat };
 
  /* ---------------------------------------------------------------- */
  /* The receipt (the publish that told nobody anything)              */
@@ -117,28 +111,31 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  /**
   * Address of this inspection's detail page, which is where Send report lives.
   *
-  * Derived from the editor's own address (`/inspections/:id/edit`) because this
-  * dialog is not handed the inspection id, and read inside the effect so nothing
-  * touches `window` during SSR. Null when the path is not that shape — the
-  * receipt then states the next step rather than offering a button that would go
-  * somewhere wrong.
+  * Derived from the host's editor path (`/inspections/:id/edit`) and read inside the
+  * effect. Null when the path is not that shape: the receipt then states the next
+  * step rather than offering a button that would go somewhere wrong.
   */
  const [inspectionHref, setInspectionHref] = useState<string | null>(null);
  useEffect(() => {
   if (isSubmitting) submitSeen.current = true;
  }, [isSubmitting]);
+ // A refused publish is not a publish. The dialog stays open with the reason, and a later Cancel clears that
+ // reason and closes it: without this reset that close read as "submitted, closed, no error" and showed a receipt.
+ useEffect(() => {
+  if (publishError) submitSeen.current = false;
+ }, [publishError]);
  useEffect(() => {
   if (open || !submitSeen.current) return;
   submitSeen.current = false;
   if (publishError) return;
-  const path = window.location.pathname;
+  const path = urls.editorPath(inspectionId);
   setInspectionHref(/\/edit\/?$/.test(path) ? path.replace(/\/edit\/?$/, "") : null);
   // The reason described THIS revision. The dialog stays mounted, so leaving it
   // behind would pre-fill the next revision with the previous one's sentence —
   // visible in the box, but the kind of thing an inspector submits unread.
   setSummary("");
   setReceiptOpen(true);
- }, [open, publishError]);
+ }, [open, publishError, urls, inspectionId]);
 
  return (
  <>

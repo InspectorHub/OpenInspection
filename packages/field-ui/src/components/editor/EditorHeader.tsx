@@ -1,17 +1,23 @@
-import { useState, type ReactNode } from "react";
-import type { useInspectionState } from "@core/field-ui/hooks/useInspection";
+import { useState, type MouseEvent, type ReactNode } from "react";
+import type { useInspectionState } from "../../hooks/useInspection";
 import { Button, IconButton, Icon } from "@core/shared-ui";
-import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
-import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
-import { ProgressStripText } from "@core/field-ui/components/editor/ProgressStripText";
-import { TemplateMenu } from "@core/field-ui/components/editor/TemplateMenu";
-import { PreviewMenu } from "@core/field-ui/components/editor/PreviewMenu";
-import { HEADER_OVERFLOW } from "@core/field-ui/components/editor/header-visibility";
-import { runWithPending } from "@core/field-ui/components/editor/publish-pending";
-import { HeaderOverflowMenu } from "@core/field-ui/components/editor/HeaderOverflowMenu";
-import { m } from "~/paraglide/messages";
+import { useFieldDataSource, useFieldSlots } from "../../context";
+import { ProgressStripText } from "./ProgressStripText";
+import { TemplateMenu } from "./TemplateMenu";
+import { PreviewMenu } from "./PreviewMenu";
+import { HEADER_OVERFLOW } from "./header-visibility";
+import { runWithPending } from "./publish-pending";
+import { HeaderOverflowMenu } from "./HeaderOverflowMenu";
+import { m } from "../../i18n";
 
 type EditorState = ReturnType<typeof useInspectionState>;
+
+const BACK_CLASS = "w-9 h-9 shrink-0 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted";
+const backIcon = (
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12H5M12 19l-7-7 7-7" />
+ </svg>
+);
 
 export interface EditorHeaderProps {
  /** Consolidated inspection state (useInspectionState return). */
@@ -71,8 +77,19 @@ export function EditorHeader({
  onUpdateSourceTemplate,
  canUpdateSourceTemplate,
 }: EditorHeaderProps) {
- // Shared Browser Rendering rate-limit UX for the on-demand PDF preview.
- const pdf = usePdfExport();
+ // The PDF preview and the theme switch are host UI (see `FieldHostSlots`); a host that
+ // supplies none simply gets no such entry point.
+ const { pdf, renderThemeControl } = useFieldSlots();
+ const { urls, exit } = useFieldDataSource();
+ const listHref = urls.inspectionsList?.() ?? null;
+ // A plain left click goes through `exit()` so the host's unsaved-changes guard sees it; a modified click or a
+ // middle click keeps the browser's own link behaviour (new tab, new window).
+ const onBackClick = (e: MouseEvent<HTMLAnchorElement>) => {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  exit();
+ };
+ const previewHref = tenantSlug ? urls.reportPreview(tenantSlug, String(state.inspection.id)) : null;
  /**
   * True while the pre-publish readiness check is in flight.
   *
@@ -99,24 +116,11 @@ export function EditorHeader({
 
  {/* Left zone: navigation + identity + progress + save status + status badge */}
  <div className="flex items-center gap-3 min-w-0 flex-1">
- <a
-  href="/inspections"
-  className="w-9 h-9 shrink-0 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
- >
-  <svg
-  className="w-4 h-4"
-  fill="none"
-  stroke="currentColor"
-  viewBox="0 0 24 24"
-  >
-  <path
-   strokeLinecap="round"
-   strokeLinejoin="round"
-   strokeWidth={2}
-   d="M19 12H5M12 19l-7-7 7-7"
-  />
-  </svg>
- </a>
+ {listHref ? (
+  <a href={listHref} onClick={onBackClick} aria-label={m.common_back()} className={BACK_CLASS}>{backIcon}</a>
+ ) : (
+  <button type="button" onClick={exit} aria-label={m.common_back()} className={BACK_CLASS}>{backIcon}</button>
+ )}
  <div className="min-w-0">
   <div className="text-[14px] font-bold truncate">
   {(state.inspection.propertyAddress as string) || m.editor_header_property_fallback()}
@@ -242,7 +246,7 @@ export function EditorHeader({
  {/* Theme — the shared 4-segment control (auto/light/dark/field), same as the
      tenant sidebar. Shown from xl up where the header has room; narrower
      widths reach it through the mobile Theme drawer. */}
- <ThemeSegmentControl className={HEADER_OVERFLOW.theme.inline} />
+ {renderThemeControl?.({ className: HEADER_OVERFLOW.theme.inline })}
 
  {/* Report settings — a labelled button, not a bare gear.
      IA-87 ③ / IA-88 ⑤: this was the only unlabelled icon in a row of text
@@ -297,21 +301,20 @@ export function EditorHeader({
      The web report is the owner preview (works on drafts, tokenless via the
      report-view loader); the PDF is the real server-rendered deliverable
      (owner on-demand pre-publish via the JWT-authed endpoint). */}
- <PreviewMenu
-  onPreviewReport={
-   tenantSlug
-    ? () => window.open(`/report-view/${tenantSlug}/${state.inspection.id}`, "_blank", "noopener")
-    : null
-  }
-  onPreviewPdf={() => pdf.exportPdf(`/api/inspections/${state.inspection.id}/pdf?type=full`, { mode: "view", filename: `report-${state.inspection.id}.pdf` })}
-  pdfBusy={pdf.busy}
-  pdfError={pdf.error}
-  /* Inside a menu already labelled "Preview", the rows name destinations,
-     not actions — "Web report" / "PDF", not "Web report" / "Preview PDF".
-     The busy and cooldown states replace the label outright, so the short
-     form loses nothing. */
-  pdfLabel={pdfActionLabel(pdf, m.editor_header_preview_pdf_short())}
- />
+ {/* No destination at all (no tenant link, no PDF export) means no menu: an empty Preview is a dead control. */}
+ {(previewHref || pdf) && (
+  <PreviewMenu
+   onPreviewReport={previewHref ? () => window.open(previewHref, "_blank", "noopener") : null}
+   onPreviewPdf={pdf ? () => pdf.run(String(state.inspection.id)) : null}
+   pdfBusy={pdf?.busy ?? false}
+   pdfError={pdf?.error ?? null}
+   /* Inside a menu already labelled "Preview", the rows name destinations,
+      not actions — "Web report" / "PDF", not "Web report" / "Preview PDF".
+      The busy and cooldown states replace the label outright, so the short
+      form loses nothing. */
+   pdfLabel={pdf ? pdf.actionLabel(m.editor_header_preview_pdf_short()) : m.editor_header_preview_pdf_short()}
+  />
+ )}
 
  {/* Sign now button */}
  <Button
@@ -355,7 +358,7 @@ export function EditorHeader({
   /* Full width in the menu: at its intrinsic size the four segments sit in
      a short pill against a much wider panel, reading as a stray chip rather
      than a control. */
-  themeControl={<ThemeSegmentControl className="w-full" />}
+  themeControl={renderThemeControl?.({ className: "w-full" }) ?? null}
  />
 
  {/* Publish button */}

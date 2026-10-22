@@ -12,8 +12,8 @@ export interface HeaderOverflowMenuProps {
   finishingFieldwork: boolean;
   /** #181 — collab-only; null when version history is unavailable. */
   onOpenVersionHistory: (() => void) | null;
-  /** The theme segment control, rendered as the menu's last row. */
-  themeControl: ReactNode;
+  /** The theme segment control, rendered as the menu's last row. Null when the host has none. */
+  themeControl: ReactNode | null;
 }
 
 /**
@@ -106,10 +106,12 @@ export function HeaderOverflowMenu({
               </MenuItem>
             </li>
           )}
-          <li role="none" className={`${HEADER_OVERFLOW.theme.row} mt-1 border-t border-ih-border px-3 pt-2 pb-1`}>
-            <div className="text-[11px] uppercase tracking-[0.1em] text-ih-fg-3 mb-1.5">{m.nav_theme_label()}</div>
-            {themeControl}
-          </li>
+          {themeControl && (
+            <li role="none" className={`${HEADER_OVERFLOW.theme.row} mt-1 border-t border-ih-border px-3 pt-2 pb-1`}>
+              <div className="text-[11px] uppercase tracking-[0.1em] text-ih-fg-3 mb-1.5">{m.nav_theme_label()}</div>
+              {themeControl}
+            </li>
+          )}
         </ul>
       </Popover>
     </>

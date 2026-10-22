@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { IconButton, Icon } from "@core/shared-ui";
-import { renderTemplate } from "@core/field-ui/shared/mustache";
-import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "@core/field-ui/shared/defect-fields";
-import { photoDisplayName, withDownload } from "@core/field-ui/shared/photo-name";
-import { PhotoGallery } from "@core/field-ui/components/media-studio/PhotoGallery";
-import { CommentLibraryList } from "@core/field-ui/components/editor/CommentLibraryList";
-import { CannedCommentRow } from "@core/field-ui/components/editor-shared/CannedCommentRow";
-import type { EditorMode } from "@core/field-ui/components/editor-shared/editor-mode";
-import { m } from "~/paraglide/messages";
+import { renderTemplate } from "../../shared/mustache";
+import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../shared/defect-fields";
+import { photoDisplayName, withDownload } from "../../shared/photo-name";
+import { PhotoGallery } from "../media-studio/PhotoGallery";
+import { CommentLibraryList } from "./CommentLibraryList";
+import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
+import type { EditorMode } from "../editor-shared/editor-mode";
+import { useFieldDataSource } from "../../context";
+import { m } from "../../i18n";
 
 interface SideRailProps {
   mode: EditorMode;
@@ -44,6 +45,7 @@ const TABS: Array<{ id: TabId; label: () => string; icon: string }> = [
 ];
 
 export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, categoryColor, locale }: SideRailProps) {
+  const { urls } = useFieldDataSource();
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [open, setOpen] = useState(initialOpen ?? false);
   // Photos: fill-only (Plan 1). Library: rich-only in fill mode — the canned
@@ -179,7 +181,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                       <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-3">{m.editor_siderail_tab_photos()}</span>
                       <div className="mt-1 grid grid-cols-3 gap-1">
                         {(activeResult.photos as string[]).map((key, i) => {
-                          const url = `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`;
+                          const url = urls.photo(inspectionId ?? "", key);
                           const name = photoDisplayName(key);
                           return (
                             <a

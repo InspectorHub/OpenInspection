@@ -1,10 +1,5 @@
 [
-  "app/components/editor/EditorHeader.tsx",
   "app/components/editor/EditorHumanCheck.tsx",
-  "app/components/editor/ItemEditor.tsx",
-  "app/components/editor/PublishModal.tsx",
-  "app/components/editor/SideRail.tsx",
-  "app/components/form/FormField.tsx",
   "app/components/media-studio/AvatarCropper.tsx",
   "app/components/media-studio/LogoUploader.tsx",
   "app/components/media-studio/SignaturePad.tsx",

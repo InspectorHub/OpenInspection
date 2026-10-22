@@ -7,7 +7,8 @@ import { makeCustomDefect } from "@core/field-ui/shared/custom-defects";
 import { useInspectionState, type InspectionSchema, type ItemFilter } from "@core/field-ui/hooks/useInspection";
 import { findingKey } from "@core/field-ui/hooks/findings/shared";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
-import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { usePublishFlow } from "@core/field-ui/hooks/usePublishFlow";
+import { useCommercialReportSave } from "@core/field-ui/hooks/useCommercialReportSave";
 import { usePropertyFactsSave } from "@core/field-ui/hooks/usePropertyFactsSave";
 import { useInspectorSignature } from "@core/field-ui/hooks/useInspectorSignature";
 import { useAddStatutoryInstance } from "@core/field-ui/hooks/useAddStatutoryInstance";
@@ -33,18 +34,17 @@ import { webMediaStore } from "~/lib/field/web-media-store";
 import { VersionHistoryPanel } from "@core/field-ui/components/collab/VersionHistoryPanel";
 import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
 import { SectionRail } from "@core/field-ui/components/editor-shared/SectionRail";
-import { EditorHeader } from "~/components/editor/EditorHeader";
+import { EditorHeader } from "@core/field-ui/components/editor/EditorHeader";
 import { FullscreenToggle } from "@core/field-ui/components/editor/FullscreenToggle";
 import { ItemList } from "@core/field-ui/components/editor-shared/ItemList";
 import { useStatutoryGroups, useStatutoryFormProgress, useStructuralEditingAllowed } from "@core/field-ui/hooks/useStatutoryGroups";
-import { useCompletedRevalidation } from "@core/field-ui/hooks/useCompletedRevalidation";
 import { AddGroupInstanceHost } from "@core/field-ui/components/statutory/AddGroupInstanceHost";
 import { RevisionBanner } from "@core/field-ui/components/statutory/RevisionBanner";
-import { ItemEditor } from "~/components/editor/ItemEditor";
+import { ItemEditor } from "@core/field-ui/components/editor/ItemEditor";
 import { ItemPaneEmptyState } from "@core/field-ui/components/editor/ItemPaneEmptyState";
 import { TagChipRow, type TagPin } from "@core/field-ui/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "@core/field-ui/components/editor/DefectFieldsRow";
-import { SideRail } from "~/components/editor/SideRail";
+import { SideRail } from "@core/field-ui/components/editor/SideRail";
 import { SpeedMode } from "@core/field-ui/components/editor/SpeedMode";
 import { FooterBar } from "@core/field-ui/components/editor/FooterBar";
 import { BatchActionBar } from "@core/field-ui/components/editor/BatchActionBar";
@@ -72,7 +72,7 @@ import { AddItemTypeModal } from "@core/field-ui/components/editor/AddItemTypeMo
 import { SaveTemplateModal } from "@core/field-ui/components/editor/SaveTemplateModal";
 import { useStructureEdit } from "@core/field-ui/hooks/useStructureEdit";
 import { UnsavedChangesBlocker } from "@core/field-ui/components/editor/UnsavedChangesBlocker";
-import { PublishModal, type PublishExtras } from "~/components/editor/PublishModal";
+import { PublishModal } from "@core/field-ui/components/editor/PublishModal";
 import { SignModal } from "@core/field-ui/components/editor/SignModal";
 import { CommentLibraryDrawer } from "@core/field-ui/components/editor/CommentLibraryDrawer";
 import { SectionPickerModal } from "@core/field-ui/components/editor/SectionPickerModal";
@@ -169,56 +169,13 @@ function InspectionEditPage() {
  // FE-2: photo uploads also get a dedicated fetcher — sharing the mutation
  // fetcher would let an autosave abort an in-flight upload (and vice versa).
  const uploadFetcher = useFetcher();
- // Publish gets its own fetcher so a publish precondition failure (e.g. "not
- // completed") is NOT swallowed by the generic autosave "Save failed" toast
- // (which only watches uploadFetcher). The real server
- // message is surfaced inline in the publish modal instead.
- // #106 — publishing is the tier-1 surface: it mints a report version, signs
- // it and notifies the client, and a double click would do all three twice.
+ // The lifecycle writes (publish, finish fieldwork) and the commercial subtype/tier selectors go
+ // through `usePublishFlow` / `useCommercialReportSave`, which sit below `state`. Each write owns its
+ // own command guard, so a tier click is never swallowed by an in-flight subtype save and a publish never
+ // waits behind autosave. The commercial narrative panel keeps one guard per block (PcaNarrativePanel).
  const ensureHuman = useEnsureHuman();
- const { fetcher: publishFetcher, submit: submitPublish, busy: publishBusy } =
-  useGuardedSubmit<{ ok: boolean; intent?: string; error?: string }>();
- const [publishError, setPublishError] = useState<string | null>(null);
- // Order-lifecycle "Finish fieldwork" — its own fetcher so marking the on-site
- // work complete never contends with an in-flight autosave or publish.
- // #106 — finishing fieldwork closes the order axis and is what the client
- // notification and the invoice clock key off; it goes through the guard.
- const { fetcher: completeFetcher, submit: submitComplete, busy: completeBusy } =
-  useGuardedSubmit<{ ok: boolean; intent?: string }>();
- // Commercial PCA Phase S — the narrative panel now owns ONE GUARD PER BLOCK
- // (#106). It used to save through a single `narrativeFetcher` held here, which
- // a guard cannot wrap: `useGuardedSubmit` refuses a second submit while one is
- // in flight, and tabbing from one narrative block to the next inside a round
- // trip would have dropped the second block's text in silence. The per-block
- // guard lives in PcaNarrativePanel and still dispatches the same
- // "save-pca-narrative" route intent (BFF pattern — never a client fetch).
- // Commercial PCA Phase T — the commercial subtype + report tier selectors
- // (CommercialReportControls) get their own fetchers for the same reason the
- // narrative panel does: a selector change must not be aborted by an
- // unrelated in-flight mutation. They sit side by side in the same panel, so
- // a shared fetcher would let a quick tier click abort an in-flight subtype
- // save (or vice versa) — React Router cancels the previous submission when
- // the same useFetcher instance re-submits (see
- // feedback_rr_shared_fetcher_abort). Dispatches "save-property-facts"
- // through the route action (BFF pattern), which PATCHes the real
- // /api/inspections/:id/property-facts endpoint. (PropertyInfoForm now persists
- // its own strip fields through the latest-wins save below — same intent.)
- // #106 — one guard EACH, never one shared: the guard refuses a second call
- // while one is in flight, so a shared instance would let a tier click be
- // swallowed by an in-flight subtype save. Each selector also writes its local
- // state only when its own guard ACCEPTED the call (see onChangeSubtype /
- // onChangeTier below) — an optimistic update on a refused submit is exactly
- // the silent divergence between screen and server this gate exists to stop.
- const { submit: submitSubtype, busy: subtypeBusy } = useGuardedSubmit();
- const { submit: submitTier, busy: tierBusy } = useGuardedSubmit();
- const saveSubtype = useCallback((subtype: string | null) => (
-  submitSubtype({ intent: "save-property-facts", payload: JSON.stringify({ commercialSubtype: subtype }) }, { method: "POST" })
- ), [submitSubtype]);
- const saveTier = useCallback((tier: "light_commercial" | "full_pca") => (
-  submitTier({ intent: "save-property-facts", payload: JSON.stringify({ reportTier: tier }) }, { method: "POST" })
- ), [submitTier]);
  // Property Facts strip (PropertyInfoForm) durable save. ONE latest-wins channel
- // is lossless here — unlike subtype/tier above — because onCommit hands us a
+ // is lossless here — unlike subtype/tier — because onCommit hands us a
  // FULL snapshot of every field each time, so a later PATCH is a strict superset
  // of any earlier one. A commit made while another is in flight replaces any
  // older queued one and is sent when the in-flight one settles, so the server
@@ -642,12 +599,22 @@ function InspectionEditPage() {
  // reader can still cancel out of was never the intent either.
  const handleAutoSignToggle = useCallback((checked: boolean) => setAutoSign(checked), []);
 
+ /* Lifecycle writes: publish and finish fieldwork. The flow reloads the editor data on success. */
+ const publishFlow = usePublishFlow(String(state.inspection.id), {
+  confirmHuman: ensureHuman,
+  // The editor's inspection copy is frozen at mount (see useInspectionState), so revalidation alone
+  // leaves the header badge and the toolbar button stale: patch the status locally as structural edits do.
+  onMarkedComplete: () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED })),
+  onFieldworkFinished: () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED })),
+  onPublished: () => state.setShowPublishModal(false),
+ });
+
  /* ---------------------------------------------------------------- */
  /* Publish pre-flight */
  /* ---------------------------------------------------------------- */
 
  const handlePublishClick = useCallback(async () => {
-  setPublishError(null);
+  publishFlow.clearPublishError();
   try {
    // Track H (C-12): fresh on-demand check via the BFF resource route
    // (token relay) — never a raw client fetch on /api.
@@ -668,12 +635,22 @@ function InspectionEditPage() {
    // Network/server error — fall through to publish (don't block UX on a flaky readiness check)
   }
   state.setShowPublishModal(true);
- }, [state.inspection.id, state.setShowPublishModal]);
+ }, [state.inspection.id, state.setShowPublishModal, publishFlow.clearPublishError]);
+
+ // A refused "Finish fieldwork" used to say nothing; the flow hands the reason over once per attempt.
+ useEffect(() => {
+  if (publishFlow.finishError) pushToast({ message: publishFlow.finishError, variant: "error", durationMs: 8000 });
+ }, [publishFlow.finishError]);
 
  /* Finish fieldwork — advisory order-lifecycle move (never a publish gate). */
  const handleFinishFieldwork = useCallback(() => {
-  submitComplete({ intent: "complete" }, { method: "post" });
- }, [submitComplete]);
+  void publishFlow.finishFieldwork();
+ }, [publishFlow]);
+
+ /* Commercial subtype + report tier (CommercialReportControls). */
+ const commercialSave = useCommercialReportSave(String(state.inspection.id), (patch) => {
+  state.setInspection((prev) => ({ ...prev, ...patch }));
+ });
 
  /* ---------------------------------------------------------------- */
  /* Item attribute handler */
@@ -881,34 +858,6 @@ function InspectionEditPage() {
  }
  }
  }, [uploadFetcher.state]);
-
- /* ---------------------------------------------------------------- */
- /* Publish result — surface the real server reason (e.g. "not       */
- /* completed") inline in the modal instead of the generic toast.    */
- /* ---------------------------------------------------------------- */
- useEffect(() => {
- if (publishFetcher.state !== "idle" || !publishFetcher.data) return;
- const data = publishFetcher.data;
- if (data.ok) {
- // Successful publish: clear any prior error, close the modal, and refresh
- // loader data so the editor reflects the now-published status.
- setPublishError(null);
- state.setShowPublishModal(false);
- revalidator.revalidate();
- } else {
- // Failed precondition: keep the modal open and show the actual reason.
- setPublishError(data.error ?? "Couldn't publish the report. Please try again.");
- }
- }, [publishFetcher.state, publishFetcher.data, state.setShowPublishModal, revalidator]);
-
- /* Finish-fieldwork result — the editor's inspection copy is frozen at mount
-  * (see useInspectionState), so revalidation alone leaves the header badge and
-  * the toolbar button stale. Patch status locally the same way structural edits
-  * do, then revalidate for anything loader-derived. */
- /* One-shot: the reason, and the measurement behind it, live in the hook. */
- useCompletedRevalidation(completeFetcher.state, completeFetcher.data,
-  () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED })),
-  () => revalidator.revalidate());
 
  /* ---------------------------------------------------------------- */
  /* Rating handler with auto-advance */
@@ -1372,7 +1321,7 @@ function InspectionEditPage() {
  }
  },
  onSave: () => findings.saveNow(),
- onPublish: () => { setPublishError(null); state.setShowPublishModal(true); },
+ onPublish: () => { publishFlow.clearPublishError(); state.setShowPublishModal(true); },
  onCloneLast: () => handleCloneLast(inspectionPrefs.cloneDefault),
  onSaveAsSnippet: () => {
  if (!state.activeItemId) return;
@@ -1715,16 +1664,11 @@ function InspectionEditPage() {
    statutoryPreviewHref={`/api/inspections/${loaderData.inspection.id}/statutory-form/preview.pdf`}
    pcaNarrative={loaderData.pcaNarrative}
    complianceData={{ ...loaderData.compliance, relianceText: loaderData.relianceText }}
-   savingCommercial={subtypeBusy || tierBusy}
-   onChangeSubtype={(subtype) => {
-    // Optimistic ONLY on acceptance: a refused submit sent nothing, and
-    // moving the local value anyway would show a subtype the server does
-    // not hold. Refused means the control snaps back, which is visible.
-    if (saveSubtype(subtype)) state.setInspection((prev) => ({ ...prev, commercialSubtype: subtype }));
-   }}
-   onChangeTier={(tier) => {
-    if (saveTier(tier)) state.setInspection((prev) => ({ ...prev, reportTier: tier }));
-   }}
+   savingCommercial={commercialSave.saving}
+   // Optimistic ONLY on acceptance (see useCommercialReportSave): a dropped call sent
+   // nothing, so the control snaps back, which is visible.
+   onChangeSubtype={commercialSave.changeSubtype}
+   onChangeTier={commercialSave.changeTier}
   />
  );
 
@@ -1829,39 +1773,14 @@ function InspectionEditPage() {
  {/* Publish confirmation modal */}
  <PublishModal
  open={state.showPublishModal}
+ inspectionId={String(state.inspection.id)}
  progress={{ rated: state.progress.rated, total: state.progress.total, pct: state.progress.pct }}
  status={state.inspection.status as string}
- publishError={publishError} isSubmitting={publishBusy}
+ publishError={publishFlow.publishError} isSubmitting={publishFlow.publishing}
  isAmendment={loaderData.nextPublishIsAmendment}
  coolingUnlockAtMs={loaderData.outboundCoolingWindow?.unlockAtMs ?? null}
- onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
- onPublish={async (markComplete: boolean, extras: PublishExtras) => {
- if (!(await ensureHuman())) return;
- // Keep the modal open: the publish-result effect closes it on success
- // and shows the real server reason inline on failure. `markComplete`
- // also closes the order axis first (advisory — never blocks publish);
- // patch status locally so the badge reflects it without a reload.
- setPublishError(null);
- if (markComplete) {
- state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED }));
- }
- // The auto-sign choice rides ALONG WITH the publish, never beside it.
- // It used to be a separate fetcher fired by the checkbox, racing this
- // request: the publish handler re-reads the inspection row to decide
- // whether to sign, and if the toggle had not landed yet it read the OLD
- // value and published UNSIGNED. The flag still persisted, so the next
- // publish signed — the worst shape for a bug like this, because the
- // reader concludes they mis-clicked rather than that a report went out
- // unsigned.
- submitPublish(
- {
- intent: "publish",
- autoSignOnPublish: String(autoSign), ...extras,
- ...(markComplete ? { markComplete: "true" } : {}),
- },
- { method: "post" },
- );
- }}
+ onClose={() => { publishFlow.clearPublishError(); state.setShowPublishModal(false); }}
+ onPublish={(markComplete, extras) => { void publishFlow.publish(markComplete, extras, autoSign); }}
  autoSign={autoSign}
  onAutoSignToggle={handleAutoSignToggle}
  />
@@ -1879,7 +1798,7 @@ function InspectionEditPage() {
   onClose={() => setShowPublishGate(false)}
   onProceed={() => {
    // IA-7 warning mode — user acknowledged the soft gaps.
-   setPublishError(null);
+   publishFlow.clearPublishError();
    setShowPublishGate(false);
    state.setShowPublishModal(true);
   }}
@@ -1961,7 +1880,7 @@ function InspectionEditPage() {
  onSign={() => setSignModalOpen(true)}
  onOpenSettings={() => state.setSettingsOpen(true)}
  onFinishFieldwork={(state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
- finishingFieldwork={completeBusy}
+ finishingFieldwork={publishFlow.finishing}
  onPreviewReport={
   loaderData.tenantSlug
   ? () => window.open(`/report-view/${loaderData.tenantSlug}/${state.inspection.id}`, "_blank", "noopener")
@@ -2297,7 +2216,7 @@ function InspectionEditPage() {
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}
  handleFinishFieldwork={handleFinishFieldwork}
- finishingFieldwork={completeBusy}
+ finishingFieldwork={publishFlow.finishing}
  collabEditing={loaderData.collabEditing}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
  onChangeTemplate={() => state.setSettingsOpen(true)}

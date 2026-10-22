@@ -2,7 +2,11 @@ import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { ItemPreviewPanel } from "~/components/template/ItemPreviewPanel";
-import { SideRail } from "~/components/editor/SideRail";
+import { SideRail } from "@core/field-ui/components/editor/SideRail";
+import { FieldDataSourceProvider } from "@core/field-ui/context";
+import { createEmptyEditorData, createFakeDataSource } from "@core/field-ui/testing/fake-data-source";
+
+const fake = createFakeDataSource({ data: createEmptyEditorData() });
 
 describe("preview parity", () => {
   it("ItemPreviewPanel renders each canned entry title + comment via the shared row", () => {
@@ -38,7 +42,7 @@ describe("preview parity", () => {
     // activeResult.tabs shape: Array<{ name; comments: Array<{ included; text; category; ... }> }>
     // included comments carry text (raw Mustache template) and category; no title field.
     const out = renderToStaticMarkup(
-      createElement(SideRail, {
+      createElement(FieldDataSourceProvider, { dataSource: fake }, createElement(SideRail, {
         activeItem: { id: "item1", label: "Roof", type: "rich" },
         activeResult: {
           tabs: [
@@ -51,7 +55,7 @@ describe("preview parity", () => {
           ],
         },
         initialOpen: true,
-      } as never),
+      } as never)),
     );
     expect(out).toContain("Lifted at ridge.");
     // DefectCategoryChip via CannedCommentRow — fails RED before 6c swap

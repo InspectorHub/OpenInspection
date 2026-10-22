@@ -281,7 +281,7 @@ Canonical examples in this repo:
   a transparent-background `<input>` with a focus underline
   (`border-b-2 border-transparent focus:border-ih-primary`), committing on
   every keystroke via `renameSection`.
-- **Inspection editor field entry** — `app/components/form/FormField.tsx`:
+- **Inspection editor field entry** — `packages/field-ui/src/components/form/FormField.tsx`:
   each item type (`text`, `number`, `select`, `boolean`, ...) renders a bare
   controlled input wired straight to `onChange`; there is no per-field save
   button, the value flows into the inspection's sync layer.

@@ -17,18 +17,25 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent, screen, act } from "@testing-library/react";
 import { PublishModal, type PublishModalProps } from "./PublishModal";
+import { FieldDataSourceProvider } from "../../context";
+import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
 
-vi.mock("~/hooks/useSessionContext", () => ({
-  useSessionContext: () => ({ outboundCoolingWindow: null }),
-  useDisplayTimeZone: () => "America/New_York",
-  useChromeDateTimeFormat: () => ({ locale: "en-US", dateFormat: "us", timeFormat: "12h" }),
-}));
+const fake = createFakeDataSource({ data: createEmptyEditorData() });
+/** The dialog reads the viewer's zone, clock and the editor path off the data source. */
+function PM(props: PublishModalProps) {
+  return (
+    <FieldDataSourceProvider dataSource={fake}>
+      <PublishModal {...props} />
+    </FieldDataSourceProvider>
+  );
+}
 
 afterEach(cleanup);
 
 function props(over: Partial<PublishModalProps> = {}): PublishModalProps {
   return {
     open: true,
+    inspectionId: "insp-1",
     progress: { rated: 40, total: 40, pct: 100 },
     status: "completed",
     publishError: null,
@@ -46,8 +53,8 @@ type View = ReturnType<typeof render>;
 
 /** One attempt finishing the way the owning route reports it: busy goes up, then back down with the dialog still open. */
 function attemptFinishes(view: View, over: Partial<PublishModalProps>) {
-  view.rerender(<PublishModal {...props({ ...over, isSubmitting: true })} />);
-  view.rerender(<PublishModal {...props({ ...over, isSubmitting: false })} />);
+  view.rerender(<PM {...props({ ...over, isSubmitting: true })} />);
+  view.rerender(<PM {...props({ ...over, isSubmitting: false })} />);
 }
 
 const reasonBox = () => screen.getByPlaceholderText(/Corrected the roof rating/i);
@@ -55,7 +62,7 @@ const publishBtn = () => screen.getByText("Publish Now").closest("button") as HT
 
 describe("PublishModal — the revision reason", () => {
   it("asks what changed when the next publish is a revision", () => {
-    render(<PublishModal {...props()} />);
+    render(<PM {...props()} />);
     expect(screen.getByText(/What changed in this amendment\?/)).toBeTruthy();
     expect(reasonBox()).toBeTruthy();
   });
@@ -64,13 +71,13 @@ describe("PublishModal — the revision reason", () => {
     // The discriminating half: always rendering the box would satisfy the test
     // above and would ask every inspector what changed about a report nobody has
     // seen yet. `report_versions.summary` is NULL on a first publish by design.
-    render(<PublishModal {...props({ isAmendment: false })} />);
+    render(<PM {...props({ isAmendment: false })} />);
     expect(screen.queryByText(/What changed in this amendment\?/)).toBeNull();
   });
 
   it("hands the typed reason to the publish submission", () => {
     const onPublish = vi.fn();
-    render(<PublishModal {...props({ onPublish })} />);
+    render(<PM {...props({ onPublish })} />);
     fireEvent.change(reasonBox(), { target: { value: "Corrected the roof rating." } });
     fireEvent.click(publishBtn());
     expect(onPublish).toHaveBeenCalledWith(false, { summary: "Corrected the roof rating." });
@@ -81,7 +88,7 @@ describe("PublishModal — the revision reason", () => {
     // render it as a reason someone wrote. Absent means the endpoint's own
     // default (NULL) stands.
     const onPublish = vi.fn();
-    const view = render(<PublishModal {...props({ onPublish })} />);
+    const view = render(<PM {...props({ onPublish })} />);
     fireEvent.change(reasonBox(), { target: { value: "   spaces   " } });
     fireEvent.click(publishBtn());
     expect(onPublish).toHaveBeenLastCalledWith(false, { summary: "spaces" });
@@ -97,7 +104,7 @@ describe("PublishModal — the revision reason", () => {
     // reason has to ride whichever one is pressed — a field wired to one of two
     // publish buttons is a field that vanishes depending on the order axis.
     const onPublish = vi.fn();
-    const view = render(<PublishModal {...props({ onPublish, status: "scheduled" })} />);
+    const view = render(<PM {...props({ onPublish, status: "scheduled" })} />);
     fireEvent.change(reasonBox(), { target: { value: "Reworded the summary." } });
 
     fireEvent.click(screen.getByText("Just publish").closest("button") as HTMLButtonElement);
@@ -112,7 +119,7 @@ describe("PublishModal — the revision reason", () => {
     // Belt and braces on the payload builder rather than the render: the guard is
     // `isAmendment && trimmed`, so a first publish cannot post a stale reason.
     const onPublish = vi.fn();
-    render(<PublishModal {...props({ onPublish, isAmendment: false })} />);
+    render(<PM {...props({ onPublish, isAmendment: false })} />);
     fireEvent.click(publishBtn());
     expect(onPublish).toHaveBeenCalledWith(false, {});
   });
@@ -122,7 +129,7 @@ describe("PublishModal — the revision reason", () => {
     // pre-fill the NEXT revision with the previous one's sentence — shown, but
     // exactly the kind of prefilled text that gets submitted unread.
     const onPublish = vi.fn();
-    const view = render(<PublishModal {...props({ onPublish })} />);
+    const view = render(<PM {...props({ onPublish })} />);
     fireEvent.change(reasonBox(), { target: { value: "Corrected the roof rating." } });
     fireEvent.click(publishBtn());
 
@@ -131,9 +138,9 @@ describe("PublishModal — the revision reason", () => {
     // render is part of it — the dialog only treats a close as a successful
     // publish when it saw a submit, which is what makes a plain Cancel keep
     // whatever was typed.
-    view.rerender(<PublishModal {...props({ onPublish, isSubmitting: true })} />);
-    view.rerender(<PublishModal {...props({ onPublish, open: false, isSubmitting: false })} />);
-    view.rerender(<PublishModal {...props({ onPublish })} />);
+    view.rerender(<PM {...props({ onPublish, isSubmitting: true })} />);
+    view.rerender(<PM {...props({ onPublish, open: false, isSubmitting: false })} />);
+    view.rerender(<PM {...props({ onPublish })} />);
     expect((reasonBox() as HTMLTextAreaElement).value).toBe("");
     fireEvent.click(publishBtn());
     expect(onPublish).toHaveBeenLastCalledWith(false, {});
@@ -144,7 +151,7 @@ describe("PublishModal — the revision reason", () => {
     // schema: `publishInspection` reads only the report id out of those options,
     // so a switch would change nothing about who is told while the publish audit
     // entry recorded the flag as given. The dialog's only checkbox is auto-sign.
-    const { container } = render(<PublishModal {...props()} />);
+    const { container } = render(<PM {...props()} />);
     const boxes = container.querySelectorAll('input[type="checkbox"]');
     expect(boxes).toHaveLength(1);
     expect(container.textContent).toContain("Auto-sign");
@@ -154,7 +161,7 @@ describe("PublishModal — the revision reason", () => {
 describe("PublishModal — the in-flight latch", () => {
   it("submits once when two clicks land in the same frame", () => {
     const onPublish = vi.fn();
-    render(<PublishModal {...props({ onPublish })} />);
+    render(<PM {...props({ onPublish })} />);
     const btn = publishBtn();
     act(() => {
       btn.click();
@@ -165,7 +172,7 @@ describe("PublishModal — the in-flight latch", () => {
 
   it("submits again once the attempt has finished", () => {
     const onPublish = vi.fn();
-    const view = render(<PublishModal {...props({ onPublish })} />);
+    const view = render(<PM {...props({ onPublish })} />);
     const btn = publishBtn();
     act(() => {
       btn.click();
@@ -179,7 +186,7 @@ describe("PublishModal — the in-flight latch", () => {
 
   it("reopens one macrotask later when the handler declines without ever raising isSubmitting (human check dismissed)", async () => {
     const onPublish = vi.fn().mockResolvedValue(undefined);
-    render(<PublishModal {...props({ onPublish })} />);
+    render(<PM {...props({ onPublish })} />);
     const btn = publishBtn();
     act(() => {
       btn.click();
@@ -200,7 +207,7 @@ describe("PublishModal — the in-flight latch", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     try {
       const onPublish = vi.fn().mockResolvedValue(undefined);
-      render(<PublishModal {...props({ onPublish })} />);
+      render(<PM {...props({ onPublish })} />);
       act(() => {
         publishBtn().click();
       });

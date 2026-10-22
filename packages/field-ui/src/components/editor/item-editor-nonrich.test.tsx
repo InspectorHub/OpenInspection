@@ -1,8 +1,20 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { ItemEditor } from "../../../app/components/editor/ItemEditor";
-import { asSelect } from "../../../tests/helpers/dom";
+import { ItemEditor } from "./ItemEditor";
+import type { ComponentProps } from "react";
+import { FieldDataSourceProvider } from "../../context";
+import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
+
+const fake = createFakeDataSource({ data: createEmptyEditorData() });
+/** The editor reads photo URLs and its child panels' data off the data source. */
+function IE(props: ComponentProps<typeof ItemEditor>) {
+  return (
+    <FieldDataSourceProvider dataSource={fake}>
+      <ItemEditor {...props} />
+    </FieldDataSourceProvider>
+  );
+}
 
 // Minimal no-op prop bag; ItemEditor tolerates omitted optional callbacks.
 const base = {
@@ -15,7 +27,7 @@ const base = {
 describe("ItemEditor — item.description hint", () => {
   it("renders the inspector-facing description hint for a rich item", () => {
     render(
-      <ItemEditor
+      <IE
         {...base}
         item={{ id: "i1", label: "Roof Covering", type: "rich", description: "Walk the roof; note granule loss." }}
         result={{}}
@@ -26,7 +38,7 @@ describe("ItemEditor — item.description hint", () => {
 
   it("renders the description hint for a non-rich item too", () => {
     render(
-      <ItemEditor
+      <IE
         {...base}
         item={{ id: "i2", label: "Year Built", type: "number", description: "From the county record." }}
         result={{}}
@@ -45,7 +57,7 @@ describe("ItemEditor — item.description hint", () => {
       "C. Reinforced concrete roof deck",
     ].join("\n");
     const { container } = render(
-      <ItemEditor
+      <IE
         {...base}
         item={{ id: "i4", label: "Opening protection", type: "text", description }}
         result={{}}
@@ -65,7 +77,7 @@ describe("ItemEditor — item.description hint", () => {
 
   it("omits the hint when no description is set", () => {
     const { container } = render(
-      <ItemEditor {...base} item={{ id: "i3", label: "Attic", type: "rich" }} result={{}} />
+      <IE {...base} item={{ id: "i3", label: "Attic", type: "rich" }} result={{}} />
     );
     expect(container.querySelector('[data-testid="item-description-hint"]')).toBeNull();
   });
@@ -75,7 +87,7 @@ describe("ItemEditor — non-rich FormField inputs", () => {
   it("renders a number input for a number item and reports value changes via onValue", () => {
     const onValue = vi.fn();
     render(
-      <ItemEditor
+      <IE
         {...base}
         item={{ id: "i1", label: "Year Built", type: "number" }}
         result={{}}
@@ -89,21 +101,22 @@ describe("ItemEditor — non-rich FormField inputs", () => {
 
   it("renders a select input for a select item", () => {
     render(
-      <ItemEditor
+      <IE
         {...base}
         item={{ id: "i2", label: "Roof Type", type: "select", options: { choices: ["Shingle", "Tile"] } }}
         result={{ value: "Tile" }}
         onValue={vi.fn()}
       />
     );
-    const select = asSelect(screen.getByRole("combobox"));
+    const select = screen.getByRole("combobox");
+    if (!(select instanceof HTMLSelectElement)) throw new Error("expected a <select>");
     expect(select.value).toBe("Tile");
     expect(screen.getByRole("option", { name: "Shingle" })).toBeTruthy();
   });
 
   it("does NOT render a rating button row or canned tabs for a non-rich item", () => {
     render(
-      <ItemEditor
+      <IE
         {...base}
         item={{ id: "i3", label: "Year Built", type: "number", tabs: { defects: [{ id: "d1", title: "x", comment: "y" }] } }}
         result={{}}
@@ -118,7 +131,7 @@ describe("ItemEditor — non-rich FormField inputs", () => {
 
   it("renders the rating row for a rich item (rich branch preserved)", () => {
     render(
-      <ItemEditor
+      <IE
         {...base}
         item={{ id: "i4", label: "Attic", type: "rich" }}
         result={{}}

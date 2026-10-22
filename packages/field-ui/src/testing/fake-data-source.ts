@@ -123,6 +123,7 @@ const DEFAULT_URLS: FieldUrls = {
   videoObject: () => null,
   presenceSocket: (inspectionId) => `ws://fake.invalid/api/inspections/${inspectionId}/presence/ws`,
   editorPath: (inspectionId) => `/inspections/${inspectionId}/edit`,
+  inspectionsList: () => '/inspections',
 };
 
 const EMPTY_PCA_NARRATIVE: PcaNarrative = {

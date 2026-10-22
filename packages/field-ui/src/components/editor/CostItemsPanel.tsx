@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, useActionLatch } from "@core/shared-ui";
 import { formatDollars } from "../../shared/money";
 import { MoneyInput } from "../MoneyInput";
@@ -9,18 +9,12 @@ import { m } from "../../i18n";
 import { THRESHOLD_CENTS, blankRow, isTempId, rowTotalCents, useCostItemWrite } from "./cost-items-rows";
 
 /**
- * Commercial PCA Phase C Task 13b — the inspection-level Cost Items editor
- * panel (ASTM E2018 Table 1 / Opinion of Cost). Presentational: `items` is
- * fed in by the host (see `CostItemsHost.tsx`, which self-loads
- * the cost lines); this component owns its OWN row edits and mutations,
- * writing them through the data source's `costItems.save` (one call per
- * create, update or delete).
+ * Commercial PCA Phase C Task 13b — the inspection-level Cost Items editor panel (ASTM E2018 Table 1 / Opinion of
+ * Cost). Presentational: `items` is fed in by the host (see `CostItemsHost.tsx`); this component owns its own row
+ * edits and writes them through the data source's `costItems.save` (one call per create, update or delete).
  *
- * Row totals are re-derived here (server's `pca-costs.ts` isn't importable
- * from the browser): `quantity * unitCostCents` for the `unit` method,
- * `lumpSumCents` for `lump_sum`. A row under the ASTM $3,000 "immediate
- * repair" materiality threshold gets an inline note (never blocks saving —
- * advisory only).
+ * Row totals are re-derived here (the server's `pca-costs.ts` is not importable from the browser). A row under the
+ * ASTM $3,000 "immediate repair" materiality threshold gets an inline note (advisory only, never blocks saving).
  */
 
 export function CostItemsPanel({
@@ -35,16 +29,18 @@ export function CostItemsPanel({
   const [rows, setRows] = useState<CostItemView[]>(items);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [removeFailed, setRemoveFailed] = useState(false);
-  // Temp ids the user asked to remove while their initial background
-  // `create` was still in flight (see `removeRow`) — cleaned up once that
-  // create resolves, by immediately deleting the just-landed server row
-  // instead of leaving it as an orphan. A ref (not state) because it's only
-  // ever read/written from async callbacks, never rendered.
+  // Temp ids removed while their `create` was still out: the server row that lands is deleted at once (no orphan).
   const pendingRemovalRef = useRef<Set<string>>(new Set());
   // Synchronous mirrors of the guards the render state (`saving`) only shows a frame late: the ids whose
   // create / update is out, and the ids whose delete is out. Two triggers in one frame meet these, not state.
   const writingRef = useRef<Set<string>>(new Set());
   const removingRef = useRef<Set<string>>(new Set());
+  // Saved rows edited again while their update was out: re-committed (latest values) once it settles, so one
+  // row never has two updates racing and an older PATCH can never land after a newer one.
+  const dirtyRef = useRef<Set<string>>(new Set());
+  // The rows as last rendered, for commits that run after an await.
+  const rowsRef = useRef(rows);
+  useEffect(() => { rowsRef.current = rows; });
 
   const bucketTotals = { immediate: 0, short_term: 0, long_term: 0 } as Record<CostItemView["bucket"], number>;
   for (const row of rows) bucketTotals[row.bucket] += rowTotalCents(row);
@@ -54,25 +50,30 @@ export function CostItemsPanel({
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
-  async function commitRow(id: string) {
-    const row = rows.find((r) => r.id === id);
-    if (!row) return;
-    // Guard against the temp-id create race: while a temp row's initial
-    // `create` is still in flight (`saving[id]` true), its inputs are
-    // disabled (see `CostItemRow`) so this normally can't fire — but keep
-    // the check here too as defense-in-depth so a stray commit can never
-    // issue a second `create` for the same row (which would land a
-    // duplicate server row — see task-13b-report.md fix wave).
-    if (isTempId(id) && writingRef.current.has(id)) return;
+  // `patch` carries a value picked in the same event (a select): the row state has not re-rendered yet, so
+  // reading the rows alone would send the value from before the pick.
+  async function commitRow(id: string, patch?: Partial<CostItemView>) {
+    const base = rowsRef.current.find((r) => r.id === id);
+    if (!base) return;
+    // A temp row's create must never be sent twice (a duplicate server row); a saved row's update waits its turn.
+    if (writingRef.current.has(id)) {
+      if (!isTempId(id)) dirtyRef.current.add(id);
+      return;
+    }
     writingRef.current.add(id);
     setSaving((s) => ({ ...s, [id]: true }));
-    const result = await submitCostItem(isTempId(id) ? "create" : "update", row);
+    const result = await submitCostItem(isTempId(id) ? "create" : "update", { ...base, ...patch });
     writingRef.current.delete(id);
     setSaving((s) => ({ ...s, [id]: false }));
+    if (pendingRemovalRef.current.delete(id)) {
+      if (result.success && result.id) void submitCostItem("delete", { ...base, id: result.id });
+      return;
+    }
     if (result.success) setRemoveFailed(false);
     if (result.success && isTempId(id) && result.id) {
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, id: result.id! } : r)));
     }
+    if (dirtyRef.current.delete(id)) void commitRow(id);
   }
 
   // Two clicks in one frame would add two draft rows (and start two creates) before anything re-renders.
@@ -81,10 +82,7 @@ export function CostItemsPanel({
   function addRow() {
     const draft = blankRow(rows.length);
     setRows((prev) => [...prev, draft]);
-    // Mark the row busy for the duration of its initial background create —
-    // `CostItemRow` disables every input/select while `busy`, so no field
-    // commit can race the create and fire a second one (see `commitRow`'s
-    // matching guard, and the fix-wave note in task-13b-report.md).
+    // Busy while its create is out: `CostItemRow` disables its inputs, and `commitRow` refuses a second create.
     writingRef.current.add(draft.id);
     setSaving((s) => ({ ...s, [draft.id]: true }));
     void submitCostItem("create", draft).then((result) => {
@@ -93,18 +91,13 @@ export function CostItemsPanel({
       const wasRemoved = pendingRemovalRef.current.delete(draft.id);
       if (result.success && result.id) {
         if (wasRemoved) {
-          // The user removed this row while its create was still pending —
-          // the local row is already gone from `rows`; the server row that
-          // just landed would otherwise be a permanent orphan, so delete it
-          // now that we finally have its real id.
+          // Removed while the create was out: delete the row that just landed rather than orphan it.
           void submitCostItem("delete", { ...draft, id: result.id });
           return;
         }
         setRows((cur) => cur.map((r) => (r.id === draft.id ? { ...r, id: result.id! } : r)));
       }
-      // Create failed: nothing persisted server-side, so a pending removal
-      // needs no follow-up — the row is already gone from `rows` (or, if not
-      // removed, it stays a temp row the user can retry by editing it).
+      // A failed create persisted nothing: a removed row needs no follow-up, a kept one stays a retryable temp row.
     });
   }
 
@@ -190,6 +183,7 @@ export function CostItemsPanel({
               busy={!!saving[row.id]}
               onChange={(patch) => patchRow(row.id, patch)}
               onCommit={() => commitRow(row.id)}
+              onPick={(patch) => { patchRow(row.id, patch); void commitRow(row.id, patch); }}
               onRemove={() => removeRow(row.id)}
             />
           ))}
@@ -200,13 +194,15 @@ export function CostItemsPanel({
 }
 
 function CostItemRow({
-  item, reserveEnabled, busy, onChange, onCommit, onRemove,
+  item, reserveEnabled, busy, onChange, onCommit, onPick, onRemove,
 }: {
   item: CostItemView;
   reserveEnabled: boolean;
   busy: boolean;
   onChange: (patch: Partial<CostItemView>) => void;
   onCommit: () => void;
+  /** A value picked from a select: change and commit it together. */
+  onPick: (patch: Partial<CostItemView>) => void;
   onRemove: () => void;
 }) {
   const total = rowTotalCents(item);
@@ -269,7 +265,7 @@ function CostItemRow({
           <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_action()}</label>
           <select
             value={item.action}
-            onChange={(e) => { onChange({ action: e.target.value as CostItemView["action"] }); onCommit(); }}
+            onChange={(e) => onPick({ action: e.target.value as CostItemView["action"] })}
             disabled={busy}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           >
@@ -281,7 +277,7 @@ function CostItemRow({
           <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_cost_method()}</label>
           <select
             value={item.costMethod}
-            onChange={(e) => { onChange({ costMethod: e.target.value as CostItemView["costMethod"] }); onCommit(); }}
+            onChange={(e) => onPick({ costMethod: e.target.value as CostItemView["costMethod"] })}
             disabled={busy}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           >
@@ -343,7 +339,7 @@ function CostItemRow({
           <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_bucket()}</label>
           <select
             value={item.bucket}
-            onChange={(e) => { onChange({ bucket: e.target.value as CostItemView["bucket"] }); onCommit(); }}
+            onChange={(e) => onPick({ bucket: e.target.value as CostItemView["bucket"] })}
             disabled={busy}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           >

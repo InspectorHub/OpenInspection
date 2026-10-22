@@ -6,10 +6,9 @@ import { HEADER_OVERFLOW, pivotBreakpoint } from './header-visibility';
 // `import.meta.url` is not a file: URL under the web vitest config (the module
 // graph is served by Vite), so resolve from the repo root instead.
 // EditorHeader still lives in the app; the overflow and preview menus moved into the package.
-const appDir = join(process.cwd(), 'app', 'components', 'editor');
 const pkgDir = join(process.cwd(), 'packages', 'field-ui', 'src', 'components', 'editor');
 const read = (dir: string, f: string) => readFileSync(join(dir, f), 'utf8');
-const HEADER_SRC = read(appDir, 'EditorHeader.tsx');
+const HEADER_SRC = read(pkgDir, 'EditorHeader.tsx');
 const OVERFLOW_SRC = read(pkgDir, 'HeaderOverflowMenu.tsx');
 const PREVIEW_SRC = read(pkgDir, 'PreviewMenu.tsx');
 

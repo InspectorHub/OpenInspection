@@ -34,6 +34,9 @@ describe("createWebUrls golden strings", () => {
         expect(urls.videoObject("i1", "m9")).toBe("/api/inspections/i1/media/video/r2-object/m9");
         expect(urls.videoObject("i1", "")).toBeNull();
     });
+    it("inspectionsList is the path the header link used to hard-code", () => {
+        expect(urls.inspectionsList?.()).toBe("/inspections");
+    });
     it("editorPath", () => {
         expect(urls.editorPath("i1")).toBe("/inspections/i1/edit");
     });
@@ -71,20 +74,17 @@ describe("presenceSocket", () => {
 describe("call sites still build the same fragments", () => {
     const read = (rel: string) => readFileSync(path.resolve(__dirname, "../../..", rel), "utf8");
     const sites: Array<[string, string[]]> = [
-        ["app/components/editor/ItemEditor.tsx", ["/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(k)}"]],
-        ["app/components/editor/SideRail.tsx", ["/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}"]],
+        ["packages/field-ui/src/components/editor/ItemEditor.tsx", ["urls.photo(inspectionId ?? \"\", k)"]],
+        ["packages/field-ui/src/components/editor/SideRail.tsx", ["urls.photo(inspectionId ?? \"\", key)"]],
         ["packages/field-ui/src/hooks/usePhotoOps.ts", ["urls.photo(state.inspection.id, baseKey)", "urls.photo(state.inspection.id, dk)", "urls.photo(state.inspection.id, annotateBaseKey)", "urls.photo(state.inspection.id, originalKey)"]],
-        [
-            "app/components/editor/EditorHeader.tsx",
-            ["/report-view/${tenantSlug}/${state.inspection.id}", "/api/inspections/${state.inspection.id}/pdf?type=full"],
-        ],
+        ["packages/field-ui/src/components/editor/EditorHeader.tsx", ["urls.reportPreview(tenantSlug, String(state.inspection.id))"]],
         ["packages/field-ui/src/components/media-studio/VideoPlayer.tsx", ["urls.videoObject(inspectionId, mediaId)"]],
         [
             "packages/field-ui/src/hooks/usePresence.ts",
             ["dataSource.urls.presenceSocket(inspectionId)"],
         ],
         ["app/routes/inspection-edit.tsx", ["/api/inspections/${loaderData.inspection.id}/statutory-form/preview.pdf"]],
-        ["app/components/editor/PublishModal.tsx", ["/inspections/:id/edit"]],
+        ["packages/field-ui/src/components/editor/PublishModal.tsx", ["urls.editorPath(inspectionId)"]],
     ];
     for (const [file, fragments] of sites) {
         it(file, () => {

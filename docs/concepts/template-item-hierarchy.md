@@ -198,7 +198,7 @@ what keys an item has, and **only two of them complain when they disagree**:
 | `app/lib/editor/structure-ops.ts` — the `ITEM_KEYS` runtime allowlist | **silently stripped** |
 | `app/lib/editor/serialize-template.ts` — the save serializer | **silently never sent** |
 | `app/components/template/types.ts` — the editor's own item type | compiles; the panel simply cannot see the field |
-| `app/components/form/FormField.tsx` — the field renderer's own item type | same |
+| `packages/field-ui/src/components/form/FormField.tsx` — the field renderer's own item type | same |
 | `server/services/inspection/report-schema-types.ts` — the report projection | **silently never printed** |
 
 This is not hypothetical. `number` was on the authority type, in the Zod base fields,

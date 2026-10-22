@@ -13,20 +13,27 @@
  * something to a company that is not in one (a permanent scary notice on the
  * most-used button in the product).
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { PublishModal } from './PublishModal';
+import { PublishModal, type PublishModalProps } from './PublishModal';
+import { FieldDataSourceProvider } from '../../context';
+import { createEmptyEditorData, createFakeDataSource } from '../../testing/fake-data-source';
+
+/** The modal reads the viewer's zone and clock and the editor path off the data source. */
+const fake = createFakeDataSource({ data: createEmptyEditorData(), session: { timeZone: 'America/New_York', locale: 'en-US', dateFormat: 'us', timeFormat: '12h' } });
+function PM(props: PublishModalProps) {
+  return (
+    <FieldDataSourceProvider dataSource={fake}>
+      <PublishModal {...props} />
+    </FieldDataSourceProvider>
+  );
+}
 
 let unlockAtMs: number | null = null;
 
-vi.mock('~/hooks/useSessionContext', () => ({
-  useSessionContext: () => ({ outboundCoolingWindow: unlockAtMs === null ? null : { unlockAtMs } }),
-  useDisplayTimeZone: () => 'America/New_York',
-  useChromeDateTimeFormat: () => ({ locale: 'en-US', dateFormat: 'us', timeFormat: '12h' }),
-}));
-
 const props = {
   open: true,
+  inspectionId: 'insp-1',
   progress: { rated: 10, total: 10, pct: 100 },
   status: 'completed',
   publishError: null,
@@ -39,22 +46,22 @@ const props = {
 };
 
 describe('PublishModal — outbound cooling window', () => {
-  it('shows the notice from its own prop when the host route has no session context (the full-screen editor)', () => {
+  it('shows the notice from its own prop (the editor data cooling window)', () => {
     unlockAtMs = null;
-    render(<PublishModal {...props} coolingUnlockAtMs={Date.now() + 3_600_000} />);
+    render(<PM {...props} coolingUnlockAtMs={Date.now() + 3_600_000} />);
     expect(screen.getByText(/less than a day old/i)).toBeTruthy();
   });
 
   it('says nothing when the company is not in a window', () => {
     unlockAtMs = null;
-    render(<PublishModal {...props} />);
+    render(<PM {...props} coolingUnlockAtMs={unlockAtMs} />);
     expect(screen.queryByText(/less than a day old/i)).toBeNull();
   });
 
   it('names the instant the client email will go, not a relative duration', () => {
     // 2026-08-11 14:00 UTC -> 10:00 AM EDT
     unlockAtMs = Date.UTC(2026, 7, 11, 14, 0, 0);
-    render(<PublishModal {...props} />);
+    render(<PM {...props} coolingUnlockAtMs={unlockAtMs} />);
     const notice = screen.getByText(/less than a day old/i);
     expect(notice.textContent).toMatch(/Aug 11, 2026/);
     expect(notice.textContent).toMatch(/10:00\s?AM/);
@@ -65,7 +72,7 @@ describe('PublishModal — outbound cooling window', () => {
     // I have to come back and press something again". Both answers are load
     // bearing: the send re-schedules itself, and the report is live now.
     unlockAtMs = Date.now() + 3_600_000;
-    render(<PublishModal {...props} />);
+    render(<PM {...props} coolingUnlockAtMs={unlockAtMs} />);
     const notice = screen.getByText(/less than a day old/i);
     expect(notice.textContent).toMatch(/confirm you are a person/i);
     expect(notice.textContent).toMatch(/goes live now/i);
@@ -75,7 +82,7 @@ describe('PublishModal — outbound cooling window', () => {
     // A notice that disabled the button would be a gate nobody asked for: the
     // window holds one email, not the publish.
     unlockAtMs = Date.now() + 3_600_000;
-    render(<PublishModal {...props} />);
+    render(<PM {...props} coolingUnlockAtMs={unlockAtMs} />);
     expect(screen.getByRole('button', { name: /publish/i })).not.toBeDisabled();
   });
 });

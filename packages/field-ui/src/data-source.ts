@@ -195,6 +195,13 @@ export interface FieldUrls {
   presenceSocket(inspectionId: string): string;
   /** The in-app path of this inspection's editor (the publish dialog reads `window.location.pathname`). */
   editorPath(inspectionId: string): string;
+  /**
+   * The in-app path of the inspection list, which the header's back control points at. Optional: a host
+   * without addressable pages (a native shell) leaves it out and the control is a plain button that calls
+   * `exit()`. When present the control is a real link (new tab, copy link, link semantics) whose plain
+   * left click still goes through `exit()`, so the host's unsaved-changes guard sees the navigation.
+   */
+  inspectionsList?(): string;
 }
 
 /**

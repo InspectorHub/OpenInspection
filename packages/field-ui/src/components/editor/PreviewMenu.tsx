@@ -5,8 +5,8 @@ import { m } from "../../i18n";
 export interface PreviewMenuProps {
   /** Open the full web report in a new tab. Null when the tenant slug is unknown. */
   onPreviewReport: (() => void) | null;
-  /** Render and open the server-side PDF — the exact client deliverable. */
-  onPreviewPdf: () => void;
+  /** Render and open the server-side PDF — the exact client deliverable. Null when the host has no PDF export. */
+  onPreviewPdf: (() => void) | null;
   /** A PDF render is in flight. */
   pdfBusy: boolean;
   /** Last PDF render error, surfaced on the trigger's tooltip. */
@@ -77,16 +77,18 @@ export function PreviewMenu({
               </MenuItem>
             </li>
           )}
-          <li role="none">
-            <MenuItem
-              data-testid="preview-pdf-btn"
-              onClick={() => run(onPreviewPdf)}
-              disabled={pdfBusy}
-              title={pdfError ?? m.editor_header_preview_pdf_title()}
-            >
-              {pdfLabel}
-            </MenuItem>
-          </li>
+          {onPreviewPdf && (
+            <li role="none">
+              <MenuItem
+                data-testid="preview-pdf-btn"
+                onClick={() => run(onPreviewPdf)}
+                disabled={pdfBusy}
+                title={pdfError ?? m.editor_header_preview_pdf_title()}
+              >
+                {pdfLabel}
+              </MenuItem>
+            </li>
+          )}
         </ul>
       </Popover>
     </>

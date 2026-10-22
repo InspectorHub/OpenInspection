@@ -25,6 +25,19 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ItemEditor } from "./ItemEditor";
+import type { ComponentProps } from "react";
+import { FieldDataSourceProvider } from "../../context";
+import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
+
+const fake = createFakeDataSource({ data: createEmptyEditorData() });
+/** The editor reads photo URLs and its child panels' data off the data source. */
+function IE(props: ComponentProps<typeof ItemEditor>) {
+  return (
+    <FieldDataSourceProvider dataSource={fake}>
+      <ItemEditor {...props} />
+    </FieldDataSourceProvider>
+  );
+}
 
 /** `Node.DOCUMENT_POSITION_FOLLOWING`, spelled out so the assertion does not
  *  depend on the DOM implementation exposing the constant. */
@@ -45,7 +58,7 @@ const base = {
 function renderItem(opts: { withCanned?: boolean; onNotes?: (v: string) => void } = {}) {
   const onNotes = opts.onNotes ?? vi.fn();
   render(
-    <ItemEditor
+    <IE
       {...base}
       onNotes={onNotes}
       item={{

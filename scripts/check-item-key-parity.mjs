@@ -55,7 +55,7 @@ const DECLARED_SKIPS = {
     'packages/field-ui/src/shared/structure-ops.ts': {},
     'app/lib/editor/serialize-template.ts': {},
     'app/components/template/types.ts': {},
-    'app/components/form/FormField.tsx': {
+    'packages/field-ui/src/components/form/FormField.tsx': {
         attributes:            'the field renderer draws one control; attributes are a panel',
         source:                'import provenance is an editor concern, not a render one',
         number:                'the author-written display number is rendered by ItemList',
@@ -146,8 +146,8 @@ const MIRRORS = [
         keys: () => directMembers(read('app/components/template/types.ts'), 'export interface TemplateItem {'),
     },
     {
-        file: 'app/components/form/FormField.tsx',
-        keys: () => directMembers(read('app/components/form/FormField.tsx'), 'export interface TemplateItem {'),
+        file: 'packages/field-ui/src/components/form/FormField.tsx',
+        keys: () => directMembers(read('packages/field-ui/src/components/form/FormField.tsx'), 'export interface TemplateItem {'),
     },
     {
         file: 'server/services/inspection/report-schema-types.ts',

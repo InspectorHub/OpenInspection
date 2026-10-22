@@ -404,14 +404,14 @@ The structural components now exist once, under
 | `ItemList` | item-type badges | rating state, batch selection |
 | `SideRail` | Preview / Library | Preview / Library / Photos |
 
-`SideRail` is the exception to the directory: it still lives at
-`app/components/editor/SideRail.tsx` and imports `EditorMode` from
+`SideRail` is the exception to the directory: it lives at
+`packages/field-ui/src/components/editor/SideRail.tsx` and imports `EditorMode` from
 `editor-shared/`. It is mode-aware but has not moved.
 
 **The item detail panel is the one thing that stays forked, and it says why.**
 Configuring an item's type and its canned entries
 (`components/template/ItemPropertiesPanel.tsx`, `ItemCommentsPanel.tsx`) and
-rating one in the field (`components/editor/ItemEditor.tsx`) are different jobs,
+rating one in the field (`packages/field-ui/src/components/editor/ItemEditor.tsx`) are different jobs,
 not one job with a flag. They share the atoms instead of the panel —
 `ItemHeader`, `CannedCommentRow`, `DefectCategoryChip`, `InlineRename`,
 `RatingSegment`, all under `editor-shared/` (`ItemHeader` in `app/components/`, the
@@ -428,7 +428,7 @@ Five things were retired to get here, and none of them should come back:
   and it was also the only place the eight non-`rich` item types and
   `item.description` were ever rendered, so the live editor was the one missing
   them. Both now render in `ItemEditor`; the route and its renderer are gone.
-  `FormField` (`app/components/form/FormField.tsx`) survives as the building
+  `FormField` (`packages/field-ui/src/components/form/FormField.tsx`) survives as the building
   block `ItemEditor` reuses for non-`rich` input, which writes to
   `result.value`. `item.description` is inspector-facing guidance: it shows in
   the editor and is never emitted to the report or to the client.
