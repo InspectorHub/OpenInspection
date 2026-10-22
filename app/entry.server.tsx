@@ -3,6 +3,11 @@ import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 import { logRouteError } from "../server/lib/route-error-logging";
+import { bindFieldUiLocale } from "~/lib/field/web-locale";
+
+// The field editor package has its own paraglide runtime; make it read the app's request-scoped
+// locale (the render runs inside paraglideMiddleware). A thunk, so no value is shared across requests.
+bindFieldUiLocale();
 
 export const streamTimeout = 5_000;
 

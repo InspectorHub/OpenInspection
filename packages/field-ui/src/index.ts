@@ -56,3 +56,5 @@ export type {
   TemplateSnapshot,
   UnitProgress,
 } from './data-source-types';
+// The host keeps the package's locale in step with its own; see ./i18n.
+export { bindFieldLocaleSource, setFieldLocale } from './i18n';
