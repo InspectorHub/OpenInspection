@@ -1,8 +1,8 @@
-import { useMemo, useCallback, useEffect, useState } from "react";
-import { useFetcher } from "react-router";
-import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
-import { isDedicatedFactKey } from "@core/field-ui/shared/property-facts-keys";
-import { m } from "~/paraglide/messages";
+import { useMemo, useCallback, useEffect, useRef, useState } from "react";
+import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { isIgnored, useFieldCommand } from "../../context";
+import { isDedicatedFactKey } from "../../shared/property-facts-keys";
+import { m } from "../../i18n";
 
 interface MetadataField {
   id: string;
@@ -56,11 +56,10 @@ interface PropertyInfoFormProps {
   onSave?: (fieldId: string, value: unknown) => void;
   // Durable save. Fires on blur for text/number/date, on change for
   // select/boolean (discrete). Receives a FULL coerced snapshot of every field
-  // (not a single field), so the parent can persist it through ONE shared
-  // fetcher without field-to-field abort: each PATCH is a superset of any
-  // in-flight one (mirrors PsqPanel.commitResponses; see
-  // feedback_rr_shared_fetcher_abort). The parent wires this to the
-  // `save-property-facts` route intent.
+  // (not a single field), so the parent can persist it through ONE
+  // latest-wins channel without losing a field: each PATCH is a superset of
+  // any earlier one, so replacing a queued older snapshot with the newest
+  // loses nothing. The parent wires this to the `save-property-facts` command.
   onCommit?: (facts: Record<string, unknown>) => void;
 }
 
@@ -128,29 +127,36 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
 
   // #200 — "Fetch property details": pull public-records facts for the address
   // and fill ONLY the fields the inspector hasn't already entered, so a lookup
-  // never clobbers manual work. Rides the editor BFF action (autofill-property-
-  // facts intent) via its own fetcher, then commits the merged snapshot through
-  // the same save-property-facts path as manual edits.
-  const autofillFetcher = useFetcher<{
-    intent?: string;
-    facts?: Record<string, unknown> | null;
-    reason?: string | null;
-  }>();
+  // never clobbers manual work. Rides the data source's `autofill-property-facts`
+  // command, then commits the merged snapshot through the same
+  // save-property-facts path as manual edits.
+  //
+  // Each lookup is a billed public-records call, so a same-frame repeat must not issue a second one;
+  // pendingProps only goes inert after the render. `useFieldCommand` is the guard: it drops the repeat.
+  const { run, busy: autofilling } = useFieldCommand(String(inspection.id));
   const [autofillMsg, setAutofillMsg] = useState<string | null>(null);
   const addressString = (propertyAddress || (inspection.propertyAddress as string) || "").trim();
-  const autofilling = autofillFetcher.state !== "idle";
 
+  // The answer is merged against the form as it is when the answer ARRIVES, not as it was when the
+  // button was pressed: the inspector may have typed into a field meanwhile, and a lookup must not
+  // overwrite it. (The fetcher effect this replaced read its props fresh at fire time for the same reason.)
+  const latest = useRef({ metaFields, inspection, onSave, onCommit });
+  latest.current = { metaFields, inspection, onSave, onCommit };
+  const mounted = useRef(true);
   useEffect(() => {
-    if (autofillFetcher.state !== "idle" || !autofillFetcher.data) return;
-    const data = autofillFetcher.data;
-    if (data.intent !== "autofill-property-facts") return;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
-    const facts = data.facts;
+  function applyAutofill(facts: Record<string, unknown> | null, reason: string | null) {
+    const { metaFields: fields, inspection: current, onSave: save, onCommit: commit } = latest.current;
     if (!facts) {
       setAutofillMsg(
-        data.reason === "NO_API_KEY"
+        reason === "NO_API_KEY"
           ? m.editor_property_autofill_unconfigured()
-          : data.reason === "NOT_FOUND"
+          : reason === "NOT_FOUND"
             ? m.editor_property_autofill_not_found()
             : m.editor_property_autofill_failed(),
       );
@@ -160,15 +166,15 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
     const dedicated: Record<string, unknown> = {};
     const metadata: Record<string, unknown> = {};
     const filledLabels: string[] = [];
-    for (const f of metaFields) {
-      const current = inspection[f.id];
-      const isEmpty = current === "" || current === null || current === undefined;
+    for (const f of fields) {
+      const existing = current[f.id];
+      const isEmpty = existing === "" || existing === null || existing === undefined;
       const factVal = facts[f.id];
-      let raw = current;
+      let raw = existing;
       if (isEmpty && factVal != null && factVal !== "") {
         raw = factVal;
         filledLabels.push(f.label);
-        onSave?.(f.id, factVal); // optimistic — keep the controlled input in sync
+        save?.(f.id, factVal); // optimistic — keep the controlled input in sync
       }
       const value = coerce(f, raw);
       if (isDedicatedFactKey(f.id)) dedicated[f.id] = value;
@@ -176,25 +182,24 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
     }
 
     if (filledLabels.length) {
-      onCommit?.(Object.keys(metadata).length ? { ...dedicated, metadata } : dedicated);
+      commit?.(Object.keys(metadata).length ? { ...dedicated, metadata } : dedicated);
       setAutofillMsg(
         m.editor_property_autofill_filled({ count: filledLabels.length, fields: filledLabels.join(", ") }),
       );
     } else {
       setAutofillMsg(m.editor_property_autofill_none());
     }
-    // Fires once per settled autofill response; metaFields/inspection/callbacks
-    // are intentionally read fresh at fire time (RR fetcher-effect convention).
-  }, [autofillFetcher.state, autofillFetcher.data]);
+  }
 
-  // Each lookup is a billed public-records call, so a same-frame repeat must not issue a second one;
-  // pendingProps only goes inert after the render.
-  const autofillLatch = useActionLatch(autofilling);
-  function runAutofill() {
-    autofillLatch(() => {
-      setAutofillMsg(null);
-      autofillFetcher.submit({ intent: "autofill-property-facts", addressString }, { method: "post" });
-    });
+  async function runAutofill() {
+    setAutofillMsg(null);
+    const answer = await run({ type: "autofill-property-facts", addressString });
+    // A dropped repeat sent nothing and the first request is still running: it is neither an answer nor a failure.
+    // After an unmount there is no form left to fill.
+    if (isIgnored(answer) || !mounted.current) return;
+    // The lookup's reason rides on BOTH outcomes; no data at all means the request never got an answer
+    // (offline, expired session), which the fetcher showed as nothing, and so does this.
+    if (answer.data) applyAutofill(answer.data.facts, answer.data.reason);
   }
 
   return (
@@ -217,7 +222,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
           <button
             type="button"
             // Only the in-flight part is aria-disabled (focus stays on the button); too-short stays native.
-            {...pendingProps(autofilling, runAutofill)}
+            {...pendingProps(autofilling, () => void runAutofill())}
             disabled={addressString.length < 5}
             className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-primary-text hover:bg-ih-primary-tint disabled:opacity-50 disabled:cursor-not-allowed ${PENDING_CLASS}`}
           >

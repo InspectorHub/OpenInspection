@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { SegmentedControl, Textarea } from "@core/shared-ui";
-import { DEFAULT_REINSPECTION_STATUSES } from "@core/field-ui/shared/reinspection-status";
-import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { m } from "~/paraglide/messages";
-import type { FollowupActionResult } from "~/routes/inspection-edit/action-followup.server";
+import { DEFAULT_REINSPECTION_STATUSES } from "../../shared/reinspection-status";
+import { isIgnored, useFieldCommand } from "../../context";
+import { m } from "../../i18n";
 
 /**
  * #119 — the baseline finding, and the verdict this round exists to record.
@@ -21,8 +20,8 @@ import type { FollowupActionResult } from "~/routes/inspection-edit/action-follo
  * ── WHY IT RENDERS ITSELF OFF `result` ──────────────────────────────────────
  * `original` and `followupStatus` are fields of the item's own result entry, so
  * the panel needs no new data: it reads what the item editor was already handed.
- * The WRITE goes through a fetcher to the editor route's `set-followup` intent
- * (see `action-followup.server.ts`) and lands in the same Y.Doc every other
+ * The WRITE is the data source's `set-followup` command (the editor route's
+ * intent of that name, see `action-followup.server.ts`) and lands in the same Y.Doc every other
  * field lands in, arriving back here as a broadcast doc update — so the value on
  * screen after a save is the document's, not an optimistic copy of it.
  *
@@ -53,9 +52,9 @@ interface OriginalFinding {
  * Whether this item carries a baseline from the round being re-inspected.
  *
  * Exported so the PARENT decides whether to mount the panel. The panel's own
- * guard cannot do that job: it runs after `useGuardedSubmit`, and hooks run
- * unconditionally — so merely rendering the component demands a data router, and
- * every existing ItemEditor test renders an ordinary item without one.
+ * guard cannot do that job: it runs after `useFieldCommand`, and hooks run
+ * unconditionally — so merely rendering the component demands a data source
+ * provider, and every existing ItemEditor test renders an ordinary item without one.
  */
 export function hasCarriedBaseline(result: Record<string, unknown>): boolean {
     return readOriginal(result) !== null;
@@ -69,15 +68,19 @@ function readOriginal(result: Record<string, unknown>): OriginalFinding | null {
 }
 
 export function FollowupPanel({
+  inspectionId,
   itemId,
   result,
 }: {
+  inspectionId: string;
   itemId: string | undefined;
   result: Record<string, unknown>;
 }) {
   const original = readOriginal(result);
   // #106 - user mutation: records the follow-up verdict on a carried item.
-  const { fetcher, submit, busy } = useGuardedSubmit<FollowupActionResult>();
+  const { run, busy } = useFieldCommand(inspectionId);
+  /** The sentence of the last refused write; a later accepted write clears it. */
+  const [error, setError] = useState<string | undefined>(undefined);
   const savedStatus = typeof result.followupStatus === "string" ? result.followupStatus : "";
   const savedNotes = typeof result.followupNotes === "string" ? result.followupNotes : "";
   // The note is a local draft until blur; the status is not, because a segmented
@@ -89,22 +92,21 @@ export function FollowupPanel({
   // none of.
   if (!original || !itemId) return null;
 
-  // Read once and narrow, rather than through the optional chain twice: the
-  // chain does not carry its narrowing into the branch.
-  const data = fetcher.data;
-  const error = data && data.ok === false ? data.error : undefined;
+  async function send(cmd: { type: "set-followup"; itemId: string; status: string | null; notes?: string }) {
+    const answer = await run(cmd);
+    // A refused second write sent nothing and is neither a failure nor a success.
+    if (isIgnored(answer)) return;
+    setError(answer.ok ? undefined : answer.error);
+  }
 
   function saveStatus(status: string) {
     // No `notes` key — absent means "leave the note alone" (see the action).
-    submit({ intent: "set-followup", itemId: itemId as string, status }, { method: "post" });
+    void send({ type: "set-followup", itemId: itemId as string, status });
   }
 
   function saveNote() {
     if (noteDraft === null || noteDraft === savedNotes) return;
-    submit(
-      { intent: "set-followup", itemId: itemId as string, status: savedStatus, notes: noteDraft },
-      { method: "post" },
-    );
+    void send({ type: "set-followup", itemId: itemId as string, status: savedStatus || null, notes: noteDraft });
   }
 
   const options = DEFAULT_REINSPECTION_STATUSES.map((s) => ({

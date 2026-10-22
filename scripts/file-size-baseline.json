@@ -1,5 +1,5 @@
 {
-  "app/routes/inspection-edit.tsx": 2616,
+  "app/routes/inspection-edit.tsx": 2556,
   "app/routes/inspector-portal.tsx": 1410,
   "scripts/verify-statutory-render.mjs": 1283,
   "server/durable-objects/inspection-doc.ts": 1003,
@@ -24,10 +24,10 @@
   "app/components/editor/ItemEditor.tsx": 651,
   "packages/field-ui/src/components/media-studio/PhotoAnnotator.tsx": 646,
   "server/api/public-report.ts": 642,
-  "app/components/inspection-edit/CompliancePanel.tsx": 638,
   "server/api/auth.ts": 617,
   "packages/field-ui/src/hooks/useInspection.ts": 600,
   "server/services/concierge.service.ts": 599,
+  "packages/field-ui/src/components/inspection-edit/CompliancePanel.tsx": 589,
   "server/api/bookings/agreement.ts": 583,
   "scripts/check-agent-terms-classification.mjs": 572,
   "scripts/check-erasure-manifest.mjs": 572,

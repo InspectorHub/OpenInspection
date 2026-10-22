@@ -14,8 +14,22 @@ import type {
 } from '../data-source';
 import type { InspectionPrefs, PcaNarrative } from '../data-source-types';
 
-export { createFakeCommentsLibrary, createFakeTemplateSearch, createFakeVersionHistory, createFakeVideo } from './fake-resources';
-export type { FakeCommentsLibrary, FakeTemplateSearch, FakeVersionHistory, FakeVideo } from './fake-resources';
+export {
+  createFakeAiAssist,
+  createFakeCommentsLibrary,
+  createFakeCostItems,
+  createFakeTemplateSearch,
+  createFakeVersionHistory,
+  createFakeVideo,
+} from './fake-resources';
+export type {
+  FakeAiAssist,
+  FakeCommentsLibrary,
+  FakeCostItems,
+  FakeTemplateSearch,
+  FakeVersionHistory,
+  FakeVideo,
+} from './fake-resources';
 
 export interface FakeSeed {
   data: EditorData;

@@ -5,7 +5,7 @@ import { useCommentTypeahead } from "@core/field-ui/hooks/useCommentTypeahead";
 import {
   flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
 } from "@core/field-ui/shared/comment-typeahead";
-import { AiAssistPanel } from "./AiAssistPanel";
+import { AiAssistPanel } from "@core/field-ui/components/editor/AiAssistPanel";
 import { NotesFieldHeader } from "@core/field-ui/components/editor/NotesFieldHeader";
 import { CloneLastButton } from "@core/field-ui/components/editor/CloneLastButton";
 import type { DefectFieldsValue } from "@core/field-ui/components/editor/DefectFieldsRow";
@@ -27,7 +27,7 @@ import { findRatingContradictions } from "@core/field-ui/shared/contradiction-li
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "@core/field-ui/shared/custom-defects";
 import type { DefectTrade } from "@core/field-ui/shared/defect-fields";
 import { ItemHeading } from "@core/field-ui/components/editor/ItemHeading";
-import { FollowupPanel, hasCarriedBaseline } from "./FollowupPanel";
+import { FollowupPanel, hasCarriedBaseline } from "@core/field-ui/components/editor/FollowupPanel";
 import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
 import { m } from "~/paraglide/messages";
 
@@ -382,7 +382,7 @@ export function ItemEditor({
  <ItemHeading sectionTitle={sectionTitle} label={item.label} description={item.description} />
 
  {/* #119 — carried items only. Gated here, not inside: see hasCarriedBaseline. */}
- {hasCarriedBaseline(result) && <FollowupPanel itemId={item.id} result={result} />}
+ {hasCarriedBaseline(result) && <FollowupPanel inspectionId={inspectionId ?? ""} itemId={item.id} result={result} />}
 
  {/* Item attributes (equipment fields: brand, year, model, etc.) */}
  {item.attributes && item.attributes.length > 0 && (
@@ -513,9 +513,9 @@ export function ItemEditor({
 
      Mounted only when there IS an artifact. The panel refuses on a null
      `resultId` too (that is its own invariant, and where the spec pins it);
-     this outer check is about not mounting a router-subscribed component
-     with nothing to offer — `AiAssistPanel` calls `useFetcher`, which throws
-     outside a data router, and several ItemEditor specs render this tree
+     this outer check is about not mounting a provider-subscribed component
+     with nothing to offer — `AiAssistPanel` reads the data source, which throws
+     outside a provider, and several ItemEditor specs render this tree
      bare on purpose. */}
  {resultId && (
   <AiAssistPanel

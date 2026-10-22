@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import type { useFetcher } from "react-router";
+import { useState } from "react";
 import { Drawer, Modal, Button, Input, IconButton, SegmentedControl } from "@core/shared-ui";
-import type { UnitScopeRow } from "@core/field-ui/components/editor/BreadcrumbDropdown";
-import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { m } from "~/paraglide/messages";
+import type { UnitScopeRow } from "./BreadcrumbDropdown";
+import type { UnitCommand } from "../../commands";
+import { isIgnored, useFieldCommand, useFieldDataSource } from "../../context";
+import { m } from "../../i18n";
 
-type UnitsFetcher = ReturnType<typeof useFetcher>;
+/** What the panel's forms hand up: one unit command per gesture. */
+type SubmitUnit = (cmd: UnitCommand) => void;
 
 export interface UnitsManagerProps {
   open: boolean;
@@ -15,19 +16,6 @@ export interface UnitsManagerProps {
   units: UnitScopeRow[];
   /** Current unit-inspection mode. */
   mode: "tagged" | "per_unit";
-  /**
-   * Shared fetcher the editor watches to revalidate the loader after a unit
-   * mutation. Every write in this panel submits through it (BFF relay).
-   */
-  fetcher: UnitsFetcher;
-  /**
-   * #106 - every write in this panel is a real unit mutation, so none of them
-   * may go out as a raw `fetcher.submit`. The editor owns the guard (it also
-   * watches this fetcher to revalidate) and this panel only fires it.
-   */
-  guardedSubmit: GuardedSubmit;
-  /** The guard's in-flight flag - the panel's own `busy`. */
-  busy: boolean;
 }
 
 /**
@@ -40,22 +28,29 @@ export interface UnitsManagerProps {
  * the common scope and deletes the promoted unit rows. `tagged → per_unit` is
  * non-lossy and fires directly.
  *
- * All writes route through the editor route action (`fetcher.submit`), never a
- * bare client fetch — the action holds the authed tenant context.
+ * Every write is a `unit` command of the data source — never a bare client
+ * fetch. #106: every one is a real unit mutation, so all six ops share the ONE
+ * guard of this panel (`useFieldCommand`): the panel owns it because the panel
+ * is the write surface, and a second guard (the route's) would let a rename in
+ * one and a delete in the other overlap. The panel also owns the reaction to an
+ * accepted write: the editor's POSTs skip revalidation, so it asks the data
+ * source to `reload()` and the switcher, manager and progress dots refresh.
  */
-export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher, guardedSubmit, busy }: UnitsManagerProps) {
+export function UnitsManager({ open, onClose, inspectionId, units, mode }: UnitsManagerProps) {
+  const dataSource = useFieldDataSource();
+  const { run, busy } = useFieldCommand(inspectionId);
   const [showLossy, setShowLossy] = useState(false);
-  // The panel fires many intents through one guard; the method is the same for
-  // all of them, so it is supplied here rather than at eleven call sites.
-  const submit = (fields: Record<string, string>) => guardedSubmit(fields, { method: "POST" });
-
-
-  // Close the lossy-confirm modal once the switch lands (the editor revalidates
-  // and re-renders in tagged mode).
-  useEffect(() => {
-    const d = fetcher.data as { ok?: boolean; intent?: string } | undefined;
-    if (d?.intent === "unit-mode-switch" && d.ok) setShowLossy(false);
-  }, [fetcher.data]);
+  // The panel fires many commands through one guard.
+  const send = async (cmd: UnitCommand) => {
+    const answer = await run(cmd);
+    // A dropped repeat sent nothing; a refused write changed nothing to refresh.
+    if (isIgnored(answer) || !answer.ok) return;
+    dataSource.reload();
+    // Close the lossy-confirm modal once the switch lands (the editor reloads
+    // and re-renders in tagged mode).
+    if (cmd.op === "mode-switch") setShowLossy(false);
+  };
+  const submit: SubmitUnit = (cmd) => void send(cmd);
 
   const unitRows = units.filter((u) => (u.kind ?? "unit") === "unit");
 
@@ -87,7 +82,7 @@ export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher
                     variant="secondary"
                     size="sm"
                     pending={busy}
-                    onClick={() => submit({ intent: "unit-mode-switch", mode: "per_unit" })}
+                    onClick={() => submit({ type: "unit", op: "mode-switch", mode: "per_unit" })}
                   >
                     {m.editor_unitsmanager_switch_to_per_unit()}
                   </Button>
@@ -135,7 +130,7 @@ export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher
             <Button
               variant="danger"
               pending={busy}
-              onClick={() => submit({ intent: "unit-mode-switch", mode: "tagged" })}
+              onClick={() => submit({ type: "unit", op: "mode-switch", mode: "tagged" })}
             >
               {m.editor_unitsmanager_switch_flatten()}
             </Button>
@@ -150,10 +145,6 @@ export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher
       </Modal>
     </>
   );
-
-  // inspectionId is part of the URL the action already binds; kept in props so
-  // the panel is self-describing and future direct-fetch paths have it.
-  void inspectionId;
 }
 
 /* ------------------------------------------------------------------ */
@@ -167,14 +158,14 @@ function UnitRow({
 }: {
   unit: UnitScopeRow;
   busy: boolean;
-  onSubmit: (fields: Record<string, string>) => void;
+  onSubmit: SubmitUnit;
 }) {
   const [name, setName] = useState(unit.name);
   const trimmed = name.trim();
 
   const commitRename = () => {
     if (trimmed && trimmed !== unit.name) {
-      onSubmit({ intent: "unit-rename", unitId: unit.id, name: trimmed });
+      onSubmit({ type: "unit", op: "rename", unitId: unit.id, name: trimmed });
     } else {
       setName(unit.name);
     }
@@ -200,7 +191,7 @@ function UnitRow({
       />
       <IconButton
         pending={busy}
-        onClick={() => onSubmit({ intent: "unit-duplicate", unitId: unit.id })}
+        onClick={() => onSubmit({ type: "unit", op: "duplicate", unitId: unit.id })}
         title={m.editor_unitsmanager_duplicate_title()}
         aria-label={m.editor_unitsmanager_duplicate_aria({ name: unit.name })}
         size="md"
@@ -212,7 +203,7 @@ function UnitRow({
       </IconButton>
       <IconButton
         pending={busy}
-        onClick={() => onSubmit({ intent: "unit-delete", unitId: unit.id })}
+        onClick={() => onSubmit({ type: "unit", op: "delete", unitId: unit.id })}
         title={m.editor_unitsmanager_remove_title()}
         aria-label={m.editor_unitsmanager_remove_aria({ name: unit.name })}
         size="md"
@@ -230,13 +221,13 @@ function UnitRow({
 /* Add a single unit.                                                 */
 /* ------------------------------------------------------------------ */
 
-function AddUnitForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: Record<string, string>) => void }) {
+function AddUnitForm({ busy, onSubmit }: { busy: boolean; onSubmit: SubmitUnit }) {
   const [name, setName] = useState("");
   const trimmed = name.trim();
 
   const add = () => {
     if (!trimmed) return;
-    onSubmit({ intent: "unit-create", name: trimmed });
+    onSubmit({ type: "unit", op: "create", name: trimmed });
     setName("");
   };
 
@@ -267,7 +258,7 @@ function AddUnitForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: Rec
 /* Bulk create — floors × stacks OR CSV paste.                        */
 /* ------------------------------------------------------------------ */
 
-function BulkCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: Record<string, string>) => void }) {
+function BulkCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: SubmitUnit }) {
   const [tab, setTab] = useState<"grid" | "csv">("grid");
   const [floors, setFloors] = useState("3");
   const [stacks, setStacks] = useState("4");
@@ -288,12 +279,12 @@ function BulkCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: 
       stacks: stacksCount,
       startAt: startAtNum,
     };
-    onSubmit({ intent: "unit-bulk-create", payload: JSON.stringify(payload) });
+    onSubmit({ type: "unit", op: "bulk-create", payload });
   };
 
   const createCsv = () => {
     if (!csv.trim()) return;
-    onSubmit({ intent: "unit-bulk-create", payload: JSON.stringify({ mode: "csv", csv }) });
+    onSubmit({ type: "unit", op: "bulk-create", payload: { mode: "csv", csv } });
   };
 
   return (

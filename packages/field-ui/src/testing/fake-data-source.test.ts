@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { EditorData, PendingMediaRecord } from '../data-source';
 import {
   createEmptyEditorData,
+  createFakeAiAssist,
   createFakeCommentsLibrary,
+  createFakeCostItems,
   createFakeDataSource,
   createFakePrefs,
   createFakeTemplateSearch,
@@ -305,7 +307,7 @@ describe('createFakeDataSource', () => {
 
       const some = createFakeDataSource({
         data: editorData(),
-        resources: { aiAssist: { run: async () => ({ ok: true }) } },
+        resources: { aiAssist: { run: async () => ({ ok: true, intent: 'review' }) } },
       });
       expect(some.resources.aiAssist).toBeDefined();
       expect(some.resources.costItems).toBeUndefined();
@@ -377,5 +379,51 @@ describe('media uploader, notify durations and the commentsLibrary fake', () => 
     lib.failSave('no');
     expect(await lib.save(entry)).toEqual({ ok: false, error: 'no' });
     expect([lib.touches, lib.saved(), lib.edited()]).toEqual([['c1'], [entry], [{ id: 'c1', entry }]]);
+  });
+});
+
+describe('the aiAssist and costItems fakes', () => {
+  it('createFakeAiAssist answers a draft and a recorded review by default, and records every request', async () => {
+    const ai = createFakeAiAssist();
+    expect(await ai.run({ intent: 'assist', payload: { text: 't' } })).toEqual({
+      ok: true,
+      intent: 'assist',
+      text: 'Improved note',
+      aiCallId: 'ai-call-1',
+    });
+    expect(await ai.run({ intent: 'review', payload: { artifactId: 'r', aiCallId: 'ai-call-1' } })).toEqual({ ok: true, intent: 'review' });
+    expect(ai.runs.map((r) => r.intent)).toEqual(['assist', 'review']);
+  });
+
+  it('createFakeAiAssist answers what it is told per intent', async () => {
+    const ai = createFakeAiAssist();
+    ai.answerAssist({ ok: false, error: 'no plan' });
+    ai.answerReview({ ok: false, error: 'no review' });
+    expect(await ai.run({ intent: 'assist', payload: { text: 't' } })).toEqual({ ok: false, error: 'no plan' });
+    expect(await ai.run({ intent: 'review', payload: { artifactId: 'r', aiCallId: 'c' } })).toEqual({ ok: false, error: 'no review' });
+  });
+
+  it('createFakeAiAssist can hold a request in flight until released', async () => {
+    const ai = createFakeAiAssist();
+    const release = ai.hold();
+    let settled = false;
+    const pending = ai.run({ intent: 'assist', payload: { text: 't' } }).then((r) => {
+      settled = true;
+      return r;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expect(ai.runs).toHaveLength(1);
+    release();
+    expect((await pending).ok).toBe(true);
+  });
+
+  it('createFakeCostItems lists its lines, records each list, and can be re-seeded', async () => {
+    const costs = createFakeCostItems([{ id: 'c1' } as never]);
+    expect((await costs.list('insp-1')).items).toHaveLength(1);
+    costs.setItems([]);
+    expect(await costs.list('insp-2')).toEqual({ items: [] });
+    expect(costs.lists).toEqual(['insp-1', 'insp-2']);
+    expect(await costs.save({})).toEqual({ ok: true });
   });
 });

@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
+import { useEffect, useRef, useState } from "react";
 import { Button, Modal, Select, type SelectOption } from "@core/shared-ui";
-import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { m } from "~/paraglide/messages";
+import { useFieldCommand, useFieldDataSource } from "../../context";
+import { m } from "../../i18n";
 import {
   INSPECTION_PROPERTY_TYPES,
   type InspectionPropertyType,
-} from "@core/field-ui/shared/inspection-property-type";
+} from "../../shared/inspection-property-type";
 
 /** Label per canonical slug. A value added to the tuple is a compile error here. */
 const LABELS: Record<InspectionPropertyType, () => string> = {
@@ -72,12 +71,23 @@ export function PropertyTypeControl({
   perUnitMode,
   hasPcaNarrative,
 }: PropertyTypeControlProps) {
-  const { submit, busy } = useGuardedSubmit();
-  // A second, read-only fetcher: the cost-item count is not in the editor loader
+  const { run, busy } = useFieldCommand(inspectionId);
+  const costItems = useFieldDataSource().resources.costItems;
+  // A second, read-only request: the cost-item count is not in the editor loader
   // (the drawer self-loads), and it is the number the inspector most needs before
   // agreeing — money already entered. Loaded only when the modal opens, through
-  // the existing BFF resource route (never a client fetch to /api/...).
-  const costs = useFetcher<{ items?: unknown[] }>();
+  // the data source's cost-items read. A host without one shows no cost line.
+  const [costCount, setCostCount] = useState(0);
+  const [counting, setCounting] = useState(false);
+  /** Which read the screen is waiting for: a newer read replaces an older one, as a refetch did. */
+  const countRead = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [pending, setPending] = useState<string | null>(null);
 
   const current = propertyType ?? "";
@@ -93,16 +103,25 @@ export function PropertyTypeControl({
    * clearing the classification would silently do nothing.
    */
   function save(next: string) {
-    submit(
-      {
-        // Reuses the inspection-metadata PATCH relay deliberately. This IS a
-        // metadata patch on the same endpoint the settings sheet uses, and a
-        // second intent issuing the identical PATCH would be duplication.
-        intent: "save-settings",
-        payload: JSON.stringify({ propertyType: next === "" ? null : next }),
-      },
-      { method: "POST" },
-    );
+    // Reuses the `save-settings` command deliberately. This IS a metadata patch
+    // on the same endpoint the settings sheet uses, and a second command issuing
+    // the identical PATCH would be duplication.
+    void run({ type: "save-settings", payload: { propertyType: next === "" ? null : next } });
+  }
+
+  async function loadCostCount() {
+    if (!costItems) return;
+    const read = (countRead.current += 1);
+    setCounting(true);
+    let count = 0;
+    try {
+      count = (await costItems.list(inspectionId)).items.length;
+    } catch {
+      // The read is advisory: a host that cannot answer shows no cost line rather than a wrong one.
+    }
+    if (!mounted.current || countRead.current !== read) return;
+    setCostCount(count);
+    setCounting(false);
   }
 
   function onPick(next: string) {
@@ -111,22 +130,20 @@ export function PropertyTypeControl({
     // them and loses nothing, so it writes straight through.
     if (current === "commercial") {
       setPending(next);
-      costs.load(`/resources/cost-items?inspectionId=${encodeURIComponent(inspectionId)}`);
+      void loadCostCount();
       return;
     }
     save(next);
   }
 
-  // Close the confirm once the write lands; the editor revalidates and this
-  // component re-renders on the new classification.
+  // Close the confirm once the write lands and the classification the editor holds matches it.
+  // (Nothing refreshes that classification after a save today: the editor's state is fixed at
+  // mount and a POST does not revalidate, so this can stay open; see the batch notes.)
   useEffect(() => {
     if (pending !== null && !busy && propertyType === (pending === "" ? null : pending)) {
       setPending(null);
     }
   }, [pending, busy, propertyType]);
-
-  const costCount = costs.data?.items?.length ?? 0;
-  const counting = costs.state !== "idle";
 
   return (
     <>

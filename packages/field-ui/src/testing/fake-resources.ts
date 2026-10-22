@@ -1,8 +1,12 @@
 import type { FieldResources } from '../data-source';
 import type {
+  AiAssistInput,
+  AiAssistResult,
   CommentsLibraryEntry,
   CommentsLibraryQuery,
   CommentsLibraryRow,
+  CostItemView,
+  CostItemsListing,
   TemplateSearchResult,
 } from '../data-source-types';
 
@@ -150,5 +154,80 @@ export function createFakeCommentsLibrary(initial: CommentsLibraryRow[] = []): F
       edits.push({ id, entry });
       return { ok: true };
     },
+  };
+}
+
+type AiAssistResource = NonNullable<FieldResources['aiAssist']>;
+
+/** The `aiAssist` resource: records every request and answers a configurable result per intent. */
+export interface FakeAiAssist extends AiAssistResource {
+  /** Every request, in call order. */
+  readonly runs: readonly AiAssistInput[];
+  /** Replace the answer of every later `assist` (default: a draft with the call id `ai-call-1`). */
+  answerAssist(result: AiAssistResult): void;
+  /** Replace the answer of every later `review` (default: recorded). */
+  answerReview(result: AiAssistResult): void;
+  /** Make every later request wait until the returned function is called, to hold one in flight. */
+  hold(): () => void;
+}
+
+export function createFakeAiAssist(): FakeAiAssist {
+  const runs: AiAssistInput[] = [];
+  let assist: AiAssistResult = { ok: true, intent: 'assist', text: 'Improved note', aiCallId: 'ai-call-1' };
+  let review: AiAssistResult = { ok: true, intent: 'review' };
+  let gate: Promise<void> | null = null;
+  return {
+    get runs() {
+      return runs;
+    },
+    answerAssist(result) {
+      assist = result;
+    },
+    answerReview(result) {
+      review = result;
+    },
+    hold() {
+      let release: () => void = () => undefined;
+      gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return () => {
+        gate = null;
+        release();
+      };
+    },
+    run: async (input) => {
+      runs.push(input);
+      if (gate !== null) await gate;
+      return input.intent === 'assist' ? assist : review;
+    },
+  };
+}
+
+type CostItemsResource = NonNullable<FieldResources['costItems']>;
+
+/** The `costItems` resource: lists `items`, records every list. `save` answers a neutral success. */
+export interface FakeCostItems extends CostItemsResource {
+  /** Inspection ids passed to `list`, in call order. */
+  readonly lists: readonly string[];
+  /** Replace the lines every later `list` answers. */
+  setItems(items: CostItemView[]): void;
+}
+
+export function createFakeCostItems(initial: CostItemView[] = []): FakeCostItems {
+  let items = initial;
+  const lists: string[] = [];
+  return {
+    get lists() {
+      return lists;
+    },
+    setItems(next) {
+      items = next;
+    },
+    list: async (inspectionId): Promise<CostItemsListing> => {
+      lists.push(inspectionId);
+      return { items };
+    },
+    save: async () => ({ ok: true }),
   };
 }

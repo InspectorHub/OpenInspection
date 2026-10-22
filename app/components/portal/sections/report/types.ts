@@ -13,7 +13,7 @@ import type { CostItemView, PcaNarrativeData } from "@core/field-ui";
 
 // Moved into @core/field-ui so the editor package can name them; re-exported here so
 // every existing importer keeps working.
-export type { CostItemView, PcaNarrativeData };
+export type { CostItemView };
 
 /** Plan 7 — a report photo object may carry a resolved media kind (video).
  *  Commercial PCA Phase P — `photoNo` is the render-order stamp assigned

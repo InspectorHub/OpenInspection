@@ -192,7 +192,7 @@ export interface RelianceText {
   siteSpecific: string;
 }
 
-/** Mirrors `CompliancePanelData` in app/components/inspection-edit/CompliancePanel.tsx. */
+/** What the compliance panel renders. The compliance panel and the editor loader share it. */
 export interface CompliancePanelData {
   reportSignoffs: ReportSignoffView[];
   psq: PsqView | null;
@@ -321,3 +321,27 @@ export interface CommentsLibraryEntry {
   repairSummary?: string;
   recommendedContractorTypeId?: string;
 }
+
+/** The cost lines of one inspection, as the host's cost-items read answers them. */
+export interface CostItemsListing {
+  items: CostItemView[];
+}
+
+/**
+ * One AI writing-assistance request. `assist` asks for a rewrite of `text` (with the item
+ * `context` when there is one); `review` records that a person reviewed the output of call
+ * `aiCallId` for the artifact `artifactId`.
+ */
+export type AiAssistInput =
+  | { intent: 'assist'; payload: { text: string; context?: string } }
+  | { intent: 'review'; payload: { artifactId: string; aiCallId: string } };
+
+/**
+ * What an AI assist or review answers. A successful `assist` carries BOTH the text and the id of the
+ * call that produced it (a suggestion without an id could never be reviewed, so a host answers
+ * `ok: false` instead); a successful `review` carries neither. `error` is the sentence to show.
+ */
+export type AiAssistResult =
+  | { ok: true; intent: 'assist'; text: string; aiCallId: string }
+  | { ok: true; intent: 'review' }
+  | { ok: false; error: string };

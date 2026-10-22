@@ -22,7 +22,7 @@ test.describe('Subsystem D — units, republish, version diff', () => {
      *
      * CHANGED vs the original: the units surface is no longer an Alpine
      * `[title="Add building"]` button answering a `window.prompt`. It is the
-     * UnitsManager drawer (app/components/editor/UnitsManager.tsx), opened from
+     * UnitsManager drawer (packages/field-ui/src/components/editor/UnitsManager.tsx), opened from
      * the editor header's "Units" button, and scope selection is the
      * BreadcrumbDropdown next to it. Two consequences the old test could not
      * have known:

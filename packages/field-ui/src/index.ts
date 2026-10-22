@@ -28,12 +28,15 @@ export type {
   UnitCommand,
 } from './data-source';
 export type {
+  AiAssistInput,
+  AiAssistResult,
   AutoAdvanceMode,
   CommercialPresets,
   CommentsLibraryEntry,
   CommentsLibraryQuery,
   CommentsLibraryRow,
   CompliancePanelData,
+  CostItemsListing,
   CostItemView,
   DefectCategory,
   DocumentReviewItemView,

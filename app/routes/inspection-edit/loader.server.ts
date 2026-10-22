@@ -6,7 +6,7 @@ import type { RatingLevel, ResultMap } from "@core/field-ui/hooks/useInspection"
 import { resolvePcaNarrative } from "@core/field-ui/shared/pca-narrative";
 import { RELIANCE_TEMPLATES } from "@core/field-ui/shared/pca-reliance-text";
 import { METADATA_PRESETS, type PropertyMetaField } from "@core/field-ui/shared/commercial-subtypes";
-import type { CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";
+import type { CompliancePanelData } from "@core/field-ui/data-source-types";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
 import { isReportPublished } from "~/lib/status";

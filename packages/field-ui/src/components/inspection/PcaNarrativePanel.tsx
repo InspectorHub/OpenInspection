@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { PcaNarrativeData } from "~/components/portal/sections/report/types";
-import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { m } from "~/paraglide/messages";
+import { isIgnored, useFieldCommand } from "../../context";
+import type { PcaNarrativeData } from "../../data-source-types";
+import { m } from "../../i18n";
 
 // Thunk (not a module const) so each label resolves at render time — a
 // module-level const would freeze the message at import.
@@ -24,7 +24,7 @@ function blocks(): { key: keyof PcaNarrativeData; label: string }[] {
  *
  * ⚠️ THE GUARD IS PER BLOCK, AND THAT IS THE WHOLE POINT (#106). This panel used
  * to hand every block's blur to ONE `narrativeFetcher` in inspection-edit.tsx.
- * `useGuardedSubmit` REFUSES a second submit while one is in flight, so a single
+ * `useFieldCommand` REFUSES a second command while one is in flight, so a single
  * shared guard here would silently drop the second block's text whenever a
  * reader tabbed from one field to the next inside a round trip — the identical
  * failure the baseline calls out for `set-item-attribute`, where successive
@@ -33,24 +33,28 @@ function blocks(): { key: keyof PcaNarrativeData; label: string }[] {
  * CompliancePanel's RelianceFieldRow already uses.
  */
 function NarrativeBlock({
+  inspectionId,
   fieldKey,
   label,
   initial,
 }: {
+  inspectionId: string;
   fieldKey: keyof PcaNarrativeData;
   label: string;
   initial: string;
 }) {
-  const { submit, busy } = useGuardedSubmit();
+  const { run, busy } = useFieldCommand(inspectionId);
   const [value, setValue] = useState(initial);
   /** The last value actually sent — a blur with no edit must not write. */
   const [saved, setSaved] = useState(initial);
 
-  function commit(next: string) {
+  async function commit(next: string) {
     if (next === saved) return;
+    const result = await run({ type: "save-pca-narrative", key: fieldKey, value: next });
     // Remember it as saved only when the guard accepted the call; otherwise the
-    // next blur would skip a value that was never sent.
-    if (!submit({ intent: "save-pca-narrative", key: fieldKey, value: next }, { method: "POST" })) return;
+    // next blur would skip a value that was never sent. (As before, an accepted
+    // call counts whatever the answer was: the textarea keeps what was typed.)
+    if (isIgnored(result)) return;
     setSaved(next);
   }
 
@@ -68,7 +72,7 @@ function NarrativeBlock({
         aria-disabled={busy || undefined}
         aria-busy={busy || undefined}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={(e) => commit(e.target.value)}
+        onBlur={(e) => void commit(e.target.value)}
       />
     </label>
   );
@@ -77,16 +81,15 @@ function NarrativeBlock({
 /**
  * Commercial PCA Phase S — narrative editor. One textarea per editable report
  * block (NO RTE per the project notes=textarea rule). Saves per-block on blur
- * through the route-action intent (BFF pattern — never a client-side fetch to
- * /api/...). Seeded blocks show their ASTM default copy until the inspector
- * edits them.
+ * through the `save-pca-narrative` command of the data source. Seeded blocks
+ * show their ASTM default copy until the inspector edits them.
  */
-export function PcaNarrativePanel({ narrative }: { narrative: PcaNarrativeData }) {
+export function PcaNarrativePanel({ inspectionId, narrative }: { inspectionId: string; narrative: PcaNarrativeData }) {
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-semibold text-ih-fg-2">{m.editor_pca_heading()}</h2>
       {blocks().map((b) => (
-        <NarrativeBlock key={b.key} fieldKey={b.key} label={b.label} initial={narrative[b.key]} />
+        <NarrativeBlock key={b.key} inspectionId={inspectionId} fieldKey={b.key} label={b.label} initial={narrative[b.key]} />
       ))}
     </div>
   );

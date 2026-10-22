@@ -8,6 +8,9 @@ import { useInspectionState, type InspectionSchema, type ItemFilter } from "@cor
 import { findingKey } from "@core/field-ui/hooks/findings/shared";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
+import { usePropertyFactsSave } from "@core/field-ui/hooks/usePropertyFactsSave";
+import { useInspectorSignature } from "@core/field-ui/hooks/useInspectorSignature";
+import { useAddStatutoryInstance } from "@core/field-ui/hooks/useAddStatutoryInstance";
 import { useEnsureHuman } from "~/components/OutboundVerification";
 import { EditorHumanCheck } from "~/components/editor/EditorHumanCheck";
 import { InspectionFieldHost } from "~/components/field/WebFieldHost";
@@ -78,10 +81,10 @@ import { useIsMobile } from "@core/field-ui/hooks/useBreakpoint";
 import { MobileAppBar } from "@core/field-ui/components/editor/MobileAppBar";
 import { MobileDrawerTriggers, type MobileDrawerId } from "@core/field-ui/components/editor/MobileDrawerTriggers";
 import { MobileFinishDrawer } from "@core/field-ui/components/editor/MobileFinishDrawer";
-import { InspectionOverview } from "~/components/editor/InspectionOverview";
+import { InspectionOverview } from "@core/field-ui/components/editor/InspectionOverview";
 import { MobileBottomDrawer } from "@core/field-ui/components/MobileBottomDrawer";
 import { BreadcrumbDropdown, type UnitScopeRow } from "@core/field-ui/components/editor/BreadcrumbDropdown";
-import { UnitsManager } from "~/components/editor/UnitsManager";
+import { UnitsManager } from "@core/field-ui/components/editor/UnitsManager";
 import { CostItemsHost } from "~/components/editor/CostItemsHost";
 import type { ResultMap } from "@core/field-ui/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "@core/field-ui/shared/types";
@@ -199,8 +202,7 @@ function InspectionEditPage() {
  // feedback_rr_shared_fetcher_abort). Dispatches "save-property-facts"
  // through the route action (BFF pattern), which PATCHes the real
  // /api/inspections/:id/property-facts endpoint. (PropertyInfoForm now persists
- // its own strip fields via propertyFactsFetcher below — same intent, separate
- // fetcher.)
+ // its own strip fields through the latest-wins save below — same intent.)
  // #106 — one guard EACH, never one shared: the guard refuses a second call
  // while one is in flight, so a shared instance would let a tier click be
  // swallowed by an in-flight subtype save. Each selector also writes its local
@@ -215,26 +217,17 @@ function InspectionEditPage() {
  const saveTier = useCallback((tier: "light_commercial" | "full_pca") => (
   submitTier({ intent: "save-property-facts", payload: JSON.stringify({ reportTier: tier }) }, { method: "POST" })
  ), [submitTier]);
- // Property Facts strip (PropertyInfoForm) durable save. A SINGLE shared fetcher
- // is abort-safe here — unlike subtype/tier above — because onCommit hands us a
+ // Property Facts strip (PropertyInfoForm) durable save. ONE latest-wins channel
+ // is lossless here — unlike subtype/tier above — because onCommit hands us a
  // FULL snapshot of every field each time, so a later PATCH is a strict superset
- // of any in-flight one. React Router cancels the previous submission when the
- // same useFetcher re-submits, but cancelling loses no data when the survivor
- // already carries the earlier field's value (mirrors PsqPanel.commitResponses;
- // see feedback_rr_shared_fetcher_abort). Rides the same "save-property-facts"
- // route intent (PATCHes /api/inspections/:id/property-facts). The form's onSave
- // keeps the optimistic local-state update; onCommit (this) persists.
- const propertyFactsFetcher = useFetcher();
- const savePropertyFacts = useCallback((facts: Record<string, unknown>) => {
-  // busy-controls-allow: onCommit hands a FULL snapshot and the PATCH replaces those fields, so a repeat rewrites the same values
-  propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify(facts) }, { method: "POST" });
- }, [propertyFactsFetcher]);
- // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
- // (create/rename/delete/duplicate/bulk/mode-switch).
- // #106 - the units panel is presentational and takes the guard as a prop;
- // this route owns the fetcher because it also watches it to revalidate.
- const { fetcher: unitsFetcher, submit: submitUnits, busy: unitsBusy } =
-  useGuardedSubmit<{ ok: boolean; intent?: string }>();
+ // of any earlier one. A commit made while another is in flight replaces any
+ // older queued one and is sent when the in-flight one settles, so the server
+ // sees the writes in order and the last one is the newest snapshot (the fetcher
+ // this replaced cancelled the superseded submit; mirrors PsqPanel.commitResponses).
+ // Rides the same "save-property-facts" command (PATCHes
+ // /api/inspections/:id/property-facts). The form's onSave keeps the optimistic
+ // local-state update; onCommit (this) persists.
+ const savePropertyFacts = usePropertyFactsSave(String(loaderData.inspection.id));
  const navigate = useNavigate();
  // Task 16 — split the single photo input into a camera capture input
  // (single file, capture=environment — "Take photo") and a library input
@@ -580,21 +573,9 @@ function InspectionEditPage() {
   [loadScope],
  );
 
- // After any units mutation lands, revalidate so the switcher / manager /
- // progress refresh from the loader. (POST submissions skip revalidation via
- // shouldRevalidate; this explicit call carries no formMethod so it runs.)
- // `unitsFetcher.data` keeps the same {ok:true} reference until the next submit
- // and `revalidator` is a fresh object each render, so without a one-shot guard
- // this effect re-fires every render → an unbounded revalidation storm. Track
- // the last-revalidated data object so each distinct result revalidates once.
- const lastRevalidatedUnitsData = useRef<unknown>(null);
- useEffect(() => {
-  const d = unitsFetcher.data;
-  if (unitsFetcher.state === "idle" && d?.ok && lastRevalidatedUnitsData.current !== d) {
-   lastRevalidatedUnitsData.current = d;
-   revalidator.revalidate();
-  }
- }, [unitsFetcher.state, unitsFetcher.data, revalidator]);
+ // After any units mutation lands the switcher / manager / progress must refresh
+ // from the loader: UnitsManager asks the data source to reload on every accepted
+ // write (POST submissions skip revalidation via shouldRevalidate).
 
  // If the active unit was deleted (or the inspection left per_unit mode), fall
  // back to the common scope so reads never point at a vanished unit.
@@ -638,16 +619,15 @@ function InspectionEditPage() {
  /* Auto-sign toggle + manual sign modal */
  /* ---------------------------------------------------------------- */
 
- // #106 — applying the inspector signature writes an e-sign record, so it
- // goes through the guard. The pad closes the modal on submit, so there is no
- // control left on screen to carry a pending affordance; a failure comes back
- // through SignModal's `failed` prop, which reads `signFetcher.data`.
- // submit-guard-allow-no-busy: the control this fires unmounts on submit.
- const { fetcher: signFetcher, submit: submitSign } = useGuardedSubmit<{ ok: boolean }>();
  const [autoSign, setAutoSign] = useState<boolean>(
   !!(state.inspection as Record<string, unknown>).autoSignOnPublish,
  );
  const [signModalOpen, setSignModalOpen] = useState(false);
+ // #106 — applying the inspector signature writes an e-sign record, so it
+ // goes through the guard. The pad closes the modal on submit, so there is no
+ // control left on screen to carry a pending affordance; a failure comes back
+ // through SignModal's `failed` prop, which reads `inspectorSignature.failed`.
+ const inspectorSignature = useInspectorSignature(String(loaderData.inspection.id), () => setSignModalOpen(false));
  // #181 — version-history panel (collab Phase 4). Inert when collab is off.
  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
 
@@ -661,17 +641,6 @@ function InspectionEditPage() {
  // well would restore the race this replaced, and persisting a choice the
  // reader can still cancel out of was never the intent either.
  const handleAutoSignToggle = useCallback((checked: boolean) => setAutoSign(checked), []);
-
- const handleSignSubmit = useCallback(
-  async (dataUri: string) => {
-   // Close only on a call the guard accepted: a refused second submit sent
-   // nothing, and closing anyway would say the signature had been applied.
-   if (submitSign({ intent: "sign-inspector", signatureBase64: dataUri }, { method: "post" })) {
-    setSignModalOpen(false);
-   }
-  },
-  [submitSign],
- );
 
  /* ---------------------------------------------------------------- */
  /* Publish pre-flight */
@@ -754,10 +723,10 @@ function InspectionEditPage() {
   const canEditStructure = useStructuralEditingAllowed(loaderData.templateSnapshot);
   // Which group is having an instance added, if any. Null closes the drawer.
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
-  // Guarded rather than a raw fetcher: recording an instance is a user
+  // Guarded rather than a raw write: recording an instance is a user
   // mutation, and a second click before the first settles would write the same
   // panel twice at the same index.
-  const instanceSubmit = useGuardedSubmit<{ ok?: boolean; error?: string }>();
+  const statutoryInstance = useAddStatutoryInstance(String(loaderData.inspection.id));
   // Visible while filling rather than at the end: an inspector who learns the
   // form is short two answers when he presses send is already three houses away.
   const formProgress = useStatutoryFormProgress(loaderData.templateSnapshot, state.results);
@@ -1899,9 +1868,9 @@ function InspectionEditPage() {
  {/* Inspector sign modal */}
  <SignModal
  open={signModalOpen}
- onSubmit={handleSignSubmit}
+ onSubmit={inspectorSignature.submit}
  onCancel={() => setSignModalOpen(false)}
- failed={Boolean(signFetcher.data && !(signFetcher.data as { ok: boolean }).ok)}
+ failed={inspectorSignature.failed}
  />
  {/* Publish gate modal */}
  <PublishGateModal
@@ -2191,19 +2160,10 @@ function InspectionEditPage() {
  <AddGroupInstanceHost
    groups={statutoryGroups}
    groupId={addingToGroup}
-   saving={instanceSubmit.busy}
+   saving={statutoryInstance.busy}
    onClose={() => setAddingToGroup(null)}
    onSave={(group, fields) => {
-     // busy-controls-allow: instanceSubmit is useGuardedSubmit, whose submit drops a second call through a synchronous inFlight ref
-     instanceSubmit.submit(
-       {
-         intent: "add-statutory-instance",
-         groupId: group.id,
-         index: String(group.capacity),
-         fields: JSON.stringify(fields),
-       },
-       { method: "post" },
-     );
+     statutoryInstance.add(group.id, group.capacity, fields);
      setAddingToGroup(null);
    }}
  />
@@ -2390,9 +2350,6 @@ function InspectionEditPage() {
    inspectionId={String(state.inspection.id)}
    units={units}
    mode={unitInspectionMode}
-   fetcher={unitsFetcher}
-   guardedSubmit={submitUnits}
-   busy={unitsBusy}
   />
  )}
  {/* Commercial PCA Phase C Task 13b — cost items drawer (Opinion of Cost) */}

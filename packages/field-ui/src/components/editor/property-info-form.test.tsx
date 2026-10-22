@@ -1,20 +1,28 @@
 // @vitest-environment happy-dom
 import { useState } from "react";
-import { render, fireEvent, screen, waitFor } from "@testing-library/react";
-import { createRoutesStub } from "react-router";
-import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
+import { render, fireEvent, screen, waitFor, cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+import { FieldDataSourceProvider } from "../../context";
+import type { CommandDataMap } from "../../commands";
+import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
+import type { FakeDataSource } from "../../testing/fake-data-source";
+import { PropertyInfoForm } from "./PropertyInfoForm";
 
-// PropertyInfoForm now uses useFetcher (the #200 "Fetch property details"
-// button), so it must render inside a data-router context. `renderPF` wraps any
-// element in a minimal stub router; an optional `action` powers the autofill
-// fetcher for the tests that click the button. The field/commit tests below
-// never click it, so their fetcher stays idle and no action is needed.
+afterEach(cleanup);
+
+// PropertyInfoForm reads the data source (the #200 "Fetch property details"
+// button issues a command), so it renders inside a `FieldDataSourceProvider`.
+// `renderPF` wraps any element in one over a fake data source; `autofill`
+// answers the lookup for the tests that click the button. The field/commit
+// tests below never click it, so no command is ever issued.
 // `onSave` fires optimistically on every change with the RAW value typed;
 // `onCommit` fires the durable save with a FULL coerced snapshot of every field
 // — on blur for text/number/date, on change for select/boolean.
-function renderPF(ui: React.ReactElement, action?: () => unknown) {
-  const Stub = createRoutesStub([{ path: "/", Component: () => ui, action }]);
-  return render(<Stub />);
+function renderPF(ui: React.ReactElement, autofill?: CommandDataMap["autofill-property-facts"]) {
+  const fake: FakeDataSource = createFakeDataSource({ data: createEmptyEditorData() });
+  if (autofill) fake.respondWith("autofill-property-facts", autofill);
+  const utils = render(<FieldDataSourceProvider dataSource={fake}>{ui}</FieldDataSourceProvider>);
+  return { ...utils, fake };
 }
 
 function labelInput(container: HTMLElement, labelText: string): HTMLInputElement | null {
@@ -266,33 +274,43 @@ describe("PropertyInfoForm select commit", () => {
   });
 });
 
-// #200 — "Fetch property details" autofill button. Relays the address to the
-// editor BFF action; fills ONLY empty fields (never clobbers manual entry) and
+// #200 — "Fetch property details" autofill button. Issues the `autofill-property-facts`
+// command with the address; fills ONLY empty fields (never clobbers manual entry) and
 // commits the merged snapshot; degrades with a clear message when unconfigured.
 describe("PropertyInfoForm — Fetch property details (#200)", () => {
   function mountAutofill(
-    actionResult: unknown,
+    answer: CommandDataMap["autofill-property-facts"],
     handlers: { onSave?: (id: string, v: unknown) => void; onCommit?: (f: Record<string, unknown>) => void },
+    extra: Record<string, unknown> = {},
   ) {
     const inspection: Record<string, unknown> = {
+      id: "insp-1",
       propertyType: "single_family",
       propertyAddress: "123 Main St, Austin, TX 78701",
       bedrooms: "4", // already set — must NOT be overwritten
       // yearBuilt / sqft / etc. absent = empty = fillable
+      ...extra,
     };
     return renderPF(
       <PropertyInfoForm inspection={inspection} onSave={handlers.onSave} onCommit={handlers.onCommit} />,
-      () => actionResult,
+      answer,
     );
   }
+
+  it("asks the data source for the address, once", async () => {
+    const { fake } = mountAutofill({ facts: null, reason: "NO_API_KEY" }, {});
+    fireEvent.click(screen.getByRole("button", { name: /fetch property details/i }));
+    await waitFor(() => expect(fake.commands).toHaveLength(1));
+    expect(fake.commands[0]).toMatchObject({
+      inspectionId: "insp-1",
+      cmd: { type: "autofill-property-facts", addressString: "123 Main St, Austin, TX 78701" },
+    });
+  });
 
   it("fills only empty fields and never clobbers a value the inspector already set", async () => {
     const onSave = vi.fn();
     const onCommit = vi.fn();
-    mountAutofill(
-      { intent: "autofill-property-facts", facts: { yearBuilt: 1990, bedrooms: 3 }, reason: null },
-      { onSave, onCommit },
-    );
+    mountAutofill({ facts: { yearBuilt: 1990, bedrooms: 3 }, reason: null }, { onSave, onCommit });
 
     fireEvent.click(screen.getByRole("button", { name: /fetch property details/i }));
 
@@ -305,11 +323,104 @@ describe("PropertyInfoForm — Fetch property details (#200)", () => {
   it("shows an 'unconfigured' message and commits nothing when the provider key is unset", async () => {
     const onSave = vi.fn();
     const onCommit = vi.fn();
-    mountAutofill({ intent: "autofill-property-facts", facts: null, reason: "NO_API_KEY" }, { onSave, onCommit });
+    mountAutofill({ facts: null, reason: "NO_API_KEY" }, { onSave, onCommit });
 
     fireEvent.click(screen.getByRole("button", { name: /fetch property details/i }));
 
     await waitFor(() => expect(screen.getByText(/isn.t configured/i)).toBeTruthy());
     expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("says nothing was found, or that the lookup failed, for the other reasons", async () => {
+    mountAutofill({ facts: null, reason: "NOT_FOUND" }, {});
+    fireEvent.click(screen.getByRole("button", { name: /fetch property details/i }));
+    await waitFor(() => expect(screen.getByText(/no public records/i)).toBeTruthy());
+    cleanup();
+
+    mountAutofill({ facts: null, reason: "REQUEST_FAILED" }, {});
+    fireEvent.click(screen.getByRole("button", { name: /fetch property details/i }));
+    await waitFor(() => expect(screen.getByText(/couldn.t|could not|failed/i)).toBeTruthy());
+  });
+
+  it("a FAILED lookup still carries its reason: the message is the reason's, not a generic one", async () => {
+    // The action answers ok:false with { facts: null, reason } for a missing key; the decoder keeps `data`.
+    const { fake } = mountAutofill({ facts: null, reason: "NO_API_KEY" }, {});
+    fake.failExecute("autofill-property-facts", "no key");
+    fireEvent.click(screen.getByRole("button", { name: /fetch property details/i }));
+    await waitFor(() => expect(screen.getByText(/isn.t configured/i)).toBeTruthy());
+  });
+
+  it("says the lookup is running and merges into the form as it is when the answer arrives", async () => {
+    // The inspector types a value into a still-empty field while the lookup is out: the answer must
+    // not overwrite it (the effect this replaced read the form fresh when the answer landed).
+    const onSave = vi.fn();
+    const onCommit = vi.fn();
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    let answer: (r: { ok: boolean; data: CommandDataMap["autofill-property-facts"] }) => void = () => undefined;
+    vi.spyOn(fake, "execute").mockImplementation((() =>
+      new Promise((resolve) => { answer = resolve as typeof answer; })) as FakeDataSource["execute"]);
+    function Harness() {
+      const [inspection, setInspection] = useState<Record<string, unknown>>({
+        id: "insp-1", propertyType: "single_family", propertyAddress: "123 Main St, Austin, TX 78701",
+      });
+      return (
+        <PropertyInfoForm
+          inspection={inspection}
+          onSave={(id, v) => { onSave(id, v); setInspection((prev) => ({ ...prev, [id]: v })); }}
+          onCommit={onCommit}
+        />
+      );
+    }
+    const { container } = render(<FieldDataSourceProvider dataSource={fake}><Harness /></FieldDataSourceProvider>);
+    fireEvent.click(screen.getByRole("button", { name: /fetch property details/i }));
+    expect(await screen.findByRole("button", { name: /fetching|looking/i })).toBeTruthy();
+
+    fireEvent.change(labelInput(container, "Year Built")!, { target: { value: "1975" } });
+    onSave.mockClear();
+    answer({ ok: true, data: { facts: { yearBuilt: 1990, sqft: 2000 }, reason: null } });
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith("sqft", 2000));
+    expect(onSave).not.toHaveBeenCalledWith("yearBuilt", 1990);
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ yearBuilt: 1975, sqft: 2000 }));
+  });
+
+  it("applies nothing when the form is gone before the answer arrives", async () => {
+    const onSave = vi.fn();
+    const onCommit = vi.fn();
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    let answer: (r: { ok: boolean; data: CommandDataMap["autofill-property-facts"] }) => void = () => undefined;
+    vi.spyOn(fake, "execute").mockImplementation((() =>
+      new Promise((resolve) => { answer = resolve as typeof answer; })) as FakeDataSource["execute"]);
+    const { unmount } = render(
+      <FieldDataSourceProvider dataSource={fake}>
+        <PropertyInfoForm
+          inspection={{ id: "insp-1", propertyType: "single_family", propertyAddress: "123 Main St, Austin, TX 78701" }}
+          onSave={onSave}
+          onCommit={onCommit}
+        />
+      </FieldDataSourceProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /fetch property details/i }));
+    unmount();
+    answer({ ok: true, data: { facts: { yearBuilt: 1990 }, reason: null } });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("shows nothing for a lookup that got no answer at all (offline), as the fetcher did", async () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    vi.spyOn(fake, "execute").mockResolvedValue({ ok: false, error: "Network error" } as never);
+    render(
+      <FieldDataSourceProvider dataSource={fake}>
+        <PropertyInfoForm inspection={{ id: "insp-1", propertyType: "single_family", propertyAddress: "123 Main St, Austin, TX 78701" }} />
+      </FieldDataSourceProvider>,
+    );
+    const btn = screen.getByRole("button", { name: /fetch property details/i });
+    fireEvent.click(btn);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText(/isn.t configured|filled|no public records/i)).toBeNull();
+    // and the button is usable again
+    expect(screen.getByRole("button", { name: /fetch property details/i }).getAttribute("aria-disabled")).not.toBe("true");
   });
 });

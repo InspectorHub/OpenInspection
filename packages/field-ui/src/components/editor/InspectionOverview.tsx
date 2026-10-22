@@ -1,11 +1,11 @@
 import type { ComponentProps } from "react";
-import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
-import { StatutoryDetailsHost } from "~/components/statutory/StatutoryDetailsHost";
-import { StatutoryCoveragePanel } from "@core/field-ui/components/statutory/StatutoryCoveragePanel";
-import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
-import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
-import { CommercialReportControls, type ReportTier } from "@core/field-ui/components/editor/CommercialReportControls";
-import { PropertyTypeControl } from "~/components/editor/PropertyTypeControl";
+import { PropertyInfoForm } from "./PropertyInfoForm";
+import { StatutoryDetailsHost } from "../statutory/StatutoryDetailsHost";
+import { StatutoryCoveragePanel } from "../statutory/StatutoryCoveragePanel";
+import { PcaNarrativePanel } from "../inspection/PcaNarrativePanel";
+import { CompliancePanel } from "../inspection-edit/CompliancePanel";
+import { CommercialReportControls, type ReportTier } from "./CommercialReportControls";
+import { PropertyTypeControl } from "./PropertyTypeControl";
 
 /**
  * The "Inspection Details" overview — property facts, the statutory form
@@ -26,10 +26,10 @@ import { PropertyTypeControl } from "~/components/editor/PropertyTypeControl";
  * living in a 2,600-line file that is at its size cap.
  *
  * Every prop is derived by the route, and this component adds no state or
- * fetcher of its own, so it renders identically from either shell. Several of
- * its children DO own fetchers — they always did, each for a reason written
- * down where it lives — and this changes none of that: only ONE shell is
- * rendered at a time, so no child gained a second instance.
+ * write channel of its own, so it renders identically from either shell. Several
+ * of its children DO own one (a guarded command each) — they always did, each
+ * for a reason written down where it lives — and this changes none of that: only
+ * ONE shell is rendered at a time, so no child gained a second instance.
  */
 interface InspectionOverviewProps {
     inspection: ComponentProps<typeof PropertyInfoForm>["inspection"];
@@ -80,13 +80,13 @@ export function InspectionOverview({
                 coverage={statutoryCoverage}
                 previewHref={statutoryPreviewHref}
             />
-            <StatutoryDetailsHost details={statutoryDetails} />
+            <StatutoryDetailsHost inspectionId={String(bag.id)} details={statutoryDetails} />
             {/* Reclassification. UNGATED on purpose — every other control in this
                 block appears only once `propertyType === 'commercial'`, so a
                 selector hidden behind the same gate could never be what gets an
                 inspection there. Sits immediately above the commercial controls it
                 unlocks, because the order of operations is: classify, then pick the
-                subtype, then the tier. Owns its own fetcher (like the narrative and
+                subtype, then the tier. Owns its own write guard (like the narrative and
                 compliance panels below) and its own lossy-confirm modal. */}
             <div className="mt-8 border-t border-ih-border pt-6">
                 <PropertyTypeControl
@@ -118,14 +118,14 @@ export function InspectionOverview({
             {/* Commercial PCA Phase S — narrative editor panel, on the same gate. */}
             {isCommercial ? (
                 <div className="mt-8 border-t border-ih-border pt-6">
-                    <PcaNarrativePanel narrative={pcaNarrative} />
+                    <PcaNarrativePanel inspectionId={String(bag.id)} narrative={pcaNarrative} />
                 </div>
             ) : null}
             {/* Commercial PCA Phase M Task 10 — compliance panel (dual sign-off /
                 PSQ / doc-review checklist / conformance preview). Rendered ONLY at
                 reportTier === 'full_pca' — a light_commercial report has no
                 compliance surface (the Task 6 API 409s writes at any other tier).
-                Self-manages its own fetchers/intents; the loader only supplies the
+                Self-manages its own guarded commands; the loader only supplies the
                 read-side artifacts. */}
             {isCommercial && reportTier === "full_pca" ? (
                 <div className="mt-8 border-t border-ih-border pt-6">

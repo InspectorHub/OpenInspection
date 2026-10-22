@@ -5,7 +5,9 @@ import { webSessionInfo, type SessionContextLike, type SessionLoaderBits } from 
 import { createWebUrls } from "./web-urls";
 import { webIsOnline, webNotify, webOnOnlineChange } from "./web-env";
 import { createWebExecute, type WebExecute } from "./web-transport";
+import { createWebAiAssist } from "./web-ai-assist";
 import { createWebCommentsLibrary } from "./web-comments-library";
+import { createWebCostItems } from "./web-cost-items";
 import { createWebPrefs } from "./web-prefs";
 import { createWebVideo } from "./web-video";
 
@@ -72,7 +74,13 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
         collab,
         media: { store: webMediaStore, uploader: createWebMediaUploader },
         urls: createWebUrls(),
-        resources: { prefs: createWebPrefs(), video: createWebVideo(), commentsLibrary: createWebCommentsLibrary() },
+        resources: {
+            prefs: createWebPrefs(),
+            video: createWebVideo(),
+            commentsLibrary: createWebCommentsLibrary(),
+            costItems: createWebCostItems(),
+            aiAssist: createWebAiAssist(),
+        },
         platform: "web",
     };
 }

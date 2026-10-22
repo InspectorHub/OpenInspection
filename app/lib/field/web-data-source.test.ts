@@ -50,6 +50,13 @@ describe("createWebFieldDataSource", () => {
         }
     });
 
+    it("serves AI assistance and the cost-item read, in the editor and in a host with no inspection", () => {
+        for (const ds of [make(), make({ current: () => null })]) {
+            expect(typeof ds.resources.aiAssist?.run).toBe("function");
+            expect(typeof ds.resources.costItems?.list).toBe("function");
+        }
+    });
+
     it("hands the live results document to the media uploader, which answers instead of throwing", async () => {
         const ds = make();
         const rec = {

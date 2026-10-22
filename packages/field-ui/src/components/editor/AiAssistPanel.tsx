@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Checkbox, Banner } from "@core/shared-ui";
-import type { AiAssistResult } from "~/routes/resources/ai-assist";
-import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { m } from "~/paraglide/messages";
+import { useFieldDataSource } from "../../context";
+import type { AiAssistInput, AiAssistResult } from "../../data-source-types";
+import { m } from "../../i18n";
 
 export interface AiAssistPanelProps {
   /** The inspector's current note. Empty ⇒ nothing to improve. */
@@ -16,7 +16,7 @@ export interface AiAssistPanelProps {
    * nothing to offer. See the fail-closed note on the loader.
    */
   resultId: string | null;
-  /** Called ONLY after the review has been recorded. See `useReviewed` below. */
+  /** Called ONLY after the review has been recorded. See `recordReview` below. */
   onAccept: (text: string) => void;
 }
 
@@ -27,12 +27,12 @@ export interface AiAssistPanelProps {
  * THE DRAFT NEVER LANDS IN THE NOTE ON ARRIVAL, and that is the design rather
  * than a nicety. It appears BELOW the textarea, in its own slab, while the
  * inspector's own words stay visible above it — the comparison IS the
- * interface. Competitors write model output straight into the field, which
- * makes the inspector's text and the model's text indistinguishable a second
- * later; here they are two things until someone says otherwise.
+ * interface. Writing model output straight into the field would make the
+ * inspector's text and the model's text indistinguishable a second later; here
+ * they are two things until someone says otherwise.
  *
  * ⚠️ THE CONTROL SAYS *REVIEW*, NEVER *ACCEPT*. "The user clicked confirm,
- * therefore the platform is absolved" is not a
+ * therefore the software carries no responsibility" is not a
  * position this product may take. So the checkbox states a fact the inspector
  * is in a position to state — that they read it — and the row that gets written
  * is `reviewed_by`. Nothing here asks anyone to accept liability, and no label
@@ -46,62 +46,88 @@ export interface AiAssistPanelProps {
  * that a reasonable refactor would "simplify" away.
  */
 export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPanelProps) {
-  // #106 — `assist` spends a metered AI call and `review` writes the record
-  // that permits the note to change, so both go out through the guard.
-  const { fetcher, submit, busy } = useGuardedSubmit<AiAssistResult>();
+  const ai = useFieldDataSource().resources.aiAssist;
   const [draft, setDraft] = useState<{ text: string; aiCallId: string } | null>(null);
   const [reviewed, setReviewed] = useState(false);
-  /** The exact response object already acted on, so one round trip is handled
-   *  once. `fetcher.data` survives after the request settles, and without this
-   *  a later re-render would replay the accept. */
-  const handledRef = useRef<AiAssistResult | null>(null);
-
-  const data = fetcher.data;
-  const error = data && !data.ok ? data.error : null;
-
+  /** The sentence of the last refused request; any accepted answer clears it. */
+  const [error, setError] = useState<string | null>(null);
+  // #106 — `assist` spends a metered AI call and `review` writes the record that permits the note to
+  // change, so both go out through ONE same-frame guard. The ref is set before the request starts: two
+  // clicks in one frame meet it before any render could show `busy`. It is released on every path.
+  const inFlight = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const mounted = useRef(true);
+  // Read at the moment an answer arrives, as the fetcher effect this replaced did: the draft may have
+  // moved on, and the parent's accept handler is a fresh closure on every render.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const onAcceptRef = useRef(onAccept);
+  onAcceptRef.current = onAccept;
   useEffect(() => {
-    if (!data || fetcher.state !== "idle" || handledRef.current === data) return;
-    handledRef.current = data;
-    if (!data.ok) return;
-    if (data.intent === "assist") {
-      // The draft is held here rather than read out of `fetcher.data` on every
-      // render: the same fetcher then carries the `review` round trip, whose
-      // response has no text in it and would blank the panel mid-decision.
-      setDraft({ text: data.text, aiCallId: data.aiCallId });
-      setReviewed(false);
-      return;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  /** One guarded request. Resolves to null when the guard dropped it (nothing was sent). */
+  async function send(input: AiAssistInput): Promise<AiAssistResult | null> {
+    if (inFlight.current || !ai) return null;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      return await ai.run(input);
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) setBusy(false);
     }
-    // The review is on file. ONLY NOW does the text become the note.
-    if (data.intent === "review" && draft) {
-      const accepted = draft.text;
-      setDraft(null);
-      setReviewed(false);
-      onAccept(accepted);
-    }
-  }, [data, fetcher.state, draft, onAccept]);
+  }
 
   // No artifact ⇒ no offer. Rendering the trigger and refusing at the end
   // would waste an AI call on text that could never be recorded as reviewed.
-  if (!resultId) return null;
+  // No host AI resource ⇒ no offer either: an absent capability hides its entry point.
+  if (!resultId || !ai) return null;
 
-  function improve() {
-    submit(
-      { intent: "assist", text: notes, context: context ?? "" },
-      { method: "post", action: "/resources/ai-assist" },
-    );
+  async function improve() {
+    const answer = await send({ intent: "assist", payload: { text: notes, context: context ?? "" } });
+    // After an unmount nothing is shown, and a dropped call changed nothing.
+    if (answer === null || !mounted.current) return;
+    if (!answer.ok) {
+      setError(answer.error);
+      return;
+    }
+    setError(null);
+    if (answer.intent === "assist") {
+      // The draft is held here rather than read off the latest answer on every
+      // render: the `review` round trip answers with no text in it and would
+      // blank the panel mid-decision.
+      setDraft({ text: answer.text, aiCallId: answer.aiCallId });
+      setReviewed(false);
+    }
   }
 
-  function useReviewed() {
+  async function recordReview() {
     // `resultId` is re-tested here, not only at the early return above: the
-    // guard takes a Record<string, string>, and the narrowing on a prop does
-    // not reach inside this closure.
+    // narrowing on a prop does not reach inside this closure.
     if (!draft || !reviewed || !resultId) return;
-    // The review write comes FIRST and the note is changed only in the branch
-    // above, on its success. Reversing these two lines is the fail-open bug.
-    submit(
-      { intent: "review", artifactId: resultId, aiCallId: draft.aiCallId },
-      { method: "post", action: "/resources/ai-assist" },
-    );
+    // The review write comes FIRST and the note is changed only below, on its
+    // success. Reversing these two steps is the fail-open bug.
+    const answer = await send({ intent: "review", payload: { artifactId: resultId, aiCallId: draft.aiCallId } });
+    if (answer === null || !mounted.current) return;
+    if (!answer.ok) {
+      setError(answer.error);
+      return;
+    }
+    setError(null);
+    // The review is on file. ONLY NOW does the text become the note.
+    const current = draftRef.current;
+    if (answer.intent === "review" && current) {
+      setDraft(null);
+      setReviewed(false);
+      onAcceptRef.current(current.text);
+    }
   }
 
   return (
@@ -111,7 +137,7 @@ export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPa
           <Button
             variant="link"
             size="sm"
-            onClick={improve}
+            onClick={() => void improve()}
             pending={busy}
             disabled={!notes.trim()}
             className="h-auto px-0 py-0 text-[11px]"
@@ -151,7 +177,7 @@ export function AiAssistPanel({ notes, context, resultId, onAccept }: AiAssistPa
             <Button variant="ghost" size="sm" onClick={() => setDraft(null)} pending={busy}>
               {m.editor_ai_assist_discard()}
             </Button>
-            <Button variant="primary" size="sm" onClick={useReviewed} pending={busy} disabled={!reviewed}>
+            <Button variant="primary" size="sm" onClick={() => void recordReview()} pending={busy} disabled={!reviewed}>
               {busy ? m.editor_ai_assist_recording() : m.editor_ai_assist_use()}
             </Button>
           </div>

@@ -4,8 +4,11 @@ import type { DateFormat, TimeFormat } from './shared/display-prefs';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
 import type { PendingMediaStore, MediaUploader } from './media-types';
 import type {
+  AiAssistInput,
+  AiAssistResult,
   CommercialPresets,
   CompliancePanelData,
+  CostItemsListing,
   DefectCategory,
   EditorInspection,
   InspectionPrefs,
@@ -215,11 +218,17 @@ export interface FieldResources {
     save(entry: CommentsLibraryEntry): Promise<CommandResult>;
     edit(id: string, entry: CommentsLibraryEntry): Promise<CommandResult>;
   };
-  costItems?: { list(inspectionId: string): Promise<unknown>; save(payload: unknown): Promise<CommandResult> };
+  /** `list` never rejects: a failed read answers no items. `save` stays untyped until its consumer converts. */
+  costItems?: { list(inspectionId: string): Promise<CostItemsListing>; save(payload: unknown): Promise<CommandResult> };
   repairItems?: { list(inspectionId: string): Promise<unknown> };
   mediaPool?: { list(inspectionId: string): Promise<unknown> };
   settingsSheet?: { load(inspectionId: string): Promise<unknown> };
-  aiAssist?: { run(input: { intent: 'assist' | 'review'; payload: unknown }): Promise<CommandResult> };
+  /**
+   * AI writing assistance for an inspection note (the web host serves it from `/resources/ai-assist`).
+   * Never rejects: every failure answers `{ ok: false, error }`. The caller owns the same-frame guard:
+   * an `assist` spends a metered AI call.
+   */
+  aiAssist?: { run(input: AiAssistInput): Promise<AiAssistResult> };
   publishReadiness?: { check(inspectionId: string): Promise<unknown> };
   /** The template picker's search. Typed from the existing route loader (see `TemplateSearchResult`). */
   templateSearch?: { search(input: { q: string; page: number }): Promise<TemplateSearchResult> };

@@ -1,11 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { useRevalidator } from "react-router";
+import { useRef, useState } from "react";
 import { Button, Modal, SegmentedControl } from "@core/shared-ui";
-import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { formatDateTime } from "@core/field-ui/shared/format";
-import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
-import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { m } from "~/paraglide/messages";
+import { isIgnored, useFieldCommand, useFieldDataSource } from "../../context";
+import type {
+  CompliancePanelData,
+  DocumentReviewItemView,
+  PsqView,
+  RelianceText,
+  ReportSignoffView,
+} from "../../data-source-types";
+import { formatDateTime } from "../../shared/format";
+import { ConfirmDialog } from "../ConfirmDialog";
+import { m } from "../../i18n";
 
 /**
  * Commercial PCA Phase M Task 10 — the "Compliance (Full PCA)" editor panel.
@@ -13,68 +18,24 @@ import { m } from "~/paraglide/messages";
  * gate in inspection-edit.tsx); light_commercial and residential inspections
  * never mount this panel.
  *
- * Every mutation type gets its OWN `useGuardedSubmit` instance (signoff per role,
+ * Every mutation type gets its OWN `useFieldCommand` instance (signoff per role,
  * remove-signoff per role, PSQ responses, PSQ status, doc-review per item) —
- * sharing a fetcher across an unrelated in-flight mutation would abort it
- * (see feedback_rr_shared_fetcher_abort / the B-17 notes-vs-rating bug this
- * project already hit once). Every submit dispatches an `intent` to the
- * inspection-edit route action (BFF relay — never a raw client fetch to
- * /api/..., see feedback_core_bff_no_client_fetch); the action then calls the
- * Task 6 compliance API via `createApi`.
+ * one shared guard would drop an unrelated write that arrives while another is
+ * in flight (see the B-17 notes-vs-rating bug this project already hit once).
+ * Every write is a `compliance` (or `save-pca-narrative`) command of the data
+ * source — never a raw client fetch to /api/...; the host's action then calls
+ * the Task 6 compliance API.
  *
- * The route POSTs skip revalidation (see inspection-edit.tsx's
+ * The editor's POSTs skip revalidation (see inspection-edit.tsx's
  * `shouldRevalidate`), so every sub-section keeps its own local optimistic
  * copy of the server row(s) it owns rather than re-reading stale loader data
- * after a submit. Sign-off (add/remove) and the doc-review seed have no local
+ * after a write. Sign-off (add/remove) and the doc-review seed have no local
  * optimistic copy — they render straight off `data` (loader props) — so those
- * three call `revalidator.revalidate()` on a successful submit, mirroring the
- * units pattern in inspection-edit.tsx (~line 510). PSQ and per-row doc-review
- * keep local state and stay revalidation-free.
+ * three call `dataSource.reload()` on an accepted write. PSQ and per-row
+ * doc-review keep local state and stay reload-free.
  */
 
-// ── Wire-shape mirrors (hand-mirrored from server/lib/validations/compliance.schema.ts;
-//    kept local/minimal — the panel only needs the fields it renders) ──────────
-
-type SignoffRole = "field_observer" | "pcr_reviewer";
-
-interface ReportSignoffView {
-  role: SignoffRole;
-  personId: string;
-  name: string;
-  license: string | null;
-  qualificationsRef?: string | null;
-  signedAt?: number;
-  dualRole?: boolean;
-}
-
-interface PsqView {
-  status: "sent" | "received" | "declined";
-  responses: Record<string, unknown> | null;
-}
-
-interface DocumentReviewItemView {
-  documentKey: string;
-  label: string;
-  requested: boolean;
-  received: boolean;
-  reviewed: boolean;
-  na: boolean;
-  notes: string | null;
-}
-
-interface RelianceTextView {
-  userReliance: string;
-  pointInTime: string;
-  siteSpecific: string;
-}
-
-export interface CompliancePanelData {
-  reportSignoffs: ReportSignoffView[];
-  psq: PsqView | null;
-  documentReview: DocumentReviewItemView[];
-  conformance: { standard: "E2018-24"; conforms: boolean };
-  relianceText: RelianceTextView;
-}
+type SignoffRole = ReportSignoffView["role"];
 
 // Thunks (not module consts) so labels resolve at render time rather than being
 // frozen to the message value present at import.
@@ -141,16 +102,26 @@ function ConformancePreview({ data }: { data: CompliancePanelData }) {
 /* Sign-off (a)                                                       */
 /* ------------------------------------------------------------------ */
 
-function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: ReportSignoffView | null }) {
-  const displayTz = useDisplayTimeZone();
-  const locale = useDisplayLocale();
-  // Independent fetchers per role AND per mutation type — a remove on one
-  // role must never abort an in-flight sign-off submit on the other.
+function SignoffRoleCard({
+  inspectionId,
+  role,
+  existing,
+}: {
+  inspectionId: string;
+  role: SignoffRole;
+  existing: ReportSignoffView | null;
+}) {
+  const dataSource = useFieldDataSource();
+  const session = dataSource.session();
+  const displayTz = session.timeZone ?? "UTC";
+  const locale = session.locale;
+  // Independent guards per role AND per mutation type — a remove on one
+  // role must never drop an in-flight sign-off on the other.
   // #106 - a sign-off is an attestation and its removal retracts one. Both go
   // through the guard, and every control on this card is already disabled while
-  // its own fetcher is in flight, so a refused click is not reachable.
-  const { fetcher: signFetcher, submit: submitSign, busy: saving } = useGuardedSubmit();
-  const { fetcher: removeFetcher, submit: submitRemoveSignoff, busy: removing } = useGuardedSubmit();
+  // its own write is in flight, so a refused click is not reachable.
+  const { run: runSign, busy: saving } = useFieldCommand(inspectionId);
+  const { run: runRemove, busy: removing } = useFieldCommand(inspectionId);
   const [personId, setPersonId] = useState(existing?.personId ?? "");
   const [name, setName] = useState(existing?.name ?? "");
   const [license, setLicense] = useState(existing?.license ?? "");
@@ -160,49 +131,30 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
 
   // This card renders straight off `existing` (loader props) — no local
   // optimistic copy of "signed" state — so a successful sign-off or removal
-  // must revalidate the route or the card never leaves its stale state.
-  // Mirrors the units pattern in inspection-edit.tsx (~line 510): guard with
-  // a last-seen ref since `fetcher.data` keeps the same reference across
-  // renders and `revalidator` is a fresh object every render — without the
-  // guard this effect would re-fire and revalidate on every render.
-  const revalidator = useRevalidator();
-  const lastRevalidatedSignData = useRef<unknown>(null);
-  useEffect(() => {
-    const d = signFetcher.data as { ok?: boolean } | undefined;
-    if (signFetcher.state === "idle" && d?.ok && lastRevalidatedSignData.current !== d) {
-      lastRevalidatedSignData.current = d;
-      revalidator.revalidate();
-    }
-  }, [signFetcher.state, signFetcher.data, revalidator]);
-  const lastRevalidatedRemoveData = useRef<unknown>(null);
-  useEffect(() => {
-    const d = removeFetcher.data as { ok?: boolean } | undefined;
-    if (removeFetcher.state === "idle" && d?.ok && lastRevalidatedRemoveData.current !== d) {
-      lastRevalidatedRemoveData.current = d;
-      revalidator.revalidate();
-    }
-  }, [removeFetcher.state, removeFetcher.data, revalidator]);
-
-  const submitSignoff = () => {
+  // must reload the editor's data or the card never leaves its stale state.
+  // One reload per accepted write: the answer settles once, so there is no
+  // re-render storm to guard against.
+  const submitSignoff = async () => {
     if (!personId.trim() || !name.trim()) return;
-    submitSign(
-      {
-        intent: "compliance-signoff",
-        role,
-        personId: personId.trim(),
-        name: name.trim(),
-        license: license.trim(),
-        dualRole: String(dualRole),
-      },
-      { method: "POST" },
-    );
+    const answer = await runSign({
+      type: "compliance",
+      op: "signoff",
+      role,
+      personId: personId.trim(),
+      name: name.trim(),
+      license: license.trim(),
+      dualRole,
+    });
+    if (!isIgnored(answer) && answer.ok) dataSource.reload();
   };
 
-  const confirmRemove = () => {
-    // Keep the confirmation open when the guard refuses.
-    if (submitRemoveSignoff({ intent: "compliance-remove-signoff", role }, { method: "POST" })) {
-      setConfirmOpen(false);
-    }
+  const confirmRemove = async () => {
+    // Keep the confirmation open while a removal is already in flight: that
+    // click sends nothing, and closing would claim the removal was requested.
+    if (removing) return;
+    setConfirmOpen(false);
+    const answer = await runRemove({ type: "compliance", op: "remove-signoff", role });
+    if (!isIgnored(answer) && answer.ok) dataSource.reload();
   };
 
   return (
@@ -259,7 +211,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
           <Button
             variant="primary"
             size="sm"
-            onClick={submitSignoff}
+            onClick={() => void submitSignoff()}
             disabled={!personId.trim() || !name.trim()} pending={saving}
             className="w-full"
           >
@@ -274,7 +226,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
         message={m.editor_compliance_remove_signoff_msg({ role: roleLabel(role) })}
         confirmLabel={m.common_remove()}
         busy={removing}
-        onConfirm={confirmRemove}
+        onConfirm={() => void confirmRemove()}
         onCancel={() => setConfirmOpen(false)}
       />
     </div>
@@ -293,13 +245,13 @@ function psqStatuses(): { value: "sent" | "received" | "declined"; label: string
   ];
 }
 
-function PsqPanel({ psq }: { psq: PsqView | null }) {
-  // Separate fetcher per mutation TYPE (responses vs status) — a status click
-  // must not abort an in-flight responses save, and vice versa.
+function PsqPanel({ inspectionId, psq }: { inspectionId: string; psq: PsqView | null }) {
+  // Separate guard per mutation TYPE (responses vs status) — a status click
+  // must not drop an in-flight responses save, and vice versa.
   // #106 - the responses save writes the questionnaire and the status write
   // records that it was sent, received or declined.
-  const { submit: submitResponses, busy: savingResponses } = useGuardedSubmit();
-  const { submit: submitStatus, busy: settingStatus } = useGuardedSubmit();
+  const { run: runResponses, busy: savingResponses } = useFieldCommand(inspectionId);
+  const { run: runStatus, busy: settingStatus } = useFieldCommand(inspectionId);
   const [responses, setResponses] = useState<Record<string, string>>(() => normalizeResponses(psq?.responses));
   const [status, setStatus] = useState<PsqView["status"] | null>(psq?.status ?? null);
   const [declineOpen, setDeclineOpen] = useState(false);
@@ -307,29 +259,25 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
 
 
   const commitResponses = () => {
-    submitResponses(
-      { intent: "compliance-psq", responses: JSON.stringify(responses) },
-      { method: "POST" },
-    );
+    void runResponses({ type: "compliance", op: "psq", responses });
   };
 
-  const applyStatus = (next: "sent" | "received", reason?: string) => {
+  const applyStatus = (next: "sent" | "received") => {
     setStatus(next);
-    submitStatus(
-      { intent: "compliance-psq-status", status: next, ...(reason ? { reason } : {}) },
-      { method: "POST" },
-    );
+    void runStatus({ type: "compliance", op: "psq-status", status: next });
   };
 
   const confirmDecline = () => {
-    // Only move the local status and clear the dialog for a call the guard
-    // accepted - a refused click sent nothing, and showing "declined" for it
+    // Only move the local status and clear the dialog while no status write is
+    // in flight - that click would send nothing, and showing "declined" for it
     // would be a claim about the record that is not true.
-    const sent = submitStatus(
-      { intent: "compliance-psq-status", status: "declined", reason: declineReason.trim() || "(no reason provided)" },
-      { method: "POST" },
-    );
-    if (!sent) return;
+    if (settingStatus) return;
+    void runStatus({
+      type: "compliance",
+      op: "psq-status",
+      status: "declined",
+      reason: declineReason.trim() || "(no reason provided)",
+    });
     setStatus("declined");
     setDeclineOpen(false);
     setDeclineReason("");
@@ -406,29 +354,26 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
 /* Document review checklist (c)                                     */
 /* ------------------------------------------------------------------ */
 
-function DocReviewRow({ item }: { item: DocumentReviewItemView }) {
-  // One fetcher PER ROW (own component instance) — toggling one document's
-  // checkbox must never abort another row's in-flight notes save.
-  // #106 - one guard per ROW, for the same reason there is one fetcher per row:
-  // toggling one document must not contend with another's in-flight save. Every
-  // control in the row is `disabled={busy}`.
-  const { submit, busy } = useGuardedSubmit();
+function DocReviewRow({ inspectionId, item }: { inspectionId: string; item: DocumentReviewItemView }) {
+  // One guard PER ROW (own component instance) — toggling one document's
+  // checkbox must never drop another row's in-flight notes save.
+  // #106 - one guard per ROW: toggling one document must not contend with
+  // another's in-flight save. Every control in the row is `disabled={busy}`.
+  const { run, busy } = useFieldCommand(inspectionId);
   const [local, setLocal] = useState(item);
 
   const submitPatch = (next: DocumentReviewItemView) => {
     setLocal(next);
-    submit(
-      {
-        intent: "compliance-doc-review",
-        documentKey: next.documentKey,
-        requested: String(next.requested),
-        received: String(next.received),
-        reviewed: String(next.reviewed),
-        na: String(next.na),
-        notes: next.notes ?? "",
-      },
-      { method: "POST" },
-    );
+    void run({
+      type: "compliance",
+      op: "doc-review",
+      documentKey: next.documentKey,
+      requested: next.requested,
+      received: next.received,
+      reviewed: next.reviewed,
+      na: next.na,
+      notes: next.notes,
+    });
   };
 
   return (
@@ -485,25 +430,20 @@ function DocReviewRow({ item }: { item: DocumentReviewItemView }) {
   );
 }
 
-function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
-  // Seeding the standard checklist is its own mutation type/fetcher too.
+function DocReviewSection({ inspectionId, items }: { inspectionId: string; items: DocumentReviewItemView[] }) {
+  const dataSource = useFieldDataSource();
+  // Seeding the standard checklist is its own mutation type/guard too.
   // #106 - seeding creates the whole standard checklist server-side; twice
   // would create it twice.
-  const { fetcher: seedFetcher, submit: submitSeed, busy: seeding } = useGuardedSubmit();
+  const { run, busy: seeding } = useFieldCommand(inspectionId);
 
   // Seeding creates rows server-side but this section renders `items`
-  // straight from loader props — without a revalidation the checklist stays
-  // empty after a successful seed. Same guarded pattern as SignoffRoleCard /
-  // the units fetcher in inspection-edit.tsx.
-  const revalidator = useRevalidator();
-  const lastRevalidatedSeedData = useRef<unknown>(null);
-  useEffect(() => {
-    const d = seedFetcher.data as { ok?: boolean } | undefined;
-    if (seedFetcher.state === "idle" && d?.ok && lastRevalidatedSeedData.current !== d) {
-      lastRevalidatedSeedData.current = d;
-      revalidator.revalidate();
-    }
-  }, [seedFetcher.state, seedFetcher.data, revalidator]);
+  // straight from loader props — without a reload the checklist stays
+  // empty after a successful seed. Same pattern as SignoffRoleCard.
+  const seed = async () => {
+    const answer = await run({ type: "compliance", op: "doc-review-seed" });
+    if (!isIgnored(answer) && answer.ok) dataSource.reload();
+  };
 
   return (
     <div className="space-y-2" data-testid="doc-review-section">
@@ -514,7 +454,7 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
             variant="link"
             size="sm"
             pending={seeding}
-            onClick={() => submitSeed({ intent: "compliance-doc-review-seed" }, { method: "POST" })}
+            onClick={() => void seed()}
           >
             {seeding ? m.common_loading() : m.editor_compliance_load_checklist()}
           </Button>
@@ -522,7 +462,7 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
       ) : (
         <ul className="space-y-2">
           {items.map((item) => (
-            <DocReviewRow key={item.documentKey} item={item} />
+            <DocReviewRow key={item.documentKey} inspectionId={inspectionId} item={item} />
           ))}
         </ul>
       )}
@@ -534,7 +474,7 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
 /* Reliance & Limitations (M10)                                       */
 /* ------------------------------------------------------------------ */
 
-function relianceFields(): { key: keyof RelianceTextView; label: string }[] {
+function relianceFields(): { key: keyof RelianceText; label: string }[] {
   return [
     { key: "userReliance", label: m.editor_compliance_reliance_userReliance() },
     { key: "pointInTime", label: m.editor_compliance_reliance_pointInTime() },
@@ -542,16 +482,26 @@ function relianceFields(): { key: keyof RelianceTextView; label: string }[] {
   ];
 }
 
-// One fetcher PER reliance clause — the three clauses save independently, so a
-// save of one must never abort another's in-flight PATCH. This is the file-wide
-// own-fetcher rule (see the header comment + the B-17 notes-vs-rating bug this
-// project already hit): a single fetcher shared across the three would cancel
-// the first field's save the moment the second field blurs.
-function RelianceFieldRow({ fieldKey, label, initial }: { fieldKey: keyof RelianceTextView; label: string; initial: string }) {
+// One guard PER reliance clause — the three clauses save independently, so a
+// save of one must never drop another's in-flight PATCH. This is the file-wide
+// own-guard rule (see the header comment + the B-17 notes-vs-rating bug this
+// project already hit): a single guard shared across the three would drop
+// the second field's save when it blurs while the first is still in flight.
+function RelianceFieldRow({
+  inspectionId,
+  fieldKey,
+  label,
+  initial,
+}: {
+  inspectionId: string;
+  fieldKey: keyof RelianceText;
+  label: string;
+  initial: string;
+}) {
   // #106 - one guard per FIELD (this is one component instance per field), which
   // is what keeps the guard from refusing the next field's blur. The textarea is
   // `disabled={busy}` for the round trip.
-  const { submit, busy } = useGuardedSubmit();
+  const { run, busy } = useFieldCommand(inspectionId);
   const [value, setValue] = useState(initial);
   // Last value we actually persisted — lets us skip a no-op save when a field
   // is blurred without an edit (e.g. tabbing through just to read it), which
@@ -560,11 +510,12 @@ function RelianceFieldRow({ fieldKey, label, initial }: { fieldKey: keyof Relian
   // source of truth like PsqPanel / DocReviewRow.
   const savedRef = useRef(initial);
 
-  const commit = () => {
+  const commit = async () => {
     if (value === savedRef.current) return;
+    const answer = await run({ type: "save-pca-narrative", key: fieldKey, value });
     // Record the value as saved only for a call the guard accepted, or a
     // refused blur would be remembered as persisted and never retried.
-    if (!submit({ intent: "save-pca-narrative", key: fieldKey, value }, { method: "POST" })) return;
+    if (isIgnored(answer)) return;
     savedRef.current = value;
   };
 
@@ -576,20 +527,20 @@ function RelianceFieldRow({ fieldKey, label, initial }: { fieldKey: keyof Relian
         value={value}
         disabled={busy}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={commit}
+        onBlur={() => void commit()}
         className="w-full rounded border border-ih-border bg-ih-bg-app p-2 text-[12px] text-ih-fg-1"
       />
     </label>
   );
 }
 
-function RelianceSection({ relianceText }: { relianceText: RelianceTextView }) {
+function RelianceSection({ inspectionId, relianceText }: { inspectionId: string; relianceText: RelianceText }) {
   return (
     <section className="space-y-1.5" data-testid="reliance-section">
       <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_compliance_reliance_heading()}</h3>
       <div className="space-y-2">
         {relianceFields().map((f) => (
-          <RelianceFieldRow key={f.key} fieldKey={f.key} label={f.label} initial={relianceText[f.key]} />
+          <RelianceFieldRow key={f.key} inspectionId={inspectionId} fieldKey={f.key} label={f.label} initial={relianceText[f.key]} />
         ))}
       </div>
       <p className="text-[11px] text-ih-fg-3 italic">
@@ -616,22 +567,22 @@ export function CompliancePanel({ inspectionId, data }: { inspectionId: string; 
       <section className="space-y-2">
         <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_compliance_dual_signoff()}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <SignoffRoleCard role="field_observer" existing={fieldObserver} />
-          <SignoffRoleCard role="pcr_reviewer" existing={pcrReviewer} />
+          <SignoffRoleCard inspectionId={inspectionId} role="field_observer" existing={fieldObserver} />
+          <SignoffRoleCard inspectionId={inspectionId} role="pcr_reviewer" existing={pcrReviewer} />
         </div>
       </section>
 
       <section className="space-y-2">
         <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_compliance_psq_heading()}</h3>
-        <PsqPanel psq={data.psq} />
+        <PsqPanel inspectionId={inspectionId} psq={data.psq} />
       </section>
 
       <section className="space-y-2">
         <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_compliance_doc_review_heading()}</h3>
-        <DocReviewSection items={data.documentReview} />
+        <DocReviewSection inspectionId={inspectionId} items={data.documentReview} />
       </section>
 
-      <RelianceSection relianceText={data.relianceText} />
+      <RelianceSection inspectionId={inspectionId} relianceText={data.relianceText} />
     </div>
   );
 }
