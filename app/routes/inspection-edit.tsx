@@ -10,6 +10,7 @@ import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useEnsureHuman } from "~/components/OutboundVerification";
 import { EditorHumanCheck } from "~/components/editor/EditorHumanCheck";
+import { InspectionFieldHost } from "~/components/field/WebFieldHost";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 import { useScopeLoader } from "~/hooks/useScopeLoader";
@@ -154,7 +155,7 @@ export default function InspectionEditRoute() {
  const { outboundCoolingWindow } = useLoaderData<typeof loader>();
  return (
  <EditorHumanCheck coolingWindow={outboundCoolingWindow}>
- <InspectionEditPage />
+ <InspectionFieldHost><InspectionEditPage /></InspectionFieldHost>
  </EditorHumanCheck>
  );
 }

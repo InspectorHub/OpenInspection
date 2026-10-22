@@ -29,6 +29,7 @@ import { buildCannedFromText, TAB_SEVERITY, type CannedTab } from "~/lib/editor/
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { RouteErrorNotice } from "~/components/RouteErrorNotice";
+import { TemplateFieldHost } from "~/components/field/WebFieldHost";
 
 export function meta() {
   return [{ title: m.templates_edit_meta_title() }];
@@ -453,6 +454,7 @@ export default function TemplateEditPage() {
   );
 
   return (
+    <TemplateFieldHost>
     <div className="flex flex-col h-screen bg-ih-bg-app">
       {/* A platform-supplied statutory template. Said once, at the top, rather
           than disabling forty controls individually: the server refuses every
@@ -690,6 +692,7 @@ export default function TemplateEditPage() {
         }}
       />
     </div>
+    </TemplateFieldHost>
   );
 }
 

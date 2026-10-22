@@ -1,5 +1,5 @@
 {
-  "app/routes/inspection-edit.tsx": 2615,
+  "app/routes/inspection-edit.tsx": 2616,
   "app/routes/inspector-portal.tsx": 1410,
   "scripts/verify-statutory-render.mjs": 1283,
   "server/durable-objects/inspection-doc.ts": 1003,
@@ -16,7 +16,7 @@
   "scripts/check-messaging-rules.mjs": 735,
   "server/index.ts": 731,
   "server/api/inspections/report-delivery.ts": 721,
-  "app/routes/template-edit.tsx": 715,
+  "app/routes/template-edit.tsx": 718,
   "server/services/inspection/inspection-analytics.service.ts": 702,
   "scripts/check-platform-defaults.mjs": 701,
   "app/hooks/usePhotoOps.ts": 662,
