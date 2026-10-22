@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "@core/shared-ui";
-import { RatingSegment, type RatingOption } from "../editor-shared/RatingSegment";
+import { RatingSegment, type RatingOption } from "@core/field-ui/components/editor-shared/RatingSegment";
 import { m } from "~/paraglide/messages";
 
 interface BatchActionBarProps {

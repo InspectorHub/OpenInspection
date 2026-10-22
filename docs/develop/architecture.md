@@ -396,7 +396,7 @@ fixes on whichever copy the next change did not touch.
 
 The structural components now exist once, under
 `app/components/editor-shared/`, and take `mode: 'author' | 'fill'`
-(`editor-shared/editor-mode.ts`):
+(`packages/field-ui/src/components/editor-shared/editor-mode.ts`):
 
 | Component | `author` renders | `fill` renders |
 |---|---|---|
@@ -414,7 +414,8 @@ Configuring an item's type and its canned entries
 rating one in the field (`components/editor/ItemEditor.tsx`) are different jobs,
 not one job with a flag. They share the atoms instead of the panel —
 `ItemHeader`, `CannedCommentRow`, `DefectCategoryChip`, `InlineRename`,
-`RatingSegment`, all under `editor-shared/`.
+`RatingSegment`, all under `editor-shared/` (`ItemHeader` in `app/components/`, the
+rest in `packages/field-ui/src/components/`).
 `components/template/preview-parity.test.ts` renders one canned entry through
 both the template preview and the editor's SideRail and compares what a reader
 sees, so the two cannot drift in silence.
@@ -449,7 +450,7 @@ Five things were retired to get here, and none of them should come back:
   isDefect, pausesAdvance?, hotkey?, order }`.
 - **Three different reorder gestures** for the same operation (drag here, arrow
   buttons there, a dropdown menu somewhere else). Dragging is the gesture, via
-  `editor-shared/useSortableReorder.ts`, with the arrow/menu path kept as the
+  `packages/field-ui/src/components/editor-shared/useSortableReorder.ts`, with the arrow/menu path kept as the
   keyboard-reachable fallback rather than as a second way of doing it.
 
 ### A feature that touches the editor extends a dimension

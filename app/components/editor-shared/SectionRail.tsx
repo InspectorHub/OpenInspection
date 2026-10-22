@@ -1,10 +1,10 @@
 import { useRef, useState, type KeyboardEvent } from 'react';
 import { Button, IconButton, MenuItem, Popover } from '@core/shared-ui';
-import { SectionDonut } from '../editor/SectionDonut';
-import { sectionIconFor } from '../editor/section-icons';
-import type { EditorMode } from './editor-mode';
-import { useSortableReorder } from './useSortableReorder';
-import { InlineRename } from './InlineRename';
+import { SectionDonut } from '@core/field-ui/components/editor/SectionDonut';
+import { sectionIconFor } from '@core/field-ui/components/editor/section-icons';
+import type { EditorMode } from '@core/field-ui/components/editor-shared/editor-mode';
+import { useSortableReorder } from '@core/field-ui/components/editor-shared/useSortableReorder';
+import { InlineRename } from '@core/field-ui/components/editor-shared/InlineRename';
 import { findingKey } from '~/hooks/findings/shared';
 import { m } from '~/paraglide/messages';
 

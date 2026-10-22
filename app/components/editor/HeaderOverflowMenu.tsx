@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Button, Icon, MenuItem, Popover } from "@core/shared-ui";
-import { HEADER_OVERFLOW } from "~/components/editor/header-visibility";
+import { HEADER_OVERFLOW } from "@core/field-ui/components/editor/header-visibility";
 import { m } from "~/paraglide/messages";
 
 export interface HeaderOverflowMenuProps {

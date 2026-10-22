@@ -1,5 +1,5 @@
 import type { EditorRatingLevel } from "@core/field-ui/shared/rating-levels";
-import { RatingSegment, type RatingOption, type RatingTone } from "../editor-shared/RatingSegment";
+import { RatingSegment, type RatingOption, type RatingTone } from "@core/field-ui/components/editor-shared/RatingSegment";
 import { m } from "~/paraglide/messages";
 
 /* Severity → RatingSegment tone. `good`/`marginal`/`significant` map to the

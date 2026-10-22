@@ -9,7 +9,7 @@ import { AiAssistPanel } from "./AiAssistPanel";
 import { NotesFieldHeader } from "./NotesFieldHeader";
 import { CloneLastButton } from "./CloneLastButton";
 import type { DefectFieldsValue } from "./DefectFieldsRow";
-import { ItemAttributesPanel, type ItemAttributeValue } from "./ItemAttributesPanel";
+import { ItemAttributesPanel, type ItemAttributeValue } from "@core/field-ui/components/editor/ItemAttributesPanel";
 import { RatingButtonRow } from "./RatingButtonRow";
 import {
  CannedCommentTabs,

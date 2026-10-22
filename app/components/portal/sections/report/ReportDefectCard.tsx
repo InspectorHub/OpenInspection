@@ -11,7 +11,7 @@
  */
 import type { ReactNode } from "react";
 import { m } from "~/paraglide/messages";
-import { DefectCategoryChip } from "~/components/editor-shared/DefectCategoryChip";
+import { DefectCategoryChip } from "@core/field-ui/components/editor-shared/DefectCategoryChip";
 import { DEFECT_PHOTO_GRID_CLASS, PRINT_CARD_CLASS, type ReportItem, type ReportPhoto } from "./types";
 
 export interface ReportDefectCardProps {

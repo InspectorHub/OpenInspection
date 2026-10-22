@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { render, screen, fireEvent } from "@testing-library/react";
 import { vi } from "vitest";
-import { InlineRename } from "~/components/editor-shared/InlineRename";
+import { InlineRename } from "./InlineRename";
 
 function setup(value = "Roof") {
   const onCommit = vi.fn();

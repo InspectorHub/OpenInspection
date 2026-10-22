@@ -1,5 +1,5 @@
 import { TabStrip, Button } from "@core/shared-ui";
-import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
+import { CannedCommentRow } from "@core/field-ui/components/editor-shared/CannedCommentRow";
 import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
 import { RepairItemsPanel } from "./RepairItemsPanel";
 import { CustomDefectForm } from "./CustomDefectForm";

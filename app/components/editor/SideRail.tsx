@@ -5,8 +5,8 @@ import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } 
 import { photoDisplayName, withDownload } from "@core/field-ui/shared/photo-name";
 import { PhotoGallery } from "~/components/media-studio/PhotoGallery";
 import { CommentLibraryList } from "./CommentLibraryList";
-import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
-import type { EditorMode } from "../editor-shared/editor-mode";
+import { CannedCommentRow } from "@core/field-ui/components/editor-shared/CannedCommentRow";
+import type { EditorMode } from "@core/field-ui/components/editor-shared/editor-mode";
 import { m } from "~/paraglide/messages";
 
 interface SideRailProps {

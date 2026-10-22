@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { DefectCategoryChip } from "~/components/editor-shared/DefectCategoryChip";
+import { DefectCategoryChip } from "./DefectCategoryChip";
 
 function html(category: string, className?: string, color?: string): string {
   return renderToStaticMarkup(createElement(DefectCategoryChip, { category, className, color }));

@@ -6,8 +6,8 @@ import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { ProgressStripText } from "~/components/editor/ProgressStripText";
 import { TemplateMenu } from "~/components/editor/TemplateMenu";
 import { PreviewMenu } from "~/components/editor/PreviewMenu";
-import { HEADER_OVERFLOW } from "~/components/editor/header-visibility";
-import { runWithPending } from "~/components/editor/publish-pending";
+import { HEADER_OVERFLOW } from "@core/field-ui/components/editor/header-visibility";
+import { runWithPending } from "@core/field-ui/components/editor/publish-pending";
 import { HeaderOverflowMenu } from "~/components/editor/HeaderOverflowMenu";
 import { m } from "~/paraglide/messages";
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { sectionIconFor } from '~/components/editor/section-icons';
+import { sectionIconFor } from './section-icons';
 
 /**
  * Per-section icon lookup — verifies that `sectionIconFor` returns an inline

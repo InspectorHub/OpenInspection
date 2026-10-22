@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { CannedCommentRow } from "~/components/editor-shared/CannedCommentRow";
+import { CannedCommentRow } from "./CannedCommentRow";
 
 function html(props: Record<string, unknown>): string {
   return renderToStaticMarkup(createElement(CannedCommentRow, props as never));

@@ -1,5 +1,5 @@
-import type { ItemAttribute } from '@core/field-ui/shared/types';
-import { choiceLabel, choiceValue } from '@core/field-ui/shared/template-choices';
+import type { ItemAttribute } from '../../shared/types';
+import { choiceLabel, choiceValue } from '../../shared/template-choices';
 
 /**
  * What one attribute can hold.
