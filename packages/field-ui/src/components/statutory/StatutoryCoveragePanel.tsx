@@ -38,8 +38,8 @@ export interface StatutoryCoverageData {
 
 export interface StatutoryCoveragePanelProps {
     coverage: StatutoryCoverageData | null;
-    /** Where the watermarked preview lives for this inspection. */
-    previewHref: string;
+    /** Where the watermarked preview lives for this inspection. Null when the host has none, and the link is left out. */
+    previewHref: string | null;
 }
 
 /** A field name as the form's own map spells it, made readable without lying. */
@@ -122,23 +122,25 @@ export function StatutoryCoveragePanel({ coverage, previewHref }: StatutoryCover
                     </div>
                 ) : null}
 
-                {/* Offered whether or not anything is missing. A form with every
-                    box answered is exactly the one worth LOOKING at, because
-                    "answered" says nothing about whether the value landed in the
-                    box the authority prints it in. */}
-                <div className="border-t border-ih-border pt-3">
-                    <a
-                        href={previewHref}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[13px] font-medium text-ih-primary-text hover:underline"
-                    >
-                        {m.statutory_coverage_preview()}
-                    </a>
-                    <p className="mt-0.5 text-[12px] text-ih-fg-3">
-                        {m.statutory_coverage_preview_hint()}
-                    </p>
-                </div>
+                {previewHref !== null ? (
+                    /* Offered whether or not anything is missing. A form with every
+                       box answered is exactly the one worth LOOKING at, because
+                       "answered" says nothing about whether the value landed in the
+                       box the authority prints it in. */
+                    <div className="border-t border-ih-border pt-3">
+                        <a
+                            href={previewHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[13px] font-medium text-ih-primary-text hover:underline"
+                        >
+                            {m.statutory_coverage_preview()}
+                        </a>
+                        <p className="mt-0.5 text-[12px] text-ih-fg-3">
+                            {m.statutory_coverage_preview_hint()}
+                        </p>
+                    </div>
+                ) : null}
             </Card>
         </section>
     );

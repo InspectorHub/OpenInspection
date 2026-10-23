@@ -22,6 +22,8 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
   const [burstActive, setBurstActive] = useState(false);
   const [burstCount, setBurstCount] = useState(0);
   const [uploading, setUploading] = useState(false);
+  /** Set synchronously by `commit`: a second press of Done before the first settles must not commit the frames twice. */
+  const committing = useRef(false);
   const [facing, setFacing] = useState<"user" | "environment">("environment");
 
   const startCamera = useCallback(async (facingMode: string) => {
@@ -104,6 +106,8 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
   }
 
   async function commit() {
+    if (committing.current) return;
+    committing.current = true;
     setUploading(true);
     try {
       const blobs = await Promise.all(
@@ -115,6 +119,7 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
       onCommit(blobs);
       onClose();
     } finally {
+      committing.current = false;
       setUploading(false);
     }
   }

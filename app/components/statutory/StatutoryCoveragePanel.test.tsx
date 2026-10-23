@@ -101,4 +101,13 @@ describe("statutory coverage panel", () => {
         const link = screen.getByRole("link");
         expect(link.getAttribute("href")).toBe(HREF);
     });
+
+    it("leaves the preview link out when the host has no preview address, and keeps the rest", () => {
+        // The pair of the test above: that one proves the link appears when there is an address,
+        // this one proves it is NOT a dead link when there is none.
+        render(<StatutoryCoveragePanel coverage={MIXED} previewHref={null} />);
+        expect(screen.queryByRole("link")).toBeNull();
+        expect(screen.getByTestId("statutory-coverage")).toBeTruthy();
+        expect(screen.getByTestId("statutory-coverage-profile")).toBeTruthy();
+    });
 });

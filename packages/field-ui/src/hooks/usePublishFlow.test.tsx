@@ -8,7 +8,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import type { CommandResult, FieldCommand } from '../commands';
-import { FieldDataSourceProvider } from '../context';
+import { FieldDataSourceProvider, useFieldEnsureHuman } from '../context';
+import type { FieldHostSlots } from '../data-source';
+import { m } from '../i18n';
 import { createEmptyEditorData, createFakeDataSource } from '../testing/fake-data-source';
 import type { FakeDataSource } from '../testing/fake-data-source';
 import { usePublishFlow } from './usePublishFlow';
@@ -21,7 +23,7 @@ const flush = () =>
   });
 
 /** Every `execute` parks until the test answers it. */
-function setup(confirmHuman?: () => Promise<boolean>) {
+function setup(confirmHuman: () => Promise<boolean> = () => Promise.resolve(true)) {
   const fake = createFakeDataSource({ data: createEmptyEditorData() });
   const pending: Array<(r: CommandResult<undefined>) => void> = [];
   const cmds: FieldCommand[] = [];
@@ -244,5 +246,57 @@ describe('usePublishFlow.finishFieldwork', () => {
     });
     await flush();
     expect(sent()).toBe(2);
+  });
+});
+
+describe('usePublishFlow with the host human check (useFieldEnsureHuman)', () => {
+  function mountWith(slots: FieldHostSlots | undefined) {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    const cmds: FieldCommand[] = [];
+    vi.spyOn(fake, 'execute').mockImplementation(((_id: string, cmd: FieldCommand) => {
+      cmds.push(cmd);
+      return Promise.resolve({ ok: true });
+    }) as FakeDataSource['execute']);
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <FieldDataSourceProvider dataSource={fake} slots={slots}>{children}</FieldDataSourceProvider>
+    );
+    const hook = renderHook(
+      () =>
+        usePublishFlow('insp-1', {
+          confirmHuman: useFieldEnsureHuman(),
+          onMarkedComplete: () => undefined,
+          onPublished: () => undefined,
+          onFieldworkFinished: () => undefined,
+        }),
+      { wrapper },
+    );
+    return { fake, hook, cmds };
+  }
+
+  it('REFUSES a publish when the host provided no slot at all, and tells the person', async () => {
+    const { fake, hook, cmds } = mountWith(undefined);
+    act(() => { void hook.result.current.publish(false, {}, false); });
+    await flush();
+    expect(cmds).toEqual([]);
+    expect(fake.notifications.map((n) => n.message)).toEqual([m.editor_human_check_unavailable()]);
+  });
+
+  it('publishes on the explicit opt-out', async () => {
+    const { fake, hook, cmds } = mountWith({ humanCheck: 'not-required' });
+    act(() => { void hook.result.current.publish(false, {}, false); });
+    await flush();
+    expect(cmds.map((c) => c.type)).toEqual(['publish']);
+    expect(fake.notifications).toEqual([]);
+  });
+
+  it('refuses when the host check answers false, and publishes when it answers true', async () => {
+    const declined = mountWith({ ensureHuman: async () => false });
+    act(() => { void declined.hook.result.current.publish(false, {}, false); });
+    await flush();
+    expect(declined.cmds).toEqual([]);
+    const passed = mountWith({ ensureHuman: async () => true });
+    act(() => { void passed.hook.result.current.publish(false, {}, false); });
+    await flush();
+    expect(passed.cmds.map((c) => c.type)).toEqual(['publish']);
   });
 });

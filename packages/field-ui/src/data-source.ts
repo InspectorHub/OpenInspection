@@ -1,6 +1,7 @@
 import type * as Y from 'yjs';
 import type { ReactNode } from 'react';
 import type { DateFormat, TimeFormat } from './shared/display-prefs';
+import type { PublishReadiness } from './shared/types';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
 import type { PendingMediaStore, MediaUploader } from './media-types';
 import type {
@@ -129,9 +130,16 @@ export interface SessionInfo {
   tenantTimeFormat: TimeFormat;
 }
 
-/** Per-call options of `notify`. `durationMs` replaces the host's default display time for the variant. */
+/** What `notify` can say: a neutral note, a success, a degraded outcome that is not a failure, or a failure. */
+export type NotifyVariant = 'info' | 'success' | 'warning' | 'error';
+
+/**
+ * Per-call options of `notify`. `durationMs` replaces the host's default display time for the variant.
+ * `action` adds one button to the message (the editor's "Undo"): `run` is called when it is pressed.
+ */
 export interface NotifyOptions {
   durationMs?: number;
+  action?: { label: string; run: () => void };
 }
 
 /**
@@ -260,7 +268,13 @@ export interface FieldResources {
    * an `assist` spends a metered AI call.
    */
   aiAssist?: { run(input: AiAssistInput): Promise<AiAssistResult> };
-  publishReadiness?: { check(inspectionId: string): Promise<unknown> };
+  /**
+   * The pre-publish check. `check` never rejects: `null` means the host could not answer (a failed or
+   * unreadable read), and the caller then goes on to the publish dialog rather than blocking on a flaky
+   * pre-flight. A non-null answer is the host's verdict, ready or not. Absent means the host has no
+   * pre-flight and the publish dialog opens directly.
+   */
+  publishReadiness?: { check(inspectionId: string): Promise<PublishReadiness | null> };
   /** The template picker's search. Typed from the existing route loader (see `TemplateSearchResult`). */
   templateSearch?: { search(input: { q: string; page: number }): Promise<TemplateSearchResult> };
   /**
@@ -323,6 +337,27 @@ export interface FieldHostSlots {
     /** Button text: the host's `pdfActionLabel`, which swaps in "Generating" / "Retry in N s". */
     actionLabel(defaultLabel: string): string;
   };
+  /**
+   * The human check that gates an outbound send (publish). Resolves `true` when the person may go on (the
+   * check passed, or none is due) and `false` when they cancelled it. Read it through `useFieldEnsureHuman`,
+   * which hands back a stable function.
+   *
+   * FAIL-CLOSED: a host that provides neither this nor `humanCheck: 'not-required'` gets a check that refuses
+   * every send and tells the person why. A forgotten slot must never turn the gate off; the client check is the
+   * only gate on publishing, so skipping it has to be a decision the host writes down.
+   */
+  ensureHuman?: () => Promise<boolean>;
+  /**
+   * The explicit opt-out of the human check, for a host that has none by design (a native shell with its own
+   * signed-in session). Only this exact value lets sends through without `ensureHuman`; it is not a default.
+   */
+  humanCheck?: 'not-required';
+  /**
+   * The unsaved-changes guard: a component the editor mounts once, which watches `atRisk` and, while it is
+   * true, stops the person leaving the page without asking. The host owns the mechanism (a router blocker, the
+   * browser's close prompt) and renders its own confirmation. Absent means leaving is never intercepted.
+   */
+  renderUnsavedGuard?: (props: { atRisk: boolean }) => ReactNode;
 }
 
 export interface FieldDataSource {
@@ -331,7 +366,7 @@ export interface FieldDataSource {
   /** The answer's `data` is typed from the command (see `CommandDataMap`). */
   execute<C extends FieldCommand>(inspectionId: string, cmd: C, opts?: ExecuteOptions): Promise<CommandResult<CommandData<C>>>;
   /** Show a transient message (replaces the host's toast inside the package). */
-  notify(message: string, variant?: 'info' | 'success' | 'error', opts?: NotifyOptions): void;
+  notify(message: string, variant?: NotifyVariant, opts?: NotifyOptions): void;
   reload(): void;
   exit(): void;
   isOnline(): boolean;

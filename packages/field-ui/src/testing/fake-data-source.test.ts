@@ -370,6 +370,20 @@ describe('media uploader, notify durations and the commentsLibrary fake', () => 
     expect(ds.notifications).toEqual([{ message: 'a', variant: 'error' }, { message: 'b', variant: 'error', durationMs: 6000 }]);
   });
 
+  it('records the warning variant and a notify action the test can press', () => {
+    const ds = createFakeDataSource({ data: editorData() });
+    const run = vi.fn();
+    ds.notify('partial', 'warning');
+    ds.notify('rated', 'info', { durationMs: 6000, action: { label: 'Undo', run } });
+    expect(ds.notifications).toMatchObject([
+      { message: 'partial', variant: 'warning' },
+      { message: 'rated', variant: 'info', durationMs: 6000, action: { label: 'Undo' } },
+    ]);
+    expect(ds.notifications[0]).not.toHaveProperty('action');
+    ds.notifications[1].action?.run();
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it('createFakeCommentsLibrary lists its rows and records touches, saves and edits', async () => {
     const lib = createFakeCommentsLibrary([{ id: 'c1', text: 'T', category: null, severity: null, section: null }]);
     expect(await lib.list({ search: 's' })).toHaveLength(1);

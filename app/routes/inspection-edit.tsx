@@ -1,37 +1,35 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
-import { INSPECTION_STATUS } from "~/lib/status";
+import { useLoaderData } from "react-router";
+import { INSPECTION_STATUS_COMPLETED } from "@core/field-ui/shared/inspection-status";
+import { useFieldDataSource, useFieldEnsureHuman, useFieldSlots } from "@core/field-ui/context";
+import type { EditorData, FieldDataSource } from "@core/field-ui/data-source";
 import { ORIGINAL_QUALITY_KEY } from "@core/field-ui/shared/original-quality";
 import { findRatingLevel, ratingAdvanceDecision } from "@core/field-ui/shared/rating-levels";
 import { makeCustomDefect } from "@core/field-ui/shared/custom-defects";
 import { useInspectionState, type InspectionSchema, type ItemFilter } from "@core/field-ui/hooks/useInspection";
 import { findingKey } from "@core/field-ui/hooks/findings/shared";
-import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { usePublishFlow } from "@core/field-ui/hooks/usePublishFlow";
 import { useCommercialReportSave } from "@core/field-ui/hooks/useCommercialReportSave";
 import { usePropertyFactsSave } from "@core/field-ui/hooks/usePropertyFactsSave";
 import { useInspectorSignature } from "@core/field-ui/hooks/useInspectorSignature";
 import { useAddStatutoryInstance } from "@core/field-ui/hooks/useAddStatutoryInstance";
-import { useEnsureHuman } from "~/components/OutboundVerification";
 import { EditorHumanCheck } from "~/components/editor/EditorHumanCheck";
 import { InspectionFieldHost } from "~/components/field/WebFieldHost";
 import { useFindings, type AttachedRepairItem } from "@core/field-ui/hooks/useFindings";
 import { usePhotoOps } from "@core/field-ui/hooks/usePhotoOps";
 import { useScopeLoader } from "@core/field-ui/hooks/useScopeLoader";
 import { useInspectionPrefs } from "@core/field-ui/hooks/useInspectionPrefs";
-import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "@core/field-ui/hooks/useKeyboard";
 import { useCannedComments } from "@core/field-ui/hooks/useCannedComments";
-import { useUnsavedChanges, unsavedChangesAtRisk } from "~/hooks/useUnsavedChanges";
+import { unsavedChangesAtRisk } from "@core/field-ui/hooks/unsaved-changes-risk";
+import { usePhotoBatchUpload } from "@core/field-ui/hooks/usePhotoBatchUpload";
+import { useReportCoverWrites } from "@core/field-ui/hooks/useReportCoverWrites";
 import { usePresence } from "@core/field-ui/hooks/usePresence";
-import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { useResultsDoc } from "@core/field-ui/collab/use-results-doc";
 import { useMediaDrain } from "@core/field-ui/hooks/useMediaDrain";
-import { webCollabHost } from "~/lib/field/web-collab";
 import { appendPendingPhoto } from "@core/field-ui/collab/results-binding";
 import { useResultsProjection } from "@core/field-ui/hooks/useResultsProjection";
 import { enqueueMedia } from "@core/field-ui/collab/media-upload-queue";
-import { webMediaStore } from "~/lib/field/web-media-store";
 import { VersionHistoryPanel } from "@core/field-ui/components/collab/VersionHistoryPanel";
 import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
 import { SectionRail } from "@core/field-ui/components/editor-shared/SectionRail";
@@ -49,13 +47,13 @@ import { SideRail } from "@core/field-ui/components/editor/SideRail";
 import { SpeedMode } from "@core/field-ui/components/editor/SpeedMode";
 import { FooterBar } from "@core/field-ui/components/editor/FooterBar";
 import { BatchActionBar } from "@core/field-ui/components/editor/BatchActionBar";
-import { capturePriorRatings } from "~/lib/editor/batch-undo";
-import { reorderItemBySwap } from "~/lib/editor/reorder-by-swap";
+import { capturePriorRatings } from "@core/field-ui/shared/batch-undo";
+import { reorderItemBySwap } from "@core/field-ui/shared/reorder-by-swap";
 import { KeyboardHud } from "@core/field-ui/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "@core/field-ui/components/editor/InspectorToolsDock";
 import { BurstCamera } from "@core/field-ui/components/editor/BurstCamera";
 import { PhotoAnnotator } from "@core/field-ui/components/media-studio/PhotoAnnotator";
-import { resolveActivePropertyPreset } from "~/lib/property-preset";
+import { resolveActivePropertyPreset } from "@core/field-ui/shared/property-preset";
 import { InspectionSettingsSheet } from "@core/field-ui/components/editor/InspectionSettingsSheet";
 import { CoverCropper, coverCropFor } from "@core/field-ui/components/media-studio/CoverCropper";
 import { PhotoCropper } from "@core/field-ui/components/media-studio/PhotoCropper";
@@ -72,7 +70,6 @@ import { AddSectionPromptModal } from "@core/field-ui/components/editor/AddSecti
 import { AddItemTypeModal } from "@core/field-ui/components/editor/AddItemTypeModal";
 import { SaveTemplateModal } from "@core/field-ui/components/editor/SaveTemplateModal";
 import { useStructureEdit } from "@core/field-ui/hooks/useStructureEdit";
-import { UnsavedChangesBlocker } from "@core/field-ui/components/editor/UnsavedChangesBlocker";
 import { PublishModal } from "@core/field-ui/components/editor/PublishModal";
 import { SignModal } from "@core/field-ui/components/editor/SignModal";
 import { CommentLibraryDrawer } from "@core/field-ui/components/editor/CommentLibraryDrawer";
@@ -89,11 +86,13 @@ import { UnitsManager } from "@core/field-ui/components/editor/UnitsManager";
 import { CostItemsHost } from "@core/field-ui/components/editor/CostItemsHost";
 import type { ResultMap } from "@core/field-ui/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "@core/field-ui/shared/types";
-import { Button, IconButton, SegmentedControl, useActionLatch } from "@core/shared-ui";
-import { m } from "~/paraglide/messages";
+import { Button, IconButton, SegmentedControl } from "@core/shared-ui";
+import { m } from "@core/field-ui/i18n";
+import { m as appMessages } from "~/paraglide/messages";
+import { editorDataFromLoader } from "~/lib/field/web-editor-data";
 
 export function meta() {
- return [{ title: m.editor_route_meta_title() }];
+ return [{ title: appMessages.editor_route_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -156,25 +155,32 @@ export { action } from "./inspection-edit/action.server";
 
 /** The editor sits outside the workspace layout, so it mounts the human check itself. */
 export default function InspectionEditRoute() {
- const { outboundCoolingWindow } = useLoaderData<typeof loader>();
+ const loaderData = useLoaderData<typeof loader>();
+ // The page takes its data as a prop and follows every revalidation: units, publish state and the rest are
+ // read from it, so a fresh payload re-renders the page.
+ const data = useMemo(() => editorDataFromLoader(loaderData), [loaderData]);
  return (
- <EditorHumanCheck coolingWindow={outboundCoolingWindow}>
- <InspectionFieldHost><InspectionEditPage /></InspectionFieldHost>
+ <EditorHumanCheck coolingWindow={data.outboundCoolingWindow}>
+ <InspectionFieldHost><InspectionEditPage data={data} /></InspectionFieldHost>
  </EditorHumanCheck>
  );
 }
 
-function InspectionEditPage() {
- const loaderData = useLoaderData<typeof loader>();
- const displayLocale = useDisplayLocale();
- // FE-2: photo uploads also get a dedicated fetcher — sharing the mutation
- // fetcher would let an autosave abort an in-flight upload (and vice versa).
- const uploadFetcher = useFetcher();
+function InspectionEditPage({ data }: { data: EditorData }) {
+ const dataSource = useFieldDataSource();
+ const slots = useFieldSlots();
+ // The host's own values (tenant, video backend, collab flag, display language), read once per render.
+ const fieldSession = dataSource.session();
+ const displayLocale = fieldSession.locale;
+ const notify = useCallback<FieldDataSource["notify"]>(
+  (message, variant, opts) => dataSource.notify(message, variant, opts),
+  [dataSource],
+ );
  // The lifecycle writes (publish, finish fieldwork) and the commercial subtype/tier selectors go
  // through `usePublishFlow` / `useCommercialReportSave`, which sit below `state`. Each write owns its
  // own command guard, so a tier click is never swallowed by an in-flight subtype save and a publish never
  // waits behind autosave. The commercial narrative panel keeps one guard per block (PcaNarrativePanel).
- const ensureHuman = useEnsureHuman();
+ const ensureHuman = useFieldEnsureHuman();
  // Property Facts strip (PropertyInfoForm) durable save. ONE latest-wins channel
  // is lossless here — unlike subtype/tier — because onCommit hands us a
  // FULL snapshot of every field each time, so a later PATCH is a strict superset
@@ -185,8 +191,7 @@ function InspectionEditPage() {
  // Rides the same "save-property-facts" command (PATCHes
  // /api/inspections/:id/property-facts). The form's onSave keeps the optimistic
  // local-state update; onCommit (this) persists.
- const savePropertyFacts = usePropertyFactsSave(String(loaderData.inspection.id));
- const navigate = useNavigate();
+ const savePropertyFacts = usePropertyFactsSave(String(data.inspection.id));
  // Task 16 — split the single photo input into a camera capture input
  // (single file, capture=environment — "Take photo") and a library input
  // (multiple, no capture — "Add from library", desktop's default add-photo
@@ -219,17 +224,17 @@ function InspectionEditPage() {
  // Dedicated columns win when a key exists in both (envelope first, row last).
  // Design 2026-07-13-oi-property-facts-commercial-persist.
  const seededInspection = useMemo(() => {
- const insp = loaderData.inspection as Record<string, unknown>;
+ const insp = data.inspection as Record<string, unknown>;
  const envelope = (insp.propertyFacts as Record<string, unknown> | null) ?? {};
  return { ...envelope, ...insp };
- }, [loaderData.inspection]);
+ }, [data.inspection]);
 
  const state = useInspectionState({
  inspection: seededInspection,
   locale: displayLocale,
- schema: loaderData.schema as unknown as InspectionSchema,
- results: loaderData.results,
- ratingLevels: loaderData.ratingLevels,
+ schema: data.schema as unknown as InspectionSchema,
+ results: data.results,
+ ratingLevels: data.ratingLevels,
  activeUnitId,
  });
 
@@ -245,9 +250,9 @@ function InspectionEditPage() {
  return resolveActivePropertyPreset(
  insp.propertyType as string | null | undefined,
  insp.commercialSubtype as string | null | undefined,
- loaderData.commercialPresets,
+ data.commercialPresets,
  );
- }, [state.inspection, loaderData.commercialPresets]);
+ }, [state.inspection, data.commercialPresets]);
 
  /* ---------------------------------------------------------------- */
  /* #181 — collab Y.Doc (real-time editing; the only editor write path) */
@@ -263,14 +268,18 @@ function InspectionEditPage() {
  // drain callback, but the drain (useMediaDrain) needs the live doc that
  // useResultsDoc returns. The ref is filled right after useMediaDrain below.
  const drainRef = useRef<() => void>(() => {});
- const collab = useResultsDoc(String(loaderData.inspection.id), webCollabHost, () => drainRef.current());
+ const collab = useResultsDoc(String(data.inspection.id), () => drainRef.current());
 
  // #181 PR-G — build the media drain (uploader + doc swap) over the live doc.
- const { drain: mediaDrain } = useMediaDrain(String(loaderData.inspection.id), collab?.doc ?? null);
+ const { drain: mediaDrain } = useMediaDrain(String(data.inspection.id), collab?.doc ?? null);
  drainRef.current = mediaDrain;
 
+ // Online photo upload, on its own channel so an autosave can never cancel an in-flight upload (and vice
+ // versa). `busy` is true while a batch is out; `outcomes` are the finished batches the effect below attaches.
+ const photoUpload = usePhotoBatchUpload(String(data.inspection.id), collab?.doc ?? null);
+
  // Once the doc is live, project it into the editor's `results`. First paint uses
- // loaderData.results; until the doc has synced its projection is merged, not adopted.
+ // data.results; until the doc has synced its projection is merged, not adopted.
  useResultsProjection(collab, state.setResults);
 
  /* ---------------------------------------------------------------- */
@@ -307,7 +316,7 @@ function InspectionEditPage() {
 
  // Track H (C-12): the tag library now arrives via the loader (token-relay)
  // instead of a raw client fetch against /api/tags.
- const tagLibrary = (loaderData.tagLibrary ?? []) as TagPin[];
+ const tagLibrary = (data.tagLibrary ?? []) as TagPin[];
 
  // Authoring unification Plan-4 module K — one tenant-wide category → color
  // lookup, built once from the loader's single fetch, keyed by BOTH name and
@@ -315,12 +324,12 @@ function InspectionEditPage() {
  // defect_categories.id, mirroring how the report resolves drivesSummary).
  const catColor = useMemo(() => {
   const map = new Map<string, string>();
-  for (const c of loaderData.defectCategories ?? []) {
+  for (const c of data.defectCategories ?? []) {
    map.set(c.name, c.color);
    map.set(c.id, c.color);
   }
   return map;
- }, [loaderData.defectCategories]);
+ }, [data.defectCategories]);
 
  const pinnedTags = useMemo(() => {
  return inspectionPrefs.pinnedTagIds
@@ -409,14 +418,14 @@ function InspectionEditPage() {
  // (NULL = inherit) falls back to the tenant default from inspection prefs.
  // Drives the proactive red asterisk on every defect row.
  const requiredDefectFields = useMemo(() => {
-  const override = (loaderData.inspection as Record<string, unknown>).requireDefectFieldsOverride as
+  const override = (data.inspection as Record<string, unknown>).requireDefectFieldsOverride as
    'none' | 'location' | 'trade' | 'both' | null | undefined;
   const effective = override ?? inspectionPrefs.requireDefectFields;
   return {
    location: effective === 'location' || effective === 'both',
    trade:    effective === 'trade'    || effective === 'both',
   };
- }, [loaderData.inspection, inspectionPrefs.requireDefectFields]);
+ }, [data.inspection, inspectionPrefs.requireDefectFields]);
 
  /* ---------------------------------------------------------------- */
  /* Canned comments library */
@@ -481,21 +490,19 @@ function InspectionEditPage() {
  state.severityForRatingId,
  ]);
 
- const revalidator = useRevalidator();
-
  /* ---------------------------------------------------------------- */
  /* Commercial PCA Phase U (Batch C2b) — per-unit scope switcher + manager */
  /* ---------------------------------------------------------------- */
 
- const units = (loaderData.units ?? []) as UnitScopeRow[];
- const unitInspectionMode = loaderData.unitInspectionMode ?? "tagged";
+ const units = (data.units ?? []) as UnitScopeRow[];
+ const unitInspectionMode = data.unitInspectionMode ?? "tagged";
  const isPerUnit = unitInspectionMode === "per_unit";
  const [unitsManagerOpen, setUnitsManagerOpen] = useState(false);
 
  // Only 'commercial' inspections expose the units surface (same gate as the PCA
  // narrative panel). Residential editors never see the switcher/manager, so they
  // render byte-identically to before.
- const showUnitsSurface = (loaderData.inspection as Record<string, unknown>).propertyType === "commercial";
+ const showUnitsSurface = (data.inspection as Record<string, unknown>).propertyType === "commercial";
 
  // Commercial PCA Phase C Task 13b — Cost Items drawer (Opinion of Cost /
  // ASTM E2018 Table 1). Same commercial-only gate as the units surface;
@@ -545,9 +552,10 @@ function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
  // `state.dirty` alone armed this forever — see `unsavedChangesAtRisk` for why.
- const { blocker, confirmLeave, cancelLeave } = useUnsavedChanges(unsavedChangesAtRisk({
-  hasLocalEdits: state.dirty, collabSynced, uploadInFlight: uploadFetcher.state !== "idle",
- }));
+ // The host renders the guard itself (`renderUnsavedGuard`); the editor only says when something is at risk.
+ const unsavedGuardEl = slots.renderUnsavedGuard?.({
+  atRisk: unsavedChangesAtRisk({ hasLocalEdits: state.dirty, collabSynced, uploadInFlight: photoUpload.busy }),
+ });
 
  /* ---------------------------------------------------------------- */
  /* Presence roster (multi-inspector collaboration) */
@@ -581,7 +589,7 @@ function InspectionEditPage() {
  // goes through the guard. The pad closes the modal on submit, so there is no
  // control left on screen to carry a pending affordance; a failure comes back
  // through SignModal's `failed` prop, which reads `inspectorSignature.failed`.
- const inspectorSignature = useInspectorSignature(String(loaderData.inspection.id), () => setSignModalOpen(false));
+ const inspectorSignature = useInspectorSignature(String(data.inspection.id), () => setSignModalOpen(false));
  // #181 — version-history panel (collab Phase 4). Inert when collab is off.
  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
 
@@ -601,8 +609,8 @@ function InspectionEditPage() {
   confirmHuman: ensureHuman,
   // The editor's inspection copy is frozen at mount (see useInspectionState), so revalidation alone
   // leaves the header badge and the toolbar button stale: patch the status locally as structural edits do.
-  onMarkedComplete: () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED })),
-  onFieldworkFinished: () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED })),
+  onMarkedComplete: () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS_COMPLETED })),
+  onFieldworkFinished: () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS_COMPLETED })),
   onPublished: () => state.setShowPublishModal(false),
  });
 
@@ -612,32 +620,23 @@ function InspectionEditPage() {
 
  const handlePublishClick = useCallback(async () => {
   publishFlow.clearPublishError();
-  try {
-   // Track H (C-12): fresh on-demand check via the BFF resource route
-   // (token relay) — never a raw client fetch on /api.
-   const res = await fetch(`/resources/publish-readiness?id=${encodeURIComponent(state.inspection.id)}`, {
-    credentials: 'include',
-   });
-   if (res.ok) {
-    const body = await res.json() as { readiness: PublishReadiness | null };
-    // IA-7: hard gaps block; soft gaps (below the tenant's required
-    // threshold) surface as a yellow warning pass with "Publish anyway".
-    if (body.readiness && (!body.readiness.ready || (body.readiness.warningDefects?.length ?? 0) > 0)) {
-     setPublishReadiness(body.readiness);
-     setShowPublishGate(true);
-     return;
-    }
-   }
-  } catch {
-   // Network/server error — fall through to publish (don't block UX on a flaky readiness check)
+  // Track H (C-12): a fresh on-demand check through the host. It never rejects: `null` (the check could not
+  // be made, or the host has none) falls through to publish, so a flaky readiness check never blocks the UX.
+  const readiness = await dataSource.resources.publishReadiness?.check(String(state.inspection.id)) ?? null;
+  // IA-7: hard gaps block; soft gaps (below the tenant's required
+  // threshold) surface as a yellow warning pass with "Publish anyway".
+  if (readiness && (!readiness.ready || (readiness.warningDefects?.length ?? 0) > 0)) {
+   setPublishReadiness(readiness);
+   setShowPublishGate(true);
+   return;
   }
   state.setShowPublishModal(true);
- }, [state.inspection.id, state.setShowPublishModal, publishFlow.clearPublishError]);
+ }, [dataSource, state.inspection.id, state.setShowPublishModal, publishFlow.clearPublishError]);
 
  // A refused "Finish fieldwork" used to say nothing; the flow hands the reason over once per attempt.
  useEffect(() => {
-  if (publishFlow.finishError) pushToast({ message: publishFlow.finishError, variant: "error", durationMs: 8000 });
- }, [publishFlow.finishError]);
+  if (publishFlow.finishError) notify(publishFlow.finishError, "error", { durationMs: 8000 });
+ }, [publishFlow.finishError, notify]);
 
  /* Finish fieldwork — advisory order-lifecycle move (never a publish gate). */
  const handleFinishFieldwork = useCallback(() => {
@@ -682,39 +681,38 @@ function InspectionEditPage() {
   },
   [],
  );
- // DB-16 — dedicated fetcher for set/clear report cover (avoids the
- // shared-fetcher abort hazard; the loader revalidates the cover after).
- const coverFetcher = useFetcher();
- const coverLatch = useActionLatch(coverFetcher.state !== "idle");
+ // DB-16 — set/clear report cover, the baked cover crop and the annotation fallback: each its own guarded
+ // command channel, and a refused save is reported.
+ const coverWrites = useReportCoverWrites(String(state.inspection.id));
 
  /* ---------------------------------------------------------------- */
  /* D8 — structural editing (section add/dup/delete/move)           */
  /* ---------------------------------------------------------------- */
 
-  const statutoryGroups = useStatutoryGroups(loaderData.templateSnapshot);
+  const statutoryGroups = useStatutoryGroups(data.templateSnapshot);
   // Every structural edit is refused server-side on a statutory inspection, so
   // the controls for them are withheld rather than offered and rejected.
-  const canEditStructure = useStructuralEditingAllowed(loaderData.templateSnapshot);
+  const canEditStructure = useStructuralEditingAllowed(data.templateSnapshot);
   // Which group is having an instance added, if any. Null closes the drawer.
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   // Guarded rather than a raw write: recording an instance is a user
   // mutation, and a second click before the first settles would write the same
   // panel twice at the same index.
-  const statutoryInstance = useAddStatutoryInstance(String(loaderData.inspection.id));
+  const statutoryInstance = useAddStatutoryInstance(String(data.inspection.id));
   // Visible while filling rather than at the end: an inspector who learns the
   // form is short two answers when he presses send is already three houses away.
-  const formProgress = useStatutoryFormProgress(loaderData.templateSnapshot, state.results);
+  const formProgress = useStatutoryFormProgress(data.templateSnapshot, state.results);
   // Which revision governs this inspection, decided on the server and only
   // displayed here — two implementations of a date-window question disagree at
   // some boundary, and nobody checks a date boundary by hand. Null when there
   // is nothing to say, which is every ordinary inspection.
-  const revisionBannerEl = loaderData.revisionStatus ? (
-    <div className="mb-4"><RevisionBanner status={loaderData.revisionStatus}
+  const revisionBannerEl = data.revisionStatus ? (
+    <div className="mb-4"><RevisionBanner status={data.revisionStatus}
       inspectionDate={String(state.inspection.date ?? "").slice(0, 10)} /></div>
   ) : null;
  const structure = useStructureEdit({
-  inspectionId: String(state.inspection.id), rawSnapshot: loaderData.templateSnapshot,
-  collabEditing: loaderData.collabEditing,
+  inspectionId: String(state.inspection.id), rawSnapshot: data.templateSnapshot,
+  collabEditing: fieldSession.collabEditing,
   results: state.results,
   templateId: (state.inspection.templateId as string | null | undefined) ?? null,
   // Phase U (Batch C2a) — scope the delete-impact tally to the active unit.
@@ -728,10 +726,14 @@ function InspectionEditPage() {
  /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
   * video posters/players render a graceful "unavailable" state, never a
   * fabricated subdomain. */
- const streamCustomerSubdomain = loaderData.streamCustomerSubdomain ?? null;
+ const streamCustomerSubdomain = fieldSession.streamCustomerSubdomain;
  /* Plan 7 — resolved video backend provider for this tenant ('r2' by default).
   * Drives VideoCapture checkbox gating and VideoPlayer branch selection. */
- const videoProvider = loaderData.videoProvider ?? "r2";
+ const videoProvider = fieldSession.videoProvider;
+ // The report preview address; null without a tenant slug, and the preview entry points are left out.
+ const previewReportUrl = fieldSession.tenantSlug
+  ? dataSource.urls.reportPreview(fieldSession.tenantSlug, String(state.inspection.id))
+  : null;
 
  /* ---------------------------------------------------------------- */
  /* Photo / media operations (extracted hook) */
@@ -829,24 +831,18 @@ function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
  useEffect(() => {
- // B-17: "fetcher went idle" is NOT "saved" — check the action's ok flag.
+ // B-17: "the upload went idle" is NOT "saved" — check the batch's ok flag.
  // A failed write keeps dirty=true so the unsaved-changes blocker still arms.
- // FE-2: uploadFetcher participates too — otherwise a photo upload leaves
+ // FE-2: the photo upload participates too — otherwise a photo upload leaves
  // dirty=true forever and the beforeunload blocker traps the inspector.
- const submitting =
- uploadFetcher.state !== "idle";
- const failed =
- (uploadFetcher.data as { ok?: boolean } | undefined)?.ok === false;
+ const submitting = photoUpload.busy;
+ const failed = photoUpload.failedSinceIdle;
  if (submitting) {
  state.setSaveStatus("saving");
  } else if (state.saveStatus === "saving") {
  if (failed) {
  state.setSaveStatus("error");
- pushToast({
- message: m.editor_route_save_failed(),
-				variant: "error",
- durationMs: 8000,
- });
+ notify(m.editor_route_save_failed(), "error", { durationMs: 8000 });
  } else {
  state.setSaveStatus("saved");
  state.setDirty(false);
@@ -854,7 +850,7 @@ function InspectionEditPage() {
  return () => clearTimeout(timer);
  }
  }
- }, [uploadFetcher.state]);
+ }, [photoUpload.busy]);
 
  /* ---------------------------------------------------------------- */
  /* Rating handler with auto-advance */
@@ -895,15 +891,12 @@ function InspectionEditPage() {
  if (!decision.advance) return;
  setTimeout(
  () => state.advanceToNextUnrated((newSectionTitle: string) => {
- pushToast({
- message: m.editor_route_entered_next_section({ section: newSectionTitle }),
- durationMs: 2500,
- });
+ notify(m.editor_route_entered_next_section({ section: newSectionTitle }), "info", { durationMs: 2500 });
  }),
  inspectionPrefs.autoAdvanceDelayMs,
  );
  },
- [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated, state.ratingLevels, prefsLoaded, inspectionPrefs.autoAdvance, inspectionPrefs.autoAdvanceDelayMs],
+ [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated, state.ratingLevels, prefsLoaded, inspectionPrefs.autoAdvance, inspectionPrefs.autoAdvanceDelayMs, notify],
  );
 
  /* ---------------------------------------------------------------- */
@@ -1011,21 +1004,18 @@ function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
  /**
- * FE-2 — uploads go through the route action ("upload-photo" intent) on a
- * dedicated fetcher: the old direct fetch('/api/…/upload') bypassed the
- * BFF token relay (unauthenticated in saas, C-12 class) and swallowed
- * every failure silently. The effect below attaches returned keys and
- * surfaces failures as a toast.
+ * FE-2 — uploads go through the host's media uploader (`usePhotoBatchUpload`): the old direct
+ * fetch('/api/…/upload') bypassed the BFF token relay (unauthenticated in saas, C-12 class) and swallowed
+ * every failure silently. The effect below attaches returned keys and surfaces failures as a toast.
  */
  // FE-3 — when set, the next picked photo pins to this defect row instead
  // of the item; armed by ItemEditor's per-defect chip right before the
  // picker opens, consumed (and cleared) by handlePhotoUpload.
  const pendingPhotoTargetRef = useRef<{ kind: "canned" | "custom"; id: string } | null>(null);
 
- // Task 16 — Worker subrequest safety: a single submission fans out one
- // upstream upload call per file (see action.server.ts's mapPool), so an
- // unbounded selection could blow the per-request subrequest budget. Cap the
- // batch and tell the user rather than silently dropping the overflow.
+ // Task 16 — Worker subrequest safety: a batch fans out one upstream upload
+ // call per file, so an unbounded selection could blow the host's request
+ // budget. Cap the batch and tell the user rather than silently dropping the overflow.
  const MAX_BATCH_PHOTOS = 20;
 
  const handlePhotoUpload = useCallback(
@@ -1060,13 +1050,13 @@ function InspectionEditPage() {
  // when back online.
  const doc = collab?.doc ?? null;
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
- if (typeof navigator !== "undefined" && navigator.onLine === false && doc && sid && !target) {
+ if (!dataSource.isOnline() && doc && sid && !target) {
   // Phase U (Batch C2a) — key the offline pending-photo doc entry to the active
   // unit. At activeUnitId == null this === the legacy `_default:{sid}:{itemId}`.
   const fk = findingKey(activeUnitId, sid, itemId);
   for (const baked of bakedFiles) {
   const pendingId = crypto.randomUUID();
-  await enqueueMedia(webMediaStore, {
+  await enqueueMedia(dataSource.media.store, {
   pendingId,
   inspectionId: String(state.inspection.id),
   kind: "photo", blob: baked,
@@ -1076,32 +1066,25 @@ function InspectionEditPage() {
   appendPendingPhoto(doc, fk, pendingId);
   }
  } else {
-  const formData = new FormData();
-  formData.append("intent", "upload-photo");
-  formData.append("itemId", itemId);
-  for (const baked of bakedFiles) formData.append("file", baked);
-  if (target) {
-  formData.append("targetType", "defect");
-  formData.append("customId", target.id);
-  formData.append("defectKind", target.kind);
-  }
-  // busy-controls-allow: a file input's change event fires once per file-chooser selection (the chooser is modal) and the input is reset after it is read, so there is no double click to repeat; a latch here would sit after the async bake and could drop a legitimate second batch
-  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+  // A file input's change event fires once per file-chooser selection (the chooser is modal) and the input
+  // is reset after it is read, so there is no double click to repeat. A batch queues behind one in flight.
+  photoUpload.submit({
+  itemId,
+  findingKey: findingKey(activeUnitId, sid ?? "", itemId),
+  files: bakedFiles,
+  target,
+  });
  }
 
  if (overflow) {
-  pushToast({
-  message: m.editor_route_photos_batch_capped(),
-  variant: "warning",
-  durationMs: 6000,
-  });
+  notify(m.editor_route_photos_batch_capped(), "warning", { durationMs: 6000 });
  }
  })();
  // Reset both inputs so re-picking the same file(s) re-fires onChange
  if (cameraInputRef.current) cameraInputRef.current.value = "";
  if (libraryInputRef.current) libraryInputRef.current.value = "";
  },
- [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection, activeUnitId],
+ [state.activeItemId, state.inspection.id, dataSource, photoUpload.submit, notify, collab?.doc, state.sectionIdForItem, state.currentSection, activeUnitId],
  );
 
  const handleBurstCommit = useCallback(
@@ -1114,46 +1097,37 @@ function InspectionEditPage() {
  // no-ops on frames already below the cap. Honors the original-quality opt-out.
  const orig = originalQualityEnabled();
  void (async () => {
- const formData = new FormData();
- formData.append("intent", "upload-photo");
- formData.append("itemId", itemId);
+ const files: Blob[] = [];
  for (let i = 0; i < blobs.length; i++) {
   const f = new File([blobs[i]], `burst-${i + 1}.jpg`, { type: "image/jpeg" });
-  formData.append("file", orig ? f : await preprocessImage(f));
+  files.push(orig ? f : await preprocessImage(f));
  }
- // busy-controls-allow: a file input's change event fires once per file-chooser selection (the chooser is modal) and the input is reset after it is read, so there is no double click to repeat; a latch here would sit after the async bake and could drop a legitimate second batch
-  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+ // The burst's "Done" guards its own repeat (BurstCamera), so each commit reaches here once.
+ const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
+ photoUpload.submit({ itemId, findingKey: findingKey(activeUnitId, sid ?? "", itemId), files, target: null });
  })();
  },
- [state.burstCameraItemId, state.inspection.id, uploadFetcher],
+ [state.burstCameraItemId, state.sectionIdForItem, state.currentSection, activeUnitId, photoUpload.submit],
  );
 
- // Attach uploaded photo keys once the action responds — to the item, or
- // (FE-3) to the specific defect row the action echoes back.
- const processedUploadData = useRef<unknown>(null);
+ // Attach uploaded photo keys once a batch has finished — to the item, or
+ // (FE-3) to the specific defect row the batch was bound to. Runs after the save-indicator effect above,
+ // as the fetcher's effects did, so the attach is the last word on the dirty flag.
+ const processedUploads = useRef(new WeakSet<object>());
  useEffect(() => {
- const d = uploadFetcher.data as
- | {
- ok?: boolean;
- keys?: string[];
- // Task 15/16 — per-file status; drives the partial-failure toast below.
- results?: Array<{ index: number; ok: boolean; key?: string; error?: string }>;
- itemId?: string;
- targetType?: "item" | "defect";
- customId?: string;
- defectKind?: "canned" | "custom";
- }
- | undefined;
- if (uploadFetcher.state !== "idle" || !d || processedUploadData.current === d) return;
- processedUploadData.current = d;
+ const settled = photoUpload.outcomes.filter((o) => !processedUploads.current.has(o));
+ if (settled.length === 0) return;
+ for (const o of settled) processedUploads.current.add(o);
+ photoUpload.consume(photoUpload.outcomes.length);
+ for (const d of settled) {
  // Attach every successful key exactly as before — unchanged regardless of
  // whether the submission was a single file or a batch.
- if (d.keys?.length && d.itemId) {
+ if (d.keys.length && d.itemId) {
  for (const k of d.keys) {
  if (d.targetType === "defect" && d.customId) {
  findings.addPhotoToDefect(
  d.itemId,
- { kind: d.defectKind ?? "canned", id: d.customId },
+ { kind: d.defectKind, id: d.customId },
  k,
  );
  } else {
@@ -1163,37 +1137,27 @@ function InspectionEditPage() {
  }
  // Task 16 — results[] lets a batch report exactly how many of a large
  // selection made it, instead of an all-or-nothing toast. d.ok is derived
- // from results.every(ok) server-side, so without this a single failed file
+ // from results.every(ok), so without this a single failed file
  // in a 12-photo batch would fire BOTH the success toast (for the 11 that
- // attached) and the old generic failure toast — keep them mutually
+ // attached) and a generic failure toast — keep them mutually
  // exclusive here.
- if (d.results?.length) {
  const total = d.results.length;
  const successCount = d.results.filter((r) => r.ok).length;
  const failCount = total - successCount;
  if (failCount > 0) {
- pushToast({
- message: m.editor_route_photos_partial_upload({ success: successCount, total, failed: failCount }),
- variant: "error",
- durationMs: 8000,
- });
+ notify(m.editor_route_photos_partial_upload({ success: successCount, total, failed: failCount }), "error", { durationMs: 8000 });
+ } else if (total > 0) {
+ notify(
+ m.editor_route_photos_added({ count: successCount, s: successCount === 1 ? "" : "s", toDefect: d.targetType === "defect" ? " to defect" : "" }),
+ "success",
+ { durationMs: 2000 },
+ );
  } else {
- pushToast({
- message: m.editor_route_photos_added({ count: successCount, s: successCount === 1 ? "" : "s", toDefect: d.targetType === "defect" ? " to defect" : "" }),
- variant: "success",
- durationMs: 2000,
- });
+ // No file reached the uploader (an empty batch): say so rather than showing nothing.
+ notify(m.editor_route_photo_upload_failed(), "error", { durationMs: 8000 });
  }
- } else if (d.ok === false) {
- // Fallback for a response shape without results[] (e.g. an older/other
- // action path) — preserves the pre-Task-16 generic failure toast.
- pushToast({
- message: m.editor_route_photo_upload_failed(),
- variant: "error",
- durationMs: 8000,
- });
  }
- }, [uploadFetcher.state, uploadFetcher.data, findings]);
+ }, [photoUpload.outcomes, photoUpload.consume, findings, notify]);
 
  /* ---------------------------------------------------------------- */
  /* Open-snippets callback (shared by keyboard shortcut + textarea trigger) */
@@ -1307,7 +1271,7 @@ function InspectionEditPage() {
  },
  onLibraryClose: () => state.setShowCommentLibrary(false),
  onPhoto: () => {
- if (!state.activeItemId || uploadFetcher.state !== "idle") return;
+ if (!state.activeItemId || photoUpload.busy) return;
  // Task 16 — desktop file pickers already offer camera-vs-library choice
  // natively, so go straight to the multi-select library input; mobile
  // still needs the explicit chooser (camera capture has no multi-select).
@@ -1354,7 +1318,7 @@ function InspectionEditPage() {
  comments,
  commentLibraryItems,
  serverComments,
- uploadFetcher.state,
+ photoUpload.busy,
  isMobile,
  ],
  );
@@ -1445,7 +1409,7 @@ function InspectionEditPage() {
  item={state.activeItem || undefined}
  sectionTitle={state.currentSection?.title}
  /* #61 — the artifact an AI content-review row cites. */
- resultId={loaderData.resultId}
+ resultId={data.resultId}
  result={
  state.activeItemId
  ? findings.getResult(
@@ -1462,7 +1426,7 @@ function InspectionEditPage() {
    : libraryInputRef.current?.click()
  }
  onAddDefectPhoto={(target) => {
- if (uploadFetcher.state !== "idle") return;
+ if (photoUpload.busy) return;
  pendingPhotoTargetRef.current = target;
  // Task 16 — same camera/library split as onPhoto above, scoped to a
  // specific defect row instead of the item.
@@ -1472,7 +1436,7 @@ function InspectionEditPage() {
  libraryInputRef.current?.click();
  }
  }}
- photoUploading={uploadFetcher.state !== "idle"}
+ photoUploading={photoUpload.busy}
  onAddCustomDefect={(input) => {
  if (state.activeItemId && state.currentSection) {
  // Forwarded and spread WHOLE — never destructured. A field named in
@@ -1539,7 +1503,7 @@ function InspectionEditPage() {
  missingFields={missingFields}
  requiredDefectFields={requiredDefectFields}
  categoryColor={catColor}
- defectCategories={loaderData.defectCategories}
+ defectCategories={data.defectCategories}
  onDefectFields={(cannedId, patch) => {
  if (state.activeItemId && state.currentSection) {
  findings.setDefectFields(
@@ -1567,7 +1531,7 @@ function InspectionEditPage() {
  undefined,
  (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined,
  ).then((ok) => {
- if (!ok) pushToast({ message: m.editor_route_defect_library_copy_failed(), variant: "warning", durationMs: 6000 });
+ if (!ok) notify(m.editor_route_defect_library_copy_failed(), "warning", { durationMs: 6000 });
  });
  }}
  queuedPreviews={[]}
@@ -1656,11 +1620,10 @@ function InspectionEditPage() {
     state.setInspection((prev) => ({ ...prev, [fieldId]: value }));
    }}
    onCommitFacts={savePropertyFacts}
-   statutoryDetails={loaderData.statutoryDetails}
-   statutoryCoverage={loaderData.statutoryCoverage}
-   statutoryPreviewHref={`/api/inspections/${loaderData.inspection.id}/statutory-form/preview.pdf`}
-   pcaNarrative={loaderData.pcaNarrative}
-   complianceData={{ ...loaderData.compliance, relianceText: loaderData.relianceText }}
+   statutoryDetails={data.statutoryDetails}
+   statutoryCoverage={data.statutoryCoverage}
+     pcaNarrative={data.pcaNarrative}
+   complianceData={{ ...data.compliance, relianceText: data.relianceText }}
    savingCommercial={commercialSave.saving}
    // Optimistic ONLY on acceptance (see useCommercialReportSave): a dropped call sent
    // nothing, so the control snaps back, which is visible.
@@ -1733,7 +1696,7 @@ function InspectionEditPage() {
  onClose={() => setVideoCaptureTarget(null)}
  onUploaded={() => {
  setVideoCaptureTarget(null);
- revalidator.revalidate();
+ dataSource.reload();
  }}
  />
  )}
@@ -1774,8 +1737,8 @@ function InspectionEditPage() {
  progress={{ rated: state.progress.rated, total: state.progress.total, pct: state.progress.pct }}
  status={state.inspection.status as string}
  publishError={publishFlow.publishError} isSubmitting={publishFlow.publishing}
- isAmendment={loaderData.nextPublishIsAmendment}
- coolingUnlockAtMs={loaderData.outboundCoolingWindow?.unlockAtMs ?? null}
+ isAmendment={data.nextPublishIsAmendment}
+ coolingUnlockAtMs={data.outboundCoolingWindow?.unlockAtMs ?? null}
  onClose={() => { publishFlow.clearPublishError(); state.setShowPublishModal(false); }}
  onPublish={(markComplete, extras) => { void publishFlow.publish(markComplete, extras, autoSign); }}
  autoSign={autoSign}
@@ -1827,7 +1790,7 @@ function InspectionEditPage() {
   // step out, or Back from it leaves the inspection entirely.
   if (state.activeView === "property") { state.setActiveView("items"); return; }
   if (state.activeItemId) { state.setActiveItemId(null); return; }
-  navigate('/inspections');
+  dataSource.exit();
  }}
  onMore={() => setMobileDrawer('actions')}
  />
@@ -1879,8 +1842,8 @@ function InspectionEditPage() {
  onFinishFieldwork={(state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
  finishingFieldwork={publishFlow.finishing}
  onPreviewReport={
-  loaderData.tenantSlug
-  ? () => window.open(`/report-view/${loaderData.tenantSlug}/${state.inspection.id}`, "_blank", "noopener")
+  previewReportUrl
+  ? () => window.open(previewReportUrl, "_blank", "noopener")
   : null
  }
  />
@@ -1893,10 +1856,11 @@ function InspectionEditPage() {
  title={m.nav_theme_label()}
  >
  <div className="p-4">
-  <ThemeSegmentControl />
+  {slots.renderThemeControl?.({})}
  </div>
  </MobileBottomDrawer>
  {finishActionsEl}
+ {unsavedGuardEl}
  </div>
  );
  }
@@ -1969,11 +1933,7 @@ function InspectionEditPage() {
  isCover={!!photoStudioKey && (state.inspection.coverPhotoId as string | null) === photoStudioKey}
  onSetCover={photoStudioKey ? () => {
   const isCover = (state.inspection.coverPhotoId as string | null) === photoStudioKey;
-  // busy-controls-allow: the value is computed from rendered state, not toggled server-side, so a repeat PATCHes the same coverPhotoId
-  coverFetcher.submit(
-   { intent: "set-cover", coverPhotoId: isCover ? "" : photoStudioKey },
-   { method: "post" },
-  );
+  coverWrites.setCover(isCover ? "" : photoStudioKey);
  } : undefined}
  onSave={({ blob, nodesJson }) => {
   const itemId = state.activeItemId;
@@ -1984,15 +1944,13 @@ function InspectionEditPage() {
    // performPhotoAnnotationSave returns false only in the brief pre-connect
    // window before the doc is live; fall back to the online annotate relay then.
    if (!performPhotoAnnotationSave({ itemId, photoIndex: photoStudioIndex, sectionId }, blob, nodesJson)) {
-    const fd = new FormData();
-    fd.append("intent", "annotate");
-    fd.append("itemId", itemId);
-    fd.append("photoIndex", String(photoStudioIndex));
-    fd.append("nodes", nodesJson);
-    if (sectionId) fd.append("sectionId", sectionId);
-    fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
-    // busy-controls-allow: the annotation bake writes a deterministic R2 key (inspectionPhotoAnnotated) and replaces the photo's annotatedKey, so a repeat rewrites the same object and row
-    coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+    coverWrites.annotate({
+     itemId,
+     photoIndex: photoStudioIndex,
+     nodes: nodesJson,
+     image: new File([blob], "annotated.png", { type: "image/png" }),
+     ...(sectionId ? { sectionId } : {}),
+    });
    }
   }
   setPhotoStudioOpen(false);
@@ -2114,25 +2072,20 @@ function InspectionEditPage() {
   onSave={(blob, c) => {
    const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
    setSessionCoverCrop({ key: galleryCropSource.key, crop });
-   const fd = new FormData();
-   fd.append("intent", "crop-cover");
-   fd.append("sourceKey", galleryCropSource.key);
-   fd.append("crop", JSON.stringify(crop));
-   fd.append("image", new File([blob], "cover.jpg", { type: "image/jpeg" }));
    // A repeat bakes a second derivative under a fresh random R2 key and orphans the first
-   // (setCroppedCover), so drop a same-frame second Save.
-   coverLatch(() => coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" }));
+   // (setCroppedCover), so a repeat of the same Save joins the one in flight; a different crop waits its turn.
+   coverWrites.cropCover({
+    sourceKey: galleryCropSource.key,
+    crop: JSON.stringify(crop),
+    image: new File([blob], "cover.jpg", { type: "image/jpeg" }),
+   });
    setGalleryCropSource(null);
   }}
  />
  )}
 
- {/* Unsaved changes blocker dialog */}
- <UnsavedChangesBlocker
- open={blocker.state === "blocked"}
- onStay={cancelLeave}
- onLeave={confirmLeave}
- />
+ {/* Unsaved changes guard (the host renders its own stay-or-leave dialog) */}
+ {unsavedGuardEl}
 
 
  {/* #181 — Version history panel (collab Phase 4). Only reachable when the
@@ -2144,8 +2097,8 @@ function InspectionEditPage() {
  <VersionHistoryPanel
  open={versionHistoryOpen}
  onClose={() => setVersionHistoryOpen(false)}
- inspectionId={String(loaderData.inspection.id)}
- onRestored={() => { revalidator.revalidate(); }}
+ inspectionId={String(data.inspection.id)}
+ onRestored={() => { dataSource.reload(); }}
  doc={collab?.doc ?? null}
  currentResults={state.results as unknown as ResultsProjection}
  />
@@ -2209,12 +2162,12 @@ function InspectionEditPage() {
  {/* ------------------------------------------------------------ */}
  <EditorHeader
  state={state}
- tenantSlug={loaderData.tenantSlug}
+ tenantSlug={fieldSession.tenantSlug}
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}
  handleFinishFieldwork={handleFinishFieldwork}
  finishingFieldwork={publishFlow.finishing}
- collabEditing={loaderData.collabEditing}
+ collabEditing={fieldSession.collabEditing}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
  onChangeTemplate={() => state.setSettingsOpen(true)}
  onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}
@@ -2415,14 +2368,15 @@ function InspectionEditPage() {
    });
    findings.batchSetRating(sectionId, state.currentSectionItems, state.batchSelected, levelId);
    const label = state.ratingLevels.find((l) => l.id === levelId)?.label ?? levelId;
-   pushToast({
-    message: m.editor_route_batch_rated({ count: selectedIds.length, s: selectedIds.length === 1 ? '' : 's', label }),
-    actionLabel: m.common_undo(),
+   notify(m.editor_route_batch_rated({ count: selectedIds.length, s: selectedIds.length === 1 ? '' : 's', label }), "info", {
     durationMs: 6000,
-    onAction: () => {
-     for (const { itemId, prior: p } of prior) {
-      findings.setRating(sectionId, itemId, p);
-     }
+    action: {
+     label: m.common_undo(),
+     run: () => {
+      for (const { itemId, prior: p } of prior) {
+       findings.setRating(sectionId, itemId, p);
+      }
+     },
     },
    });
   }}
@@ -2450,7 +2404,7 @@ function InspectionEditPage() {
  const photos = (result?.photos as string[]) || [];
  if (photos.length > 0) {
   openPhotoStudio({
-   url: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(photos[0])}`,
+   url: dataSource.urls.photo(String(state.inspection.id), photos[0]),
    key: photos[0],
    index: 1,
    total: photos.length,

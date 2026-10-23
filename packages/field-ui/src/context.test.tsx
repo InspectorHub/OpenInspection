@@ -3,8 +3,9 @@ import { describe, expect, it, vi, afterEach } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import type { CommandResult, FieldCommand } from './commands';
 import type { FieldDataSource, FieldHostSlots } from './data-source';
-import { FieldDataSourceProvider, isIgnored, useFieldCommand, useFieldDataSource, useFieldSlots } from './context';
+import { FieldDataSourceProvider, isIgnored, useFieldCommand, useFieldDataSource, useFieldEnsureHuman, useFieldSlots } from './context';
 import type { FieldRunResult } from './context';
+import { m } from './i18n';
 import { createEmptyEditorData, createFakeDataSource } from './testing/fake-data-source';
 import type { FakeDataSource } from './testing/fake-data-source';
 
@@ -325,5 +326,68 @@ describe('FakeDataSource contract', () => {
       { message: 'hello', variant: 'success' },
       { message: 'plain', variant: undefined },
     ]);
+  });
+});
+
+describe('useFieldEnsureHuman', () => {
+  function Check({ out }: { out: boolean[] }) {
+    const ensureHuman = useFieldEnsureHuman();
+    return <button type="button" onClick={() => void ensureHuman().then((ok) => out.push(ok))}>check</button>;
+  }
+
+  it("hands back the host's check, and its answer decides", async () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    const out: boolean[] = [];
+    const ensureHuman = vi.fn(async () => false);
+    renderWith(fake, <Check out={out} />, { ensureHuman });
+    act(() => { screen.getByRole('button').click(); });
+    await flush();
+    expect(ensureHuman).toHaveBeenCalledTimes(1);
+    expect(out).toEqual([false]);
+  });
+
+  it('FAILS CLOSED when the host gave neither a check nor an opt-out: refuses, and says why', async () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    const out: boolean[] = [];
+    renderWith(fake, <Check out={out} />);
+    act(() => { screen.getByRole('button').click(); });
+    await flush();
+    expect(out).toEqual([false]);
+    expect(fake.notifications).toEqual([{ message: m.editor_human_check_unavailable(), variant: 'error' }]);
+  });
+
+  it("lets a send through only on the host's explicit opt-out, silently", async () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    const out: boolean[] = [];
+    renderWith(fake, <Check out={out} />, { humanCheck: 'not-required' });
+    act(() => { screen.getByRole('button').click(); });
+    await flush();
+    expect(out).toEqual([true]);
+    expect(fake.notifications).toEqual([]);
+  });
+
+  it('a present check wins over the opt-out, answers true when it does, and says nothing', async () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    const out: boolean[] = [];
+    const ensureHuman = vi.fn(async () => true);
+    renderWith(fake, <Check out={out} />, { ensureHuman, humanCheck: 'not-required' });
+    act(() => { screen.getByRole('button').click(); });
+    await flush();
+    expect(ensureHuman).toHaveBeenCalledTimes(1);
+    expect(out).toEqual([true]);
+    expect(fake.notifications).toEqual([]);
+  });
+
+  it('keeps the refusing function identity across renders', () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    const seen: Array<() => Promise<boolean>> = [];
+    function Grab() {
+      seen.push(useFieldEnsureHuman());
+      return null;
+    }
+    const view = renderWith(fake, <Grab />);
+    view.rerender(<FieldDataSourceProvider dataSource={fake}><Grab /></FieldDataSourceProvider>);
+    expect(seen.length).toBeGreaterThan(1);
+    expect(seen.every((f) => f === seen[0])).toBe(true);
   });
 });

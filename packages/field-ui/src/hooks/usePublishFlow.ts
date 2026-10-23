@@ -5,9 +5,10 @@ import { m } from '../i18n';
 export interface PublishFlowOptions {
   /**
    * Asks the host to confirm a person is present (a human check) before the publish goes out.
-   * Resolving false abandons the publish: nothing is sent and no state changes.
+   * Resolving false abandons the publish: nothing is sent and no state changes. Required on purpose: pass
+   * `useFieldEnsureHuman()`, which is fail-closed, so the check cannot be left out by omission.
    */
-  confirmHuman?: () => Promise<boolean>;
+  confirmHuman: () => Promise<boolean>;
   /**
    * The publish also marks the on-site work complete. Called BEFORE the request, because the editor's
    * inspection copy is frozen at mount and the status badge has to move without a reload. Not called for
@@ -62,7 +63,7 @@ export function usePublishFlow(inspectionId: string, options: PublishFlowOptions
 
   async function publish(markComplete: boolean, extras: PublishExtras, autoSign: boolean): Promise<void> {
     if (publishCmd.isBusy()) return;
-    if (options.confirmHuman && !(await options.confirmHuman())) return;
+    if (!(await options.confirmHuman())) return;
     setPublishError(null);
     if (markComplete && !publishCmd.isBusy()) options.onMarkedComplete();
     // The auto-sign choice rides ALONG WITH the publish, never beside it: the handler re-reads the

@@ -7,6 +7,8 @@ import { useFieldDataSource, useFieldSlots } from "@core/field-ui/context";
 import type { FieldDataSource, FieldHostSlots } from "@core/field-ui/data-source";
 import { loaderPayload } from "~/lib/field/web-editor-data.fixtures";
 import type { EditorLoaderData } from "~/lib/field/web-editor-data";
+import { OutboundVerificationProvider } from "~/components/OutboundVerification";
+import { m as appMessages } from "~/paraglide/messages";
 import { WebFieldHost } from "./WebFieldHost";
 
 type OnSeen = (ds: FieldDataSource, slots: FieldHostSlots) => void;
@@ -69,6 +71,38 @@ describe("WebFieldHost", () => {
         expect(slots!.pdf!.actionLabel("Preview")).toBe("Preview");
     });
 
+    it("passes the human check and the unsaved-changes guard through as slots, with stable identity", async () => {
+        const seen: FieldHostSlots[] = [];
+        mount(loaderPayload(), (_d, s) => { seen.push(s); });
+        await screen.findByText("probe");
+        const slots = seen[seen.length - 1]!;
+        expect(typeof slots.renderUnsavedGuard).toBe("function");
+        // No human check is mounted around this host, so the check answers that the person may go on.
+        await expect(slots.ensureHuman!()).resolves.toBe(true);
+        expect(seen.every((s) => s.ensureHuman === seen[0].ensureHuman)).toBe(true);
+    });
+
+    it("the human check slot is the check mounted around the host: its dialog opens and a cancel there answers false", async () => {
+        let slots: FieldHostSlots | null = null;
+        const Stub = createRoutesStub([{
+            path: "/",
+            Component: () => (
+                <OutboundVerificationProvider windowOpen siteKey="test-site-key">
+                    <WebFieldHost editor={loaderPayload()}><Probe onSeen={(_d, s) => { slots = s; }} /></WebFieldHost>
+                </OutboundVerificationProvider>
+            ),
+        }]);
+        render(<Stub initialEntries={["/"]} />);
+        await screen.findByText("probe");
+        let answer: boolean | null = null;
+        await act(async () => { void slots!.ensureHuman!().then((ok) => { answer = ok; }); });
+        // The default context would have answered true without a dialog; reaching the real provider shows it.
+        const cancel = await screen.findByRole("button", { name: appMessages.outbound_verify_cancel() });
+        expect(answer).toBeNull();
+        await act(async () => { cancel.click(); });
+        await waitFor(() => expect(answer).toBe(false));
+    });
+
     it("keeps the data source identity across a revalidation and serves the NEW loader data", async () => {
         const seen: FieldDataSource[] = [];
         let n = 0;
@@ -120,12 +154,13 @@ describe("WebFieldHost", () => {
         await screen.findByText("list page");
     });
 
-    it("rejects collab loudly rather than doing nothing, and serves a media uploader that answers instead of throwing", async () => {
+    it("serves the real collab connector, and a media uploader that answers instead of throwing", async () => {
         let ds: FieldDataSource | null = null;
         mount(loaderPayload(), (d) => { ds = d; });
         await screen.findByText("probe");
-        expect(() => ds!.collab.connect("i", {})).toThrow(/not wired/);
-        await expect(ds!.collab.purge("i")).rejects.toThrow(/not wired/);
+        expect(typeof ds!.collab.connect).toBe("function");
+        // No IndexedDB here, so a purge has nothing to do and says nothing; it must not reject.
+        await expect(ds!.collab.purge("i")).resolves.toBeUndefined();
         // With no results document a crop cannot be addressed: a not-ok answer, no request.
         const fetchSpy = vi.spyOn(globalThis, "fetch");
         const uploader = ds!.media.uploader("i", null);

@@ -2,7 +2,9 @@ import { useMemo, useRef, type ReactNode } from "react";
 import { useLoaderData, useNavigate, useRevalidator } from "react-router";
 import { FieldDataSourceProvider } from "@core/field-ui/context";
 import type { EditorData, FieldHostSlots } from "@core/field-ui/data-source";
+import { useEnsureHuman } from "~/components/OutboundVerification";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import { WebUnsavedGuard } from "~/components/field/WebUnsavedGuard";
 import { pdfActionLabel, usePdfExport } from "~/hooks/usePdfExport";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import type { loader } from "~/routes/inspection-edit/loader.server";
@@ -48,6 +50,8 @@ export function WebFieldHost({ editor, children }: WebFieldHostProps) {
     const revalidator = useRevalidator();
     const sessionContext = useSessionContext();
     const pdf = usePdfExport();
+    // On a host with no human check mounted the context's default answers true at once.
+    const ensureHuman = useEnsureHuman();
 
     // Refs are refreshed during render on purpose (as `useKeyboard` does): an effect would run
     // after a child's effect, and a child calling `load()` there would read the previous payload.
@@ -61,6 +65,8 @@ export function WebFieldHost({ editor, children }: WebFieldHostProps) {
     sessionRef.current = sessionContext;
     const pdfRef = useRef(pdf);
     pdfRef.current = pdf;
+    const ensureHumanRef = useRef(ensureHuman);
+    ensureHumanRef.current = ensureHuman;
     const { busy, error, generating, cooldown } = pdf;
 
     const dataSource = useMemo(() => {
@@ -95,6 +101,9 @@ export function WebFieldHost({ editor, children }: WebFieldHostProps) {
                 error,
                 actionLabel: (defaultLabel) => pdfActionLabel({ generating, cooldown }, defaultLabel),
             },
+            // The same check `EditorHumanCheck` mounts around the editor; read through a ref so the slot keeps its identity.
+            ensureHuman: () => ensureHumanRef.current(),
+            renderUnsavedGuard: ({ atRisk }) => <WebUnsavedGuard atRisk={atRisk} />,
         }),
         [busy, error, generating, cooldown],
     );

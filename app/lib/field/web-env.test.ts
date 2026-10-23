@@ -56,4 +56,22 @@ describe("webNotify", () => {
             { message: "plain", variant: "error", durationMs: 8000 },
         ]);
     });
+
+    it("maps a warning to the warning toast with its own default time", () => {
+        const push = vi.fn();
+        webNotify("partial", "warning", push);
+        expect(push.mock.calls.map((c) => c[0])).toEqual([{ message: "partial", variant: "warning", durationMs: 6000 }]);
+    });
+
+    it("hands an action to the toast as its label and handler, and adds none when there is none", () => {
+        const push = vi.fn();
+        const run = vi.fn();
+        webNotify("rated", "info", push, { durationMs: 6000, action: { label: "Undo", run } });
+        webNotify("plain", "info", push, { durationMs: 6000 });
+        const [withAction, without] = push.mock.calls.map((c) => c[0]);
+        expect(withAction).toMatchObject({ message: "rated", variant: "neutral", durationMs: 6000, actionLabel: "Undo" });
+        withAction.onAction();
+        expect(run).toHaveBeenCalledTimes(1);
+        expect(without).toEqual({ message: "plain", variant: "neutral", durationMs: 6000 });
+    });
 });

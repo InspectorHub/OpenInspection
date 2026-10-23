@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { reorderItemBySwap } from './reorder-by-swap';
 
 const items = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];

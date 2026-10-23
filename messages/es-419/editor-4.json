@@ -179,5 +179,6 @@
   "editor_pane_all_rated_title": "Todos los elementos de esta sección están calificados",
   "editor_pane_all_rated_desc": "Abra un elemento para revisarlo o pase a la siguiente sección.",
   "editor_pane_no_items_title": "Esta sección aún no tiene elementos",
-  "editor_pane_no_items_desc": "Agregue el primero con «+ Agregar elemento» en la lista de elementos."
+  "editor_pane_no_items_desc": "Agregue el primero con «+ Agregar elemento» en la lista de elementos.",
+  "editor_human_check_unavailable": "Esta aplicación no puede verificar que usted es una persona, por lo que no se envió nada. Comuníquese con soporte."
 }

@@ -9,6 +9,7 @@ import type {
   FieldDataSource,
   FieldResources,
   FieldUrls,
+  NotifyVariant,
   PendingMediaRecord,
   SessionInfo,
 } from '../data-source';
@@ -65,9 +66,11 @@ export interface FakeDataSource extends FieldDataSource {
   /** Every `notify` call, in call order. */
   readonly notifications: readonly {
     message: string;
-    variant: 'info' | 'success' | 'error' | undefined;
+    variant: NotifyVariant | undefined;
     /** Present only when the caller passed `NotifyOptions.durationMs`. */
     durationMs?: number;
+    /** Present only when the caller passed `NotifyOptions.action`; `run` is its handler, so a test can press it. */
+    action?: { label: string; run: () => void };
   }[];
   /** Every `media.uploader(...).upload` call, in call order. `hadDoc` is whether a results document was passed. */
   readonly uploads: readonly { inspectionId: string; rec: PendingMediaRecord; hadDoc: boolean }[];
@@ -219,7 +222,7 @@ export function createFakePrefs(initial: Partial<InspectionPrefs> = {}): FakePre
 export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
   const commands: ExecutedCommand[] = [];
   const purged: string[] = [];
-  const notifications: { message: string; variant: 'info' | 'success' | 'error' | undefined; durationMs?: number }[] = [];
+  const notifications: { message: string; variant: NotifyVariant | undefined; durationMs?: number; action?: { label: string; run: () => void } }[] = [];
   const uploads: { inspectionId: string; rec: PendingMediaRecord; hadDoc: boolean }[] = [];
   let uploadFailure: string | null = null;
   const failures = new Map<FieldCommand['type'], string>();
@@ -304,9 +307,12 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
       return result as CommandResult<CommandData<C>>;
     },
     notify: (message, variant, opts) => {
-      notifications.push(
-        opts?.durationMs === undefined ? { message, variant } : { message, variant, durationMs: opts.durationMs },
-      );
+      notifications.push({
+        message,
+        variant,
+        ...(opts?.durationMs === undefined ? {} : { durationMs: opts.durationMs }),
+        ...(opts?.action === undefined ? {} : { action: opts.action }),
+      });
     },
     reload: () => {
       reloadCount += 1;

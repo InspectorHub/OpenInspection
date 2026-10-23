@@ -9,11 +9,13 @@
  */
 import type * as Y from "yjs";
 import { IndexeddbPersistence } from "y-indexeddb";
-import { resultsDocName } from "@core/field-ui/collab/results-doc-connection";
+import { connectResultsDoc, resultsDocName } from "@core/field-ui/collab/results-doc-connection";
 import type {
     ResultsDocPersistence,
 } from "@core/field-ui/collab/results-doc-connection";
+import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
 import type { OfflinePurgeHost } from "@core/field-ui/collab/offline-purge";
+import type { CollabConnector } from "@core/field-ui/data-source";
 import type { ResultsDocHost } from "@core/field-ui/collab/use-results-doc";
 import { webMediaStore } from "./web-media-store";
 
@@ -99,4 +101,39 @@ export const webOfflinePurgeHost: OfflinePurgeHost = {
     available: () => typeof indexedDB !== "undefined",
     media: webMediaStore,
     clearResultsData: webClearResultsData,
+};
+
+/**
+ * The web `FieldDataSource.collab`: the results-document connection and the offline purge over this
+ * host's pieces. `connect` opens the connection at once (the socket opens after IndexedDB has applied its
+ * stored state, as `connectResultsDoc` guarantees) and returns a live handle: `doc` is read through a getter
+ * because a version restore replaces the document, and `persistenceSynced` settles the first time IndexedDB
+ * has applied its state.
+ */
+export const webCollabConnector: CollabConnector = {
+    connect(inspectionId, opts) {
+        let markPersisted: () => void = () => undefined;
+        const persistenceSynced = new Promise<void>((resolve) => {
+            markPersisted = resolve;
+        });
+        const { handle, destroy } = connectResultsDoc(inspectionId, {
+            ...webCollabHost,
+            onChange: (updated) => {
+                if (updated.persistenceSynced) markPersisted();
+                opts.onChange?.();
+            },
+            ...(opts.onSynced ? { onSynced: opts.onSynced } : {}),
+        });
+        return {
+            get doc() {
+                return handle.doc;
+            },
+            persistenceSynced,
+            synced: () => handle.synced,
+            destroy,
+        };
+    },
+    async purge(inspectionId) {
+        await purgeInspectionOfflineData(inspectionId, webOfflinePurgeHost);
+    },
 };

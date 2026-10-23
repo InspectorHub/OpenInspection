@@ -1,6 +1,7 @@
-import type { CollabConnector, EditorData, FieldDataSource, SessionInfo } from "@core/field-ui/data-source";
+import type { EditorData, FieldDataSource, SessionInfo } from "@core/field-ui/data-source";
 import { createWebMediaUploader } from "./web-uploader";
 import { webMediaStore } from "./web-media-store";
+import { webCollabConnector } from "./web-collab";
 import { webSessionInfo, type SessionContextLike, type SessionLoaderBits } from "./web-session";
 import { createWebUrls } from "./web-urls";
 import { webIsOnline, webNotify, webOnOnlineChange } from "./web-env";
@@ -9,6 +10,7 @@ import { createWebAiAssist } from "./web-ai-assist";
 import { createWebCommentsLibrary } from "./web-comments-library";
 import { createWebCostItems } from "./web-cost-items";
 import { createWebPrefs } from "./web-prefs";
+import { createWebPublishReadiness } from "./web-publish-readiness";
 import { createWebVideo } from "./web-video";
 import { createWebMediaPool } from "./web-media-pool";
 import { createWebRepairItems } from "./web-repair-items";
@@ -33,18 +35,6 @@ export interface WebDataSourceParts {
 }
 
 const NO_INSPECTION = "This host has no inspection to read or write.";
-
-const notWired = (what: string) =>
-    `${what} is not wired to the web data source yet; the editor still uses its own path for it.`;
-
-const collab: CollabConnector = {
-    connect() {
-        throw new Error(notWired("Collaborative editing"));
-    },
-    purge() {
-        return Promise.reject(new Error(notWired("Offline purge")));
-    },
-};
 
 /**
  * Compose the web `FieldDataSource`. Nothing browser-only is touched here: the media store opens
@@ -76,7 +66,7 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
         exit: () => parts.exit(),
         isOnline: webIsOnline,
         onOnlineChange: webOnOnlineChange,
-        collab,
+        collab: webCollabConnector,
         media: { store: webMediaStore, uploader: createWebMediaUploader },
         urls: createWebUrls(),
         resources: {
@@ -90,6 +80,7 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
             mediaPool: createWebMediaPool(),
             settingsSheet: createWebSettingsSheet(),
             versionHistory: createWebVersionHistory(),
+            publishReadiness: createWebPublishReadiness(),
         },
         platform: "web",
     };

@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { useFieldDataSource } from "../../context";
 import { PropertyInfoForm } from "./PropertyInfoForm";
 import { StatutoryDetailsHost } from "../statutory/StatutoryDetailsHost";
 import { StatutoryCoveragePanel } from "../statutory/StatutoryCoveragePanel";
@@ -38,7 +39,6 @@ interface InspectionOverviewProps {
     onCommitFacts: ComponentProps<typeof PropertyInfoForm>["onCommit"];
     statutoryDetails: ComponentProps<typeof StatutoryDetailsHost>["details"];
     statutoryCoverage: ComponentProps<typeof StatutoryCoveragePanel>["coverage"];
-    statutoryPreviewHref: string;
     pcaNarrative: ComponentProps<typeof PcaNarrativePanel>["narrative"];
     complianceData: ComponentProps<typeof CompliancePanel>["data"];
     savingCommercial: boolean;
@@ -53,13 +53,13 @@ export function InspectionOverview({
     onCommitFacts,
     statutoryDetails,
     statutoryCoverage,
-    statutoryPreviewHref,
     pcaNarrative,
     complianceData,
     savingCommercial,
     onChangeSubtype,
     onChangeTier,
 }: InspectionOverviewProps) {
+    const { urls } = useFieldDataSource();
     // Read once, so the three gates below cannot disagree about the same house.
     const bag = inspection as Record<string, unknown>;
     const isCommercial = bag.propertyType === "commercial";
@@ -78,7 +78,7 @@ export function InspectionOverview({
                 all -- so the reader needs the list before the form, not after. */}
             <StatutoryCoveragePanel
                 coverage={statutoryCoverage}
-                previewHref={statutoryPreviewHref}
+                previewHref={urls.statutoryPreviewPdf(String(bag.id))}
             />
             <StatutoryDetailsHost inspectionId={String(bag.id)} details={statutoryDetails} />
             {/* Reclassification. UNGATED on purpose — every other control in this

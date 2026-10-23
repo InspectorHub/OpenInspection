@@ -17,6 +17,7 @@ export type {
   MediaFileResult,
   MediaUploader,
   NotifyOptions,
+  NotifyVariant,
   PendingMediaRecord,
   PendingMediaStore,
   PhotoAnnotateMeta,
@@ -76,7 +77,7 @@ export type {
   VideoUploadRef,
   VideoUploadTicket,
 } from './data-source-types';
-export { FieldDataSourceProvider, isIgnored, useFieldCommand, useFieldDataSource, useFieldSlots } from './context';
+export { FieldDataSourceProvider, isIgnored, useFieldCommand, useFieldDataSource, useFieldEnsureHuman, useFieldSlots } from './context';
 export type { FieldCommandRunner, FieldDataSourceProviderProps, FieldRunResult, IgnoredRun } from './context';
 export type { DateFormat, TimeFormat } from './shared/display-prefs';
 // The host keeps the package's locale in step with its own; see ./i18n.

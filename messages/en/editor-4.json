@@ -179,5 +179,6 @@
   "editor_pane_all_rated_title": "Every item in this section is rated",
   "editor_pane_all_rated_desc": "Open an item to review it, or move on to the next section.",
   "editor_pane_no_items_title": "This section has no items yet",
-  "editor_pane_no_items_desc": "Add the first one with “+ Add item” in the item list."
+  "editor_pane_no_items_desc": "Add the first one with “+ Add item” in the item list.",
+  "editor_human_check_unavailable": "This app cannot verify that you are a person, so nothing was sent. Contact support."
 }

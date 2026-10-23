@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { capturePriorRatings } from '~/lib/editor/batch-undo';
+import { capturePriorRatings } from './batch-undo';
 
 describe('capturePriorRatings', () => {
   it('captures current rating (or null) per item', () => {

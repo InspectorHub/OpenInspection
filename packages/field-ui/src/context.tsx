@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import type { ReactNode } from 'react';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
 import type { FieldDataSource, FieldHostSlots } from './data-source';
+import { m } from './i18n';
 
 const DataSourceContext = createContext<FieldDataSource | null>(null);
 const NO_SLOTS: FieldHostSlots = {};
@@ -34,6 +35,30 @@ export function useFieldDataSource(): FieldDataSource {
 /** The host-supplied UI slots; an empty object when the provider was given none. */
 export function useFieldSlots(): FieldHostSlots {
   return useContext(SlotsContext);
+}
+
+const NOT_REQUIRED = async (): Promise<boolean> => true;
+
+/**
+ * The host's human check as one stable function, FAIL-CLOSED.
+ *
+ * - `slots.ensureHuman` present: that function.
+ * - `slots.humanCheck === 'not-required'` (the host's explicit opt-out): answers `true` at once.
+ * - Neither: refuses (`false`) and shows the person why, because a host that forgot the slot must not
+ *   silently lose the check. The caller treats `false` as "do not send".
+ *
+ * The function keeps its identity across renders for as long as the slot and data source do.
+ */
+export function useFieldEnsureHuman(): () => Promise<boolean> {
+  const slots = useFieldSlots();
+  const dataSource = useFieldDataSource();
+  const { ensureHuman, humanCheck } = slots;
+  const refuse = useCallback(async (): Promise<boolean> => {
+    dataSource.notify(m.editor_human_check_unavailable(), 'error');
+    return false;
+  }, [dataSource]);
+  if (ensureHuman) return ensureHuman;
+  return humanCheck === 'not-required' ? NOT_REQUIRED : refuse;
 }
 
 /**

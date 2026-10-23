@@ -14,7 +14,7 @@
  * accompanied by a case that MUST warn.
  */
 import { describe, it, expect } from 'vitest';
-import { unsavedChangesAtRisk } from './useUnsavedChanges';
+import { unsavedChangesAtRisk } from './unsaved-changes-risk';
 
 const base = { hasLocalEdits: false, collabSynced: true, uploadInFlight: false };
 
