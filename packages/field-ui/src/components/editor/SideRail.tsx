@@ -45,16 +45,17 @@ const TABS: Array<{ id: TabId; label: () => string; icon: string }> = [
 ];
 
 export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, categoryColor, locale }: SideRailProps) {
-  const { urls } = useFieldDataSource();
+  const { urls, resources } = useFieldDataSource();
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [open, setOpen] = useState(initialOpen ?? false);
   // Photos: fill-only (Plan 1). Library: rich-only in fill mode — the canned
-  // library is meaningless for a data-entry item (module E). In author mode
-  // Library always stays (template canned authoring).
+  // library is meaningless for a data-entry item (module E). Either tab is also
+  // left out when the host does not provide what it lists (the comment library,
+  // the photo pool): a tab that can only say "unavailable" is a dead control.
   const hideLibrary = mode === "fill" && !!activeItem && activeItem.type !== "rich";
   const visibleTabs = TABS.filter((t) => {
-    if (t.id === "photos" && mode !== "fill") return false;
-    if (t.id === "library" && hideLibrary) return false;
+    if (t.id === "photos" && (mode !== "fill" || !resources.mediaPool)) return false;
+    if (t.id === "library" && (hideLibrary || !resources.commentsLibrary)) return false;
     return true;
   });
   const effectiveTab = visibleTabs.some((t) => t.id === activeTab) ? activeTab : "preview";

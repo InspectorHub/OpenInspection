@@ -7,7 +7,8 @@ export interface AddMediaChooserProps {
  onTakePhoto: () => void;
  /** "Add from library" — opens the multi-select library input (Task 16). */
  onAddFromLibrary: () => void;
- onPickVideo: () => void;
+ /** "Video" — opens video capture. Absent when the host has no video flow: the choice is left out. */
+ onPickVideo?: () => void;
 }
 
 export function AddMediaChooser({ onClose, onTakePhoto, onAddFromLibrary, onPickVideo }: AddMediaChooserProps) {
@@ -23,7 +24,7 @@ export function AddMediaChooser({ onClose, onTakePhoto, onAddFromLibrary, onPick
   />
   <div className="relative w-full max-w-md rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover">
    <h2 className="mb-3 text-[15px] font-bold text-ih-fg-1">{m.editor_addmedia_title()}</h2>
-   <div className="grid grid-cols-3 gap-3">
+   <div className={`grid gap-3 ${onPickVideo ? "grid-cols-3" : "grid-cols-2"}`}>
     <button
      type="button"
      onClick={onTakePhoto}
@@ -38,7 +39,7 @@ export function AddMediaChooser({ onClose, onTakePhoto, onAddFromLibrary, onPick
     >
      {m.editor_addmedia_add_from_library()}
     </button>
-    {(() => {
+    {onPickVideo && (() => {
      const offline = typeof navigator !== "undefined" && navigator.onLine === false;
      return (
       <button

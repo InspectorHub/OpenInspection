@@ -2,6 +2,8 @@ import { useState, type MouseEvent, type ReactNode } from "react";
 import type { useInspectionState } from "../../hooks/useInspection";
 import { Button, IconButton, Icon } from "@core/shared-ui";
 import { useFieldDataSource, useFieldSlots } from "../../context";
+import { useEditorCapabilities } from "../../hooks/useEditorCapabilities";
+import { useHostActions } from "../../hooks/useHostActions";
 import { ProgressStripText } from "./ProgressStripText";
 import { TemplateMenu } from "./TemplateMenu";
 import { PreviewMenu } from "./PreviewMenu";
@@ -80,7 +82,9 @@ export function EditorHeader({
  // The PDF preview and the theme switch are host UI (see `FieldHostSlots`); a host that
  // supplies none simply gets no such entry point.
  const { pdf, renderThemeControl } = useFieldSlots();
- const { urls, exit, openUrl, notify } = useFieldDataSource();
+ const caps = useEditorCapabilities();
+ const { urls, exit } = useFieldDataSource();
+ const { openPreview } = useHostActions(String(state.inspection.id));
  const listHref = urls.inspectionsList?.() ?? null;
  // A plain left click goes through `exit()` so the host's unsaved-changes guard sees it; a modified click or a
  // middle click keeps the browser's own link behaviour (new tab, new window).
@@ -89,8 +93,6 @@ export function EditorHeader({
   e.preventDefault();
   exit();
  };
- // The host opens the preview itself; one that cannot says so rather than doing nothing.
- const openPreview = (url: string) => (openUrl ? openUrl(url) : notify(m.editor_open_url_unavailable(), "warning"));
  const previewHref = tenantSlug ? urls.reportPreview(tenantSlug, String(state.inspection.id)) : null;
  /**
   * True while the pre-publish readiness check is in flight.
@@ -230,7 +232,7 @@ export function EditorHeader({
      item list column). The header holds global actions only. */}
 
  {/* #181 — Version history (only when collab editing is enabled) */}
- {collabEditing && (
+ {collabEditing && caps.versionHistory && (
   <IconButton
   aria-label={m.editor_header_version_history()}
   onClick={() => onOpenVersionHistory?.()}
@@ -257,7 +259,7 @@ export function EditorHeader({
      least discoverable. The label collapses on narrow widths (where its
      text-button neighbours hide entirely) but the button itself never
      does — nothing else opens this sheet. */}
- <Button
+ {caps.settingsSheet && <Button
   variant="secondary"
   size="md"
   aria-label={m.editor_header_settings()}
@@ -286,13 +288,13 @@ export function EditorHeader({
   }
  >
   <span className="hidden lg:inline">{m.editor_header_settings()}</span>
- </Button>
+ </Button>}
 
  {/* Template menu [config] — global template actions consolidated here
      (swap template · save as new · update source), replacing the buttons
      that used to sit at the section-rail bottom. */}
  <TemplateMenu
-  onChangeTemplate={onChangeTemplate}
+  onChangeTemplate={caps.settingsSheet ? onChangeTemplate : null}
   onSaveAsNewTemplate={onSaveAsNewTemplate}
   onUpdateSourceTemplate={onUpdateSourceTemplate}
   canUpdateSource={canUpdateSourceTemplate}
@@ -303,10 +305,10 @@ export function EditorHeader({
      The web report is the owner preview (works on drafts, tokenless via the
      report-view loader); the PDF is the real server-rendered deliverable
      (owner on-demand pre-publish via the JWT-authed endpoint). */}
- {/* No destination at all (no tenant link, no PDF export) means no menu: an empty Preview is a dead control. */}
- {(previewHref || pdf) && (
+ {/* No destination at all (no tenant link or no host that opens it, and no PDF export) means no menu: an empty Preview is a dead control. */}
+ {((previewHref && openPreview) || pdf) && (
   <PreviewMenu
-   onPreviewReport={previewHref ? () => openPreview(previewHref) : null}
+   onPreviewReport={previewHref && openPreview ? () => openPreview(previewHref) : null}
    onPreviewPdf={pdf ? () => pdf.run(String(state.inspection.id)) : null}
    pdfBusy={pdf?.busy ?? false}
    pdfError={pdf?.error ?? null}
@@ -356,7 +358,7 @@ export function EditorHeader({
    (state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null
   }
   finishingFieldwork={finishingFieldwork}
-  onOpenVersionHistory={collabEditing && onOpenVersionHistory ? onOpenVersionHistory : null}
+  onOpenVersionHistory={collabEditing && caps.versionHistory && onOpenVersionHistory ? onOpenVersionHistory : null}
   /* Full width in the menu: at its intrinsic size the four segments sit in
      a short pill against a much wider panel, reading as a stray chip rather
      than a control. */

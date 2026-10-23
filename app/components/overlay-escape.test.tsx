@@ -4,7 +4,9 @@ import { render, cleanup, fireEvent } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { hasOpenLayer, Modal } from "@core/shared-ui";
 import { AddMediaChooser } from "@core/field-ui/components/editor/AddMediaChooser";
-import { KeyboardHud } from "@core/field-ui/components/editor/KeyboardHud";
+import { KeyboardHud as BareKeyboardHud } from "@core/field-ui/components/editor/KeyboardHud";
+import { FieldDataSourceProvider } from "@core/field-ui/context";
+import { createEmptyEditorData, createFakeDataSource } from "@core/field-ui/testing/fake-data-source";
 import { VersionCompare } from "@core/field-ui/components/collab/VersionCompare";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
 
@@ -12,6 +14,16 @@ afterEach(() => {
   cleanup();
   expect(hasOpenLayer()).toBe(false);
 });
+
+// The sheet lists the shortcuts the host can act on, so it reads the host's capabilities.
+const hudHost = createFakeDataSource({ data: createEmptyEditorData() });
+function KeyboardHud({ onClose }: { onClose: () => void }) {
+  return (
+    <FieldDataSourceProvider dataSource={hudHost}>
+      <BareKeyboardHud onClose={onClose} />
+    </FieldDataSourceProvider>
+  );
+}
 
 const esc = () => fireEvent.keyDown(document, { key: "Escape" });
 

@@ -18,6 +18,8 @@ import { useScopeLoader } from "../hooks/useScopeLoader";
 import { useInspectionPrefs } from "../hooks/useInspectionPrefs";
 import { useKeyboard } from "../hooks/useKeyboard";
 import { useCannedComments } from "../hooks/useCannedComments";
+import { useEditorCapabilities } from "../hooks/useEditorCapabilities";
+import { useHostActions } from "../hooks/useHostActions";
 import { unsavedChangesAtRisk } from "../hooks/unsaved-changes-risk";
 import { usePhotoBatchUpload } from "../hooks/usePhotoBatchUpload";
 import { useReportCoverWrites } from "../hooks/useReportCoverWrites";
@@ -108,6 +110,7 @@ function originalQualityEnabled(): boolean {
 export function FieldEditor({ data }: { data: EditorData }) {
  const dataSource = useFieldDataSource();
  const slots = useFieldSlots();
+ const caps = useEditorCapabilities();
  // The host's own values (tenant, video backend, collab flag, display language), read once per render.
  const fieldSession = dataSource.session();
  const displayLocale = fieldSession.locale;
@@ -669,21 +672,8 @@ export function FieldEditor({ data }: { data: EditorData }) {
  /* Plan 7 — resolved video backend provider for this tenant ('r2' by default).
   * Drives VideoCapture checkbox gating and VideoPlayer branch selection. */
  const videoProvider = fieldSession.videoProvider;
- // The report preview address; null without a tenant slug, and the preview entry points are left out.
- const previewReportUrl = fieldSession.tenantSlug
-  ? dataSource.urls.reportPreview(fieldSession.tenantSlug, String(state.inspection.id))
-  : null;
-
- // The host opens the preview itself; one that cannot says so rather than doing nothing.
- const openPreview = (url: string) => {
-  if (dataSource.openUrl) dataSource.openUrl(url);
-  else notify(m.editor_open_url_unavailable(), "warning");
- };
- // The template schema is frozen at mount, so a template change needs a fresh mount, not a data refresh.
- const restartAfterTemplate = () => {
-  if (dataSource.restartSession) dataSource.restartSession();
-  else notify(m.editor_template_applied_reopen(), "warning");
- };
+ // The preview entry points need an address and a host that can open it; either missing leaves them out.
+ const { openPreview, previewReportUrl, restartAfterTemplate } = useHostActions(String(state.inspection.id));
 
  /* ---------------------------------------------------------------- */
  /* Photo / media operations (extracted hook) */
@@ -1181,7 +1171,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  state.setActiveItemId(item.id);
  state.setCurrentSectionIdx(item.sectionIdx);
  },
- onOpenLibrary: () => {
+ onOpenLibrary: !caps.commentsLibrary ? undefined : () => {
  if (!state.activeItemId) return;
  const r = state.getResult(state.activeItemId);
  state.setCommentLibraryFilter(
@@ -1191,7 +1181,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  state.setCommentLibrarySelectedIdx(0);
  state.setShowCommentLibrary(true);
  },
- onOpenSnippets: openSnippets,
+ onOpenSnippets: caps.commentsLibrary ? openSnippets : undefined,
  showCommentLibrary: state.showCommentLibrary,
  onLibraryDown: () => {
  state.setCommentLibrarySelectedIdx(
@@ -1234,7 +1224,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  onSave: () => findings.saveNow(),
  onPublish: () => { publishFlow.clearPublishError(); state.setShowPublishModal(true); },
  onCloneLast: () => handleCloneLast(inspectionPrefs.cloneDefault),
- onSaveAsSnippet: () => {
+ onSaveAsSnippet: !caps.commentsLibrary ? undefined : () => {
  if (!state.activeItemId) return;
  const r = state.getResult(state.activeItemId);
  const notes = ((r?.notes as string) || "").trim();
@@ -1265,6 +1255,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  toggleSpeedMode,
  speedRate,
  openSnippets,
+ caps.commentsLibrary,
  comments,
  commentLibraryItems,
  serverComments,
@@ -1468,9 +1459,9 @@ export function FieldEditor({ data }: { data: EditorData }) {
  onCloneLast={handleCloneLast}
  cloneDefaultScope={inspectionPrefs.cloneDefault}
  tagChipRow={tagChipRow}
- onOpenSnippets={openSnippets}
- onSearchLibrary={comments.searchLibrary}
- onSaveDefectToLibrary={(input) => {
+ onOpenSnippets={caps.commentsLibrary ? openSnippets : undefined}
+ onSearchLibrary={caps.commentsLibrary ? comments.searchLibrary : undefined}
+ onSaveDefectToLibrary={!caps.commentsLibrary ? undefined : (input) => {
  // Track H (B-20 follow-up): best-effort — the defect itself already landed in
  // result.customComments; a failed library save only costs reuse next time.
  const text = input.comment ? `${input.title} — ${input.comment}` : input.title;
@@ -1491,8 +1482,8 @@ export function FieldEditor({ data }: { data: EditorData }) {
  .recommendations as AttachedRepairItem[] | undefined)
  : undefined) ?? []
  }
- onAttachRepairItem={findings.attachRepairItem}
- onDetachRepairItem={findings.detachRepairItem}
+ onAttachRepairItem={caps.repairItems ? findings.attachRepairItem : undefined}
+ onDetachRepairItem={caps.repairItems ? findings.detachRepairItem : undefined}
  inspectionId={String(state.inspection.id)}
  coverKey={coverKey}
  onOpenPhoto={onOpenPhoto}
@@ -1546,12 +1537,14 @@ export function FieldEditor({ data }: { data: EditorData }) {
  <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
   <p className="text-[15px] font-semibold text-ih-fg-1">{m.editor_route_empty_template_title()}</p>
   <p className="text-[13px] text-ih-fg-3 max-w-sm">{m.editor_route_empty_template_desc()}</p>
-  <Button
-  variant="primary"
-  onClick={() => state.setSettingsOpen(true)}
-  >
-  {m.editor_route_choose_template()}
-  </Button>
+  {caps.settingsSheet && (
+   <Button
+   variant="primary"
+   onClick={() => state.setSettingsOpen(true)}
+   >
+   {m.editor_route_choose_template()}
+   </Button>
+  )}
  </div>
  ) : null;
 
@@ -1629,7 +1622,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  setAddMediaChooser(null);
  libraryInputRef.current?.click();
  }}
- onPickVideo={() => {
+ onPickVideo={!caps.video ? undefined : () => {
  const t = addMediaChooser;
  setAddMediaChooser(null);
  setVideoCaptureTarget(t);
@@ -1671,15 +1664,17 @@ export function FieldEditor({ data }: { data: EditorData }) {
  const finishActionsEl = (
  <>
  {/* Inspection settings sheet */}
- <InspectionSettingsSheet
- open={state.settingsOpen}
- onClose={() => state.setSettingsOpen(false)}
- inspectionId={String(state.inspection.id)}
- // Template schema drives the whole editor state (frozen at mount in useInspection),
- // so a template change requires a full route reload — this also fixes the same
- // staleness for mid-inspection template switches, not just the empty case.
- onTemplateApplied={restartAfterTemplate}
- />
+ {caps.settingsSheet && (
+  <InspectionSettingsSheet
+  open={state.settingsOpen}
+  onClose={() => state.setSettingsOpen(false)}
+  inspectionId={String(state.inspection.id)}
+  // Template schema drives the whole editor state (frozen at mount in useInspection),
+  // so a template change requires a full route reload — this also fixes the same
+  // staleness for mid-inspection template switches, not just the empty case.
+  onTemplateApplied={restartAfterTemplate}
+  />
+ )}
  {/* Publish confirmation modal */}
  <PublishModal
  open={state.showPublishModal}
@@ -1761,7 +1756,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
   <p className="text-center text-ih-fg-3 mt-12">{m.editor_route_mobile_begin()}</p>
  ))}
  </main>
- <MobileDrawerTriggers onOpen={(id) => setMobileDrawer(id)} />
+ <MobileDrawerTriggers onOpen={(id) => setMobileDrawer(id)} showTheme={caps.themeControl} />
  <MobileBottomDrawer
  open={mobileDrawer === 'sections'}
  onClose={() => setMobileDrawer(null)}
@@ -1788,11 +1783,11 @@ export function FieldEditor({ data }: { data: EditorData }) {
  onClose={() => setMobileDrawer(null)}
  onPublish={() => void handlePublishClick()}
  onSign={() => setSignModalOpen(true)}
- onOpenSettings={() => state.setSettingsOpen(true)}
+ onOpenSettings={caps.settingsSheet ? () => state.setSettingsOpen(true) : null}
  onFinishFieldwork={(state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
  finishingFieldwork={publishFlow.finishing}
  onPreviewReport={
-  previewReportUrl
+  previewReportUrl && openPreview
   ? () => openPreview(previewReportUrl)
   : null
  }
@@ -1916,6 +1911,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  index={viewer.index}
  onClose={() => setViewer((v) => ({ ...v, index: null }))}
  onAction={onViewerAction}
+ hideActions={caps.video ? undefined : ["poster"]}
  streamCustomerSubdomain={streamCustomerSubdomain}
  inspectionId={String(state.inspection.id)}
  />
@@ -2037,7 +2033,6 @@ export function FieldEditor({ data }: { data: EditorData }) {
  {/* Unsaved changes guard (the host renders its own stay-or-leave dialog) */}
  {unsavedGuardEl}
 
-
  {/* #181 — Version history panel (collab Phase 4). Only reachable when the
      collabEditing flag is on (the trigger button is gated in EditorHeader).
      Live convergence for ALL clients (incl. the initiator) is now driven by the
@@ -2053,37 +2048,38 @@ export function FieldEditor({ data }: { data: EditorData }) {
  currentResults={state.results as unknown as ResultsProjection}
  />
 
-
  {finishActionsEl}
 
  {/* Comment library drawer */}
- <CommentLibraryDrawer
- open={state.showCommentLibrary}
- comments={{
- filterMode: comments.filterMode,
- setFilterMode: comments.setFilterMode,
- sort: comments.sort,
- setSort: comments.setSort,
- touchSnippet: comments.touchSnippet,
- }}
- state={{
- activeItem: state.activeItem,
- currentSection: state.currentSection,
- activeItemId: state.activeItemId,
- getResult: state.getResult,
- getRatingLabel: state.getRatingLabel,
- commentLibraryFilter: state.commentLibraryFilter,
- setCommentLibraryFilter: state.setCommentLibraryFilter,
- setCommentLibrarySelectedIdx: state.setCommentLibrarySelectedIdx,
- commentLibrarySearch: state.commentLibrarySearch,
- setCommentLibrarySearch: state.setCommentLibrarySearch,
- commentLibrarySelectedIdx: state.commentLibrarySelectedIdx,
- setShowCommentLibrary: state.setShowCommentLibrary,
- }}
- serverComments={serverComments}
- onInsert={onInsert}
- onClose={() => state.setShowCommentLibrary(false)}
- />
+ {caps.commentsLibrary && (
+  <CommentLibraryDrawer
+  open={state.showCommentLibrary}
+  comments={{
+  filterMode: comments.filterMode,
+  setFilterMode: comments.setFilterMode,
+  sort: comments.sort,
+  setSort: comments.setSort,
+  touchSnippet: comments.touchSnippet,
+  }}
+  state={{
+  activeItem: state.activeItem,
+  currentSection: state.currentSection,
+  activeItemId: state.activeItemId,
+  getResult: state.getResult,
+  getRatingLabel: state.getRatingLabel,
+  commentLibraryFilter: state.commentLibraryFilter,
+  setCommentLibraryFilter: state.setCommentLibraryFilter,
+  setCommentLibrarySelectedIdx: state.setCommentLibrarySelectedIdx,
+  commentLibrarySearch: state.commentLibrarySearch,
+  setCommentLibrarySearch: state.setCommentLibrarySearch,
+  commentLibrarySelectedIdx: state.commentLibrarySelectedIdx,
+  setShowCommentLibrary: state.setShowCommentLibrary,
+  }}
+  serverComments={serverComments}
+  onInsert={onInsert}
+  onClose={() => state.setShowCommentLibrary(false)}
+  />
+ )}
 
  {/* Section picker modal */}
  <SectionPickerModal
@@ -2143,20 +2139,22 @@ export function FieldEditor({ data }: { data: EditorData }) {
     >
      {m.editor_route_units()}
     </Button>
-    <Button
-     variant="secondary"
-     size="sm"
-     onClick={() => setCostItemsOpen(true)}
-     className="hidden lg:inline-flex"
-     title={m.editor_route_cost_items_title()}
-     icon={
-      <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m0-10a4 4 0 100 8 4 4 0 000-8z" />
-      </svg>
-     }
-    >
-     {m.editor_route_cost_items()}
-    </Button>
+    {caps.costItems && (
+     <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => setCostItemsOpen(true)}
+      className="hidden lg:inline-flex"
+      title={m.editor_route_cost_items_title()}
+      icon={
+       <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m0-10a4 4 0 100 8 4 4 0 000-8z" />
+       </svg>
+      }
+     >
+      {m.editor_route_cost_items()}
+     </Button>
+    )}
    </div>
   ) : undefined
  }
@@ -2172,7 +2170,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
   />
  )}
  {/* Commercial PCA Phase C Task 13b — cost items drawer (Opinion of Cost) */}
- {showUnitsSurface && (
+ {showUnitsSurface && caps.costItems && (
   <CostItemsHost
    open={costItemsOpen}
    onClose={() => setCostItemsOpen(false)}

@@ -10,6 +10,8 @@ export type MobileDrawerId = 'sections' | 'items' | 'preview' | 'theme' | 'actio
 
 export interface MobileDrawerTriggersProps {
     onOpen: (id: MobileDrawerId) => void;
+    /** False when the host supplies no theme control: the Theme tab would open an empty drawer, so it is left out. Defaults to true. */
+    showTheme?: boolean;
 }
 
 /**
@@ -17,7 +19,7 @@ export interface MobileDrawerTriggersProps {
  * the corresponding bottom drawer. Replaces the InspectorToolsDock on
  * mobile.
  */
-export function MobileDrawerTriggers({ onOpen }: MobileDrawerTriggersProps) {
+export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerTriggersProps) {
     return (
         <nav className="fixed left-0 right-0 bottom-0 z-30 h-14 bg-ih-bg-card border-t border-ih-border flex">
             {([
@@ -25,7 +27,7 @@ export function MobileDrawerTriggers({ onOpen }: MobileDrawerTriggersProps) {
                 { id: 'items',    label: m.editor_mobile_drawer_items(),    icon: '≣' },
                 { id: 'preview',  label: m.editor_route_drawer_preview(),  icon: '👁' },
                 { id: 'theme',    label: m.nav_theme_label(),        icon: '◐' },
-            ] as const).map(t => (
+            ] as const).filter(t => showTheme || t.id !== 'theme').map(t => (
                 <button
                     key={t.id}
                     onClick={() => onOpen(t.id)}

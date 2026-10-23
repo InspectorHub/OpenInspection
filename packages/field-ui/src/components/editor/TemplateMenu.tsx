@@ -3,8 +3,8 @@ import { Button, MenuItem, Popover } from "@core/shared-ui";
 import { m } from "../../i18n";
 
 export interface TemplateMenuProps {
-  /** Open the template picker (the inspection's applied template can be swapped). */
-  onChangeTemplate: () => void;
+  /** Open the template picker (the inspection's applied template can be swapped). Null when the host has no settings sheet: the row is left out. */
+  onChangeTemplate: (() => void) | null;
   /** Save the current structure as a brand-new template. */
   onSaveAsNewTemplate: () => void;
   /** Write the current structure back to the inspection's source template. */
@@ -56,15 +56,19 @@ export function TemplateMenu({
 
       <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} align="right">
         <ul role="menu" aria-label={m.template_menu_actions_aria()} className="py-1 min-w-[220px]">
-          <li role="none">
-            <MenuItem
-              data-testid="change-template-btn"
-              onClick={() => run(onChangeTemplate)}
-            >
-              {m.template_menu_change()}
-            </MenuItem>
-          </li>
-          <li aria-hidden className="mx-3 my-1 border-t border-ih-border" />
+          {onChangeTemplate && (
+            <>
+              <li role="none">
+                <MenuItem
+                  data-testid="change-template-btn"
+                  onClick={() => run(onChangeTemplate)}
+                >
+                  {m.template_menu_change()}
+                </MenuItem>
+              </li>
+              <li aria-hidden className="mx-3 my-1 border-t border-ih-border" />
+            </>
+          )}
           <li role="none">
             <MenuItem
               data-testid="save-template-new-btn"

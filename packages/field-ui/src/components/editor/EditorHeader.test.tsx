@@ -65,7 +65,7 @@ describe('EditorHeader host slots', () => {
     expect(previewButton()).toBeNull();
   });
 
-  it('CONTROL - Preview appears with a tenant slug alone, and with a PDF export alone', () => {
+  it('CONTROL - Preview appears with a tenant slug and a host that opens it, and with a PDF export alone', () => {
     mount(undefined, { tenantSlug: 'acme' });
     expect(previewButton()).not.toBeNull();
     cleanup();
@@ -105,15 +105,14 @@ describe('EditorHeader host slots', () => {
     open.mockRestore();
   });
 
-  it('tells the user when the host cannot open a URL, and opens nothing', () => {
-    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
-    const fake = mount(undefined, { tenantSlug: 'acme', without: ['openUrl'] });
+  it('offers no web report row when the host cannot open a URL, and no Preview menu at all without a PDF export either', () => {
+    mount(PDF_SLOT, { tenantSlug: 'acme', without: ['openUrl'] });
     act(() => { previewButton()!.click(); });
-    act(() => { screen.getByTestId('preview-report-btn').click(); });
-    expect(fake.openedUrls).toEqual([]);
-    expect(fake.notifications.map((n) => n.variant)).toEqual(['warning']);
-    expect(open).not.toHaveBeenCalled();
-    open.mockRestore();
+    expect(screen.queryByTestId('preview-report-btn')).toBeNull();
+    expect(screen.getByTestId('preview-pdf-btn')).toBeTruthy();
+    cleanup();
+    mount(undefined, { tenantSlug: 'acme', without: ['openUrl'] });
+    expect(previewButton()).toBeNull();
   });
 });
 

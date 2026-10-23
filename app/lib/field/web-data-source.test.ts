@@ -95,6 +95,26 @@ describe("createWebFieldDataSource", () => {
         }
     });
 
+    it("provides every optional capability the editor hides its entry points for, so the web editor shows them all", () => {
+        // The editor leaves an entry out when its resource is absent (FieldEditor.capabilities.test.tsx). The web
+        // host must therefore keep providing each one: a member dropped here would silently remove a button.
+        const CAPABILITIES = [
+            "aiAssist",
+            "commentsLibrary",
+            "costItems",
+            "mediaPool",
+            "publishReadiness",
+            "repairItems",
+            "settingsSheet",
+            "templateSearch",
+            "versionHistory",
+            "video",
+        ] as const;
+        for (const ds of [make(), make({ current: () => null })]) {
+            for (const key of CAPABILITIES) expect(ds.resources[key], key).toBeDefined();
+        }
+    });
+
     it("hands the live results document to the media uploader, which answers instead of throwing", async () => {
         const ds = make();
         const rec = {

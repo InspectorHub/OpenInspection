@@ -1,5 +1,6 @@
 import { IconButton, useLayer } from "@core/shared-ui";
 import { useIsMobile } from "../../hooks/useBreakpoint";
+import { useEditorCapabilities } from "../../hooks/useEditorCapabilities";
 import { m } from "../../i18n";
 
 interface ShortcutColumn {
@@ -8,6 +9,8 @@ interface ShortcutColumn {
 }
 
 export function KeyboardHud({ onClose }: { onClose: () => void }) {
+  // Only the shortcuts this host can act on are listed: a sheet that advertises a dead key is a lie.
+  const { commentsLibrary } = useEditorCapabilities();
   const COLUMNS: ShortcutColumn[] = [
     { title: m.editor_hud_col_navigate(), rows: [
       { key: "Up/Down", label: m.editor_hud_nav_prev_next() },
@@ -27,11 +30,13 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
       { key: "N", label: m.editor_hud_rate_na() },
     ]},
     { title: m.editor_hud_col_content(), rows: [
-      { key: "/", label: m.editor_hud_content_library() },
-      { key: ";", label: m.editor_hud_content_snippet() },
+      ...(commentsLibrary ? [
+        { key: "/", label: m.editor_hud_content_library() },
+        { key: ";", label: m.editor_hud_content_snippet() },
+      ] : []),
       { key: "P", label: m.editor_item_add_photo() },
       { key: "T", label: m.editor_hud_content_tag() },
-      { key: "Cmd+D", label: m.editor_hud_content_save_snippet() },
+      ...(commentsLibrary ? [{ key: "Cmd+D", label: m.editor_hud_content_save_snippet() }] : []),
     ]},
     { title: m.editor_hud_col_view(), rows: [
       { key: "Cmd+1", label: m.editor_hud_view_three_pane() },

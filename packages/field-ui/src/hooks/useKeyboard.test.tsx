@@ -64,3 +64,24 @@ describe("useKeyboard Escape", () => {
     expect(h.onSave).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("useKeyboard comment-library keys", () => {
+  const LIBRARY_KEYS: [string, Partial<KeyboardEvent>][] = [
+    ["/", {}],
+    [";", {}],
+    ["d", { metaKey: true }],
+  ];
+
+  it.each(LIBRARY_KEYS)("claims %s for the library when the host provides it", (key, mods) => {
+    const h = handlers();
+    render(<Harness h={h} layerOpen={false} />);
+    expect(fireEvent.keyDown(window, { key, ...mods })).toBe(false);
+    expect(key === "/" ? h.onOpenLibrary : key === ";" ? h.onOpenSnippets : h.onSaveAsSnippet).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(LIBRARY_KEYS)("leaves %s alone when the host has no library (not prevented, nothing thrown)", (key, mods) => {
+    const h = handlers({ onOpenLibrary: undefined, onOpenSnippets: undefined, onSaveAsSnippet: undefined });
+    render(<Harness h={h} layerOpen={false} />);
+    expect(fireEvent.keyDown(window, { key, ...mods })).toBe(true);
+  });
+});

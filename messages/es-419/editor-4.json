@@ -181,6 +181,5 @@
   "editor_pane_no_items_title": "Esta sección aún no tiene elementos",
   "editor_pane_no_items_desc": "Agregue el primero con «+ Agregar elemento» en la lista de elementos.",
   "editor_human_check_unavailable": "Esta aplicación no puede verificar que usted es una persona, por lo que no se envió nada. Comuníquese con soporte.",
-  "editor_open_url_unavailable": "Esta aplicación no puede abrir la vista previa del informe desde aquí.",
   "editor_template_applied_reopen": "Se aplicó la plantilla. Cierre y vuelva a abrir esta inspección para verla."
 }

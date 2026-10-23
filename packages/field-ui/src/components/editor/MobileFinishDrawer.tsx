@@ -9,8 +9,8 @@ export interface MobileFinishDrawerProps {
   onPublish: () => void;
   /** Opens the manual signature modal. */
   onSign: () => void;
-  /** Opens the per-inspection report settings sheet. */
-  onOpenSettings: () => void;
+  /** Opens the per-inspection report settings sheet; null when the host has none (the button is left out). */
+  onOpenSettings: (() => void) | null;
   /** Advisory lifecycle move; null once the fieldwork is already complete. */
   onFinishFieldwork: (() => void) | null;
   /** Whether the finish-fieldwork request is in flight. */
@@ -68,9 +68,11 @@ export function MobileFinishDrawer({
             {m.editor_header_preview_report()}
           </Button>
         )}
-        <Button variant="secondary" className="w-full" onClick={() => run(onOpenSettings)}>
-          {m.editor_header_settings()}
-        </Button>
+        {onOpenSettings && (
+          <Button variant="secondary" className="w-full" onClick={() => run(onOpenSettings)}>
+            {m.editor_header_settings()}
+          </Button>
+        )}
         {onFinishFieldwork && (
           <Button
             variant="secondary"

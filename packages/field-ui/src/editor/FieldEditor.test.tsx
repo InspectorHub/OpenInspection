@@ -92,12 +92,12 @@ describe("FieldEditor", () => {
       expect(open).not.toHaveBeenCalled();
     });
 
-    it("tells the person when the host cannot open the preview, instead of doing nothing", async () => {
-      const fake = mount({ without: ["openUrl"] });
+    it("offers no report preview when the host cannot open it, while the rest of the drawer stays", async () => {
+      mount({ without: ["openUrl"] });
       await openMoreActions();
-      fireEvent.click(await screen.findByText(m.editor_header_preview_report()));
-      expect(fake.openedUrls).toEqual([]);
-      expect(fake.notifications.map((n) => n.message)).toContain(m.editor_open_url_unavailable());
+      // The drawer is open (Publish is in it), and the preview entry is not.
+      await screen.findByRole("button", { name: m.editor_header_publish() });
+      expect(screen.queryByText(m.editor_header_preview_report())).toBeNull();
     });
 
     it("restarts the session after a template change, not just a data reload", async () => {

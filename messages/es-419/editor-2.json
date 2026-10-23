@@ -111,6 +111,7 @@
   "editor_item_notes_label": "Notas",
   "editor_item_notes_chars": "{count} caracteres",
   "editor_item_notes_placeholder": "Agregue notas — escriba para ver comentarios recomendados, / para la biblioteca",
+  "editor_item_notes_placeholder_no_library": "Agregue notas — escriba para ver comentarios recomendados",
   "editor_item_recommended": "Comentarios recomendados",
   "editor_item_add_photo": "Agregar foto",
   "editor_item_add_defect_photo_aria": "Agregar foto a este defecto",

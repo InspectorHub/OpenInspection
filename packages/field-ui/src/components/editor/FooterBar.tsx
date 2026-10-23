@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@core/shared-ui";
 import type { PresenceUser, PresenceStatus } from "../../hooks/usePresence";
+import { useEditorCapabilities } from "../../hooks/useEditorCapabilities";
 import { m } from "../../i18n";
 
 interface FooterBarProps {
@@ -13,11 +14,12 @@ interface FooterBarProps {
 export function FooterBar({ connected = false, status, roster = [] }: FooterBarProps) {
   const effectiveStatus: PresenceStatus = status ?? (connected ? "connected" : "connecting");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const { commentsLibrary } = useEditorCapabilities();
 
   const SHORTCUTS = [
     { keys: ["1", "-", "5"], desc: m.editor_footer_shortcut_rate() },
     { keys: ["J", "/", "K"], desc: m.editor_footer_shortcut_nav() },
-    { keys: ["/"], desc: m.editor_footer_shortcut_library() },
+    ...(commentsLibrary ? [{ keys: ["/"], desc: m.editor_footer_shortcut_library() }] : []),
     { keys: ["P"], desc: m.editor_footer_shortcut_photo() },
     { keys: ["V"], desc: m.editor_footer_shortcut_voice() },
     { keys: ["R"], desc: m.editor_footer_shortcut_repeat() },

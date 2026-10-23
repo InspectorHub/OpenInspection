@@ -2,9 +2,13 @@
 import { render, screen } from '@testing-library/react';
 import { SideRail as BareSideRail } from "./SideRail";
 import { FieldDataSourceProvider } from "../../context";
-import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
+import { createEmptyEditorData, createFakeCommentsLibrary, createFakeDataSource, createFakeMediaPool } from "../../testing/fake-data-source";
 
-const fake = createFakeDataSource({ data: createEmptyEditorData() });
+// The rail lists what the host provides: the photo pool and the comment library.
+const fake = createFakeDataSource({
+  data: createEmptyEditorData(),
+  resources: { mediaPool: createFakeMediaPool(), commentsLibrary: createFakeCommentsLibrary() },
+});
 /** The rail reads photo URLs and the photo gallery's data off the data source. */
 function SideRail(props: Parameters<typeof BareSideRail>[0]) {
   return (

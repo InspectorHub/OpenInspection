@@ -485,15 +485,15 @@ export function ItemEditor({
     if (e.key === "Escape") { e.preventDefault(); setTaOpen(false); return; }
    }
    if (
-    e.key === '/' &&
+    onOpenSnippets && e.key === '/' &&
     !e.nativeEvent.isComposing &&
     shouldTriggerSlash(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)
    ) {
     e.preventDefault();
-    onOpenSnippets?.();
+    onOpenSnippets();
    }
   }}
-  placeholder={m.editor_item_notes_placeholder()}
+  placeholder={onOpenSnippets ? m.editor_item_notes_placeholder() : m.editor_item_notes_placeholder_no_library()}
   className="w-full h-28 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
  />
  <CommentTypeahead

@@ -24,9 +24,9 @@ export interface KeyboardHandlers {
   onSpeedPrev?: () => void;
   onSpeedOpenEditor?: () => void;
 
-  // Comment library
-  onOpenLibrary: () => void;
-  onOpenSnippets: () => void;
+  // Comment library. A host without the library leaves both out, and the keys are then left alone (typed as text).
+  onOpenLibrary?: () => void;
+  onOpenSnippets?: () => void;
   showCommentLibrary: boolean;
   onLibraryDown?: () => void;
   onLibraryUp?: () => void;
@@ -39,7 +39,8 @@ export interface KeyboardHandlers {
   onPublish: () => void;
   /** Workflow shortcuts PR — R key clones the previous item via tenant scope default. */
   onCloneLast: () => void;
-  onSaveAsSnippet: () => void;
+  /** Cmd/Ctrl+D. Absent when the host has no comment library: the key is then left to the browser. */
+  onSaveAsSnippet?: () => void;
   onToggleCheatsheet: () => void;
 
   // G-prefix
@@ -102,7 +103,7 @@ export function useKeyboard(
           h.onPublish();
           return;
         }
-        if (e.key === "d" || e.key === "D") {
+        if ((e.key === "d" || e.key === "D") && h.onSaveAsSnippet) {
           e.preventDefault();
           h.onSaveAsSnippet();
           return;
@@ -243,14 +244,14 @@ export function useKeyboard(
       }
 
       // / = open comment library
-      if (e.key === "/") {
+      if (e.key === "/" && h.onOpenLibrary) {
         e.preventDefault();
         h.onOpenLibrary();
         return;
       }
 
       // ; = open snippets
-      if (e.key === ";") {
+      if (e.key === ";" && h.onOpenSnippets) {
         e.preventDefault();
         h.onOpenSnippets();
         return;
