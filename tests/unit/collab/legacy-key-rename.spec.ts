@@ -167,11 +167,14 @@ describe('renameLegacyFindingKeys', () => {
     it('leaves meta keys, unknown ids, ambiguous ids and composite keys alone, and counts the first three', () => {
         const doc = legacyDoc({
             roof: { rating: 'D' },
-            _inspector_signature: { signatureBase64: 'x' } as never,
             gone: { rating: 'S' },
             shared: { rating: 'I' },
             [COMPOSITE.replace('roof', 'attic')]: { notes: 'already composite' },
         });
+        // A stored document from before meta keys were skipped on import: an item map under a meta key.
+        const meta = new Y.Map<unknown>();
+        meta.set('signatureBase64', 'x');
+        results(doc).set('_inspector_signature', meta);
         const untouched = (key: string) => JSON.stringify((results(doc).get(key) as Y.Map<unknown>).toJSON());
         const before = { meta: untouched('_inspector_signature'), gone: untouched('gone'), shared: untouched('shared') };
 

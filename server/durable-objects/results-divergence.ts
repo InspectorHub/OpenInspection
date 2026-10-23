@@ -19,6 +19,7 @@ import { and, eq } from 'drizzle-orm';
 import { inspectionResults } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { projectResults } from '../lib/collab/results-doc';
+import { isMetaKey } from '../lib/finding-key';
 import type { ResultsProjection } from '../lib/collab/results-doc.types';
 
 /**
@@ -46,17 +47,6 @@ export function isNonEmptyProjection(value: unknown): value is ResultsProjection
  */
 export function projectionsEqual(a: ResultsProjection, b: ResultsProjection): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
-}
-
-/**
- * A meta key (`_inspector_signature`): underscore-prefixed with fewer than three
- * colon-separated parts. Composite finding keys start with `_default:` too, so
- * the prefix alone cannot tell them apart. (`finding-key-migration.ts` has an
- * `isMetaKey` of its own that is the bare prefix test: there it only ever runs on
- * keys already known to be legacy-shaped, so the two agree where both apply.)
- */
-function isMetaKey(key: string): boolean {
-    return key.startsWith('_') && key.split(':').length < 3;
 }
 
 function hasText(value: unknown): boolean {

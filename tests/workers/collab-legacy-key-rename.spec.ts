@@ -168,8 +168,8 @@ describe('the rename-legacy-keys verb', () => {
         const res = await rename(f);
 
         expect(res.status).toBe(200);
-        // The signature came in with the blob as a (contentless) item; it is meta, so it is counted and left alone.
-        expect(await res.json()).toEqual({ renamed: 1, skippedMeta: 1, skippedUnknown: 0, skippedAmbiguous: 0, conflicts: 0 });
+        // The signature is meta: the document never imported it, so there is none to skip.
+        expect(await res.json()).toEqual({ renamed: 1, skippedMeta: 0, skippedUnknown: 0, skippedAmbiguous: 0, conflicts: 0 });
         const proj = await projection(f);
         expect(proj[COMPOSITE]).toEqual(before);
         expect('roof' in proj).toBe(false);
@@ -441,5 +441,80 @@ describe('the divergence log line on an inspection with several reports', () => 
         });
 
         expect(warn.mock.calls.filter((c) => String(c[0]).includes('collab_d1_divergence'))).toHaveLength(0);
+    });
+});
+
+describe('meta keys survive the document persist', () => {
+    const OTHER_META = { note: 'kept too' };
+    const withMeta = { roof: { rating: 'D', notes: 'Flashing lifted' }, _inspector_signature: SIGNATURE, _other_meta: OTHER_META };
+
+    async function persistEdit(f: Fixture, edit: (doc: Y.Doc) => void = () => undefined): Promise<void> {
+        await runInDurableObject(f.stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            applyItemPatch(io.doc, '_default:s1:attic', 'notes', 'edited');
+            edit(io.doc);
+            await io.persist();
+        });
+    }
+
+    it('keeps the signature of a blob the document imported, across the first persist and a later edit', async () => {
+        const f = await legacyInspection(withMeta);
+        await openedInEditor(f); // import + persist
+        expect((await blobOf(f))._inspector_signature).toEqual(SIGNATURE);
+
+        await persistEdit(f);
+
+        const blob = await blobOf(f);
+        expect(blob._inspector_signature).toEqual(SIGNATURE);
+        expect(blob._other_meta).toEqual(OTHER_META);
+    });
+
+    it('never puts a meta key into the document', async () => {
+        const f = await legacyInspection(withMeta);
+        await openedInEditor(f);
+        const keys = await runInDurableObject(f.stub, (instance: InspectionDocDO) => [...(instance as unknown as DOInternals).doc.getMap('results').keys()]);
+        expect(keys.filter((k) => k.startsWith('_') && !k.startsWith('_default:'))).toEqual([]);
+        expect(Object.keys(await projection(f)).filter((k) => k.startsWith('_') && !k.startsWith('_default:'))).toEqual([]);
+    });
+
+    it('keeps the signature when a stored document already holds an empty item map for it', async () => {
+        const f = await legacyInspection(withMeta);
+        await openedInEditor(f);
+        await runInDurableObject(f.stub, (instance: InspectionDocDO) => {
+            (instance as unknown as DOInternals).doc.getMap<unknown>('results').set('_inspector_signature', new Y.Map<unknown>());
+        });
+        // The signature is written the way the signing routes write it: straight to the row.
+        await b.DB.prepare('UPDATE inspection_results SET data = ? WHERE report_id = ?')
+            .bind(JSON.stringify({ ...(await blobOf(f)), _inspector_signature: SIGNATURE }), f.reportId).run();
+
+        await persistEdit(f);
+
+        const blob = await blobOf(f);
+        expect(blob._inspector_signature).toEqual(SIGNATURE);
+        expect(blob._other_meta).toEqual(OTHER_META);
+        expect(Object.keys(await projection(f))).not.toContain('_inspector_signature');
+    });
+
+    it('picks up a signature written to the row after the document was opened, and the findings are unchanged', async () => {
+        const f = await legacyInspection({ roof: { rating: 'D', notes: 'Flashing lifted' } });
+        await openedInEditor(f);
+        const before = (await blobOf(f))[COMPOSITE];
+        await b.DB.prepare('UPDATE inspection_results SET data = ? WHERE report_id = ?')
+            .bind(JSON.stringify({ ...(await blobOf(f)), _inspector_signature: SIGNATURE }), f.reportId).run();
+
+        await persistEdit(f);
+
+        const blob = await blobOf(f);
+        expect(blob._inspector_signature).toEqual(SIGNATURE);
+        expect(blob.roof).toMatchObject({ rating: 'D', notes: 'Flashing lifted' });
+        expect(blob[COMPOSITE]).toEqual(before);
+        expect(blob['_default:s1:attic']).toMatchObject({ notes: 'edited' });
+    });
+
+    it('does not conjure a meta key for a row that never had one', async () => {
+        const f = await legacyInspection({ roof: { rating: 'D' } });
+        await openedInEditor(f);
+        await persistEdit(f);
+        expect(Object.keys(await blobOf(f)).filter((k) => k.startsWith('_') && !k.startsWith('_default:'))).toEqual([]);
     });
 });

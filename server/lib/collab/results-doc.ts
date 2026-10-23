@@ -25,6 +25,7 @@ import type {
     CustomCommentEntry,
 } from './results-doc.types';
 import { withoutRepairPriceRows } from '../repair-price-keys';
+import { isMetaKey } from '../finding-key';
 
 type CannedTab = 'information' | 'limitations' | 'defects';
 
@@ -611,7 +612,8 @@ export function loadResultsProjection(doc: Y.Doc, projection: ResultsProjection)
     const results = doc.getMap<unknown>('results');
 
     doc.transact(() => {
-        for (const [findingKey, entry] of Object.entries(projection)) {
+        // Meta keys (the inspector signature) are not findings; see `isMetaKey`.
+        for (const [findingKey, entry] of Object.entries(projection).filter(([key]) => !isMetaKey(key))) {
             // Idempotent structure first (Condition A): never clobber existing.
             getOrSeedItem(results, findingKey);
 
@@ -727,7 +729,7 @@ export function projectResults(doc: Y.Doc): ResultsProjection {
     const projection: ResultsProjection = {};
 
     results.forEach((rawItem, findingKey) => {
-        if (!(rawItem instanceof Y.Map)) return;
+        if (!(rawItem instanceof Y.Map) || isMetaKey(findingKey)) return; // an old document may hold an empty map for a meta key
 
         const entry: ItemEntry = {};
 

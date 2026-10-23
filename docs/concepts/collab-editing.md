@@ -131,7 +131,7 @@ under `server/`.
 | `server/lib/inspection/reports.ts` | deletes the row of a deleted report | Acceptable: no content written. |
 | `server/services/inspection/inspection-annotations.service.ts` | `annotatedKey` / crop metadata on a photo | Acceptable only through the `skipResultsWrite` path, which the Media Studio routes take when collab is on. A caller that omits the option writes straight to D1. |
 | `server/api/admin/admin-finding-keys.ts` (through `server/lib/inspection/finding-key-migration.ts`) | legacy key rename | Acceptable: rows without collab state are rewritten in D1; rows with collab state are renamed inside the document by the object (see below). Meta keys are never rewritten. |
-| `server/lib/inspection/auto-sign.ts`, `server/api/inspection-sync.ts` (inspector signature) | the `_inspector_signature` meta key | Meta key, not a finding, but it is written by reading and replacing the whole blob, and a document does not keep it. `loadResultsProjection` (the import of a D1 blob into a document) seeds an item map for EVERY key of the blob, including `_inspector_signature`, so the first import creates an empty map for it, `projectResults` writes `_inspector_signature: {}`, and the next persist replaces the real signature with that. A document that already has stored state never imported the key at all, so its persist also leaves the signature out. Known gap, not fixed here: `loadResultsProjection` should skip meta keys, and the signature belongs in a column or a verb of its own. |
+| `server/lib/inspection/auto-sign.ts`, `server/api/inspection-sync.ts` (inspector signature) | the `_inspector_signature` meta key | Acceptable: a meta key, not a finding, and the persist preserves meta keys (see "Meta keys" below). |
 | `server/api/inspection-sync.ts` (photo delete) | splices an item's `photos` | **Not acceptable** while collab is on. Also addresses the item by its bare id. |
 | `server/services/inspection-results.service.ts` (`applyResultsBatch`, behind the results batch route) | rating, notes, value, canned, defect fields, attributes | **Not acceptable** while collab is on. |
 | `server/services/inspection/inspection-results.service.ts` (`updateResults`, `switchRatingSystem`) | merges whole results, remaps every rating | **Not acceptable** while collab is on. |
@@ -142,6 +142,44 @@ The rows marked not acceptable are known gaps, listed here so the rule is not
 mistaken for a description of the code as it stands. A fix routes the change
 through the object (the `/followup` and `/rename-legacy-keys` verbs are the
 pattern) or skips the D1 write when collab is on.
+
+### Meta keys
+
+A key that starts with `_` and has fewer than three colon-separated parts
+(`_inspector_signature`) is a meta key: row-level data that lives in the blob
+next to the findings but is not one. Composite finding keys also start with
+`_default:`, which is why the colon count decides (`isMetaKey` in
+`server/lib/finding-key.ts`, the one definition every module uses).
+
+The engine generates item ids as UUIDs, so a real finding never looks like a meta
+key. A template imported from elsewhere whose item id starts with `_` and has no
+colon would be treated as one: its content stays in the row untouched but is not
+loaded into the document, so it cannot be edited collaboratively.
+
+- The document **never holds a meta key**. Importing a blob skips them
+  (`loadResultsProjection`) and projecting a document skips them
+  (`projectResults`), so a document that was imported before this rule and still
+  holds an empty item map for one does not leak it into the blob either.
+- The persist **keeps whatever meta keys the row holds**. Before replacing `data`
+  with the projection, `writeResultsProjection` reads the row it is about to
+  write (same tenant and report scope as the write) and merges its meta keys into
+  the new blob. Meta keys come from the row only, never from the document. This
+  is what lets the signing routes (`auto-sign.ts`, the inspector-signature route
+  in `inspection-sync.ts`) keep writing the signature straight to the row.
+- If that read fails the persist throws before writing anything: the document
+  has already been stored in the object, and the alarm that follows every edit
+  retries the whole write. Writing without the read would risk the exact loss the
+  read exists to prevent, so a failed read behaves like any other D1 failure.
+- The read and the write are two statements. A signature saved in the instant
+  between them is overwritten by the older value just read, and a later save of
+  the signature (publishing signs again when auto-sign is on) puts it back. The
+  window is one round trip wide and the loss is of a value that can be redone.
+- The signature is not moved into the document, which would remove the window
+  and the special case. That is a larger change (a document field, a client
+  surface and a migration of existing rows) and is not done here.
+
+A signature that an earlier version of the persist had already replaced with
+`{}` is gone from the row; nothing here brings it back.
 
 ### Legacy finding keys
 

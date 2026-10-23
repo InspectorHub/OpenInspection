@@ -30,6 +30,7 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, inspectionResults, tenantConfigs } from '../db/schema';
 import { collabDocName } from '../collab/doc-name';
+import { isMetaKey } from '../finding-key';
 import { logger } from '../logger';
 import { templateSnapshotSectionsOrNone } from '../../services/inspection/shared';
 import { LegacyRenameCountsSchema, type FindingKeyMigrationResult, type LegacyRenameCounts } from '../validations/admin/finding-keys';
@@ -68,13 +69,6 @@ async function isCollabOn(db: DrizzleD1Database, tenantId: string): Promise<bool
     return cfg?.collabEditing !== false;
 }
 
-/**
- * A key that is not a finding: the inspector signature and other underscore-prefixed meta.
- * Only ever asked of keys already known to be legacy-shaped, where composite keys
- * (which also start with an underscore) cannot occur; `results-divergence.ts` has
- * a stricter `isMetaKey` for blobs where they do.
- */
-const isMetaKey = (key: string): boolean => key.startsWith('_');
 /** A legacy key has fewer than three colon-separated parts. */
 const isLegacyShaped = (key: string): boolean => key.split(':').length < 3;
 
