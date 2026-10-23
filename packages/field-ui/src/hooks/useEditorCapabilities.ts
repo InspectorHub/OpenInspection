@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { useFieldDataSource, useFieldSlots } from '../context';
 
 /**
@@ -20,11 +21,18 @@ export interface EditorCapabilities {
   settingsSheet: boolean;
   /** The host's theme switch: the header control and the phone Theme tab. */
   themeControl: boolean;
+  /** A camera API on this device (what the burst camera calls): the phone More drawer's Capture group. */
+  cameraCapture: boolean;
 }
+
+const subscribeNever = () => () => {};
+const cameraSnapshot = () => typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function';
 
 export function useEditorCapabilities(): EditorCapabilities {
   const { resources } = useFieldDataSource();
   const { renderThemeControl } = useFieldSlots();
+  // A store read with a fixed server snapshot, so the server markup and the first client render agree.
+  const cameraCapture = useSyncExternalStore(subscribeNever, cameraSnapshot, () => false);
   return {
     commentsLibrary: resources.commentsLibrary !== undefined,
     costItems: resources.costItems !== undefined,
@@ -33,5 +41,6 @@ export function useEditorCapabilities(): EditorCapabilities {
     repairItems: resources.repairItems !== undefined,
     settingsSheet: resources.settingsSheet !== undefined,
     themeControl: renderThemeControl !== undefined,
+    cameraCapture,
   };
 }

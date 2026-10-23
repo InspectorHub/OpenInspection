@@ -15,6 +15,8 @@ export interface NotesFieldHeaderProps {
   suggestionsOpen: boolean;
   /** Open that list and put the caret back in the note. */
   onOpenSuggestions: () => void;
+  /** Opens the comment library as a sheet. Left out where the library has no other way in (no `/` key on a phone). */
+  onOpenLibrary?: () => void;
 }
 
 /**
@@ -46,6 +48,7 @@ export function NotesFieldHeader({
   canInsertCanned,
   suggestionsOpen,
   onOpenSuggestions,
+  onOpenLibrary,
 }: NotesFieldHeaderProps) {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
@@ -65,6 +68,17 @@ export function NotesFieldHeader({
         >
           {m.editor_item_recommended()}
           <span className="text-[10px]" aria-hidden="true">▾</span>
+        </Button>
+      )}
+      {onOpenLibrary && (
+        <Button
+          variant="secondary"
+          size="sm"
+          className="min-h-11 touch-manipulation"
+          data-testid="notes-library-trigger"
+          onClick={onOpenLibrary}
+        >
+          {m.editor_item_open_library()}
         </Button>
       )}
       <span

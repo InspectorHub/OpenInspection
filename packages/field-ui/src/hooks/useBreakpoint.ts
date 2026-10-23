@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 
 /**
  * Returns true when viewport is below the Tailwind `md` breakpoint (768px).
@@ -17,4 +17,34 @@ export function useIsMobile(): boolean {
         return () => mq.removeEventListener('change', fn);
     }, []);
     return isMobile;
+}
+
+export type EditorLayout = 'phone' | 'tablet' | 'desktop';
+
+const PHONE_QUERY = '(max-width: 767.98px)';
+const TABLET_QUERY = '(max-width: 1023.98px)';
+
+function readLayout(): EditorLayout {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'desktop';
+    if (window.matchMedia(PHONE_QUERY).matches) return 'phone';
+    if (window.matchMedia(TABLET_QUERY).matches) return 'tablet';
+    return 'desktop';
+}
+
+function subscribeLayout(onChange: () => void): () => void {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
+    const queries = [window.matchMedia(PHONE_QUERY), window.matchMedia(TABLET_QUERY)];
+    for (const mq of queries) mq.addEventListener('change', onChange);
+    return () => { for (const mq of queries) mq.removeEventListener('change', onChange); };
+}
+
+/**
+ * The editor's layout band: phone (< 768), tablet (768-1023), desktop (>= 1024), decided by width alone.
+ *
+ * A store subscription with a FIXED server snapshot ('desktop'), so the server render and the client's first
+ * render agree and the client then moves to the real band. The `useState(() => matchMedia(...))` form read the
+ * browser on the first client render and produced a hydration mismatch on every phone load.
+ */
+export function useEditorLayout(): EditorLayout {
+    return useSyncExternalStore(subscribeLayout, readLayout, () => 'desktop');
 }

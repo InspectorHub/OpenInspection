@@ -63,3 +63,39 @@ test("inserting a library row hands the text to the editor, records the use and 
   expect(p.comments.touchSnippet).toHaveBeenCalledWith("c1");
   expect(p.state.setShowCommentLibrary).toHaveBeenCalledWith(false);
 });
+
+test("as a phone sheet: a bottom dialog with the search first, and one tap inserts and closes", () => {
+  const p = { ...props(), sheet: true };
+  mount("en-US", p);
+  const sheet = screen.getByRole("dialog", { name: "Comment Library" });
+  // A bottom sheet, not the right-hand drawer.
+  expect(sheet.className).toContain("bottom-0");
+  expect(sheet.className).not.toContain("inset-y-0");
+  // The search field leads the fields (sort and filter come after it), and the list is padded for the home indicator.
+  const fields = [...sheet.querySelectorAll<HTMLElement>("input,select")];
+  expect(fields[0].getAttribute("id")).toBe("comment-library-search");
+  expect(sheet.innerHTML).toContain("pb-[calc(0.5rem+env(safe-area-inset-bottom))]");
+  fireEvent.click(screen.getByText("Flashing is lifted."));
+  expect(p.onInsert).toHaveBeenCalledWith("s1", "i1", "Flashing is lifted.");
+  expect(p.state.setShowCommentLibrary).toHaveBeenCalledWith(false);
+});
+
+test("without the sheet flag it stays the right-hand drawer", () => {
+  mount("en-US", props());
+  expect(screen.getByRole("dialog", { name: "Comment Library" }).className).not.toContain("bottom-0");
+});
+
+test("opening the sheet focuses its Close button, never the search field, so no soft keyboard rises", () => {
+  const p = { ...props(), sheet: true };
+  mount("en-US", p);
+  const sheet = screen.getByRole("dialog", { name: "Comment Library" });
+  expect(document.activeElement).not.toBe(sheet.querySelector("#comment-library-search"));
+  expect((document.activeElement as HTMLElement).textContent).toBe("Close");
+  fireEvent.click(document.activeElement as HTMLElement);
+  expect(p.onClose).toHaveBeenCalled();
+});
+
+test("as the right-hand drawer the search field still takes focus", () => {
+  mount("en-US", props());
+  expect(document.activeElement?.getAttribute("id")).toBe("comment-library-search");
+});

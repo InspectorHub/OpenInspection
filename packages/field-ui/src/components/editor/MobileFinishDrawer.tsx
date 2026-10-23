@@ -17,6 +17,14 @@ export interface MobileFinishDrawerProps {
   finishingFieldwork: boolean;
   /** Opens the full web report in a new tab; null when the slug is unknown. */
   onPreviewReport: (() => void) | null;
+  /** Opens the burst camera; null when the device has no camera API (the Capture group is then left out). */
+  onBurstCamera?: (() => void) | null;
+  /** Opens version history; null unless collaboration and the host's version history are both there. */
+  onOpenVersionHistory?: (() => void) | null;
+  /** Opens the units manager; null unless the inspection is commercial. */
+  onOpenUnits?: (() => void) | null;
+  /** Opens the cost items drawer; null unless the inspection is commercial and the host has cost lines. */
+  onOpenCostItems?: (() => void) | null;
 }
 
 /**
@@ -29,12 +37,11 @@ export interface MobileFinishDrawerProps {
  * inspector could complete an entire inspection on a phone and then have no way
  * to finish it.
  *
- * Publish leads because it is what someone opens this for; everything else
- * supports it. Deliberately NOT a port of the desktop action row — search,
- * version history and the template menu are back-office work, and putting them
- * on a phone would bury the one action that matters. For the same reason this
- * opens from the app bar rather than gaining a fifth tab in the bottom nav: a
- * terminal action does not belong in a row of navigation.
+ * Publish leads because it is what someone opens this for, then Sign and Finish fieldwork. Below them come the
+ * things a phone has no key or dock for: a "Capture" group (burst camera) and an "Inspection" group (version
+ * history, units, cost items, report settings), each behind the same gate as its desktop control. The
+ * template menu and search stay back-office. This opens from the app bar rather than gaining a fifth tab in the
+ * bottom nav: a terminal action does not belong in a row of navigation.
  */
 export function MobileFinishDrawer({
   open,
@@ -45,43 +52,65 @@ export function MobileFinishDrawer({
   onFinishFieldwork,
   finishingFieldwork,
   onPreviewReport,
+  onBurstCamera = null,
+  onOpenVersionHistory = null,
+  onOpenUnits = null,
+  onOpenCostItems = null,
 }: MobileFinishDrawerProps) {
   const run = (fn: () => void) => {
     onClose();
     fn();
   };
-  // Short, unlike the section/item drawers this shares a component with: those
-  // are scrollable lists that want the height, this is five buttons. At the 0.7
-  // default the sheet covered most of the screen with dead space below the last
-  // button, which reads as a list that failed to load.
+  // A hit area of at least 44px and no tap delay on every row; the groups below the ending actions are headed in
+  // sentence case, and a group with no rows has no heading.
+  const row = "w-full min-h-11 touch-manipulation";
+  const inspectionRows: Array<{ label: string; run: () => void }> = [];
+  if (onOpenVersionHistory) inspectionRows.push({ label: m.editor_header_version_history(), run: onOpenVersionHistory });
+  if (onOpenUnits) inspectionRows.push({ label: m.editor_route_units(), run: onOpenUnits });
+  if (onOpenCostItems) inspectionRows.push({ label: m.editor_route_cost_items(), run: onOpenCostItems });
+  if (onOpenSettings) inspectionRows.push({ label: m.editor_header_settings(), run: onOpenSettings });
+  const groupHeading = "px-1 pt-3 pb-1 text-[12px] font-bold text-ih-fg-2";
   return (
-    <MobileBottomDrawer open={open} onClose={onClose} title={m.editor_mobile_more()} heightFraction={0.42}>
-      <div className="p-4 space-y-2">
-        <Button variant="primary" className="w-full" onClick={() => run(onPublish)}>
+    <MobileBottomDrawer open={open} onClose={onClose} title={m.editor_mobile_more()} heightFraction={0.8}>
+      <div className="p-4 space-y-2 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <Button variant="primary" className={row} onClick={() => run(onPublish)}>
           {m.editor_header_publish()}
         </Button>
-        <Button variant="secondary" className="w-full" onClick={() => run(onSign)}>
+        <Button variant="secondary" className={row} onClick={() => run(onSign)}>
           {m.editor_header_sign()}
         </Button>
-        {onPreviewReport && (
-          <Button variant="secondary" className="w-full" onClick={() => run(onPreviewReport)}>
-            {m.editor_header_preview_report()}
-          </Button>
-        )}
-        {onOpenSettings && (
-          <Button variant="secondary" className="w-full" onClick={() => run(onOpenSettings)}>
-            {m.editor_header_settings()}
-          </Button>
-        )}
         {onFinishFieldwork && (
           <Button
             variant="secondary"
-            className="w-full"
+            className={row}
             pending={finishingFieldwork}
             onClick={() => run(onFinishFieldwork)}
           >
             {finishingFieldwork ? m.editor_finish_fieldwork_pending() : m.editor_finish_fieldwork()}
           </Button>
+        )}
+        {onPreviewReport && (
+          <Button variant="secondary" className={row} onClick={() => run(onPreviewReport)}>
+            {m.editor_header_preview_report()}
+          </Button>
+        )}
+        {onBurstCamera && (
+          <>
+            <h3 className={groupHeading}>{m.editor_mobile_group_capture()}</h3>
+            <Button variant="secondary" className={row} onClick={() => run(onBurstCamera)}>
+              {m.editor_mobile_burst_camera()}
+            </Button>
+          </>
+        )}
+        {inspectionRows.length > 0 && (
+          <>
+            <h3 className={groupHeading}>{m.editor_mobile_group_inspection()}</h3>
+            {inspectionRows.map((r) => (
+              <Button key={r.label} variant="secondary" className={row} onClick={() => run(r.run)}>
+                {r.label}
+              </Button>
+            ))}
+          </>
         )}
       </div>
     </MobileBottomDrawer>

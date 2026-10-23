@@ -19,6 +19,7 @@ beforeEach(() => stubViewport(false));
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  Reflect.deleteProperty(navigator, "mediaDevices");
 });
 
 /** Open the item the template offers, through whichever tree is mounted. */
@@ -36,6 +37,12 @@ const notesField = () =>
 const has = (name: string | RegExp) => screen.queryAllByRole("button", { name }).length > 0;
 /** The phone nav buttons carry an icon glyph in front of their label ("≣ Items"), so the label ends the name. */
 const endsWith = (label: string) => new RegExp(`${label}$`);
+
+/** Open the phone's More drawer, waiting until its first row is there. */
+async function openMoreDrawer() {
+  fireEvent.click(screen.getByRole("button", { name: m.editor_mobile_more() }));
+  await screen.findByRole("button", { name: m.editor_header_publish() });
+}
 
 interface Entry {
   name: string;
@@ -95,6 +102,55 @@ const ENTRIES: Entry[] = [
       fireEvent.click(screen.getByRole("button", { name: m.editor_mobile_more() }));
       await screen.findByRole("button", { name: m.editor_header_publish() });
       return has(m.editor_header_settings());
+    },
+  },
+  // The phone More drawer: every row is gated exactly like its desktop counterpart. The controls are the rows that
+  // belong to no capability, so hiding one row must not take another with it.
+  {
+    name: "control: phone More drawer ending actions and Units",
+    cap: null,
+    trees: ["phone"],
+    present: async () => {
+      await openMoreDrawer();
+      return has(m.editor_header_sign()) && has(m.editor_finish_fieldwork()) && has(m.editor_route_units());
+    },
+  },
+  {
+    name: "versionHistory: phone More drawer row",
+    cap: "versionHistory",
+    trees: ["phone"],
+    present: async () => {
+      await openMoreDrawer();
+      return has(m.editor_header_version_history());
+    },
+  },
+  {
+    name: "costItems: phone More drawer row",
+    cap: "costItems",
+    trees: ["phone"],
+    present: async () => {
+      await openMoreDrawer();
+      return has(m.editor_route_cost_items());
+    },
+  },
+  {
+    name: "cameraCapture: phone More drawer, Burst camera row",
+    cap: "cameraCapture",
+    trees: ["phone"],
+    present: async () => {
+      // A burst needs an item to put its photos on, so the row only exists once one is open.
+      await openItem(true);
+      await openMoreDrawer();
+      return has(m.editor_mobile_burst_camera());
+    },
+  },
+  {
+    name: "commentsLibrary: phone Library button in the notes toolbar",
+    cap: "commentsLibrary",
+    trees: ["phone"],
+    present: async () => {
+      await openItem(true);
+      return has(m.editor_item_open_library());
     },
   },
   { name: "commentsLibrary: side rail tab", cap: "commentsLibrary", trees: ["desktop"], present: async () => has(m.editor_siderail_tab_library()) },
@@ -227,7 +283,7 @@ const ENTRIES: Entry[] = [
   {
     name: "video: poster-frame action in the media viewer",
     cap: "video",
-    trees: ["desktop"],
+    trees: ["desktop", "phone"],
     data: VIDEO_DATA,
     present: async (phone) => {
       await openItem(phone);

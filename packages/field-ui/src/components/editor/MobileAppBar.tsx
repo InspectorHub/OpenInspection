@@ -18,7 +18,7 @@ export function MobileAppBar({ sectionTitle, itemLabel, onBack, onMore }: Mobile
         <header className="sticky top-0 z-30 h-12 bg-ih-bg-card border-b border-ih-border flex items-center px-2 gap-2">
             <IconButton
                 onClick={onBack}
-                className="w-10 h-10"
+                className="w-11 h-11 touch-manipulation"
                 aria-label={m.common_back()}
             ><Icon name="back" size={18} /></IconButton>
             <div className="flex-1 min-w-0">
@@ -27,7 +27,7 @@ export function MobileAppBar({ sectionTitle, itemLabel, onBack, onMore }: Mobile
             </div>
             <IconButton
                 onClick={onMore}
-                className="w-10 h-10"
+                className="w-11 h-11 touch-manipulation"
                 aria-label={m.editor_mobile_more()}
             >⋮</IconButton>
         </header>

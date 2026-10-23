@@ -112,6 +112,7 @@ interface ItemEditorProps {
  tagChipRow?: React.ReactNode;
  /** B-19b — called when "/" is typed at a line/word start in the notes field. */
  onOpenSnippets?: () => void;
+ onOpenLibrary?: () => void; // phone: a button in the notes toolbar opens the library sheet
  /** Track H (IA-5 / migration step 3) — searches the whole tenant comment library
   *  (incl. imported libraries); powers the "From your library" group under
   *  the Defects-tab search. */
@@ -181,7 +182,7 @@ export function ItemEditor({
  onCloneLast,
  cloneDefaultScope,
  tagChipRow,
- onOpenSnippets,
+ onOpenSnippets, onOpenLibrary,
  onSearchLibrary,
  onSaveDefectToLibrary,
  queuedPreviews,
@@ -457,10 +458,9 @@ export function ItemEditor({
      ABOVE the textarea, never floated inside it — see NotesFieldHeader. */}
  <div>
  <NotesFieldHeader
-  fieldId="notes-textarea"
-  charCount={((result.notes as string) || "").length}
+  fieldId="notes-textarea" charCount={((result.notes as string) || "").length}
   canInsertCanned={taEntries.length > 0}
-  suggestionsOpen={taOpen}
+  suggestionsOpen={taOpen} onOpenLibrary={onOpenLibrary}
   onOpenSuggestions={() => { setTaQuery(""); setTaOpen(true); notesRef.current?.focus(); }}
  />
  <div className="relative">

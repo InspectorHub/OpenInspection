@@ -29,14 +29,11 @@ import { useMediaDrain } from "../hooks/useMediaDrain";
 import { appendPendingPhoto } from "../collab/results-binding";
 import { useResultsProjection } from "../hooks/useResultsProjection";
 import { enqueueMedia } from "../collab/media-upload-queue";
-import { VersionHistoryPanel } from "../components/collab/VersionHistoryPanel";
-import type { ResultsProjection } from "../shared/results-doc.types";
 import { SectionRail } from "../components/editor-shared/SectionRail";
 import { EditorHeader } from "../components/editor/EditorHeader";
 import { FullscreenToggle } from "../components/editor/FullscreenToggle";
 import { ItemList } from "../components/editor-shared/ItemList";
 import { useStatutoryGroups, useStatutoryFormProgress, useStructuralEditingAllowed } from "../hooks/useStatutoryGroups";
-import { AddGroupInstanceHost } from "../components/statutory/AddGroupInstanceHost";
 import { RevisionBanner } from "../components/statutory/RevisionBanner";
 import { ItemEditor } from "../components/editor/ItemEditor";
 import { ItemPaneEmptyState } from "../components/editor/ItemPaneEmptyState";
@@ -50,39 +47,23 @@ import { capturePriorRatings } from "../shared/batch-undo";
 import { reorderItemBySwap } from "../shared/reorder-by-swap";
 import { KeyboardHud } from "../components/editor/KeyboardHud";
 import { InspectorToolsDock } from "../components/editor/InspectorToolsDock";
-import { BurstCamera } from "../components/editor/BurstCamera";
-import { PhotoAnnotator } from "../components/media-studio/PhotoAnnotator";
 import { resolveActivePropertyPreset } from "../shared/property-preset";
 import { InspectionSettingsSheet } from "../components/editor/InspectionSettingsSheet";
-import { CoverCropper, coverCropFor } from "../components/media-studio/CoverCropper";
-import { PhotoCropper } from "../components/media-studio/PhotoCropper";
-import { MediaViewer } from "../components/media-studio/MediaViewer";
-import { PosterPicker } from "../components/media-studio/PosterPicker";
 import { VideoCapture } from "../components/media-studio/VideoCapture";
-import { fullResUrl } from "../components/media-studio/cropImage";
 import { preprocessImage } from "../components/media-studio/preprocessImage";
 import { PublishGateModal } from "../components/editor/PublishGateModal";
 import { AddMediaChooser } from "../components/editor/AddMediaChooser";
-import { RecropWarningModal } from "../components/editor/RecropWarningModal";
-import { StructureDeleteModal } from "../components/editor/StructureDeleteModal";
-import { AddSectionPromptModal } from "../components/editor/AddSectionPromptModal";
-import { AddItemTypeModal } from "../components/editor/AddItemTypeModal";
-import { SaveTemplateModal } from "../components/editor/SaveTemplateModal";
 import { useStructureEdit } from "../hooks/useStructureEdit";
 import { PublishModal } from "../components/editor/PublishModal";
 import { SignModal } from "../components/editor/SignModal";
-import { CommentLibraryDrawer } from "../components/editor/CommentLibraryDrawer";
-import { SectionPickerModal } from "../components/editor/SectionPickerModal";
-import { TagPickerModal } from "../components/editor/TagPickerModal";
-import { useIsMobile } from "../hooks/useBreakpoint";
+import { useEditorLayout } from "../hooks/useBreakpoint";
+import { SharedOverlays } from "./SharedOverlays";
 import { MobileAppBar } from "../components/editor/MobileAppBar";
 import { MobileDrawerTriggers, type MobileDrawerId } from "../components/editor/MobileDrawerTriggers";
 import { MobileFinishDrawer } from "../components/editor/MobileFinishDrawer";
 import { InspectionOverview } from "../components/editor/InspectionOverview";
 import { MobileBottomDrawer } from "../components/MobileBottomDrawer";
 import { BreadcrumbDropdown, type UnitScopeRow } from "../components/editor/BreadcrumbDropdown";
-import { UnitsManager } from "../components/editor/UnitsManager";
-import { CostItemsHost } from "../components/editor/CostItemsHost";
 import type { ResultMap } from "../hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "../shared/types";
 import { Button, IconButton, SegmentedControl } from "@core/shared-ui";
@@ -720,7 +701,8 @@ export function FieldEditor({ data }: { data: EditorData }) {
  });
 
  /* Mobile shell state */
- const isMobile = useIsMobile();
+ // Tablet renders the desktop tree until it gets a tree of its own.
+ const isMobile = useEditorLayout() === "phone";
  const [mobileDrawer, setMobileDrawer] = useState<MobileDrawerId | null>(null);
 
  const PRESET_TAGS = useMemo(() => [
@@ -1029,7 +1011,9 @@ export function FieldEditor({ data }: { data: EditorData }) {
 
  const handleBurstCommit = useCallback(
  (blobs: Blob[]) => {
- if (!state.burstCameraItemId || blobs.length === 0) return;
+ if (blobs.length === 0) return;
+ // No target item: say so, never drop the frames silently.
+ if (!state.burstCameraItemId) { notify(m.editor_burst_no_item(), "warning", { durationMs: 6000 }); return; }
  const itemId = state.burstCameraItemId;
 
  // N4 — bake each frame before upload. Burst frames are already
@@ -1047,7 +1031,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  photoUpload.submit({ itemId, findingKey: findingKey(activeUnitId, sid ?? "", itemId), files, target: null });
  })();
  },
- [state.burstCameraItemId, state.sectionIdForItem, state.currentSection, activeUnitId, photoUpload.submit],
+ [state.burstCameraItemId, state.sectionIdForItem, state.currentSection, activeUnitId, photoUpload.submit, notify],
  );
 
  // Attach uploaded photo keys once a batch has finished — to the item, or
@@ -1460,6 +1444,8 @@ export function FieldEditor({ data }: { data: EditorData }) {
  cloneDefaultScope={inspectionPrefs.cloneDefault}
  tagChipRow={tagChipRow}
  onOpenSnippets={caps.commentsLibrary ? openSnippets : undefined}
+ // The phone has no `/` key: the library gets a button in the notes toolbar instead.
+ onOpenLibrary={isMobile && caps.commentsLibrary ? () => { state.setCommentLibrarySearch(""); state.setCommentLibrarySelectedIdx(0); state.setShowCommentLibrary(true); } : undefined}
  onSearchLibrary={caps.commentsLibrary ? comments.searchLibrary : undefined}
  onSaveDefectToLibrary={!caps.commentsLibrary ? undefined : (input) => {
  // Track H (B-20 follow-up): best-effort — the defect itself already landed in
@@ -1721,11 +1707,50 @@ export function FieldEditor({ data }: { data: EditorData }) {
  </>
  );
 
+ /* Every overlay that is not a finish dialog, mounted once by each tree below. */
+ const sharedOverlaysEl = (
+ <SharedOverlays
+ state={state}
+ caps={caps}
+ structure={structure}
+ coverWrites={coverWrites}
+ comments={comments}
+ statutoryInstance={statutoryInstance}
+ statutoryGroups={statutoryGroups}
+ collabDoc={collab?.doc ?? null}
+ inspectionId={String(state.inspection.id)}
+ phone={isMobile}
+ streamCustomerSubdomain={streamCustomerSubdomain}
+ onReload={() => dataSource.reload()}
+ handleBurstCommit={handleBurstCommit}
+ studio={{ open: photoStudioOpen, url: photoStudioUrl, key: photoStudioKey, index: photoStudioIndex, total: photoStudioTotal, setOpen: setPhotoStudioOpen }}
+ photoOps={{ viewer, setViewer, itemGalleryPhotos, onViewerAction, posterTarget, setPosterTarget, photoCropTarget, setPhotoCropTarget, recropWarn, setRecropWarn, galleryCropSource, setGalleryCropSource, sessionCoverCrop, setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave }}
+ addingToGroup={addingToGroup}
+ setAddingToGroup={setAddingToGroup}
+ versionHistoryOpen={versionHistoryOpen}
+ setVersionHistoryOpen={setVersionHistoryOpen}
+ serverComments={serverComments}
+ onInsert={onInsert}
+ tagPickerOpen={tagPickerOpen}
+ setTagPickerOpen={setTagPickerOpen}
+ presetTags={PRESET_TAGS}
+ toggleTag={toggleTag}
+ showUnitsSurface={showUnitsSurface}
+ unitsManagerOpen={unitsManagerOpen}
+ setUnitsManagerOpen={setUnitsManagerOpen}
+ units={units}
+ unitInspectionMode={unitInspectionMode}
+ costItemsOpen={costItemsOpen}
+ setCostItemsOpen={setCostItemsOpen}
+ />
+ );
+
  if (isMobile) {
  return (
- <div className="min-h-screen pb-14">
+ <div className="min-h-dvh pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
  {photoInputsEl}
  {addMediaOverlaysEl}
+ {sharedOverlaysEl}
  <MobileAppBar
  sectionTitle={state.currentSection?.title ?? ''}
  itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? m.editor_route_select_an_item()}
@@ -1791,6 +1816,10 @@ export function FieldEditor({ data }: { data: EditorData }) {
   ? () => openPreview(previewReportUrl)
   : null
  }
+ onBurstCamera={caps.cameraCapture && state.activeItemId ? () => { state.setBurstCameraItemId(state.activeItemId || null); state.setBurstCameraOpen(true); } : null}
+ onOpenVersionHistory={fieldSession.collabEditing && caps.versionHistory ? () => setVersionHistoryOpen(true) : null}
+ onOpenUnits={showUnitsSurface ? () => setUnitsManagerOpen(true) : null}
+ onOpenCostItems={showUnitsSurface && caps.costItems ? () => setCostItemsOpen(true) : null}
  />
  {/* Theme — narrow-screen home for the theme control the xl+ header shows
      inline, so the auto/light/dark/field preference is reachable on tablet
@@ -1857,251 +1886,14 @@ export function FieldEditor({ data }: { data: EditorData }) {
  {/* Keyboard cheatsheet overlay */}
  {state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}
 
- {/* Burst camera overlay */}
- <BurstCamera
- open={state.burstCameraOpen}
- onClose={() => {
- state.setBurstCameraOpen(false);
- state.setBurstCameraItemId(null);
- }}
- onCommit={handleBurstCommit}
- />
-
- {/* Photo studio overlay */}
- <PhotoAnnotator
- open={photoStudioOpen}
- photoUrl={photoStudioUrl}
- photoIndex={photoStudioIndex}
- totalPhotos={photoStudioTotal}
- sectionName={state.currentSection?.title || state.currentSection?.name || ""}
- initialAnnotationsJson={null}
- isCover={!!photoStudioKey && (state.inspection.coverPhotoId as string | null) === photoStudioKey}
- onSetCover={photoStudioKey ? () => {
-  const isCover = (state.inspection.coverPhotoId as string | null) === photoStudioKey;
-  coverWrites.setCover(isCover ? "" : photoStudioKey);
- } : undefined}
- onSave={({ blob, nodesJson }) => {
-  const itemId = state.activeItemId;
-  if (itemId && photoStudioIndex != null) {
-   const sectionId = state.currentSection?.id;
-   // #181 — the Y.Doc owns results.data: bake the annotation PNG to R2 + mirror
-   // the returned annotatedKey into the doc (offline refuses with a toast).
-   // performPhotoAnnotationSave returns false only in the brief pre-connect
-   // window before the doc is live; fall back to the online annotate relay then.
-   if (!performPhotoAnnotationSave({ itemId, photoIndex: photoStudioIndex, sectionId }, blob, nodesJson)) {
-    coverWrites.annotate({
-     itemId,
-     photoIndex: photoStudioIndex,
-     nodes: nodesJson,
-     image: new File([blob], "annotated.png", { type: "image/png" }),
-     ...(sectionId ? { sectionId } : {}),
-    });
-   }
-  }
-  setPhotoStudioOpen(false);
- }}
- onClose={() => setPhotoStudioOpen(false)}
- />
-
- {/* Task 8 — unified MediaViewer for an item's photo strip (tap a thumbnail
-  * to open; the bottom toolbar routes cover/annotate/revert/delete to the
-  * per-photo endpoints; crop opens the PhotoCropper, rotate/caption are no-ops). */}
- <MediaViewer
- photos={viewer.index !== null ? itemGalleryPhotos(viewer.itemId) : []}
- index={viewer.index}
- onClose={() => setViewer((v) => ({ ...v, index: null }))}
- onAction={onViewerAction}
- hideActions={caps.video ? undefined : ["poster"]}
- streamCustomerSubdomain={streamCustomerSubdomain}
- inspectionId={String(state.inspection.id)}
- />
-
- {/* Plan 7 — poster-frame picker for a video entry (opened by the "Poster
-  * frame" toolbar action). Fails closed when the Stream subdomain is absent. */}
- {posterTarget && (
- <PosterPicker
-  inspectionId={String(state.inspection.id)}
-  streamUid={posterTarget.streamUid}
-  durationSec={posterTarget.durationSec}
-  posterPct={posterTarget.posterPct}
-  streamCustomerSubdomain={streamCustomerSubdomain}
-  onClose={() => setPosterTarget(null)}
- />
- )}
+ {sharedOverlaysEl}
 
  {addMediaOverlaysEl}
-
- {/* Plan 4 (Task 8) — per-photo crop overlay. Cropping ALWAYS re-derives from
-  * the ORIGINAL key. A re-crop that would discard an existing annotation warns
-  * first (no native window.confirm). */}
- {photoCropTarget && (
- <PhotoCropper
-  sourceUrl={fullResUrl(photoCropTarget.sourceUrl)}
-  allowFree
-  title={m.editor_route_crop_photo()}
-  saveLabel={m.editor_route_save_crop()}
-  onCancel={() => setPhotoCropTarget(null)}
-  onSave={(blob, crop) => {
-   const target = photoCropTarget;
-   setPhotoCropTarget(null);
-   const run = () => performPhotoCropSave(target, blob, crop);
-   if (target.hasAnnotation) setRecropWarn({ run });
-   else run();
-  }}
- />
- )}
-
- {/* Plan 4 — re-crop warning modal (annotation will be discarded). */}
- <RecropWarningModal
- open={Boolean(recropWarn)}
- onCancel={() => setRecropWarn(null)}
- onConfirm={() => { const r = recropWarn?.run; setRecropWarn(null); r?.(); }}
- />
-
- {/* D8 — structural delete confirmation modal (section OR item; NEVER window.confirm). */}
- <StructureDeleteModal
-  open={Boolean(structure.deletePending)}
-  title={structure.deletePending?.title ?? ""}
-  noun={structure.deletePending?.kind ?? "section"}
-  impact={structure.deletePending?.impact ?? { items: 0, ratings: 0, notes: 0, photos: 0 }}
-  onCancel={structure.cancelDelete}
-  onConfirm={structure.confirmDelete}
- />
-
- {/* D8 — "Add section" title prompt. */}
- <AddSectionPromptModal
-  open={structure.addSectionPromptOpen}
-  value={structure.addSectionTitle}
-  onChange={structure.setAddSectionTitle}
-  onConfirm={structure.submitAddSection}
-  onCancel={structure.closeAddSectionPrompt}
- />
-
- <AddGroupInstanceHost
-   groups={statutoryGroups}
-   groupId={addingToGroup}
-   saving={statutoryInstance.busy}
-   onClose={() => setAddingToGroup(null)}
-   onSave={(group, fields) => {
-     statutoryInstance.add(group.id, group.capacity, fields);
-     setAddingToGroup(null);
-   }}
- />
-
- {/* D8 — "Add item" type-picker. */}
- <AddItemTypeModal
-  open={Boolean(structure.addItemPending)}
-  onConfirm={structure.submitAddItem}
-  onCancel={structure.closeAddItemPrompt}
- />
-
- {/* D8 — save structure to template / as new template. */}
- <SaveTemplateModal
-  mode={structure.saveTemplatePending?.mode ?? null}
-  name={structure.saveTemplateName}
-  onChangeName={structure.setSaveTemplateName}
-  onConfirm={structure.submitSaveTemplate}
-  onCancel={structure.closeSaveTemplate}
- />
-
- {/* Media Studio — gallery "Set as cover" crop overlay */}
- {galleryCropSource && (
- <CoverCropper
-  sourceUrl={fullResUrl(galleryCropSource.url)}
-  sourceKey={galleryCropSource.key}
-  initialCrop={
-   sessionCoverCrop?.key === galleryCropSource.key
-    ? sessionCoverCrop.crop
-    : coverCropFor(state.inspection as Record<string, unknown>, galleryCropSource.key)
-  }
-  onCancel={() => setGalleryCropSource(null)}
-  onSave={(blob, c) => {
-   const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
-   setSessionCoverCrop({ key: galleryCropSource.key, crop });
-   // A repeat bakes a second derivative under a fresh random R2 key and orphans the first
-   // (setCroppedCover), so a repeat of the same Save joins the one in flight; a different crop waits its turn.
-   coverWrites.cropCover({
-    sourceKey: galleryCropSource.key,
-    crop: JSON.stringify(crop),
-    image: new File([blob], "cover.jpg", { type: "image/jpeg" }),
-   });
-   setGalleryCropSource(null);
-  }}
- />
- )}
 
  {/* Unsaved changes guard (the host renders its own stay-or-leave dialog) */}
  {unsavedGuardEl}
 
- {/* #181 — Version history panel (collab Phase 4). Only reachable when the
-     collabEditing flag is on (the trigger button is gated in EditorHeader).
-     Live convergence for ALL clients (incl. the initiator) is now driven by the
-     DO's MSG_RESTORE control frame (Task 12b): each client drops its local Y.Doc
-     + IndexedDB and resyncs. The onRestored revalidate below is belt-and-braces —
-     it refreshes loader data for the non-collab projection path. */}
- <VersionHistoryPanel
- open={versionHistoryOpen}
- onClose={() => setVersionHistoryOpen(false)}
- inspectionId={String(data.inspection.id)}
- onRestored={() => { dataSource.reload(); }}
- doc={collab?.doc ?? null}
- currentResults={state.results as unknown as ResultsProjection}
- />
-
  {finishActionsEl}
-
- {/* Comment library drawer */}
- {caps.commentsLibrary && (
-  <CommentLibraryDrawer
-  open={state.showCommentLibrary}
-  comments={{
-  filterMode: comments.filterMode,
-  setFilterMode: comments.setFilterMode,
-  sort: comments.sort,
-  setSort: comments.setSort,
-  touchSnippet: comments.touchSnippet,
-  }}
-  state={{
-  activeItem: state.activeItem,
-  currentSection: state.currentSection,
-  activeItemId: state.activeItemId,
-  getResult: state.getResult,
-  getRatingLabel: state.getRatingLabel,
-  commentLibraryFilter: state.commentLibraryFilter,
-  setCommentLibraryFilter: state.setCommentLibraryFilter,
-  setCommentLibrarySelectedIdx: state.setCommentLibrarySelectedIdx,
-  commentLibrarySearch: state.commentLibrarySearch,
-  setCommentLibrarySearch: state.setCommentLibrarySearch,
-  commentLibrarySelectedIdx: state.commentLibrarySelectedIdx,
-  setShowCommentLibrary: state.setShowCommentLibrary,
-  }}
-  serverComments={serverComments}
-  onInsert={onInsert}
-  onClose={() => state.setShowCommentLibrary(false)}
-  />
- )}
-
- {/* Section picker modal */}
- <SectionPickerModal
- open={state.sectionPickerOpen}
- sectionPickerQuery={state.sectionPickerQuery}
- setSectionPickerQuery={state.setSectionPickerQuery}
- filteredSectionsForPicker={state.filteredSectionsForPicker}
- sections={state.sections}
- pickSection={state.pickSection}
- closeSectionPicker={state.closeSectionPicker}
- />
-
- {/* Tag picker modal */}
- <TagPickerModal
-  open={tagPickerOpen && Boolean(state.activeItemId)}
-  activeItemId={state.activeItemId ?? ""}
-  tagsByItem={state.tagsByItem}
-  presetTags={PRESET_TAGS}
-  onToggle={toggleTag}
-  onClose={() => setTagPickerOpen(false)}
- />
-
 
  {/* ------------------------------------------------------------ */}
  {/* Fixed top header with progress bar */}
@@ -2159,24 +1951,6 @@ export function FieldEditor({ data }: { data: EditorData }) {
   ) : undefined
  }
  />
- {/* Commercial PCA Phase U (Batch C2b) — units management drawer */}
- {showUnitsSurface && (
-  <UnitsManager
-   open={unitsManagerOpen}
-   onClose={() => setUnitsManagerOpen(false)}
-   inspectionId={String(state.inspection.id)}
-   units={units}
-   mode={unitInspectionMode}
-  />
- )}
- {/* Commercial PCA Phase C Task 13b — cost items drawer (Opinion of Cost) */}
- {showUnitsSurface && caps.costItems && (
-  <CostItemsHost
-   open={costItemsOpen}
-   onClose={() => setCostItemsOpen(false)}
-   inspectionId={String(state.inspection.id)}
-  />
- )}
  {/* ------------------------------------------------------------ */}
  {/* 4-column layout below header */}
  {/* ------------------------------------------------------------ */}

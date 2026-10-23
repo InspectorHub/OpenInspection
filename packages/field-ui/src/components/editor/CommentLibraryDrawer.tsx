@@ -1,7 +1,8 @@
 import { useRef } from "react";
-import { Drawer, IconButton, SegmentedControl } from "@core/shared-ui";
+import { Button, Drawer, IconButton, SegmentedControl } from "@core/shared-ui";
 import { useFieldDataSource } from "../../context";
 import { CommentLibraryList } from "./CommentLibraryList";
+import { MobileBottomDrawer } from "../MobileBottomDrawer";
 import { m } from "../../i18n";
 
 export interface CommentLibraryDrawerProps {
@@ -30,18 +31,51 @@ export interface CommentLibraryDrawerProps {
  serverComments: Array<{ id: string; text: string; useCount?: number; lastUsedAt?: string | null }>;
  onInsert: (sectionId: string, itemId: string, text: string) => void;
  onClose: () => void;
+ /**
+  * Render as a bottom sheet (phone) instead of the right-hand drawer: the search field comes first and the list
+  * scrolls under it. The content and every handler are the same.
+  */
+ sheet?: boolean;
 }
 
-export function CommentLibraryDrawer({ open, comments, state, serverComments, onInsert, onClose }: CommentLibraryDrawerProps) {
+export function CommentLibraryDrawer({ open, comments, state, serverComments, onInsert, onClose, sheet = false }: CommentLibraryDrawerProps) {
  const searchRef = useRef<HTMLInputElement>(null);
  // The viewer's display language, which is what the host's own display-locale hook answered.
  const locale = useFieldDataSource().session().locale;
- return (
- <Drawer open={open} onClose={onClose} title={m.editor_comment_library_title()} wide initialFocusRef={searchRef}>
- {/* -m-4 cancels the Drawer body padding so the sub-headers keep their
+ // The search field. The sheet puts it first (a phone opens this to find one line, not to sort); the drawer keeps it below the filters.
+ const searchBlock = (
+ <div className="px-4 py-2">
+ <input
+ ref={searchRef}
+ id="comment-library-search"
+ type="text"
+ placeholder={m.editor_comment_library_search_placeholder()}
+ value={state.commentLibrarySearch}
+ onChange={(e) => {
+ state.setCommentLibrarySearch(e.target.value);
+ state.setCommentLibrarySelectedIdx(0);
+ }}
+ className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
+ />
+ <p className="text-[10px] text-ih-fg-3 mt-1">
+ {m.editor_comment_library_count({ count: serverComments.length })}
+ </p>
+ </div>
+ );
+
+ const body = (
+ /* -m-4 cancels the Drawer body padding so the sub-headers keep their
      full-bleed borders and the list scrolls independently under the pinned
-     search/filter header (h-full flex column). */}
- <div className="flex flex-col h-full -m-4">
+     search/filter header (h-full flex column). The sheet has no body padding. */
+ <div className={`flex flex-col h-full ${sheet ? "" : "-m-4"}`}>
+ {/* The sheet opens on this button, not on the search field: the dialog focuses its first focusable, and a
+     field there would raise the soft keyboard over most of the list before anyone asked to type. */}
+ {sheet && (
+ <div className="flex justify-end px-2 pt-1">
+ <Button variant="ghost" className="min-h-11 touch-manipulation" onClick={onClose}>{m.common_close()}</Button>
+ </div>
+ )}
+ {sheet && searchBlock}
 
  {/* Sort + Filter mode header */}
  <div className="flex items-center gap-3 px-3 py-2 border-b border-ih-border">
@@ -116,27 +150,10 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  />
  </div>
 
- {/* Search */}
- <div className="px-4 py-2">
- <input
- ref={searchRef}
- id="comment-library-search"
- type="text"
- placeholder={m.editor_comment_library_search_placeholder()}
- value={state.commentLibrarySearch}
- onChange={(e) => {
- state.setCommentLibrarySearch(e.target.value);
- state.setCommentLibrarySelectedIdx(0);
- }}
- className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
- />
- <p className="text-[10px] text-ih-fg-3 mt-1">
- {m.editor_comment_library_count({ count: serverComments.length })}
- </p>
- </div>
+ {!sheet && searchBlock}
 
  {/* Comment list (server-fetched, sort/filter aware) */}
- <div className="flex-1 overflow-y-auto pb-2">
+ <div className={`flex-1 overflow-y-auto ${sheet ? "pb-[calc(0.5rem+env(safe-area-inset-bottom))]" : "pb-2"}`}>
  <CommentLibraryList
  serverComments={serverComments}
  selectedIndex={state.commentLibrarySelectedIdx}
@@ -151,6 +168,17 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  />
  </div>
  </div>
+ );
+ if (sheet) {
+ return (
+ <MobileBottomDrawer open={open} onClose={onClose} title={m.editor_comment_library_title()} heightFraction={0.92}>
+ {body}
+ </MobileBottomDrawer>
+ );
+ }
+ return (
+ <Drawer open={open} onClose={onClose} title={m.editor_comment_library_title()} wide initialFocusRef={searchRef}>
+ {body}
  </Drawer>
  );
 }
