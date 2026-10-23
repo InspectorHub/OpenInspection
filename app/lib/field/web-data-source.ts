@@ -63,6 +63,12 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
         execute,
         notify: (message, variant, opts) => webNotify(message, variant, undefined, opts),
         reload: () => parts.reload(),
+        // A template change needs a fresh mount (the editor freezes its schema and seeds the collab document
+        // from it), which a loader revalidation does not give.
+        restartSession: () => window.location.reload(),
+        openUrl: (url) => {
+            window.open(url, "_blank", "noopener");
+        },
         exit: () => parts.exit(),
         isOnline: webIsOnline,
         onOnlineChange: webOnOnlineChange,

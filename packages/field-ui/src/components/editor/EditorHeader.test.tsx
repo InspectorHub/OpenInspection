@@ -23,10 +23,11 @@ const state = {
   setSettingsOpen: vi.fn(),
 };
 
-function mount(slots?: FieldHostSlots, extra: { tenantSlug?: string | null; urls?: Partial<FieldUrls> } = {}) {
+function mount(slots?: FieldHostSlots, extra: { tenantSlug?: string | null; urls?: Partial<FieldUrls>; without?: readonly ('restartSession' | 'openUrl')[] } = {}) {
   const fake = createFakeDataSource({
     data: createEmptyEditorData(),
     urls: { reportPreview: (slug, id) => `/report-view/${slug}/${id}`, ...extra.urls },
+    ...(extra.without ? { without: extra.without } : {}),
   });
   const ui: ReactNode = (
     <FieldDataSourceProvider dataSource={fake} slots={slots}>
@@ -93,12 +94,25 @@ describe('EditorHeader host slots', () => {
     expect(screen.getByTestId('preview-report-btn')).toBeTruthy();
   });
 
-  it('opens the web report at the data source URL for the tenant and inspection', () => {
+  it('opens the web report through the host (openUrl), never through window.open', () => {
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
-    mount(undefined, { tenantSlug: 'acme' });
+    const fake = mount(undefined, { tenantSlug: 'acme' });
     act(() => { previewButton()!.click(); });
     act(() => { screen.getByTestId('preview-report-btn').click(); });
-    expect(open).toHaveBeenCalledWith('/report-view/acme/insp-1', '_blank', 'noopener');
+    expect(fake.openedUrls).toEqual(['/report-view/acme/insp-1']);
+    expect(fake.notifications).toEqual([]);
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it('tells the user when the host cannot open a URL, and opens nothing', () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const fake = mount(undefined, { tenantSlug: 'acme', without: ['openUrl'] });
+    act(() => { previewButton()!.click(); });
+    act(() => { screen.getByTestId('preview-report-btn').click(); });
+    expect(fake.openedUrls).toEqual([]);
+    expect(fake.notifications.map((n) => n.variant)).toEqual(['warning']);
+    expect(open).not.toHaveBeenCalled();
     open.mockRestore();
   });
 });

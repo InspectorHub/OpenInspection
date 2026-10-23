@@ -368,6 +368,18 @@ export interface FieldDataSource {
   /** Show a transient message (replaces the host's toast inside the package). */
   notify(message: string, variant?: NotifyVariant, opts?: NotifyOptions): void;
   reload(): void;
+  /**
+   * Start the editor over from a clean mount. `reload()` only re-reads the loader data, but the editor freezes
+   * its template schema (and seeds the collab document from it) when it mounts, so a template change needs a
+   * fresh mount. The web host reloads the page. A host that cannot do this leaves the member out: the editor
+   * then tells the person to reopen the inspection instead of silently showing the old template.
+   */
+  restartSession?(): void;
+  /**
+   * Open an address outside the editor (the report preview). The web host opens a new tab without an opener.
+   * A host that cannot leaves the member out: the editor then tells the person the preview is unavailable.
+   */
+  openUrl?(url: string): void;
   exit(): void;
   isOnline(): boolean;
   onOnlineChange(cb: (online: boolean) => void): () => void;

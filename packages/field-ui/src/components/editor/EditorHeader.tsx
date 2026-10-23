@@ -80,7 +80,7 @@ export function EditorHeader({
  // The PDF preview and the theme switch are host UI (see `FieldHostSlots`); a host that
  // supplies none simply gets no such entry point.
  const { pdf, renderThemeControl } = useFieldSlots();
- const { urls, exit } = useFieldDataSource();
+ const { urls, exit, openUrl, notify } = useFieldDataSource();
  const listHref = urls.inspectionsList?.() ?? null;
  // A plain left click goes through `exit()` so the host's unsaved-changes guard sees it; a modified click or a
  // middle click keeps the browser's own link behaviour (new tab, new window).
@@ -89,6 +89,8 @@ export function EditorHeader({
   e.preventDefault();
   exit();
  };
+ // The host opens the preview itself; one that cannot says so rather than doing nothing.
+ const openPreview = (url: string) => (openUrl ? openUrl(url) : notify(m.editor_open_url_unavailable(), "warning"));
  const previewHref = tenantSlug ? urls.reportPreview(tenantSlug, String(state.inspection.id)) : null;
  /**
   * True while the pre-publish readiness check is in flight.
@@ -304,7 +306,7 @@ export function EditorHeader({
  {/* No destination at all (no tenant link, no PDF export) means no menu: an empty Preview is a dead control. */}
  {(previewHref || pdf) && (
   <PreviewMenu
-   onPreviewReport={previewHref ? () => window.open(previewHref, "_blank", "noopener") : null}
+   onPreviewReport={previewHref ? () => openPreview(previewHref) : null}
    onPreviewPdf={pdf ? () => pdf.run(String(state.inspection.id)) : null}
    pdfBusy={pdf?.busy ?? false}
    pdfError={pdf?.error ?? null}

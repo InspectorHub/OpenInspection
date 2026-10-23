@@ -46,6 +46,8 @@ export interface FakeSeed {
   platform?: FieldDataSource['platform'];
   /** Initial connectivity; defaults to online. */
   online?: boolean;
+  /** Host members the fake leaves out, to exercise the editor's fallback for a host that lacks them. */
+  without?: readonly ('restartSession' | 'openUrl')[];
 }
 
 export interface ExecutedCommand {
@@ -62,6 +64,10 @@ export interface FakeDataSource extends FieldDataSource {
   /** Inspection ids passed to `collab.purge`, in call order. */
   readonly purged: readonly string[];
   readonly reloadCount: number;
+  /** Number of `restartSession` calls. */
+  readonly restartCount: number;
+  /** Every address passed to `openUrl`, in call order. */
+  readonly openedUrls: readonly string[];
   readonly exitCount: number;
   /** Every `notify` call, in call order. */
   readonly notifications: readonly {
@@ -233,6 +239,8 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
   let putFailure: Error | null = null;
   let reloadCount = 0;
   let exitCount = 0;
+  let restartCount = 0;
+  const openedUrls: string[] = [];
 
   const ds: FakeDataSource = {
     get commands() {
@@ -253,6 +261,8 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
     get reloadCount() {
       return reloadCount;
     },
+    get restartCount() { return restartCount; },
+    get openedUrls() { return openedUrls; },
     get exitCount() {
       return exitCount;
     },
@@ -317,6 +327,8 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
     reload: () => {
       reloadCount += 1;
     },
+    ...(seed.without?.includes('restartSession') ? {} : { restartSession: () => void (restartCount += 1) }),
+    ...(seed.without?.includes('openUrl') ? {} : { openUrl: (url: string) => void openedUrls.push(url) }),
     exit: () => {
       exitCount += 1;
     },

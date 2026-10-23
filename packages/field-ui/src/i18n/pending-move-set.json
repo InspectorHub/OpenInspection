@@ -8,6 +8,5 @@
   "app/components/statutory/StatutoryFormNotice.tsx",
   "app/components/statutory/StatutoryReadinessCard.tsx",
   "app/components/statutory/StatutorySourceRow.tsx",
-  "app/hooks/usePdfExport.ts",
-  "app/routes/inspection-edit.tsx"
+  "app/hooks/usePdfExport.ts"
 ]

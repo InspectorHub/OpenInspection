@@ -20,6 +20,30 @@ function make(over: Partial<WebDataSourceParts> = {}) {
 }
 
 describe("createWebFieldDataSource", () => {
+    it("openUrl opens a new tab without an opener", () => {
+        const open = vi.fn();
+        vi.stubGlobal("window", { open });
+        try {
+            make().openUrl?.("/report/x");
+            expect(open).toHaveBeenCalledWith("/report/x", "_blank", "noopener");
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("restartSession reloads the page, and does not go through the loader revalidation", () => {
+        const pageReload = vi.fn();
+        const revalidate = vi.fn();
+        vi.stubGlobal("window", { location: { reload: pageReload } });
+        try {
+            make({ reload: revalidate }).restartSession?.();
+            expect(pageReload).toHaveBeenCalledTimes(1);
+            expect(revalidate).not.toHaveBeenCalled();
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
     it("load with a scope asks the transport for load-scope and merges the slice", async () => {
         const transport = vi.fn(async () => ({ ok: true, data: { scope: "u1", results: { "u1:a": { rating: "ok" } } } })) as unknown as WebExecute;
         const ds = make({ transport });

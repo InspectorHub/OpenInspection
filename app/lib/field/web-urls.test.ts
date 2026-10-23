@@ -85,7 +85,7 @@ describe("call sites still build the same fragments", () => {
         ],
         ["packages/field-ui/src/components/editor/InspectionOverview.tsx", ["urls.statutoryPreviewPdf(String(bag.id))"]],
         [
-            "app/routes/inspection-edit.tsx",
+            "packages/field-ui/src/editor/FieldEditor.tsx",
             ["dataSource.urls.reportPreview(fieldSession.tenantSlug, String(state.inspection.id))", "dataSource.urls.photo(String(state.inspection.id), photos[0])"],
         ],
         ["packages/field-ui/src/components/editor/PublishModal.tsx", ["urls.editorPath(inspectionId)"]],
