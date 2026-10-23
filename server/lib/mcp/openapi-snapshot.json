@@ -13596,7 +13596,7 @@
       "body": null
     },
     "summary": "One-time migration: rewrite legacy finding keys to composite format",
-    "description": "Batch-converts inspection_results.data keys from legacy itemId format to composite _default:sectionId:itemId format. Idempotent — already-composite keys are skipped."
+    "description": "Batch-converts inspection_results.data keys from legacy itemId format to composite _default:sectionId:itemId format. Idempotent — already-composite keys are skipped and underscore-prefixed meta keys are never rewritten. Rows with live collaborative state are always renamed inside their document, as are rows without state when the tenant has collaboration on; those count as delegated, with renamedInDocuments and conflicts summed from the documents. A failure for one inspection is listed in failedIds and does not stop the rest. Every results row examined counts in exactly one of migrated, delegated, failed or skipped."
   },
   {
     "operationId": "moveInspectionItemPhoto",
