@@ -46,6 +46,7 @@ interface DOInternals {
     persist(): Promise<void>;
     ctx: { getWebSockets(): unknown[] };
     fetch(req: Request): Promise<Response>;
+    hydrateFromD1Once(): Promise<void>;
 }
 
 class MockWebSocket {
@@ -71,11 +72,18 @@ interface Fixture {
 async function seededServer(): Promise<Fixture> {
     const inspectionId = 'insp-resolve-' + crypto.randomUUID().slice(0, 8);
     const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
-    await runInDurableObject(stub, (instance: InspectionDocDO) => {
+    await runInDurableObject(stub, async (instance: InspectionDocDO) => {
         const io = instance as unknown as DOInternals;
         io.tenantId = TENANT;
         io.inspectionId = inspectionId;
         io.identityPersisted = true;
+        // Production hydrates from D1 on the first connect, BEFORE any edit lands. Seeding a document
+        // directly skips that step, so the request under test would hydrate lazily instead: and once the
+        // debounced persist (about 1 s after the seed) has written a D1 row, that late hydration imports
+        // the row on top of the live document and the bytes change under a refused request. A slow
+        // machine crosses the debounce inside one test. Hydrating first, against the empty D1, makes it
+        // the memoised no-op it is in production.
+        await io.hydrateFromD1Once();
         seedResultsDoc(io.doc, [{ findingKey: KEY }, { findingKey: KEY2 }]);
         appendPhoto(io.doc, KEY, { key: 'already/uploaded.jpg' });
         pushPendingPhoto(io.doc, KEY, pendingPhoto('A'));

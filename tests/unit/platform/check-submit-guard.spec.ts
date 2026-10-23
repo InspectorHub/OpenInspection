@@ -493,7 +493,10 @@ describe('the two committed files agree', () => {
         expect(r.awaitingTotal).toBe(0);
         expect(ceiling).toEqual({});
         const keys = Object.keys(baseline);
-        expect(keys.length).toBeGreaterThan(40);
+        // Floor, not a target: it only proves the baseline was not emptied by accident. It was 40 while the
+        // editor still carried its write sites here; moving them into packages/field-ui retired ten entries
+        // (the code that held them left, or was converted to a latch), so the floor follows the debt down.
+        expect(keys.length).toBeGreaterThan(30);
         expect(keys.filter((k) => !String(baseline[k] ?? '').trim())).toEqual([]);
     });
 
