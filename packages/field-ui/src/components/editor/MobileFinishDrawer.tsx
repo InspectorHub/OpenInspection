@@ -17,7 +17,9 @@ export interface MobileFinishDrawerProps {
   finishingFieldwork: boolean;
   /** Opens the full web report in a new tab; null when the slug is unknown. */
   onPreviewReport: (() => void) | null;
-  /** Opens the burst camera; null when the device has no camera API (the Capture group is then left out). */
+  /** Opens Speed mode; null when nothing is left to rate. It leads the Capture group and needs no camera or open item. */
+  onSpeedMode?: (() => void) | null;
+  /** Opens the burst camera; null when the device has no camera API or no item is open (its row is then left out). */
   onBurstCamera?: (() => void) | null;
   /** Opens version history; null unless collaboration and the host's version history are both there. */
   onOpenVersionHistory?: (() => void) | null;
@@ -25,6 +27,20 @@ export interface MobileFinishDrawerProps {
   onOpenUnits?: (() => void) | null;
   /** Opens the cost items drawer; null unless the inspection is commercial and the host has cost lines. */
   onOpenCostItems?: (() => void) | null;
+  /** Renders the report as a PDF; null when the host has no PDF export (the row is left out). */
+  onPreviewPdf?: (() => void) | null;
+  /** The PDF row's label as the host words it (it counts down a cooldown, for one). */
+  pdfLabel?: string;
+  /** The PDF export is running or cooling down: the row stays but does not act. */
+  pdfBusy?: boolean;
+  /** The host's last PDF error, shown under the row. */
+  pdfError?: string | null;
+  /** Template actions, as in the desktop Template menu. Change needs the settings sheet; Update source needs a source template. */
+  onChangeTemplate?: (() => void) | null;
+  onSaveAsNewTemplate?: (() => void) | null;
+  onUpdateSourceTemplate?: (() => void) | null;
+  /** Opens the Theme drawer; null when the host supplies no theme control (the row is left out). */
+  onOpenTheme?: (() => void) | null;
 }
 
 /**
@@ -38,7 +54,7 @@ export interface MobileFinishDrawerProps {
  * to finish it.
  *
  * Publish leads because it is what someone opens this for, then Sign and Finish fieldwork. Below them come the
- * things a phone has no key or dock for: a "Capture" group (burst camera) and an "Inspection" group (version
+ * things a phone has no key or dock for: a "Capture" group (speed mode, burst camera) and an "Inspection" group (version
  * history, units, cost items, report settings), each behind the same gate as its desktop control. The
  * template menu and search stay back-office. This opens from the app bar rather than gaining a fifth tab in the
  * bottom nav: a terminal action does not belong in a row of navigation.
@@ -52,10 +68,19 @@ export function MobileFinishDrawer({
   onFinishFieldwork,
   finishingFieldwork,
   onPreviewReport,
+  onSpeedMode = null,
   onBurstCamera = null,
   onOpenVersionHistory = null,
   onOpenUnits = null,
   onOpenCostItems = null,
+  onPreviewPdf = null,
+  pdfLabel,
+  pdfBusy = false,
+  pdfError = null,
+  onChangeTemplate = null,
+  onSaveAsNewTemplate = null,
+  onUpdateSourceTemplate = null,
+  onOpenTheme = null,
 }: MobileFinishDrawerProps) {
   const run = (fn: () => void) => {
     onClose();
@@ -69,6 +94,10 @@ export function MobileFinishDrawer({
   if (onOpenUnits) inspectionRows.push({ label: m.editor_route_units(), run: onOpenUnits });
   if (onOpenCostItems) inspectionRows.push({ label: m.editor_route_cost_items(), run: onOpenCostItems });
   if (onOpenSettings) inspectionRows.push({ label: m.editor_header_settings(), run: onOpenSettings });
+  const templateRows: Array<{ label: string; run: () => void }> = [];
+  if (onChangeTemplate) templateRows.push({ label: m.template_menu_change(), run: onChangeTemplate });
+  if (onSaveAsNewTemplate) templateRows.push({ label: m.template_menu_save_new(), run: onSaveAsNewTemplate });
+  if (onUpdateSourceTemplate) templateRows.push({ label: m.template_menu_update_source(), run: onUpdateSourceTemplate });
   const groupHeading = "px-1 pt-3 pb-1 text-[12px] font-bold text-ih-fg-2";
   return (
     <MobileBottomDrawer open={open} onClose={onClose} title={m.editor_mobile_more()} heightFraction={0.8}>
@@ -94,12 +123,27 @@ export function MobileFinishDrawer({
             {m.editor_header_preview_report()}
           </Button>
         )}
-        {onBurstCamera && (
+        {onPreviewPdf && (
+          <>
+            <Button variant="secondary" className={row} pending={pdfBusy} onClick={() => run(onPreviewPdf)}>
+              {pdfLabel ?? m.editor_header_preview_pdf_short()}
+            </Button>
+            {pdfError && <p className="px-1 text-[12px] text-ih-bad-fg">{pdfError}</p>}
+          </>
+        )}
+        {(onSpeedMode || onBurstCamera) && (
           <>
             <h3 className={groupHeading}>{m.editor_mobile_group_capture()}</h3>
-            <Button variant="secondary" className={row} onClick={() => run(onBurstCamera)}>
-              {m.editor_mobile_burst_camera()}
-            </Button>
+            {onSpeedMode && (
+              <Button variant="secondary" className={row} onClick={() => run(onSpeedMode)}>
+                {m.editor_dock_speed_mode()}
+              </Button>
+            )}
+            {onBurstCamera && (
+              <Button variant="secondary" className={row} onClick={() => run(onBurstCamera)}>
+                {m.editor_mobile_burst_camera()}
+              </Button>
+            )}
           </>
         )}
         {inspectionRows.length > 0 && (
@@ -111,6 +155,21 @@ export function MobileFinishDrawer({
               </Button>
             ))}
           </>
+        )}
+        {templateRows.length > 0 && (
+          <>
+            <h3 className={groupHeading}>{m.template_menu_template()}</h3>
+            {templateRows.map((r) => (
+              <Button key={r.label} variant="secondary" className={row} onClick={() => run(r.run)}>
+                {r.label}
+              </Button>
+            ))}
+          </>
+        )}
+        {onOpenTheme && (
+          <Button variant="secondary" className={`${row} mt-3`} onClick={() => run(onOpenTheme)}>
+            {m.nav_theme_label()}
+          </Button>
         )}
       </div>
     </MobileBottomDrawer>

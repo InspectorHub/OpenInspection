@@ -7,6 +7,7 @@ import { useHostActions } from "../../hooks/useHostActions";
 import { ProgressStripText } from "./ProgressStripText";
 import { TemplateMenu } from "./TemplateMenu";
 import { PreviewMenu } from "./PreviewMenu";
+import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { HEADER_OVERFLOW } from "./header-visibility";
 import { runWithPending } from "./publish-pending";
 import { HeaderOverflowMenu } from "./HeaderOverflowMenu";
@@ -155,46 +156,7 @@ export function EditorHeader({
  </div>
 
  {/* Save status indicator */}
- {state.saveStatus !== "idle" && (
-  <span
-  className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${
-   state.saveStatus === "saving"
-   ? "text-ih-watch-fg"
-   : state.saveStatus === "saved"
-   ? "text-ih-ok-fg"
-   : "text-ih-bad-fg"
-  }`}
-  >
-  {state.saveStatus === "saving" ? (
-   <>
-   <span className="w-1.5 h-1.5 rounded-full bg-ih-watch animate-pulse" />
-   {m.editor_header_save_saving()}
-   </>
-  ) : state.saveStatus === "saved" ? (
-   <>
-   <svg
-    className="w-3.5 h-3.5"
-    fill="none"
-    stroke="currentColor"
-    viewBox="0 0 24 24"
-   >
-    <path
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    strokeWidth={2}
-    d="M5 13l4 4L19 7"
-    />
-   </svg>
-   {m.editor_header_save_saved()}
-   </>
-  ) : (
-   <>
-   <span className="w-1.5 h-1.5 rounded-full bg-ih-bad" />
-   {m.editor_header_save_error()}
-   </>
-  )}
-  </span>
- )}
+ <SaveStatusIndicator status={state.saveStatus} />
 
  {/* Status badge */}
  <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-ih-bg-muted text-ih-fg-2 ring-ih-border inline-flex items-center">

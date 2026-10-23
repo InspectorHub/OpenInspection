@@ -9,10 +9,12 @@ interface LightboxSlide { src?: string; alt?: string }
  */
 export type AnySlide = LightboxSlide | { type: string; [k: string]: unknown };
 /** Isolation wrapper around yet-another-react-lightbox (single-maintainer dep). */
-export function PhotoLightbox({ slides, index, open, onClose, toolbarButtons, renderSlide }: {
+export function PhotoLightbox({ slides, index, open, onClose, toolbarButtons, toolbarWrap, renderSlide }: {
   slides: AnySlide[]; index: number; open: boolean; onClose: () => void;
   /** Custom toolbar nodes rendered before the built-in Close button (YARL v3 `toolbar.buttons`). */
   toolbarButtons?: React.ReactNode[];
+  /** Narrow screens: the toolbar spans the full width and wraps onto a second row instead of letting its buttons shrink into each other. */
+  toolbarWrap?: boolean;
   /** Plan 7 — render a custom (e.g. video) slide; return undefined to fall back to the default image render. */
   renderSlide?: (slide: AnySlide) => React.ReactNode | undefined;
 }) {
@@ -27,6 +29,8 @@ export function PhotoLightbox({ slides, index, open, onClose, toolbarButtons, re
       plugins={[Zoom]}
       zoom={{ maxZoomPixelRatio: 3, doubleTapDelay: 300, pinchZoomDistanceFactor: 100 }}
       toolbar={{ buttons: [...(toolbarButtons ?? []), "close"] }}
+      // Spread, not `styles={undefined}`: the lightbox reads `styles.root` and an explicit undefined replaces its default.
+      {...(toolbarWrap ? { styles: { toolbar: { flexWrap: "wrap", left: 0 } } } : {})}
       render={renderSlide ? { slide: ({ slide }) => renderSlide(slide as unknown as AnySlide) || undefined } : undefined}
     />
   );

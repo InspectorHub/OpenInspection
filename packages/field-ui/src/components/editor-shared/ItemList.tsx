@@ -83,6 +83,8 @@ interface SharedItemListProps {
   groups?: readonly EditorGroup[];
   /** Add another instance of a group. Called with the group's id. */
   onAddGroupInstance?: (groupId: string) => void;
+  /** Tablet pane: fluid width, rows at least 56px high, the selected row marked by a tint, a 3px bar and bold text. */
+  pane?: boolean;
 }
 
 /**
@@ -121,6 +123,7 @@ function slotHeadings(
   return { heading, closes };
 }
 
+const PANE_SELECTED = "bg-ih-primary-tint border-l-[3px] border-ih-primary font-bold text-ih-primary-text";
 /** Map rating to dot color for the item list */
 function ratingDotClass(rating: string): string {
   if (rating === "Satisfactory" || rating === "SAT") return "bg-ih-ok";
@@ -151,6 +154,7 @@ export function ItemList({
   activeUnitId = null,
   groups,
   onAddGroupInstance,
+  pane = false,
 }: SharedItemListProps) {
   const { heading: slotHeading, closes: groupClosedBy } = slotHeadings(groups, items);
   const grouped = Boolean(groups?.length);
@@ -193,7 +197,7 @@ export function ItemList({
   });
 
   return (
-    <div data-shortcut-scope className="w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col">
+    <div data-shortcut-scope className={pane ? "w-full min-w-0 flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col" : "w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col"}>
       {/* Filter chips live in the inspection-edit header row (with per-filter
           counts + a working Flagged filter); this shared list only renders the
           items it is handed, already filtered by the parent. */}
@@ -226,9 +230,9 @@ export function ItemList({
                   setEditingId(item.id);
                 }
               }}
-              className={`group relative flex items-stretch rounded-md text-[13px] transition-all ${
+              className={`group relative flex items-stretch rounded-md text-[13px] transition-all ${pane ? "min-h-14 " : ""}${
                 activeItemId === item.id
-                  ? "bg-ih-bg-card shadow-ih-card border-l-[3px] border-ih-primary font-medium"
+                  ? pane ? PANE_SELECTED : "bg-ih-bg-card shadow-ih-card border-l-[3px] border-ih-primary font-medium"
                   : "text-ih-fg-3 hover:bg-ih-bg-muted"
               }`}
             >
@@ -269,7 +273,7 @@ export function ItemList({
                     }
                   }}
                   onDoubleClick={onRenameItem && !batchMode ? () => setEditingId(item.id) : undefined}
-                  className={`flex-1 min-w-0 text-left py-2 flex items-center gap-2 ${onReorderItem && !batchMode ? "pr-1" : "px-3"}`}
+                  className={`flex-1 min-w-0 text-left py-2 flex items-center gap-2 ${pane ? "touch-manipulation " : ""}${onReorderItem && !batchMode ? "pr-1" : "px-3"}`}
                 >
                   {batchMode && (
                     <span

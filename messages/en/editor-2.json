@@ -152,6 +152,7 @@
   "editor_mobile_group_capture": "Capture",
   "editor_mobile_group_inspection": "Inspection",
   "editor_mobile_burst_camera": "Burst camera",
+  "editor_speed_rate_unrated": "Speed rate · {count} unrated",
   "editor_item_open_library": "Library",
   "editor_burst_no_item": "Choose an item before using the burst camera. Those photos were not saved.",
   "editor_progress_rated": "{rated}/{total} rated",

@@ -37,4 +37,18 @@ describe('singleKeyShortcutsAllowed', () => {
         document.body.appendChild(scope);
         expect(singleKeyShortcutsAllowed(btn, false)).toBe(true);
     });
+    it('allows when focus sits on <main> itself: where a closing drawer or dialog puts focus back', () => {
+        // On the phone and tablet layouts a bottom drawer closes onto <main>, and without this the number keys,
+        // J/K and the other single-key shortcuts stay dead for a hardware keyboard until something else is focused.
+        const main = document.createElement('main');
+        document.body.appendChild(main);
+        expect(singleKeyShortcutsAllowed(main, false)).toBe(true);
+    });
+    it('still blocks a control INSIDE <main>: only main itself is the focus fallback', () => {
+        const main = document.createElement('main');
+        const btn = document.createElement('button');
+        main.appendChild(btn);
+        document.body.appendChild(main);
+        expect(singleKeyShortcutsAllowed(btn, false)).toBe(false);
+    });
 });

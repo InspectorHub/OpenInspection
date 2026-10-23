@@ -28,6 +28,7 @@ import { useResultsDoc } from "../collab/use-results-doc";
 import { useMediaDrain } from "../hooks/useMediaDrain";
 import { appendPendingPhoto } from "../collab/results-binding";
 import { useResultsProjection } from "../hooks/useResultsProjection";
+import { useSpeedRating } from "../hooks/useSpeedRating";
 import { enqueueMedia } from "../collab/media-upload-queue";
 import { SectionRail } from "../components/editor-shared/SectionRail";
 import { EditorHeader } from "../components/editor/EditorHeader";
@@ -58,7 +59,12 @@ import { PublishModal } from "../components/editor/PublishModal";
 import { SignModal } from "../components/editor/SignModal";
 import { useEditorLayout } from "../hooks/useBreakpoint";
 import { SharedOverlays } from "./SharedOverlays";
-import { MobileAppBar } from "../components/editor/MobileAppBar";
+import { AppBar } from "../components/editor/AppBar";
+import { TabletActions } from "../components/editor/TabletActions";
+import { SpeedEntryButton } from "../components/editor/SpeedEntryButton";
+import { TabletTree } from "./TabletTree";
+import { SaveStatusIndicator } from "../components/editor/SaveStatusIndicator";
+import { InspectionIdentity } from "../components/editor/InspectionIdentity";
 import { MobileDrawerTriggers, type MobileDrawerId } from "../components/editor/MobileDrawerTriggers";
 import { MobileFinishDrawer } from "../components/editor/MobileFinishDrawer";
 import { InspectionOverview } from "../components/editor/InspectionOverview";
@@ -701,8 +707,11 @@ export function FieldEditor({ data }: { data: EditorData }) {
  });
 
  /* Mobile shell state */
- // Tablet renders the desktop tree until it gets a tree of its own.
- const isMobile = useEditorLayout() === "phone";
+ // The layout band decides the tree. `isMobile` is every touch layout (phone and tablet), which share the
+ // touch entry points (the add-media chooser, the library button, drawers that close on a pick).
+ const layout = useEditorLayout();
+ const isPhone = layout === "phone";
+ const isMobile = layout !== "desktop";
  const [mobileDrawer, setMobileDrawer] = useState<MobileDrawerId | null>(null);
 
  const PRESET_TAGS = useMemo(() => [
@@ -779,6 +788,18 @@ export function FieldEditor({ data }: { data: EditorData }) {
  /* ---------------------------------------------------------------- */
 
  /**
+ * The ONE place a rating is written. The item editor's rating row, the 1-5 and N/A keys, clearing, Speed mode's
+ * tap, its keys and its Undo, and the batch bar's Undo all end here, with the same (section, item, rating)
+ * arguments, so a rating is the same entry in the results document, moves the same counters and dirties the
+ * same state whichever way it was entered. What differs between entries is only what happens AFTER the write
+ * (auto-advance in the item editor, queue handling in Speed mode), and that stays with the caller.
+ */
+ const commitRating = useCallback(
+ (sectionId: string, itemId: string, rating: string | null) => findings.setRating(sectionId, itemId, rating),
+ [findings],
+ );
+
+ /**
  * B-18 — two root causes lived here:
  * 1. `find(l => l.id === rating)` missed because the old hardcoded
  * buttons emitted 'DEF' while levels carry ids like 'Defect', so
@@ -791,7 +812,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  const handleRating = useCallback(
  (rating: string, source: 'pointer' | 'keyboard' = 'pointer') => {
  if (!state.activeItemId || !state.currentSection) return;
- findings.setRating(state.currentSection.id, state.activeItemId, rating);
+ commitRating(state.currentSection.id, state.activeItemId, rating);
  const level = findRatingLevel(state.ratingLevels ?? [], rating);
  const decision = ratingAdvanceDecision({
  source,
@@ -818,7 +839,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  inspectionPrefs.autoAdvanceDelayMs,
  );
  },
- [state.activeItemId, state.currentSection, findings, state.advanceToNextUnrated, state.ratingLevels, prefsLoaded, inspectionPrefs.autoAdvance, inspectionPrefs.autoAdvanceDelayMs, notify],
+ [state.activeItemId, state.currentSection, commitRating, state.advanceToNextUnrated, state.ratingLevels, prefsLoaded, inspectionPrefs.autoAdvance, inspectionPrefs.autoAdvanceDelayMs, notify],
  );
 
  /* ---------------------------------------------------------------- */
@@ -838,9 +859,8 @@ export function FieldEditor({ data }: { data: EditorData }) {
  /* Speed mode helpers */
  /* ---------------------------------------------------------------- */
 
- const toggleSpeedMode = useCallback(() => {
- if (!state.speedMode) {
- // Build flat queue of unrated items
+ // The flat list of every item in the inspection and the queue of the ones still unrated: what Speed mode walks.
+ const buildSpeedQueue = useCallback(() => {
  const flatItems: typeof state.speedItemsRef.current = [];
  for (let s = 0; s < state.sections.length; s++) {
  const sec = state.sections[s];
@@ -861,7 +881,15 @@ export function FieldEditor({ data }: { data: EditorData }) {
  .map((it, idx) => ({ idx, rating: it.rating }))
  .filter((x) => !x.rating)
  .map((x) => x.idx);
+ return { flatItems, queue };
+ }, [state.sections, state.getResult]);
 
+ // How many items Speed mode would walk: the label of its touch entry points, which are left out at zero.
+ const speedUnrated = useMemo(() => buildSpeedQueue().queue.length, [buildSpeedQueue, state.results]);
+
+ const toggleSpeedMode = useCallback(() => {
+ if (!state.speedMode) {
+ const { flatItems, queue } = buildSpeedQueue();
  if (queue.length === 0) return;
  state.speedItemsRef.current = flatItems;
  state.setSpeedQueue(queue);
@@ -870,33 +898,12 @@ export function FieldEditor({ data }: { data: EditorData }) {
  } else {
  state.setSpeedMode(false);
  }
- }, [state]);
+ }, [state, buildSpeedQueue]);
 
- const speedRate = useCallback(
- (levelIdx: number) => {
- if (!state.speedMode) return;
- const qi = state.speedQueue[state.speedCurrent];
- if (qi == null) return;
- const item = state.speedItemsRef.current[qi];
- if (!item || !state.ratingLevels[levelIdx]) return;
- const sid = state.sectionIdForItem(item.id);
- if (sid) {
- findings.setRating(sid, item.id, state.ratingLevels[levelIdx].id);
- }
- // Remove from queue + auto-advance
- const newQueue = [...state.speedQueue];
- newQueue.splice(state.speedCurrent, 1);
- state.setSpeedQueue(newQueue);
- if (newQueue.length === 0) {
- setTimeout(() => state.setSpeedMode(false), 1500);
- return;
- }
- if (state.speedCurrent >= newQueue.length) {
- state.setSpeedCurrent(newQueue.length - 1);
- }
- },
- [state, findings],
- );
+ // Rating and Undo in Speed mode (every write goes through `commitRating`); see the hook for the queue rules.
+ const { speedRate, undoSpeedRating, finishedItem, pendingUndo, setPendingUndo } = useSpeedRating({
+ state, commitRating, doc: collab?.doc ?? null, activeUnitId,
+ });
 
  /* ---------------------------------------------------------------- */
  /* Speed mode derived data */
@@ -920,6 +927,48 @@ export function FieldEditor({ data }: { data: EditorData }) {
  state.setSpeedCurrent(state.speedCurrent - 1);
  }
  }, [state.speedCurrent, state.setSpeedCurrent]);
+
+ /* Speed mode, mounted once by whichever tree renders. State and handlers live here, above the layout, so a
+ * rotation keeps the item, the queue position and the toast. A rating tap does not also call onNext: speedRate
+ * has already taken the rated item out of the queue, so the cursor points at the next one. */
+ const shownSpeedItem = speedItem ?? finishedItem;
+ const speedModeEl = state.speedMode && shownSpeedItem ? (
+ <SpeedMode
+ item={{
+ id: shownSpeedItem.id,
+ label: shownSpeedItem.label,
+ type: "rich",
+ }}
+ sectionTitle={shownSpeedItem.sectionName}
+ result={state.getResult(shownSpeedItem.id)}
+ finished={!speedItem}
+ pendingUndo={pendingUndo}
+ onPendingUndoChange={setPendingUndo}
+ onRating={(rating) => {
+ const levelIdx = state.ratingLevels.findIndex(
+ (l) => l.id === rating,
+ );
+ if (levelIdx >= 0) speedRate(levelIdx);
+ }}
+ onPrev={speedPrev}
+ onNext={speedNext}
+ onExit={() => state.setSpeedMode(false)}
+ currentIndex={state.speedCurrent}
+ totalCount={state.speedQueue.length}
+ onNextItem={speedNext}
+ onPrevItem={speedPrev}
+ onJumpTo={(sectionId, itemId) => {
+ state.selectSectionById(sectionId);
+ state.setActiveItemId(itemId);
+ state.setSpeedMode(false);
+ }}
+ advanceOnRate={false}
+ onUndoRating={undoSpeedRating}
+ touch={isMobile}
+ ratingLevels={state.ratingLevels}
+ sections={state.sections as Array<{ id: string; title?: string; name?: string; items?: Array<{ id: string; label?: string; name?: string }> }>}
+ />
+ ) : null;
 
  /* ---------------------------------------------------------------- */
  /* Photo upload */
@@ -1114,7 +1163,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  },
  onClearRating: () => {
  if (state.activeItemId && state.currentSection) {
- findings.setRating(state.currentSection.id, state.activeItemId, null);
+ commitRating(state.currentSection.id, state.activeItemId, null);
  }
  },
  onNARating: () => {
@@ -1326,6 +1375,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  onRenameItem={canEditStructure ? (itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label) : undefined}
  groups={statutoryGroups}
  onAddGroupInstance={(groupId) => setAddingToGroup(groupId)}
+ pane={layout === "tablet"}
  />
  );
 
@@ -1745,24 +1795,208 @@ export function FieldEditor({ data }: { data: EditorData }) {
  />
  );
 
- if (isMobile) {
+ // Filter chips, the statutory progress and the batch toggle above the item list. Fixed-width on desktop: es-419
+ // "Sin calificar" broke mid-phrase inside its chip, so the STRIP wraps and labels do not. Tablet reuses it as is.
+ const itemFilterBarEl = (
+ <div className="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-ih-border">
+ <SegmentedControl
+ ariaLabel={m.editor_route_item_filter()}
+ value={state.itemFilter}
+ onChange={(v) => state.setItemFilter(v as ItemFilter)}
+ options={(["all", "unrated", "issues", "flagged"] as const).map((f) => ({
+ value: f,
+ label: (
+ <span className="whitespace-nowrap">
+ {f === "all" ? m.editor_route_filter_all() : f === "unrated" ? m.editor_route_filter_unrated() : f === "issues" ? m.editor_route_filter_issues() : m.editor_route_filter_flagged()}
+ {f !== "all" && (
+ <span className="ml-1 text-[10px]">
+ {f === "unrated" ? state.filterCounts.unrated : f === "issues" ? state.filterCounts.issues : state.filterCounts.flagged}
+ </span>
+ )}
+ </span>
+ ),
+ }))}
+ />
+ {formProgress && (
+ <span className="ml-auto text-[11px] text-ih-fg-3 whitespace-nowrap">
+ {m.statutory_form_completeness({ answered: String(formProgress.answered), total: String(formProgress.total) })}
+ </span>
+ )}
+ {/* Batch mode toggle — object-scoped action, lives with the items it selects
+     (moved out of the global header). */}
+ <IconButton
+ onClick={() => {
+  if (state.batchMode) {
+  state.setBatchMode(false);
+  state.setBatchSelected({});
+  } else {
+  state.setBatchMode(true);
+  }
+ }}
+ selected={state.batchMode}
+ size="sm"
+ className={isMobile ? "ml-auto w-11 h-11 touch-manipulation" : "ml-auto"}
+ title={state.batchMode ? m.editor_route_exit_batch_mode() : m.editor_route_batch_mode()}
+ aria-label={state.batchMode ? m.editor_route_exit_batch_mode() : m.editor_route_batch_select_items()}
+ >
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+ </svg>
+ </IconButton>
+ </div>
+ );
+
+ // Batch action bar: spans the full editor width and shows while items are selected. Desktop and tablet mount it.
+ const batchBarEl = state.batchMode && state.selectedBatchCount > 0 ? (
+ <BatchActionBar
+  count={state.selectedBatchCount}
+  ratingLevels={state.ratingLevels.slice(0, 5)}
+  getRatingColor={state.getRatingColor}
+  onSelectAll={() => state.batchSelectAll()}
+  onClear={() => state.setBatchSelected({})}
+  onSetRating={(levelId) => {
+   const sectionId = state.currentSection?.id || "";
+   const selectedIds = Object.keys(state.batchSelected).filter((id) => state.batchSelected[id]);
+   const prior = capturePriorRatings(selectedIds, (id) => {
+    const r = state.getResult(id, sectionId);
+    return (r?.rating as string | null) ?? null;
+   });
+   findings.batchSetRating(sectionId, state.currentSectionItems, state.batchSelected, levelId);
+   const label = state.ratingLevels.find((l) => l.id === levelId)?.label ?? levelId;
+   notify(m.editor_route_batch_rated({ count: selectedIds.length, s: selectedIds.length === 1 ? '' : 's', label }), "info", {
+    durationMs: 6000,
+    action: {
+     label: m.common_undo(),
+     run: () => {
+      for (const { itemId, prior: p } of prior) {
+       commitRating(sectionId, itemId, p);
+      }
+     },
+    },
+   });
+  }}
+  onExit={() => { state.setBatchMode(false); state.setBatchSelected({}); }}
+ />
+ ) : null;
+
+ // The tools dock FAB (speed mode, burst camera, photo studio, shortcuts). Desktop and tablet mount it.
+ const toolsDockEl = (
+ <InspectorToolsDock
+ onToggleSpeedMode={toggleSpeedMode}
+ onBurstCamera={(itemId) => {
+ state.setBurstCameraItemId(itemId || state.activeItemId || null);
+ state.setBurstCameraOpen(true);
+ }}
+ onPhotoStudio={() => {
+ if (!state.activeItemId) return;
+ const result = state.getResult(state.activeItemId);
+ const photos = (result?.photos as string[]) || [];
+ if (photos.length > 0) {
+  openPhotoStudio({
+   url: dataSource.urls.photo(String(state.inspection.id), photos[0]),
+   key: photos[0],
+   index: 1,
+   total: photos.length,
+  });
+ } else {
+  openPhotoStudio({ url: null, key: null, index: 0, total: 0 });
+ }
+ }}
+ onToggleCheatsheet={() =>
+ state.setShowCheatsheet(!state.showCheatsheet)
+ }
+ activeItemId={state.activeItemId || undefined}
+ hidden={state.speedMode}
+ />
+ );
+
+
+ // Back out one level: the overview to the items, an open item to the list (phone only: the tablet shows both at
+ // once), then out of the editor through the host's exit, so the unsaved-changes guard still runs.
+ const goBack = (itemLevel: boolean) => {
+  if (state.activeView === "property") { state.setActiveView("items"); return; }
+  if (itemLevel && state.activeItemId) { state.setActiveItemId(null); return; }
+  dataSource.exit();
+ };
+ const openSpeedFromDrawer = () => { setMobileDrawer(null); toggleSpeedMode(); };
+ const appBarTitles = {
+  sectionTitle: state.currentSection?.title ?? "",
+  itemLabel: ((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? m.editor_route_select_an_item(),
+ };
+
+ // The per-unit scope switcher (commercial, per_unit mode only: the desktop header's `perUnitControls`), for the
+ // phone's Items drawer and the tablet's list pane, and the save indicator both app bars carry.
+ const scopeSwitcherEl = showUnitsSurface && isPerUnit ? <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} /> : null;
+ const saveStatusEl = <SaveStatusIndicator status={state.saveStatus} />;
+ const { pdf } = slots;
+
+ // The bottom drawers of the touch layouts. The phone also has the Items drawer (the tablet shows the list in a pane).
+ const mobileDrawersEl = (
+ <>
+ <MobileBottomDrawer open={mobileDrawer === 'sections'} onClose={() => setMobileDrawer(null)} title={m.editor_route_drawer_sections()}>
+ {sectionRailEl}
+ </MobileBottomDrawer>
+ {isPhone && (
+ <MobileBottomDrawer open={mobileDrawer === 'items'} onClose={() => setMobileDrawer(null)} title={m.editor_route_drawer_items()}>
+ {scopeSwitcherEl && <div className="px-2 pt-2">{scopeSwitcherEl}</div>}
+ {speedUnrated > 0 && <div className="px-2 pt-2"><SpeedEntryButton unrated={speedUnrated} onOpen={openSpeedFromDrawer} className="w-full" /></div>}
+ {itemListEl}
+ </MobileBottomDrawer>
+ )}
+ <MobileBottomDrawer open={mobileDrawer === 'preview'} onClose={() => setMobileDrawer(null)} title={m.editor_route_drawer_preview()}>
+ {sideRailEl}
+ </MobileBottomDrawer>
+ <MobileFinishDrawer
+ open={mobileDrawer === 'actions'}
+ onClose={() => setMobileDrawer(null)}
+ onPublish={() => void handlePublishClick()}
+ onSign={() => setSignModalOpen(true)}
+ onOpenSettings={caps.settingsSheet ? () => state.setSettingsOpen(true) : null}
+ onFinishFieldwork={(state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
+ finishingFieldwork={publishFlow.finishing}
+ onPreviewReport={
+  previewReportUrl && openPreview
+  ? () => openPreview(previewReportUrl)
+  : null
+ }
+ onPreviewPdf={pdf ? () => pdf.run(String(state.inspection.id)) : null}
+ pdfLabel={pdf ? pdf.actionLabel(m.editor_header_preview_pdf_short()) : undefined}
+ pdfBusy={pdf?.busy ?? false}
+ pdfError={pdf?.error ?? null}
+ onChangeTemplate={caps.settingsSheet ? () => state.setSettingsOpen(true) : null}
+ onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}
+ onUpdateSourceTemplate={structure.canSaveBack ? () => structure.openSaveTemplate("back") : null}
+ onOpenTheme={caps.themeControl ? () => setMobileDrawer('theme') : null}
+ onSpeedMode={speedUnrated > 0 ? toggleSpeedMode : null}
+ onBurstCamera={caps.cameraCapture && state.activeItemId ? () => { state.setBurstCameraItemId(state.activeItemId || null); state.setBurstCameraOpen(true); } : null}
+ onOpenVersionHistory={fieldSession.collabEditing && caps.versionHistory ? () => setVersionHistoryOpen(true) : null}
+ onOpenUnits={showUnitsSurface ? () => setUnitsManagerOpen(true) : null}
+ onOpenCostItems={showUnitsSurface && caps.costItems ? () => setCostItemsOpen(true) : null}
+ />
+ {/* Theme — narrow-screen home for the theme control the xl+ header shows
+     inline, so the auto/light/dark/field preference is reachable on tablet
+     and phone too. */}
+ <MobileBottomDrawer open={mobileDrawer === 'theme'} onClose={() => setMobileDrawer(null)} title={m.nav_theme_label()}>
+ <div className="p-4">
+  {slots.renderThemeControl?.({})}
+ </div>
+ </MobileBottomDrawer>
+ </>
+ );
+
+ if (isPhone) {
  return (
- <div className="min-h-dvh pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+ <div data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
  {photoInputsEl}
  {addMediaOverlaysEl}
  {sharedOverlaysEl}
- <MobileAppBar
- sectionTitle={state.currentSection?.title ?? ''}
- itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? m.editor_route_select_an_item()}
- onBack={() => {
-  // B-22: back from item editor → item list; back from list → inspections.
-  // The overview is a third destination on this shell and needs its own
-  // step out, or Back from it leaves the inspection entirely.
-  if (state.activeView === "property") { state.setActiveView("items"); return; }
-  if (state.activeItemId) { state.setActiveItemId(null); return; }
-  dataSource.exit();
- }}
+ {speedModeEl}
+ <AppBar
+ platform={dataSource.platform}
+ {...appBarTitles}
+ onBack={() => goBack(true)}
  onMore={() => setMobileDrawer('actions')}
+ status={saveStatusEl}
  />
  <main className="p-4">
  {revisionBannerEl}
@@ -1782,106 +2016,64 @@ export function FieldEditor({ data }: { data: EditorData }) {
  ))}
  </main>
  <MobileDrawerTriggers onOpen={(id) => setMobileDrawer(id)} showTheme={caps.themeControl} />
- <MobileBottomDrawer
- open={mobileDrawer === 'sections'}
- onClose={() => setMobileDrawer(null)}
- title={m.editor_route_drawer_sections()}
- >
- {sectionRailEl}
- </MobileBottomDrawer>
- <MobileBottomDrawer
- open={mobileDrawer === 'items'}
- onClose={() => setMobileDrawer(null)}
- title={m.editor_route_drawer_items()}
- >
- {itemListEl}
- </MobileBottomDrawer>
- <MobileBottomDrawer
- open={mobileDrawer === 'preview'}
- onClose={() => setMobileDrawer(null)}
- title={m.editor_route_drawer_preview()}
- >
- {sideRailEl}
- </MobileBottomDrawer>
- <MobileFinishDrawer
- open={mobileDrawer === 'actions'}
- onClose={() => setMobileDrawer(null)}
- onPublish={() => void handlePublishClick()}
- onSign={() => setSignModalOpen(true)}
- onOpenSettings={caps.settingsSheet ? () => state.setSettingsOpen(true) : null}
- onFinishFieldwork={(state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
- finishingFieldwork={publishFlow.finishing}
- onPreviewReport={
-  previewReportUrl && openPreview
-  ? () => openPreview(previewReportUrl)
-  : null
- }
- onBurstCamera={caps.cameraCapture && state.activeItemId ? () => { state.setBurstCameraItemId(state.activeItemId || null); state.setBurstCameraOpen(true); } : null}
- onOpenVersionHistory={fieldSession.collabEditing && caps.versionHistory ? () => setVersionHistoryOpen(true) : null}
- onOpenUnits={showUnitsSurface ? () => setUnitsManagerOpen(true) : null}
- onOpenCostItems={showUnitsSurface && caps.costItems ? () => setCostItemsOpen(true) : null}
- />
- {/* Theme — narrow-screen home for the theme control the xl+ header shows
-     inline, so the auto/light/dark/field preference is reachable on tablet
-     and phone too. */}
- <MobileBottomDrawer
- open={mobileDrawer === 'theme'}
- onClose={() => setMobileDrawer(null)}
- title={m.nav_theme_label()}
- >
- <div className="p-4">
-  {slots.renderThemeControl?.({})}
- </div>
- </MobileBottomDrawer>
+ {mobileDrawersEl}
  {finishActionsEl}
  {unsavedGuardEl}
  </div>
  );
  }
 
+ if (layout === "tablet") {
+ return (
+ <TabletTree
+ overlays={<>{photoInputsEl}{addMediaOverlaysEl}{sharedOverlaysEl}{speedModeEl}{state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}{mobileDrawersEl}{finishActionsEl}{unsavedGuardEl}</>}
+ appBar={
+  <AppBar
+  tablet
+  platform={dataSource.platform}
+  {...appBarTitles}
+  onBack={() => goBack(false)}
+  onOpenSections={() => setMobileDrawer('sections')}
+  onMore={() => setMobileDrawer('actions')}
+  actions={<TabletActions onPreview={() => setMobileDrawer('preview')} onPublish={handlePublishClick} />}
+  status={saveStatusEl}
+  />
+ }
+ collabSynced={collabSynced}
+ footer={<FooterBar connected={presence.connected} status={presence.status} roster={presence.roster} />}
+ listHeader={
+  <>
+  <InspectionIdentity address={state.inspection.propertyAddress as string | undefined} id={String(state.inspection.id)} date={state.formattedDate} status={String(state.inspection.status)} />
+  {scopeSwitcherEl && <div className="px-3 py-2 border-b border-ih-border">{scopeSwitcherEl}</div>}
+  {itemFilterBarEl}
+  {speedUnrated > 0 && <div className="px-3 py-2 border-b border-ih-border"><SpeedEntryButton unrated={speedUnrated} onOpen={toggleSpeedMode} className="w-full" /></div>}
+  </>
+ }
+ sectionTitle={state.currentSection?.title ?? ""}
+ list={itemListEl}
+ main={<>{revisionBannerEl}{state.activeView === "property" ? propertyOverviewEl : itemEditorEl}</>}
+ emptyTemplate={emptyTemplateEl}
+ batchBar={batchBarEl}
+ tools={toolsDockEl}
+ />
+ );
+ }
+
  return (
  <div
   /* Desktop editor minimum design width 1024px (iPad landscape fits without
-     scroll; real phones/small tablets never reach here — the isMobile branch
-     above owns <768px). Below 1024 the whole editor scrolls horizontally
-     instead of squeezing the fixed-width rails; the fixed header/footer stay
-     pinned to the viewport and always cover the visible area. */
+     scroll). Phones and tablets never reach here: the phone and tablet trees
+     above own everything under 1024px. The minimum stays as a floor for a
+     desktop window dragged narrower, where the whole editor scrolls
+     horizontally instead of squeezing the fixed-width rails; the fixed
+     header/footer stay pinned to the viewport. */
+  data-layout="desktop"
+  data-collab-synced={collabSynced ? "true" : "false"}
   className="flex h-screen bg-ih-bg-card overflow-x-auto"
  >
  {photoInputsEl}
 
- {/* SpeedMode overlay */}
- {state.speedMode && speedItem && (
- <SpeedMode
- item={{
- id: speedItem.id,
- label: speedItem.label,
- type: "rich",
- }}
- sectionTitle={speedItem.sectionName}
- result={state.getResult(speedItem.id)}
- onRating={(rating) => {
- const levelIdx = state.ratingLevels.findIndex(
- (l) => l.id === rating,
- );
- if (levelIdx >= 0) speedRate(levelIdx);
- }}
- onPrev={speedPrev}
- onNext={speedNext}
- onExit={() => state.setSpeedMode(false)}
- currentIndex={state.speedCurrent}
- totalCount={state.speedQueue.length}
- onNextItem={speedNext}
- onPrevItem={speedPrev}
- onJumpTo={(sectionId, itemId) => {
- state.selectSectionById(sectionId);
- state.setActiveItemId(itemId);
- state.setSpeedMode(false);
- }}
- ratingLevels={state.ratingLevels}
- sections={state.sections as Array<{ id: string; title?: string; name?: string; items?: Array<{ id: string; label?: string; name?: string }> }>}
- />
- )}
+ {speedModeEl}
 
  {/* Keyboard cheatsheet overlay */}
  {state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}
@@ -1968,53 +2160,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  {/* Column 2: Item List (280px, items-only) — hidden in fullscreen */}
  {!state.itemFullscreen && (
  <div className="w-[280px] flex-shrink-0 border-r border-ih-border flex flex-col overflow-hidden relative">
- {/* Filter tabs. Fixed 280px: es-419 "Sin calificar" broke mid-phrase inside its chip, so the STRIP wraps and labels do not. */}
- <div className="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-ih-border">
- <SegmentedControl
- ariaLabel={m.editor_route_item_filter()}
- value={state.itemFilter}
- onChange={(v) => state.setItemFilter(v as ItemFilter)}
- options={(["all", "unrated", "issues", "flagged"] as const).map((f) => ({
- value: f,
- label: (
- <span className="whitespace-nowrap">
- {f === "all" ? m.editor_route_filter_all() : f === "unrated" ? m.editor_route_filter_unrated() : f === "issues" ? m.editor_route_filter_issues() : m.editor_route_filter_flagged()}
- {f !== "all" && (
- <span className="ml-1 text-[10px]">
- {f === "unrated" ? state.filterCounts.unrated : f === "issues" ? state.filterCounts.issues : state.filterCounts.flagged}
- </span>
- )}
- </span>
- ),
- }))}
- />
- {formProgress && (
- <span className="ml-auto text-[11px] text-ih-fg-3 whitespace-nowrap">
- {m.statutory_form_completeness({ answered: String(formProgress.answered), total: String(formProgress.total) })}
- </span>
- )}
- {/* Batch mode toggle — object-scoped action, lives with the items it selects
-     (moved out of the global header). */}
- <IconButton
- onClick={() => {
-  if (state.batchMode) {
-  state.setBatchMode(false);
-  state.setBatchSelected({});
-  } else {
-  state.setBatchMode(true);
-  }
- }}
- selected={state.batchMode}
- size="sm"
- className="ml-auto"
- title={state.batchMode ? m.editor_route_exit_batch_mode() : m.editor_route_batch_mode()}
- aria-label={state.batchMode ? m.editor_route_exit_batch_mode() : m.editor_route_batch_select_items()}
- >
- <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
- </svg>
- </IconButton>
- </div>
+ {itemFilterBarEl}
  {itemListEl}
  </div>
  )}
@@ -2071,76 +2217,14 @@ export function FieldEditor({ data }: { data: EditorData }) {
  )}
  </div>
 
- {/* ------------------------------------------------------------ */}
- {/* Batch Action Bar — spans full editor width, shown when items are selected */}
- {/* ------------------------------------------------------------ */}
- {state.batchMode && state.selectedBatchCount > 0 && (
- <BatchActionBar
-  count={state.selectedBatchCount}
-  ratingLevels={state.ratingLevels.slice(0, 5)}
-  getRatingColor={state.getRatingColor}
-  onSelectAll={() => state.batchSelectAll()}
-  onClear={() => state.setBatchSelected({})}
-  onSetRating={(levelId) => {
-   const sectionId = state.currentSection?.id || "";
-   const selectedIds = Object.keys(state.batchSelected).filter((id) => state.batchSelected[id]);
-   const prior = capturePriorRatings(selectedIds, (id) => {
-    const r = state.getResult(id, sectionId);
-    return (r?.rating as string | null) ?? null;
-   });
-   findings.batchSetRating(sectionId, state.currentSectionItems, state.batchSelected, levelId);
-   const label = state.ratingLevels.find((l) => l.id === levelId)?.label ?? levelId;
-   notify(m.editor_route_batch_rated({ count: selectedIds.length, s: selectedIds.length === 1 ? '' : 's', label }), "info", {
-    durationMs: 6000,
-    action: {
-     label: m.common_undo(),
-     run: () => {
-      for (const { itemId, prior: p } of prior) {
-       findings.setRating(sectionId, itemId, p);
-      }
-     },
-    },
-   });
-  }}
-  onExit={() => { state.setBatchMode(false); state.setBatchSelected({}); }}
- />
- )}
+ {batchBarEl}
 
  {/* ------------------------------------------------------------ */}
  {/* Footer Bar */}
  {/* ------------------------------------------------------------ */}
  <FooterBar connected={presence.connected} status={presence.status} roster={presence.roster} />
 
- {/* ------------------------------------------------------------ */}
- {/* Inspector Tools Dock (FAB) */}
- {/* ------------------------------------------------------------ */}
- <InspectorToolsDock
- onToggleSpeedMode={toggleSpeedMode}
- onBurstCamera={(itemId) => {
- state.setBurstCameraItemId(itemId || state.activeItemId || null);
- state.setBurstCameraOpen(true);
- }}
- onPhotoStudio={() => {
- if (!state.activeItemId) return;
- const result = state.getResult(state.activeItemId);
- const photos = (result?.photos as string[]) || [];
- if (photos.length > 0) {
-  openPhotoStudio({
-   url: dataSource.urls.photo(String(state.inspection.id), photos[0]),
-   key: photos[0],
-   index: 1,
-   total: photos.length,
-  });
- } else {
-  openPhotoStudio({ url: null, key: null, index: 0, total: 0 });
- }
- }}
- onToggleCheatsheet={() =>
- state.setShowCheatsheet(!state.showCheatsheet)
- }
- activeItemId={state.activeItemId || undefined}
- hidden={state.speedMode}
- />
+ {toolsDockEl}
  </div>
  );
 }

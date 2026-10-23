@@ -375,10 +375,8 @@ export interface FieldDataSource {
    * then tells the person to reopen the inspection instead of silently showing the old template.
    */
   restartSession?(): void;
-  /**
-   * Open an address outside the editor (the report preview). The web host opens a new tab without an opener.
-   * A host that cannot leaves the member out: the editor then tells the person the preview is unavailable.
-   */
+  /** Open an address outside the editor (the report preview), in a new tab without an opener on the web. A host that
+   * cannot leaves the member out: the editor then tells the person the preview is unavailable. */
   openUrl?(url: string): void;
   exit(): void;
   isOnline(): boolean;
@@ -395,5 +393,7 @@ export interface FieldDataSource {
   };
   urls: FieldUrls;
   resources: FieldResources;
+  /** Where the editor runs. It picks the phone and tablet app bar; a native host sets `viewport-fit=cover`, since the native
+   * bars and the bottom tabs reserve `env(safe-area-inset-*)`. The web adapter reports 'web': the bar stays as it was. */
   platform: 'web' | 'ios' | 'android';
 }

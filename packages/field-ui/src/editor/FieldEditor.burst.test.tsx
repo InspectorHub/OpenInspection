@@ -35,13 +35,15 @@ async function openMore() {
 const burstRows = () => screen.queryAllByRole("button", { name: m.editor_mobile_burst_camera() });
 
 describe("burst camera needs a target item", () => {
-  it("phone: no open item means no Burst row and no Capture heading; an open item brings both", async () => {
+  it("phone: no open item means no Burst row (Speed mode keeps the Capture heading); an open item adds the row", async () => {
     mount(null, true);
     await itemsTab();
     await openMore();
     const sheet = screen.getByRole("dialog", { name: m.editor_mobile_more() });
     expect(burstRows()).toHaveLength(0);
-    expect(within(sheet).queryByText(m.editor_mobile_group_capture())).toBeNull();
+    // Capture now also holds Speed mode, which needs no open item, so the heading is there without a burst row.
+    expect(within(sheet).queryByText(m.editor_mobile_group_capture())).not.toBeNull();
+    expect(within(sheet).queryByRole("button", { name: m.editor_dock_speed_mode() })).not.toBeNull();
     // The rest of the drawer is unaffected.
     expect(within(sheet).queryByText(m.editor_mobile_group_inspection())).not.toBeNull();
     cleanup();

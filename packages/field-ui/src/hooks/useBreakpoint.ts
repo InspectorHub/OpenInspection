@@ -48,3 +48,21 @@ function subscribeLayout(onChange: () => void): () => void {
 export function useEditorLayout(): EditorLayout {
     return useSyncExternalStore(subscribeLayout, readLayout, () => 'desktop');
 }
+
+/**
+ * True while the viewport is at most `px` wide. A store subscription with a fixed `false` server snapshot, so the
+ * server markup and the first client render agree before the client moves to the real answer.
+ */
+export function useMaxWidth(px: number): boolean {
+    const query = `(max-width: ${px}px)`;
+    return useSyncExternalStore(
+        (onChange) => {
+            if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
+            const mq = window.matchMedia(query);
+            mq.addEventListener('change', onChange);
+            return () => mq.removeEventListener('change', onChange);
+        },
+        () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches,
+        () => false,
+    );
+}

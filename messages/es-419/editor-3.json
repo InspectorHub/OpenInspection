@@ -21,6 +21,7 @@
   "editor_signmodal_failed": "No se pudo guardar la firma. Inténtelo de nuevo.",
   "editor_speedmode_aria_label": "Calificar rápidamente los elementos de la inspección",
   "editor_speedmode_exit": "Salir del modo rápido",
+  "editor_speedmode_all_rated": "Todo está calificado",
   "editor_speedmode_gesture_hint": "Deslice para navegar · Mantenga presionado para saltar",
   "editor_speedmode_prev": "Anterior",
   "editor_speedmode_footer_press": "Presione",

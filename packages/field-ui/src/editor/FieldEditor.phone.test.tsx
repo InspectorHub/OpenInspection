@@ -61,8 +61,18 @@ describe("phone tree: touch entry points", () => {
     }
   });
 
-  it("a group with no rows is not shown: no camera means no Capture heading", async () => {
+  it("no camera means no Burst row; Speed mode still fills the Capture group", async () => {
     mount("cameraCapture", true);
+    await openItem();
+    await openMore();
+    const sheet = screen.getByRole("dialog", { name: m.editor_mobile_more() });
+    expect(within(sheet).queryByRole("button", { name: m.editor_mobile_burst_camera() })).toBeNull();
+    expect(within(sheet).queryByText(m.editor_mobile_group_capture())).not.toBeNull();
+    expect(within(sheet).queryByText(m.editor_mobile_group_inspection())).not.toBeNull();
+  });
+
+  it("a group with no rows is not shown: nothing to rate and no camera means no Capture heading", async () => {
+    mount("cameraCapture", true, createEmptyEditorData({ ...DATA, results: { "_default:s1:i1": { rating: "ok" } } }));
     await openItem();
     await openMore();
     const sheet = screen.getByRole("dialog", { name: m.editor_mobile_more() });

@@ -152,6 +152,7 @@
   "editor_mobile_group_capture": "Captura",
   "editor_mobile_group_inspection": "Inspección",
   "editor_mobile_burst_camera": "Cámara de ráfaga",
+  "editor_speed_rate_unrated": "Modo rápido · {count} sin calificar",
   "editor_item_open_library": "Biblioteca",
   "editor_burst_no_item": "Elija un elemento antes de usar la cámara de ráfaga. Esas fotos no se guardaron.",
   "editor_progress_rated": "{rated}/{total} calificados",

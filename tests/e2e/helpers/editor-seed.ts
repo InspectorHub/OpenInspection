@@ -53,6 +53,10 @@ export const EXCLUSIVE_SEED_PROJECTS = [
     'address-autofill',
     'people-role-profiles',
     'inspection-lifecycle',
+    'editor-responsive',
+    'speed-mode-parity-390',
+    'speed-mode-parity-834',
+    'speed-mode-parity-1280',
 ] as const;
 
 /** Key for the entry handed to projects that need a login but no inspection. */

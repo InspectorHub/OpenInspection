@@ -1,4 +1,5 @@
 import { PhotoLightbox } from "./PhotoLightbox";
+import { useMaxWidth } from "../../hooks/useBreakpoint";
 import { VideoPlayer } from "./VideoPlayer";
 import { fullResUrl } from "./cropImage";
 import { resolveMediaType } from "../../shared/media-type";
@@ -13,10 +14,13 @@ export function MediaViewerToolbar({
   edited,
   on,
   hide,
+  compact = false,
 }: {
   kind: "photo" | "video";
   edited: boolean;
   on: (a: MediaAction) => void;
+  /** A narrow screen: 44px targets that keep their label on one line and never shrink (the bar wraps instead). */
+  compact?: boolean;
   /** Actions the parent does not handle; they are left out rather than shown dead. */
   hide?: readonly MediaAction[];
 }) {
@@ -25,7 +29,7 @@ export function MediaViewerToolbar({
       key={a}
       type="button"
       onClick={() => on(a)}
-      className="yarl__button"
+      className={compact ? "yarl__button min-h-11 min-w-11 whitespace-nowrap shrink-0" : "yarl__button"}
       style={{ fontSize: 13, fontWeight: 700, padding: "0 12px", color: "#fff" }}
     >
       {label}
@@ -69,6 +73,8 @@ export interface MediaViewerProps {
 }
 export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSubdomain, inspectionId, hideActions }: MediaViewerProps) {
   const viewed = index !== null ? photos[index] : undefined;
+  // Seven controls do not fit one line at phone width: wrap them, with 44px targets (the wide toolbar is untouched).
+  const compact = useMaxWidth(480);
   const kind = viewed ? resolveMediaType(viewed) : "photo";
 
   const toolbar = viewed
@@ -78,6 +84,7 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
           kind={kind}
           edited={!!viewed.annotated}
           hide={hideActions}
+          compact={compact}
           on={(a) => {
             onClose();
             onAction(a, viewed);
@@ -129,6 +136,7 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
       open={index !== null}
       onClose={onClose}
       toolbarButtons={toolbar}
+      toolbarWrap={compact}
       renderSlide={(slide) => {
         const ps = slide as PlaceholderSlide | undefined;
         if (ps?.type === "placeholder") {

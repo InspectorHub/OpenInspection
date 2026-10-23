@@ -350,6 +350,7 @@ export function ItemPhotoStrip({
           // aria-disabled while uploading so focus stays on the button.
           {...pendingProps(photoUploading, onAddPhoto)}
           aria-label={m.media_strip_add_photo_aria()}
+          data-testid="photo-add"
           className={`strip-add w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary-text transition-colors ${PENDING_CLASS}`}
         >
           {photoUploading ? (
