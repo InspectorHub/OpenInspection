@@ -491,6 +491,7 @@ export const UNREGISTERED = new Map([
     ['lint:fix', 'eslint --fix; a mutation, not a check'],
     ['lint:eslint', 'eslint keeps its own process — it needs the type-aware program and a 12 GB heap, which is not something to import into a shared runner'],
     ['lint:advisories', 'queries the network (npm audit), so it cannot run at a rung that must work offline'],
+    ['lint:package-tarball', 'packs @inspectorhub/field-ui and scans the tarball, so it needs the built dist; it runs in publish-field-ui.yml right before npm publish, the one moment the contents are final, and by hand when preparing a release'],
     ['verify:real-corpus', 'reads real vendor exports that are NOT in this repository and must never be. A release-time manual rung run by somebody holding the private corpus: CI here runs on a public repository and cannot hold credentials for private material. Listed rather than omitted so that its absence from every rung is a recorded decision instead of an oversight'],
     ['verify:statutory-render', 'renders a statutory field map onto the AUTHORITY\'S own published PDF, which is that agency\'s document and is not in this repository. Same rung and same reason as verify:real-corpus above: a release-time manual check run by whoever holds the forms, driven by STATUTORY_PDF_DIR, which no CI job here can be given. It is what nothing else in the subsystem can do — every other check is satisfiable by a map and a test that agree with each other about a form neither has opened'],
 ]);

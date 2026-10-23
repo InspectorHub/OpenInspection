@@ -47,4 +47,13 @@ jobs:
             exit 1
           fi
       - run: npm run build -w @inspectorhub/field-ui
+      # Scan what will actually ship (the packed tarball) before it can no longer be taken back.
+      # Terms that must not be written into this public repository come in at run time as a
+      # JSON array of regex sources (repository secret PACKAGE_SCAN_EXTRA_PATTERNS; may be empty).
+      - name: Scan the tarball
+        env:
+          PACKAGE_SCAN_EXTRA_PATTERNS: ${{ secrets.PACKAGE_SCAN_EXTRA_PATTERNS }}
+        run: |
+          [ -n "$PACKAGE_SCAN_EXTRA_PATTERNS" ] || unset PACKAGE_SCAN_EXTRA_PATTERNS
+          npm run lint:package-tarball
       - run: npm publish -w @inspectorhub/field-ui --provenance --access public

@@ -1,0 +1,57 @@
+import { gzipSync } from 'node:zlib';
+import { describe, expect, it } from 'vitest';
+// @ts-expect-error - plain .mjs gate script, no type declarations
+import { readTarball, scanFiles } from '../../../scripts/check-package-tarball.mjs';
+
+type Finding = { path: string; id: string };
+const scan = (files: Record<string, string>, extra: string[] = []): Finding[] => scanFiles(files, extra);
+const ids = (files: Record<string, string>, extra?: string[]) => scan(files, extra).map((f) => f.id);
+
+/** Build a gzip'd ustar archive the way `npm pack` lays one out (everything under `package/`). */
+function tarball(files: Record<string, string>): Buffer {
+  const blocks: Buffer[] = [];
+  for (const [name, body] of Object.entries(files)) {
+    const data = Buffer.from(body, 'utf8');
+    const header = Buffer.alloc(512);
+    header.write(`package/${name}`, 0, 'utf8');
+    header.write(data.length.toString(8).padStart(11, '0'), 124, 'ascii');
+    header.write('0', 156, 'ascii');
+    blocks.push(header, data, Buffer.alloc((512 - (data.length % 512)) % 512));
+  }
+  blocks.push(Buffer.alloc(1024));
+  return gzipSync(Buffer.concat(blocks));
+}
+
+describe('check-package-tarball', () => {
+  const clean = { 'dist/index.js': 'export const x = 1;\n', 'README.md': '# pkg\n', LICENSE: 'text', 'package.json': '{}' };
+
+  it('passes a clean package and counts the files it scanned', () => {
+    expect(scan(clean)).toEqual([]);
+  });
+
+  it('reads back exactly what a packed archive holds, with the package/ prefix removed', () => {
+    expect(readTarball(tarball(clean))).toEqual(clean);
+  });
+
+  it('flags each leak class against a clean control', () => {
+    const cjk = String.fromCodePoint(0x4e2d, 0x6587);
+    expect(ids({ ...clean, 'dist/a.js': `// ${cjk}` })).toEqual(['cjk']);
+    expect(ids({ ...clean, 'dist/a.js': 'import x from "@core/field-ui/x";' })).toEqual(['alias-leak']);
+    expect(ids({ ...clean, 'dist/a.js': '//# sourceMappingURL=a.js.map' })).toEqual(['source-map']);
+    expect(ids({ ...clean, 'dist/a.js.map': '{}' })).toContain('source-map');
+    expect(ids({ ...clean, 'dist/a.js': 'const k = "sk_live_abcdefghijklmnop";' })).toEqual(['secret-shape']);
+    expect(ids({ ...clean, 'dist/a.js': '// built in C:\\Users\\someone' })).toEqual(['local-path']);
+    expect(ids({ ...clean, 'dist/a.js': 'const p = "C:\\\\Users\\\\someone";' })).toEqual(['local-path']);
+    expect(ids({ ...clean, 'dist/a.js': '// see /home/someone/proj/x' })).toEqual(['local-path']);
+  });
+
+  it('rejects files outside the allowed set', () => {
+    expect(ids({ ...clean, 'src/index.ts': 'x', '.env': 'A=1' })).toEqual(['unexpected-file', 'unexpected-file']);
+  });
+
+  it('applies run-time patterns, and only when given', () => {
+    const files = { ...clean, 'dist/a.js': '// mentions Widgetron' };
+    expect(ids(files)).toEqual([]);
+    expect(ids(files, ['widgetron'])).toEqual(['extra-pattern']);
+  });
+});
