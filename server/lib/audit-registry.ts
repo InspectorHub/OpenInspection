@@ -73,7 +73,7 @@ export type RetiredAuditAction =
  * a sentence, not a field.
  */
 export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActionDef> = {
-    'admin.migrate_finding_keys': { family: 'inspection_results', label: 'audit_action_admin_migrate_finding_keys', meta: { migrated: 'count', processed: 'count', skipped: 'count' }, status: { kind: 'live' } },
+    'admin.migrate_finding_keys': { family: 'inspection_results', label: 'audit_action_admin_migrate_finding_keys', meta: { conflicts: 'count', delegated: 'count', failed: 'count', migrated: 'count', processed: 'count', renamed: 'count', skipped: 'count' }, status: { kind: 'live' } },
     'agent.magic_login.issued': { family: 'agent', label: 'audit_action_agent_magic_login_issued', meta: { hasAccount: 'flag', inspectionId: 'id' }, status: { kind: 'live' } },
     'agreement.create': {
         family: 'agreement_request',
