@@ -175,7 +175,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 
 - **Framework**: React Router v8 on Cloudflare Workers with Vite.
 - **Rendering**: Full SSR — RR v8 server renders on the edge, hydrates on the client.
-- **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
+- **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`packages/field-ui/src/theme.css`, imported by `app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
 - **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. RR v8 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
 - **State management**: React hooks in `app/hooks/` — `useInspection`, `useFindings`, `useKeyboard`, `useCannedComments`, `usePresence`, `useTheme`, `useUnsavedChanges`, plus the `findings/` and `inspection/` sub-hook directories. (`useOfflineQueue` was RETIRED with the rest of the bespoke offline layer in #181; do not reach for it.)
 - **Component library**: `packages/shared-ui/` — `src/index.ts` is the authoritative list (Button, IconButton, MenuItem, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, RadioCardGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar). Do not maintain a count here — read the file. See `docs/develop/design-system.md`.

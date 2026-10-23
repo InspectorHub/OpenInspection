@@ -161,7 +161,8 @@ describe("InspectorSyncBadge", () => {
   // ALL and is invisible everywhere but a browser. Assert the alias is declared
   // rather than trusting that the class string looks plausible.
   it("uses a colour token that the stylesheet actually declares", () => {
-    const css = readFileSync(join(import.meta.dirname, "../../styles/tailwind.css"), "utf8");
+    const css = `${readFileSync(join(import.meta.dirname, "../../styles/tailwind.css"), "utf8")}
+${readFileSync(join(import.meta.dirname, "../../../packages/field-ui/src/theme.css"), "utf8")}`;
     expect(css).toContain("--color-ih-fg-3:");
     expect(css).toMatch(/--ih-fg-3:\s*#/);
   });

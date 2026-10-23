@@ -22,7 +22,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const CSS = readFileSync(resolve(__dirname, '../../../app/styles/tailwind.css'), 'utf8');
+const CSS = `${readFileSync(resolve(__dirname, '../../../app/styles/tailwind.css'), 'utf8')}
+${readFileSync(resolve(__dirname, '../../../packages/field-ui/src/theme.css'), 'utf8')}`;
 
 /**
  * The theme blocks, by the selector that opens each one. Every theme must define

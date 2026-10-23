@@ -61,6 +61,7 @@ const SCAN_DIRS = ["app", join("packages", "shared-ui", "src"), join("packages",
 /** Compiled paraglide output of the field-ui package: generated, never hand-edited. */
 const GENERATED_DIRS = [join("packages", "field-ui", "src", "i18n", "generated")];
 const CSS_PATH = join("app", "styles", "tailwind.css");
+const THEME_PATH = join("packages", "field-ui", "src", "theme.css");
 
 /** Entire files exempt from all rules. Keep this list short and justified. */
 const FILE_ALLOWLIST = [
@@ -283,7 +284,8 @@ function main() {
   }
 
   const unresolved = findUnresolvedAliases({
-    css: readFileSync(join(ROOT, CSS_PATH), "utf8"),
+    css: `${readFileSync(join(ROOT, CSS_PATH), "utf8")}
+${readFileSync(join(ROOT, THEME_PATH), "utf8")}`,
     files,
   });
   if (unresolved.checked === 0) {
@@ -309,7 +311,7 @@ function main() {
     console.error(
       "`[undefined token]` has no such exception: the class compiles to nothing. Either fix " +
         "the name, or add the token to the @theme block AND to :root, the dark block and the " +
-        "field block in app/styles/tailwind.css.\n",
+        "field block in app/styles/tailwind.css or packages/field-ui/src/theme.css.\n",
     );
     for (const v of violations) console.error("  " + v);
     console.error(`\n${violations.length} violation(s).`);
