@@ -1,0 +1,50 @@
+name: publish-field-ui
+
+# Publishes @inspectorhub/field-ui to npm with trusted publishing (OIDC, no
+# token). The filename is bound to the trusted-publisher entry on npmjs.com:
+# renaming this file breaks publishing until that entry is edited to match.
+#
+# Trigger: release-please.yml dispatches this workflow, with the release tag as
+# the ref, right after release-please cuts a `field-ui-vX.Y.Z` release. A tag or
+# release created with the default GITHUB_TOKEN does not start other workflows,
+# but workflow_dispatch is the documented exception, so no PAT is needed. This
+# workflow is also the one that runs, so the OIDC token names this file (a
+# workflow_call would present the CALLER's filename to npm instead).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    # Upstream only: forks have no trusted-publisher entry.
+    if: >-
+      github.repository == 'InspectorHub/OpenInspection' &&
+      github.ref_type == 'tag' &&
+      startsWith(github.ref_name, 'field-ui-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22.22.x
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm >= 11.5.1; the npm bundled with Node 22 is 10.x.
+      - run: npm install -g npm@latest
+      - run: npm ci
+      # The tag and the package must agree, or the registry gets a version the
+      # release does not describe.
+      - name: Check tag matches package version
+        run: |
+          expected="field-ui-v$(node -p "require('./packages/field-ui/package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package version ($expected)" >&2
+            exit 1
+          fi
+      - run: npm run build -w @inspectorhub/field-ui
+      - run: npm publish -w @inspectorhub/field-ui --provenance --access public

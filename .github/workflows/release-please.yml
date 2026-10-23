@@ -13,12 +13,15 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # Dispatches publish-field-ui.yml (see the last step).
+  actions: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -27,3 +30,17 @@ jobs:
           # Release PR, provide a PAT or GitHub App token as RELEASE_PLEASE_TOKEN
           # and uncomment the line below; otherwise the Release PR carries no CI.
           # token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      # Releases and tags created with GITHUB_TOKEN do not trigger other
+      # workflows, so publish-field-ui.yml cannot listen for the tag. A
+      # workflow_dispatch started with GITHUB_TOKEN is exempt from that rule, and
+      # it runs publish-field-ui.yml itself, which keeps the filename that npm
+      # trusted publishing is bound to. The ref is the tag release-please made.
+      - name: Publish @inspectorhub/field-ui
+        if: >-
+          github.repository == 'InspectorHub/OpenInspection' &&
+          steps.release.outputs['packages/field-ui--release_created'] == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs['packages/field-ui--tag_name'] }}
+        run: gh workflow run publish-field-ui.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
