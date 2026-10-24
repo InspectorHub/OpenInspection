@@ -112,4 +112,4 @@ editor components.
 
 ## Licence
 
-AGPL-3.0-only, with the additional permission described in `LICENSE`.
+Licensed under the GNU Affero General Public License v3 (AGPL-3.0-only). See LICENSE.

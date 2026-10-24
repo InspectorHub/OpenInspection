@@ -20,8 +20,22 @@ name: publish-field-ui
 #             dependencies; it runs npm itself on the one tarball the build job
 #             scanned and uploaded.
 
+# Manual runs: the guards below (repository, tag ref, field-ui-v prefix) apply to dry runs too.
+# This workflow is dispatched with the release tag as the ref, so a manual dry run must be
+# started on an existing field-ui-v* tag ref as well; there is no way to dry-run from a branch.
+# dry_run builds, stages, scans, packs and uploads the tarball, then skips the publish itself.
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run everything except the actual npm publish
+        type: boolean
+        default: false
+
+# Two releases must never publish at once; a second run waits instead of being cancelled.
+concurrency:
+  group: publish-field-ui
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -55,23 +69,31 @@ jobs:
             echo "tag $GITHUB_REF_NAME does not match package version ($expected)" >&2
             exit 1
           fi
-      - run: npm run build -w @inspectorhub/field-ui
-      - name: Pack
-        run: |
-          mkdir -p "$RUNNER_TEMP/field-ui-pack"
-          npm pack -w @inspectorhub/field-ui --pack-destination "$RUNNER_TEMP/field-ui-pack"
-      # Scan the very file that will be published, before it can no longer be taken back.
+      # Coherence (release manifest, package.json, tag) -> build -> stage -> scan -> dry-run pack,
+      # in one script that pull requests run too (scripts/release-check-field-ui.mjs). It also
+      # writes the file list, size and sha512 to the job summary. The package is built in a staging
+      # directory (packages/field-ui/.publish) so that it carries the plain AGPL LICENSE; the
+      # repository copy is never touched. See packages/field-ui/PUBLISHING.md.
       # Terms that must not be written into this public repository come in at run time as a
       # JSON array of regex sources (repository secret PACKAGE_SCAN_EXTRA_PATTERNS). The run
       # REQUIRES the secret: an unset or empty one fails here instead of quietly dropping the
       # private-term check. To publish without those patterns on purpose, set the secret to [].
-      - name: Scan the tarball
+      - name: Release check (build, stage, scan, dry-run pack)
+        env:
+          PACKAGE_SCAN_EXTRA_PATTERNS: ${{ secrets.PACKAGE_SCAN_EXTRA_PATTERNS }}
+          PACKAGE_SCAN_REQUIRE_EXTRA: '1'
+        run: npm run release:check:field-ui -- --require-extra
+      # Pack the staged directory; the publish job publishes exactly this file.
+      - name: Pack
         env:
           PACKAGE_SCAN_EXTRA_PATTERNS: ${{ secrets.PACKAGE_SCAN_EXTRA_PATTERNS }}
           PACKAGE_SCAN_REQUIRE_EXTRA: '1'
         run: |
+          mkdir -p "$RUNNER_TEMP/field-ui-pack"
+          npm pack ./packages/field-ui/.publish --pack-destination "$RUNNER_TEMP/field-ui-pack"
           set -- "$RUNNER_TEMP"/field-ui-pack/*.tgz
           [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one packed tarball, found $#" >&2; exit 1; }
+          # The scan read the directory; check the packed bytes too.
           node scripts/check-package-tarball.mjs --tarball="$1"
       - uses: actions/upload-artifact@v4
         with:
@@ -103,7 +125,25 @@ jobs:
         with:
           name: field-ui-tarball
           path: ${{ runner.temp }}/field-ui-pack
+      - name: Is this version already published?
+        id: exists
+        run: |
+          set -- "$RUNNER_TEMP"/field-ui-pack/*.tgz
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one tarball, found $#" >&2; exit 1; }
+          packed="$(tar -xzOf "$1" package/package.json | node -p "const p=JSON.parse(require('fs').readFileSync(0,'utf8'));p.name+'@'+p.version")"
+          echo "spec=$packed" >> "$GITHUB_OUTPUT"
+          echo "sha512: $(sha512sum "$1" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
+          if out="$(npm view "$packed" version --registry https://registry.npmjs.org 2>&1)"; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$packed is already on the registry; the publish step is skipped (idempotent re-run)."
+          elif echo "$out" | grep -qE 'E404|404 Not Found'; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "could not tell whether $packed is published: $out" >&2
+            exit 1
+          fi
       - name: Publish the scanned tarball
+        if: ${{ steps.exists.outputs.published != 'true' && !inputs.dry_run }}
         run: |
           set -- "$RUNNER_TEMP"/field-ui-pack/*.tgz
           [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one tarball, found $#" >&2; exit 1; }
@@ -114,3 +154,25 @@ jobs:
             exit 1
           fi
           npm publish "$1" --provenance --access public
+      - name: Dry run
+        if: ${{ inputs.dry_run }}
+        run: echo "::notice::dry_run is set; nothing was published."
+      # The version must be visible on the registry afterwards (it can lag, so retry); provenance
+      # information is best effort and never fails the job.
+      - name: Check the registry shows the version
+        if: ${{ !inputs.dry_run }}
+        env:
+          SPEC: ${{ steps.exists.outputs.spec }}
+        run: |
+          spec="$SPEC"
+          for i in 1 2 3 4 5 6; do
+            if v="$(npm view "$spec" version --registry https://registry.npmjs.org 2>/dev/null)" && [ -n "$v" ]; then
+              echo "registry shows $spec"
+              npm view "$spec" dist.integrity --registry https://registry.npmjs.org || true
+              npm view "$spec" dist.attestations --json --registry https://registry.npmjs.org || echo "::notice::no provenance information available (best effort)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "$spec is not visible on the registry after the publish step" >&2
+          exit 1

@@ -105,3 +105,6 @@ tests/e2e/zz-e2e-coverage-probe.spec.ts
 
 # The editor package's own compiled paraglide output (npm run i18n:compile)
 packages/field-ui/src/i18n/generated/
+
+# The staged npm package of @inspectorhub/field-ui (npm run stage:field-ui); rebuilt from scratch each run
+/packages/field-ui/.publish/
