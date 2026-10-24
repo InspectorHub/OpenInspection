@@ -56,22 +56,33 @@ jobs:
             exit 1
           fi
       - run: npm run build -w @inspectorhub/field-ui
-      - name: Pack
-        run: |
-          mkdir -p "$RUNNER_TEMP/field-ui-pack"
-          npm pack -w @inspectorhub/field-ui --pack-destination "$RUNNER_TEMP/field-ui-pack"
-      # Scan the very file that will be published, before it can no longer be taken back.
+      # The published package is built in a staging directory (packages/field-ui/.publish) so that it
+      # carries the plain AGPL LICENSE; the repository copy is never touched. See
+      # packages/field-ui/PUBLISHING.md. The tag check above reads the SOURCE package.json, which has
+      # the same name and version as the staged one.
+      - name: Stage the package
+        run: npm run stage:field-ui
+      # Scan the staged directory, before it can no longer be taken back.
       # Terms that must not be written into this public repository come in at run time as a
       # JSON array of regex sources (repository secret PACKAGE_SCAN_EXTRA_PATTERNS). The run
       # REQUIRES the secret: an unset or empty one fails here instead of quietly dropping the
       # private-term check. To publish without those patterns on purpose, set the secret to [].
-      - name: Scan the tarball
+      - name: Scan the staged package
+        env:
+          PACKAGE_SCAN_EXTRA_PATTERNS: ${{ secrets.PACKAGE_SCAN_EXTRA_PATTERNS }}
+          PACKAGE_SCAN_REQUIRE_EXTRA: '1'
+        run: npm run lint:package-tarball
+      # Pack the staged directory; the publish job publishes exactly this file.
+      - name: Pack
         env:
           PACKAGE_SCAN_EXTRA_PATTERNS: ${{ secrets.PACKAGE_SCAN_EXTRA_PATTERNS }}
           PACKAGE_SCAN_REQUIRE_EXTRA: '1'
         run: |
+          mkdir -p "$RUNNER_TEMP/field-ui-pack"
+          npm pack ./packages/field-ui/.publish --pack-destination "$RUNNER_TEMP/field-ui-pack"
           set -- "$RUNNER_TEMP"/field-ui-pack/*.tgz
           [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one packed tarball, found $#" >&2; exit 1; }
+          # The scan read the directory; check the packed bytes too.
           node scripts/check-package-tarball.mjs --tarball="$1"
       - uses: actions/upload-artifact@v4
         with:

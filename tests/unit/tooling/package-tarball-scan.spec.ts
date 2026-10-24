@@ -23,7 +23,8 @@ function tarball(files: Record<string, string>): Buffer {
 }
 
 describe('check-package-tarball', () => {
-  const clean = { 'dist/index.js': 'export const x = 1;\n', 'README.md': '# pkg\n', LICENSE: 'text', 'package.json': '{}' };
+  const plainLicense = 'GNU AFFERO GENERAL PUBLIC LICENSE\nVersion 3, 19 November 2007\n';
+  const clean = { 'dist/index.js': 'export const x = 1;\n', 'README.md': '# pkg\n', LICENSE: plainLicense, 'package.json': '{}' };
 
   it('passes a clean package and counts the files it scanned', () => {
     expect(scan(clean)).toEqual([]);
@@ -58,6 +59,21 @@ describe('check-package-tarball', () => {
     // Neighbours just outside the ranges stay clean (accented Latin, Greek, Cyrillic, and code points either side of the Hangul ranges).
     const outside = String.fromCodePoint(0x3b1, 0x44f, 0xe9, 0x10ff, 0x1200, 0xd7b0);
     expect(ids({ ...clean, 'dist/a.js': `// ${outside}` })).toEqual([]);
+  });
+
+  it('requires the LICENSE to be the AGPL notice, and flags an extra permission in it', () => {
+    expect(ids({ ...clean, LICENSE: 'MIT License' })).toEqual(['license-missing-agpl']);
+    expect(ids({ ...clean, LICENSE: `${plainLicense}\nADDITIONAL PERMISSION FOR X` })).toEqual(['license-extra-permission']);
+    expect(ids({ ...clean, LICENSE: `${plainLicense}\nunder section 7 of the licence` })).toEqual(['license-extra-permission']);
+  });
+
+  it('flags a permission or self-hosting mention in the README and package.json', () => {
+    for (const word of ['additional permission', 'Section 7', 'self-hosted']) {
+      expect(ids({ ...clean, 'README.md': `# pkg\n${word}\n` }), `README ${word}`).toEqual(['license-extra-permission-mention']);
+      expect(ids({ ...clean, 'package.json': `{"x":"${word}"}` }), `package.json ${word}`).toEqual(['license-extra-permission-mention']);
+    }
+    // The same words elsewhere in the tarball are not this rule's business.
+    expect(ids({ ...clean, 'dist/a.js': '// self-hosted' })).toEqual([]);
   });
 
   it('rejects files outside the allowed set', () => {

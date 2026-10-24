@@ -24,14 +24,20 @@
  * Scanning a tarball that already exists: `--tarball=<file>` reads that file instead of packing the
  * workspace, so a pipeline can scan the exact bytes it is about to publish.
  *
+ * What is scanned by default: the STAGED directory packages/field-ui/.publish (built by
+ * `npm run stage:field-ui`), packed with `npm pack <dir>`. That directory is what gets published,
+ * and it carries the plain AGPL LICENSE, so the scan also checks the licence text: the LICENSE must
+ * be the plain AGPL notice, and neither it nor the README or package.json may mention an additional
+ * permission. The workspace mode (`--workspace <name>`) packs the source package instead.
+ *
  * Usage:
- *   node scripts/check-package-tarball.mjs [workspace] [--require-extra] [--tarball=<file.tgz>]
- *   (workspace defaults to @inspectorhub/field-ui)
+ *   node scripts/check-package-tarball.mjs [--dir <path> | --workspace <name> | --tarball=<file.tgz>] [--require-extra]
+ *   (no target: the staged directory; it must exist, run `npm run stage:field-ui` first)
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
@@ -72,6 +78,11 @@ const RULES = [
     },
 ];
 
+export const STAGED_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'packages', 'field-ui', '.publish');
+
+/** Wording that must not appear in the shipped README or package.json. */
+const PERMISSION_MENTION = /additional permission|section 7|self-hosted/i;
+
 /** Pure scan over `{ path -> text }`, so it is testable without a tarball. */
 export function scanFiles(files, extraPatterns = []) {
     const findings = [];
@@ -81,6 +92,17 @@ export function scanFiles(files, extraPatterns = []) {
             findings.push({ path, id: 'unexpected-file', why: 'not in the allowed file set', sample: '' });
         }
         if (path.endsWith('.map')) findings.push({ path, id: 'source-map', why: 'source map file', sample: '' });
+        if (path === 'LICENSE') {
+            if (!text.includes('GNU AFFERO GENERAL PUBLIC LICENSE')) {
+                findings.push({ path, id: 'license-missing-agpl', why: 'LICENSE does not carry the GNU AGPL title', sample: '' });
+            }
+            const m = /additional permission|section 7/i.exec(text);
+            if (m) findings.push({ path, id: 'license-extra-permission', why: 'LICENSE carries an additional permission', sample: m[0] });
+        }
+        if (path === 'README.md' || path === 'package.json') {
+            const m = PERMISSION_MENTION.exec(text);
+            if (m) findings.push({ path, id: 'license-extra-permission-mention', why: 'mentions a licence permission or self-hosting', sample: m[0] });
+        }
         if (hasCjk(text)) findings.push({ path, id: 'cjk', why: 'non-English CJK text', sample: '' });
         for (const rule of [...RULES, ...extra]) {
             rule.re.lastIndex = 0;
@@ -136,10 +158,11 @@ export function resolveExtraPatterns(raw, require = false) {
     return parsed;
 }
 
-function pack(workspace) {
+function pack(target) {
     const dir = mkdtempSync(join(tmpdir(), 'pkg-scan-'));
     try {
-        const out = execFileSync('npm', ['pack', '-w', workspace, '--pack-destination', dir, '--json'], {
+        const selector = target.dir ? [target.dir] : ['-w', target.workspace];
+        const out = execFileSync('npm', ['pack', ...selector, '--pack-destination', dir, '--json'], {
             encoding: 'utf8',
             shell: process.platform === 'win32',
             stdio: ['ignore', 'pipe', 'inherit'],
@@ -153,7 +176,15 @@ function pack(workspace) {
 
 function main() {
     const args = process.argv.slice(2);
-    const workspace = args.find((a) => !a.startsWith('--')) ?? '@inspectorhub/field-ui';
+    const flagValue = (name) => {
+        const i = args.indexOf(name);
+        return i >= 0 ? args[i + 1] : undefined;
+    };
+    const workspace = flagValue('--workspace');
+    const dirArg = flagValue('--dir');
+    const tarballArg = args.find((a) => a.startsWith('--tarball='));
+    const target = workspace ? { workspace } : { dir: resolve(dirArg ?? STAGED_DIR) };
+    const label = workspace ?? target.dir;
     const require = args.includes('--require-extra') || process.env.PACKAGE_SCAN_REQUIRE_EXTRA === '1';
     let extra;
     try {
@@ -162,11 +193,14 @@ function main() {
         console.error(`check-package-tarball: ${err.message}`);
         process.exit(1);
     }
-    const tarballArg = args.find((a) => a.startsWith('--tarball='));
-    const files = tarballArg ? readTarball(readFileSync(tarballArg.slice('--tarball='.length))) : pack(workspace);
+    if (!tarballArg && target.dir && !existsSync(target.dir)) {
+        console.error(`check-package-tarball: ${target.dir} does not exist. Run: npm run stage:field-ui`);
+        process.exit(1);
+    }
+    const files = tarballArg ? readTarball(readFileSync(tarballArg.slice('--tarball='.length))) : pack(target);
     const count = Object.keys(files).length;
     if (count === 0) {
-        console.error(`check-package-tarball: 0 files in the tarball of ${workspace} — an empty scan is not a pass.`);
+        console.error(`check-package-tarball: 0 files in the tarball of ${label} — an empty scan is not a pass.`);
         process.exit(1);
     }
     const findings = scanFiles(files, extra);
