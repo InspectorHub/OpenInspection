@@ -158,15 +158,17 @@ jobs:
       - name: Dry run
         if: ${{ inputs.dry_run }}
         run: echo "::notice::dry_run is set; nothing was published."
-      # The version must be visible on the registry afterwards (it can lag, so retry); provenance
-      # information is best effort and never fails the job.
+      # A check, not a gate: the publish step above has already succeeded when this runs. npm says a new
+      # version "may take a few minutes to become available", so wait up to 5 minutes (30 x 10 s) for it to
+      # show up. If it does not, say so with a warning annotation and leave the job green; a published
+      # version must not be reported as a failed run. Provenance information is best effort as well.
       - name: Check the registry shows the version
         if: ${{ !inputs.dry_run }}
         env:
           SPEC: ${{ steps.exists.outputs.spec }}
         run: |
           spec="$SPEC"
-          for i in 1 2 3 4 5 6; do
+          for i in $(seq 1 30); do
             if v="$(npm view "$spec" version --registry https://registry.npmjs.org 2>/dev/null)" && [ -n "$v" ]; then
               echo "registry shows $spec"
               npm view "$spec" dist.integrity --registry https://registry.npmjs.org || true
@@ -175,5 +177,4 @@ jobs:
             fi
             sleep 10
           done
-          echo "$spec is not visible on the registry after the publish step" >&2
-          exit 1
+          echo "::warning::$spec was published but is not visible on the registry yet (checked for 5 minutes). Check npm view $spec later; the publish step itself succeeded."
