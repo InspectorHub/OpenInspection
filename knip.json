@@ -70,17 +70,6 @@
     // Path aliases (tsconfig paths and vite aliases), not packages.
     "@core/shared-ui",
     "@core/api-types",
-    "@core/offline-package",
-    // Declared in the root package.json but imported only by packages/field-ui since the editor moved there
-    // (they are its peerDependencies). Left declared at the root on purpose: the root build resolves them from
-    // the root node_modules. Without this, knip reports each as an unused root dependency. The way to stop
-    // ignoring them is to drop them from the root package.json (npm installs a workspace's peers), which is
-    // a package.json and lockfile change and belongs in its own commit.
-    "react-photo-album",
-    "yet-another-react-lightbox",
-    "react-easy-crop",
-    "react-konva",
-    "konva",
-    "sortablejs"
+    "@core/offline-package"
   ]
 }
