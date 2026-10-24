@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
@@ -104,52 +105,62 @@ const seedDefaultsRecommendationRoute = createRoute(withMcpMetadata({
     description: "Load the built-in starter set of recommendations into the company library. An entry whose category and name already exist as a recommendation is skipped, so repeating the call is safe and adds only what is missing; the response counts how many were inserted and skipped. Takes no body and writes no audit entry. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
-const recommendationsRoutes = createApiRouter()
-    .openapi(listRecommendationsRoute, async (c) => {
-        const { category, severity } = c.req.valid('query');
-        const tenantId = c.get('tenantId') as string;
-        const filter: { category?: string; severity?: 'good' | 'marginal' | 'significant' | 'minor' } = {};
-        if (category) filter.category = category;
-        if (severity) filter.severity = severity;
-        const data = await c.var.services.recommendation.listByTenant(tenantId, filter);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(getRecommendationRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        const r = await c.var.services.recommendation.getById(id, tenantId);
-        if (!r) throw Errors.NotFound('Recommendation not found');
-        return c.json({ success: true as const, data: r }, 200);
-    })
-    .openapi(createRecommendationRoute, async (c) => {
-        const input = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const userId = (c.get('user') as { sub?: string } | undefined)?.sub;
-        const r = await c.var.services.recommendation.create(tenantId, { ...input, createdByUserId: userId ?? null });
-        auditFromContext(c, 'recommendation.created', 'recommendation', { entityId: r.id, metadata: { name: r.name, severity: r.severity } });
-        return c.json({ success: true as const, data: r }, 200);
-    })
-    .openapi(replaceRecommendationRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const r = await c.var.services.recommendation.update(id, tenantId, patch);
-        auditFromContext(c, 'recommendation.updated', 'recommendation', { entityId: r.id });
-        return c.json({ success: true as const, data: r }, 200);
-    })
-    .openapi(deleteRecommendationRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        await c.var.services.recommendation.delete(id, tenantId);
-        auditFromContext(c, 'recommendation.deleted', 'recommendation', { entityId: id });
-        return c.json({ success: true as const, data: { deleted: true as const } }, 200);
-    })
-    .openapi(seedDefaultsRecommendationRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const result = await c.var.services.recommendation.bulkSeed(tenantId, RECOMMENDATION_SEEDS);
-        return c.json({ success: true as const, data: result }, 200);
-    });
+const app = createApiRouter();
+app.openapi(listRecommendationsRoute, async (c) => {
+    const { category, severity } = c.req.valid('query');
+    const tenantId = c.get('tenantId') as string;
+    const filter: { category?: string; severity?: 'good' | 'marginal' | 'significant' | 'minor' } = {};
+    if (category) filter.category = category;
+    if (severity) filter.severity = severity;
+    const data = await c.var.services.recommendation.listByTenant(tenantId, filter);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(getRecommendationRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    const r = await c.var.services.recommendation.getById(id, tenantId);
+    if (!r) throw Errors.NotFound('Recommendation not found');
+    return c.json({ success: true as const, data: r }, 200);
+});
+app.openapi(createRecommendationRoute, async (c) => {
+    const input = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const userId = (c.get('user') as { sub?: string } | undefined)?.sub;
+    const r = await c.var.services.recommendation.create(tenantId, { ...input, createdByUserId: userId ?? null });
+    auditFromContext(c, 'recommendation.created', 'recommendation', { entityId: r.id, metadata: { name: r.name, severity: r.severity } });
+    return c.json({ success: true as const, data: r }, 200);
+});
+app.openapi(replaceRecommendationRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const r = await c.var.services.recommendation.update(id, tenantId, patch);
+    auditFromContext(c, 'recommendation.updated', 'recommendation', { entityId: r.id });
+    return c.json({ success: true as const, data: r }, 200);
+});
+app.openapi(deleteRecommendationRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    await c.var.services.recommendation.delete(id, tenantId);
+    auditFromContext(c, 'recommendation.deleted', 'recommendation', { entityId: id });
+    return c.json({ success: true as const, data: { deleted: true as const } }, 200);
+});
+app.openapi(seedDefaultsRecommendationRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const result = await c.var.services.recommendation.bulkSeed(tenantId, RECOMMENDATION_SEEDS);
+    return c.json({ success: true as const, data: result }, 200);
+});
 
-export type RecommendationsApi = typeof recommendationsRoutes;
+/** Registration order. Drives `RecommendationsApi`; a test pins it to what `app` really registered. */
+export const recommendationsRouteConfigs = [
+    listRecommendationsRoute,
+    getRecommendationRoute,
+    createRecommendationRoute,
+    replaceRecommendationRoute,
+    deleteRecommendationRoute,
+    seedDefaultsRecommendationRoute,
+] as const;
 
-export default recommendationsRoutes;
+export type RecommendationsApi = ApiOf<typeof recommendationsRouteConfigs>;
+
+export default app;

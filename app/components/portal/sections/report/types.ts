@@ -9,6 +9,11 @@
 import type { CourtesyTranslationPayload } from "~/lib/report-translation";
 import type { TenantBrand } from "~/lib/brand";
 import type { ReportMedia } from "../../../../../server/lib/report-video";
+import type { CostItemView, PcaNarrativeData } from "@core/field-ui";
+
+// Moved into @core/field-ui so the editor package can name them; re-exported here so
+// every existing importer keeps working.
+export type { CostItemView };
 
 /** Plan 7 — a report photo object may carry a resolved media kind (video).
  *  Commercial PCA Phase P — `photoNo` is the render-order stamp assigned
@@ -168,17 +173,6 @@ export interface ReportOutlineEntry {
   /** Filled by the PDF measurement pass; undefined/null on the web. */
   page?: number | null;
 }
-export interface PcaNarrativeData {
-  transmittalLetter: string;
-  summaryGeneralDescription: string;
-  summaryPhysicalCondition: string;
-  summaryRecommendations: string;
-  purpose: string;
-  scopeOfWork: string;
-  limitationsExceptions: string;
-  reconnaissance: string;
-  additionalConsiderations: string;
-}
 export interface SystemsSummaryRow {
   systemId: string;
   systemTitle: string;
@@ -246,19 +240,6 @@ interface ReportUnit {
   attrs: unknown;
 }
 
-/* Commercial PCA Phase C — client-side mirror of server/lib/pca-costs shapes
-   (server lib cannot be imported by app/; these are structural duplicates). */
-export interface CostItemView {
-  id: string; system: string; component: string; location: string;
-  action: 'repair' | 'replace' | 'further_study';
-  costMethod: 'unit' | 'lump_sum';
-  quantity: number | null; uom: string | null;
-  unitCostCents: number | null; lumpSumCents: number | null;
-  eul: number | null; effAge: number | null; rul: number | null;
-  suggestedRemedy: string;
-  bucket: 'immediate' | 'short_term' | 'long_term';
-  sectionRef: string | null; photoRef: string | null; sortOrder: number;
-}
 export interface Table1Row { item: CostItemView; total: number }
 interface Table1 {
   immediate: Table1Row[]; shortTerm: Table1Row[];

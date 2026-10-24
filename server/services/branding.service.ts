@@ -8,7 +8,7 @@ import type { EmailIdentityConfig } from '../lib/email/sender-identity';
 import { r2Keys } from '../lib/r2-keys';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
 import { resolveLocale } from '../lib/locale';
-import { resolveDisplayPrefs, type DateFormat, type TimeFormat } from '../lib/session/display-prefs';
+import { resolveDisplayPrefs, type DateFormat, type TimeFormat } from '@core/field-ui/shared/display-prefs';
 import { assertWritableTenantConfig } from '../lib/tenant-config-write-policy';
 
 export interface IntegrationConfig {

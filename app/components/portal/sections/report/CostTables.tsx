@@ -1,4 +1,4 @@
-import { formatDollars } from "~/lib/money";
+import { formatDollars } from "@core/field-ui/shared/money";
 import { m } from "~/paraglide/messages";
 import type { CostTables as CT, Table1Row } from "./types";
 

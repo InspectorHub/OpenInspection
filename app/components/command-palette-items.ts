@@ -75,5 +75,6 @@ export function getSettings(): PaletteItem[] {
     { id: "s-payments", label: m.command_palette_settings_payments(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/advanced" },
     { id: "s-ai", label: m.command_palette_settings_ai(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/advanced" },
     { id: "s-data", label: m.command_palette_settings_data(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/data" },
+    { id: "s-offline-packages", label: m.command_palette_settings_offline_packages(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/offline-packages" },
   ];
 }

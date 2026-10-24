@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
+import type { ApiOf } from '../../lib/api-schema';
 import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
@@ -187,116 +188,119 @@ const grantRoute = createRoute(withMcpMetadata({
         'opt-in evidence.',
 }, { scopes: ['agent'], tier: 'extended' }));
 
-const agentNotificationPreferenceRoutes = createApiRouter()
-    .openapi(getScreenRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const agentUserId = c.get('user').sub;
-        const db = getDrizzle(c);
+const app = createApiRouter();
+app.openapi(getScreenRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const agentUserId = c.get('user').sub;
+    const db = getDrizzle(c);
 
-        const companies = await listAgentCompanies(db, agentUserId);
-        const disclosure = await new SmsConsentService(c.env.DB).currentDisclosure();
-        const { companyId } = c.req.valid('query');
-        const selected = companyId
-            ? companies.find((x) => x.tenantId === companyId)
-            : companies[0];
-        // An unknown id is not an error here: the agent may have been revoked
-        // since the page loaded, and a 400 on a READ would strand them on a
-        // screen with nothing to do. Fall back to showing the company list.
-        const chosen = selected
-            ? await readChoices(db, selected.tenantId, 'contact', selected.contactId)
-            : new Map<string, boolean>();
+    const companies = await listAgentCompanies(db, agentUserId);
+    const disclosure = await new SmsConsentService(c.env.DB).currentDisclosure();
+    const { companyId } = c.req.valid('query');
+    const selected = companyId
+        ? companies.find((x) => x.tenantId === companyId)
+        : companies[0];
+    // An unknown id is not an error here: the agent may have been revoked
+    // since the page loaded, and a 400 on a READ would strand them on a
+    // screen with nothing to do. Fall back to showing the company list.
+    const chosen = selected
+        ? await readChoices(db, selected.tenantId, 'contact', selected.contactId)
+        : new Map<string, boolean>();
 
-        return c.json({
-            success: true as const,
-            data: {
-                companies: companies.map((x) => ({ id: x.tenantId, name: x.name })),
-                selected: selected?.tenantId ?? null,
-                ...buildScreenModel('agent', chosen),
-                // Consent is per COMPANY, like everything else on this screen:
-                // it attaches to the contact row that company holds.
-                smsConsent: selected
-                    ? await readSmsConsent(db, selected.tenantId, 'agent', [{ kind: 'contact' as const, id: selected.contactId }], disclosure)
-                    : null,
-            },
-        }, 200);
-    })
-    .openapi(saveRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const agentUserId = c.get('user').sub;
-        const { classId, channel, enabled, companyId, scope } = c.req.valid('json');
+    return c.json({
+        success: true as const,
+        data: {
+            companies: companies.map((x) => ({ id: x.tenantId, name: x.name })),
+            selected: selected?.tenantId ?? null,
+            ...buildScreenModel('agent', chosen),
+            // Consent is per COMPANY, like everything else on this screen:
+            // it attaches to the contact row that company holds.
+            smsConsent: selected
+                ? await readSmsConsent(db, selected.tenantId, 'agent', [{ kind: 'contact' as const, id: selected.contactId }], disclosure)
+                : null,
+        },
+    }, 200);
+});
+app.openapi(saveRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const agentUserId = c.get('user').sub;
+    const { classId, channel, enabled, companyId, scope } = c.req.valid('json');
 
-        // Refused at the edge as well as at the send boundary — the boundary is
-        // what makes a preference true, this is what keeps the screen honest.
-        assertChoosable(classId, 'agent');
+    // Refused at the edge as well as at the send boundary — the boundary is
+    // what makes a preference true, this is what keeps the screen honest.
+    assertChoosable(classId, 'agent');
 
-        const db = getDrizzle(c);
-        const companies = await listAgentCompanies(db, agentUserId);
-        const targets = scope === 'all'
-            ? companies
-            : companies.filter((x) => x.tenantId === companyId);
-        if (targets.length === 0) {
-            throw Errors.BadRequest('You are not currently linked to that company.');
+    const db = getDrizzle(c);
+    const companies = await listAgentCompanies(db, agentUserId);
+    const targets = scope === 'all'
+        ? companies
+        : companies.filter((x) => x.tenantId === companyId);
+    if (targets.length === 0) {
+        throw Errors.BadRequest('You are not currently linked to that company.');
+    }
+
+    for (const t of targets) {
+        await writeChoice(db, {
+            tenantId: t.tenantId, subjectKind: 'contact', subjectId: t.contactId,
+            classId, channel, enabled,
+        });
+    }
+    return c.json({ success: true as const, applied: targets.length }, 200);
+});
+app.openapi(bulkRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const agentUserId = c.get('user').sub;
+    const { action, channel, classId, companyId, scope } = c.req.valid('json');
+
+    const db = getDrizzle(c);
+    const companies = await listAgentCompanies(db, agentUserId);
+    const targets = scope === 'all'
+        ? companies
+        : companies.filter((x) => x.tenantId === companyId);
+    if (targets.length === 0) {
+        throw Errors.BadRequest('You are not currently linked to that company.');
+    }
+    for (const t of targets) {
+        await applyBulk(
+            db,
+            { tenantId: t.tenantId, subjectKind: 'contact', subjectId: t.contactId },
+            'agent',
+            { action, ...(channel ? { channel } : {}), ...(classId ? { classId } : {}) },
+        );
+        // A whole-channel stop is also a consent act on SMS (§4.2), and an
+        // agent's revocation is recorded AS an agent's.
+        if (action === 'disable' && channel === 'sms' && !classId) {
+            const block = await readSmsConsent(db, t.tenantId, 'agent', [{ kind: 'contact' as const, id: t.contactId }], null);
+            await revokeChannel(new SmsConsentService(c.env.DB), t.tenantId, 'sms', block, 'agent');
         }
+    }
+    return c.json({ success: true as const, applied: targets.length }, 200);
+});
+app.openapi(grantRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const agentUserId = c.get('user').sub;
+    const { companyId, scope } = c.req.valid('json');
 
-        for (const t of targets) {
-            await writeChoice(db, {
-                tenantId: t.tenantId, subjectKind: 'contact', subjectId: t.contactId,
-                classId, channel, enabled,
+    const db = getDrizzle(c);
+    const companies = await listAgentCompanies(db, agentUserId);
+    const targets = scope === 'all' ? companies : companies.filter((x) => x.tenantId === companyId);
+    if (targets.length === 0) throw Errors.BadRequest('You are not currently linked to that company.');
+
+    const svc = new SmsConsentService(c.env.DB);
+    for (const t of targets) {
+        const block = await readSmsConsent(db, t.tenantId, 'agent', [{ kind: 'contact' as const, id: t.contactId }], null);
+        if (block) {
+            await grantSms(svc, t.tenantId, block, 'agent', {
+                ip: c.req.header('cf-connecting-ip'),
+                userAgent: c.req.header('user-agent'),
             });
         }
-        return c.json({ success: true as const, applied: targets.length }, 200);
-    })
-    .openapi(bulkRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const agentUserId = c.get('user').sub;
-        const { action, channel, classId, companyId, scope } = c.req.valid('json');
+    }
+    return c.json({ success: true as const, applied: targets.length }, 200);
+});
 
-        const db = getDrizzle(c);
-        const companies = await listAgentCompanies(db, agentUserId);
-        const targets = scope === 'all'
-            ? companies
-            : companies.filter((x) => x.tenantId === companyId);
-        if (targets.length === 0) {
-            throw Errors.BadRequest('You are not currently linked to that company.');
-        }
-        for (const t of targets) {
-            await applyBulk(
-                db,
-                { tenantId: t.tenantId, subjectKind: 'contact', subjectId: t.contactId },
-                'agent',
-                { action, ...(channel ? { channel } : {}), ...(classId ? { classId } : {}) },
-            );
-            // A whole-channel stop is also a consent act on SMS (§4.2), and an
-            // agent's revocation is recorded AS an agent's.
-            if (action === 'disable' && channel === 'sms' && !classId) {
-                const block = await readSmsConsent(db, t.tenantId, 'agent', [{ kind: 'contact' as const, id: t.contactId }], null);
-                await revokeChannel(new SmsConsentService(c.env.DB), t.tenantId, 'sms', block, 'agent');
-            }
-        }
-        return c.json({ success: true as const, applied: targets.length }, 200);
-    })
-    .openapi(grantRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const agentUserId = c.get('user').sub;
-        const { companyId, scope } = c.req.valid('json');
+/** Registration order. Drives `AgentNotificationPreferencesApi`; a test pins it to what `app` really registered. */
+export const agentNotificationPreferenceRouteConfigs = [getScreenRoute, saveRoute, bulkRoute, grantRoute] as const;
 
-        const db = getDrizzle(c);
-        const companies = await listAgentCompanies(db, agentUserId);
-        const targets = scope === 'all' ? companies : companies.filter((x) => x.tenantId === companyId);
-        if (targets.length === 0) throw Errors.BadRequest('You are not currently linked to that company.');
-
-        const svc = new SmsConsentService(c.env.DB);
-        for (const t of targets) {
-            const block = await readSmsConsent(db, t.tenantId, 'agent', [{ kind: 'contact' as const, id: t.contactId }], null);
-            if (block) {
-                await grantSms(svc, t.tenantId, block, 'agent', {
-                    ip: c.req.header('cf-connecting-ip'),
-                    userAgent: c.req.header('user-agent'),
-                });
-            }
-        }
-        return c.json({ success: true as const, applied: targets.length }, 200);
-    });
-
-export default agentNotificationPreferenceRoutes;
-export type AgentNotificationPreferencesApi = typeof agentNotificationPreferenceRoutes;
+export default app;
+export type AgentNotificationPreferencesApi = ApiOf<typeof agentNotificationPreferenceRouteConfigs>;

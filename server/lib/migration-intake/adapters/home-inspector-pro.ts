@@ -49,7 +49,7 @@
 
 import type {
     TemplateSchemaV2, TemplateSection, TemplateItem,
-} from '../../../types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 import {
     DEFAULT_IMPORTED_RATING_OPTIONS,
     type ConvertStats,

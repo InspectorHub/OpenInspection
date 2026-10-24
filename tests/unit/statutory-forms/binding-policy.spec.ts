@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { assertNoPersonalDataOutsideBindings }
     from '../../../server/lib/statutory/binding-policy';
-import type { StatutoryFormDeclaration } from '../../../server/types/template-schema';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/template-schema';
 
 const decl = (bindings: StatutoryFormDeclaration['bindings']):
     StatutoryFormDeclaration => ({ formId: 'f', bindings });

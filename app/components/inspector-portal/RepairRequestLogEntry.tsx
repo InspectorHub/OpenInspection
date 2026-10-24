@@ -26,7 +26,7 @@
  */
 import { Card, Pill } from "@core/shared-ui";
 import { RepairDefectRowView } from "~/components/portal/sections/repair/RepairDefectRowView";
-import { formatCents } from "~/lib/money";
+import { formatCents } from "@core/field-ui/shared/money";
 import type { RepairActionTag } from "~/lib/repair-action-tag";
 // The list-owner vocabulary, read from the module the COLUMN reads (a leaf:
 // plain data, no drizzle). A local union here is how a Pill ends up with a

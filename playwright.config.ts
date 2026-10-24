@@ -295,6 +295,7 @@ export default defineConfig({
         // Invites a throwaway member off the shared admin and removes them through
         // the Team page; never touches the admin or the seeded inspector.
         { name: 'team-remove-member', testMatch: 'team-remove-member.spec.ts', dependencies: ['api'] },
+        { name: 'offline-package-import', testMatch: 'offline-package-import.spec.ts', dependencies: ['api'] },
         // Both run the setup wizard. They used to send their own company names
         // ("Branding Corp", "Timezone Corp"), which meant whichever reached
         // /api/auth/setup first named the tenant for the whole run.
@@ -314,17 +315,17 @@ export default defineConfig({
         { name: 'inspection-edit-hotkeys', testMatch: 'inspection-edit-hotkeys.spec.ts', dependencies: ['editor-seed'] },
         // Phase 3 Task 16 — batch photo upload (library input multi-select).
         { name: 'batch-photo-upload', testMatch: 'batch-photo-upload.spec.ts', dependencies: ['editor-seed'] },
+        // Plan B Task 9: the editor at phone/tablet/desktop widths (viewports set in the spec), then Speed mode vs item editor parity, one project per viewport so each has its own seeded inspection.
+        { name: 'editor-responsive', testMatch: 'editor-responsive.spec.ts', dependencies: ['editor-seed'] },
+        ...[{ width: 390, height: 844 }, { width: 834, height: 1194 }, { width: 1280, height: 800 }].map((viewport) => ({ name: `speed-mode-parity-${viewport.width}`, testMatch: 'speed-mode-parity.spec.ts', dependencies: ['editor-seed'], use: { viewport } })),
         { name: 'inspection-lifecycle', testMatch: 'inspection-lifecycle.spec.ts', dependencies: ['editor-seed'] },
         // Destructive (reset/restore DB) — env-gated inside the specs:
         { name: 'backup-restore-seed', testMatch: 'backup-restore-seed.spec.ts' },
         { name: 'backup-restore-verify', testMatch: 'backup-restore-verify.spec.ts' },
-        // DS-0520 subsystem C — still a skip-shell, and for a reason nothing in
-        // this repo can supply: two servers plus the Stripe CLI. See the spec.
+        // DS-0520 subsystem C — still a skip-shell: it needs two servers plus the Stripe CLI, which nothing here supplies. See the spec.
         { name: 'subsystem-c-stripe-smoke', testMatch: 'subsystem-c-stripe-cross-repo-smoke.spec.ts' },
-        // subsystem-d-flows / subsystem-e-flows moved to playwright.seeded.config.ts.
-        // They need the multi-user seed, which writes users into the standalone
-        // tenant and therefore 409s the `api` project's fresh-setup assertion —
-        // the two cannot share one D1. `npm run test:e2e:seeded` runs them.
+        // subsystem-d/e-flows moved to playwright.seeded.config.ts: their multi-user seed writes users into the standalone
+        // tenant, 409s the `api` project's fresh setup, and cannot share one D1. `npm run test:e2e:seeded` runs them.
         // Commercial PCA Task 19a — real TOC page numbers (two-pass Chrome +
         // pdf-lib). Exercises the actual worker report render + BROWSER binding;
         // see tests/e2e/report-toc-numbers.spec.ts for its harness requirements.

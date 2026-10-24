@@ -190,6 +190,11 @@ export const SCRIPT_GATES = [
     // rebase, and after a push it is not fixable at all. Measured at 0.67s over
     // 3,605 files.
     { key: 'privatereview', label: 'No private-review references', script: 'check-no-private-review-refs.mjs', fix: 'npm run lint:private-review', rung: PRECOMMIT },
+    // PRECOMMIT: an import from the host app (react-router, `~/`, a .server module) compiles in
+    // the web app and only breaks the package in some other host, so the one moment it is cheap
+    // to catch is the commit that typed it. Walks packages/field-ui/src only; milliseconds. It
+    // fails on ZERO files scanned, because an empty walk would read as a clean package.
+    { key: 'fielduiboundary', label: 'field-ui import boundary', script: 'check-field-ui-boundary.mjs', fix: 'npm run lint:field-ui-boundary', rung: PRECOMMIT },
     // ---- PUSH rung -------------------------------------------------------
     // The 33 gates `npm run lint` used to chain with `&&`. Generated from
     // package.json rather than retyped, and pinned by the spec against that
@@ -486,6 +491,7 @@ export const UNREGISTERED = new Map([
     ['lint:fix', 'eslint --fix; a mutation, not a check'],
     ['lint:eslint', 'eslint keeps its own process — it needs the type-aware program and a 12 GB heap, which is not something to import into a shared runner'],
     ['lint:advisories', 'queries the network (npm audit), so it cannot run at a rung that must work offline'],
+    ['lint:package-tarball', 'packs @inspectorhub/field-ui and scans the tarball, so it needs the built dist; it runs in publish-field-ui.yml right before npm publish, the one moment the contents are final, and by hand when preparing a release'],
     ['verify:real-corpus', 'reads real vendor exports that are NOT in this repository and must never be. A release-time manual rung run by somebody holding the private corpus: CI here runs on a public repository and cannot hold credentials for private material. Listed rather than omitted so that its absence from every rung is a recorded decision instead of an oversight'],
     ['verify:statutory-render', 'renders a statutory field map onto the AUTHORITY\'S own published PDF, which is that agency\'s document and is not in this repository. Same rung and same reason as verify:real-corpus above: a release-time manual check run by whoever holds the forms, driven by STATUTORY_PDF_DIR, which no CI job here can be given. It is what nothing else in the subsystem can do — every other check is satisfiable by a map and a test that agree with each other about a form neither has opened'],
 ]);

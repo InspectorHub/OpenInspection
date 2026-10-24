@@ -5,12 +5,13 @@ import type { HonoConfig } from '../types/hono';
 import { inspections, tenants } from '../lib/db/schema';
 import { resolveRenderAccess } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
+import { mounted, type ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { resolvePortalAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
 import { recordReportView, readReportViewCountingEnabled } from '../lib/report-views';
-import publicViewTrackingRoutes from './public/view-tracking';
+import publicViewTrackingRoutes, { viewTrackingRouteConfigs } from './public/view-tracking';
 // Re-exported for existing importers (tests); both now live in lib/.
 export { resolveOwnerPreviewToken } from '../lib/public-access';
 export { resolveRenderAccess } from '../lib/render-token';
@@ -20,8 +21,8 @@ import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, getBaseUrl } from '../lib/url';
 import { publicReportAccessAllowed, shouldPinLatestPublished } from '../lib/report-access';
-import publicVerifyRoutes from './public/verify';
-import publicInspectorProfileRoutes from './public/inspector-profile';
+import publicVerifyRoutes, { publicVerifyRouteConfigs } from './public/verify';
+import publicInspectorProfileRoutes, { publicInspectorProfileRouteConfigs } from './public/inspector-profile';
 import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { readCourtesyTranslationForReport } from '../lib/translation/read-for-report';
@@ -203,7 +204,7 @@ const invoiceRoute = createRoute(withMcpMetadata({
 // the tenant's OWN Stripe secret key is loaded per-request into c.env by the
 // integration-secrets middleware). Returns the client secret + the tenant's
 // publishable key so the browser can mount Stripe Elements inline.
-const PayIntentSchema = z.object({
+export const PayIntentSchema = z.object({
     clientSecret: z.string(),
     publishableKey: z.string(),
     amountCents: z.number(),
@@ -234,7 +235,7 @@ const payIntentRoute = createRoute(withMcpMetadata({
 // Public report-gate (③-A.2). The "report blocked, here's why + CTA" page,
 // resolved by tenant slug + id (no token — pre-report). Returns only
 // non-sensitive gate fields (reason + branding + inspector contact + amount).
-const ReportGateResponseSchema = z.object({
+export const ReportGateResponseSchema = z.object({
     reason: z.enum(['payment', 'agreement']),
     companyName: z.string(),
     primaryColor: z.string().nullable(),
@@ -270,358 +271,371 @@ const reportGateRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login report-gate status resolved by tenant slug + inspection id. Returns the outstanding gate (agreement before payment) with branding, inspector contact, and amount due — or null when the report is not gated.',
 }, { scopes: [], tier: 'extended' }));
 
-const publicReportRoutes = createApiRouter()
-    .route('/', publicVerifyRoutes)
-    .route('/', publicViewTrackingRoutes)
-    .openapi(reportRoute, async (c) => {
-        const { tenant, id } = c.req.valid('param');
-        const { token, render } = c.req.valid('query');
-        const clientGrant = await resolveClientTenant(c, token, id);
-        let tenantId = clientGrant?.tenantId ?? null;
-        // Render-token path: headless CF Browser Rendering cannot carry a session
-        // cookie or portal token; trusted server flows mint a short-TTL render token
-        // and pass it as `?render=`. Resolve tenantId from the inspection row so the
-        // headless browser can load the full report without any user credential.
-        let renderMode = false;
-        // A version named INSIDE the signed render token, when the caller is
-        // materialising a specific published version (the verify page's frozen
-        // PDF). Never read from the query string: a link holder who could append
-        // `&v=1` would be asking the renderer for a version they were never sent.
-        let pinnedVersion: number | undefined;
-        if (!tenantId && render) {
-            const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
-            if (r) {
-                const db = getDrizzle(c);
-                const row = await db.select({ tenantId: inspections.tenantId })
-                    .from(inspections).where(eq(inspections.id, id)).get();
-                if (row) { tenantId = row.tenantId; renderMode = true; pinnedVersion = r.versionNumber; }
-            }
+const app = createApiRouter();
+app.route('/', publicVerifyRoutes);
+app.route('/', publicViewTrackingRoutes);
+app.openapi(reportRoute, async (c) => {
+    const { tenant, id } = c.req.valid('param');
+    const { token, render } = c.req.valid('query');
+    const clientGrant = await resolveClientTenant(c, token, id);
+    let tenantId = clientGrant?.tenantId ?? null;
+    // Render-token path: headless CF Browser Rendering cannot carry a session
+    // cookie or portal token; trusted server flows mint a short-TTL render token
+    // and pass it as `?render=`. Resolve tenantId from the inspection row so the
+    // headless browser can load the full report without any user credential.
+    let renderMode = false;
+    // A version named INSIDE the signed render token, when the caller is
+    // materialising a specific published version (the verify page's frozen
+    // PDF). Never read from the query string: a link holder who could append
+    // `&v=1` would be asking the renderer for a version they were never sent.
+    let pinnedVersion: number | undefined;
+    if (!tenantId && render) {
+        const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
+        if (r) {
+            const db = getDrizzle(c);
+            const row = await db.select({ tenantId: inspections.tenantId })
+                .from(inspections).where(eq(inspections.id, id)).get();
+            if (row) { tenantId = row.tenantId; renderMode = true; pinnedVersion = r.versionNumber; }
         }
-        // Owner-session preview: an authenticated tenant user (inspector/admin)
-        // may preview their own report without a recipient token. Ownership of
-        // THIS inspection is enforced by getReportData's tenant-scoped query.
-        let ownerPreview = false;
-        if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
+    }
+    // Owner-session preview: an authenticated tenant user (inspector/admin)
+    // may preview their own report without a recipient token. Ownership of
+    // THIS inspection is enforced by getReportData's tenant-scoped query.
+    let ownerPreview = false;
+    if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
 
-        // OPTION A — a delivered report renders what it FROZE.
-        //
-        // A recipient reading their link gets the latest PUBLISHED version's
-        // snapshot, not live tables. Without this the everyday web read tracked
-        // current state, so an inspector who renewed a licence or left an
-        // association silently retro-edited every report they had ever issued —
-        // on a document that carries a signature and an integrity hash claiming
-        // it had not changed.
-        //
-        // Three deliberate exclusions:
-        //  - RENDER TOKEN already names its own version (above); it must keep
-        //    it, because the verify page materialises one specific version.
-        //  - OWNER PREVIEW stays LIVE. The owner is the author: preview exists
-        //    to show work in progress, and pinning it would hide every edit made
-        //    after the last publish. This is the plan's own split — "publish →
-        //    snapshot; live/draft preview → read current state".
-        //  - AN UNPUBLISHED report has no version row, so it resolves live by
-        //    falling through with `pinnedVersion` still undefined.
-        //
-        // Server-derived, like the render token's: nothing here reads a version
-        // from the query string, so a link holder still cannot ask for one.
-        if (tenantId && shouldPinLatestPublished({ renderMode, ownerPreview, tokenPinnedVersion: pinnedVersion })) {
-            const latest = await c.var.services.reportVersion.getLatestPublished(tenantId, id);
-            if (latest) pinnedVersion = latest.versionNumber;
+    // OPTION A — a delivered report renders what it FROZE.
+    //
+    // A recipient reading their link gets the latest PUBLISHED version's
+    // snapshot, not live tables. Without this the everyday web read tracked
+    // current state, so an inspector who renewed a licence or left an
+    // association silently retro-edited every report they had ever issued —
+    // on a document that carries a signature and an integrity hash claiming
+    // it had not changed.
+    //
+    // Three deliberate exclusions:
+    //  - RENDER TOKEN already names its own version (above); it must keep
+    //    it, because the verify page materialises one specific version.
+    //  - OWNER PREVIEW stays LIVE. The owner is the author: preview exists
+    //    to show work in progress, and pinning it would hide every edit made
+    //    after the last publish. This is the plan's own split — "publish →
+    //    snapshot; live/draft preview → read current state".
+    //  - AN UNPUBLISHED report has no version row, so it resolves live by
+    //    falling through with `pinnedVersion` still undefined.
+    //
+    // Server-derived, like the render token's: nothing here reads a version
+    // from the query string, so a link holder still cannot ask for one.
+    if (tenantId && shouldPinLatestPublished({ renderMode, ownerPreview, tokenPinnedVersion: pinnedVersion })) {
+        const latest = await c.var.services.reportVersion.getLatestPublished(tenantId, id);
+        if (latest) pinnedVersion = latest.versionNumber;
+    }
+    if (!tenantId) {
+        // IA-36 ⑨ — distinguish "this link was taken offline" from "this link
+        // never existed". The recipient was invited by us and the link died by
+        // our policy, so they get a page that says so instead of a 404 that
+        // implies they mistyped something. Only reached AFTER access was
+        // already refused, and only for a token whose secret the caller is
+        // already holding — a guessed token still gets the flat 404.
+        const state = await classifyPortalAccess(c.var.services.portalAccess, token, id);
+        if (state === 'expired' || state === 'revoked') {
+            return c.json({
+                success: false as const,
+                error: {
+                    code: state === 'expired' ? 'REPORT_LINK_EXPIRED' : 'REPORT_LINK_REVOKED',
+                    message: 'This report link is no longer active.',
+                },
+            }, 410);
         }
-        if (!tenantId) {
-            // IA-36 ⑨ — distinguish "this link was taken offline" from "this link
-            // never existed". The recipient was invited by us and the link died by
-            // our policy, so they get a page that says so instead of a 404 that
-            // implies they mistyped something. Only reached AFTER access was
-            // already refused, and only for a token whose secret the caller is
-            // already holding — a guessed token still gets the flat 404.
-            const state = await classifyPortalAccess(c.var.services.portalAccess, token, id);
-            if (state === 'expired' || state === 'revoked') {
-                return c.json({
-                    success: false as const,
-                    error: {
-                        code: state === 'expired' ? 'REPORT_LINK_EXPIRED' : 'REPORT_LINK_REVOKED',
-                        message: 'This report link is no longer active.',
-                    },
-                }, 410);
-            }
-            return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
-        }
-        // Publish gate: client/token access is revoked while the report is not
-        // published (owner-preview + render-token bypass — they may view drafts).
-        const gateRow = await getDrizzle(c)
-            .select({ reportStatus: inspections.reportStatus })
-            .from(inspections)
-            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
-            .get();
-        // TWO gates, not one. `releaseGate` is the agreement/payment hold the
-        // client Hub already reports; this endpoint used to check only whether
-        // the report was published, so a workspace that required payment got a
-        // Hub saying the report was held back and this endpoint handing it over.
-        const releaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
-        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus, releaseGate })) {
-            return c.json(releaseGate
-                ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
-                : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
-        }
-        // OI #271 — delivery confirmation, after the publish gate (a blocked
-        // request is not an open). Grant/renderMode/ownerPreview are resolved
-        // here; only `x-oi-client-method` is relayed. Never throws.
-        //
-        // `countingEnabled` is the tenant's own decision and defaults to false
-        // (a legitimate interest may not be a mask for processing
-        // its supposed beneficiary cannot decline). A missing config row reads
-        // as OFF, which is the same direction as the column default: a tenant
-        // who has never opened the settings page has not opted in.
-        // Read through the shared reader, which is also what decides whether the
-        // delivery email may state that opens are recorded. Two readings of one
-        // column is how the email came to describe processing this branch was
-        // not doing.
-        const countingEnabled = await readReportViewCountingEnabled(getDrizzle(c), tenantId);
-        await recordReportView(getDrizzle(c), { tenantId, inspectionId: id }, {
-            countingEnabled,
-            accessTokenId: clientGrant?.accessTokenId ?? null, renderMode, ownerPreview,
-            method: c.req.header('x-oi-client-method') ?? c.req.method,
-            purpose: c.req.header('purpose'), secPurpose: c.req.header('sec-purpose'),
-        });
-        // Photo URLs: render mode carries the render token so the headless browser
-        // can load photos without a session cookie. Owner-preview points at the
-        // authed editor photo route (cookie authenticates there). Public client
-        // viewers use the token-scoped public photo route.
-        const tk = token ?? '';
-        const makePhotoUrl = renderMode
-            ? (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&render=${encodeURIComponent(render!)}`
-            : ownerPreview
-                ? (key: string) => `/api/inspections/${id}/photo?key=${encodeURIComponent(key)}`
-                : (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
-        // Plan 7 — video media context. `renderMode` (the render-token/PDF path)
-        // forces video entries to a poster + QR (the headless PDF browser cannot
-        // embed a player). The Stream customer subdomain is read from env; absent
-        // ⇒ fail closed (selectReportMedia degrades video → image, never a
-        // fabricated subdomain). appBaseUrl is the request origin for the QR deep
-        // link.
-        const streamCustomerSubdomain = c.env.STREAM_CUSTOMER_SUBDOMAIN ?? '';
-        const appBaseUrl = new URL(c.req.url).origin;
-        // R2 video serve base: PDF consumes only the poster JPEG (render-token);
-        // web viewer fetches clips, tenant-guarded by the pool-row lookup.
-        const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl, {
-            isPdf: renderMode,
-            streamCustomerSubdomain,
-            appBaseUrl,
-            r2BaseUrl: `/api/inspections/${id}/media/video`,
-        }, pinnedVersion);
-        // #23 — the courtesy translation, when one is stored AND still describes
-        // this English. ⚠️ No tenant setting is read: production is gated,
-        // consumption never is. See lib/translation/read-for-report.ts.
-        const courtesyTranslation = await readCourtesyTranslationForReport(
-            { db: c.env.DB, inspection: c.var.services.inspection, translations: c.var.services.reportTranslation },
-            { tenantId, inspectionId: id, locale: COURTESY_TRANSLATION_LOCALE, data },
-        );
-        return c.json({ success: true as const, data, courtesyTranslation }, 200);
-    })
-    .openapi(reportPhotoRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { key, token, download, render, w } = c.req.valid('query');
-        let tenantId = (await resolveClientTenant(c, token, id))?.tenantId ?? null;
-        let renderMode = false;
-        let ownerPreview = false;
-        if (!tenantId && render) {
-            const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
-            if (r) {
-                const db = getDrizzle(c);
-                const row = await db.select({ tenantId: inspections.tenantId })
-                    .from(inspections).where(eq(inspections.id, id)).get();
-                if (row) { tenantId = row.tenantId; renderMode = true; }
-            }
-        }
-        // Owner-session preview — same fallback as the report data route so the
-        // owner's tokenless preview can load its photos (the key is re-checked
-        // against this tenant + inspection below).
-        if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
-        if (!tenantId) return c.notFound();
-        const photoGate = await getDrizzle(c)
-            .select({ reportStatus: inspections.reportStatus })
-            .from(inspections)
-            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
-            .get();
-        // A gate that holds the report but serves its photographs is not a gate.
-        const photoReleaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
-        if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus, releaseGate: photoReleaseGate })) {
-            return c.notFound();
-        }
-        // Ownership: keys are `${tenantId}/inspections/${inspectionId}/...` — reject
-        // anything outside the token's tenant + the requested inspection.
-        if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
-        const photo = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
-            width: w,
-            download: download === '1',
-        });
-        return photo ?? c.notFound();
-    })
-    .openapi(reportPdfDownloadRoute, async (c) => {
-        const { tenant, id } = c.req.valid('param');
-        const { token, type } = c.req.valid('query');
-        const reportType = type ?? 'full';
-
-        // Auth: portal token + legacy agent-view-token bridge only.
-        // No owner-preview, no render-token acceptance — this is a public
-        // client-facing endpoint; the handler mints its own render token for
-        // the headless renderer below.
-        const tenantId = (await resolveClientTenant(c, token, id))?.tenantId ?? null;
-        if (!tenantId) return c.notFound();
-
-        if (!c.env.BROWSER || !c.env.PHOTOS) {
-            return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
-        }
-
-        const db = getDrizzle(c);
-        const insp = await db
-            .select({ status: inspections.status, reportStatus: inspections.reportStatus })
-            .from(inspections)
-            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
-            .get();
-        if (!insp) return c.notFound();
-        // Publish gate: this is a pure client-facing endpoint (no owner-preview, no
-        // render token), so block whenever the report is not currently published.
-        // Same two gates. This is the pure client-facing download; the headless
-        // renderer reaches the report through its own render token above, so
-        // gating here does not block the PDF from being BUILT, only from being
-        // handed to a client who has not cleared the hold.
-        const pdfReleaseGate = await releaseGateFor(c.var.services, id, tenantId, false);
-        if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus, releaseGate: pdfReleaseGate })) {
-            // Same two meanings as the payload door above. Answering NOT_PUBLISHED
-            // for a held report tells a client who owes money that their inspector
-            // has not finished — the wrong fact, and it points them at the wrong
-            // person to fix it.
-            return c.json(pdfReleaseGate
-                ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
-                : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
-        }
-        // Everyday download always tracks current content (versionNumber: null →
-        // content-hash cache, renders live data). Frozen per-version PDFs are only
-        // served from the verify page via GET /api/public/verify/report/:token/pdf.
-        const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenant, id, c.env.JWT_SECRET);
-        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
-        const record = await c.var.services.reportPdf.getOrRender(id, tenantId, reportType, {
-            reportUrl, contentHash, versionNumber: null,
-        });
-        const obj = await c.var.services.reportPdf.streamPdf(record);
-        if (!obj) return c.notFound();
-
-        const filename = `report-${id}${reportType === 'summary' ? '-summary' : ''}.pdf`;
-        return new Response(obj.body, { status: 200, headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="${filename}"`,
-            'Cache-Control': 'private, max-age=300',
-        } });
-    })
-    .route('/', publicInspectorProfileRoutes)
-    .openapi(invoiceRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        // IA-34 — client/co_client grant required (?token= or portal session).
-        const actor = await resolveClientActor(c, id);
-        if (!actor) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
-        const tenantId = actor.tenantId;
-        const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
-        if (!inv) return c.json({ success: true as const, data: null }, 200);
-        // A-10 — ship the tenant brand with the invoice so the public pay page
-        // renders the inspector's branding (no tenant slug in /invoice/:id URLs).
-        const tenantRow = await getDrizzle(c).select({ slug: tenants.slug })
-            .from(tenants).where(eq(tenants.id, tenantId)).get();
-        const brand = await c.var.services.branding.getBrand(tenantId, {
-            slug: tenantRow?.slug ?? null,
-            baseUrl: getBaseUrl(c),
-        });
-        // IA-44 — and the slug, so the page can hand off to the slug-keyed Hub
-        // once payment succeeds.
-        // IA-86 — project through the declared shape instead of spreading the
-        // row. `PublicInvoiceBodySchema` always described what a payer may see,
-        // but hono/zod-openapi does not validate or trim RESPONSES, so the
-        // declaration was decorative and the row shipped whole: `notes` (the
-        // inspector's private remark), `qboSyncStatus`, `tenantId`, `contactId`,
-        // `clientEmail`. Parsing here makes the declaration load-bearing —
-        // zod strips anything undeclared, so a column added later cannot leak by
-        // default. Same failure IA-33 fixed on the report endpoint.
-        // The two nested shapes are normalized first. A legacy/imported line
-        // item with a missing description, or a brand that gains a field the
-        // branding service does not yet return, would make `.parse()` THROW —
-        // and trading an information leak for a 500 on the pay page is not a
-        // fix. Every other declared field is a plain string/number from the
-        // invoice row (createdAt goes through safeISODate).
-        //
-        // `brand` in particular crosses a service boundary, so its shape is not
-        // this file's to guarantee: name the fields the payer's page needs and
-        // let anything else fall away, rather than trusting the whole object.
-        const lineItems = (inv.lineItems ?? []).map((li) => ({
-            description: String(li?.description ?? ''),
-            amountCents: Number(li?.amountCents ?? 0),
-        }));
-        const brandView = {
-            companyName: brand?.companyName ?? null,
-            primaryColor: brand?.primaryColor ?? null,
-            logoUrl: brand?.logoUrl ?? null,
-            defaultTimezone: brand?.defaultTimezone ?? 'UTC',
-            supportEmail: brand?.supportEmail ?? null,
-            companyPhone: brand?.companyPhone ?? null,
-            privacyUrl: brand?.privacyUrl ?? null,
-            termsUrl: brand?.termsUrl ?? null,
-        };
-        const view = PublicInvoiceBodySchema.parse({ ...inv, lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
-        return c.json({ success: true as const, data: view }, 200);
-    })
-    .openapi(payIntentRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        // IA-34 — client/co_client grant required (?token= or portal session).
-        const actor = await resolveClientActor(c, id);
-        if (!actor) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
-        const tenantId = actor.tenantId;
-        // The Stripe keys in c.env were injected for the ROUTED tenant. Both
-        // resolve from the same inspection, so a mismatch means the routing and
-        // the grant disagree — refuse rather than charge with foreign keys.
-        const routedTenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
-        if (routedTenantId && routedTenantId !== tenantId) {
-            return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
-        }
-
-        // Bring-your-own-keys: the tenant's Stripe secret + publishable key are
-        // merged into c.env from their encrypted secrets. No keys → graceful 503
-        // (the pay panel shows the "contact your inspector" fallback).
-        const env = c.env;
-        const secretKey = env.STRIPE_SECRET_KEY;
-        const publishableKey = env.STRIPE_PUBLISHABLE_KEY;
-        if (!secretKey || !publishableKey) {
-            return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'Online payment is not set up for this inspector.' } }, 503);
-        }
-
-        const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
-        if (!inv) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invoice not found' } }, 404);
-
-        try {
-            const { StripeService } = await import('../services/stripe.service');
-            const svc = new StripeService(secretKey);
-            const { clientSecret } = await svc.createPaymentIntent(
-                { id: inv.id, amountCents: inv.amountCents, inspectionId: inv.inspectionId, status: inv.status, paidAt: inv.paidAt },
-                // Phase B — charge in the invoice's snapshot currency (Stripe lowercases,
-                // e.g. 'cad'), not a hardcoded USD, so the charge matches the billed amount.
-                { tenantId, currency: inv.currency, descriptionPrefix: 'Inspection invoice' },
-            );
-            return c.json({ success: true as const, data: { clientSecret, publishableKey, amountCents: inv.amountCents } }, 200);
-        } catch (err) {
-            if (err instanceof InvoiceNotPayableError) {
-                return c.json({ success: false as const, error: { code: 'INVOICE_NOT_PAYABLE', message: err.message } }, 409);
-            }
-            logger.error('Stripe pay-intent failed', { inspectionId: id.slice(0, 8) }, err instanceof Error ? err : undefined);
-            return c.json({ success: false as const, error: { code: 'STRIPE_ERROR', message: 'Payment could not be started. Please try again.' } }, 503);
-        }
-    })
-    .openapi(reportGateRoute, async (c) => {
-        const { tenant, id } = c.req.valid('param');
-        const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
-        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
-        const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant, c.var.services.agreement);
-        return c.json({ success: true as const, data: gate }, 200);
+        return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
+    }
+    // Publish gate: client/token access is revoked while the report is not
+    // published (owner-preview + render-token bypass — they may view drafts).
+    const gateRow = await getDrizzle(c)
+        .select({ reportStatus: inspections.reportStatus })
+        .from(inspections)
+        .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+        .get();
+    // TWO gates, not one. `releaseGate` is the agreement/payment hold the
+    // client Hub already reports; this endpoint used to check only whether
+    // the report was published, so a workspace that required payment got a
+    // Hub saying the report was held back and this endpoint handing it over.
+    const releaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
+    if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus, releaseGate })) {
+        return c.json(releaseGate
+            ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
+            : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+    }
+    // OI #271 — delivery confirmation, after the publish gate (a blocked
+    // request is not an open). Grant/renderMode/ownerPreview are resolved
+    // here; only `x-oi-client-method` is relayed. Never throws.
+    //
+    // `countingEnabled` is the tenant's own decision and defaults to false
+    // (a legitimate interest may not be a mask for processing
+    // its supposed beneficiary cannot decline). A missing config row reads
+    // as OFF, which is the same direction as the column default: a tenant
+    // who has never opened the settings page has not opted in.
+    // Read through the shared reader, which is also what decides whether the
+    // delivery email may state that opens are recorded. Two readings of one
+    // column is how the email came to describe processing this branch was
+    // not doing.
+    const countingEnabled = await readReportViewCountingEnabled(getDrizzle(c), tenantId);
+    await recordReportView(getDrizzle(c), { tenantId, inspectionId: id }, {
+        countingEnabled,
+        accessTokenId: clientGrant?.accessTokenId ?? null, renderMode, ownerPreview,
+        method: c.req.header('x-oi-client-method') ?? c.req.method,
+        purpose: c.req.header('purpose'), secPurpose: c.req.header('sec-purpose'),
     });
+    // Photo URLs: render mode carries the render token so the headless browser
+    // can load photos without a session cookie. Owner-preview points at the
+    // authed editor photo route (cookie authenticates there). Public client
+    // viewers use the token-scoped public photo route.
+    const tk = token ?? '';
+    const makePhotoUrl = renderMode
+        ? (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&render=${encodeURIComponent(render!)}`
+        : ownerPreview
+            ? (key: string) => `/api/inspections/${id}/photo?key=${encodeURIComponent(key)}`
+            : (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
+    // Plan 7 — video media context. `renderMode` (the render-token/PDF path)
+    // forces video entries to a poster + QR (the headless PDF browser cannot
+    // embed a player). The Stream customer subdomain is read from env; absent
+    // ⇒ fail closed (selectReportMedia degrades video → image, never a
+    // fabricated subdomain). appBaseUrl is the request origin for the QR deep
+    // link.
+    const streamCustomerSubdomain = c.env.STREAM_CUSTOMER_SUBDOMAIN ?? '';
+    const appBaseUrl = new URL(c.req.url).origin;
+    // R2 video serve base: PDF consumes only the poster JPEG (render-token);
+    // web viewer fetches clips, tenant-guarded by the pool-row lookup.
+    const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl, {
+        isPdf: renderMode,
+        streamCustomerSubdomain,
+        appBaseUrl,
+        r2BaseUrl: `/api/inspections/${id}/media/video`,
+    }, pinnedVersion);
+    // #23 — the courtesy translation, when one is stored AND still describes
+    // this English. ⚠️ No tenant setting is read: production is gated,
+    // consumption never is. See lib/translation/read-for-report.ts.
+    const courtesyTranslation = await readCourtesyTranslationForReport(
+        { db: c.env.DB, inspection: c.var.services.inspection, translations: c.var.services.reportTranslation },
+        { tenantId, inspectionId: id, locale: COURTESY_TRANSLATION_LOCALE, data },
+    );
+    return c.json({ success: true as const, data, courtesyTranslation }, 200);
+});
+app.openapi(reportPhotoRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { key, token, download, render, w } = c.req.valid('query');
+    let tenantId = (await resolveClientTenant(c, token, id))?.tenantId ?? null;
+    let renderMode = false;
+    let ownerPreview = false;
+    if (!tenantId && render) {
+        const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
+        if (r) {
+            const db = getDrizzle(c);
+            const row = await db.select({ tenantId: inspections.tenantId })
+                .from(inspections).where(eq(inspections.id, id)).get();
+            if (row) { tenantId = row.tenantId; renderMode = true; }
+        }
+    }
+    // Owner-session preview — same fallback as the report data route so the
+    // owner's tokenless preview can load its photos (the key is re-checked
+    // against this tenant + inspection below).
+    if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
+    if (!tenantId) return c.notFound();
+    const photoGate = await getDrizzle(c)
+        .select({ reportStatus: inspections.reportStatus })
+        .from(inspections)
+        .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+        .get();
+    // A gate that holds the report but serves its photographs is not a gate.
+    const photoReleaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
+    if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus, releaseGate: photoReleaseGate })) {
+        return c.notFound();
+    }
+    // Ownership: keys are `${tenantId}/inspections/${inspectionId}/...` — reject
+    // anything outside the token's tenant + the requested inspection.
+    if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
+    const photo = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
+        width: w,
+        download: download === '1',
+    });
+    return photo ?? c.notFound();
+});
+app.openapi(reportPdfDownloadRoute, async (c) => {
+    const { tenant, id } = c.req.valid('param');
+    const { token, type } = c.req.valid('query');
+    const reportType = type ?? 'full';
 
-export type PublicReportApi = typeof publicReportRoutes;
+    // Auth: portal token + legacy agent-view-token bridge only.
+    // No owner-preview, no render-token acceptance — this is a public
+    // client-facing endpoint; the handler mints its own render token for
+    // the headless renderer below.
+    const tenantId = (await resolveClientTenant(c, token, id))?.tenantId ?? null;
+    if (!tenantId) return c.notFound();
 
-export default publicReportRoutes;
+    if (!c.env.BROWSER || !c.env.PHOTOS) {
+        return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
+    }
+
+    const db = getDrizzle(c);
+    const insp = await db
+        .select({ status: inspections.status, reportStatus: inspections.reportStatus })
+        .from(inspections)
+        .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+        .get();
+    if (!insp) return c.notFound();
+    // Publish gate: this is a pure client-facing endpoint (no owner-preview, no
+    // render token), so block whenever the report is not currently published.
+    // Same two gates. This is the pure client-facing download; the headless
+    // renderer reaches the report through its own render token above, so
+    // gating here does not block the PDF from being BUILT, only from being
+    // handed to a client who has not cleared the hold.
+    const pdfReleaseGate = await releaseGateFor(c.var.services, id, tenantId, false);
+    if (!publicReportAccessAllowed({ renderMode: false, ownerPreview: false, reportStatus: insp.reportStatus, releaseGate: pdfReleaseGate })) {
+        // Same two meanings as the payload door above. Answering NOT_PUBLISHED
+        // for a held report tells a client who owes money that their inspector
+        // has not finished — the wrong fact, and it points them at the wrong
+        // person to fix it.
+        return c.json(pdfReleaseGate
+            ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
+            : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+    }
+    // Everyday download always tracks current content (versionNumber: null →
+    // content-hash cache, renders live data). Frozen per-version PDFs are only
+    // served from the verify page via GET /api/public/verify/report/:token/pdf.
+    const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenant, id, c.env.JWT_SECRET);
+    const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+    const record = await c.var.services.reportPdf.getOrRender(id, tenantId, reportType, {
+        reportUrl, contentHash, versionNumber: null,
+    });
+    const obj = await c.var.services.reportPdf.streamPdf(record);
+    if (!obj) return c.notFound();
+
+    const filename = `report-${id}${reportType === 'summary' ? '-summary' : ''}.pdf`;
+    return new Response(obj.body, { status: 200, headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Cache-Control': 'private, max-age=300',
+    } });
+});
+app.route('/', publicInspectorProfileRoutes);
+app.openapi(invoiceRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    // IA-34 — client/co_client grant required (?token= or portal session).
+    const actor = await resolveClientActor(c, id);
+    if (!actor) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
+    const tenantId = actor.tenantId;
+    const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
+    if (!inv) return c.json({ success: true as const, data: null }, 200);
+    // A-10 — ship the tenant brand with the invoice so the public pay page
+    // renders the inspector's branding (no tenant slug in /invoice/:id URLs).
+    const tenantRow = await getDrizzle(c).select({ slug: tenants.slug })
+        .from(tenants).where(eq(tenants.id, tenantId)).get();
+    const brand = await c.var.services.branding.getBrand(tenantId, {
+        slug: tenantRow?.slug ?? null,
+        baseUrl: getBaseUrl(c),
+    });
+    // IA-44 — and the slug, so the page can hand off to the slug-keyed Hub
+    // once payment succeeds.
+    // IA-86 — project through the declared shape instead of spreading the
+    // row. `PublicInvoiceBodySchema` always described what a payer may see,
+    // but hono/zod-openapi does not validate or trim RESPONSES, so the
+    // declaration was decorative and the row shipped whole: `notes` (the
+    // inspector's private remark), `qboSyncStatus`, `tenantId`, `contactId`,
+    // `clientEmail`. Parsing here makes the declaration load-bearing —
+    // zod strips anything undeclared, so a column added later cannot leak by
+    // default. Same failure IA-33 fixed on the report endpoint.
+    // The two nested shapes are normalized first. A legacy/imported line
+    // item with a missing description, or a brand that gains a field the
+    // branding service does not yet return, would make `.parse()` THROW —
+    // and trading an information leak for a 500 on the pay page is not a
+    // fix. Every other declared field is a plain string/number from the
+    // invoice row (createdAt goes through safeISODate).
+    //
+    // `brand` in particular crosses a service boundary, so its shape is not
+    // this file's to guarantee: name the fields the payer's page needs and
+    // let anything else fall away, rather than trusting the whole object.
+    const lineItems = (inv.lineItems ?? []).map((li) => ({
+        description: String(li?.description ?? ''),
+        amountCents: Number(li?.amountCents ?? 0),
+    }));
+    const brandView = {
+        companyName: brand?.companyName ?? null,
+        primaryColor: brand?.primaryColor ?? null,
+        logoUrl: brand?.logoUrl ?? null,
+        defaultTimezone: brand?.defaultTimezone ?? 'UTC',
+        supportEmail: brand?.supportEmail ?? null,
+        companyPhone: brand?.companyPhone ?? null,
+        privacyUrl: brand?.privacyUrl ?? null,
+        termsUrl: brand?.termsUrl ?? null,
+    };
+    const view = PublicInvoiceBodySchema.parse({ ...inv, lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
+    return c.json({ success: true as const, data: view }, 200);
+});
+app.openapi(payIntentRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    // IA-34 — client/co_client grant required (?token= or portal session).
+    const actor = await resolveClientActor(c, id);
+    if (!actor) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
+    const tenantId = actor.tenantId;
+    // The Stripe keys in c.env were injected for the ROUTED tenant. Both
+    // resolve from the same inspection, so a mismatch means the routing and
+    // the grant disagree — refuse rather than charge with foreign keys.
+    const routedTenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
+    if (routedTenantId && routedTenantId !== tenantId) {
+        return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
+    }
+
+    // Bring-your-own-keys: the tenant's Stripe secret + publishable key are
+    // merged into c.env from their encrypted secrets. No keys → graceful 503
+    // (the pay panel shows the "contact your inspector" fallback).
+    const env = c.env;
+    const secretKey = env.STRIPE_SECRET_KEY;
+    const publishableKey = env.STRIPE_PUBLISHABLE_KEY;
+    if (!secretKey || !publishableKey) {
+        return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'Online payment is not set up for this inspector.' } }, 503);
+    }
+
+    const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
+    if (!inv) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invoice not found' } }, 404);
+
+    try {
+        const { StripeService } = await import('../services/stripe.service');
+        const svc = new StripeService(secretKey);
+        const { clientSecret } = await svc.createPaymentIntent(
+            { id: inv.id, amountCents: inv.amountCents, inspectionId: inv.inspectionId, status: inv.status, paidAt: inv.paidAt },
+            // Phase B — charge in the invoice's snapshot currency (Stripe lowercases,
+            // e.g. 'cad'), not a hardcoded USD, so the charge matches the billed amount.
+            { tenantId, currency: inv.currency, descriptionPrefix: 'Inspection invoice' },
+        );
+        return c.json({ success: true as const, data: { clientSecret, publishableKey, amountCents: inv.amountCents } }, 200);
+    } catch (err) {
+        if (err instanceof InvoiceNotPayableError) {
+            return c.json({ success: false as const, error: { code: 'INVOICE_NOT_PAYABLE', message: err.message } }, 409);
+        }
+        logger.error('Stripe pay-intent failed', { inspectionId: id.slice(0, 8) }, err instanceof Error ? err : undefined);
+        return c.json({ success: false as const, error: { code: 'STRIPE_ERROR', message: 'Payment could not be started. Please try again.' } }, 503);
+    }
+});
+app.openapi(reportGateRoute, async (c) => {
+    const { tenant, id } = c.req.valid('param');
+    const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
+    if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+    const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant, c.var.services.agreement);
+    return c.json({ success: true as const, data: gate }, 200);
+});
+
+/** Registration order, mounts included. Drives `PublicReportApi`; a test pins it to what `app` really registered. */
+export const publicReportRouteParts = [
+    mounted('/', publicVerifyRoutes, publicVerifyRouteConfigs),
+    mounted('/', publicViewTrackingRoutes, viewTrackingRouteConfigs),
+    reportRoute,
+    reportPhotoRoute,
+    reportPdfDownloadRoute,
+    mounted('/', publicInspectorProfileRoutes, publicInspectorProfileRouteConfigs),
+    invoiceRoute,
+    payIntentRoute,
+    reportGateRoute,
+] as const;
+
+export type PublicReportApi = ApiOf<typeof publicReportRouteParts>;
+
+export default app;

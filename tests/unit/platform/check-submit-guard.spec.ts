@@ -493,7 +493,10 @@ describe('the two committed files agree', () => {
         expect(r.awaitingTotal).toBe(0);
         expect(ceiling).toEqual({});
         const keys = Object.keys(baseline);
-        expect(keys.length).toBeGreaterThan(40);
+        // Floor, not a target: it only proves the baseline was not emptied by accident. It was 40 while the
+        // editor still carried its write sites here; moving them into packages/field-ui retired ten entries
+        // (the code that held them left, or was converted to a latch), so the floor follows the debt down.
+        expect(keys.length).toBeGreaterThan(30);
         expect(keys.filter((k) => !String(baseline[k] ?? '').trim())).toEqual([]);
     });
 
@@ -507,5 +510,41 @@ describe('the two committed files agree', () => {
         expect(r.ok).toBe(false);
         expect(r.failures.join(' ')).toMatch(/backlog GREW: 1 awaiting against a ceiling of 0/);
         expect(r.over).toEqual(['new.tsx']);
+    });
+});
+
+describe('findSubmitCallSites — <expr>.execute( is the field-ui command channel', () => {
+    it('flags dataSource.execute(, an optional-chained receiver and a call-result receiver', () => {
+        expect(findSubmitCallSites(`await dataSource.execute(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`await source?.execute(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`await useData().execute(id, cmd);`)).toHaveLength(1);
+    });
+
+    it('flags the dodges: destructured execute, non-null receiver, line break, space before the paren, alias', () => {
+        expect(findSubmitCallSites(`const { execute } = useFieldDataSource();\nawait execute(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`await ds!.execute(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`await ref.current!.execute(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`await ds\n  .execute(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`await ds.execute (id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`await ds.execute?.(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`const run = ds.execute;`)).toHaveLength(1);
+    });
+    it('does not flag a method definition, a bare execute( call, or a mention in a comment', () => {
+        expect(findSubmitCallSites(`class A { async execute(id, cmd) { return 1; } }`)).toHaveLength(0);
+        expect(findSubmitCallSites(`execute(cmd);`)).toHaveLength(0);
+        expect(findSubmitCallSites(`// dataSource.execute(id, cmd)\n/* x.execute(1) */`)).toHaveLength(0);
+    });
+
+    it('does not count a fetcher call twice and a mixed file counts each call once', () => {
+        const hits = findSubmitCallSites(`fetcher.submit(a, post);\nawait ds.execute(id, cmd);`);
+        expect(hits.map((h) => h.line)).toEqual([1, 2]);
+    });
+
+    it('is excused only by a busy-controls-allow marker with a reason on or just above the call', () => {
+        expect(findSubmitCallSites(`// busy-controls-allow: the hook latches this call\nawait ds.execute(id, cmd);`)).toHaveLength(0);
+        expect(findSubmitCallSites(`await ds.execute(id, cmd); // busy-controls-allow: the hook latches this call`)).toHaveLength(0);
+        expect(findSubmitCallSites(`// busy-controls-allow:\nawait ds.execute(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`// submit-guard-allow: reason here\nawait ds.execute(id, cmd);`)).toHaveLength(1);
+        expect(findSubmitCallSites(`// busy-controls-allow: far above the call\n\n\n\n\nawait ds.execute(id, cmd);`)).toHaveLength(1);
     });
 });

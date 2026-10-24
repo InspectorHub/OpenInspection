@@ -48,28 +48,33 @@ const migrateFindingKeysRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-const adminFindingKeyRoutes = createApiRouter()
-    .openapi(migrateFindingKeysRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const result = await migrateFindingKeys(
-            getDrizzle(c),
-            tenantId,
-            renameThroughDurableObject(c.env.INSPECTION_DOC, tenantId),
-        );
+const app = createApiRouter();
+app.openapi(migrateFindingKeysRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const result = await migrateFindingKeys(
+        getDrizzle(c),
+        tenantId,
+        renameThroughDurableObject(c.env.INSPECTION_DOC, tenantId),
+    );
 
-        auditFromContext(c, 'admin.migrate_finding_keys', 'inspection_results', {
-            metadata: {
-                processed: result.processed,
-                migrated:  result.migrated,
-                skipped:   result.skipped,
-                delegated: result.delegated,
-                failed:    result.failed,
-                renamed:   result.renamedInDocuments,
-                conflicts: result.conflicts,
-            },
-        });
-
-        return c.json({ success: true as const, data: result }, 200);
+    auditFromContext(c, 'admin.migrate_finding_keys', 'inspection_results', {
+        metadata: {
+            processed: result.processed,
+            migrated:  result.migrated,
+            skipped:   result.skipped,
+            delegated: result.delegated,
+            failed:    result.failed,
+            renamed:   result.renamedInDocuments,
+            conflicts: result.conflicts,
+        },
     });
 
-export default adminFindingKeyRoutes;
+    return c.json({ success: true as const, data: result }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminFindingKeyRouteConfigs = [
+    migrateFindingKeysRoute,
+] as const;
+
+export default app;

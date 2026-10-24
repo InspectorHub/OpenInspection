@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
-import { findingKey } from '../../../server/lib/finding-key';
+import { findingKey } from '@core/field-ui/shared/finding-key';
 import {
     readResultMap,
     bindResultMap,
@@ -18,7 +18,7 @@ import {
     addPhotoToCannedDefect,
     addPhotoToCustomDefect,
     appendNote,
-} from '../../../app/lib/collab/results-binding';
+} from '@core/field-ui/collab/results-binding';
 
 // ─── Group 1: Round-trip scalar ───────────────────────────────────────────────
 

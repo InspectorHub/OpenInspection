@@ -6,7 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Pill, Button, EmptyState, Modal } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ActionFailureAlert } from "~/components/ActionFailureAlert";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { useCapability } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";

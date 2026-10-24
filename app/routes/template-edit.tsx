@@ -16,19 +16,20 @@ import { ItemCommentsPanel } from "~/components/template/ItemCommentsPanel";
 import { ItemPreviewPanel } from "~/components/template/ItemPreviewPanel";
 import { SectionAuthorHeader } from "~/components/template/SectionAuthorHeader";
 import { SectionPreview } from "~/components/template/SectionPreview";
-import { SectionRail } from "~/components/editor-shared/SectionRail";
-import { ItemList } from "~/components/editor-shared/ItemList";
+import { SectionRail } from "@core/field-ui/components/editor-shared/SectionRail";
+import { ItemList } from "@core/field-ui/components/editor-shared/ItemList";
 import { TemplatePropertyTypePanel } from "~/components/template/TemplatePropertyTypePanel";
 import { serializeTemplateMeta, serializeSectionMeta } from "~/lib/editor/template-meta";
-import * as ops from "~/lib/editor/structure-ops";
+import * as ops from "@core/field-ui/shared/structure-ops";
 import { serializeItemForSave } from "~/lib/editor/serialize-template";
 import type { PropertyType } from "~/components/template/types";
-import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
-import { useCannedComments } from "~/hooks/useCannedComments";
+import { CommentLibraryDrawer } from "@core/field-ui/components/editor/CommentLibraryDrawer";
+import { useCannedComments } from "@core/field-ui/hooks/useCannedComments";
 import { buildCannedFromText, TAB_SEVERITY, type CannedTab } from "~/lib/editor/canned-from-library";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 import { RouteErrorNotice } from "~/components/RouteErrorNotice";
+import { TemplateFieldHost } from "~/components/field/WebFieldHost";
 
 export function meta() {
   return [{ title: m.templates_edit_meta_title() }];
@@ -152,7 +153,8 @@ const NEW_RICH_ITEM = {
   options: { choices: [] as string[] },
 };
 
-export default function TemplateEditPage() {
+export default function TemplateEditPage() { return <TemplateFieldHost><TemplateEditPageBody /></TemplateFieldHost>; }
+function TemplateEditPageBody() {
   const { id, name: initialName, version: initialVersion, schema: initial, defectCategories, defaultProfileId: initialDefaultProfileId, statutoryFormId } = useLoaderData<typeof loader>();
   // #106 - Save writes the whole template schema and bumps its version.
   const { fetcher, submit, busy: saving } = useGuardedSubmit();

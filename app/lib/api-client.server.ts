@@ -84,6 +84,30 @@ import { getCloudflareEnv, type LoadContext } from "~/lib/load-context";
 export interface CreateApiOptions {
     /** Session JWT — attached as `Authorization: Bearer <token>` when present. */
     token?: string;
+    /**
+     * An `Idempotency-Key` for the FIRST write (non-GET) this client sends. Later writes of the same client
+     * carry none: the server claims a key per request path and payload, so one key reused for a second,
+     * different write would be refused as a mismatch. Use it for an action whose one real effect is a
+     * non-idempotent create and whose follow-up writes are idempotent anyway.
+     */
+    idempotencyKey?: string;
+    /**
+     * When the server refuses the keyed write because an identical request (same key) is still being processed
+     * (409 `IDEMPOTENCY_IN_FLIGHT`), THROW that answer as a 409 Response instead of handing the caller a failed
+     * write it would flatten to `ok: false`. For a handler whose own response is the answer to a browser fetch
+     * (a resource route), where a thrown Response is returned as-is and the caller can wait and retry the same key.
+     * Not for a page action: a thrown Response there renders the error boundary.
+     */
+    inFlightAsResponse?: boolean;
+}
+
+/** The status and error code of the idempotency middleware's refusal of a repeat that arrives while the first is running. */
+const IDEMPOTENCY_IN_FLIGHT_CODE = "IDEMPOTENCY_IN_FLIGHT";
+
+async function isInFlightRefusal(res: Response): Promise<boolean> {
+    if (res.status !== 409) return false;
+    const body = (await res.clone().json().catch(() => null)) as { error?: { code?: unknown } } | null;
+    return body?.error?.code === IDEMPOTENCY_IN_FLIGHT_CODE;
 }
 
 const NON_GET = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -94,13 +118,15 @@ const NON_GET = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  *   - CSRF token + matching `__Host-csrf_token` cookie on non-GET requests
  *   - Service Binding (`env.API_WORKER.fetch`) when available; falls back to global fetch
  */
-function buildFetch(context: LoadContext, token?: string): typeof fetch {
+function buildFetch(context: LoadContext, token?: string, idempotencyKey?: string, inFlightAsResponse = false): typeof fetch {
     const env = getCloudflareEnv(context);
+    let keyPending = Boolean(idempotencyKey);
 
     return (async (input: Request | string | URL, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(input, init);
         const method = req.method.toUpperCase();
 
+        let keyed = false;
         const headers = new Headers(req.headers);
         if (token && !headers.has("Authorization")) {
             headers.set("Authorization", `Bearer ${token}`);
@@ -108,16 +134,21 @@ function buildFetch(context: LoadContext, token?: string): typeof fetch {
         if (NON_GET.has(method)) {
             const { headerValue, cookieValue } = makeCsrfPair();
             headers.set("x-csrf-token", headerValue);
+            if (keyPending && idempotencyKey) {
+                keyPending = false;
+                keyed = true;
+                headers.set("Idempotency-Key", idempotencyKey);
+            }
             const existingCookie = headers.get("Cookie") ?? "";
             headers.set("Cookie", existingCookie ? `${existingCookie}; ${cookieValue}` : cookieValue);
         }
 
         const outgoing = new Request(req, { headers });
 
-        if (env.API_WORKER) {
-            return env.API_WORKER.fetch(outgoing);
-        }
-        return fetch(outgoing);
+        const res = env.API_WORKER ? await env.API_WORKER.fetch(outgoing) : await fetch(outgoing);
+        // Only the write that carried the key can be refused as "still running"; surface it for the caller to retry.
+        if (keyed && inFlightAsResponse && (await isInFlightRefusal(res))) throw res;
+        return res;
     }) as typeof fetch;
 }
 
@@ -229,7 +260,7 @@ export interface Api {
  */
 export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Api {
     const baseUrl = getApiUrl(context);
-    const fetcher = buildFetch(context, opts.token);
+    const fetcher = buildFetch(context, opts.token, opts.idempotencyKey, opts.inFlightAsResponse);
 
     // `hc<T>` constrains `T extends Hono<...>`. Each per-module type (`AdminApi`,
     // etc.) is `typeof <x>Routes` where `<x>Routes` is an `OpenAPIHono` instance —

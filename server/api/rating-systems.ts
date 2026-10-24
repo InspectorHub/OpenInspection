@@ -9,6 +9,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
@@ -115,53 +116,63 @@ const deleteRatingSystemRoute = createRoute(withMcpMetadata({
     description: "Permanently delete a custom rating system and write a rating_system.deleted audit entry. Built-in systems cannot be deleted (403), and a system that any template still uses is refused with 409 naming how many templates bind it. Returns 404 for an unknown id. Not reversible. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
-const ratingSystemsRoutes = createApiRouter()
-    .openapi(listRatingSystemsRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        // Lazy-seed defaults so first-time tenants always see the four canonical
-        // systems even if starter content was never seeded for them.
-        await c.var.services.ratingSystem.seedDefaults(tenantId);
-        const data = await c.var.services.ratingSystem.list(tenantId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(getRatingSystemRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        const sys = await c.var.services.ratingSystem.get(id, tenantId);
-        if (!sys) throw Errors.NotFound('Rating system not found');
-        return c.json({ success: true as const, data: sys }, 200);
-    })
-    .openapi(createRatingSystemRoute, async (c) => {
-        const input = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const sys = await c.var.services.ratingSystem.create(tenantId, input);
-        auditFromContext(c, 'rating_system.created', 'rating_system', { entityId: sys.id, metadata: { name: sys.name, slug: sys.slug } });
-        return c.json({ success: true as const, data: sys }, 200);
-    })
-    .openapi(cloneRatingSystemRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { name, slug } = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const sys = await c.var.services.ratingSystem.clone(id, tenantId, name, slug);
-        auditFromContext(c, 'rating_system.cloned', 'rating_system', { entityId: sys.id, metadata: { sourceId: id, name } });
-        return c.json({ success: true as const, data: sys }, 200);
-    })
-    .openapi(replaceRatingSystemRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const sys = await c.var.services.ratingSystem.update(id, tenantId, patch);
-        auditFromContext(c, 'rating_system.updated', 'rating_system', { entityId: sys.id });
-        return c.json({ success: true as const, data: sys }, 200);
-    })
-    .openapi(deleteRatingSystemRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        const result = await c.var.services.ratingSystem.delete(id, tenantId);
-        auditFromContext(c, 'rating_system.deleted', 'rating_system', { entityId: id });
-        return c.json({ success: true as const, data: result }, 200);
-    });
+const app = createApiRouter();
+app.openapi(listRatingSystemsRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    // Lazy-seed defaults so first-time tenants always see the four canonical
+    // systems even if starter content was never seeded for them.
+    await c.var.services.ratingSystem.seedDefaults(tenantId);
+    const data = await c.var.services.ratingSystem.list(tenantId);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(getRatingSystemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    const sys = await c.var.services.ratingSystem.get(id, tenantId);
+    if (!sys) throw Errors.NotFound('Rating system not found');
+    return c.json({ success: true as const, data: sys }, 200);
+});
+app.openapi(createRatingSystemRoute, async (c) => {
+    const input = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const sys = await c.var.services.ratingSystem.create(tenantId, input);
+    auditFromContext(c, 'rating_system.created', 'rating_system', { entityId: sys.id, metadata: { name: sys.name, slug: sys.slug } });
+    return c.json({ success: true as const, data: sys }, 200);
+});
+app.openapi(cloneRatingSystemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { name, slug } = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const sys = await c.var.services.ratingSystem.clone(id, tenantId, name, slug);
+    auditFromContext(c, 'rating_system.cloned', 'rating_system', { entityId: sys.id, metadata: { sourceId: id, name } });
+    return c.json({ success: true as const, data: sys }, 200);
+});
+app.openapi(replaceRatingSystemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const sys = await c.var.services.ratingSystem.update(id, tenantId, patch);
+    auditFromContext(c, 'rating_system.updated', 'rating_system', { entityId: sys.id });
+    return c.json({ success: true as const, data: sys }, 200);
+});
+app.openapi(deleteRatingSystemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    const result = await c.var.services.ratingSystem.delete(id, tenantId);
+    auditFromContext(c, 'rating_system.deleted', 'rating_system', { entityId: id });
+    return c.json({ success: true as const, data: result }, 200);
+});
 
-export type RatingSystemsApi = typeof ratingSystemsRoutes;
+/** Registration order. Drives `RatingSystemsApi`; a test pins it to what `app` really registered. */
+export const ratingSystemsRouteConfigs = [
+    listRatingSystemsRoute,
+    getRatingSystemRoute,
+    createRatingSystemRoute,
+    cloneRatingSystemRoute,
+    replaceRatingSystemRoute,
+    deleteRatingSystemRoute,
+] as const;
 
-export default ratingSystemsRoutes;
+export type RatingSystemsApi = ApiOf<typeof ratingSystemsRouteConfigs>;
+
+export default app;

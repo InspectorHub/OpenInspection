@@ -128,6 +128,10 @@ export default [
   route("resources/statutory-update", "routes/resources/statutory-update.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
   route("resources/inspection-media", "routes/resources/inspection-media.tsx"),
+  // The offline media drain posts here (photo / crop / annotation) instead of calling /api from the browser.
+  route("resources/media-upload", "routes/resources/media-upload.ts"),
+  // The field editor posts its write commands here (same action as the editor page, JSON answer).
+  route("resources/inspection-editor-command/:id", "routes/resources/inspection-editor-command.ts"),
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   route("resources/recent-inspections", "routes/resources/recent-inspections.tsx"),
   route("resources/hub-pickers", "routes/resources/hub-pickers.tsx"),
@@ -220,6 +224,7 @@ export default [
       route("settings/data", "routes/settings-data.tsx"),
       route("settings/imports", "routes/settings-imports.tsx"),
       route("settings/imports/:batchId", "routes/settings-imports-batch.tsx"),
+      route("settings/offline-packages", "routes/settings-offline-packages.tsx"),
       route("settings/compliance", "routes/settings-compliance.tsx"),
       // The authority's own PDF for each statutory revision this build
       // publishes. In Settings rather than Library because it is a deployment

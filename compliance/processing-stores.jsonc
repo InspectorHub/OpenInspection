@@ -188,11 +188,11 @@
       "subjects": ["end_client", "staff"],
       "purpose": "Collaborative editing host: one Yjs document per report, plus up to 25 projection snapshots.",
       "retention_rule": "none",
-      "deletion_mechanism": "tenant-purge.service.ts POSTs /purge to one object per report id, collected pre-cascade",
+      "deletion_mechanism": "removed when its inspection is hard-deleted (deleteInspectionCascade POSTs /purge to one object per report, after the rows are gone, best effort, outcome recorded as collabPurge on the inspection.delete audit event); tenant-purge.service.ts POSTs /purge to one object per report id, collected pre-cascade",
       "export_mechanism": "none",
       "tenant_scope": "per-tenant",
       "evidence_level": "E2",
-      "note": "Addressed by `${tenantId}:${reportId}` — see collabDocName — so the purge collects the tenant's report ids BEFORE the cascade deletes the rows they come from. A purge that cannot confirm this store records `durable_objects` as incomplete on the destruction record rather than reporting success. RETENTION is still absent: nothing expires a document while the tenant lives."
+      "note": "Addressed by `${tenantId}:${reportId}` — see collabDocName — so the purge collects the tenant's report ids BEFORE the cascade deletes the rows they come from. A purge that cannot confirm this store records `durable_objects` as incomplete on the destruction record rather than reporting success. RETENTION is still absent: nothing expires a document while its inspection exists. A failed purge at inspection delete does not undo the delete; it is logged and recorded as collabPurge failed, and the object is not retried. Objects of inspections deleted before this purge existed cannot be enumerated and are not swept."
     },
     {
       "store_type": "durable_object",

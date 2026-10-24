@@ -1,6 +1,6 @@
 import { ITEM_TYPES } from "./types";
 import type { TemplateItem } from "./types";
-import { itemDepths, subtreeOf, MAX_ITEM_DEPTH } from "../../../server/lib/template-hierarchy";
+import { itemDepths, subtreeOf, MAX_ITEM_DEPTH } from "@core/field-ui/shared/template-hierarchy";
 import { m } from "~/paraglide/messages";
 
 export interface ItemPropertiesPanelProps {

@@ -5,7 +5,7 @@
 // renders nothing.
 import { describe, it, expect } from 'vitest';
 import { buildPcaReportBlock } from '../../../server/lib/pca-report-block';
-import { PCA_NARRATIVE_SEED } from '../../../server/lib/pca-narrative';
+import { PCA_NARRATIVE_SEED } from '@core/field-ui/shared/pca-narrative';
 
 // severityBucket carries the getRatingBucket domain the report pipeline emits
 // (`monitor` → marginal severity); the prior 'marginal' here was a value that

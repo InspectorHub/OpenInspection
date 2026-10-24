@@ -12,7 +12,7 @@
  */
 import { createApi } from "~/lib/api-client.server";
 import { m } from "~/paraglide/messages";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { EMPTY_BRAND } from "~/lib/brand";
 import type { HubSection } from "~/components/portal/ClientPortalHub";
 import type { ProgressSection } from "~/components/portal/sections/ProgressView";

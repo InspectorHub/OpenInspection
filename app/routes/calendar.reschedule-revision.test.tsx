@@ -17,7 +17,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
-import { RevisionBanner } from "~/components/statutory/RevisionBanner";
+import { RevisionBanner } from "@core/field-ui/components/statutory/RevisionBanner";
 import type { RevisionStatus } from "../../server/lib/statutory/revision-status";
 
 const CANNOT_PRODUCE: RevisionStatus = {

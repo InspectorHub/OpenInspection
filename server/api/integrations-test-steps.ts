@@ -1,6 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
@@ -67,79 +68,85 @@ async function logStep(
     }).catch(() => {});
 }
 
-const integrationsTestStepsRoutes = createApiRouter()
-    .openapi(emailStepRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const user = c.get('user');
-        if (!tenantId || !user?.sub) throw Errors.Unauthorized('Missing tenant scope');
-        await checkRateLimit(c, 'integration-test-step', tenantId);
-        const { step } = c.req.valid('json');
-        const db = getDrizzle(c);
-        const cfg = await db.select({ p: tenantConfigs.emailByoProvider }).from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId)).get();
-        const provider = coerceEmailByoProvider(cfg?.p);
+const app = createApiRouter();
+app.openapi(emailStepRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const user = c.get('user');
+    if (!tenantId || !user?.sub) throw Errors.Unauthorized('Missing tenant scope');
+    await checkRateLimit(c, 'integration-test-step', tenantId);
+    const { step } = c.req.valid('json');
+    const db = getDrizzle(c);
+    const cfg = await db.select({ p: tenantConfigs.emailByoProvider }).from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId)).get();
+    const provider = coerceEmailByoProvider(cfg?.p);
 
-        let result: StepResult;
-        if (provider === 'resend') {
-            const apiKey = c.env.RESEND_API_KEY;
-            if (!apiKey) {
-                result = { step, status: 'fail', detail: 'No Resend API key is saved.' };
-            } else {
-                const identity = await c.var.services.branding.getEmailIdentity(tenantId);
-                result = await runEmailStep(step, {
-                    apiKey,
-                    senderEmail: identity.senderEmail,
-                    senderDisplayName: identity.senderDisplayName ?? identity.companyName,
-                    replyTo: identity.replyTo,
-                    // Session user only. The body schema has no recipient field.
-                    sessionEmail: await readSessionEmail(db, tenantId, user.sub),
-                    lastSend: await readLastSend(c.env.TENANT_CACHE, tenantId, user.sub),
-                    saveLastSend: (s) => writeLastSend(c.env.TENANT_CACHE, tenantId, user.sub, s),
-                    clearLastSend: () => clearLastSend(c.env.TENANT_CACHE, tenantId, user.sub),
-                    lookupDelivery: (id) => lookupResendDelivery(db, tenantId, id),
-                });
-            }
-        } else if (step !== 'key_valid') {
-            result = { step, status: 'skipped', detail: 'Only the key check is available for this provider.' };
+    let result: StepResult;
+    if (provider === 'resend') {
+        const apiKey = c.env.RESEND_API_KEY;
+        if (!apiKey) {
+            result = { step, status: 'fail', detail: 'No Resend API key is saved.' };
         } else {
-            const env = c.env;
-            const apiKey = provider === 'sendgrid' ? env.SENDGRID_API_KEY
-                : provider === 'postmark' ? env.POSTMARK_SERVER_TOKEN
-                : env.MAILGUN_API_KEY;
-            const domain = env.MAILGUN_DOMAIN;
-            if (!apiKey || (provider === 'mailgun' && !domain)) {
-                result = { step, status: 'fail', detail: 'The credentials for this provider are not fully saved.' };
-            } else {
-                const adapter = resolveEmailProvider(provider, provider === 'mailgun' ? { apiKey, domain: domain! } : { apiKey });
-                const v = adapter.validateCredentials ? await adapter.validateCredentials().catch(() => null) : { ok: true as const };
-                result = v?.ok
-                    ? { step, status: 'pass', detail: `${provider} accepted the credentials.` }
-                    : { step, status: 'fail', detail: v ? `${provider} rejected the credentials.` : 'The credential check failed unexpectedly.' };
-            }
+            const identity = await c.var.services.branding.getEmailIdentity(tenantId);
+            result = await runEmailStep(step, {
+                apiKey,
+                senderEmail: identity.senderEmail,
+                senderDisplayName: identity.senderDisplayName ?? identity.companyName,
+                replyTo: identity.replyTo,
+                // Session user only. The body schema has no recipient field.
+                sessionEmail: await readSessionEmail(db, tenantId, user.sub),
+                lastSend: await readLastSend(c.env.TENANT_CACHE, tenantId, user.sub),
+                saveLastSend: (s) => writeLastSend(c.env.TENANT_CACHE, tenantId, user.sub, s),
+                clearLastSend: () => clearLastSend(c.env.TENANT_CACHE, tenantId, user.sub),
+                lookupDelivery: (id) => lookupResendDelivery(db, tenantId, id),
+            });
         }
-        await logStep(c.env, tenantId, user.sub, 'email', provider, result);
-        return c.json({ success: true as const, data: { ...result, provider } }, 200);
-    })
-    .openapi(stripeStepRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const user = c.get('user');
-        if (!tenantId || !user?.sub) throw Errors.Unauthorized('Missing tenant scope');
-        await checkRateLimit(c, 'integration-test-step', tenantId);
-        const { step } = c.req.valid('json');
-        const secretKey = c.env.STRIPE_SECRET_KEY;
-        const result = await runStripeStep(step, {
-            fetchAccount: secretKey
-                ? async () => ({
-                    ...(await new (await import('../services/stripe.service')).StripeService(secretKey).getAccountStatus()),
-                    livemode: secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_'),
-                })
-                : null,
-            webhookSecretConfigured: !!c.env.STRIPE_WEBHOOK_SECRET,
-            readDeliveries: () => readWebhookLog(c.env.TENANT_CACHE, tenantId),
-        });
-        await logStep(c.env, tenantId, user.sub, 'stripe', null, result);
-        return c.json({ success: true as const, data: { ...result, provider: null } }, 200);
+    } else if (step !== 'key_valid') {
+        result = { step, status: 'skipped', detail: 'Only the key check is available for this provider.' };
+    } else {
+        const env = c.env;
+        const apiKey = provider === 'sendgrid' ? env.SENDGRID_API_KEY
+            : provider === 'postmark' ? env.POSTMARK_SERVER_TOKEN
+            : env.MAILGUN_API_KEY;
+        const domain = env.MAILGUN_DOMAIN;
+        if (!apiKey || (provider === 'mailgun' && !domain)) {
+            result = { step, status: 'fail', detail: 'The credentials for this provider are not fully saved.' };
+        } else {
+            const adapter = resolveEmailProvider(provider, provider === 'mailgun' ? { apiKey, domain: domain! } : { apiKey });
+            const v = adapter.validateCredentials ? await adapter.validateCredentials().catch(() => null) : { ok: true as const };
+            result = v?.ok
+                ? { step, status: 'pass', detail: `${provider} accepted the credentials.` }
+                : { step, status: 'fail', detail: v ? `${provider} rejected the credentials.` : 'The credential check failed unexpectedly.' };
+        }
+    }
+    await logStep(c.env, tenantId, user.sub, 'email', provider, result);
+    return c.json({ success: true as const, data: { ...result, provider } }, 200);
+});
+app.openapi(stripeStepRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const user = c.get('user');
+    if (!tenantId || !user?.sub) throw Errors.Unauthorized('Missing tenant scope');
+    await checkRateLimit(c, 'integration-test-step', tenantId);
+    const { step } = c.req.valid('json');
+    const secretKey = c.env.STRIPE_SECRET_KEY;
+    const result = await runStripeStep(step, {
+        fetchAccount: secretKey
+            ? async () => ({
+                ...(await new (await import('../services/stripe.service')).StripeService(secretKey).getAccountStatus()),
+                livemode: secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_'),
+            })
+            : null,
+        webhookSecretConfigured: !!c.env.STRIPE_WEBHOOK_SECRET,
+        readDeliveries: () => readWebhookLog(c.env.TENANT_CACHE, tenantId),
     });
+    await logStep(c.env, tenantId, user.sub, 'stripe', null, result);
+    return c.json({ success: true as const, data: { ...result, provider: null } }, 200);
+});
 
-export type IntegrationsTestStepsApi = typeof integrationsTestStepsRoutes;
-export default integrationsTestStepsRoutes;
+/** Registration order. Drives `IntegrationsTestStepsApi`; a test pins it to what `app` really registered. */
+export const integrationsTestStepsRouteConfigs = [
+    emailStepRoute,
+    stripeStepRoute,
+] as const;
+
+export type IntegrationsTestStepsApi = ApiOf<typeof integrationsTestStepsRouteConfigs>;
+export default app;

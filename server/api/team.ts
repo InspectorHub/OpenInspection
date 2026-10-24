@@ -1,6 +1,6 @@
-import { createRoute } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { z } from '@hono/zod-openapi';
+import { mounted, type ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import { requireCapability, capabilitiesFor } from '../lib/middleware/require-capability';
@@ -8,24 +8,19 @@ import { auditRefusedGrant, templateAuditMeta, updateMemberAudited } from './tea
 import { PermissionTemplateService } from '../services/team/permission-templates.service';
 import { applyTemplateToRequest } from '../services/team/apply-template';
 import { requestedWithCompanyDefault, inspectionScopeOf } from './team-invite-default';
-import teamPermissionTemplateRoutes from './team-permission-templates';
+import teamPermissionTemplateRoutes, { teamPermissionTemplateRouteConfigs } from './team-permission-templates';
 import { exportPayroll } from '../services/pay-split.service';
 import { PayrollExportSchema, PayrollRunResponseSchema } from '../lib/validations/pay-split.schema';
 import { requireSeatAvailable } from '../features/seat-quota';
 import { inviteAcceptUrl } from '../lib/url';
 import { auditFromContext } from '../lib/audit';
 import { assertMayTouchOwner } from '../lib/auth/owner-guard';
-import {
-    InviteMemberSchema,
-    UpdateMemberSchema,
-    InviteResponseSchema,
-    TeamMembersResponseSchema
-} from '../lib/validations/admin.schema';
+import { InviteMemberSchema, UpdateMemberSchema, InviteResponseSchema, TeamMembersResponseSchema } from '../lib/validations/admin.schema';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
-import teamDefaultsRoutes from './team-defaults';
-import teamTwoFactorRoutes from './team-two-factor';
+import teamDefaultsRoutes, { teamDefaultsRouteConfigs } from './team-defaults';
+import teamTwoFactorRoutes, { teamTwoFactorRouteConfigs } from './team-two-factor';
 import { projectMembers } from '../lib/team/member-projection';
 
 /**
@@ -233,167 +228,169 @@ const resendInviteRoute = createRoute(withMcpMetadata({
     operationId: "resendTeamInvite",
 }, { scopes: ['write'], tier: 'extended' }));
 
-const teamRoutes = createApiRouter()
-    // `/defaults` lives in its own file — see team-defaults.ts for why.
-    .route('/', teamDefaultsRoutes)
-    // Built-in and company permission templates; applying one is `templateId` below.
-    .route('/', teamPermissionTemplateRoutes)
-    // Account recovery, mounted here so the path stays /api/team/members/... .
-    .route('/', teamTwoFactorRoutes)
-    .openapi(listTeamMembersRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const teamService = c.var.services.team;
-        const { activeUsers, pendingInvites, maxUsers } = await teamService.getMembers(tenantId);
-        // The invite id IS the accept token (POST /api/auth/join), so the list is
-        // a bearer credential for the invited role. Only the roles that can send
-        // invitations may see it; anyone else gets members and the seat cap only.
-        const role = c.get('userRole');
-        const mayViewInvites = isAdminRole(role);
-        // Everyone below the administrator tier gets a reduced roster: id, name and role, plus the
-        // email for someone who schedules for others. Who holds which switch, who has a second
-        // factor and when each colleague was last active are the administrators' to see.
-        const members = projectMembers(activeUsers, {
-            administrator: mayViewInvites,
-            schedulesOthers: mayViewInvites || (await capabilitiesFor(c)).scheduleOthers,
-        });
-
-        return c.json({
-            success: true,
-            data: {
-                members,
-                invites: mayViewInvites
-                    ? pendingInvites.map((invite) => ({
-                        ...invite,
-                        inviteLink: inviteAcceptUrl(c, invite.id),
-                    }))
-                    : [],
-                maxUsers,
-            }
-        }, 200);
-    })
-    .openapi(inviteTeamMemberRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const teamService = c.var.services.team;
-
-        // A template, when named, is copied in first: its role and switches (then any
-        // switches sent alongside) are what the invite carries, and they go through
-        // the same checks below as the same role and switches typed by hand.
-        const applied = body.templateId ? await new PermissionTemplateService(c.env.DB).resolveRef(tenantId, body.templateId) : null;
-        const stamped = applyTemplateToRequest({ applied, requestedRole: body.role, requestedOverrides: await requestedWithCompanyDefault(c, { applied, requestedRole: body.role, requested: body.permissionOverrides }) });
-        const inviteRole = stamped.role ?? 'inspector';
-
-        // The invited role is copied onto the new user at accept time, so
-        // inviting as owner is minting an owner. Same rule as update/remove.
-        assertMayTouchOwner(c.get('userRole'), 'inspector', inviteRole);
-
-        // The inviter's own resolved capabilities are the ceiling for the invite.
-        const actor = { role: c.get('userRole'), capabilities: await capabilitiesFor(c) };
-        const { token, expiresAt } = await auditRefusedGrant(c, 'invite', inviteRole, () => teamService.createInvite({
-            tenantId, email: body.email, role: inviteRole, permissionOverrides: stamped.overrides ?? null, actor,
-        }));
-
-        // Who added whom to this company, on the durable record. The
-        // `user.invited` outbox event this handler also produces is a
-        // replication receipt with a two-cycle life; it answers "did the other
-        // side get it", not "who did this".
-        //
-        // No entityId: `tenant_invites.id` IS the join token that appears in
-        // the link below, so writing it here would park a live credential in a
-        // table an audit UI reads. No email either -- metadata is redacted by
-        // value shape at write time, so an address would be stripped anyway,
-        // and the invite row already holds it.
-        auditFromContext(c, 'user.invite', 'user', {
-            metadata: { role: inviteRole, inspectionScope: inspectionScopeOf(inviteRole, stamped.overrides), ...templateAuditMeta(applied) },
-        });
-
-        const inviteLink = inviteAcceptUrl(c, token);
-
-        // Send email via service (requires RESEND_API_KEY in env), unless the
-        // caller is delivering the link themselves.
-        //
-        // The flag defaults to true, so every existing caller is unaffected.
-        // It is only honourable at all because `inviteLink` comes back in the
-        // response AND the pending row can produce it again later: an invite
-        // with no email and no link is not a quiet invite, it is one nobody can
-        // accept. The drawer's checkbox spent a long time promising this
-        // without sending the flag, which is how it came to be implemented.
-        if (body.notify) {
-            await c.var.services.email.sendInvitation(body.email, inviteLink);
-        }
-
-        return c.json({
-            success: true,
-            data: {
-                inviteLink,
-                expiresAt: expiresAt.toISOString()
-            }
-        }, 201);
-    })
-    .openapi(updateTeamMemberRoute, async (c) => {
-        const { id: memberId } = c.req.valid('param');
-        const body = c.req.valid('json');
-
-        await updateMemberAudited(c, memberId, body);
-
-        return c.json({ success: true as const, data: { updated: true as const } }, 200);
-    })
-    .openapi(removeTeamMemberRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const user = c.get('user');
-        const requesterId = user?.sub as string;
-        const { id: memberId } = c.req.valid('param');
-
-        const teamService = c.var.services.team;
-        const authService = c.var.services.auth;
-
-        const { reassignTo, unassign } = c.req.valid('query');
-        const result = await teamService.removeMember(tenantId, memberId, requesterId, c.get('userRole'), { reassignTo, unassign: unassign === 'true' });
-        auditFromContext(c, 'user.removed', 'user', {
-            entityId: memberId,
-            metadata: { reassigned: result.reassigned, unassigned: result.unassigned, keptForRecord: result.keptForRecord, reassignedTo: reassignTo ?? null },
-        });
-
-        // Invalidate the deleted user's sessions so their cookie becomes invalid immediately
-        await authService.invalidateUserSessions(memberId);
-
-        return c.json({ success: true, data: { removed: true, reassigned: result.reassigned, unassigned: result.unassigned } }, 200);
-    })
-    .openapi(cancelInviteRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { token } = c.req.valid('param');
-        await c.var.services.team.cancelInvite(tenantId, token);
-        return c.json({ success: true as const, data: { cancelled: true as const } }, 200);
-    })
-    .openapi(resendInviteRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { token } = c.req.valid('param');
-        const invite = await c.var.services.team.findPendingInvite(tenantId, token);
-        if (!invite) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
-        const inviteLink = inviteAcceptUrl(c, token);
-        await c.var.services.email.sendInvitation(invite.email, inviteLink);
-        return c.json({ success: true as const, data: { resent: true as const } }, 200);
-    })
-    .openapi(exportPayrollRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { fromMs, toMs } = c.req.valid('json');
-        const rows = await exportPayroll(getDrizzle(c), tenantId, { fromMs, toMs });
-        return c.json({
-            success: true as const,
-            data: {
-                lockedCount: rows.length,
-                totalCents:  rows.reduce((sum, r) => sum + r.amountCents, 0),
-                splits:      rows.map(r => ({
-                    id: r.id, inspectionServiceId: r.inspectionServiceId, userId: r.userId,
-                    amountCents: r.amountCents, source: r.source,
-                    lockedAtMs: r.lockedAt === null ? null : Number(r.lockedAt),
-                    correctsSplitId: r.correctsSplitId, reason: r.reason,
-                    createdAtMs: Number(r.createdAt), updatedAtMs: Number(r.updatedAt),
-                })),
-            },
-        }, 200);
+const app = createApiRouter();
+// `/defaults` lives in its own file — see team-defaults.ts for why.
+app.route('/', teamDefaultsRoutes);
+// Built-in and company permission templates; applying one is `templateId` below.
+app.route('/', teamPermissionTemplateRoutes);
+// Account recovery, mounted here so the path stays /api/team/members/... .
+app.route('/', teamTwoFactorRoutes);
+app.openapi(listTeamMembersRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const teamService = c.var.services.team;
+    const { activeUsers, pendingInvites, maxUsers } = await teamService.getMembers(tenantId);
+    // The invite id IS the accept token (POST /api/auth/join), so the list is
+    // a bearer credential for the invited role. Only the roles that can send
+    // invitations may see it; anyone else gets members and the seat cap only.
+    const role = c.get('userRole');
+    const mayViewInvites = isAdminRole(role);
+    // Everyone below the administrator tier gets a reduced roster: id, name and role, plus the
+    // email for someone who schedules for others. Who holds which switch, who has a second
+    // factor and when each colleague was last active are the administrators' to see.
+    const members = projectMembers(activeUsers, {
+        administrator: mayViewInvites,
+        schedulesOthers: mayViewInvites || (await capabilitiesFor(c)).scheduleOthers,
     });
 
-export type TeamApi = typeof teamRoutes;
+    return c.json({
+        success: true,
+        data: {
+            members,
+            invites: mayViewInvites
+                ? pendingInvites.map((invite) => ({
+                    ...invite,
+                    inviteLink: inviteAcceptUrl(c, invite.id),
+                }))
+                : [],
+            maxUsers,
+        }
+    }, 200);
+});
+app.openapi(inviteTeamMemberRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const teamService = c.var.services.team;
 
-export default teamRoutes;
+    // A template, when named, is copied in first: its role and switches (then any
+    // switches sent alongside) are what the invite carries, and they go through
+    // the same checks below as the same role and switches typed by hand.
+    const applied = body.templateId ? await new PermissionTemplateService(c.env.DB).resolveRef(tenantId, body.templateId) : null;
+    const stamped = applyTemplateToRequest({ applied, requestedRole: body.role, requestedOverrides: await requestedWithCompanyDefault(c, { applied, requestedRole: body.role, requested: body.permissionOverrides }) });
+    const inviteRole = stamped.role ?? 'inspector';
+
+    // The invited role is copied onto the new user at accept time, so
+    // inviting as owner is minting an owner. Same rule as update/remove.
+    assertMayTouchOwner(c.get('userRole'), 'inspector', inviteRole);
+
+    // The inviter's own resolved capabilities are the ceiling for the invite.
+    const actor = { role: c.get('userRole'), capabilities: await capabilitiesFor(c) };
+    const { token, expiresAt } = await auditRefusedGrant(c, 'invite', inviteRole, () => teamService.createInvite({
+        tenantId, email: body.email, role: inviteRole, permissionOverrides: stamped.overrides ?? null, actor,
+    }));
+
+    // Who added whom to this company, on the durable record. The
+    // `user.invited` outbox event this handler also produces is a
+    // replication receipt with a two-cycle life; it answers "did the other
+    // side get it", not "who did this".
+    //
+    // No entityId: `tenant_invites.id` IS the join token that appears in
+    // the link below, so writing it here would park a live credential in a
+    // table an audit UI reads. No email either -- metadata is redacted by
+    // value shape at write time, so an address would be stripped anyway,
+    // and the invite row already holds it.
+    auditFromContext(c, 'user.invite', 'user', {
+        metadata: { role: inviteRole, inspectionScope: inspectionScopeOf(inviteRole, stamped.overrides), ...templateAuditMeta(applied) },
+    });
+
+    const inviteLink = inviteAcceptUrl(c, token);
+
+    // Send email via service (requires RESEND_API_KEY in env), unless the
+    // caller is delivering the link themselves.
+    //
+    // The flag defaults to true, so every existing caller is unaffected.
+    // It is only honourable at all because `inviteLink` comes back in the
+    // response AND the pending row can produce it again later: an invite
+    // with no email and no link is not a quiet invite, it is one nobody can
+    // accept. The drawer's checkbox spent a long time promising this
+    // without sending the flag, which is how it came to be implemented.
+    if (body.notify) {
+        await c.var.services.email.sendInvitation(body.email, inviteLink);
+    }
+
+    return c.json({
+        success: true,
+        data: {
+            inviteLink,
+            expiresAt: expiresAt.toISOString()
+        }
+    }, 201);
+});
+app.openapi(updateTeamMemberRoute, async (c) => {
+    const { id: memberId } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    await updateMemberAudited(c, memberId, body);
+
+    return c.json({ success: true as const, data: { updated: true as const } }, 200);
+});
+app.openapi(removeTeamMemberRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const user = c.get('user');
+    const requesterId = user?.sub as string;
+    const { id: memberId } = c.req.valid('param');
+
+    const teamService = c.var.services.team;
+    const authService = c.var.services.auth;
+
+    const { reassignTo, unassign } = c.req.valid('query');
+    const result = await teamService.removeMember(tenantId, memberId, requesterId, c.get('userRole'), { reassignTo, unassign: unassign === 'true' });
+    auditFromContext(c, 'user.removed', 'user', {
+        entityId: memberId,
+        metadata: { reassigned: result.reassigned, unassigned: result.unassigned, keptForRecord: result.keptForRecord, reassignedTo: reassignTo ?? null },
+    });
+
+    // Invalidate the deleted user's sessions so their cookie becomes invalid immediately
+    await authService.invalidateUserSessions(memberId);
+
+    return c.json({ success: true, data: { removed: true, reassigned: result.reassigned, unassigned: result.unassigned } }, 200);
+});
+app.openapi(cancelInviteRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { token } = c.req.valid('param');
+    await c.var.services.team.cancelInvite(tenantId, token);
+    return c.json({ success: true as const, data: { cancelled: true as const } }, 200);
+});
+app.openapi(resendInviteRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { token } = c.req.valid('param');
+    const invite = await c.var.services.team.findPendingInvite(tenantId, token);
+    if (!invite) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
+    const inviteLink = inviteAcceptUrl(c, token);
+    await c.var.services.email.sendInvitation(invite.email, inviteLink);
+    return c.json({ success: true as const, data: { resent: true as const } }, 200);
+});
+app.openapi(exportPayrollRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { fromMs, toMs } = c.req.valid('json');
+    const rows = await exportPayroll(getDrizzle(c), tenantId, { fromMs, toMs });
+    return c.json({
+        success: true as const,
+        data: {
+            lockedCount: rows.length,
+            totalCents:  rows.reduce((sum, r) => sum + r.amountCents, 0),
+            splits:      rows.map(r => ({
+                id: r.id, inspectionServiceId: r.inspectionServiceId, userId: r.userId,
+                amountCents: r.amountCents, source: r.source,
+                lockedAtMs: r.lockedAt === null ? null : Number(r.lockedAt),
+                correctsSplitId: r.correctsSplitId, reason: r.reason,
+                createdAtMs: Number(r.createdAt), updatedAtMs: Number(r.updatedAt),
+            })),
+        },
+    }, 200);
+});
+
+export const teamRouteParts = [mounted('/', teamDefaultsRoutes, teamDefaultsRouteConfigs), mounted('/', teamPermissionTemplateRoutes, teamPermissionTemplateRouteConfigs), mounted('/', teamTwoFactorRoutes, teamTwoFactorRouteConfigs), listTeamMembersRoute, inviteTeamMemberRoute, updateTeamMemberRoute, removeTeamMemberRoute, cancelInviteRoute, resendInviteRoute, exportPayrollRoute] as const;
+
+export type TeamApi = ApiOf<typeof teamRouteParts>;
+
+export default app;

@@ -1,9 +1,9 @@
 // Guards that the server-side formatter (server/lib/format.ts) stays byte-identical
-// to the app-side twin (app/lib/format.ts). The app<->server import boundary forbids
+// to the app-side twin (packages/field-ui/src/shared/format.ts). The app<->server import boundary forbids
 // sharing one module, so this parity test is the executable coupling that fails the
 // build if the two ever drift.
 import { describe, it, expect } from 'vitest';
-import * as appFmt from '../../../app/lib/format';
+import * as appFmt from '@core/field-ui/shared/format';
 import * as srvFmt from '../../../server/lib/format';
 
 // Static references so dead-code analysis sees these server exports as used —

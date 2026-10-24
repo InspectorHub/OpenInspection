@@ -3,9 +3,8 @@
  * them, and that a bad value can never switch a limit off.
  */
 import { describe, it, expect } from 'vitest';
-import {
-    DEFAULT_IMPORT_LIMITS, IMPORT_LIMIT_CEILINGS, estimateSubrequests, packageTooLarge, readImportLimits,
-} from '../../../server/lib/native/import-limits';
+import { DEFAULT_IMPORT_LIMITS, IMPORT_LIMIT_CEILINGS } from '@core/offline-package';
+import { estimateSubrequests, packageTooLarge, readImportLimits } from '../../../server/lib/native/import-limits';
 
 /** Workers Free: subrequests allowed per invocation. */
 const FREE_SUBREQUEST_CEILING = 1000;

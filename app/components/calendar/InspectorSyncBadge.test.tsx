@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { render } from "@testing-library/react";
 import { InspectorSyncBadge, syncBadgeState } from "./InspectorSyncBadge";
-import { formatRelativeTime } from "~/lib/format";
+import { formatRelativeTime } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 const NOW = Date.UTC(2026, 7, 3, 12, 0, 0);
@@ -161,7 +161,8 @@ describe("InspectorSyncBadge", () => {
   // ALL and is invisible everywhere but a browser. Assert the alias is declared
   // rather than trusting that the class string looks plausible.
   it("uses a colour token that the stylesheet actually declares", () => {
-    const css = readFileSync(join(import.meta.dirname, "../../styles/tailwind.css"), "utf8");
+    const css = `${readFileSync(join(import.meta.dirname, "../../styles/tailwind.css"), "utf8")}
+${readFileSync(join(import.meta.dirname, "../../../packages/field-ui/src/theme.css"), "utf8")}`;
     expect(css).toContain("--color-ih-fg-3:");
     expect(css).toMatch(/--ih-fg-3:\s*#/);
   });

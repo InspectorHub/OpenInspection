@@ -5,7 +5,7 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Banner } from "@core/shared-ui";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
-import { formatDateTime } from "~/lib/format";
+import { formatDateTime } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 /**

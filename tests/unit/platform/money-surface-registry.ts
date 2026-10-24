@@ -66,10 +66,16 @@ export const MONEY_SURFACE: Record<string, Disposition> = {
     'GET /api/public/report-gate/{tenant}/{id}': exempt('client-facing-token-track'),
     'POST /api/public/inspections/{id}/deposit-intent': exempt('client-facing-token-track'),
     'GET /api/public/services': exempt('client-facing-token-track'),
+    'GET /api/public/book/{tenant}': exempt('client-facing-token-track'),
+    'GET /api/public/book/{tenant}/{slug}': exempt('client-facing-token-track'),
     'POST /api/public/book': exempt('client-facing-token-track'),
     'GET /api/public/checkout/:token': exempt('client-facing-token-track'),
 
     // Company settings that hold amounts
+    'GET /api/event-types': redact('inspectionFees', 'events.ts'),
+    'GET /api/inspections/{inspectionId}/events': redact('inspectionFees', 'events.ts'),
+    'POST /api/event-types': redact('inspectionFees', 'events.ts'),
+    'POST /api/inspections/{inspectionId}/events': redact('inspectionFees', 'events.ts'),
     'GET /api/admin/event-types': redact('inspectionFees', 'admin/admin-settings.ts'),
     'POST /api/admin/event-types': redact('inspectionFees', 'admin/admin-settings.ts'),
     'PATCH /api/admin/event-types/{id}': redact('inspectionFees', 'admin/admin-settings.ts'),
@@ -95,6 +101,9 @@ export const MONEY_SURFACE: Record<string, Disposition> = {
     'GET /api/services/pay-rules-by-service': gate('companyFinance'),
     'POST /api/services/{id}/pay-rules': gate('companyFinance'),
     'PUT /api/services/{id}/pay-rules/{ruleId}': gate('companyFinance'),
+
+    // QuickBooks connection status carries both ledger figures of a payment discrepancy
+    'GET /api/integrations/qbo/status': gate('companyFinance'),
 
     // Aggregates scope themselves by capability inside the handler
     'GET /api/metrics': redact('companyFinance', 'metrics.ts'),

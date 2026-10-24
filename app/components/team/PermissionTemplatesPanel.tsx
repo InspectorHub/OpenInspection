@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, Pill, PENDING_CLASS, pendingProps } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
 import { MAX_TEMPLATE_NAME_LENGTH } from "../../../server/lib/auth/permission-templates";
 import { ROLE_TONES } from "~/routes/team.shapes";

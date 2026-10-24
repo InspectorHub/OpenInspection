@@ -30,7 +30,7 @@ const { purgeInspectionOfflineData } = vi.hoisted(() => ({
         attempted: true,
     })),
 }));
-vi.mock("~/lib/collab/offline-purge", () => ({ purgeInspectionOfflineData }));
+vi.mock("@core/field-ui/collab/offline-purge", () => ({ purgeInspectionOfflineData }));
 
 import InspectionsPage from "~/routes/inspections";
 
@@ -110,7 +110,7 @@ describe("/inspections — deleting clears the device's copy (F55)", () => {
     it("purges the deleted inspection's offline data, by id", async () => {
         await selectAndDelete(renderDashboard(true));
         await waitFor(() => expect(purgeInspectionOfflineData).toHaveBeenCalledTimes(1));
-        expect(purgeInspectionOfflineData).toHaveBeenCalledWith("insp-55");
+        expect(purgeInspectionOfflineData).toHaveBeenCalledWith("insp-55", expect.anything());
     });
 
     it("does NOT purge when the server refused the delete", async () => {

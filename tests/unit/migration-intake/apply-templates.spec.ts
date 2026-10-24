@@ -24,7 +24,7 @@ import type {
     EntityCounts,
     MigrationBundleV1,
 } from '../../../server/lib/migration-intake/bundle';
-import type { TemplateSchemaV2 } from '../../../server/types/template-schema';
+import type { TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';

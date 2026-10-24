@@ -151,75 +151,81 @@ const uploadSourceRoute = createRoute(withMcpMetadata({
     description: "Supply the issuing authority's own published PDF for one revision of one statutory form. The upload is verified against the sha256 that revision records and refused if it does not match, naming both values. The bytes are never fetched on the operator's behalf: the source URL is provenance for a human, and an authority may publish a superseded revision at its most obvious address.",
 }, { scopes: ['admin'], tier: 'excluded' }));
 
-const adminStatutorySourceRoutes = createApiRouter()
-    .openapi(listSourcesRoute, async (c) => {
-        // `c.env.PHOTOS` may be absent in a deployment that never bound a
-        // bucket. Passed through as `undefined` rather than asserted: the
-        // service reports that as `storageBound: false`, which is the honest
-        // answer, where a throw here would show the operator a broken page
-        // instead of the reason their uploads cannot land.
-        const bucket = c.env.PHOTOS as R2Bucket | undefined;
-        const data = await listStatutoryFormSources({
+const app = createApiRouter();
+app.openapi(listSourcesRoute, async (c) => {
+    // `c.env.PHOTOS` may be absent in a deployment that never bound a
+    // bucket. Passed through as `undefined` rather than asserted: the
+    // service reports that as `storageBound: false`, which is the honest
+    // answer, where a throw here would show the operator a broken page
+    // instead of the reason their uploads cannot land.
+    const bucket = c.env.PHOTOS as R2Bucket | undefined;
+    const data = await listStatutoryFormSources({
+        bucket,
+        versions: PUBLISHED_FORM_VERSIONS,
+    });
+    // The other two prerequisites, answered here because this is the only
+    // screen where somebody is thinking about them. The rows below say
+    // whether the PDF is stored; on their own they let an owner finish the
+    // one job they can do and still be missing a template or a licence
+    // class — each of which is discovered later, by somebody else, mid-job.
+    //
+    // BEST-EFFORT, AND THAT IS THE POINT. The rows are what this page is
+    // for: an owner comes here to supply a document. Readiness is an
+    // addition, and an addition that can take the upload screen down with
+    // it when a query fails is a net loss. On failure the key is OMITTED —
+    // never sent as an empty shape, which the client would render as a card
+    // of crosses and read as "nothing is set up", a claim about the
+    // workspace made from a query that never answered.
+    let readiness;
+    try {
+        readiness = await statutoryReadiness({
+            db: getDrizzle(c),
+            tenantId: c.get('tenantId'),
             bucket,
             versions: PUBLISHED_FORM_VERSIONS,
+            now: Date.now(),
         });
-        // The other two prerequisites, answered here because this is the only
-        // screen where somebody is thinking about them. The rows below say
-        // whether the PDF is stored; on their own they let an owner finish the
-        // one job they can do and still be missing a template or a licence
-        // class — each of which is discovered later, by somebody else, mid-job.
-        //
-        // BEST-EFFORT, AND THAT IS THE POINT. The rows are what this page is
-        // for: an owner comes here to supply a document. Readiness is an
-        // addition, and an addition that can take the upload screen down with
-        // it when a query fails is a net loss. On failure the key is OMITTED —
-        // never sent as an empty shape, which the client would render as a card
-        // of crosses and read as "nothing is set up", a claim about the
-        // workspace made from a query that never answered.
-        let readiness;
-        try {
-            readiness = await statutoryReadiness({
-                db: getDrizzle(c),
-                tenantId: c.get('tenantId'),
-                bucket,
-                versions: PUBLISHED_FORM_VERSIONS,
-                now: Date.now(),
-            });
-        } catch (err) {
-            logger.warn('statutory readiness could not be computed; the upload rows are unaffected', {
-                error: err instanceof Error ? err.message : String(err),
-            });
-        }
-        return c.json({
-            success: true as const,
-            data: { ...data, ...(readiness ? { readiness } : {}) },
-        }, 200);
-    })
-    .openapi(uploadSourceRoute, async (c) => {
-        const { formId } = c.req.valid('param');
-        const form = await c.req.parseBody();
-        const file = form['file'];
-        const revisionRaw = form['revision'];
-
-        if (!(file instanceof File)) {
-            throw Errors.BadRequest("A `file` part carrying the authority's PDF is required.");
-        }
-        const revision = typeof revisionRaw === 'string' ? revisionRaw.trim() : '';
-        if (revision === '') {
-            throw Errors.BadRequest(
-                'A `revision` part is required, spelled exactly as the revision is '
-                + 'printed on the document.',
-            );
-        }
-
-        const data = await storeStatutoryFormSource({
-            bucket: c.env.PHOTOS,
-            versions: PUBLISHED_FORM_VERSIONS,
-            formId,
-            revision,
-            bytes: new Uint8Array(await file.arrayBuffer()),
+    } catch (err) {
+        logger.warn('statutory readiness could not be computed; the upload rows are unaffected', {
+            error: err instanceof Error ? err.message : String(err),
         });
-        return c.json({ success: true as const, data }, 200);
+    }
+    return c.json({
+        success: true as const,
+        data: { ...data, ...(readiness ? { readiness } : {}) },
+    }, 200);
+});
+app.openapi(uploadSourceRoute, async (c) => {
+    const { formId } = c.req.valid('param');
+    const form = await c.req.parseBody();
+    const file = form['file'];
+    const revisionRaw = form['revision'];
+
+    if (!(file instanceof File)) {
+        throw Errors.BadRequest("A `file` part carrying the authority's PDF is required.");
+    }
+    const revision = typeof revisionRaw === 'string' ? revisionRaw.trim() : '';
+    if (revision === '') {
+        throw Errors.BadRequest(
+            'A `revision` part is required, spelled exactly as the revision is '
+            + 'printed on the document.',
+        );
+    }
+
+    const data = await storeStatutoryFormSource({
+        bucket: c.env.PHOTOS,
+        versions: PUBLISHED_FORM_VERSIONS,
+        formId,
+        revision,
+        bytes: new Uint8Array(await file.arrayBuffer()),
     });
+    return c.json({ success: true as const, data }, 200);
+});
 
-export default adminStatutorySourceRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminStatutorySourceRouteConfigs = [
+    listSourcesRoute,
+    uploadSourceRoute,
+] as const;
+
+export default app;

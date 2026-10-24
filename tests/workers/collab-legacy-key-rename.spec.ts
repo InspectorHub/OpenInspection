@@ -22,9 +22,9 @@ import { Hono } from 'hono';
 import { INSPECTION_RESULTS_TEST_DDL, TENANT_CONFIGS_TEST_DDL } from '../helpers/inline-ddl';
 import adminFindingKeyRoutes from '../../server/api/admin/admin-finding-keys';
 import type { HonoConfig } from '../../server/types/hono';
-import { applyItemPatch, projectResults } from '../../server/lib/collab/results-doc';
+import { applyItemPatch, projectResults } from '@core/field-ui/shared/results-doc';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
-import type { ResultsProjection } from '../../server/lib/collab/results-doc.types';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 
 const b = env as unknown as {
     DB: D1Database;

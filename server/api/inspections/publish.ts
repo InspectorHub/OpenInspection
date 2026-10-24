@@ -22,7 +22,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation } from '../../services/inspection/shared';
 import { refuseLeaveCancelledViaStatusWrite } from './cancel-write-path';
-import { guardStaffConfirm } from './staff-status-guards';
+import { confirmInspectionRoute } from './publish-routes';
 import { guardActOnJob } from './act-guard';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
@@ -287,248 +287,242 @@ async function runReportTransition(
     }
 }
 
-const publishRoutes = createApiRouter()
-    .openapi(completeInspectionRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = getTenantId(c);
-        const service = c.var.services.inspection;
-        const { inspection } = await service.getInspection(id, tenantId);
+const publishRoutes = createApiRouter();
+publishRoutes.openapi(completeInspectionRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = getTenantId(c);
+    const service = c.var.services.inspection;
+    const { inspection } = await service.getInspection(id, tenantId);
 
-        // Idempotency: if already completed, short-circuit so a retry on a
-        // network error or double-click does not re-run the admin notification.
-        if (inspection.status === INSPECTION_STATUS.COMPLETED) {
-            return c.json({ success: true }, 200);
-        }
-
-        // #81 — a fourth way out of `cancelled`, and it leaked the same way the
-        // bulk one did: straight to `completed` with `cancel_reason` still
-        // attached. `confirmInspection` has always refused a cancelled
-        // inspection; this route is the same claim about the same axis ("the
-        // visit happened") and had no guard at all. Recovery goes through
-        // `POST /:id/uncancel` first, then the visit can be marked complete.
-        const leaveRefusal = refuseLeaveCancelledViaStatusWrite(inspection.status);
-        if (leaveRefusal) return c.json({ success: false as const, error: leaveRefusal }, 400);
-
-        const db = getDrizzle(c);
-        await db.update(inspectionTable).set({ status: INSPECTION_STATUS.COMPLETED }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
-
-        // Report DELIVERY is still not fired here: `report.published` is a
-        // report event, produced solely by the publish path, and firing it on
-        // completion would deliver a report that may never have been published
-        // (IA-30). The primary-client lookup that used to sit here fed the
-        // removed notification's metadata and had no other reader.
-
-        // B3 — was a direct staff notification TYPED `report.published`, on the
-        // route that COMPLETES an inspection. Completing is not publishing (the
-        // comment above says so itself), so the mislabel went with the
-        // migration: this fires the real `inspection.completed` trigger and the
-        // seeded `Office alert — inspection completed` rule raises the notice,
-        // through the same path every other recipient uses.
-        c.executionCtx.waitUntil(
-            fireAutomation(c.env.DB, tenantId, id, 'inspection.completed'),
-        );
-
-        auditFromContext(c, 'inspection.complete', 'inspection', {
-            entityId: id,
-            metadata: { propertyAddress: inspection.propertyAddress },
-        });
+    // Idempotency: if already completed, short-circuit so a retry on a
+    // network error or double-click does not re-run the admin notification.
+    if (inspection.status === INSPECTION_STATUS.COMPLETED) {
         return c.json({ success: true }, 200);
-    })
-    .openapi(publishReadinessRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { id } = c.req.valid('param');
-        const service = c.var.services.inspection;
-        const readiness = await service.computePublishReadiness(id, tenantId);
-        return c.json(readiness, 200);
-    })
-    .openapi(createRoute(withMcpMetadata({
-        method: 'post', path: '/{id}/confirm',
-        tags: ["inspections"], summary: "Confirm inspection for current tenant",
-        middleware: [requireRole('owner', 'manager', 'inspector'), guardActOnJob, guardStaffConfirm] as const,
-        request: { params: z.object({ id: z.string().describe('Inspection to confirm.') }) },
-        responses: { 200: { content: { 'application/json': { schema: SuccessResponseSchema } }, description: 'Confirmed' } },
-        operationId: "confirmInspection",
-        description: "Mark an inspection as confirmed: sets its status to confirmed, stamps confirmedAt with the current time and fires the workspace's inspection.confirmed automation rules, which decide whether anyone is notified. Returns 404 when the inspection does not exist and 400 when it is cancelled (uncancel it first). Not idempotent: confirming an already confirmed inspection restamps confirmedAt and fires the automations again. Restricted to owners, managers, inspectors and staff; staff cannot confirm a completed inspection and need scheduleOthers or a place on the inspection. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
-    }, { scopes: ['write'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await c.var.services.inspection.confirmInspection(tenantId, id);
-        return c.json({ success: true });
-    })
-    // POST /{id}/cancel AND POST /{id}/uncancel both live in ./cancellation.ts,
-    // which owns the cancellation axis in both directions: the quote, the fee
-    // acknowledgement, the refund, and the one door back (#81). Neither is a
-    // report-lifecycle event, which is what this file is for.
-    .openapi(publishRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const body = c.req.valid('json');
-        const service = c.var.services.inspection;
-        // Built explicitly so `recipients` is omitted (not `undefined`) when absent (exactOptionalPropertyTypes).
-        const publishOptions: Parameters<typeof service.publishInspection>[2] = {
-            theme: body.theme,
-            requireSignature: body.requireSignature,
-            requirePayment: body.requirePayment,
-            sendAgreementCopy: body.sendAgreementCopy,
-            ...(body.recipients ? { recipients: body.recipients } : {}),
-            ...(body.reportId ? { reportId: body.reportId } : {}),
-            actor: { userId: c.get('user').sub, role: c.get('userRole') },
-        };
-        const result = await service.publishInspection(id, tenantId, publishOptions);
+    }
 
-        // A verified person vouches for the report emails this publish queued, delayed ones included.
-        await stampIfHumanVerified(c.get('humanVerified'), getDrizzle(c), tenantId, id);
+    // #81 — a fourth way out of `cancelled`, and it leaked the same way the
+    // bulk one did: straight to `completed` with `cancel_reason` still
+    // attached. `confirmInspection` has always refused a cancelled
+    // inspection; this route is the same claim about the same axis ("the
+    // visit happened") and had no guard at all. Recovery goes through
+    // `POST /:id/uncancel` first, then the visit can be marked complete.
+    const leaveRefusal = refuseLeaveCancelledViaStatusWrite(inspection.status);
+    if (leaveRefusal) return c.json({ success: false as const, error: leaveRefusal }, 400);
 
-        // The only record that a PERSON published this, and the only one that
-        // survives a later unpublish. Written HERE rather than beside the
-        // `return`: everything between is best-effort follow-on work, and the
-        // PDF pipeline's slug/hash/footer lookups are awaited outside a try — a
-        // throw there would drop the row for a publish that already happened.
-        // F79 — says WHAT was published, deliberately not WHO was told. It used to
-        // copy `notifyClient`/`notifyAgent` out of the body and nothing honoured
-        // them: `publishInspection` never read those options, and delivery is the
-        // workspace's `report.published` automation rules' decision. A publish
-        // marked "notify nobody" was therefore RECORDED as having notified nobody
-        // while every rule fired and the mail went out — the record stating the
-        // opposite of the event, in the artefact someone later reads to answer "who
-        // was told, and when". An always-guessed field is worse than an absent one;
-        // who was told is recorded in the automation logs and the delivery rows.
-        auditFromContext(c, 'inspection.published', 'inspection', {
-            entityId: id,
-            metadata: { reportId: body.reportId },
-        });
+    const db = getDrizzle(c);
+    await db.update(inspectionTable).set({ status: INSPECTION_STATUS.COMPLETED }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
-        // #23 — the courtesy translation, when the publisher asked for one on
-        // THIS publish. Never blocks: a translation that could not be produced
-        // leaves the English report published and correct, which is the state
-        // the feature degrades to by design. See lib/translation/on-publish.ts.
-        c.executionCtx.waitUntil(
-            translateOnPublishForRequest(c, id, body.translateTo ?? null, body.reportId),
-        );
+    // Report DELIVERY is still not fired here: `report.published` is a
+    // report event, produced solely by the publish path, and firing it on
+    // completion would deliver a report that may never have been published
+    // (IA-30). The primary-client lookup that used to sit here fed the
+    // removed notification's metadata and had no other reader.
 
-        // Design System 0520 subsystem D phase 9 — Republish snapshot.
-        // After the inspection's status flips to published, persist a frozen
-        // snapshot into report_versions so the customer-facing viewer can
-        // browse history + diff. Best-effort: failures log but do NOT block
-        // the publish response. snapshot-too-large (> 1 MB) downgrades to a
-        // warning audit entry rather than a 5xx — the report itself remains
-        // viewable through the existing /reports/:id path.
-        const userId = (c.get('user') as { sub?: string } | undefined)?.sub;
-        let publishedVersion: number | null = null;
-        if (userId) {
-            try {
-                // The version chain is per REPORT. Passing the id through is
-                // what keeps two deliverables on one order from interleaving
-                // into a single chain, which fails verification for both.
-                const out = await c.var.services.reportVersion.snapshotOnPublish(
-                    tenantId, id, userId, body.summary, body.reportId,
-                );
-                publishedVersion = out.versionNumber;
-                logger.info('report-version snapshot saved', {
-                    inspectionId:  id,
-                    versionNumber: out.versionNumber,
-                });
-            } catch (err) {
-                logger.warn('report-version snapshot failed (non-fatal)', {
-                    inspectionId: id,
-                    error:        err instanceof Error ? err.message : String(err),
-                });
-            }
-        }
+    // B3 — was a direct staff notification TYPED `report.published`, on the
+    // route that COMPLETES an inspection. Completing is not publishing (the
+    // comment above says so itself), so the mislabel went with the
+    // migration: this fires the real `inspection.completed` trigger and the
+    // seeded `Office alert — inspection completed` rule raises the notice,
+    // through the same path every other recipient uses.
+    c.executionCtx.waitUntil(
+        fireAutomation(c.env.DB, tenantId, id, 'inspection.completed'),
+    );
 
-        // Purge transient (versionNumber=null) cached PDFs now that a frozen version
-        // exists. Subsequent everyday downloads will render fresh current content
-        // rather than serving a stale pre-publish snapshot. Best-effort: failures
-        // are logged but never block the publish response.
-        try {
-            await c.var.services.reportPdf.purgeTransientPdfs(id, tenantId);
-        } catch (e) {
-            logger.warn('purge transient pdfs failed', { inspectionId: id, error: String(e) });
-        }
-
-        // Spec 5A.5 — enqueue + background-render Summary + Full PDFs after
-        // publish. Best-effort: failures log but never block the publish
-        // response. Persistent record in report_pdfs lets the client UI poll
-        // (status: queued -> rendering -> ready) and offer Refresh PDFs.
-        //
-        // Gated by tenant_configs.enable_pdf_pipeline (default
-        // OFF). Free-plan tenants and Paid tenants who don't want the spend
-        // skip rendering entirely; the report viewer's window.print() button
-        // remains the universal fallback.
-        const reportPdf = c.var.services.reportPdf;
-        if (await reportPdf.isPipelineEnabled(tenantId)) {
-            const tenantSlug = await resolveTenantSlug(c, tenantId);
-            // renderUrl: token-bearing URL for the headless browser PDF render.
-            const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
-            const sourceVersion = Date.now();
-            // Content hash enables post-publish owner/client downloads to reuse this
-            // render instead of triggering a second Browser Rendering call.
-            const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
-            const footer = await c.var.services.inspection.getReportPdfFooterContext(id, tenantId);
-            const renderBoth = async () => {
-                try {
-                    await Promise.all([
-                        reportPdf.markQueued(id, tenantId, 'summary', publishedVersion),
-                        reportPdf.markQueued(id, tenantId, 'full', publishedVersion),
-                    ]);
-                    await Promise.allSettled([
-                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash, footer }),
-                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash, footer }),
-                    ]);
-                } catch (err) {
-                    logger.error('[publish] PDF render enqueue failed', { inspectionId: id }, err instanceof Error ? err : undefined);
-                }
-            };
-            c.executionCtx.waitUntil(renderBoth());
-        }
-
-        return c.json({ success: true, data: { ...result, isnSync: await (await import('../../services/isn/report-link-sync')).syncPublishedReportToIsn(c, tenantId, id, body.reportId) } }, 200);
-    })
-    .openapi(reinspectRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { id } = c.req.valid('param');
-        const body = c.req.valid('json');
-        try {
-            // The validated body IS the options object (selectedItemIds +
-            // optional inspectorId/scheduledDate); restating the fields here is
-            // how F47's scheduledDate could have been added and silently dropped.
-            const created = await c.var.services.inspection.createReinspection(tenantId, id, body);
-            return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound } }, 200);
-        } catch (err) {
-            return c.json({ success: false, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to create re-inspection' } }, 400);
-        }
-    })
-    .openapi(reinspectCandidatesRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { id } = c.req.valid('param');
-        const candidates = await c.var.services.inspection.getReinspectCandidates(tenantId, id);
-        return c.json({ success: true, data: { candidates } }, 200);
-    })
-    .openapi(submitReportRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const result = await runReportTransition(() => c.var.services.inspection.submitReport(id, tenantId), 'Failed to submit report');
-        if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
-        return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.SUBMITTED } }, 200);
-    })
-    .openapi(returnReportRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const result = await runReportTransition(() => c.var.services.inspection.returnReport(id, tenantId), 'Failed to return report');
-        if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
-        return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.IN_PROGRESS } }, 200);
-    })
-    .openapi(unpublishReportRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const result = await runReportTransition(() => c.var.services.inspection.unpublishReport(id, tenantId), 'Failed to unpublish report');
-        if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
-        // IA-36 — unpublishing retracts the report, so the links that point at
-        // it must stop working too; otherwise a recipient keeps a live URL to a
-        // report the inspector has withdrawn. Expire all of this inspection's
-        // access tokens immediately.
-        await c.var.services.portalAccess.setExpiryForInspection(tenantId, id, Date.now());
-        return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.IN_PROGRESS } }, 200);
+    auditFromContext(c, 'inspection.complete', 'inspection', {
+        entityId: id,
+        metadata: { propertyAddress: inspection.propertyAddress },
     });
+    return c.json({ success: true }, 200);
+});
+publishRoutes.openapi(publishReadinessRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const service = c.var.services.inspection;
+    const readiness = await service.computePublishReadiness(id, tenantId);
+    return c.json(readiness, 200);
+});
+publishRoutes.openapi(confirmInspectionRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.inspection.confirmInspection(tenantId, id);
+    return c.json({ success: true });
+});
+// POST /{id}/cancel AND POST /{id}/uncancel both live in ./cancellation.ts,
+// which owns the cancellation axis in both directions: the quote, the fee
+// acknowledgement, the refund, and the one door back (#81). Neither is a
+// report-lifecycle event, which is what this file is for.
+publishRoutes.openapi(publishRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const service = c.var.services.inspection;
+    // Built explicitly so `recipients` is omitted (not `undefined`) when absent (exactOptionalPropertyTypes).
+    const publishOptions: Parameters<typeof service.publishInspection>[2] = {
+        theme: body.theme,
+        requireSignature: body.requireSignature,
+        requirePayment: body.requirePayment,
+        sendAgreementCopy: body.sendAgreementCopy,
+        ...(body.recipients ? { recipients: body.recipients } : {}),
+        ...(body.reportId ? { reportId: body.reportId } : {}),
+        actor: { userId: c.get('user').sub, role: c.get('userRole') },
+    };
+    const result = await service.publishInspection(id, tenantId, publishOptions);
+
+    // A verified person vouches for the report emails this publish queued, delayed ones included.
+    await stampIfHumanVerified(c.get('humanVerified'), getDrizzle(c), tenantId, id);
+
+    // The only record that a PERSON published this, and the only one that
+    // survives a later unpublish. Written HERE rather than beside the
+    // `return`: everything between is best-effort follow-on work, and the
+    // PDF pipeline's slug/hash/footer lookups are awaited outside a try — a
+    // throw there would drop the row for a publish that already happened.
+    // F79 — says WHAT was published, deliberately not WHO was told. It used to
+    // copy `notifyClient`/`notifyAgent` out of the body and nothing honoured
+    // them: `publishInspection` never read those options, and delivery is the
+    // workspace's `report.published` automation rules' decision. A publish
+    // marked "notify nobody" was therefore RECORDED as having notified nobody
+    // while every rule fired and the mail went out — the record stating the
+    // opposite of the event, in the artefact someone later reads to answer "who
+    // was told, and when". An always-guessed field is worse than an absent one;
+    // who was told is recorded in the automation logs and the delivery rows.
+    auditFromContext(c, 'inspection.published', 'inspection', {
+        entityId: id,
+        metadata: { reportId: body.reportId },
+    });
+
+    // #23 — the courtesy translation, when the publisher asked for one on
+    // THIS publish. Never blocks: a translation that could not be produced
+    // leaves the English report published and correct, which is the state
+    // the feature degrades to by design. See lib/translation/on-publish.ts.
+    c.executionCtx.waitUntil(
+        translateOnPublishForRequest(c, id, body.translateTo ?? null, body.reportId),
+    );
+
+    // Design System 0520 subsystem D phase 9 — Republish snapshot.
+    // After the inspection's status flips to published, persist a frozen
+    // snapshot into report_versions so the customer-facing viewer can
+    // browse history + diff. Best-effort: failures log but do NOT block
+    // the publish response. snapshot-too-large (> 1 MB) downgrades to a
+    // warning audit entry rather than a 5xx — the report itself remains
+    // viewable through the existing /reports/:id path.
+    const userId = (c.get('user') as { sub?: string } | undefined)?.sub;
+    let publishedVersion: number | null = null;
+    if (userId) {
+        try {
+            // The version chain is per REPORT. Passing the id through is
+            // what keeps two deliverables on one order from interleaving
+            // into a single chain, which fails verification for both.
+            const out = await c.var.services.reportVersion.snapshotOnPublish(
+                tenantId, id, userId, body.summary, body.reportId,
+            );
+            publishedVersion = out.versionNumber;
+            logger.info('report-version snapshot saved', {
+                inspectionId:  id,
+                versionNumber: out.versionNumber,
+            });
+        } catch (err) {
+            logger.warn('report-version snapshot failed (non-fatal)', {
+                inspectionId: id,
+                error:        err instanceof Error ? err.message : String(err),
+            });
+        }
+    }
+
+    // Purge transient (versionNumber=null) cached PDFs now that a frozen version
+    // exists. Subsequent everyday downloads will render fresh current content
+    // rather than serving a stale pre-publish snapshot. Best-effort: failures
+    // are logged but never block the publish response.
+    try {
+        await c.var.services.reportPdf.purgeTransientPdfs(id, tenantId);
+    } catch (e) {
+        logger.warn('purge transient pdfs failed', { inspectionId: id, error: String(e) });
+    }
+
+    // Spec 5A.5 — enqueue + background-render Summary + Full PDFs after
+    // publish. Best-effort: failures log but never block the publish
+    // response. Persistent record in report_pdfs lets the client UI poll
+    // (status: queued -> rendering -> ready) and offer Refresh PDFs.
+    //
+    // Gated by tenant_configs.enable_pdf_pipeline (default
+    // OFF). Free-plan tenants and Paid tenants who don't want the spend
+    // skip rendering entirely; the report viewer's window.print() button
+    // remains the universal fallback.
+    const reportPdf = c.var.services.reportPdf;
+    if (await reportPdf.isPipelineEnabled(tenantId)) {
+        const tenantSlug = await resolveTenantSlug(c, tenantId);
+        // renderUrl: token-bearing URL for the headless browser PDF render.
+        const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
+        const sourceVersion = Date.now();
+        // Content hash enables post-publish owner/client downloads to reuse this
+        // render instead of triggering a second Browser Rendering call.
+        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+        const footer = await c.var.services.inspection.getReportPdfFooterContext(id, tenantId);
+        const renderBoth = async () => {
+            try {
+                await Promise.all([
+                    reportPdf.markQueued(id, tenantId, 'summary', publishedVersion),
+                    reportPdf.markQueued(id, tenantId, 'full', publishedVersion),
+                ]);
+                await Promise.allSettled([
+                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash, footer }),
+                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash, footer }),
+                ]);
+            } catch (err) {
+                logger.error('[publish] PDF render enqueue failed', { inspectionId: id }, err instanceof Error ? err : undefined);
+            }
+        };
+        c.executionCtx.waitUntil(renderBoth());
+    }
+
+    return c.json({ success: true, data: { ...result, isnSync: await (await import('../../services/isn/report-link-sync')).syncPublishedReportToIsn(c, tenantId, id, body.reportId) } }, 200);
+});
+publishRoutes.openapi(reinspectRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    try {
+        // The validated body IS the options object (selectedItemIds +
+        // optional inspectorId/scheduledDate); restating the fields here is
+        // how F47's scheduledDate could have been added and silently dropped.
+        const created = await c.var.services.inspection.createReinspection(tenantId, id, body);
+        return c.json({ success: true, data: { id: created.id, reinspectionRound: created.reinspectionRound } }, 200);
+    } catch (err) {
+        return c.json({ success: false, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to create re-inspection' } }, 400);
+    }
+});
+publishRoutes.openapi(reinspectCandidatesRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const { id } = c.req.valid('param');
+    const candidates = await c.var.services.inspection.getReinspectCandidates(tenantId, id);
+    return c.json({ success: true, data: { candidates } }, 200);
+});
+publishRoutes.openapi(submitReportRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const result = await runReportTransition(() => c.var.services.inspection.submitReport(id, tenantId), 'Failed to submit report');
+    if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
+    return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.SUBMITTED } }, 200);
+});
+publishRoutes.openapi(returnReportRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const result = await runReportTransition(() => c.var.services.inspection.returnReport(id, tenantId), 'Failed to return report');
+    if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
+    return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.IN_PROGRESS } }, 200);
+});
+publishRoutes.openapi(unpublishReportRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const result = await runReportTransition(() => c.var.services.inspection.unpublishReport(id, tenantId), 'Failed to unpublish report');
+    if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
+    // IA-36 — unpublishing retracts the report, so the links that point at
+    // it must stop working too; otherwise a recipient keeps a live URL to a
+    // report the inspector has withdrawn. Expire all of this inspection's
+    // access tokens immediately.
+    await c.var.services.portalAccess.setExpiryForInspection(tenantId, id, Date.now());
+    return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.IN_PROGRESS } }, 200);
+});
+
+export const publishRouteConfigs = [completeInspectionRoute, publishReadinessRoute, confirmInspectionRoute, publishRoute, reinspectRoute, reinspectCandidatesRoute, submitReportRoute, returnReportRoute, unpublishReportRoute] as const;
 
 export default publishRoutes;

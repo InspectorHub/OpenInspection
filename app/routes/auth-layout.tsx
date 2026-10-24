@@ -92,9 +92,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
  * document response, including caching directives that must not apply to a
  * per-viewer page.
  *
- * No other route on this branch exports `headers` (asserted by
- * `auth-layout-headers.test.ts`) — one that did would win as the deeper export
- * and would have to forward this itself.
+ * Routes that export their own `headers` (the editor and the docs pages) win as
+ * the deeper export, so they must forward `Set-Cookie` themselves if they are
+ * ever placed under this layout. The editor sits outside it today.
  */
 export function headers({ loaderHeaders }: Route.HeadersArgs) {
   const out = new Headers();

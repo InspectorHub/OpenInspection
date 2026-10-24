@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import { Form } from "react-router";
 import { Banner, Button, Card, Pill, formatFileSize } from "@core/shared-ui";
 
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 /**

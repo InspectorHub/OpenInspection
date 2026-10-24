@@ -278,7 +278,7 @@ describe('d', () => { /* collection time, no testTimeout */ });
 
 describe('the lexer cannot be desynced into looking clean', () => {
     it('a regex literal containing a quote does not swallow the rest of the file', () => {
-        // `/role="radio"/g` is real, in app/components/editor/batch-action-bar.test.ts.
+        // `/role="radio"/g` is real, in packages/field-ui/src/components/editor/batch-action-bar.test.ts.
         // A scanner that skips string literals reads that `"` as an opening quote
         // and masks everything after it — producing not an error but a file with
         // no findings. This is why the gate parses instead of matching.

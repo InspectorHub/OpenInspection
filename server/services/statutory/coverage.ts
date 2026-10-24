@@ -40,8 +40,8 @@ import { StatutoryOverflowService } from './overflow.service';
 import {
     gatherStatutoryInputs,
     type StatutoryInspectionRow,
-} from '../../api/inspections/statutory-inputs';
-import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
+} from './statutory-inputs';
+import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
 // Not exported: nothing needs one missing field's type on its own, and the
 // dead-code gate is right to say so. It reaches every consumer inside

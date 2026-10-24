@@ -8,8 +8,8 @@ import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
 import {
     loadResultsProjection, projectResults, seedResultsDoc, applyItemPatch, upsertCanned,
-} from '../../../server/lib/collab/results-doc';
-import type { ResultsProjection } from '../../../server/lib/collab/results-doc.types';
+} from '@core/field-ui/shared/results-doc';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 import { hasRenamableLegacyKeys, itemSectionsFromSnapshot, renameLegacyFindingKeys } from '../../../server/lib/collab/legacy-key-rename';
 
 const SECTIONS = new Map<string, string[]>([['roof', ['s1']], ['attic', ['s1']], ['shared', ['s1', 's2']]]);

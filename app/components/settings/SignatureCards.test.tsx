@@ -21,7 +21,7 @@ import { EmailSignatureCard, SavedSignatureCard } from "./SignatureCards";
  * settings; react-easy-crop's own behaviour is not this card's contract, and
  * the crop geometry is covered by crop-rotation.
  */
-vi.mock("~/components/media-studio/PhotoCropper", () => ({
+vi.mock("@core/field-ui/components/media-studio/PhotoCropper", () => ({
   PhotoCropper: (p: { outputFormat?: string; maxLongEdge?: number }) => (
     <div data-testid="cropper" data-format={p.outputFormat} data-max={String(p.maxLongEdge)} />
   ),

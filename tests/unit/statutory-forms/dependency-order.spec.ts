@@ -22,7 +22,7 @@ import type {
     StatutoryFieldDependencies,
     StatutoryFormDeclaration,
     TemplateSchemaV2,
-} from '../../../server/types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 
 const SNAPSHOT = {
     schemaVersion: 2,

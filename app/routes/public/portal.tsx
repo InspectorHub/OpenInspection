@@ -13,7 +13,7 @@ import { Form, useLoaderData, useActionData, useNavigation } from "react-router"
 import type { Route } from "./+types/portal";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { brandFormat, brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 import InspectionList, { type InspectionRow } from "~/components/portal/InspectionList";
 import { PublicLegalFooter } from "~/components/PublicLegalFooter";

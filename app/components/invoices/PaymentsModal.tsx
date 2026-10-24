@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { useFetcher } from "react-router";
 import { Modal, Button, Input, Select, Banner } from "@core/shared-ui";
 import type { GuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { formatCurrency, formatDate } from "~/lib/format";
+import { formatCurrency, formatDate } from "@core/field-ui/shared/format";
 import { civilToInstantISO, todayInZone } from "~/lib/civil-time";
 import { m } from "~/paraglide/messages";
 

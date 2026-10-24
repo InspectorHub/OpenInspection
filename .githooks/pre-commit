@@ -82,7 +82,8 @@ CONFIG_STAGED=$(echo "$STAGED" | grep -E '^(tsconfig|package\.json|package-lock\
 #    (The api tier never needed either: tsconfig.api.json includes server/** alone.)
 needs_paraglide() {
     [ -d app/paraglide ] || return 0
-    echo "$STAGED" | grep -qE '^(messages/|project\.inlang/)'
+    [ -d packages/field-ui/src/i18n/generated ] || return 0
+    echo "$STAGED" | grep -qE '^(messages/|project\.inlang/|packages/field-ui/project\.inlang/)'
 }
 needs_typegen() {
     [ -d .react-router/types ] || return 0
@@ -138,15 +139,21 @@ else
             GEN_OK=0
         fi
     fi
-    # The api program includes server/** and nothing else, so staged changes
-    # confined to app/ packages/ workers/ cannot affect it. That pass was being
-    # run anyway: 11s warm, and 152s when its build-info had gone cold — paid on
-    # every front-end commit for a program the commit cannot reach.
+    # The api program includes server/** plus three package trees (see its `include`:
+    # packages/api-types, packages/offline-package and packages/field-ui/src/shared), so
+    # staged changes confined to app/ workers/ and the REST of packages/ cannot affect
+    # it. That pass was being run anyway: 11s warm, and 152s when its build-info had
+    # gone cold — paid on every front-end commit for a program the commit cannot reach.
+    # The package trees must stay in API_INPUTS below: a commit that changes only a
+    # signature in packages/field-ui/src/shared used to be checked by the app pass alone,
+    # while about forty server files import it. tests/unit/tooling/precommit-tier.spec.ts
+    # keeps this list equal to tsconfig.api.json's include.
     #
     # Config changes (tsconfig, package.json, vite/react-router config) still run
     # BOTH, because those can move either program's inputs.
+    API_INPUTS='^(server/|packages/api-types/|packages/offline-package/|packages/field-ui/src/shared/)'
     APP_ONLY=0
-    if [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -E '^server/')" ]; then
+    if [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -E "$API_INPUTS")" ]; then
         APP_ONLY=1
     fi
 

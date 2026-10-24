@@ -24,7 +24,7 @@
  *
  * The NEGATIVE CONTROLS must NOT be reported, here or in `probe-schema.ts`.
  */
-import { MoneyInput } from '~/components/MoneyInput';
+import { MoneyInput } from '@core/field-ui/components/MoneyInput';
 
 /** POSITIVE: a money field entering the persisted inspection shape. */
 export interface ProbeFindingEntry {

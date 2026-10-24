@@ -10,13 +10,15 @@
 //
 // The sub-routers are mounted at `/` so the external path surface is IDENTICAL
 // to the original chain (every route path is absolute, e.g. `/book`,
-// `/agreements/:token`). Hono merges each sub-router's OpenAPI + RPC types, so
-// `typeof bookingsRoutes` (exported as `BookingsApi`) is preserved for the
-// `hono/client` consumers. `server/index.ts` mounts the default export at
+// `/agreements/:token`). `BookingsApi` is derived from `bookingsRouteParts`
+// (see lib/api-schema.ts) for the `hono/client` consumers; a sub-router still
+// written as a chain is listed with `legacyMounted`, which reads its schema
+// from its own type. `server/index.ts` mounts the default export at
 // `/api/public` unchanged.
 import { createRoute, z } from '@hono/zod-openapi';
 import { bookingWindowMin, widestBookingWindowMin, slotSatisfiesWindow } from '../lib/booking/booking-window';
 import { createApiRouter } from '../lib/openapi-router';
+import { legacyMounted, mounted, type ApiOf } from '../lib/api-schema';
 import { eq } from 'drizzle-orm';
 import { services as servicesTable, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
@@ -26,14 +28,14 @@ import {
     AvailabilityResponseSchema
 } from '../lib/validations/booking.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-import createBookingRoutes from './bookings/create';
-import bookingProfileRoutes from './bookings/profile';
+import createBookingRoutes, { createBookingRouteConfigs } from './bookings/create';
+import bookingProfileRoutes, { bookingProfileRouteConfigs } from './bookings/profile';
 // Mounted here rather than in server/index.ts: the deposit is part of the
 // public booking surface, and `/api/public` is where this aggregator already
 // lands, so the external path is identical either way.
-import depositIntentRoutes from './public/deposit-intent';
+import depositIntentRoutes, { depositIntentRouteConfigs } from './public/deposit-intent';
 import agreementRoutes from './bookings/agreement';
-import publicGeocodeRoutes from './bookings/geocode';
+import publicGeocodeRoutes, { publicGeocodeRouteConfigs } from './bookings/geocode';
 import { getDrizzle } from '../lib/route-helpers';
 
 /**
@@ -174,111 +176,122 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
     operationId: 'getTenantBookingSlots',
 }, { scopes: ['read'], tier: 'extended' }));
 
-const bookingsRouter = createApiRouter();
-// The slot list changes with every booking, block and sync: never cache it, on any status. (A statement of
-// its own, not a link in the chain below: `.use` on a chained router loses the OpenAPI typing.)
-bookingsRouter.use('/slots', async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
+export const bookingsRoutes = createApiRouter();
+// The slot list changes with every booking, block and sync: never cache it, on any status.
+bookingsRoutes.use('/slots', async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
 
-export const bookingsRoutes = bookingsRouter
-    .route('/', bookingProfileRoutes)
-    .route('/', depositIntentRoutes)
-    .openapi(listInspectorsRoute, async (c) => {
-        const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
-        if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
+bookingsRoutes.route('/', bookingProfileRoutes);
+bookingsRoutes.route('/', depositIntentRoutes);
+bookingsRoutes.openapi(listInspectorsRoute, async (c) => {
+    const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
+    if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
 
-        const service = c.var.services.booking;
-        const inspectors = await service.listInspectors(tenantId);
-        return c.json({ success: true, data: inspectors }, 200);
-    })
-    .openapi(listPublicServicesRoute, async (c) => {
-        const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
-        if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
-        const db = getDrizzle(c);
-        const rows = await db.select({
-            id:              servicesTable.id,
-            name:            servicesTable.name,
-            description:     servicesTable.description,
-            price:           servicesTable.price,
-            durationMinutes: servicesTable.durationMinutes,
-            active:          servicesTable.active,
-            templateId:      servicesTable.templateId,
-        }).from(servicesTable)
-            .where(eq(servicesTable.tenantId, tenantId))
-            .all();
-        // Only expose services that are active AND have a template wired up.
-        const visible = rows.filter(r => r.active && r.templateId);
-        return c.json({
-            success: true,
-            data: {
-                services: visible.map(r => ({
-                    id:              r.id,
-                    name:            r.name,
-                    description:     r.description ?? null,
-                    price:           r.price,
-                    durationMinutes: r.durationMinutes ?? null,
-                })),
-            },
-        }, 200);
-    })
-    .openapi(getAvailabilityRoute, async (c) => {
-        // A-17 — public read endpoint: rate-limit like the other public surfaces.
-        await checkRateLimit(c, 'availability');
+    const service = c.var.services.booking;
+    const inspectors = await service.listInspectors(tenantId);
+    return c.json({ success: true, data: inspectors }, 200);
+});
+bookingsRoutes.openapi(listPublicServicesRoute, async (c) => {
+    const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
+    if (!tenantId) throw Errors.Forbidden('Tenant context missing.');
+    const db = getDrizzle(c);
+    const rows = await db.select({
+        id:              servicesTable.id,
+        name:            servicesTable.name,
+        description:     servicesTable.description,
+        price:           servicesTable.price,
+        durationMinutes: servicesTable.durationMinutes,
+        active:          servicesTable.active,
+        templateId:      servicesTable.templateId,
+    }).from(servicesTable)
+        .where(eq(servicesTable.tenantId, tenantId))
+        .all();
+    // Only expose services that are active AND have a template wired up.
+    const visible = rows.filter(r => r.active && r.templateId);
+    return c.json({
+        success: true,
+        data: {
+            services: visible.map(r => ({
+                id:              r.id,
+                name:            r.name,
+                description:     r.description ?? null,
+                price:           r.price,
+                durationMinutes: r.durationMinutes ?? null,
+            })),
+        },
+    }, 200);
+});
+bookingsRoutes.openapi(getAvailabilityRoute, async (c) => {
+    // A-17 — public read endpoint: rate-limit like the other public surfaces.
+    await checkRateLimit(c, 'availability');
 
-        const { inspectorId } = c.req.valid('param');
-        const { start, end, tenant } = c.req.valid('query');
+    const { inspectorId } = c.req.valid('param');
+    const { start, end, tenant } = c.req.valid('query');
 
-        // A-17 — slug-authoritative tenant resolution (B-16 pattern). The old
-        // context fallback (tenantId || requestedTenantSlug) pointed at the fixed
-        // tenant in standalone and at NOTHING in saas mode (this path is not
-        // slug-routed), so it 403'd there. No context fallback.
-        const tenantRow = await getDrizzle(c)
-            .select({ id: tenants.id })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
-        if (!tenantRow) throw Errors.NotFound('Tenant not found.');
-        const tenantId = tenantRow.id;
+    // A-17 — slug-authoritative tenant resolution (B-16 pattern). The old
+    // context fallback (tenantId || requestedTenantSlug) pointed at the fixed
+    // tenant in standalone and at NOTHING in saas mode (this path is not
+    // slug-routed), so it 403'd there. No context fallback.
+    const tenantRow = await getDrizzle(c)
+        .select({ id: tenants.id })
+        .from(tenants).where(eq(tenants.slug, tenant)).get();
+    if (!tenantRow) throw Errors.NotFound('Tenant not found.');
+    const tenantId = tenantRow.id;
 
-        const startDate = start || new Date().toISOString().split('T')[0];
-        const endDate = end || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const startDate = start || new Date().toISOString().split('T')[0];
+    const endDate = end || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-        const service = c.var.services.booking;
-        const result = await service.getAvailability(tenantId, inspectorId, startDate, endDate);
-        return c.json({ success: true, data: result }, 200);
-    })
-    .route('/', createBookingRoutes)
-    .route('/', agreementRoutes)
-    .route('/', publicGeocodeRoutes)
-    .openapi(getTenantSlotsRoute, async (c) => {
-        await checkRateLimit(c, 'availability');
-        const { tenant, date, serviceIds, inspectorId, propertyZip, timeSlot } = c.req.valid('query');
-        const tenantRow = await getDrizzle(c).select({ id: tenants.id })
-            .from(tenants).where(eq(tenants.slug, tenant)).get();
-        if (!tenantRow) throw Errors.NotFound('Tenant not found.');
-        const ids = serviceIds ? serviceIds.split(',').filter(Boolean) : [];
-        // Offer only the slots a booking of this length fits: the chosen services' minutes, or the default
-        // window. The booking itself is judged over the same length (see booking-window.ts).
-        const totalMin = await c.var.services.booking.serviceTotalMinutes(tenantRow.id, ids);
-        const windowMin = timeSlot ? bookingWindowMin(totalMin, timeSlot) : widestBookingWindowMin(totalMin);
-        const all = await c.var.services.booking.getTenantSlots(
-            tenantRow.id, date, ids, undefined, propertyZip ?? null, windowMin,
-        );
-        const slots = all.slots.map(s => ({
-            time: s.time,
-            available: (inspectorId ? s.inspectorIds.includes(inspectorId) : s.available)
-                // A named window offers only starts inside it; `custom` names a time the page does not choose from this list.
-                && (!timeSlot || timeSlot === 'custom' || slotSatisfiesWindow(s.time, timeSlot, null)),
-        }));
-        return c.json({
-            success: true,
-            data: {
-                slots,
-                ...(all.holidayAdvisory ? { holidayAdvisory: all.holidayAdvisory } : {}),
-                // IA-26 keeps inspector identities server-side, but "nobody
-                // serves your area" is about the CLIENT's property, not about
-                // who we employ — and a silent empty grid would send them
-                // hunting through dates for a slot that cannot exist.
-                ...(all.outsideServiceArea ? { outsideServiceArea: true } : {}),
-            },
-        }, 200);
-    });
+    const service = c.var.services.booking;
+    const result = await service.getAvailability(tenantId, inspectorId, startDate, endDate);
+    return c.json({ success: true, data: result }, 200);
+});
+bookingsRoutes.route('/', createBookingRoutes);
+bookingsRoutes.route('/', agreementRoutes);
+bookingsRoutes.route('/', publicGeocodeRoutes);
+bookingsRoutes.openapi(getTenantSlotsRoute, async (c) => {
+    await checkRateLimit(c, 'availability');
+    const { tenant, date, serviceIds, inspectorId, propertyZip, timeSlot } = c.req.valid('query');
+    const tenantRow = await getDrizzle(c).select({ id: tenants.id })
+        .from(tenants).where(eq(tenants.slug, tenant)).get();
+    if (!tenantRow) throw Errors.NotFound('Tenant not found.');
+    const ids = serviceIds ? serviceIds.split(',').filter(Boolean) : [];
+    // Offer only the slots a booking of this length fits: the chosen services' minutes, or the default
+    // window. The booking itself is judged over the same length (see booking-window.ts).
+    const totalMin = await c.var.services.booking.serviceTotalMinutes(tenantRow.id, ids);
+    const windowMin = timeSlot ? bookingWindowMin(totalMin, timeSlot) : widestBookingWindowMin(totalMin);
+    const all = await c.var.services.booking.getTenantSlots(
+        tenantRow.id, date, ids, undefined, propertyZip ?? null, windowMin,
+    );
+    const slots = all.slots.map(s => ({
+        time: s.time,
+        available: (inspectorId ? s.inspectorIds.includes(inspectorId) : s.available)
+            // A named window offers only starts inside it; `custom` names a time the page does not choose from this list.
+            && (!timeSlot || timeSlot === 'custom' || slotSatisfiesWindow(s.time, timeSlot, null)),
+    }));
+    return c.json({
+        success: true,
+        data: {
+            slots,
+            ...(all.holidayAdvisory ? { holidayAdvisory: all.holidayAdvisory } : {}),
+            // IA-26 keeps inspector identities server-side, but "nobody
+            // serves your area" is about the CLIENT's property, not about
+            // who we employ — and a silent empty grid would send them
+            // hunting through dates for a slot that cannot exist.
+            ...(all.outsideServiceArea ? { outsideServiceArea: true } : {}),
+        },
+    }, 200);
+});
 
-export type BookingsApi = typeof bookingsRoutes;
+/** Registration order, mounts included. Drives `BookingsApi`; a test pins it to what `bookingsRoutes` really registered. */
+export const bookingsRouteParts = [
+    mounted('/', bookingProfileRoutes, bookingProfileRouteConfigs),
+    mounted('/', depositIntentRoutes, depositIntentRouteConfigs),
+    listInspectorsRoute,
+    listPublicServicesRoute,
+    getAvailabilityRoute,
+    mounted('/', createBookingRoutes, createBookingRouteConfigs),
+    legacyMounted('/', agreementRoutes),
+    mounted('/', publicGeocodeRoutes, publicGeocodeRouteConfigs),
+    getTenantSlotsRoute,
+] as const;
+
+export type BookingsApi = ApiOf<typeof bookingsRouteParts>;

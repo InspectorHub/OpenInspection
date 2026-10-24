@@ -2,7 +2,7 @@ import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
 import { isValidTimeZone } from '../../tz';
 import { isValidLocale } from '../../locale';
-import { DATE_FORMATS, TIME_FORMATS } from '../../session/display-prefs';
+import { DATE_FORMATS, TIME_FORMATS } from '@core/field-ui/shared/display-prefs';
 import { DepositPolicySchema } from '../deposit-policy.schema';
 
 /**

@@ -1,0 +1,238 @@
+import { useEffect, useRef, useState } from "react";
+import { Button, Modal, Select, type SelectOption } from "@core/shared-ui";
+import { isIgnored, useFieldCommand, useFieldDataSource } from "../../context";
+import { m } from "../../i18n";
+import {
+  INSPECTION_PROPERTY_TYPES,
+  type InspectionPropertyType,
+} from "../../shared/inspection-property-type";
+
+/** Label per canonical slug. A value added to the tuple is a compile error here. */
+const LABELS: Record<InspectionPropertyType, () => string> = {
+  single_family: () => m.editor_property_type_single_family(),
+  multi_unit: () => m.editor_property_type_multi_unit(),
+  commercial: () => m.editor_property_type_commercial(),
+};
+
+interface PropertyTypeControlProps {
+  inspectionId: string;
+  propertyType: string | null;
+  commercialSubtype: string | null;
+  reportTier: string | null;
+  /** True when findings are scoped per unit — decides the second bullet below. */
+  perUnitMode: boolean;
+  /** True when any ASTM PCA narrative block has text. */
+  hasPcaNarrative: boolean;
+  /**
+   * Called with the saved classification (`null` = unclassified) once the host accepted it. The editor keeps
+   * its own copy of the inspection (fixed at mount), so the host patches it here; the select and the gates
+   * that read it follow the saved value instead of snapping back.
+   */
+  onSaved: (next: string | null) => void;
+}
+
+/**
+ * The property-type selector — the ONLY way to reclassify an inspection after
+ * intake.
+ *
+ * Why it exists: `inspections.property_type` is set at creation by the wizard and
+ * was settable nowhere else, so a wrong pick was permanent and every inspection
+ * created before the field was captured could never reach the commercial surface
+ * at all. Its two siblings (`commercial_subtype`, `report_tier`) have always been
+ * editable through the property-facts strip; this was the one omission.
+ *
+ * Why it is NOT gated on `propertyType === 'commercial'` like its neighbours: a
+ * control that only appears once you are already commercial cannot be the thing
+ * that gets you there. It renders for every inspection, including unclassified
+ * ones.
+ *
+ * -- WHY LEAVING 'commercial' ASKS FIRST --------------------------------------
+ * Reclassifying is not a neutral edit. Four readers branch on this column
+ * (`report-tier.ts`, `pca-report-block.ts`, `building-profile.ts`, and the
+ * editor's own units gate), so moving off `commercial` closes the units surface,
+ * the cost-items drawer, the PCA narrative panel and the compliance panel in one
+ * step. Nothing is DELETED — no cascade runs, every row stays exactly where it
+ * is, and setting the type back to Commercial restores all of it — but the work
+ * stops being visible, and two different things happen to two kinds of data:
+ *
+ *   - Cost items, PCA narrative and deviations drop off the PUBLISHED REPORT.
+ *     `inspection-report.service.ts` only reads cost rows when `resolveReportTier`
+ *     returns non-null, and `buildPcaReportBlock` returns null for non-commercial.
+ *   - Per-unit findings and the unit list KEEP PRINTING. The report's unit
+ *     payload is gated on `unit_inspection_mode`, a separate column this control
+ *     does not touch — while the editor's unit switcher is gated on the property
+ *     type and closes. So those findings stay on the report and become
+ *     unreachable for editing. That asymmetry is the reason this modal exists
+ *     rather than a silent save.
+ *
+ * The confirm is a DS Modal, never `window.confirm`, and mirrors the lossy
+ * `per_unit → tagged` switch in `UnitsManager` — the established precedent for a
+ * scope change the inspector cannot undo by hand.
+ */
+export function PropertyTypeControl({
+  inspectionId,
+  propertyType,
+  commercialSubtype,
+  reportTier,
+  perUnitMode,
+  hasPcaNarrative,
+  onSaved,
+}: PropertyTypeControlProps) {
+  const { run, busy } = useFieldCommand(inspectionId);
+  const dataSource = useFieldDataSource();
+  const costItems = dataSource.resources.costItems;
+  // A second, read-only request: the cost-item count is not in the editor loader
+  // (the drawer self-loads), and it is the number the inspector most needs before
+  // agreeing — money already entered. Loaded only when the modal opens, through
+  // the data source's cost-items read. A host without one shows no cost line.
+  const [costCount, setCostCount] = useState(0);
+  const [counting, setCounting] = useState(false);
+  /** Which read the screen is waiting for: a newer read replaces an older one, as a refetch did. */
+  const countRead = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const [pending, setPending] = useState<string | null>(null);
+
+  const current = propertyType ?? "";
+
+  const options: SelectOption[] = [
+    { value: "", label: m.editor_property_type_unclassified() },
+    ...INSPECTION_PROPERTY_TYPES.map((value) => ({ value, label: LABELS[value]() })),
+  ];
+
+  /**
+   * Write it. `null` rather than `''` for unclassified: the settings sanitizer
+   * treats an empty string as "field unchanged" and would drop the key, so
+   * clearing the classification would silently do nothing.
+   */
+  async function save(next: string) {
+    const value = next === "" ? null : next;
+    // Reuses the `save-settings` command deliberately. This IS a metadata patch
+    // on the same endpoint the settings sheet uses, and a second command issuing
+    // the identical PATCH would be duplication.
+    const result = await run({ type: "save-settings", payload: { propertyType: value } });
+    if (isIgnored(result)) return;
+    if (!result.ok) {
+      dataSource.notify(result.error || m.editor_property_type_save_failed(), "error");
+      return;
+    }
+    // Show the saved type, then reload so the surfaces that read the loader (units, cost items) follow it.
+    if (mounted.current) onSaved(value);
+    dataSource.reload();
+  }
+
+  async function loadCostCount() {
+    if (!costItems) return;
+    const read = (countRead.current += 1);
+    setCounting(true);
+    let count = 0;
+    try {
+      count = (await costItems.list(inspectionId)).items.length;
+    } catch {
+      // The read is advisory: a host that cannot answer shows no cost line rather than a wrong one.
+    }
+    if (!mounted.current || countRead.current !== read) return;
+    setCostCount(count);
+    setCounting(false);
+  }
+
+  function onPick(next: string) {
+    if (next === current) return;
+    // Only the direction that closes surfaces asks. Arriving AT commercial opens
+    // them and loses nothing, so it writes straight through.
+    if (current === "commercial") {
+      setPending(next);
+      void loadCostCount();
+      return;
+    }
+    void save(next);
+  }
+
+  // Close the confirm once the write lands and the classification the editor holds matches it
+  // (`onSaved` patches that classification; a refused write leaves the confirm open to retry or cancel).
+  useEffect(() => {
+    if (pending !== null && !busy && propertyType === (pending === "" ? null : pending)) {
+      setPending(null);
+    }
+  }, [pending, busy, propertyType]);
+
+  return (
+    <>
+      <Select
+        label={m.editor_property_type_label()}
+        hint={m.editor_property_type_hint()}
+        value={current}
+        // aria-disabled, not native: a focused select that became disabled would drop focus to <body>.
+        // The change is ignored while the save is in flight (the controlled value snaps back).
+        aria-disabled={busy || undefined}
+        options={options}
+        onChange={(e) => {
+          if (busy) return;
+          onPick(e.target.value);
+        }}
+        className="max-w-sm aria-disabled:opacity-50"
+        data-testid="property-type-select"
+      />
+
+      <Modal
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        title={m.editor_property_type_lossy_title()}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setPending(null)}>
+              {m.common_cancel()}
+            </Button>
+            <Button
+              variant="danger"
+              pending={busy}
+              data-testid="property-type-confirm"
+              onClick={() => pending !== null && void save(pending)}
+            >
+              {m.editor_property_type_lossy_confirm()}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-[13px] text-ih-fg-2">
+          <div>
+            <p className="font-bold">{m.editor_property_type_lossy_report_heading()}</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {/* Only what actually exists is listed. Naming a category that is
+                  empty teaches the reader to skim the warning next time. */}
+              {counting ? (
+                <li>{m.editor_property_type_lossy_counting()}</li>
+              ) : costCount > 0 ? (
+                <li data-testid="lossy-cost-items">
+                  {costCount === 1
+                    ? m.editor_property_type_lossy_cost_one({ count: costCount })
+                    : m.editor_property_type_lossy_cost_many({ count: costCount })}
+                </li>
+              ) : null}
+              {hasPcaNarrative ? <li>{m.editor_property_type_lossy_narrative()}</li> : null}
+              {commercialSubtype ? (
+                <li>{m.editor_property_type_lossy_subtype({ subtype: commercialSubtype })}</li>
+              ) : null}
+              {reportTier ? <li>{m.editor_property_type_lossy_tier({ tier: reportTier })}</li> : null}
+            </ul>
+          </div>
+
+          {perUnitMode ? (
+            <div>
+              <p className="font-bold">{m.editor_property_type_lossy_editor_heading()}</p>
+              <p className="mt-1" data-testid="lossy-units">{m.editor_property_type_lossy_units()}</p>
+            </div>
+          ) : null}
+
+          <p className="text-ih-fg-3">{m.editor_property_type_lossy_kept()}</p>
+        </div>
+      </Modal>
+    </>
+  );
+}

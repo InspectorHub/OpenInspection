@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Card, useActionLatch } from "@core/shared-ui";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
 
 /** Where this contact stands with QuickBooks, as the card draws it. */

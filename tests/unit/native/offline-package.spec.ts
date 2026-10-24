@@ -8,12 +8,12 @@ import { unzipSync, zipSync } from 'fflate';
 import {
     OfflinePackageManifestSchema, OutboxEntrySchema, OutboxSchema, MediaIndexSchema, OFFLINE_ID_PATTERN,
     PACKAGE_MAX_AGE_DAYS, APPLIED_RECORD_RETENTION_DAYS,
-} from '../../../server/lib/native/offline-package';
+} from '@core/offline-package';
 import {
     listPackage, readPackageEntry, readPackageEntries, verifyPackageEntries, MAX_MEDIA_ENTRY_BYTES,
 } from '../../../server/lib/native/offline-zip';
 import { readBoundedBody } from '../../../server/lib/bounded-body';
-import { DEFAULT_IMPORT_LIMITS, IMPORT_LIMIT_CEILINGS } from '../../../server/lib/native/import-limits';
+import { DEFAULT_IMPORT_LIMITS, IMPORT_LIMIT_CEILINGS } from '@core/offline-package';
 import { aliasEntryData, buildPackage, declareEntrySize } from '../helpers/offline-package-fixture';
 
 const MAX_PACKAGE_BYTES = DEFAULT_IMPORT_LIMITS.compressedBytes;

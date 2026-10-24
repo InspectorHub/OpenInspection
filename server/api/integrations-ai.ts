@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
@@ -85,58 +86,64 @@ const aiConfigGetRoute = createRoute(withMcpMetadata({
     description: 'Never returns a credential — the key lives in encrypted secrets and is surfaced separately.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-const integrationsAiRoutes = createApiRouter()
-    .openapi(aiTestRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const uid = c.get('user')?.sub ?? null;
-        const body = c.req.valid('json');
-        // A blank key means the one this workspace already stored. Resolving it
-        // here rather than in testAiConnection keeps that function honest: it
-        // probes exactly what it is handed, and the fallback is visible at the
-        // one place that knows which workspace is asking.
-        const stored = (await loadTenantEmailConfig(c.env, tenantId)).dbSecrets.geminiApiKey ?? null;
-        const chosen = keyForProbe(body.apiKey, stored);
-        if ('refuse' in chosen) {
-            const result = { ok: false as const, field: 'apiKey' as const, message: m_ai_key_missing };
-            await recordIntegrationTest(getDrizzle(c), { tenantId, testedByUserId: uid, target: 'gemini', ok: false, detail: result.message });
-            return c.json({ success: true as const, data: result }, 200);
-        }
-        const result = await testAiConnection({ ...body, apiKey: chosen.key });
-        // The stored target key is still 'gemini'. It is a LEGACY LABEL for
-        // "the AI integration", kept because existing rows carry it and the
-        // settings grid keys off it; it no longer names a vendor, and the
-        // engine no longer has one. Renaming it is its own pass across the
-        // schema enum, the service and the settings UI.
-        //
-        // `detail` carries the FIELD that failed — never the message shown to
-        // the workspace, and never the provider's own words.
-        await recordIntegrationTest(getDrizzle(c), {
-            tenantId, testedByUserId: uid, target: 'gemini', ok: result.ok,
-            detail: result.ok
-                ? 'AI endpoint accepted a test completion.'
-                : `AI endpoint test failed on: ${result.field}.`,
-        });
+const app = createApiRouter();
+app.openapi(aiTestRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const uid = c.get('user')?.sub ?? null;
+    const body = c.req.valid('json');
+    // A blank key means the one this workspace already stored. Resolving it
+    // here rather than in testAiConnection keeps that function honest: it
+    // probes exactly what it is handed, and the fallback is visible at the
+    // one place that knows which workspace is asking.
+    const stored = (await loadTenantEmailConfig(c.env, tenantId)).dbSecrets.geminiApiKey ?? null;
+    const chosen = keyForProbe(body.apiKey, stored);
+    if ('refuse' in chosen) {
+        const result = { ok: false as const, field: 'apiKey' as const, message: m_ai_key_missing };
+        await recordIntegrationTest(getDrizzle(c), { tenantId, testedByUserId: uid, target: 'gemini', ok: false, detail: result.message });
         return c.json({ success: true as const, data: result }, 200);
-    })
-    .openapi(aiConfigRoute, async (c) => {
-        const body = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const hasKey = Boolean((await loadTenantEmailConfig(c.env, tenantId)).dbSecrets.geminiApiKey);
-        // A save that only flips the courtesy-translation switch leaves the
-        // provider fields as stored, so the completeness check does not apply.
-        const stored = await readAiConfig(getDrizzle(c), tenantId);
-        const gap = changesOnlyCourtesyTranslation(body, stored) ? null : aiConfigGap(body, c.env, hasKey);
-        if (gap) {
-            return c.json({ success: false as const, error: { code: 'AI_CONFIG_INCOMPLETE', message: gap.message, field: gap.field } }, 422);
-        }
-        await saveAiConfig(getDrizzle(c), tenantId, body);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(aiConfigGetRoute, async (c) => {
-        const data = await readAiConfig(getDrizzle(c), c.get('tenantId'));
-        return c.json({ success: true as const, data }, 200);
-    })
-;
+    }
+    const result = await testAiConnection({ ...body, apiKey: chosen.key });
+    // The stored target key is still 'gemini'. It is a LEGACY LABEL for
+    // "the AI integration", kept because existing rows carry it and the
+    // settings grid keys off it; it no longer names a vendor, and the
+    // engine no longer has one. Renaming it is its own pass across the
+    // schema enum, the service and the settings UI.
+    //
+    // `detail` carries the FIELD that failed — never the message shown to
+    // the workspace, and never the provider's own words.
+    await recordIntegrationTest(getDrizzle(c), {
+        tenantId, testedByUserId: uid, target: 'gemini', ok: result.ok,
+        detail: result.ok
+            ? 'AI endpoint accepted a test completion.'
+            : `AI endpoint test failed on: ${result.field}.`,
+    });
+    return c.json({ success: true as const, data: result }, 200);
+});
+app.openapi(aiConfigRoute, async (c) => {
+    const body = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    const hasKey = Boolean((await loadTenantEmailConfig(c.env, tenantId)).dbSecrets.geminiApiKey);
+    // A save that only flips the courtesy-translation switch leaves the
+    // provider fields as stored, so the completeness check does not apply.
+    const stored = await readAiConfig(getDrizzle(c), tenantId);
+    const gap = changesOnlyCourtesyTranslation(body, stored) ? null : aiConfigGap(body, c.env, hasKey);
+    if (gap) {
+        return c.json({ success: false as const, error: { code: 'AI_CONFIG_INCOMPLETE', message: gap.message, field: gap.field } }, 422);
+    }
+    await saveAiConfig(getDrizzle(c), tenantId, body);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(aiConfigGetRoute, async (c) => {
+    const data = await readAiConfig(getDrizzle(c), c.get('tenantId'));
+    return c.json({ success: true as const, data }, 200);
+});
 
-export type IntegrationsAiApi = typeof integrationsAiRoutes;
-export default integrationsAiRoutes;
+/** Registration order. Drives `IntegrationsAiApi`; a test pins it to what `app` really registered. */
+export const integrationsAiRouteConfigs = [
+    aiTestRoute,
+    aiConfigRoute,
+    aiConfigGetRoute,
+] as const;
+
+export type IntegrationsAiApi = ApiOf<typeof integrationsAiRouteConfigs>;
+export default app;

@@ -4,7 +4,7 @@ OpenInspection ships with a small, opinionated design system ("Design System
 0523") rather than raw Tailwind utilities. It has three layers:
 
 1. **Token layer** — CSS custom properties + a Tailwind v4 `@theme` block
-   (`app/styles/tailwind.css`) that map semantic names (`bg-ih-bg-card`,
+   (`packages/field-ui/src/theme.css`, imported by `app/styles/tailwind.css`) that map semantic names (`bg-ih-bg-card`,
    `text-ih-fg-2`, `bg-ih-ok`) to real colors, and flip automatically for dark
    mode.
 2. **Component primitives** — `packages/shared-ui/src/` — a small set of
@@ -21,7 +21,7 @@ today — don't invent new tokens or components ad hoc; extend what's here.
 
 ## 1. Token layer
 
-All tokens are CSS custom properties, declared once in `app/styles/tailwind.css`
+All tokens are CSS custom properties, declared once in `packages/field-ui/src/theme.css` (imported by `app/styles/tailwind.css`, which keeps only app-only tokens)
 and re-exposed as Tailwind utilities via a `@theme` block (so `bg-ih-primary`,
 `text-ih-fg-1`, etc. work as ordinary Tailwind classes). Components must
 consume tokens, not literal colors — dark mode is then "free": swapping the
@@ -281,7 +281,7 @@ Canonical examples in this repo:
   a transparent-background `<input>` with a focus underline
   (`border-b-2 border-transparent focus:border-ih-primary`), committing on
   every keystroke via `renameSection`.
-- **Inspection editor field entry** — `app/components/form/FormField.tsx`:
+- **Inspection editor field entry** — `packages/field-ui/src/components/form/FormField.tsx`:
   each item type (`text`, `number`, `select`, `boolean`, ...) renders a bare
   controlled input wired straight to `onChange`; there is no per-field save
   button, the value flows into the inspection's sync layer.

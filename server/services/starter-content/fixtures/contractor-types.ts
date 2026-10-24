@@ -1,4 +1,4 @@
-import { DEFECT_TRADES, DEFECT_TRADE_LABELS, type DefectTrade } from '../../../types/defect-fields';
+import { DEFECT_TRADES, DEFECT_TRADE_LABELS, type DefectTrade } from '@core/field-ui/shared/defect-fields.types';
 
 /**
  * The contractor-type taxonomy a fresh workspace starts with (#277).

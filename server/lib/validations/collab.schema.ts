@@ -25,7 +25,7 @@ export const CollabRestoreRequestSchema = z.object({
  * `status` is a STATUS KEY from the workspace's re-inspection status set, and
  * this schema deliberately does not enumerate them: the set is per-tenant
  * (`tenant_configs.reinspection_statuses`, defaults in
- * `server/lib/reinspection-status.ts`), so membership is checked by the handler
+ * `packages/field-ui/src/shared/reinspection-status.ts`), so membership is checked by the handler
  * against the tenant's own list rather than baked in here. `null` is valid and
  * means "no conclusion recorded" — the state a carried item starts in, so
  * clearing an answer has to be expressible.

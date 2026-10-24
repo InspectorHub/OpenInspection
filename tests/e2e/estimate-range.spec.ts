@@ -12,7 +12,7 @@
  * What remains is the part that never depended on that column: the Report
  * Features settings surface renders (E-04), and the results write path folds a
  * defect-estimate patch by DROPPING the price keys rather than rejecting them
- * (E-05) — the rule that outlived the flag, enforced by lib/repair-price-keys.ts.
+ * (E-05) — the rule that outlived the flag, enforced by packages/field-ui/src/shared/repair-price-keys.ts.
  *
  * The inspection-results JSON sanitizer (sanitizeDefectStates) is covered
  * by the unit suite; the e2e suite focuses on the surfaces that depend on a

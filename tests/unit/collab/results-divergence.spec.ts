@@ -5,8 +5,8 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as Y from 'yjs';
-import { loadResultsProjection } from '../../../server/lib/collab/results-doc';
-import type { ResultsProjection } from '../../../server/lib/collab/results-doc.types';
+import { loadResultsProjection } from '@core/field-ui/shared/results-doc';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 import { logger } from '../../../server/lib/logger';
 import { countDivergentFindings, logDivergence } from '../../../server/durable-objects/results-divergence';
 

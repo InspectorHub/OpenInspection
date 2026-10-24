@@ -310,5 +310,8 @@
   "settings_team_templates_archive": "Archive",
   "settings_team_templates_archive_title": "Archive this template?",
   "settings_team_templates_archive_confirm": "{name} can no longer be chosen, and its name can be used again. People who already have it keep their permissions.",
-  "settings_team_templates_limit": "A company can keep {max} templates. Archive one to save another."
+  "settings_team_templates_limit": "A company can keep {max} templates. Archive one to save another.",
+  "settings_hub_offline_packages_title": "Offline packages",
+  "settings_hub_offline_packages_desc": "Import work a team member exported when the app could not sync.",
+  "settings_team_remove_member_import_link": "Import an offline package"
 }

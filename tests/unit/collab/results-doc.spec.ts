@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { removeMediaBy } from '../../../server/lib/collab/results-doc-media';
+import { removeMediaBy } from '@core/field-ui/shared/results-doc-media';
 import * as Y from 'yjs';
 import {
   seedResultsDoc,
@@ -19,8 +19,8 @@ import {
   upsertRecommendation,
   loadResultsProjection,
   removeFindingKeys,
-} from '../../../server/lib/collab/results-doc';
-import type { ResultsProjection } from '../../../server/lib/collab/results-doc.types';
+} from '@core/field-ui/shared/results-doc';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 
 const FK = '_default:s1:i1';
 

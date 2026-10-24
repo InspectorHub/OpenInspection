@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 /**
  * Pure-logic spec test for cloneByScope. The function under test is
  * duplicated below to lock the contract; the production helper lives in
- * app/hooks/useFindings.ts. Keeping the duplicate in the api
+ * packages/field-ui/src/hooks/useFindings.ts. Keeping the duplicate in the api
  * workspace avoids cross-workspace import issues.
  */
 function cloneByScope(

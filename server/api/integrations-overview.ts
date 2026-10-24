@@ -28,18 +28,23 @@ const overviewRoute = createRoute(withMcpMetadata({
     description: 'Returns one card per outside service (card payments, accounting, calendar, email, SMS, address suggestions, property facts, video, AI) with its status (connected, needs attention, not connected), its source (built-in or the company\'s own account) and whether the company can switch between the two. Derived from stored settings and keys with no network call. Keys are never returned, only whether they are set.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const integrationsOverviewRoutes = createApiRouter()
-    .openapi(overviewRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const inputs = await loadOverviewInputs({
-            env: c.env,
-            profile: c.var.profile,
-            tenantId,
-            userId: c.get('user')?.sub ?? null,
-            tenantSecretKeys: c.get('tenantSecretKeys') ?? [],
-        });
-        return c.json({ success: true as const, data: buildIntegrationOverview(inputs) }, 200);
+const app = createApiRouter();
+app.openapi(overviewRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+    const inputs = await loadOverviewInputs({
+        env: c.env,
+        profile: c.var.profile,
+        tenantId,
+        userId: c.get('user')?.sub ?? null,
+        tenantSecretKeys: c.get('tenantSecretKeys') ?? [],
     });
+    return c.json({ success: true as const, data: buildIntegrationOverview(inputs) }, 200);
+});
 
-export default integrationsOverviewRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const integrationsOverviewRouteConfigs = [
+    overviewRoute,
+] as const;
+
+export default app;

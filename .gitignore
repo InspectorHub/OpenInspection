@@ -50,6 +50,7 @@ wrangler.*.toml
 # input timestamps, which is the only thing keeping it honest; a committed copy
 # goes stale and produces cross-boundary errors with no matching source.
 .types/
+.types-tsgo/
 
 # drizzle-kit schema-first: generated/temp artifacts (db:check regenerates drizzle-tmp)
 drizzle-tmp/
@@ -101,3 +102,6 @@ tests/e2e/zz-e2e-coverage-probe.spec.ts
 # ANCHORED, per the warning above: it is written to the repo root, and a bare
 # pattern would also match anything of that name at any depth.
 /worker-startup.cpuprofile
+
+# The editor package's own compiled paraglide output (npm run i18n:compile)
+packages/field-ui/src/i18n/generated/

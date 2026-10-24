@@ -1,0 +1,107 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { createWebUrls } from "./web-urls";
+
+/**
+ * Golden strings. These literals mirror the call sites listed in the "call sites" block
+ * at the bottom of this file. A batch that converts one of those call sites to `FieldUrls`
+ * must re-run this file: it passes only while the adapter and the not-yet-converted call
+ * sites still build the same string.
+ */
+
+const urls = createWebUrls();
+
+describe("createWebUrls golden strings", () => {
+    it("photo encodes the key", () => {
+        expect(urls.photo("i1", "a/b c.jpg")).toBe("/api/inspections/i1/photo?key=a%2Fb%20c.jpg");
+    });
+    it("reportPreview needs a slug", () => {
+        expect(urls.reportPreview("acme", "i1")).toBe("/report-view/acme/i1");
+        expect(urls.reportPreview("", "i1")).toBeNull();
+    });
+    it("reportPdf carries ?type=full", () => {
+        expect(urls.reportPdf("i1")).toBe("/api/inspections/i1/pdf?type=full");
+    });
+    it("costExport encodes the inspection id and names the format (the strings the export buttons built)", () => {
+        expect(urls.costExport("i 1", "csv")).toBe("/resources/cost-export?inspectionId=i%201&format=csv");
+        expect(urls.costExport("i1", "xlsx")).toBe("/resources/cost-export?inspectionId=i1&format=xlsx");
+    });
+    it("statutoryPreviewPdf", () => {
+        expect(urls.statutoryPreviewPdf("i1")).toBe("/api/inspections/i1/statutory-form/preview.pdf");
+    });
+    it("videoObject is null for an empty ref", () => {
+        expect(urls.videoObject("i1", "m9")).toBe("/api/inspections/i1/media/video/r2-object/m9");
+        expect(urls.videoObject("i1", "")).toBeNull();
+    });
+    it("videoObject keeps a hostile ref inside its one path segment", () => {
+        // `ref` comes from the collab document, which any collaborator can write.
+        expect(urls.videoObject("i1", "../../x?y#z")).toBe("/api/inspections/i1/media/video/r2-object/..%2F..%2Fx%3Fy%23z");
+        expect(urls.videoObject("i1", "..")).toBe("/api/inspections/i1/media/video/r2-object/%2E%2E");
+        expect(urls.videoObject("i1", "a/b")).not.toContain("r2-object/a/b");
+    });
+    it("an id with path characters cannot leave its segment", () => {
+        expect(urls.photo("a/../b", "k")).toBe("/api/inspections/a%2F..%2Fb/photo?key=k");
+        expect(urls.editorPath("..")).toBe("/inspections/%2E%2E/edit");
+    });
+    it("inspectionsList is the path the header link used to hard-code", () => {
+        expect(urls.inspectionsList?.()).toBe("/inspections");
+    });
+    it("editorPath", () => {
+        expect(urls.editorPath("i1")).toBe("/inspections/i1/edit");
+    });
+});
+
+describe("presenceSocket", () => {
+    it("uses wss for https and ws otherwise, from an injected location", () => {
+        expect(createWebUrls({ protocol: "https:", host: "app.example.com" }).presenceSocket("i1")).toBe(
+            "wss://app.example.com/api/inspections/i1/presence/ws",
+        );
+        expect(createWebUrls({ protocol: "http:", host: "localhost:8787" }).presenceSocket("i1")).toBe(
+            "ws://localhost:8787/api/inspections/i1/presence/ws",
+        );
+    });
+    it("equals what usePresence built from window.location before it read the data source", () => {
+        // The formula the hook used (verbatim from the old call site), evaluated for each scheme.
+        const old = (loc: { protocol: string; host: string }, id: string) => {
+            const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
+            return `${protocol}//${loc.host}/api/inspections/${id}/presence/ws`;
+        };
+        for (const loc of [
+            { protocol: "https:", host: "app.inspectorhub.io" },
+            { protocol: "http:", host: "localhost:8787" },
+            { protocol: "http:", host: "192.168.1.20:8787" },
+        ]) {
+            expect(createWebUrls(loc).presenceSocket("insp-9")).toBe(old(loc, "insp-9"));
+        }
+    });
+    it("throws a clear error on the server when no location was injected", () => {
+        expect(typeof window).toBe("undefined");
+        expect(() => createWebUrls().presenceSocket("i1")).toThrow(/browser location/);
+    });
+});
+
+describe("call sites still build the same fragments", () => {
+    const read = (rel: string) => readFileSync(path.resolve(__dirname, "../../..", rel), "utf8");
+    const sites: Array<[string, string[]]> = [
+        ["packages/field-ui/src/components/editor/ItemEditor.tsx", ["urls.photo(inspectionId ?? \"\", k)"]],
+        ["packages/field-ui/src/components/editor/SideRail.tsx", ["urls.photo(inspectionId ?? \"\", key)"]],
+        ["packages/field-ui/src/hooks/usePhotoOps.ts", ["urls.photo(state.inspection.id, baseKey)", "urls.photo(state.inspection.id, dk)", "urls.photo(state.inspection.id, annotateBaseKey)", "urls.photo(state.inspection.id, originalKey)"]],
+        ["packages/field-ui/src/components/editor/EditorHeader.tsx", ["urls.reportPreview(tenantSlug, String(state.inspection.id))"]],
+        ["packages/field-ui/src/components/media-studio/VideoPlayer.tsx", ["urls.videoObject(inspectionId, mediaId)"]],
+        [
+            "packages/field-ui/src/hooks/usePresence.ts",
+            ["dataSource.urls.presenceSocket(inspectionId)"],
+        ],
+        ["packages/field-ui/src/components/editor/InspectionOverview.tsx", ["urls.statutoryPreviewPdf(String(bag.id))"]],
+        ["packages/field-ui/src/hooks/useHostActions.ts", ["dataSource.urls.reportPreview(tenantSlug, inspectionId)"]],
+        ["packages/field-ui/src/editor/FieldEditor.tsx", ["dataSource.urls.photo(String(state.inspection.id), photos[0])"]],
+        ["packages/field-ui/src/components/editor/PublishModal.tsx", ["urls.editorPath(inspectionId)"]],
+    ];
+    for (const [file, fragments] of sites) {
+        it(file, () => {
+            const text = read(file);
+            for (const f of fragments) expect(text).toContain(f);
+        });
+    }
+});

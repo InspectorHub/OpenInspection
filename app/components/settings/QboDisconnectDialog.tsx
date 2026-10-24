@@ -1,6 +1,6 @@
 import { useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 
 /**
  * The confirmation in front of Disconnect.

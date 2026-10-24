@@ -7,7 +7,7 @@ import {
     migrateLegacyKey,
     findingKeysFromTemplateSnapshot,
     DEFAULT_UNIT,
-} from '../../../server/lib/finding-key';
+} from '@core/field-ui/shared/finding-key';
 
 describe('findingKey', () => {
     it('builds 3-part key with unitId', () => {

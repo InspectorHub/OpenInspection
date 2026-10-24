@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const completePost = vi.fn();
 const publishPost = vi.fn();
 const inspectionPatch = vi.fn();
+const unitsPost = vi.fn();
 /** Call order across endpoints — the whole point of the auto-sign specs. */
 const calls: string[] = [];
 
@@ -20,12 +21,14 @@ vi.mock('~/lib/api-client.server', () => ({
                 complete: { $post: completePost },
                 publish: { $post: publishPost },
                 $patch: inspectionPatch,
+                units: { $post: unitsPost },
             },
         },
     })),
 }));
 
 import { action } from './action.server';
+import { createApi } from '~/lib/api-client.server';
 import { routeArgs } from '../../../tests/helpers/route-args';
 /** Minimal AppLoadContext stub — the action only forwards it to createApi. */
 const CONTEXT = {} as Parameters<typeof action>[0]['context'];
@@ -191,5 +194,93 @@ describe('editor action — the revision reason travels with the publish', () =>
             param: { id: 'insp-1' },
             json: { summary: 'Fixed a typo.' },
         });
+    });
+});
+
+// React Router decodes `%2F` in a route param, and the typed API client pastes params into the path
+// without encoding them, so `..%2F..%2Fx%3F` would otherwise steer the forwarded call to another path.
+// The guard sits right after the token check: nothing is read, nothing is forwarded.
+describe('editor action: the inspection id must be a single path segment', () => {
+    const bad = ['..', '.', '', '../x', 'a/b', 'a?b', 'a#b', `a${String.fromCharCode(92)}b`, 'a%2Fb', '%2e%2e'];
+
+    function postWithId(id: string) {
+        const request = new Request('https://acme.example.com/resources/inspection-editor-command/x', {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ intent: 'complete' }).toString(),
+        });
+        return action(routeArgs(request, { params: { id }, context: CONTEXT }));
+    }
+
+    beforeEach(() => {
+        completePost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+        vi.mocked(createApi).mockClear();
+    });
+
+    it.each(bad)('refuses %j with a 400 and forwards nothing', async (id) => {
+        const res = await postWithId(id);
+        expect(res).toBeInstanceOf(Response);
+        expect((res as Response).status).toBe(400);
+        expect(createApi).not.toHaveBeenCalled();
+        expect(completePost).not.toHaveBeenCalled();
+    });
+
+    it('CONTROL - an ordinary id still goes through', async () => {
+        const res = await postWithId('3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+        expect(completePost).toHaveBeenCalledTimes(1);
+        expect(res).toMatchObject({ ok: true, intent: 'complete' });
+    });
+});
+
+
+/**
+ * The web transport sends the command's idempotency key as a form field. A timed-out create is retried with
+ * the same key, so the action must hand it to the API client for the intents that would otherwise duplicate.
+ */
+describe('editor action - idempotency key for non-idempotent intents', () => {
+    beforeEach(() => {
+        vi.mocked(createApi).mockClear();
+        unitsPost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+        completePost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+    });
+
+    it('unit-create passes the key to the API client', async () => {
+        await post({ intent: 'unit-create', name: 'Unit 4', idempotencyKey: 'key-123' });
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]).toMatchObject({ idempotencyKey: 'key-123' });
+    });
+
+    it('unit-create without a key passes none', async () => {
+        await post({ intent: 'unit-create', name: 'Unit 4' });
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]?.idempotencyKey).toBeUndefined();
+    });
+
+    it('an idempotent intent never forwards the key', async () => {
+        await post({ intent: 'complete', idempotencyKey: 'key-123' });
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]?.idempotencyKey).toBeUndefined();
+    });
+});
+
+describe('editor action — who may receive a thrown "still running" answer', () => {
+    function postTo(url: string) {
+        const request = new Request(url, {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ intent: 'unit-create', name: 'A', idempotencyKey: 'k-1' }).toString(),
+        });
+        return action(routeArgs(request, { params: { id: 'insp-1' }, context: CONTEXT }));
+    }
+    beforeEach(() => {
+        unitsPost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+        vi.mocked(createApi).mockClear();
+    });
+
+    it('the resource route (the command channel) asks for it', async () => {
+        await postTo('https://acme.example.com/resources/inspection-editor-command/insp-1');
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]).toMatchObject({ idempotencyKey: 'k-1', inFlightAsResponse: true });
+    });
+
+    it('the page route does not: a thrown Response there would render the error boundary', async () => {
+        await postTo('https://acme.example.com/inspections/insp-1/edit');
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]).toMatchObject({ idempotencyKey: 'k-1', inFlightAsResponse: false });
     });
 });

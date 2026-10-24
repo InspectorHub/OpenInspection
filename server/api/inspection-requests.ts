@@ -11,6 +11,7 @@
 
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
 import {
@@ -173,97 +174,107 @@ const addSubRoute = createRoute(withMcpMetadata({
         + "adds another inspection. Restricted to owners and managers."
 }, { scopes: ['write'], tier: 'extended' }));
 
-const inspectionRequestsRoutes = createApiRouter()
-    .openapi(listRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const q = c.req.valid('query');
-        const filter: { status?: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'; from?: string; to?: string; limit?: number; offset?: number } = {
-            limit: q.limit, offset: q.offset,
-        };
-        if (q.status) filter.status = q.status;
-        if (q.from)   filter.from   = q.from;
-        if (q.to)     filter.to     = q.to;
-        const rows = await c.var.services.inspectionRequest.list(tenantId, await resolveInspectionScope(c), filter);
-        // `InspectionRequestListResponseSchema` puts `{ requests, total }` INSIDE
-        // `data` — that is what the OpenAPI document publishes and what
-        // `packages/api-types` exports. The handler had drifted to the bare
-        // `data: rows` + `meta.total` envelope used by /api/inspections, so a
-        // generated client following the contract read `data.requests` and got
-        // undefined. Nothing under `app/` calls this endpoint (the hono client is
-        // wired in api-client.server.ts but never used), so the contract is the
-        // only consumer and the handler is the side that was wrong.
-        return c.json({ success: true, data: await moneyView(c, { requests: rows, total: rows.length }, 'inspectionFees') }, 200);
-    })
-    .openapi(detailRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const request = await c.var.services.inspectionRequest.get(tenantId, id, await resolveInspectionScope(c));
-        if (!request) throw Errors.NotFound('Inspection request not found');
-        return c.json({ success: true, data: await moneyView(c, { request }, 'inspectionFees') }, 200);
-    })
-    .openapi(byInspectionRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { inspectionId } = c.req.valid('param');
-        const scope = await resolveInspectionScope(c);
-        // For a restricted caller an inspection that is hidden and one that does not exist answer alike.
-        await requireVisibleInspection(getDrizzle(c), scope, tenantId, inspectionId);
-        const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId, scope);
-        return c.json({ success: true as const, data: await moneyView(c, { request: request ?? null }, 'inspectionFees') }, 200);
-    })
-    .openapi(createReqRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
+const app = createApiRouter();
+app.openapi(listRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const q = c.req.valid('query');
+    const filter: { status?: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'; from?: string; to?: string; limit?: number; offset?: number } = {
+        limit: q.limit, offset: q.offset,
+    };
+    if (q.status) filter.status = q.status;
+    if (q.from)   filter.from   = q.from;
+    if (q.to)     filter.to     = q.to;
+    const rows = await c.var.services.inspectionRequest.list(tenantId, await resolveInspectionScope(c), filter);
+    // `InspectionRequestListResponseSchema` puts `{ requests, total }` INSIDE
+    // `data` — that is what the OpenAPI document publishes and what
+    // `packages/api-types` exports. The handler had drifted to the bare
+    // `data: rows` + `meta.total` envelope used by /api/inspections, so a
+    // generated client following the contract read `data.requests` and got
+    // undefined. Nothing under `app/` calls this endpoint (the hono client is
+    // wired in api-client.server.ts but never used), so the contract is the
+    // only consumer and the handler is the side that was wrong.
+    return c.json({ success: true, data: await moneyView(c, { requests: rows, total: rows.length }, 'inspectionFees') }, 200);
+});
+app.openapi(detailRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const request = await c.var.services.inspectionRequest.get(tenantId, id, await resolveInspectionScope(c));
+    if (!request) throw Errors.NotFound('Inspection request not found');
+    return c.json({ success: true, data: await moneyView(c, { request }, 'inspectionFees') }, 200);
+});
+app.openapi(byInspectionRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { inspectionId } = c.req.valid('param');
+    const scope = await resolveInspectionScope(c);
+    // For a restricted caller an inspection that is hidden and one that does not exist answer alike.
+    await requireVisibleInspection(getDrizzle(c), scope, tenantId, inspectionId);
+    const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId, scope);
+    return c.json({ success: true as const, data: await moneyView(c, { request: request ?? null }, 'inspectionFees') }, 200);
+});
+app.openapi(createReqRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
 
-        const reqInput: {
-            clientName: string; clientEmail?: string | null; clientPhone?: string | null;
-            propertyAddress: string; propertyCity?: string | null; propertyState?: string | null;
-            propertyZip?: string | null; scheduledAt: string; notes?: string | null; inspectorId?: string | null;
-        } = {
-            clientName:      body.clientName,
-            propertyAddress: body.propertyAddress,
-            scheduledAt:     body.scheduledAt,
-        };
-        if ('clientEmail'  in body) reqInput.clientEmail  = body.clientEmail  ?? null;
-        if ('clientPhone'  in body) reqInput.clientPhone  = body.clientPhone  ?? null;
-        if ('propertyCity' in body) reqInput.propertyCity = body.propertyCity ?? null;
-        if ('propertyState' in body) reqInput.propertyState = body.propertyState ?? null;
-        if ('propertyZip'  in body) reqInput.propertyZip  = body.propertyZip  ?? null;
-        if ('notes'        in body) reqInput.notes        = body.notes        ?? null;
-        if (body.inspectorId)       reqInput.inspectorId  = body.inspectorId;
+    const reqInput: {
+        clientName: string; clientEmail?: string | null; clientPhone?: string | null;
+        propertyAddress: string; propertyCity?: string | null; propertyState?: string | null;
+        propertyZip?: string | null; scheduledAt: string; notes?: string | null; inspectorId?: string | null;
+    } = {
+        clientName:      body.clientName,
+        propertyAddress: body.propertyAddress,
+        scheduledAt:     body.scheduledAt,
+    };
+    if ('clientEmail'  in body) reqInput.clientEmail  = body.clientEmail  ?? null;
+    if ('clientPhone'  in body) reqInput.clientPhone  = body.clientPhone  ?? null;
+    if ('propertyCity' in body) reqInput.propertyCity = body.propertyCity ?? null;
+    if ('propertyState' in body) reqInput.propertyState = body.propertyState ?? null;
+    if ('propertyZip'  in body) reqInput.propertyZip  = body.propertyZip  ?? null;
+    if ('notes'        in body) reqInput.notes        = body.notes        ?? null;
+    if (body.inspectorId)       reqInput.inspectorId  = body.inspectorId;
 
-        const subs = body.subInspections.map(s => {
-            const out: { templateId: string; price?: number; notes?: string | null } = { templateId: s.templateId };
-            if (s.price !== undefined) out.price = s.price;
-            if (s.notes !== undefined) out.notes = s.notes ?? null;
-            return out;
-        });
-
-        const created = await c.var.services.inspectionRequest.create(tenantId, reqInput, subs);
-        return c.json({ success: true, data: await moneyView(c, { request: created }, 'inspectionFees') }, 201);
-    })
-    .openapi(updateReqRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const raw = c.req.valid('json');
-        const patch: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(raw)) {
-            if (v !== undefined) patch[k] = v;
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const updated = await c.var.services.inspectionRequest.update(tenantId, id, patch as any);
-        return c.json({ success: true, data: await moneyView(c, { request: updated }, 'inspectionFees') }, 200);
-    })
-    .openapi(addSubRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const body = c.req.valid('json');
-        const sub: { templateId: string; price?: number; notes?: string | null } = { templateId: body.templateId };
-        if (body.price !== undefined) sub.price = body.price;
-        if (body.notes !== undefined) sub.notes = body.notes ?? null;
-        const updated = await c.var.services.inspectionRequest.addSubInspection(tenantId, id, sub);
-        return c.json({ success: true, data: await moneyView(c, { request: updated }, 'inspectionFees') }, 200);
+    const subs = body.subInspections.map(s => {
+        const out: { templateId: string; price?: number; notes?: string | null } = { templateId: s.templateId };
+        if (s.price !== undefined) out.price = s.price;
+        if (s.notes !== undefined) out.notes = s.notes ?? null;
+        return out;
     });
 
-export type InspectionRequestsApi = typeof inspectionRequestsRoutes;
+    const created = await c.var.services.inspectionRequest.create(tenantId, reqInput, subs);
+    return c.json({ success: true, data: await moneyView(c, { request: created }, 'inspectionFees') }, 201);
+});
+app.openapi(updateReqRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const raw = c.req.valid('json');
+    const patch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw)) {
+        if (v !== undefined) patch[k] = v;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updated = await c.var.services.inspectionRequest.update(tenantId, id, patch as any);
+    return c.json({ success: true, data: await moneyView(c, { request: updated }, 'inspectionFees') }, 200);
+});
+app.openapi(addSubRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const sub: { templateId: string; price?: number; notes?: string | null } = { templateId: body.templateId };
+    if (body.price !== undefined) sub.price = body.price;
+    if (body.notes !== undefined) sub.notes = body.notes ?? null;
+    const updated = await c.var.services.inspectionRequest.addSubInspection(tenantId, id, sub);
+    return c.json({ success: true, data: await moneyView(c, { request: updated }, 'inspectionFees') }, 200);
+});
 
-export default inspectionRequestsRoutes;
+/** Registration order. Drives `InspectionRequestsApi`; a test pins it to what `app` really registered. */
+export const inspectionRequestsRouteConfigs = [
+    listRoute,
+    detailRoute,
+    byInspectionRoute,
+    createReqRoute,
+    updateReqRoute,
+    addSubRoute,
+] as const;
+
+export type InspectionRequestsApi = ApiOf<typeof inspectionRequestsRouteConfigs>;
+
+export default app;

@@ -1,7 +1,7 @@
 import { pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { attentionLabel } from "~/components/settings/QboSyncStatus";
-import { formatCurrency } from "~/lib/format";
+import { formatCurrency } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { QBO_VOIDED_IN_QBO } from "../../../server/lib/qbo-discrepancy";
 import type { QBOSyncErrorSummary } from "../../../server/services/qbo/api-base";

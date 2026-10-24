@@ -1,5 +1,5 @@
 /**
- * Server-side twin of app/lib/format.ts. The app<->server import boundary forbids
+ * Server-side twin of packages/field-ui/src/shared/format.ts. The app<->server import boundary forbids
  * importing app/ from server/, so this duplicates the (pure `Intl`) formatter for
  * email/PDF/API rendering. The two files MUST stay identical in behavior — a
  * parity test (tests/unit/platform/format-parity.spec.ts) asserts byte-identical

@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import { mounted, type ApiOf } from '../lib/api-schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
 import { setCookie } from 'hono/cookie';
@@ -11,22 +12,14 @@ import { checkRateLimit } from '../lib/rate-limit';
 import { requireCsrfToken } from '../lib/middleware/csrf';
 import { signJwt } from '../lib/jwt-keyring';
 import { writeAuditLog, auditFromContext } from '../lib/audit';
-import {
-    LoginSchema,
-    ChangePasswordSchema,
-    JoinTeamSchema,
-    ForgotPasswordSchema,
-    ResetPasswordSchema,
-    AuthResponseSchema, LoginResponseSchema,
-    SetupSchema,
-} from '../lib/validations/auth.schema';
+import { LoginSchema, ChangePasswordSchema, JoinTeamSchema, ForgotPasswordSchema, ResetPasswordSchema, AuthResponseSchema, LoginResponseSchema, SetupSchema } from '../lib/validations/auth.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { authCookieOptions, AUTH_COOKIE_NAME } from '../lib/auth-helpers';
 import { safeReturnTo } from '../lib/mcp/safe-return-to';
 import { findGlobalAgentById } from '../services/agent/account';
-import totpRoutes from './auth/totp';
-import profileRoutes from './auth/profile';
+import totpRoutes, { totpRouteConfigs } from './auth/totp';
+import profileRoutes, { profileRouteConfigs } from './auth/profile';
 import { getDrizzle } from '../lib/route-helpers';
 import { platformActorClaims } from '../lib/platform-actor-claims';
 
@@ -257,7 +250,8 @@ const setupStatusRoute = createRoute(withMcpMetadata({
 // `GET /sso` is its own router so server/index.ts can mount it at the ROOT without
 // dragging the rest of the auth surface there: the portal mints an absolute
 // `https://app.{domain}/sso?code=<code>` and the browser navigates straight to it.
-export const ssoRootRoutes = createApiRouter().openapi(ssoConsumeRoute, async (c) => {
+export const ssoRootRoutes = createApiRouter();
+ssoRootRoutes.openapi(ssoConsumeRoute, async (c) => {
     const { code, return_to } = c.req.valid('query');
     if (!c.env.TENANT_CACHE) return c.redirect('/login?sso=unavailable', 302);
 
@@ -334,287 +328,289 @@ export const ssoRootRoutes = createApiRouter().openapi(ssoConsumeRoute, async (c
     return c.redirect(safeReturnTo(return_to, '/inspections'), 302);
 });
 
-const coreAuthRoutes = createApiRouter()
-    .openapi(loginRoute, async (c) => {
-        // SaaS deploys disable the local password form (login via portal) —
-        // see the matching guard on GET /login. Returning Gone (410) + a
-        // redirect hint lets stale clients (cached SPA build, scripted callers)
-        // bail out cleanly instead of attempting credential validation against
-        // a per-(tenant_id,email) row they can't disambiguate.
-        const profile = c.var.profile;
-        if (profile?.mode === 'saas') {
-            const portal = c.var.profile.loginRedirectBase;
-            return c.json({
-                success: false,
-                error: {
-                    code: 'LOGIN_MOVED_TO_PORTAL',
-                    message: 'Sign in via the workspace portal.',
-                    ...(portal ? { details: { redirect: `${portal}/login` } } : {}),
-                },
-            }, 410);
-        }
-
-        await checkRateLimit(c, 'login');
-
-        const body = c.req.valid('json');
-        // The profile owns this, fallback included — `getDeploymentProfile`
-        // resolves `SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK`. Writing the
-        // literal here was a second copy of a decision, and the all-zero UUID
-        // appeared three times in this repo for two answers.
-        const tenantId = getDeploymentProfile(c.env).fixedTenantId!;
-        const user = await c.var.services.auth.validateCredentials(body.email, body.password, tenantId);
-
-        const keyring = await c.var.keyringPromise!;
-        const now = Math.floor(Date.now() / 1000);
-
-        // Spec 4A — If the user has 2FA enabled, return a short-lived challenge token instead of
-        // the session JWT. The client must POST it back along with a TOTP code to /api/auth/login/2fa
-        // before any session is granted.
-        if (user.totpEnabled) {
-            const challengeToken = await signJwt({
-                sub: user.id,
-                t: 'challenge',
-                iat: now,
-                exp: now + 60 * 5,
-            }, keyring);
-            // Intentionally NOT a Set-Cookie — challenge tokens travel JSON-only so a stolen
-            // session cookie alone never permits 2FA bypass.
-            return c.json({
-                success: true,
-                data: { requires2fa: true, challengeToken }
-            }, 200);
-        }
-
-        // Email is intentionally NOT in the payload — JWTs are signed but not encrypted, and the
-        // token travels through logs / intermediaries. PII belongs in the DB, not in the bearer.
-        const token = await signJwt({
-            sub: user.id,
-            'custom:tenantId': user.tenantId,
-            'custom:userRole': user.role,
-            role: user.role,
-            iat: now,
-            exp: now + 60 * 60 * 24,
-        }, keyring);
-
-        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
-
-        // Token Relay BFF: when the React Router v7 SSR frontend (server-to-server) calls
-        // this endpoint, Workers fetch() may strip Set-Cookie. The BFF signals
-        // itself via X-Token-Relay header; we return the JWT in the body so the
-        // BFF can store it in its own session cookie. The browser never sees this
-        // header because the BFF is the only caller — browsers use the HttpOnly
-        // cookie path exclusively.
-        const isBff = c.req.header('x-token-relay') === '1';
+const coreAuthRoutes = createApiRouter();
+coreAuthRoutes.openapi(loginRoute, async (c) => {
+    // SaaS deploys disable the local password form (login via portal) —
+    // see the matching guard on GET /login. Returning Gone (410) + a
+    // redirect hint lets stale clients (cached SPA build, scripted callers)
+    // bail out cleanly instead of attempting credential validation against
+    // a per-(tenant_id,email) row they can't disambiguate.
+    const profile = c.var.profile;
+    if (profile?.mode === 'saas') {
+        const portal = c.var.profile.loginRedirectBase;
         return c.json({
-            success: true,
-            data: { redirect: '/inspections', ...(isBff ? { token } : {}) }
-        }, 200);
-    })
-    .openapi(changePasswordRoute, async (c) => {
-        // The global JWT middleware has already verified the token and populated c.var.user.
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
-
-        const body = c.req.valid('json');
-        await c.var.services.auth.updatePassword(user.sub, body.currentPassword, body.newPassword);
-
-        // The service also emits a `user.password_changed` outbox event. That
-        // is replication and it expires after two cycles; this row is the
-        // durable half, and it is the half a later reader asks for.
-        //
-        // Deliberately no metadata: nothing about a password belongs in a
-        // column whose redaction is documented as knowingly incomplete.
-        auditFromContext(c, 'user.password_change', 'user', {
-            entityId: user.sub,
-        });
-
-        return c.json({ success: true }, 200);
-    })
-    .openapi(joinTeamRoute, async (c) => {
-        const body = c.req.valid('json');
-        // The seat decision belongs to the deployment, not to the service:
-        // standalone has a `max_users` default and no billing behind it.
-        const user = await c.var.services.auth.joinTeam(body.token, body.password, {
-            name: body.name,
-            seatQuota: {
-                enforce: c.var.profile.hasSeatQuota,
-                billingPortalUrl: c.var.profile.billingPortalUrl,
+            success: false,
+            error: {
+                code: 'LOGIN_MOVED_TO_PORTAL',
+                message: 'Sign in via the workspace portal.',
+                ...(portal ? { details: { redirect: `${portal}/login` } } : {}),
             },
-        });
+        }, 410);
+    }
 
-        const keyring = await c.var.keyringPromise!;
-        const now = Math.floor(Date.now() / 1000);
-        const token = await signJwt({
+    await checkRateLimit(c, 'login');
+
+    const body = c.req.valid('json');
+    // The profile owns this, fallback included — `getDeploymentProfile`
+    // resolves `SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK`. Writing the
+    // literal here was a second copy of a decision, and the all-zero UUID
+    // appeared three times in this repo for two answers.
+    const tenantId = getDeploymentProfile(c.env).fixedTenantId!;
+    const user = await c.var.services.auth.validateCredentials(body.email, body.password, tenantId);
+
+    const keyring = await c.var.keyringPromise!;
+    const now = Math.floor(Date.now() / 1000);
+
+    // Spec 4A — If the user has 2FA enabled, return a short-lived challenge token instead of
+    // the session JWT. The client must POST it back along with a TOTP code to /api/auth/login/2fa
+    // before any session is granted.
+    if (user.totpEnabled) {
+        const challengeToken = await signJwt({
             sub: user.id,
-            'custom:tenantId': user.tenantId,
-            'custom:userRole': user.role,
-            role: user.role,
+            t: 'challenge',
             iat: now,
-            exp: now + 60 * 60 * 24,
+            exp: now + 60 * 5,
         }, keyring);
-
-        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
-
-        // An invite being ACCEPTED is the other half of the invite being sent,
-        // and the pair is what answers "how did this person get in".
-        //
-        // `writeAuditLog` and not `auditFromContext`: the JWT middleware returns
-        // early for `/join`, so there is no tenant on the context here. The
-        // tenant is the one the invite belongs to, which is what `joinTeam`
-        // just returned.
-        writeAuditLog({
-            db: c.env.DB,
-            tenantId: user.tenantId,
-            userId: user.id,
-            action: 'user.join',
-            entityType: 'user',
-            entityId: user.id,
-            metadata: { role: user.role },
-            ipAddress: c.req.header('CF-Connecting-IP'),
-        });
-
+        // Intentionally NOT a Set-Cookie — challenge tokens travel JSON-only so a stolen
+        // session cookie alone never permits 2FA bypass.
         return c.json({
             success: true,
-            data: { redirect: '/inspections' }
+            data: { requires2fa: true, challengeToken }
         }, 200);
-    })
-    .route('/', ssoRootRoutes) // what keeps /api/auth/sso answering; index.ts mounts the same router at the root
-    .openapi(forgotPasswordRoute, async (c) => {
-        // SaaS deploys disable the local password form (password reset via
-        // portal) — see the matching guard on POST /api/auth/login. Password
-        // resets must go through the workspace portal which owns the identity
-        // layer for SaaS tenants.
-        const profile = c.var.profile;
-        if (profile?.mode === 'saas') {
-            return c.json({
-                success: false as const,
-                error: {
-                    code: 'PASSWORD_RESET_MOVED_TO_PORTAL',
-                    message: 'Use the workspace portal to reset your password.',
-                },
-            }, 410);
-        }
+    }
 
-        await checkRateLimit(c, 'forgot');
+    // Email is intentionally NOT in the payload — JWTs are signed but not encrypted, and the
+    // token travels through logs / intermediaries. PII belongs in the DB, not in the bearer.
+    const token = await signJwt({
+        sub: user.id,
+        'custom:tenantId': user.tenantId,
+        'custom:userRole': user.role,
+        role: user.role,
+        iat: now,
+        exp: now + 60 * 60 * 24,
+    }, keyring);
 
-        const body = c.req.valid('json');
-        const resetToken = await c.var.services.auth.createPasswordResetToken(
-            body.email,
-            getDeploymentProfile(c.env).fixedTenantId!,
-        );
+    setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
-        if (!resetToken) return c.json({ success: true }, 200);
+    // Token Relay BFF: when the React Router v7 SSR frontend (server-to-server) calls
+    // this endpoint, Workers fetch() may strip Set-Cookie. The BFF signals
+    // itself via X-Token-Relay header; we return the JWT in the body so the
+    // BFF can store it in its own session cookie. The browser never sees this
+    // header because the BFF is the only caller — browsers use the HttpOnly
+    // cookie path exclusively.
+    const isBff = c.req.header('x-token-relay') === '1';
+    return c.json({
+        success: true,
+        data: { redirect: '/inspections', ...(isBff ? { token } : {}) }
+    }, 200);
+});
+coreAuthRoutes.openapi(changePasswordRoute, async (c) => {
+    // The global JWT middleware has already verified the token and populated c.var.user.
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
 
-        const baseUrl = getBaseUrl(c);
-        const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
+    const body = c.req.valid('json');
+    await c.var.services.auth.updatePassword(user.sub, body.currentPassword, body.newPassword);
 
-        await c.var.services.email.sendPasswordReset(body.email, resetLink)
-            .catch((e: unknown) => {
-                // Platform-level refusals (suppressed address, domain unverified,
-                // quota exhausted) are actionable: surface them so the user knows
-                // the reset email was refused rather than waiting forever.
-                if (e instanceof AppError) throw e;
-                // Transient failures are best-effort — the user can retry.
-                logger.warn('[auth] password-reset email delivery failed (transient)', { error: e instanceof Error ? e.message : String(e) });
-            });
-
-        return c.json({ success: true }, 200);
-    })
-    .openapi(resetPasswordRoute, async (c) => {
-        const body = c.req.valid('json');
-        await c.var.services.auth.resetPassword(body.token, body.newPassword);
-        return c.json({ success: true }, 200);
-    })
-    .openapi(setupRoute, async (c) => {
-        // 1. Safety Check: Only allow if no tenant-scoped users exist.
-        // Agent Accounts A1 — global agents (tenant_id IS NULL) are unrelated to
-        // first-time tenant initialization, so they must not block setup.
-        const db = getDrizzle(c);
-        const existingTenantUser = await db.select().from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
-        if (existingTenantUser) {
-            return c.json({ success: false, error: { code: 'already_initialized', message: 'System already initialized' } }, 409);
-        }
-
-        const body = c.req.valid('json');
-
-        // 2. Verification Code Check — gated solely by the SETUP_CODE secret.
-        // Fail closed when it is unset so an unprotected Worker can't be claimed.
-        const storedCode = c.env.SETUP_CODE;
-        if (!storedCode) {
-            return c.json({ success: false, error: { code: 'setup_code_unset', message: 'SETUP_CODE is not configured on this Worker. Set it as a secret and try again.' } }, 400);
-        }
-        if (body.verificationCode !== storedCode) {
-            return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
-        }
-
-        // 3. Initialize Workspace
-        const passwordHash = await c.var.services.auth.hashPassword(body.password);
-        // The profile owns this, fallback included — `getDeploymentProfile`
-        // resolves `SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK`. Writing the
-        // literal here was a second copy of a decision, and the all-zero UUID
-        // appeared three times in this repo for two answers.
-        const tenantId = getDeploymentProfile(c.env).fixedTenantId!;
-        const slug = body.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
-        await c.var.services.admin.updateTenantStatus({
-            id: tenantId,
-            name: body.companyName,
-            slug,
-            status: 'active',
-            adminEmail: body.email,
-            adminPasswordHash: passwordHash,
-            adminName: body.adminName,
-        });
-
-        // Auto-seed the FULL starter content library for the new tenant in one
-        // idempotent pass (templates, agreements, canned comments, event types, tags,
-        // recommendations, rating systems, marketplace libraries) — the same canonical
-        // seeder `POST /api/admin/data/install-bundled-content` uses, so /setup yields
-        // a fully populated NEW workspace (no separate post-deploy seed step needed).
-        // Not an EXISTING one — `already_initialized` above refuses forever once a user exists, so content a later release ships arrives only via that route.
-        try {
-            const { seedStarterContent } = await import('../services/starter-content.service');
-            const seeded = await seedStarterContent(c.env.DB, tenantId);
-            logger.info('Auto-seeded starter content during setup', { tenantId, ...seeded });
-        } catch (seedErr) {
-            // Don't block setup if seeding fails — log and continue.
-            logger.error('Auto-seed starter content failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
-        }
-
-        // 4. Issue a JWT for the new admin so the caller can authenticate immediately
-        const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
-        if (newUser) {
-            const keyring = await c.var.keyringPromise!;
-            const now = Math.floor(Date.now() / 1000);
-            const token = await signJwt({
-                sub: newUser.id,
-                'custom:tenantId': newUser.tenantId,
-                'custom:userRole': newUser.role,
-                role: newUser.role,
-                iat: now,
-                exp: now + 60 * 60 * 24,
-            }, keyring);
-            setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
-        }
-
-        return c.json({
-            success: true,
-            data: { redirect: '/inspections' }
-        }, 200);
-    })
-    .route('/', profileRoutes)
-    .route('/', totpRoutes)
-    .openapi(inviteInfoRoute, async (c) => {
-        const { token } = c.req.valid('query');
-        const info = await c.var.services.auth.getInviteInfo(token);
-        if (!info) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
-        return c.json({ success: true as const, data: info }, 200);
-    })
-    .openapi(setupStatusRoute, async (c) => {
-        const isSetUp = await c.var.services.auth.isSetUp();
-        return c.json({ success: true as const, data: { isSetUp } }, 200);
+    // The service also emits a `user.password_changed` outbox event. That
+    // is replication and it expires after two cycles; this row is the
+    // durable half, and it is the half a later reader asks for.
+    //
+    // Deliberately no metadata: nothing about a password belongs in a
+    // column whose redaction is documented as knowingly incomplete.
+    auditFromContext(c, 'user.password_change', 'user', {
+        entityId: user.sub,
     });
 
-export type CoreAuthApi = typeof coreAuthRoutes;
+    return c.json({ success: true }, 200);
+});
+coreAuthRoutes.openapi(joinTeamRoute, async (c) => {
+    const body = c.req.valid('json');
+    // The seat decision belongs to the deployment, not to the service:
+    // standalone has a `max_users` default and no billing behind it.
+    const user = await c.var.services.auth.joinTeam(body.token, body.password, {
+        name: body.name,
+        seatQuota: {
+            enforce: c.var.profile.hasSeatQuota,
+            billingPortalUrl: c.var.profile.billingPortalUrl,
+        },
+    });
+
+    const keyring = await c.var.keyringPromise!;
+    const now = Math.floor(Date.now() / 1000);
+    const token = await signJwt({
+        sub: user.id,
+        'custom:tenantId': user.tenantId,
+        'custom:userRole': user.role,
+        role: user.role,
+        iat: now,
+        exp: now + 60 * 60 * 24,
+    }, keyring);
+
+    setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
+
+    // An invite being ACCEPTED is the other half of the invite being sent,
+    // and the pair is what answers "how did this person get in".
+    //
+    // `writeAuditLog` and not `auditFromContext`: the JWT middleware returns
+    // early for `/join`, so there is no tenant on the context here. The
+    // tenant is the one the invite belongs to, which is what `joinTeam`
+    // just returned.
+    writeAuditLog({
+        db: c.env.DB,
+        tenantId: user.tenantId,
+        userId: user.id,
+        action: 'user.join',
+        entityType: 'user',
+        entityId: user.id,
+        metadata: { role: user.role },
+        ipAddress: c.req.header('CF-Connecting-IP'),
+    });
+
+    return c.json({
+        success: true,
+        data: { redirect: '/inspections' }
+    }, 200);
+});
+coreAuthRoutes.route('/', ssoRootRoutes); // what keeps /api/auth/sso answering; index.ts mounts the same router at the root
+coreAuthRoutes.openapi(forgotPasswordRoute, async (c) => {
+    // SaaS deploys disable the local password form (password reset via
+    // portal) — see the matching guard on POST /api/auth/login. Password
+    // resets must go through the workspace portal which owns the identity
+    // layer for SaaS tenants.
+    const profile = c.var.profile;
+    if (profile?.mode === 'saas') {
+        return c.json({
+            success: false as const,
+            error: {
+                code: 'PASSWORD_RESET_MOVED_TO_PORTAL',
+                message: 'Use the workspace portal to reset your password.',
+            },
+        }, 410);
+    }
+
+    await checkRateLimit(c, 'forgot');
+
+    const body = c.req.valid('json');
+    const resetToken = await c.var.services.auth.createPasswordResetToken(
+        body.email,
+        getDeploymentProfile(c.env).fixedTenantId!,
+    );
+
+    if (!resetToken) return c.json({ success: true }, 200);
+
+    const baseUrl = getBaseUrl(c);
+    const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
+
+    await c.var.services.email.sendPasswordReset(body.email, resetLink)
+        .catch((e: unknown) => {
+            // Platform-level refusals (suppressed address, domain unverified,
+            // quota exhausted) are actionable: surface them so the user knows
+            // the reset email was refused rather than waiting forever.
+            if (e instanceof AppError) throw e;
+            // Transient failures are best-effort — the user can retry.
+            logger.warn('[auth] password-reset email delivery failed (transient)', { error: e instanceof Error ? e.message : String(e) });
+        });
+
+    return c.json({ success: true }, 200);
+});
+coreAuthRoutes.openapi(resetPasswordRoute, async (c) => {
+    const body = c.req.valid('json');
+    await c.var.services.auth.resetPassword(body.token, body.newPassword);
+    return c.json({ success: true }, 200);
+});
+coreAuthRoutes.openapi(setupRoute, async (c) => {
+    // 1. Safety Check: Only allow if no tenant-scoped users exist.
+    // Agent Accounts A1 — global agents (tenant_id IS NULL) are unrelated to
+    // first-time tenant initialization, so they must not block setup.
+    const db = getDrizzle(c);
+    const existingTenantUser = await db.select().from(users).where(sql`${users.tenantId} IS NOT NULL`).limit(1).get();
+    if (existingTenantUser) {
+        return c.json({ success: false, error: { code: 'already_initialized', message: 'System already initialized' } }, 409);
+    }
+
+    const body = c.req.valid('json');
+
+    // 2. Verification Code Check — gated solely by the SETUP_CODE secret.
+    // Fail closed when it is unset so an unprotected Worker can't be claimed.
+    const storedCode = c.env.SETUP_CODE;
+    if (!storedCode) {
+        return c.json({ success: false, error: { code: 'setup_code_unset', message: 'SETUP_CODE is not configured on this Worker. Set it as a secret and try again.' } }, 400);
+    }
+    if (body.verificationCode !== storedCode) {
+        return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
+    }
+
+    // 3. Initialize Workspace
+    const passwordHash = await c.var.services.auth.hashPassword(body.password);
+    // The profile owns this, fallback included — `getDeploymentProfile`
+    // resolves `SINGLE_TENANT_ID ?? FIXED_TENANT_FALLBACK`. Writing the
+    // literal here was a second copy of a decision, and the all-zero UUID
+    // appeared three times in this repo for two answers.
+    const tenantId = getDeploymentProfile(c.env).fixedTenantId!;
+    const slug = body.companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    await c.var.services.admin.updateTenantStatus({
+        id: tenantId,
+        name: body.companyName,
+        slug,
+        status: 'active',
+        adminEmail: body.email,
+        adminPasswordHash: passwordHash,
+        adminName: body.adminName,
+    });
+
+    // Auto-seed the FULL starter content library for the new tenant in one
+    // idempotent pass (templates, agreements, canned comments, event types, tags,
+    // recommendations, rating systems, marketplace libraries) — the same canonical
+    // seeder `POST /api/admin/data/install-bundled-content` uses, so /setup yields
+    // a fully populated NEW workspace (no separate post-deploy seed step needed).
+    // Not an EXISTING one — `already_initialized` above refuses forever once a user exists, so content a later release ships arrives only via that route.
+    try {
+        const { seedStarterContent } = await import('../services/starter-content.service');
+        const seeded = await seedStarterContent(c.env.DB, tenantId);
+        logger.info('Auto-seeded starter content during setup', { tenantId, ...seeded });
+    } catch (seedErr) {
+        // Don't block setup if seeding fails — log and continue.
+        logger.error('Auto-seed starter content failed during setup', { tenantId }, seedErr instanceof Error ? seedErr : undefined);
+    }
+
+    // 4. Issue a JWT for the new admin so the caller can authenticate immediately
+    const newUser = await db.select().from(users).where(eq(users.email, body.email)).get().catch(() => null);
+    if (newUser) {
+        const keyring = await c.var.keyringPromise!;
+        const now = Math.floor(Date.now() / 1000);
+        const token = await signJwt({
+            sub: newUser.id,
+            'custom:tenantId': newUser.tenantId,
+            'custom:userRole': newUser.role,
+            role: newUser.role,
+            iat: now,
+            exp: now + 60 * 60 * 24,
+        }, keyring);
+        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
+    }
+
+    return c.json({
+        success: true,
+        data: { redirect: '/inspections' }
+    }, 200);
+});
+coreAuthRoutes.route('/', profileRoutes);
+coreAuthRoutes.route('/', totpRoutes);
+coreAuthRoutes.openapi(inviteInfoRoute, async (c) => {
+    const { token } = c.req.valid('query');
+    const info = await c.var.services.auth.getInviteInfo(token);
+    if (!info) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
+    return c.json({ success: true as const, data: info }, 200);
+});
+coreAuthRoutes.openapi(setupStatusRoute, async (c) => {
+    const isSetUp = await c.var.services.auth.isSetUp();
+    return c.json({ success: true as const, data: { isSetUp } }, 200);
+});
+
+export const coreAuthRouteParts = [loginRoute, changePasswordRoute, joinTeamRoute, mounted('/', ssoRootRoutes, [ssoConsumeRoute] as const), forgotPasswordRoute, resetPasswordRoute, setupRoute, mounted('/', profileRoutes, profileRouteConfigs), mounted('/', totpRoutes, totpRouteConfigs), inviteInfoRoute, setupStatusRoute] as const;
+
+export type CoreAuthApi = ApiOf<typeof coreAuthRouteParts>;
 
 export default coreAuthRoutes;

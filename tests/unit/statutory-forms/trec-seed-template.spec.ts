@@ -3,7 +3,7 @@ import seed from '../../../server/data/seed-templates/trec-rei-7-6.json';
 import { fieldMap, version } from '../../../server/lib/statutory/forms/tx-trec-rei-7-6';
 import { PUBLISHED_FORM_VERSIONS } from '../../../server/lib/statutory/forms';
 import { versionForInspection } from '../../../server/lib/statutory/form-registry';
-import type { StatutoryFormDeclaration } from '../../../server/types/template-schema';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/template-schema';
 
 /**
  * The template that produces the Texas form, against the map of that form.

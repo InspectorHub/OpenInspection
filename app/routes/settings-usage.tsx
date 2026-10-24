@@ -5,7 +5,7 @@ import { createApi } from "~/lib/api-client.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { formatNumber } from "~/lib/format";
+import { formatNumber } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 export function meta() {

@@ -5,6 +5,7 @@
 // `ensureSeed` so the list is never truly empty for an active tenant.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
+import type { ApiOf } from '../../lib/api-schema';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
@@ -92,41 +93,49 @@ const deleteDefectCategoryRoute = createRoute(withMcpMetadata({
     description: 'Delete a custom (non-seed) defect category. Seed rows (maintenance/recommendation/safety) are protected and silently no-op.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const adminDefectCategoriesRoutes = createApiRouter()
-    .openapi(listDefectCategoriesRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const svc = new DefectCategoryService(c.env.DB);
-        const data = await svc.ensureSeed(tenantId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(createDefectCategoryRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const input = c.req.valid('json');
-        const svc = new DefectCategoryService(c.env.DB);
-        const row = await svc.create(tenantId, input);
-        auditFromContext(c, 'defect_category.created', 'defect_category', { entityId: row.id, metadata: { name: row.name } });
-        return c.json({ success: true as const, data: row }, 201);
-    })
-    .openapi(updateDefectCategoryRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        const svc = new DefectCategoryService(c.env.DB);
-        const updated = await svc.update(tenantId, id, patch);
-        if (!updated) throw Errors.NotFound('Defect category not found');
-        auditFromContext(c, 'defect_category.updated', 'defect_category', { entityId: id });
-        return c.json({ success: true as const, data: updated }, 200);
-    })
-    .openapi(deleteDefectCategoryRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const svc = new DefectCategoryService(c.env.DB);
-        const deleted = await svc.remove(tenantId, id);
-        // Only log the delete when a row actually went away (a no-op — unknown id,
-        // cross-tenant, or protected seed — must not emit a phantom audit entry).
-        if (deleted) auditFromContext(c, 'defect_category.deleted', 'defect_category', { entityId: id });
-        return c.json({ success: true as const, data: { deleted } }, 200);
-    });
+const app = createApiRouter();
+app.openapi(listDefectCategoriesRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const svc = new DefectCategoryService(c.env.DB);
+    const data = await svc.ensureSeed(tenantId);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(createDefectCategoryRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const input = c.req.valid('json');
+    const svc = new DefectCategoryService(c.env.DB);
+    const row = await svc.create(tenantId, input);
+    auditFromContext(c, 'defect_category.created', 'defect_category', { entityId: row.id, metadata: { name: row.name } });
+    return c.json({ success: true as const, data: row }, 201);
+});
+app.openapi(updateDefectCategoryRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    const svc = new DefectCategoryService(c.env.DB);
+    const updated = await svc.update(tenantId, id, patch);
+    if (!updated) throw Errors.NotFound('Defect category not found');
+    auditFromContext(c, 'defect_category.updated', 'defect_category', { entityId: id });
+    return c.json({ success: true as const, data: updated }, 200);
+});
+app.openapi(deleteDefectCategoryRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const svc = new DefectCategoryService(c.env.DB);
+    const deleted = await svc.remove(tenantId, id);
+    // Only log the delete when a row actually went away (a no-op — unknown id,
+    // cross-tenant, or protected seed — must not emit a phantom audit entry).
+    if (deleted) auditFromContext(c, 'defect_category.deleted', 'defect_category', { entityId: id });
+    return c.json({ success: true as const, data: { deleted } }, 200);
+});
 
-export type AdminDefectCategoriesApi = typeof adminDefectCategoriesRoutes;
-export default adminDefectCategoriesRoutes;
+/** Registration order. Drives `AdminDefectCategoriesApi`; a test pins it to what `app` really registered. */
+export const adminDefectCategoriesRouteConfigs = [
+    listDefectCategoriesRoute,
+    createDefectCategoryRoute,
+    updateDefectCategoryRoute,
+    deleteDefectCategoryRoute,
+] as const;
+
+export type AdminDefectCategoriesApi = ApiOf<typeof adminDefectCategoriesRouteConfigs>;
+export default app;

@@ -37,33 +37,38 @@ const photoUploadUrlRoute = createRoute(withMcpMetadata({
     description: 'Mint a signed, 24-hour photo upload URL for a native client. The URL needs no Authorization header, so a background upload survives an expired access token. The same pendingId always maps to the same storage key.',
 }, { scopes: ['write'], tier: 'excluded' }));
 
-const mediaUploadUrlRoutes = createApiRouter()
-    .openapi(photoUploadUrlRoute, async (c) => {
-        // Only a native client holds an upload that outlives its access token; a
-        // web session has no use for a signed URL, so it is not offered one.
-        if (!c.get('nativeClient')) throw Errors.Unauthorized('Native session required');
-        const { id } = c.req.valid('param');
-        const { pendingId, contentType } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const userId = c.get('user').sub;
-        // Ownership check (404 on another tenant's inspection). Tenant is from the credential.
-        await c.var.services.inspection.getInspection(id, tenantId);
+const app = createApiRouter();
+app.openapi(photoUploadUrlRoute, async (c) => {
+    // Only a native client holds an upload that outlives its access token; a
+    // web session has no use for a signed URL, so it is not offered one.
+    if (!c.get('nativeClient')) throw Errors.Unauthorized('Native session required');
+    const { id } = c.req.valid('param');
+    const { pendingId, contentType } = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    const userId = c.get('user').sub;
+    // Ownership check (404 on another tenant's inspection). Tenant is from the credential.
+    await c.var.services.inspection.getInspection(id, tenantId);
 
-        const ext = SIGNED_PHOTO_EXT[contentType];
-        const token = await signUploadToken(
-            { tenantId, inspectionId: id, mediaId: pendingId, ext, userId },
-            PHOTO_UPLOAD_TTL_SEC,
-            c.env.JWT_SECRET,
-            'photo',
-        );
-        return c.json({
-            success: true as const,
-            data: {
-                url: `/api/public/uploads/photo?token=${encodeURIComponent(token)}`,
-                key: r2Keys.inspectionPhoto(tenantId, id, pendingId, ext),
-                expiresAt: Date.now() + PHOTO_UPLOAD_TTL_SEC * 1000,
-            },
-        }, 200);
-    });
+    const ext = SIGNED_PHOTO_EXT[contentType];
+    const token = await signUploadToken(
+        { tenantId, inspectionId: id, mediaId: pendingId, ext, userId },
+        PHOTO_UPLOAD_TTL_SEC,
+        c.env.JWT_SECRET,
+        'photo',
+    );
+    return c.json({
+        success: true as const,
+        data: {
+            url: `/api/public/uploads/photo?token=${encodeURIComponent(token)}`,
+            key: r2Keys.inspectionPhoto(tenantId, id, pendingId, ext),
+            expiresAt: Date.now() + PHOTO_UPLOAD_TTL_SEC * 1000,
+        },
+    }, 200);
+});
 
-export default mediaUploadUrlRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const mediaUploadUrlRouteConfigs = [
+    photoUploadUrlRoute,
+] as const;
+
+export default app;

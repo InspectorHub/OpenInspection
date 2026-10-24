@@ -10,8 +10,8 @@
  * empty for every agent regardless of how many defects existed (IA-31). Both
  * sides now go through here so the read cannot drift apart again.
  */
-import { findingKey, DEFAULT_UNIT } from './finding-key';
-import type { ItemEntry, DefectState, ResultsProjection } from './collab/results-doc.types';
+import { findingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
+import type { ItemEntry, DefectState, ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 
 /** The stored entry for one item, or an empty entry when nothing is recorded. */
 export function readItemEntry(

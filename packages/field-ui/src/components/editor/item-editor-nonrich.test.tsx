@@ -1,0 +1,143 @@
+// @vitest-environment happy-dom
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { ItemEditor } from "./ItemEditor";
+import type { ComponentProps } from "react";
+import { FieldDataSourceProvider } from "../../context";
+import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
+
+const fake = createFakeDataSource({ data: createEmptyEditorData() });
+/** The editor reads photo URLs and its child panels' data off the data source. */
+function IE(props: ComponentProps<typeof ItemEditor>) {
+  return (
+    <FieldDataSourceProvider dataSource={fake}>
+      <ItemEditor {...props} />
+    </FieldDataSourceProvider>
+  );
+}
+
+// Minimal no-op prop bag; ItemEditor tolerates omitted optional callbacks.
+const base = {
+  sectionTitle: "Roof",
+  onRating: vi.fn(),
+  onNotes: vi.fn(),
+  onNotesBlur: vi.fn(),
+};
+
+describe("ItemEditor — item.description hint", () => {
+  it("renders the inspector-facing description hint for a rich item", () => {
+    render(
+      <IE
+        {...base}
+        item={{ id: "i1", label: "Roof Covering", type: "rich", description: "Walk the roof; note granule loss." }}
+        result={{}}
+      />
+    );
+    expect(screen.getByText("Walk the roof; note granule loss.")).toBeTruthy();
+  });
+
+  it("renders the description hint for a non-rich item too", () => {
+    render(
+      <IE
+        {...base}
+        item={{ id: "i2", label: "Year Built", type: "number", description: "From the county record." }}
+        result={{}}
+      />
+    );
+    expect(screen.getByText("From the county record.")).toBeTruthy();
+  });
+
+  it("keeps a transcribed option list on separate lines instead of one paragraph", () => {
+    // What a statutory question's description actually holds: the authority's
+    // own instruction text, which is frequently a list.
+    const description = [
+      "All glazed openings are covered with:",
+      "A. Plywood",
+      "B. OSB",
+      "C. Reinforced concrete roof deck",
+    ].join("\n");
+    const { container } = render(
+      <IE
+        {...base}
+        item={{ id: "i4", label: "Opening protection", type: "text", description }}
+        result={{}}
+        onValue={vi.fn()}
+      />
+    );
+    const hint = container.querySelector('[data-testid="item-description-hint"]');
+    expect(hint?.textContent).toBe(description);
+    // ⚠️ THE ASSERTION ABOVE CANNOT SEE THE DEFECT. `textContent` reports the
+    // newlines whether or not they render: under the browser default
+    // (`white-space: normal`) all four lines collapse into one paragraph and
+    // that expectation still passes. CSS is the whole of this fix, so the class
+    // is what has to be asserted — and the page itself is what has to be looked
+    // at, which is why this change also has a browser record.
+    expect(hint?.className).toContain("whitespace-pre-line");
+  });
+
+  it("omits the hint when no description is set", () => {
+    const { container } = render(
+      <IE {...base} item={{ id: "i3", label: "Attic", type: "rich" }} result={{}} />
+    );
+    expect(container.querySelector('[data-testid="item-description-hint"]')).toBeNull();
+  });
+});
+
+describe("ItemEditor — non-rich FormField inputs", () => {
+  it("renders a number input for a number item and reports value changes via onValue", () => {
+    const onValue = vi.fn();
+    render(
+      <IE
+        {...base}
+        item={{ id: "i1", label: "Year Built", type: "number" }}
+        result={{}}
+        onValue={onValue}
+      />
+    );
+    const input = screen.getByRole("spinbutton"); // <input type="number">
+    fireEvent.change(input, { target: { value: "1995" } });
+    expect(onValue).toHaveBeenCalledWith(1995);
+  });
+
+  it("renders a select input for a select item", () => {
+    render(
+      <IE
+        {...base}
+        item={{ id: "i2", label: "Roof Type", type: "select", options: { choices: ["Shingle", "Tile"] } }}
+        result={{ value: "Tile" }}
+        onValue={vi.fn()}
+      />
+    );
+    const select = screen.getByRole("combobox");
+    if (!(select instanceof HTMLSelectElement)) throw new Error("expected a <select>");
+    expect(select.value).toBe("Tile");
+    expect(screen.getByRole("option", { name: "Shingle" })).toBeTruthy();
+  });
+
+  it("does NOT render a rating button row or canned tabs for a non-rich item", () => {
+    render(
+      <IE
+        {...base}
+        item={{ id: "i3", label: "Year Built", type: "number", tabs: { defects: [{ id: "d1", title: "x", comment: "y" }] } }}
+        result={{}}
+        onValue={vi.fn()}
+      />
+    );
+    // Rating button row and canned tabs are rich-only.
+    expect(screen.queryByRole("button", { name: /Satisfactory/ })).toBeNull();
+    expect(screen.queryByText("Information")).toBeNull();
+    expect(screen.queryByText("Defects")).toBeNull();
+  });
+
+  it("renders the rating row for a rich item (rich branch preserved)", () => {
+    render(
+      <IE
+        {...base}
+        item={{ id: "i4", label: "Attic", type: "rich" }}
+        result={{}}
+      />
+    );
+    // FALLBACK_LEVELS render Satisfactory/Monitor/Defect labels.
+    expect(screen.getByText("Satisfactory")).toBeTruthy();
+  });
+});

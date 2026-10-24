@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLoaderData, Form, useNavigation } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { formatDateTime } from "~/lib/format";
+import { formatDateTime } from "@core/field-ui/shared/format";
 import type { Route } from "./+types/settings-automations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";

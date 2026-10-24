@@ -4,6 +4,7 @@ import type { AppEnv } from '../../types/hono';
 import type { McpProps } from './build-server';
 import { buildKeyring, signJwt } from '../jwt-keyring';
 import { users } from '../db/schema';
+import { getApiApp } from '../api-app';
 
 /**
  * Maps McpProps to the internal JWT claim set consumed by classifyJwtPayload.
@@ -82,17 +83,14 @@ export async function isGrantUserActive(env: AppEnv, props: McpProps): Promise<b
  *  3. Clone the incoming request, injecting `Authorization: Bearer <jwt>`.
  *  4. Dispatch to the API app directly (no network hop).
  *
- * The dynamic import keeps the DO's top-level graph light — same rationale
+ * The app is reached through `getApiApp()` (a loader the worker entry
+ * registers), which keeps the DO's top-level graph light — same rationale
  * as the lazy-import pattern in workers/app.ts.
  *
- * Testing: the pure helpers above (internalJwtPayload, assertCompanySlugMatches,
- * slugFromMcpPath) and isGrantUserActive are unit-tested (C3 / Fix 1).
- * The full buildKeyring → signJwt → app.fetch path in this function is NOT yet
- * exercised by any automated test — C4's workers test STUBS callApiAsUser to
- * assert tool-handler wiring, so the JWT-mint → in-process dispatch seam is
- * currently verified only by manual MCP-Inspector E2E. A seeded D1 + keyring +
- * Hono integration test that drives this path end-to-end is deferred (belongs
- * at the integration layer).
+ * Testing: the pure helpers above and isGrantUserActive are unit-tested in
+ * identity-bridge.spec.ts; the JWT-mint → in-process dispatch seam is covered
+ * by call-api-as-user.spec.ts against a fake registered app. C4's workers test
+ * STUBS callApiAsUser to assert tool-handler wiring.
  */
 export async function callApiAsUser(
     env: AppEnv,
@@ -116,6 +114,6 @@ export async function callApiAsUser(
     merged.set('Authorization', `Bearer ${jwt}`);
     const req = new Request(request, { headers: merged });
 
-    const { app } = await import('../../index');
+    const app = await getApiApp();
     return app.fetch(req, env, ctx);
 }

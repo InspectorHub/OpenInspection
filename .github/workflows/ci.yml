@@ -244,19 +244,11 @@ jobs:
         run: |
           set -eu
           BASE_FILE="contracts/native-contract.openapi.json"
-          # A base branch that cannot be resolved is an error, never a reason to skip:
-          # without this check a missing ref would look exactly like "file absent".
+          # A base branch that cannot be resolved is an error, never a reason to skip.
+          # So is a base branch without the contract file: the contract is on every
+          # base branch this workflow runs against, so `git show` failing here fails
+          # the step instead of quietly comparing nothing.
           git rev-parse --verify --quiet "origin/${BASE_REF}^{commit}" > /dev/null
-          # The skip below is correct ONLY in the pull request that first
-          # introduces the contract. With the ref known to exist, `cat-file -e`
-          # answers one question - does the file exist on the base branch - so a
-          # failed read of a file that IS there (git show below) still fails the step.
-          # Remove this branch in the change that follows the first merge of the
-          # contract.
-          if ! git cat-file -e "origin/${BASE_REF}:${BASE_FILE}"; then
-            echo "Contract first introduced: origin/${BASE_REF} has no ${BASE_FILE} yet; nothing to compare against - skipping."
-            exit 0
-          fi
           mkdir -p "$RUNNER_TEMP/native-base"
           git show "origin/${BASE_REF}:${BASE_FILE}" > "$RUNNER_TEMP/native-base/native-contract.openapi.json"
           docker run --rm \

@@ -18,7 +18,7 @@
  */
 import { m } from "~/paraglide/messages";
 import { EmptyState, PENDING_CLASS, pendingProps } from "@core/shared-ui";
-import { formatRelativeTime } from "~/lib/format";
+import { formatRelativeTime } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import {
   channelLabel,

@@ -68,7 +68,7 @@ export function findI18nViolations(source, filename) {
       out.push(
         `${filename}:${i + 1} formats a date with no locale, so it reads the ` +
           `BROWSER's locale and timezone rather than the tenant's or the user's ` +
-          `(#270); use app/lib/format-date.ts (formatShapedDate / ` +
+          `(#270); use @core/field-ui/shared/format-date (formatShapedDate / ` +
           `formatShapedDateTime / formatInspectionDateTime) with a resolved ` +
           `locale, zone and shape, or annotate '// i18n-lint-ok: <reason>'`,
       );
@@ -80,14 +80,14 @@ export function findI18nViolations(source, filename) {
 // Scan app/ + server/. Exclude the formatter modules themselves (the canonical
 // en-US default lives there), the tz-offset picker labels (locale-neutral by
 // design), and tz.ts (Intl.DateTimeFormat('en-US') is offset math, not content).
-const SCOPE = ['app', 'server'];
+const SCOPE = ['app', 'server', 'packages/field-ui/src'];
 const EXCLUDE = [
-  'app/lib/format.ts',
-  'app/lib/format-date.ts',
   'server/lib/format.ts',
   'server/lib/tz.ts',
   'app/lib/timezones.ts',
 ];
+// Compiled paraglide output of the field-ui package: generated, never hand-edited.
+const EXCLUDE_DIRS = ['packages/field-ui/src/i18n/generated'];
 
 function collectFiles(path) {
   const out = [];
@@ -97,6 +97,8 @@ function collectFiles(path) {
   } catch {
     return out;
   }
+  const dirNorm = path.replace(/\\/g, '/');
+  if (EXCLUDE_DIRS.some((d) => dirNorm === d || dirNorm.startsWith(d + '/'))) return out;
   if (stat.isFile()) {
     const norm = path.replace(/\\/g, '/');
     if (!/\.(ts|tsx)$/.test(path)) return out;

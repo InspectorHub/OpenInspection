@@ -32,7 +32,7 @@ export const StatutoryFormDeclarationSchema = z.object({
      * Form field name -> where its value comes from.
      *
      * Checked for SHAPE only. The value side is `StatutoryValueSource`, a closed
-     * discriminated union in `server/types/statutory-declaration.ts`, and the
+     * discriminated union in `packages/field-ui/src/shared/statutory-declaration.ts`, and the
      * authority on whether a binding is usable is the field map that ships with
      * the software and goes through code review — not this parse. Restating that
      * union here would create a second place for it to be wrong.
@@ -45,7 +45,7 @@ export const StatutoryFormDeclarationSchema = z.object({
      *
      * Optional, because a pack published before this key existed carries no
      * claim about it and inventing one would be worse than the silence — see
-     * the field's own comment in `server/types/statutory-declaration.ts`.
+     * the field's own comment in `packages/field-ui/src/shared/statutory-declaration.ts`.
      */
     revision: z.string().min(1).optional(),
     /**

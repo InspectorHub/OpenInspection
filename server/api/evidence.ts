@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
@@ -147,29 +148,36 @@ const downloadEvidenceRoute = createRoute(withMcpMetadata({
     description: 'Returns evidence.zip from R2 (signed.pdf + certificate.pdf + audit-trail.json + public-key.pem). Every 200 carries `x-artifact-status: current | superseded`: a correction published against the inspection supersedes this file, which stays retrievable as historical evidence but stops being the current answer. Cache directives match the claim, so no response can outlive it.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-const evidenceRoutes = createApiRouter()
-    .openapi(downloadAgreementRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        // A signed agreement belongs to an inspection; one outside the caller's set is not found.
-        await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
-        return downloadAgreementPdf(c.env.DB, c.env.PHOTOS, id, tenantId);
-    })
-    .openapi(downloadCertRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        // A signed agreement belongs to an inspection; one outside the caller's set is not found.
-        await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
-        return downloadCertPdf(c.env.DB, c.env.PHOTOS, id, tenantId);
-    })
-    .openapi(downloadEvidenceRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        // A signed agreement belongs to an inspection; one outside the caller's set is not found.
-        await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
-        return downloadEvidenceZip(c.env.DB, c.env.PHOTOS, id, tenantId);
-    });
+const app = createApiRouter();
+app.openapi(downloadAgreementRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    // A signed agreement belongs to an inspection; one outside the caller's set is not found.
+    await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
+    return downloadAgreementPdf(c.env.DB, c.env.PHOTOS, id, tenantId);
+});
+app.openapi(downloadCertRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    // A signed agreement belongs to an inspection; one outside the caller's set is not found.
+    await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
+    return downloadCertPdf(c.env.DB, c.env.PHOTOS, id, tenantId);
+});
+app.openapi(downloadEvidenceRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    // A signed agreement belongs to an inspection; one outside the caller's set is not found.
+    await requireVisibleAgreementRequest(getDrizzle(c), await resolveInspectionScope(c), tenantId, id);
+    return downloadEvidenceZip(c.env.DB, c.env.PHOTOS, id, tenantId);
+});
 
-export type EvidenceApi = typeof evidenceRoutes;
+/** Registration order. Drives `EvidenceApi`; a test pins it to what `app` really registered. */
+export const evidenceRouteConfigs = [
+    downloadAgreementRoute,
+    downloadCertRoute,
+    downloadEvidenceRoute,
+] as const;
 
-export default evidenceRoutes;
+export type EvidenceApi = ApiOf<typeof evidenceRouteConfigs>;
+
+export default app;

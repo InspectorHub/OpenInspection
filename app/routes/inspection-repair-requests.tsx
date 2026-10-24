@@ -25,7 +25,7 @@ import {
   RepairRequestLogEntry,
   type RepairRequestLogList,
 } from "~/components/inspector-portal/RepairRequestLogEntry";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { useDisplayTimeZone, useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import type { RepairActionTag } from "~/lib/repair-action-tag";
 // Same vocabulary the column and the response schema read — see the note in

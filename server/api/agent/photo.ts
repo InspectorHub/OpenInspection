@@ -35,23 +35,26 @@ const agentPhotoRoute = createRoute(withMcpMetadata({
     description: "Streams a defect photo from R2 to an agent associated with the inspection. 404 when the agent has no association or the key falls outside that tenant + inspection.",
 }, { scopes: ['agent'], tier: 'extended' }));
 
-const agentPhotoRoutes = createApiRouter()
-    .openapi(agentPhotoRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        const { id } = c.req.valid('param');
-        const { key, w, download } = c.req.valid('query');
-        // Association first: an unassociated agent must not even probe the bucket.
-        const access = await c.var.services.agent.accessToInspection(user.sub, id);
-        if (!access) return c.notFound();
-        // Key scope. Without this an associated agent could read any object in
-        // any tenant by passing someone else's key.
-        if (!key.startsWith(`${access.tenantId}/inspections/${id}/`)) return c.notFound();
-        const photo = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
-            width: w,
-            download: download === '1',
-        });
-        return photo ?? c.notFound();
+const app = createApiRouter();
+app.openapi(agentPhotoRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    const { id } = c.req.valid('param');
+    const { key, w, download } = c.req.valid('query');
+    // Association first: an unassociated agent must not even probe the bucket.
+    const access = await c.var.services.agent.accessToInspection(user.sub, id);
+    if (!access) return c.notFound();
+    // Key scope. Without this an associated agent could read any object in
+    // any tenant by passing someone else's key.
+    if (!key.startsWith(`${access.tenantId}/inspections/${id}/`)) return c.notFound();
+    const photo = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
+        width: w,
+        download: download === '1',
     });
+    return photo ?? c.notFound();
+});
 
-export default agentPhotoRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const agentPhotoRouteConfigs = [agentPhotoRoute] as const;
+
+export default app;

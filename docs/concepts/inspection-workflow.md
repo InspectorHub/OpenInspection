@@ -50,7 +50,7 @@ Keys are item IDs from the template. Only items the inspector interacted with ar
 
 ## 2. Field Collection
 
-Field collection happens in the inspection editor (`app/routes/inspection-edit.tsx`) — the single fill surface. Values are captured through the findings API into the collaborative results document (`app/lib/collab/results-binding.ts`), keyed by the composite `finding-key`. (The former standalone offline form-renderer route was retired; there is no separate mobile form surface.)
+Field collection happens in the inspection editor (`app/routes/inspection-edit.tsx`) — the single fill surface. Values are captured through the findings API into the collaborative results document (`packages/field-ui/src/collab/results-binding.ts`), keyed by the composite `finding-key`. (The former standalone offline form-renderer route was retired; there is no separate mobile form surface.)
 
 **Field-level merge**: writes are last-write-wins per item key — only changed items need to be sent. The bulk write path is `POST /api/inspections/:id/results/batch` (there is no `PATCH /api/inspections/:id/results` route).
 
@@ -152,5 +152,5 @@ Public booking: the page is a React Router route at `/book/:tenant`, and its dat
 | `server/services/inspection.service.ts` | Core business logic |
 | `server/lib/validations/template.schema.ts` | Template v2 schema validation |
 | `app/routes/inspection-edit.tsx` | 3-pane inspection editor (single fill surface) |
-| `app/hooks/useInspection.ts` | Inspection state management |
-| `app/hooks/useCannedComments.ts` | Comment picker logic |
+| `packages/field-ui/src/hooks/useInspection.ts` | Inspection state management |
+| `packages/field-ui/src/hooks/useCannedComments.ts` | Comment picker logic |

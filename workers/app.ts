@@ -27,6 +27,8 @@ import { paraglideMiddleware } from "../app/paraglide/server.js";
 // INCOMING request: a locale decided later cannot change the render that is
 // already under way. See the seam note in ui-locale.ts.
 import { withResolvedUiLocale } from "../server/lib/i18n/ui-locale";
+// Imports nothing, like the ones above: a late-bound handle on the API app.
+import { registerApiAppLoader } from "../server/lib/api-app";
 import type { WorkerEnv } from "./env";
 import { cloudflareContext } from "../app/lib/load-context";
 import { withHumanToken } from "./human-token";
@@ -53,6 +55,12 @@ type Ctx = Context<{ Bindings: WorkerEnv }>;
 type ApiModule = typeof import("../server/index");
 let apiModule: Promise<ApiModule> | undefined;
 const getApi = () => (apiModule ??= import("../server/index"));
+
+// lib/ and services/ reach the API app through this loader instead of importing
+// server/index themselves. It is the SAME lazy, cached `getApi()` above, so
+// nothing is evaluated here: registering only stores a function. `api-app.ts`
+// imports nothing, which is what lets it sit in this entry's top-level graph.
+registerApiAppLoader(async () => (await getApi()).app);
 
 // The tracker only OBSERVES this load (it records the route table once the
 // renderer has imported the build); page timing never triggers it.

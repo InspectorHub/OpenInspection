@@ -7,7 +7,7 @@ import { m } from "~/paraglide/messages";
 import {
   INSPECTION_PROPERTY_TYPES,
   type InspectionPropertyType,
-} from "../../../server/lib/inspection-property-type";
+} from "@core/field-ui/shared/inspection-property-type";
 
 // `label` is a thunk so each type name resolves at render inside the paraglide
 // request scope, not once at module import.

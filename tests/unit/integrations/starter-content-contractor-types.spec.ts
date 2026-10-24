@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CONTRACTOR_TYPES } from '../../../server/services/starter-content/fixtures/contractor-types';
-import { DEFECT_TRADES, DEFECT_TRADE_LABELS } from '../../../server/types/defect-fields';
+import { DEFECT_TRADES, DEFECT_TRADE_LABELS } from '@core/field-ui/shared/defect-fields.types';
 
 /**
  * The contractor-type seed, now DERIVED from the trade vocabulary (#277).

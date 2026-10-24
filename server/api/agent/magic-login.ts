@@ -1,6 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { setCookie } from 'hono/cookie';
 import { createApiRouter } from '../../lib/openapi-router';
+import type { ApiOf } from '../../lib/api-schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getBaseUrl } from '../../lib/url';
 import { signJwt } from '../../lib/jwt-keyring';
@@ -64,49 +65,51 @@ const redeemRoute = createRoute(withMcpMetadata({
 }, { scopes: [], tier: 'excluded' }));
 
 /** POST /api/agent/magic-login/request — mounted under the /api/agent router group. */
-export const agentMagicLoginRequestRoutes = createApiRouter()
-    .openapi(requestRoute, async (c) => {
-        const body = c.req.valid('json');
-        const result = await requestMagicLogin({
-            portalAccess: c.var.services.portalAccess,
-            kv: c.env.TENANT_CACHE,
-            db: c.env.DB,
-            inspectionId: body.inspectionId,
-            reportToken: body.token,
-            coreBaseUrl: getBaseUrl(c),
-            ...(body.returnTo ? { returnTo: body.returnTo } : {}),
-        });
-        // EMAIL the single-use sign-in link to the agent's own account inbox —
-        // never return it to the caller. The durable report link is a reusable
-        // bearer, so returning a full-session login URL to whoever presents it
-        // was an account-takeover vector (#258 review #5). Only the agent's inbox
-        // can now complete sign-in; report VIEWING via the token is unchanged.
-        if (result) {
-            // Defer the send to waitUntil — awaiting only on the account-exists
-            // path would make it measurably slower than the no-account path, a
-            // timing enumeration oracle. Mirrors server/api/agent/login.ts's
-            // loginLink and portal.ts's requestLink.
-            const sendPromise = (async () => {
-                try {
-                    // Agent accounts belong to no company: the deployment speaks.
-                    await c.var.services.platformEmail().sendAgentLoginLink(result.email, result.loginUrl);
-                } catch (err) {
-                    logger.error('agent.magic_login.link_send_failed', {}, err instanceof Error ? err : undefined);
-                }
-            })();
-            let execCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
-            try {
-                execCtx = c.executionCtx;
-            } catch {
-                execCtx = undefined;
-            }
-            if (execCtx) execCtx.waitUntil(sendPromise);
-            else await sendPromise;
-        }
-        // Anti-oracle: identical { sent: true } response (and timing) whether or
-        // not an agent account exists for the report link's recipient.
-        return c.json({ success: true as const, data: { sent: true as const } }, 200);
+export const agentMagicLoginRequestRoutes = createApiRouter();
+agentMagicLoginRequestRoutes.openapi(requestRoute, async (c) => {
+    const body = c.req.valid('json');
+    const result = await requestMagicLogin({
+        portalAccess: c.var.services.portalAccess,
+        kv: c.env.TENANT_CACHE,
+        db: c.env.DB,
+        inspectionId: body.inspectionId,
+        reportToken: body.token,
+        coreBaseUrl: getBaseUrl(c),
+        ...(body.returnTo ? { returnTo: body.returnTo } : {}),
     });
+    // EMAIL the single-use sign-in link to the agent's own account inbox —
+    // never return it to the caller. The durable report link is a reusable
+    // bearer, so returning a full-session login URL to whoever presents it
+    // was an account-takeover vector (#258 review #5). Only the agent's inbox
+    // can now complete sign-in; report VIEWING via the token is unchanged.
+    if (result) {
+        // Defer the send to waitUntil — awaiting only on the account-exists
+        // path would make it measurably slower than the no-account path, a
+        // timing enumeration oracle. Mirrors server/api/agent/login.ts's
+        // loginLink and portal.ts's requestLink.
+        const sendPromise = (async () => {
+            try {
+                // Agent accounts belong to no company: the deployment speaks.
+                await c.var.services.platformEmail().sendAgentLoginLink(result.email, result.loginUrl);
+            } catch (err) {
+                logger.error('agent.magic_login.link_send_failed', {}, err instanceof Error ? err : undefined);
+            }
+        })();
+        let execCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
+        try {
+            execCtx = c.executionCtx;
+        } catch {
+            execCtx = undefined;
+        }
+        if (execCtx) execCtx.waitUntil(sendPromise);
+        else await sendPromise;
+    }
+    // Anti-oracle: identical { sent: true } response (and timing) whether or
+    // not an agent account exists for the report link's recipient.
+    return c.json({ success: true as const, data: { sent: true as const } }, 200);
+});
+
+export const agentMagicLoginRequestRouteConfigs = [requestRoute] as const;
 
 /** GET /agent/magic-login — mounted at the TOP LEVEL (not under /api); see workers/app.ts. */
 /**
@@ -121,44 +124,46 @@ function safeReturnTo(returnTo: string | undefined): string | null {
     return returnTo;
 }
 
-export const agentMagicLoginRedeemRoutes = createApiRouter()
-    .openapi(redeemRoute, async (c) => {
-        const { code } = c.req.valid('query');
-        try {
-            const { userId, email, returnTo } = await redeemMagicLogin(c.env.TENANT_CACHE, c.env.DB, code);
+export const agentMagicLoginRedeemRoutes = createApiRouter();
+agentMagicLoginRedeemRoutes.openapi(redeemRoute, async (c) => {
+    const { code } = c.req.valid('query');
+    try {
+        const { userId, email, returnTo } = await redeemMagicLogin(c.env.TENANT_CACHE, c.env.DB, code);
 
-            // Agent JWT claim shape mirrors server/api/agent-signup.ts:101-108
-            // EXACTLY — no tenantId/custom:tenantId. Agents are global users;
-            // per-inspection tenant association is resolved per-route.
-            const keyring = await c.var.keyringPromise!;
-            const now = Math.floor(Date.now() / 1000);
-            const token = await signJwt({
-                sub: userId,
-                role: 'agent',
-                'custom:userRole': 'agent',
-                email,
-                iat: now,
-                exp: now + 60 * 60 * 24,
-            }, keyring);
+        // Agent JWT claim shape mirrors server/api/agent-signup.ts:101-108
+        // EXACTLY — no tenantId/custom:tenantId. Agents are global users;
+        // per-inspection tenant association is resolved per-route.
+        const keyring = await c.var.keyringPromise!;
+        const now = Math.floor(Date.now() / 1000);
+        const token = await signJwt({
+            sub: userId,
+            role: 'agent',
+            'custom:userRole': 'agent',
+            email,
+            iat: now,
+            exp: now + 60 * 60 * 24,
+        }, keyring);
 
-            setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
+        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
-            // Global agent identity — tenant-less by design, so this does NOT go
-            // through the tenant-scoped audit_logs table (auditLogs.tenantId is a
-            // NOT NULL FK to tenants.id). Mirrors agent-signup.ts, which mints the
-            // same kind of tenant-less session with structured logging only.
-            logger.info('agent.magic_login.redeemed', { userId });
+        // Global agent identity — tenant-less by design, so this does NOT go
+        // through the tenant-scoped audit_logs table (auditLogs.tenantId is a
+        // NOT NULL FK to tenants.id). Mirrors agent-signup.ts, which mints the
+        // same kind of tenant-less session with structured logging only.
+        logger.info('agent.magic_login.redeemed', { userId });
 
-            // IA-47 — land the agent back on the report they were viewing when a
-            // safe returnTo was threaded through; otherwise the dashboard.
-            return c.redirect(safeReturnTo(returnTo) ?? '/agent-dashboard', 302);
-        } catch (err) {
-            logger.warn('agent.magic_login.redeem_failed', {
-                error: err instanceof Error ? err.message : String(err),
-            });
-            return c.redirect('/agent-login?error=expired_link', 302);
-        }
-    });
+        // IA-47 — land the agent back on the report they were viewing when a
+        // safe returnTo was threaded through; otherwise the dashboard.
+        return c.redirect(safeReturnTo(returnTo) ?? '/agent-dashboard', 302);
+    } catch (err) {
+        logger.warn('agent.magic_login.redeem_failed', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        return c.redirect('/agent-login?error=expired_link', 302);
+    }
+});
 
-export type AgentMagicLoginRequestApi = typeof agentMagicLoginRequestRoutes;
-export type AgentMagicLoginRedeemApi = typeof agentMagicLoginRedeemRoutes;
+export const agentMagicLoginRedeemRouteConfigs = [redeemRoute] as const;
+
+export type AgentMagicLoginRequestApi = ApiOf<typeof agentMagicLoginRequestRouteConfigs>;
+export type AgentMagicLoginRedeemApi = ApiOf<typeof agentMagicLoginRedeemRouteConfigs>;

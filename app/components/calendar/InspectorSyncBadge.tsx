@@ -1,4 +1,4 @@
-import { formatRelativeTime } from "~/lib/format";
+import { formatRelativeTime } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 export type SyncBadgeState = "connected" | "stale" | "not-connected";

@@ -139,6 +139,14 @@ const GROUPS: Group[] = [
         desc: m.settings_hub_data_desc,
         icon: "M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4",
       },
+      {
+        // Same audience as the page behind it: owners and managers (the whole
+        // group is admin-only). Inspectors import from the app.
+        to: "/settings/offline-packages",
+        title: m.settings_hub_offline_packages_title,
+        desc: m.settings_hub_offline_packages_desc,
+        icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
+      },
     ],
   },
   {

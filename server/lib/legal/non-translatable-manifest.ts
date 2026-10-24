@@ -151,14 +151,14 @@ export const NON_TRANSLATABLE_MANIFEST: NonTranslatableEntry[] = [
     {
         id: 'pca-reliance-user-reliance',
         category: 'reliance_clause',
-        source: 'server/lib/pca-reliance-text.ts',
+        source: 'packages/field-ui/src/shared/pca-reliance-text.ts',
         locator: 'userReliance',
         reason: 'Names who may rely on the report and requires written authorization for anyone else. This is the clause that decides whether a third party has a claim at all, so its wording is the instrument rather than a description of one.',
     },
     {
         id: 'pca-reliance-point-in-time',
         category: 'reliance_clause',
-        source: 'server/lib/pca-reliance-text.ts',
+        source: 'packages/field-ui/src/shared/pca-reliance-text.ts',
         locator: 'pointInTime',
         reason: 'Fixes the report to the date of the site visit and disclaims any duty to update. A translation that softened the duty language would extend an obligation the consultant never accepted.',
     },
@@ -174,7 +174,7 @@ export const NON_TRANSLATABLE_MANIFEST: NonTranslatableEntry[] = [
     {
         id: 'pca-reliance-site-specific',
         category: 'limitation_of_liability',
-        source: 'server/lib/pca-reliance-text.ts',
+        source: 'packages/field-ui/src/shared/pca-reliance-text.ts',
         locator: 'siteSpecific',
         reason: 'States what the report is NOT — not an engineering study, not a code-compliance survey, not a warranty. Every phrase is a boundary on what can be claimed against it, which is a limitation of liability written as a scope statement.',
     },
@@ -213,7 +213,7 @@ export const NON_TRANSLATABLE_MANIFEST: NonTranslatableEntry[] = [
     {
         id: 'template-section-disclaimer-text',
         category: 'warranty_disclaimer',
-        source: 'server/types/template-schema.ts',
+        source: 'packages/field-ui/src/shared/template-schema.ts',
         locator: 'disclaimerText',
         reason: 'Per-section disclaimer authored on the template and rendered verbatim in the report. It is the inspector limiting what a section covers, so it travels with the report as their words and not as a paraphrase.',
     },

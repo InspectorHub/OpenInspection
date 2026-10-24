@@ -38,7 +38,7 @@ import roofSeed from '../../../server/data/seed-templates/fl-citizens-roof-rcf-1
 import fourPointSeed from '../../../server/data/seed-templates/fl-citizens-4point-insp4pt.json';
 import type {
     FieldGroup, StatutoryFormDeclaration, TemplateSchemaV2,
-} from '../../../server/types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 import { buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
 import { drawnRuns } from '../helpers/pdf-drawn-runs';
 

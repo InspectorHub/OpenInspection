@@ -12,6 +12,7 @@
 import { requireRole } from '../lib/middleware/rbac';
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { eq } from 'drizzle-orm';
 import { tenants } from '../lib/db/schema';
 import { summariseSeats } from '../lib/billing-summary';
@@ -34,42 +35,47 @@ const summaryRoute = createRoute(withMcpMetadata({
     description: "Returns the company's seat summary: its tier, the user cap (maxUsers, 1 when unset), and seatsUsed, which counts current non-removed members and excludes invitations not yet accepted. permanent mirrors seatsUsed and guests is always 0, kept only for response shape. When the deployment has a billing portal configured, portalUrl points to its billing page; otherwise it is omitted. Read-only and never contacts a payment provider. Available to owner and manager roles; inspectors and staff get 403. Returns 404 if the company record is missing."
 }, { scopes: ['read'], tier: 'extended' }));
 
-const billingRoutes = createApiRouter()
-    .openapi(summaryRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized();
+const app = createApiRouter();
+app.openapi(summaryRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized();
 
-        const db = getDrizzle(c);
-        const tenant = await db.select({
-            maxUsers: tenants.maxUsers,
-            tier:     tenants.tier,
-        }).from(tenants).where(eq(tenants.id, tenantId)).get();
-        if (!tenant) throw Errors.NotFound('Tenant not found');
+    const db = getDrizzle(c);
+    const tenant = await db.select({
+        maxUsers: tenants.maxUsers,
+        tier:     tenants.tier,
+    }).from(tenants).where(eq(tenants.id, tenantId)).get();
+    if (!tenant) throw Errors.NotFound('Tenant not found');
 
-        // Seats come from `getSeatUsage`, not from a query written here. This
-        // route used to count the tenant's users itself and forgot
-        // `deleted_at IS NULL`, so a removed member — soft-deleted so their
-        // inspection attribution survives — stayed on the bill after the
-        // invite guard had already handed their seat back.
-        //
-        // `members`, not `used`: `used` includes the invitations that have been
-        // sent and not accepted, because the quota has to reserve the seats they
-        // can still claim. A bill is for the people who are actually here, and
-        // it has to agree with the seat quantity the subscription is reconciled
-        // against — which is the same `members` number.
-        const usage = await getSeatUsage(tenantId, c.env.DB);
-        const summary = summariseSeats(usage.members, tenant);
+    // Seats come from `getSeatUsage`, not from a query written here. This
+    // route used to count the tenant's users itself and forgot
+    // `deleted_at IS NULL`, so a removed member — soft-deleted so their
+    // inspection attribution survives — stayed on the bill after the
+    // invite guard had already handed their seat back.
+    //
+    // `members`, not `used`: `used` includes the invitations that have been
+    // sent and not accepted, because the quota has to reserve the seats they
+    // can still claim. A bill is for the people who are actually here, and
+    // it has to agree with the seat quantity the subscription is reconciled
+    // against — which is the same `members` number.
+    const usage = await getSeatUsage(tenantId, c.env.DB);
+    const summary = summariseSeats(usage.members, tenant);
 
-        // Portal Customer Portal redirect URL — surfaced for the "Manage
-        // billing" CTA on the page. Omitted when the portal isn't wired
-        // (standalone deployments) so the UI hides the button.
-        const base = c.var.profile.billingPortalUrl;
-        const data = base
-            ? { ...summary, portalUrl: `${base}/api/billing/portal` }
-            : summary;
+    // Portal Customer Portal redirect URL — surfaced for the "Manage
+    // billing" CTA on the page. Omitted when the portal isn't wired
+    // (standalone deployments) so the UI hides the button.
+    const base = c.var.profile.billingPortalUrl;
+    const data = base
+        ? { ...summary, portalUrl: `${base}/api/billing/portal` }
+        : summary;
 
-        return c.json({ success: true as const, data }, 200);
-    });
+    return c.json({ success: true as const, data }, 200);
+});
 
-export type BillingApi = typeof billingRoutes;
-export default billingRoutes;
+/** Registration order. Drives `BillingApi`; a test pins it to what `app` really registered. */
+export const billingRouteConfigs = [
+    summaryRoute,
+] as const;
+
+export type BillingApi = ApiOf<typeof billingRouteConfigs>;
+export default app;

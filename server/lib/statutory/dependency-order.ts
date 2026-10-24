@@ -48,7 +48,7 @@
  * that is not conditional, a node an earlier walk already measured, or a node
  * still on this walk. The third is a ring, and the walk is holding its members.
  */
-import type { StatutoryFieldDependencies } from '../../types/statutory-declaration';
+import type { StatutoryFieldDependencies } from '@core/field-ui/shared/statutory-declaration';
 import { fail } from './resolve-source';
 
 /** Is this field itself one of the form's conditional questions? */

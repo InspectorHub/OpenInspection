@@ -6,6 +6,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { REGISTRY, getDescriptor } from '../lib/email-templates/registry';
@@ -197,153 +198,162 @@ const previewRoute = createRoute(withMcpMetadata({
 
 // ─── Router ────────────────────────────────────────────────────────────────
 
-const emailTemplateRoutes = createApiRouter()
-    .openapi(listRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const svc = new EmailTemplateService(c.env.DB);
-        const overrides = await svc.listForTenant(tenantId);
-        const overrideMap = new Map(overrides.map(o => [o.trigger, o]));
+const app = createApiRouter();
+app.openapi(listRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const svc = new EmailTemplateService(c.env.DB);
+    const overrides = await svc.listForTenant(tenantId);
+    const overrideMap = new Map(overrides.map(o => [o.trigger, o]));
 
-        const editableDescriptors = REGISTRY.filter(d => d.editable);
-        const data = editableDescriptors.map(d => {
-            const override = overrideMap.get(d.trigger);
-            return {
-                trigger: d.trigger,
-                name: d.name,
-                category: d.category,
-                required: d.required,
-                enabled: override?.enabled ?? true,
-                isCustomized: !!override,
-                subject: override?.subject ?? d.defaultSubject,
-            };
-        });
-
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(getRoute, async (c) => {
-        const { trigger } = c.req.valid('param');
-        const d = getDescriptor(trigger);
-        if (!d || !d.editable) {
-            return c.json({ success: false as const, error: { message: 'Template not found', code: 'NOT_FOUND' } }, 404);
-        }
-
-        const tenantId = c.get('tenantId');
-        const svc = new EmailTemplateService(c.env.DB);
-        const overrides = await svc.listForTenant(tenantId);
-        const override = overrides.find(o => o.trigger === trigger);
-
-        return c.json({
-            success: true as const,
-            data: {
-                trigger: d.trigger,
-                name: d.name,
-                required: d.required,
-                enabled: override?.enabled ?? true,
-                subject: override?.subject ?? d.defaultSubject,
-                blocks: d.blocks.map(b => ({
-                    key: b.key,
-                    label: b.label,
-                    multiline: b.multiline,
-                    value: override?.blocks?.[b.key] ?? b.default,
-                })),
-                variables: d.variables,
-            },
-        }, 200);
-    })
-    .openapi(putRoute, async (c) => {
-        const { trigger } = c.req.valid('param');
-        const body = c.req.valid('json');
-
-        const d = getDescriptor(trigger);
-        if (!d || !d.editable) {
-            return c.json({ success: false as const, error: { message: 'Template not found', code: 'NOT_FOUND' } }, 404);
-        }
-
-        if (d.required && body.enabled === false) {
-            return c.json({ success: false as const, error: { message: 'This template is required and cannot be disabled.', code: 'VALIDATION_ERROR' } }, 400);
-        }
-
-        if (body.blocks) {
-            for (const key of Object.keys(body.blocks)) {
-                if (!d.blocks.some(b => b.key === key)) {
-                    return c.json({ success: false as const, error: { message: `Unknown block: ${key}`, code: 'VALIDATION_ERROR' } }, 400);
-                }
-            }
-        }
-
-        const tenantId = c.get('tenantId');
-        await new EmailTemplateService(c.env.DB).upsert(
-            tenantId,
-            trigger,
-            { subject: body.subject, blocks: body.blocks, enabled: body.enabled },
-            Date.now(),
-        );
-
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(resetRoute, async (c) => {
-        const { trigger } = c.req.valid('param');
-        const d = getDescriptor(trigger);
-        if (!d || !d.editable) {
-            return c.json({ success: false as const, error: { message: 'Template not found', code: 'NOT_FOUND' } }, 404);
-        }
-
-        const tenantId = c.get('tenantId');
-        await new EmailTemplateService(c.env.DB).remove(tenantId, trigger);
-
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(previewRoute, async (c) => {
-        const { trigger } = c.req.valid('param');
-        const body = c.req.valid('json');
-
-        const d = getDescriptor(trigger);
-        if (!d || !d.editable) {
-            return c.json({ success: false as const, error: { message: 'Template not found', code: 'NOT_FOUND' } }, 404);
-        }
-
-        const tenantId = c.get('tenantId');
-        const brandingService = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
-        brandingService.requestEnv = c.env;
-        const emailBrand = await brandingService.getEmailBrand(tenantId);
-
-        const APP_NAME = c.env.APP_NAME;
-        const PRIMARY_COLOR = c.env.PRIMARY_COLOR;
-
-        const tenantBrand = {
-            name: emailBrand.companyName || APP_NAME || 'OpenInspection',
-            logoUrl: emailBrand.logoUrl,
-            primaryColor: emailBrand.primaryColor || PRIMARY_COLOR || '#4f46e5',
+    const editableDescriptors = REGISTRY.filter(d => d.editable);
+    const data = editableDescriptors.map(d => {
+        const override = overrideMap.get(d.trigger);
+        return {
+            trigger: d.trigger,
+            name: d.name,
+            category: d.category,
+            required: d.required,
+            enabled: override?.enabled ?? true,
+            isCustomized: !!override,
+            subject: override?.subject ?? d.defaultSubject,
         };
-        const platformBrand = {
-            name: APP_NAME || 'OpenInspection',
-            logoUrl: null,
-            primaryColor: PRIMARY_COLOR || '#4f46e5',
-        };
-
-        const override = {
-            trigger,
-            subject: body.subject ?? null,
-            blocks: body.blocks ?? null,
-            enabled: true,
-        };
-
-        const renderer = new EmailTemplateRenderer({
-            tenantBrand,
-            platformBrand,
-            overrides: new Map([[trigger, override]]),
-            // The preview has to agree with what this workspace would actually
-            // send: the delivery-confirmation notice rides a report-link email
-            // only where opens are counted, so previewing it unconditionally
-            // would show the author a paragraph their recipients never get.
-            viewCountingEnabled: await readReportViewCountingEnabled(getDrizzle(c), tenantId),
-        });
-
-        const { subject, html } = renderer.render(trigger, sampleDataFor(d));
-
-        return c.json({ success: true as const, data: { subject, html } }, 200);
     });
 
-export type EmailTemplatesApi = typeof emailTemplateRoutes;
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(getRoute, async (c) => {
+    const { trigger } = c.req.valid('param');
+    const d = getDescriptor(trigger);
+    if (!d || !d.editable) {
+        return c.json({ success: false as const, error: { message: 'Template not found', code: 'NOT_FOUND' } }, 404);
+    }
 
-export default emailTemplateRoutes;
+    const tenantId = c.get('tenantId');
+    const svc = new EmailTemplateService(c.env.DB);
+    const overrides = await svc.listForTenant(tenantId);
+    const override = overrides.find(o => o.trigger === trigger);
+
+    return c.json({
+        success: true as const,
+        data: {
+            trigger: d.trigger,
+            name: d.name,
+            required: d.required,
+            enabled: override?.enabled ?? true,
+            subject: override?.subject ?? d.defaultSubject,
+            blocks: d.blocks.map(b => ({
+                key: b.key,
+                label: b.label,
+                multiline: b.multiline,
+                value: override?.blocks?.[b.key] ?? b.default,
+            })),
+            variables: d.variables,
+        },
+    }, 200);
+});
+app.openapi(putRoute, async (c) => {
+    const { trigger } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    const d = getDescriptor(trigger);
+    if (!d || !d.editable) {
+        return c.json({ success: false as const, error: { message: 'Template not found', code: 'NOT_FOUND' } }, 404);
+    }
+
+    if (d.required && body.enabled === false) {
+        return c.json({ success: false as const, error: { message: 'This template is required and cannot be disabled.', code: 'VALIDATION_ERROR' } }, 400);
+    }
+
+    if (body.blocks) {
+        for (const key of Object.keys(body.blocks)) {
+            if (!d.blocks.some(b => b.key === key)) {
+                return c.json({ success: false as const, error: { message: `Unknown block: ${key}`, code: 'VALIDATION_ERROR' } }, 400);
+            }
+        }
+    }
+
+    const tenantId = c.get('tenantId');
+    await new EmailTemplateService(c.env.DB).upsert(
+        tenantId,
+        trigger,
+        { subject: body.subject, blocks: body.blocks, enabled: body.enabled },
+        Date.now(),
+    );
+
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(resetRoute, async (c) => {
+    const { trigger } = c.req.valid('param');
+    const d = getDescriptor(trigger);
+    if (!d || !d.editable) {
+        return c.json({ success: false as const, error: { message: 'Template not found', code: 'NOT_FOUND' } }, 404);
+    }
+
+    const tenantId = c.get('tenantId');
+    await new EmailTemplateService(c.env.DB).remove(tenantId, trigger);
+
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(previewRoute, async (c) => {
+    const { trigger } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    const d = getDescriptor(trigger);
+    if (!d || !d.editable) {
+        return c.json({ success: false as const, error: { message: 'Template not found', code: 'NOT_FOUND' } }, 404);
+    }
+
+    const tenantId = c.get('tenantId');
+    const brandingService = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
+    brandingService.requestEnv = c.env;
+    const emailBrand = await brandingService.getEmailBrand(tenantId);
+
+    const APP_NAME = c.env.APP_NAME;
+    const PRIMARY_COLOR = c.env.PRIMARY_COLOR;
+
+    const tenantBrand = {
+        name: emailBrand.companyName || APP_NAME || 'OpenInspection',
+        logoUrl: emailBrand.logoUrl,
+        primaryColor: emailBrand.primaryColor || PRIMARY_COLOR || '#4f46e5',
+    };
+    const platformBrand = {
+        name: APP_NAME || 'OpenInspection',
+        logoUrl: null,
+        primaryColor: PRIMARY_COLOR || '#4f46e5',
+    };
+
+    const override = {
+        trigger,
+        subject: body.subject ?? null,
+        blocks: body.blocks ?? null,
+        enabled: true,
+    };
+
+    const renderer = new EmailTemplateRenderer({
+        tenantBrand,
+        platformBrand,
+        overrides: new Map([[trigger, override]]),
+        // The preview has to agree with what this workspace would actually
+        // send: the delivery-confirmation notice rides a report-link email
+        // only where opens are counted, so previewing it unconditionally
+        // would show the author a paragraph their recipients never get.
+        viewCountingEnabled: await readReportViewCountingEnabled(getDrizzle(c), tenantId),
+    });
+
+    const { subject, html } = renderer.render(trigger, sampleDataFor(d));
+
+    return c.json({ success: true as const, data: { subject, html } }, 200);
+});
+
+/** Registration order. Drives `EmailTemplatesApi`; a test pins it to what `app` really registered. */
+export const emailTemplateRouteConfigs = [
+    listRoute,
+    getRoute,
+    putRoute,
+    resetRoute,
+    previewRoute,
+] as const;
+
+export type EmailTemplatesApi = ApiOf<typeof emailTemplateRouteConfigs>;
+
+export default app;

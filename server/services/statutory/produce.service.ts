@@ -63,7 +63,7 @@ import {
 } from '../../lib/statutory/values';
 import type { SignatureImage } from '../../lib/statutory/render-signature';
 import { r2Keys } from '../../lib/r2-keys';
-import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../types/template-schema';
+import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
 export interface ProduceStatutoryFormInput {
     /** The form the template declares. */

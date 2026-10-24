@@ -71,8 +71,8 @@
 import { Inflate, unzipSync, type UnzipFileInfo } from 'fflate';
 import { MAX_PHOTO_BYTES } from '../media/store-photo';
 import { MAX_IMPORT_BYTES } from '../../durable-objects/inspection-doc-import';
-import { DEFAULT_IMPORT_LIMITS, type ImportLimits, type LimitExceeded } from './import-limits';
-import { OFFLINE_ID_PATTERN } from './offline-package';
+import { DEFAULT_IMPORT_LIMITS, OFFLINE_ID_PATTERN, type ImportLimits } from '@core/offline-package';
+import type { LimitExceeded } from './import-limits';
 
 const MIB = 1024 * 1024;
 

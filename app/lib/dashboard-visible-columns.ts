@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 
-import { useIsMobile } from "~/hooks/useBreakpoint";
+import { useIsMobile } from "@core/field-ui/hooks/useBreakpoint";
 import { MOBILE_HIDDEN_COLUMNS } from "../../server/lib/dashboard-columns";
 
 /**

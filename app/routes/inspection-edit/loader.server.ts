@@ -1,17 +1,18 @@
 import type { Route } from "../+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { viewerFromSessionContext } from "~/lib/field/web-session";
+import { layoutFromCookieHeader } from "~/lib/field/editor-layout-cookie";
 import { unwrapResultsResponse } from "~/lib/results";
-import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
-import { resolvePcaNarrative } from "../../../server/lib/pca-narrative";
-import { RELIANCE_TEMPLATES } from "../../../server/lib/pca-reliance-text";
-import { METADATA_PRESETS, type PropertyMetaField } from "../../../server/lib/commercial-subtypes";
-import type { CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";
+import type { RatingLevel, ResultMap } from "@core/field-ui/hooks/useInspection";
+import { resolvePcaNarrative } from "@core/field-ui/shared/pca-narrative";
+import { RELIANCE_TEMPLATES } from "@core/field-ui/shared/pca-reliance-text";
+import { METADATA_PRESETS, type PropertyMetaField } from "@core/field-ui/shared/commercial-subtypes";
+import type { CompliancePanelData } from "@core/field-ui/data-source-types";
 import { getCloudflareEnv } from "~/lib/load-context";
 import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
 import { isReportPublished } from "~/lib/status";
 import { resolveReportTier } from "../../../server/lib/report-tier";
-
 type Api = ReturnType<typeof createApi>;
 
 /**
@@ -219,8 +220,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  let tenantSlug: string | null = null;
  let videoProvider: "r2" | "stream" = "r2";
  let collabEditing = false;
- // The full-screen editor is declared outside the workspace layout, so it has no
- // session context of its own; this is what lets it ask for the human check.
+ let viewer: ReturnType<typeof viewerFromSessionContext> = null;
+ // The editor sits outside the workspace layout, so it reads its own session context (human check, viewer).
  let outboundCoolingWindow: { unlockAtMs: number; turnstileSiteKey: string | null } | null = null;
  if (sessRes?.ok) {
  const sb = await sessRes.json() as {
@@ -238,6 +239,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  videoProvider = sb.data?.videoProvider ?? "r2";
  // #181 — per-tenant collab editing flag (default false until collab is GA).
  collabEditing = sb.data?.collabEditing ?? false;
+ viewer = viewerFromSessionContext(sb.data);
  }
 
  // Plan 7 — the Stream customer subdomain (env) drives video poster thumbnails
@@ -333,9 +335,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  };
 
  // Commercial subtype-preset field definitions for PropertyInfoForm (design
- // 2026-07-13). commercial-subtypes is a server-only module — it never reaches
- // the client bundle; only these resolved field arrays cross the loader
- // boundary. Keyed `commercial:<subtype>`; the editor picks the active one off
+ // 2026-07-13). commercial-subtypes is a pure module in the field-ui shared package;
+ // the loader resolves the presets here so only these resolved field arrays
+ // cross the loader boundary. Keyed `commercial:<subtype>`; the editor picks the active one off
  // state.inspection.commercialSubtype so the Property Info field list reacts
  // live to the Phase T subtype selector with no extra fetch. Commercial subset
  // only — residential inspections keep PropertyInfoForm's own default fields.
@@ -393,5 +395,5 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // Returned values are written into the page source: the snapshot goes once (top-level), and no token.
  const inspectionRow: Record<string, unknown> = { ...inspection };
  delete inspectionRow.templateSnapshot;
- return { inspection: inspectionRow, schema, results, resultId, ratingLevels, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment };
+ return { inspection: inspectionRow, schema, results, resultId, ratingLevels, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, viewer, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment, initialLayout: layoutFromCookieHeader(request.headers.get("cookie")) };
 }

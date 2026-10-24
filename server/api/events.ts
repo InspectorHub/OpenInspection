@@ -1,6 +1,7 @@
-import {} from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { z } from '@hono/zod-openapi';
+import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { CreatedEventTypeSchema, CreatedInspectionEventSchema, EventTypeListResponseSchema, InspectionEventListResponseSchema } from '../lib/validations/event.schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { isAdminRole } from '../lib/auth/roles';
 import { Errors } from '../lib/errors';
@@ -39,37 +40,97 @@ const EventStatusBody = z.object({
 
 // ---- Event types CRUD ----
 
+// The two creates and the status change declare no request body: the money guard reads the RAW body before the
+// schema's defaults apply, and the status change authorises on the body as well, neither of which a route validator
+// can express. Each handler parses its own body, so its `Errors.BadRequest` answers stay as they were.
+const listEventTypesRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/event-types', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    responses: { 200: { content: { 'application/json': { schema: EventTypeListResponseSchema } }, description: 'Event types' } },
+    operationId: 'listVisitEventTypes', summary: 'List the company visit event types',
+    description: 'Lists the event types the company schedules visits with, such as a radon drop-off, ordered by sort order. Price fields are left out for callers without the inspection-fees capability.',
+}, { scopes: ['read'], tier: 'extended' }));
+
+const listInspectionEventsRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/inspections/{inspectionId}/events', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: z.object({ inspectionId: z.string().describe('Id of the inspection whose visits to list.') }) },
+    responses: { 200: { content: { 'application/json': { schema: InspectionEventListResponseSchema } }, description: 'Visits of the inspection' } },
+    operationId: 'listInspectionEvents', summary: 'List the visits of an inspection',
+    description: 'Lists the scheduled visits (events) of one inspection, earliest first. The price is left out for callers without the inspection-fees capability.',
+}, { scopes: ['read'], tier: 'extended' }));
+
+const deleteEventRoute = createRoute(withMcpMetadata({
+    method: 'delete', path: '/events/{id}', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager')] as const,
+    request: { params: z.object({ id: z.string().describe('Id of the visit to delete.') }) },
+    responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('Always true on success.') }) } }, description: 'Deleted' } },
+    operationId: 'deleteInspectionEvent', summary: 'Delete a visit from an inspection',
+    description: 'Deletes one scheduled visit (event). Owner or manager only.',
+}, { scopes: ['write'], tier: 'extended' }));
+
+const createEventTypeRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/event-types', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager')] as const,
+    responses: { 201: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('Always true on success.'), data: CreatedEventTypeSchema.describe('The created event type.') }) } }, description: 'Created event type' } },
+    operationId: 'createVisitEventType', summary: 'Create a visit event type',
+    description: 'Creates an event type the company schedules visits with. The JSON body is {name, slug, defaultDurationMin?, defaultPriceCents?, color?, sortOrder?, followUpDelayHours?}: name and slug are required, slug is lowercase letters, digits and underscores, color is a six-digit hex value, and the omitted fields take 30 minutes, a price of 0, #6366f1, sort order 0 and the stored follow-up default. A body that is not valid answers 400 with the field errors. Owner or manager only; a price is refused without the inspection-fees capability.',
+}, { scopes: [], tier: 'excluded' }));
+
+const createInspectionEventRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/inspections/{inspectionId}/events', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: z.object({ inspectionId: z.string().describe('Id of the inspection the visit is scheduled on.') }) },
+    responses: { 201: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('Always true on success.'), data: CreatedInspectionEventSchema.describe('The created visit.') }) } }, description: 'Created visit' } },
+    operationId: 'createInspectionEvent', summary: 'Schedule a visit on an inspection',
+    description: 'Schedules a visit (event) of an event type on one inspection. The JSON body is {eventTypeId, scheduledAt, durationMin, inspectorId?, priceCents?, notes?}: scheduledAt is an ISO 8601 date-time, durationMin a positive whole number of minutes, and priceCents defaults to 0. A body that is not valid answers 400 with the field errors. A price is refused without the inspection-fees capability.',
+}, { scopes: [], tier: 'excluded' }));
+
+const updateEventStatusRoute = createRoute(withMcpMetadata({
+    method: 'put', path: '/events/{id}', tags: ['calendar'],
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: { params: z.object({ id: z.string().describe('Id of the visit whose status changes.') }) },
+    responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('Always true on success.') }) } }, description: 'Status changed' } },
+    operationId: 'updateInspectionEventStatus', summary: 'Change the status of a visit',
+    description: 'Moves one visit to a new lifecycle status. The JSON body is {status}, one of scheduled, completed, results_received or cancelled. The status decides who may make the change, so it is checked after the body is read: office staff accounts are refused for any status, and results_received is owner or manager only. A visit of an inspection the caller cannot see answers 404.',
+}, { scopes: [], tier: 'excluded' }));
+
 const eventsRoutes = createApiRouter()
-    .get('/event-types', requireRole('owner', 'manager', 'inspector'), async (c) => {
+    .openapi(listEventTypesRoute, async (c) => {
         const data = await c.var.services.event.listEventTypes(c.get('tenantId'));
-        return c.json({ success: true, data: await moneyView(c, data, 'inspectionFees') });
+        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
     })
-    .post('/event-types', requireRole('owner', 'manager'), async (c) => {
+    .openapi(listInspectionEventsRoute, async (c) => {
+        const { inspectionId } = c.req.valid('param');
+        const data = await c.var.services.event.listInspectionEvents(c.get('tenantId'), inspectionId);
+        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
+    })
+    .openapi(deleteEventRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        await c.var.services.event.deleteEvent(c.get('tenantId'), id);
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(createEventTypeRoute, async (c) => {
         // Checked on the RAW body: the schema's default of 0 would otherwise make
         // every create look like it sets a price.
         const parsed = TypeBody.safeParse(await guardMoneyWrite(c, await c.req.json(), null));
         if (!parsed.success) throw Errors.BadRequest('Invalid event type', parsed.error.flatten().fieldErrors);
         const row = await c.var.services.event.createEventType(c.get('tenantId'), parsed.data);
-        return c.json({ success: true, data: await moneyView(c, row, 'inspectionFees') }, 201);
+        return c.json({ success: true as const, data: await moneyView(c, row, 'inspectionFees') }, 201);
     })
     // ---- Inspection events ----
-    .get('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
-        const inspectionId = c.req.param('inspectionId') as string;
-        const data = await c.var.services.event.listInspectionEvents(c.get('tenantId'), inspectionId);
-        return c.json({ success: true, data: await moneyView(c, data, 'inspectionFees') });
-    })
-    .post('/inspections/:inspectionId/events', requireRole('owner', 'manager', 'inspector'), async (c) => {
-        const inspectionId = c.req.param('inspectionId') as string;
+    .openapi(createInspectionEventRoute, async (c) => {
+        const { inspectionId } = c.req.valid('param');
         const parsed = EventBody.safeParse(await guardMoneyWrite(c, await c.req.json(), null));
         if (!parsed.success) throw Errors.BadRequest('Invalid event', parsed.error.flatten().fieldErrors);
         const row = await c.var.services.event.createEvent(c.get('tenantId'), inspectionId, {
             ...parsed.data,
             scheduledAt: new Date(parsed.data.scheduledAt),
         });
-        return c.json({ success: true, data: await moneyView(c, row, 'inspectionFees') }, 201);
+        return c.json({ success: true as const, data: await moneyView(c, row, 'inspectionFees') }, 201);
     })
-    .put('/events/:id', requireRole('owner', 'manager', 'inspector'), async (c) => {
-        const id = c.req.param('id') as string;
+    .openapi(updateEventStatusRoute, async (c) => {
+        const { id } = c.req.valid('param');
         const parsed = EventStatusBody.safeParse(await c.req.json());
         if (!parsed.success) throw Errors.BadRequest('Invalid status', parsed.error.flatten().fieldErrors);
         // Completing a visit is the FIELD's own act: the inspector standing on
@@ -93,12 +154,7 @@ const eventsRoutes = createApiRouter()
         // A visit of an inspection the caller cannot see is not found, whatever the body says.
         await requireVisibleEvent(getDrizzle(c), await resolveInspectionScope(c), c.get('tenantId'), id);
         await c.var.services.event.updateEventStatus(c.get('tenantId'), id, parsed.data.status);
-        return c.json({ success: true });
-    })
-    .delete('/events/:id', requireRole('owner', 'manager'), async (c) => {
-        const id = c.req.param('id') as string;
-        await c.var.services.event.deleteEvent(c.get('tenantId'), id);
-        return c.json({ success: true });
+        return c.json({ success: true as const }, 200);
     });
 
 export type EventsApi = typeof eventsRoutes;

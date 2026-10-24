@@ -1,9 +1,11 @@
 {
   // Program for `vitest --typecheck` (the `*.spec-d.ts` assertions). It exists
-  // only to type-check FOUR files.
+  // only to type-check the type-assertion files: its `include` is
+  // `worker-configuration.d.ts` plus every `tests/**/*.spec-d.ts` (a dozen and
+  // growing, so the count is not written down here).
   //
   // It used to `extends` tsconfig.api.json AND re-list `server/**/*`, so it
-  // recompiled the entire server program to check those four — measured at 238s
+  // recompiled the entire server program to check what was then four files — measured at 238s
   // of typecheck time. It now REFERENCES the api project and consumes the
   // `.d.ts` that project already emits, the same change that took the app pass
   // from 46.6s to 19.8s. Missing it here was an oversight when the references
@@ -39,6 +41,9 @@
     "tsBuildInfoFile": "./.tsbuildinfo.tests-typecheck",
     "paths": {
       "@core/api-types": ["./packages/api-types/index.ts"],
+      "@core/offline-package": ["./packages/offline-package/index.ts"],
+      "@core/field-ui": ["./packages/field-ui/src/index.ts"],
+      "@core/field-ui/*": ["./packages/field-ui/src/*"],
       "~/*": ["./app/*"]
     }
   },

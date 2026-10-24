@@ -7,7 +7,7 @@
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
-  "app/lib/editor/structure-ops.ts#Snapshot.schemaVersion": {
+  "packages/field-ui/src/shared/structure-ops.ts#Snapshot.schemaVersion": {
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
   },
@@ -243,12 +243,68 @@
     "kind": "invisible-read",
     "reason": "Read as `env[`JWT_PUBLIC_KEY_V${n}`]` by buildKeyring (jwt-keyring.ts). The next rotation slot; provisioning it is a verify-only window before JWT_CURRENT_KID flips."
   },
-  "server/types/template-schema.ts#TemplateSection.sharedComments": {
+  "packages/field-ui/src/shared/template-schema.ts#TemplateSection.sharedComments": {
     "kind": "invisible-read",
     "reason": "Read by NAME as a string: `app/lib/editor/structure-ops.ts` lists `'sharedComments'` among the section keys it carries across a structure edit. A string in a list is a read no name-based scan can follow."
   },
-  "server/types/template-schema.ts#TemplateSchemaV2.schemaVersion": {
+  "packages/field-ui/src/shared/template-schema.ts#TemplateSchemaV2.schemaVersion": {
     "kind": "wire-shape",
     "reason": "Stored version discriminator. Written into every persisted payload (report-version.service.ts writes SNAPSHOT_SCHEMA_VERSION; shared.ts seeds `{schemaVersion: 2}`), required on the way in by the validator (`z.literal(2)` in template.schema.ts, `z.number()` in report-data.schema.ts), and carried by the templates already in the database. Nothing branches on it because there is exactly one version so far — which is what it exists to make possible, not evidence that it is dead."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.commands": {
+    "kind": "record",
+    "reason": "The ordered list of commands the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.reloadCount": {
+    "kind": "record",
+    "reason": "How many times the editor asked the host to reload on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.exitCount": {
+    "kind": "record",
+    "reason": "How many times the editor asked the host to leave on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-resources.ts#FakeTemplateSearch.searches": {
+    "kind": "record",
+    "reason": "The ordered list of template searches the editor issued on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.restartCount": {
+    "kind": "record",
+    "reason": "How many times the editor asked the host to restart the session on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-data-source.ts#FakeDataSource.openedUrls": {
+    "kind": "record",
+    "reason": "The addresses the editor asked the host to open on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.posters": {
+    "kind": "record",
+    "reason": "The poster images the editor asked for on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.createUploads": {
+    "kind": "record",
+    "reason": "The video upload sessions the editor created on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.uploadedFiles": {
+    "kind": "record",
+    "reason": "The video files the editor uploaded on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.posterUploads": {
+    "kind": "record",
+    "reason": "The poster images the editor uploaded on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVideo.finalizes": {
+    "kind": "record",
+    "reason": "The video uploads the editor finalised on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVersionHistory.restores": {
+    "kind": "record",
+    "reason": "The versions the editor restored on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeVersionHistory.gets": {
+    "kind": "record",
+    "reason": "The versions the editor opened on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/testing/fake-panel-resources.ts#FakeSettingsSheet.loads": {
+    "kind": "record",
+    "reason": "The times the editor loaded the settings sheet on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
   }
 }

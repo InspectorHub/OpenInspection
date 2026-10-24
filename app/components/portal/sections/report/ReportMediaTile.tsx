@@ -13,7 +13,7 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
-import { photoDisplayName, withDownload } from "~/lib/photo-name";
+import { photoDisplayName, withDownload } from "@core/field-ui/shared/photo-name";
 import { m } from "~/paraglide/messages";
 import { qrToSvg } from "../../../../../server/lib/qr";
 import { PRINT_FIGURE_CLASS, printThumbWidth, type ReportPhoto } from "./types";

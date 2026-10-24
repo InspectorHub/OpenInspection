@@ -5,7 +5,7 @@ import {
   resolveDisplayPrefs,
   type DateFormat,
   type TimeFormat,
-} from "../../server/lib/session/display-prefs";
+} from "@core/field-ui/shared/display-prefs";
 
 /**
  * Session context returned by GET /api/session/context.

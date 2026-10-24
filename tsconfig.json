@@ -53,7 +53,10 @@
     ],
     "paths": {
       "~/*": ["./app/*"],
-      "@core/shared-ui": ["./packages/shared-ui/src/index.ts"]
+      "@core/shared-ui": ["./packages/shared-ui/src/index.ts"],
+      "@core/offline-package": ["./packages/offline-package/index.ts"],
+      "@core/field-ui": ["./packages/field-ui/src/index.ts"],
+      "@core/field-ui/*": ["./packages/field-ui/src/*"]
     },
     "rootDirs": [".", "./.react-router/types"],
     "noEmit": true,
@@ -74,6 +77,9 @@
     // allowJs or the .gitignore (paraglide's own .gitignore excludes the whole
     // outdir, so these are gitignored but still present after i18n:compile).
     "app/paraglide/**/*.d.ts",
+    // The editor package's own compiled messages (gitignored, present after
+    // i18n:compile), listed for the same reason as the app copy above.
+    "packages/field-ui/src/i18n/generated/**/*.d.ts",
     "workers/**/*.ts",
     "vite.config.ts",
     // The worker entry's `typeof import("../server/index")` pulls the server
@@ -97,7 +103,13 @@
     // it, no npm script runs it, no tool reads it. It is NOT what checks these
     // files, and editing it will not affect anything. This is.
     "packages/shared-ui/src/**/*.ts",
-    "packages/shared-ui/src/**/*.tsx"
+    "packages/shared-ui/src/**/*.tsx",
+    // Same arrangement for the field editor package: listed so its sources and
+    // co-located specs are compiled even before any route imports them.
+    // `packages/field-ui/tsconfig.json` is an orphan like shared-ui's; this is
+    // what checks the files.
+    "packages/field-ui/src/**/*.ts",
+    "packages/field-ui/src/**/*.tsx"
   ],
   // ⚠️ NO SPEC EXCLUSIONS, AND THAT IS LOAD-BEARING.
   //

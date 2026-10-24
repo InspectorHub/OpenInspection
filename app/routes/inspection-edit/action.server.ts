@@ -1,20 +1,22 @@
 import type { Route } from "../+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
+import { isPathSegment } from "~/lib/path-segment";
 import { createApi } from "~/lib/api-client.server";
 import { sanitizeSettingsPatch } from "~/lib/settings-patch";
 import { unwrapResultsResponse } from "~/lib/results";
 import { mapPool } from "~/lib/map-pool";
 import { handleStatutoryIntent } from "./action-statutory.server";
 import { handleFollowupIntent } from "./action-followup.server";
+import { writeKeyFor } from "./action-idempotency.server";
 
 export async function action({ request, params, context }: Route.ActionArgs) {
  const token = await requireToken(context, request);
+ if (!isPathSegment(params.id)) return Response.json({ ok: false, error: "Invalid inspection id" }, { status: 400 });
  const formData = await request.formData();
  const intent = formData.get("intent");
- const api = createApi(context, { token });
- // B-17: every branch must record whether the API write actually landed —
- // returning { ok: true } unconditionally turned failed PATCHes into silent
- // data loss (the save pill said "Saved" either way).
+ const api = createApi(context, { token, idempotencyKey: writeKeyFor(intent, formData), inFlightAsResponse: new URL(request.url).pathname.startsWith("/resources/") });
+ // B-17: every branch must record whether the API write actually landed — returning { ok: true }
+ // unconditionally turned failed PATCHes into silent data loss (the save pill said "Saved" either way).
  let ok = true;
 
  // `complete` is not on the typed client (like submit/return/unpublish).

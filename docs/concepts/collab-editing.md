@@ -78,7 +78,7 @@ question, not a correctness one.
 
 ## The projection model
 
-`server/lib/collab/results-doc.ts` is pure Yjs (no React, no server deps) and owns
+`packages/field-ui/src/shared/results-doc.ts` is pure Yjs (no React, no server deps) and owns
 the document shape + the projection that is its exact inverse:
 
 - `projectResults(doc)` → the plain-JSON `ResultMap` written to `inspection_results.data`.
@@ -149,7 +149,7 @@ A key that starts with `_` and has fewer than three colon-separated parts
 (`_inspector_signature`) is a meta key: row-level data that lives in the blob
 next to the findings but is not one. Composite finding keys also start with
 `_default:`, which is why the colon count decides (`isMetaKey` in
-`server/lib/finding-key.ts`, the one definition every module uses).
+`packages/field-ui/src/shared/finding-key.ts`, the one definition every module uses).
 
 The engine generates item ids as UUIDs, so a real finding never looks like a meta
 key. A template imported from elsewhere whose item id starts with `_` and has no
@@ -298,7 +298,7 @@ on-demand JSON-projection snapshots in DO storage (capped at 25, `{seq, atMs, by
   in, persists, and broadcasts a **MSG_RESTORE** control frame. Every connected
   client drops its local Y.Doc + IndexedDB and resyncs from scratch — so a restore
   converges all live clients (a plain additive update could not revert deletions).
-- UI: the **Version history** panel in the editor (`app/components/collab/VersionHistoryPanel.tsx`).
+- UI: the **Version history** panel in the editor (`packages/field-ui/src/components/collab/VersionHistoryPanel.tsx`).
 
 ## Configuration
 
@@ -339,10 +339,10 @@ queue (`app/lib/offline/*`, `useOfflineQueue`/`useOfflineWrite`), the conflict U
 |---|---|
 | `server/durable-objects/inspection-doc.ts` | the DO: Y.Doc host, WS sync, persist, snapshots/restore |
 | `server/api/inspections/collab.ts` | authorized WS + snapshot/restore routes |
-| `server/lib/collab/results-doc.ts` | pure Yjs doc model + `projectResults` / `loadResultsProjection` |
+| `packages/field-ui/src/shared/results-doc.ts` | pure Yjs doc model + `projectResults` / `loadResultsProjection` |
 | `server/lib/collab/legacy-key-rename.ts` | pure Yjs rename of legacy finding keys, run by the DO's `/rename-legacy-keys` |
 | `server/durable-objects/results-divergence.ts` | the log-only blob-vs-document divergence check |
-| `app/lib/collab/results-doc-connection.ts` | browser Y.Doc ↔ DO connection (offline + restore resync) |
-| `app/lib/collab/use-results-doc.ts` | React hook over the connection |
-| `app/lib/collab/results-binding.ts` | doc ↔ editor write-API bridge |
-| `app/components/collab/VersionHistoryPanel.tsx` | version-history UI |
+| `packages/field-ui/src/collab/results-doc-connection.ts` | browser Y.Doc ↔ DO connection (offline + restore resync) |
+| `packages/field-ui/src/collab/use-results-doc.ts` | React hook over the connection |
+| `packages/field-ui/src/collab/results-binding.ts` | doc ↔ editor write-API bridge |
+| `packages/field-ui/src/components/collab/VersionHistoryPanel.tsx` | version-history UI |

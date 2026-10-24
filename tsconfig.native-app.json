@@ -1,0 +1,11 @@
+{
+  // Optional native (tsgo) twin of ./tsconfig.json. Output and references only; every
+  // other option is inherited. `references` is not inherited through
+  // `extends`, so it is restated and pointed at the native API project, whose
+  // declarations live in .types-tsgo/ and never touch the tsc-owned .types/.
+  "extends": "./tsconfig.json",
+  "references": [{ "path": "./tsconfig.native-api.json" }],
+  "compilerOptions": {
+    "tsBuildInfoFile": "./.types-tsgo/.tsbuildinfo.app"
+  }
+}

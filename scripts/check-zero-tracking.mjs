@@ -45,9 +45,13 @@ const ROOT = process.cwd();
 
 // Client-side surfaces only. Server code may talk to anything it likes; the
 // posture is about what the BROWSER does.
-const ROOTS = ['app', 'public'];
+const ROOTS = ['app', 'public', 'packages/field-ui/src'];
 const EXT = /\.(ts|tsx|js|jsx|mjs|html)$/;
-const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.types', 'paraglide', 'vendor', 'fonts']);
+const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.types', '.types-tsgo', 'paraglide', 'vendor', 'fonts']);
+// Skipped by exact repo-relative path, never by name: a directory called `generated` anywhere else is hand-written
+// until proven otherwise, and a name-wide skip would let tracking code hide in one.
+//   - the compiled paraglide output of packages/field-ui/src/i18n (never hand-edited).
+const SKIP_PATH = new Set(['packages/field-ui/src/i18n/generated']);
 
 // Files that match a rule for a reason that has been looked at. Each needs a
 // sentence, not a name — a bare allowlist entry is indistinguishable from a
@@ -93,6 +97,7 @@ function walk(dir, acc) {
     for (const name of entries) {
         if (SKIP_DIR.has(name)) continue;
         const p = join(dir, name);
+        if (SKIP_PATH.has(relative(ROOT, p).split(sep).join('/'))) continue;
         let st;
         try { st = statSync(p); } catch { continue; }
         if (st.isDirectory()) walk(p, acc);

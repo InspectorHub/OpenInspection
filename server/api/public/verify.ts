@@ -1,6 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
-import { inspections, reportVersions } from '../../lib/db/schema';
+import { agreementRequests, inspections, reportVersions } from '../../lib/db/schema';
 import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
@@ -111,134 +111,182 @@ const reportVerifyPdfRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login download of the immutable archived PDF for a specific published report version. Identified by the report_versions verification token (same token as the verifier page). Rendered once on-demand and cached forever by version number.',
 }, { scopes: [], tier: 'extended' }));
 
-const publicVerifyRoutes = createApiRouter()
-    .openapi(verifyRoute, async (c) => {
-        const { envelopeId } = c.req.valid('param');
-        const data = await loadVerifyData(c, envelopeId);
-        if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
-        return c.json({
-            success: true as const,
-            data: {
-                envelopeId,
-                documentTitle: data.agreement?.name ?? null,
-                clientName: data.reqRow.clientName,
-                // clientEmail deliberately NOT exposed — this is a public, no-auth
-                // endpoint; the signer roster below is email-free for the same reason.
-                chainValid: data.verify.valid,
-                chainReason: data.verify.valid ? null : (data.verify.reason as string),
-                keyFingerprint: data.pubKey?.fingerprint ?? null,
-                keyAlgorithm: 'Ed25519',
-                eventCount: data.auditRows.length,
-                contentSnapshot: data.reqRow.contentSnapshot ?? null,
-                contentHash: data.reqRow.contentHash ?? null,
-                signers: data.signers.map((s) => ({
-                    name: s.name,
-                    role: s.role,
-                    status: s.status,
-                    signedAt: s.signedAt ? new Date(s.signedAt).toISOString() : null,
-                    channel: s.channel ?? null,
-                })),
-                // SIGNED signers only. A pending signer has been shown nothing
-                // and recorded nothing; counting it would suppress the notice on
-                // a document whose actual signatories all saw it.
-                languageDisclosureCurrent: signaturesRecordCurrentDisclosure(
-                    data.signers.filter((s) => s.status === 'signed')
-                        .map((s) => s.languageDisclosureVersion),
-                ),
-            },
-        }, 200);
-    })
-    .openapi(reportVerifyRoute, async (c) => {
-        const { token } = c.req.valid('param');
-        const data = await loadReportVerifyData(c, token);
-        if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Token not found' } }, 404);
-        return c.json({ success: true as const, data: {
-            versionNumber: data.verify.versionNumber,
-            isAmendment:   data.verify.isAmendment,
-            publishedAt:   data.verify.publishedAt,
-            contentHash:   data.verify.contentHash,
-            keyFingerprint: data.verify.keyFingerprint,
-            keyAlgorithm:  'Ed25519',
-            legacy:        data.verify.legacy,
-            hashValid:     data.verify.hashValid,
-            signatureValid: data.verify.signatureValid,
-            keyMissing:    data.verify.keyMissing,
-            chainValid:    data.verify.chainValid,
-            propertyAddressMasked: data.propertyAddressMasked,
-            notPublished: data.notPublished,
-            tenantSlug: data.tenantSlug,
-        } }, 200);
-    })
-    .openapi(reportVerifyPdfRoute, async (c) => {
-        const { token } = c.req.valid('param');
-        // Resolve token → report_versions row to get tenantId + versionNumber.
-        // loadReportVerifyData only returns inspectionId from verifyByToken, so
-        // we query the row directly for the tenantId we need.
-        const db = getDrizzle(c);
-        const versionRow = await db.select({
-            tenantId:      reportVersions.tenantId,
-            inspectionId:  reportVersions.inspectionId,
-            versionNumber: reportVersions.versionNumber,
-            contentHash:   reportVersions.contentHash,
-        }).from(reportVersions).where(eq(reportVersions.verificationToken, token)).get();
-        if (!versionRow) return c.notFound();
+// Resolves the verification token printed on a signed document to its envelope id, so the verifier page can
+// then read `/verify/{envelopeId}`. Public and unauthenticated: the token is the credential.
+const verifyByTokenRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/verify-by-token/{token}',
+    tags: ['public'],
+    summary: 'Resolve a verification token to an envelope',
+    request: { params: z.object({ token: z.string().describe('Verification token printed on the signed agreement document.') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(true).describe('Always true on success.'),
+                data: z.object({ envelopeId: z.string().describe('Id of the signature envelope the token belongs to.') }).describe('The resolved envelope.'),
+            }) } },
+            description: 'Envelope id',
+        },
+        404: {
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(false).describe('Always false on an error.'),
+                error: z.object({
+                    message: z.string().describe('Human-readable description of the error.'),
+                    code: z.string().describe('Stable machine-readable error code.'),
+                }).describe('Error detail.'),
+            }) } },
+            description: 'No envelope has this token',
+        },
+    },
+    operationId: 'getPublicVerifyByToken',
+    description: 'Public, no-login lookup that turns the verification token printed on a signed agreement into the signature envelope id, which the public verification route then reads. Answers 404 when no envelope carries the token.',
+}, { scopes: [], tier: 'excluded' }));
 
-        const { tenantId, inspectionId, versionNumber, contentHash } = versionRow;
+const app = createApiRouter();
+app.openapi(verifyRoute, async (c) => {
+    const { envelopeId } = c.req.valid('param');
+    const data = await loadVerifyData(c, envelopeId);
+    if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
+    return c.json({
+        success: true as const,
+        data: {
+            envelopeId,
+            documentTitle: data.agreement?.name ?? null,
+            clientName: data.reqRow.clientName,
+            // clientEmail deliberately NOT exposed — this is a public, no-auth
+            // endpoint; the signer roster below is email-free for the same reason.
+            chainValid: data.verify.valid,
+            chainReason: data.verify.valid ? null : (data.verify.reason as string),
+            keyFingerprint: data.pubKey?.fingerprint ?? null,
+            keyAlgorithm: 'Ed25519',
+            eventCount: data.auditRows.length,
+            contentSnapshot: data.reqRow.contentSnapshot ?? null,
+            contentHash: data.reqRow.contentHash ?? null,
+            signers: data.signers.map((s) => ({
+                name: s.name,
+                role: s.role,
+                status: s.status,
+                signedAt: s.signedAt ? new Date(s.signedAt).toISOString() : null,
+                channel: s.channel ?? null,
+            })),
+            // SIGNED signers only. A pending signer has been shown nothing
+            // and recorded nothing; counting it would suppress the notice on
+            // a document whose actual signatories all saw it.
+            languageDisclosureCurrent: signaturesRecordCurrentDisclosure(
+                data.signers.filter((s) => s.status === 'signed')
+                    .map((s) => s.languageDisclosureVersion),
+            ),
+        },
+    }, 200);
+});
+app.openapi(reportVerifyRoute, async (c) => {
+    const { token } = c.req.valid('param');
+    const data = await loadReportVerifyData(c, token);
+    if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Token not found' } }, 404);
+    return c.json({ success: true as const, data: {
+        versionNumber: data.verify.versionNumber,
+        isAmendment:   data.verify.isAmendment,
+        publishedAt:   data.verify.publishedAt,
+        contentHash:   data.verify.contentHash,
+        keyFingerprint: data.verify.keyFingerprint,
+        keyAlgorithm:  'Ed25519',
+        legacy:        data.verify.legacy,
+        hashValid:     data.verify.hashValid,
+        signatureValid: data.verify.signatureValid,
+        keyMissing:    data.verify.keyMissing,
+        chainValid:    data.verify.chainValid,
+        propertyAddressMasked: data.propertyAddressMasked,
+        notPublished: data.notPublished,
+        tenantSlug: data.tenantSlug,
+    } }, 200);
+});
+app.openapi(reportVerifyPdfRoute, async (c) => {
+    const { token } = c.req.valid('param');
+    // Resolve token → report_versions row to get tenantId + versionNumber.
+    // loadReportVerifyData only returns inspectionId from verifyByToken, so
+    // we query the row directly for the tenantId we need.
+    const db = getDrizzle(c);
+    const versionRow = await db.select({
+        tenantId:      reportVersions.tenantId,
+        inspectionId:  reportVersions.inspectionId,
+        versionNumber: reportVersions.versionNumber,
+        contentHash:   reportVersions.contentHash,
+    }).from(reportVersions).where(eq(reportVersions.verificationToken, token)).get();
+    if (!versionRow) return c.notFound();
 
-        // Publish gate: the frozen archived PDF is a public client artifact — refuse
-        // while the report is not currently published (re-publishing restores it).
-        //
-        // ⚠️ DELIBERATELY NOT the agreement/payment release gate, which the other
-        // public report paths do enforce (see publicReportAccessAllowed). This
-        // endpoint is reached with a per-version VERIFICATION token, and that
-        // token is carried by the document itself — so anyone holding one already
-        // holds the report, and refusing them protects nothing while breaking the
-        // thing the page exists for: a third party checking that a document they
-        // were handed is authentic. If a verification token ever starts being
-        // distributed to someone who has NOT been given the report, this becomes
-        // a hole and the gate belongs here too.
-        const inspRow = await db.select({ reportStatus: inspections.reportStatus })
-          .from(inspections)
-          .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-          .get();
-        if (!isReportPublished(inspRow?.reportStatus)) {
-          return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
-        }
+    const { tenantId, inspectionId, versionNumber, contentHash } = versionRow;
 
-        if (!c.env.BROWSER || !c.env.PHOTOS) {
-            return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
-        }
+    // Publish gate: the frozen archived PDF is a public client artifact — refuse
+    // while the report is not currently published (re-publishing restores it).
+    //
+    // ⚠️ DELIBERATELY NOT the agreement/payment release gate, which the other
+    // public report paths do enforce (see publicReportAccessAllowed). This
+    // endpoint is reached with a per-version VERIFICATION token, and that
+    // token is carried by the document itself — so anyone holding one already
+    // holds the report, and refusing them protects nothing while breaking the
+    // thing the page exists for: a third party checking that a document they
+    // were handed is authentic. If a verification token ever starts being
+    // distributed to someone who has NOT been given the report, this becomes
+    // a hole and the gate belongs here too.
+    const inspRow = await db.select({ reportStatus: inspections.reportStatus })
+      .from(inspections)
+      .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+      .get();
+    if (!isReportPublished(inspRow?.reportStatus)) {
+      return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
+    }
 
-        // Check if we already have a frozen PDF for this exact version.
-        // getOrRender will return cached row on content-hash hit; on miss it
-        // renders once and stores with versionNumber so subsequent hits are instant.
-        const tenantSlug = await resolveTenantSlug(c, tenantId);
-        // The version travels into the render so the frozen PDF renders what
-        // that version FROZE. Before this the URL named no version, so the
-        // "frozen" artifact was whatever the live page said the first time
-        // somebody asked for it — which may be long after publication. The
-        // freezing was a caching side effect, not a property of the document.
-        const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, inspectionId, c.env.JWT_SECRET, versionNumber);
+    if (!c.env.BROWSER || !c.env.PHOTOS) {
+        return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
+    }
 
-        // Use contentHash from the snapshot row if available; fall back to live hash
-        // so even legacy rows (no contentHash) get a rendered PDF.
-        const hash = contentHash ?? await c.var.services.inspection.getReportContentHash(inspectionId, tenantId);
-        const footer = await c.var.services.inspection.getReportPdfFooterContext(inspectionId, tenantId);
+    // Check if we already have a frozen PDF for this exact version.
+    // getOrRender will return cached row on content-hash hit; on miss it
+    // renders once and stores with versionNumber so subsequent hits are instant.
+    const tenantSlug = await resolveTenantSlug(c, tenantId);
+    // The version travels into the render so the frozen PDF renders what
+    // that version FROZE. Before this the URL named no version, so the
+    // "frozen" artifact was whatever the live page said the first time
+    // somebody asked for it — which may be long after publication. The
+    // freezing was a caching side effect, not a property of the document.
+    const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, inspectionId, c.env.JWT_SECRET, versionNumber);
 
-        const record = await c.var.services.reportPdf.getOrRender(inspectionId, tenantId, 'full', {
-            reportUrl,
-            contentHash: hash,
-            versionNumber,
-            footer,
-        });
-        const obj = await c.var.services.reportPdf.streamPdf(record);
-        if (!obj) return c.notFound();
+    // Use contentHash from the snapshot row if available; fall back to live hash
+    // so even legacy rows (no contentHash) get a rendered PDF.
+    const hash = contentHash ?? await c.var.services.inspection.getReportContentHash(inspectionId, tenantId);
+    const footer = await c.var.services.inspection.getReportPdfFooterContext(inspectionId, tenantId);
 
-        return new Response(obj.body, { status: 200, headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="report-v${versionNumber}.pdf"`,
-            'Cache-Control': 'public, max-age=31536000, immutable',
-        } });
+    const record = await c.var.services.reportPdf.getOrRender(inspectionId, tenantId, 'full', {
+        reportUrl,
+        contentHash: hash,
+        versionNumber,
+        footer,
     });
+    const obj = await c.var.services.reportPdf.streamPdf(record);
+    if (!obj) return c.notFound();
 
-export default publicVerifyRoutes;
+    return new Response(obj.body, { status: 200, headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="report-v${versionNumber}.pdf"`,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+    } });
+});
+app.openapi(verifyByTokenRoute, async (c) => {
+    const { token } = c.req.valid('param');
+    const row = await getDrizzle(c).select({ id: agreementRequests.id })
+        .from(agreementRequests)
+        .where(eq(agreementRequests.verificationToken, token))
+        .get();
+    if (!row) return c.json({ success: false as const, error: { message: 'Not found', code: 'NOT_FOUND' } }, 404);
+    return c.json({ success: true as const, data: { envelopeId: row.id } }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const publicVerifyRouteConfigs = [
+    verifyRoute,
+    reportVerifyRoute,
+    reportVerifyPdfRoute,
+    verifyByTokenRoute,
+] as const;
+
+export default app;

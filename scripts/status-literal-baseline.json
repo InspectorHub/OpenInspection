@@ -1,5 +1,5 @@
 [
-  "app/components/editor/PublishModal.tsx::PublishModal::status !== \"completed\"",
+  "packages/field-ui/src/components/editor/PublishModal.tsx::PublishModal::status !== \"completed\"",
   "app/lib/dashboard-filters.ts::reportStateLabel::reportStatus === \"in_progress\"",
   "app/lib/dashboard-filters.ts::reportStateLabel::reportStatus === \"published\"",
   "app/lib/dashboard-filters.ts::reportStateLabel::reportStatus === \"submitted\"",

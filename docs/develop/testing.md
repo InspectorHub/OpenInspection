@@ -127,6 +127,24 @@ tests/
   (vitest v4 replacement for `environmentMatchGlobs`).
 - Prefer asserting **service-layer** behavior directly over reconstructing HTTP.
 
+### Every route is OpenAPI or a named exception
+
+`tests/unit/platform/native-routes-are-exceptions.spec.ts` reads the runtime route table of the
+real application (`app.routes`, including routes registered through helper functions), subtracts every
+method and path in the generated OpenAPI document, and requires the remainder to equal
+`NATIVE_ROUTE_EXCEPTIONS` in `tests/unit/platform/native-route-exceptions.ts` exactly. Paths are compared in
+the OpenAPI spelling (`{id}`); middleware and `app.all` dispatch lines are not routes and are skipped.
+
+- **A new plain route fails the spec, by name.** Describe it with `createRoute` (preferred), or add an entry
+  with a category from the closed list and a one-line reason (at most 120 characters) saying why it cannot or
+  should not be an OpenAPI operation.
+- **A stale entry fails too**: the route was removed, or is now in the document. Delete the entry.
+- **`MAX_ENTRIES` is a ratchet.** It equals the current count and may only go down.
+- **It prints both numbers on every run** (`native routes found`, `exceptions listed`) with a per-category
+  breakdown, and fails when the route table is empty.
+- **Out of scope:** routes served outside the Hono application (the OAuth provider wrapper paths, Durable Object
+  internal paths, React Router resource routes under `app/`).
+
 ### Worker-runtime (`tests/workers/*.spec.ts`)
 
 - Runs in real `workerd` via `@cloudflare/vitest-pool-workers`. Reserve this for
@@ -332,6 +350,45 @@ job, which is the price of the name meaning what it says.
 
 Every job that touches generated types runs `gen-version`, `i18n:compile:cached`
 and `react-router typegen` first. CodeQL runs separately (`codeql.yml`).
+
+### Native type-check (optional)
+
+`npm run type-check:native` runs the same four programs as `npm run type-check`
+(api, app, tests, e2e, in that order) through `tsgo`, the native TypeScript
+compiler from `@typescript/native-preview`. It is a convenience for local work.
+CI and the pre-commit hook still use the real `tsc`, which stays the authority.
+
+**When to use it.** A new worktree with no `.types/`, a cold or invalidated
+`tsc` cache, or a machine with little free memory. Measured on one Windows
+machine with about 16 GB of RAM, on the server program, cold: `tsgo --checkers 1` took 63-70 s and peaked at about 7.2-7.6 GB;
+`tsc -b` took about 175 s and peaked at about 9.65 GB. A full cold
+`type-check:native` (all four steps) took about 84 s, with the api step about
+66 s. A second run with nothing changed is a stat pass of under a second.
+
+**Limits.**
+
+- It is a preview. The version is pinned exactly in `package.json`; bump it on
+  purpose and re-run it on a known-good tree.
+- It is not faster everywhere. After server declarations change, its incremental
+  rebuild takes about 61-69 s, against about 11-21 s for a warm `tsc -b`. It
+  removes the cold-start cliff; it does not replace a warm `tsc` loop.
+- It is not the authority. In one injected-error test on this repository (39
+  kinds of type error), `tsc` reported all of them and `tsgo` missed none. That
+  is one sample, not a guarantee, and a green native run is still not a
+  substitute for the CI result.
+- It builds in project-reference mode (`tsc -b` style), whereas
+  `type-check:tests` runs `tsc -p tsconfig.tests.json --noEmit`. The first writes
+  build-info and declarations and skips up-to-date projects; the second writes
+  nothing. Do not compare timings across the two modes.
+- Keep it serial, and do not run it beside another type-check, eslint or a build.
+  `--checkers 1` is fixed in the script on purpose: the default of four checkers
+  copies the type cache into each one, roughly multiplying memory, and has
+  driven a 16 GB machine to a few MB of free memory.
+- It writes to its own directory, `.types-tsgo/` (gitignored), through the
+  `tsconfig.native-*.json` files, which only redirect output and `references`.
+  It never touches `.types/` or the `.tsbuildinfo.*` files: two compilers
+  sharing one build-info file overwrite each other and make both start cold.
+  Deleting `.types-tsgo/` is always safe.
 
 ---
 

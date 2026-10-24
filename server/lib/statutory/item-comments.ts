@@ -29,7 +29,7 @@
 import { renderTemplate } from '../mustache';
 import { resolveDefectMustacheVars } from '../../services/inspection/shared';
 import type { CannedDefect } from '../../services/inspection/report-schema-types';
-import type { DefectCommentState } from '../../types/inspection-item-state';
+import type { DefectCommentState } from '@core/field-ui/shared/inspection-item-state';
 
 /** One canned info/limitation entry as a template carries it. */
 interface CannedEntry { id: string; comment: string; default: boolean }

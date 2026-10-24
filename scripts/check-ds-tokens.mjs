@@ -57,8 +57,11 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const SCAN_DIRS = ["app", join("packages", "shared-ui", "src")];
+const SCAN_DIRS = ["app", join("packages", "shared-ui", "src"), join("packages", "field-ui", "src")];
+/** Compiled paraglide output of the field-ui package: generated, never hand-edited. */
+const GENERATED_DIRS = [join("packages", "field-ui", "src", "i18n", "generated")];
 const CSS_PATH = join("app", "styles", "tailwind.css");
+const THEME_PATH = join("packages", "field-ui", "src", "theme.css");
 
 /** Entire files exempt from all rules. Keep this list short and justified. */
 const FILE_ALLOWLIST = [
@@ -70,10 +73,10 @@ const FILE_ALLOWLIST = [
   join("app", "components", "editor", "PhotoStudio.tsx"),
   // Media Studio react-konva annotator — same fixed-dark studio chrome as
   // PhotoStudio.tsx (its replacement); neutral on-dark styling is intentional.
-  join("app", "components", "media-studio", "PhotoAnnotator.tsx"),
+  join("packages", "field-ui", "src", "components", "media-studio", "PhotoAnnotator.tsx"),
   // Extracted from PhotoAnnotator.tsx — same fixed-dark studio chrome.
-  join("app", "components", "media-studio", "AnnotationToolbar.tsx"),
-  join("app", "components", "media-studio", "MeasureCalibration.tsx"),
+  join("packages", "field-ui", "src", "components", "media-studio", "AnnotationToolbar.tsx"),
+  join("packages", "field-ui", "src", "components", "media-studio", "MeasureCalibration.tsx"),
 ];
 
 /** How many lines above a violation a `ds-allow` comment still excuses it. */
@@ -243,8 +246,9 @@ function* walk(dir) {
   for (const entry of readdirSync(dir)) {
     const p = join(dir, entry);
     const st = statSync(p);
-    if (st.isDirectory()) yield* walk(p);
-    else if (/\.tsx?$/.test(entry)) yield p;
+    if (st.isDirectory()) {
+      if (!GENERATED_DIRS.includes(relative(ROOT, p))) yield* walk(p);
+    } else if (/\.tsx?$/.test(entry)) yield p;
   }
 }
 
@@ -280,7 +284,8 @@ function main() {
   }
 
   const unresolved = findUnresolvedAliases({
-    css: readFileSync(join(ROOT, CSS_PATH), "utf8"),
+    css: `${readFileSync(join(ROOT, CSS_PATH), "utf8")}
+${readFileSync(join(ROOT, THEME_PATH), "utf8")}`,
     files,
   });
   if (unresolved.checked === 0) {
@@ -306,7 +311,7 @@ function main() {
     console.error(
       "`[undefined token]` has no such exception: the class compiles to nothing. Either fix " +
         "the name, or add the token to the @theme block AND to :root, the dark block and the " +
-        "field block in app/styles/tailwind.css.\n",
+        "field block in app/styles/tailwind.css or packages/field-ui/src/theme.css.\n",
     );
     for (const v of violations) console.error("  " + v);
     console.error(`\n${violations.length} violation(s).`);

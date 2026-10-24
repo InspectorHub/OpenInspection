@@ -122,81 +122,86 @@ const reportTranslationStateRoute = createRoute(withMcpMetadata({
     description: 'The three states a report translation can be in, per deliverable. The withheld state is the one that is otherwise silent: a report edited and republished stops showing its translation by design, and without this nobody is told until a client asks where it went.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-const reportTranslationRoutes = createApiRouter()
-    .openapi(reportTranslationStateRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const locale = c.req.valid('query').locale || (TRANSLATABLE_LOCALES[0] ?? '');
-        const deps = {
-            db: c.env.DB,
-            inspection: c.var.services.inspection,
-            translations: c.var.services.reportTranslation,
-        };
-        const rows = await listReports(getDrizzle(c), tenantId, id);
-        const reports = [];
-        for (const r of rows) {
-            reports.push({
-                reportId: r.id,
-                state: await readTranslationState(deps, {
-                    tenantId, inspectionId: id, reportId: r.id, locale,
-                }),
-            });
-        }
-        return c.json({ success: true as const, data: { locale, reports } }, 200);
-    })
-    .openapi(reportTranslationRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const { action, locale, reportId } = c.req.valid('json');
+const app = createApiRouter();
+app.openapi(reportTranslationStateRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const locale = c.req.valid('query').locale || (TRANSLATABLE_LOCALES[0] ?? '');
+    const deps = {
+        db: c.env.DB,
+        inspection: c.var.services.inspection,
+        translations: c.var.services.reportTranslation,
+    };
+    const rows = await listReports(getDrizzle(c), tenantId, id);
+    const reports = [];
+    for (const r of rows) {
+        reports.push({
+            reportId: r.id,
+            state: await readTranslationState(deps, {
+                tenantId, inspectionId: id, reportId: r.id, locale,
+            }),
+        });
+    }
+    return c.json({ success: true as const, data: { locale, reports } }, 200);
+});
+app.openapi(reportTranslationRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const { action, locale, reportId } = c.req.valid('json');
 
-        if (!TRANSLATABLE_LOCALES.includes(locale)) {
-            throw Errors.BadRequest(
-                `This deployment does not produce translations in '${locale}'. `
-                + `Offered: ${TRANSLATABLE_LOCALES.join(', ')}.`,
-            );
-        }
+    if (!TRANSLATABLE_LOCALES.includes(locale)) {
+        throw Errors.BadRequest(
+            `This deployment does not produce translations in '${locale}'. `
+            + `Offered: ${TRANSLATABLE_LOCALES.join(', ')}.`,
+        );
+    }
 
-        const translations = c.var.services.reportTranslation;
+    const translations = c.var.services.reportTranslation;
 
-        if (action === 'remove') {
-            // Deliberately BEFORE the production switch is consulted.
-            const { reportId: resolved, removed } = await removeCourtesyTranslation(
-                { db: c.env.DB, translations },
-                { tenantId, inspectionId: id, ...(reportId ? { reportId } : {}), locale },
-            );
-            auditFromContext(c, 'inspection.report_translation_removed', 'inspection', {
-                entityId: id,
-                metadata: { locale, reportId: resolved, removed },
-            });
-            return c.json({
-                success: true as const,
-                data: { action, locale, reportId: resolved, segmentCount: 0, changed: removed },
-            }, 200);
-        }
-
-        if (!await isCourtesyTranslationEnabled(c.env.DB, tenantId)) {
-            throw Errors.BadRequest(
-                'Courtesy translation is switched off for this workspace. Turn it on in '
-                + 'Settings before producing a new translation.',
-            );
-        }
-
-        const result = await generateCourtesyTranslation(
-            { db: c.env.DB, ai: c.var.services.ai, inspection: c.var.services.inspection, translations },
+    if (action === 'remove') {
+        // Deliberately BEFORE the production switch is consulted.
+        const { reportId: resolved, removed } = await removeCourtesyTranslation(
+            { db: c.env.DB, translations },
             { tenantId, inspectionId: id, ...(reportId ? { reportId } : {}), locale },
         );
-        auditFromContext(c, 'inspection.report_translation_regenerated', 'inspection', {
+        auditFromContext(c, 'inspection.report_translation_removed', 'inspection', {
             entityId: id,
-            metadata: { locale, reportId: result.reportId, segmentCount: result.segmentCount },
+            metadata: { locale, reportId: resolved, removed },
         });
         return c.json({
             success: true as const,
-            data: {
-                action, locale, reportId: result.reportId,
-                segmentCount: result.segmentCount, changed: true,
-            },
+            data: { action, locale, reportId: resolved, segmentCount: 0, changed: removed },
         }, 200);
-    })
-;
+    }
 
-export default reportTranslationRoutes;
+    if (!await isCourtesyTranslationEnabled(c.env.DB, tenantId)) {
+        throw Errors.BadRequest(
+            'Courtesy translation is switched off for this workspace. Turn it on in '
+            + 'Settings before producing a new translation.',
+        );
+    }
+
+    const result = await generateCourtesyTranslation(
+        { db: c.env.DB, ai: c.var.services.ai, inspection: c.var.services.inspection, translations },
+        { tenantId, inspectionId: id, ...(reportId ? { reportId } : {}), locale },
+    );
+    auditFromContext(c, 'inspection.report_translation_regenerated', 'inspection', {
+        entityId: id,
+        metadata: { locale, reportId: result.reportId, segmentCount: result.segmentCount },
+    });
+    return c.json({
+        success: true as const,
+        data: {
+            action, locale, reportId: result.reportId,
+            segmentCount: result.segmentCount, changed: true,
+        },
+    }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const reportTranslationRouteConfigs = [
+    reportTranslationStateRoute,
+    reportTranslationRoute,
+] as const;
+
+export default app;

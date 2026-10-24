@@ -4,7 +4,7 @@ import { AppError, ErrorCode } from '../errors';
 
 export type ClientPlatform = 'ios' | 'android' | 'windows';
 export const CLIENT_PLATFORMS = ['ios', 'android', 'windows'] as const satisfies readonly ClientPlatform[];
-export const SERVER_CONTRACT_VERSION = 1;
+export const SERVER_CONTRACT_VERSION = 2;
 
 export interface VersionPolicy {
   minSupported: string | null;
@@ -93,6 +93,9 @@ const NEVER_BLOCK_RULES: readonly NeverBlockRule[] = [
   { pattern: /^\/api\/inspections\/[^/]+\/media\/(upload-url|video\/(create-upload|finalize|r2-upload|r2-upload-poster))$/ },
   { pattern: /^\/api\/public\/uploads\// },
   { pattern: /^\/api\/client\/(session|import|compat)$/ },
+  // Reconcile: the device asks which of its local inspections the server still shows it. An outdated
+  // app must still be able to learn that something was deleted. Listed by method: it is one POST.
+  { method: 'POST', pattern: /^\/api\/client\/inspections\/visible$/ },
   { method: 'POST', pattern: /^\/api\/inspections$/ },
   // `bulk` is a fixed route (PATCH /api/inspections/bulk), not an inspection id: a bulk update is not
   // work captured on a device, so an outdated app does not get it past the version rule.

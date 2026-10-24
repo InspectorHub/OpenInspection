@@ -1,4 +1,4 @@
-import { RevisionBanner } from "~/components/statutory/RevisionBanner";
+import { RevisionBanner } from "@core/field-ui/components/statutory/RevisionBanner";
 import type { RevisionStatus } from "../../../server/lib/statutory/revision-status";
 
 /**

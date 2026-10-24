@@ -128,100 +128,109 @@ const checkRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const adminHolidayRoutes = createApiRouter()
-    .openapi(listRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { year } = c.req.valid('query');
-        const db = getDrizzle(c);
-        let rows;
-        if (year) {
-            const start = `${year}-01-01`;
-            const end = `${year}-12-31`;
-            rows = await db.select().from(tenantCustomHolidays).where(and(
-                eq(tenantCustomHolidays.tenantId, tenantId),
-                gte(tenantCustomHolidays.date, start),
-                lte(tenantCustomHolidays.date, end),
-            )).orderBy(asc(tenantCustomHolidays.date)).all();
-        } else {
-            rows = await db.select().from(tenantCustomHolidays).where(
-                eq(tenantCustomHolidays.tenantId, tenantId),
-            ).orderBy(asc(tenantCustomHolidays.date)).all();
-        }
-        return c.json({
-            success: true as const,
-            data: { holidays: rows.map(serializeHoliday) },
-        }, 200);
-    })
-    .openapi(createRouteDef, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const db = getDrizzle(c);
-        const existing = await db.select({ id: tenantCustomHolidays.id })
-            .from(tenantCustomHolidays)
-            .where(and(
-                eq(tenantCustomHolidays.tenantId, tenantId),
-                eq(tenantCustomHolidays.date, body.date),
-            ))
-            .get();
-        if (existing) {
-            throw Errors.BadRequest('A custom holiday already exists on that date.', 'DUPLICATE_HOLIDAY');
-        }
-        const now = new Date();
-        const id = crypto.randomUUID();
-        await db.insert(tenantCustomHolidays).values({
-            id,
-            tenantId,
-            date: body.date,
-            name: body.name,
-            createdAt: now,
-            updatedAt: now,
-        });
-        return c.json({
-            success: true as const,
-            data: { holiday: { id, date: body.date, name: body.name } },
-        }, 201);
-    })
-    .openapi(deleteRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const db = getDrizzle(c);
-        const row = await db.select().from(tenantCustomHolidays).where(and(
+const app = createApiRouter();
+app.openapi(listRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { year } = c.req.valid('query');
+    const db = getDrizzle(c);
+    let rows;
+    if (year) {
+        const start = `${year}-01-01`;
+        const end = `${year}-12-31`;
+        rows = await db.select().from(tenantCustomHolidays).where(and(
             eq(tenantCustomHolidays.tenantId, tenantId),
-            eq(tenantCustomHolidays.id, id),
-        )).get();
-        if (!row) throw Errors.NotFound('Custom holiday not found.');
-        await db.delete(tenantCustomHolidays).where(and(
+            gte(tenantCustomHolidays.date, start),
+            lte(tenantCustomHolidays.date, end),
+        )).orderBy(asc(tenantCustomHolidays.date)).all();
+    } else {
+        rows = await db.select().from(tenantCustomHolidays).where(
             eq(tenantCustomHolidays.tenantId, tenantId),
-            eq(tenantCustomHolidays.id, id),
-        ));
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(previewRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { year } = c.req.valid('query');
-        const config = await loadTenantHolidayConfig(c.env.DB, tenantId);
-        if (!config.holidayRegion) {
-            return c.json({ success: true as const, data: { dates: [] } }, 200);
-        }
-        const custom = await loadCustomHolidaysForYear(c.env.DB, tenantId, year);
-        const catalog = resolveCompanyClosedDates({
-            region: config.holidayRegion,
-            customRows: custom,
-            year,
-        });
-        const dates = [...catalog.entries()]
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([date, name]) => ({ date, name }));
-        return c.json({ success: true as const, data: { dates } }, 200);
-    })
-    .openapi(checkRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { date } = c.req.valid('query');
-        const result = await resolveInternalHolidayEffect(c.env.DB, tenantId, date);
-        return c.json({
-            success: true as const,
-            data: { effect: result.effect, name: result.name },
-        }, 200);
+        ).orderBy(asc(tenantCustomHolidays.date)).all();
+    }
+    return c.json({
+        success: true as const,
+        data: { holidays: rows.map(serializeHoliday) },
+    }, 200);
+});
+app.openapi(createRouteDef, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const db = getDrizzle(c);
+    const existing = await db.select({ id: tenantCustomHolidays.id })
+        .from(tenantCustomHolidays)
+        .where(and(
+            eq(tenantCustomHolidays.tenantId, tenantId),
+            eq(tenantCustomHolidays.date, body.date),
+        ))
+        .get();
+    if (existing) {
+        throw Errors.BadRequest('A custom holiday already exists on that date.', 'DUPLICATE_HOLIDAY');
+    }
+    const now = new Date();
+    const id = crypto.randomUUID();
+    await db.insert(tenantCustomHolidays).values({
+        id,
+        tenantId,
+        date: body.date,
+        name: body.name,
+        createdAt: now,
+        updatedAt: now,
     });
+    return c.json({
+        success: true as const,
+        data: { holiday: { id, date: body.date, name: body.name } },
+    }, 201);
+});
+app.openapi(deleteRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const db = getDrizzle(c);
+    const row = await db.select().from(tenantCustomHolidays).where(and(
+        eq(tenantCustomHolidays.tenantId, tenantId),
+        eq(tenantCustomHolidays.id, id),
+    )).get();
+    if (!row) throw Errors.NotFound('Custom holiday not found.');
+    await db.delete(tenantCustomHolidays).where(and(
+        eq(tenantCustomHolidays.tenantId, tenantId),
+        eq(tenantCustomHolidays.id, id),
+    ));
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(previewRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { year } = c.req.valid('query');
+    const config = await loadTenantHolidayConfig(c.env.DB, tenantId);
+    if (!config.holidayRegion) {
+        return c.json({ success: true as const, data: { dates: [] } }, 200);
+    }
+    const custom = await loadCustomHolidaysForYear(c.env.DB, tenantId, year);
+    const catalog = resolveCompanyClosedDates({
+        region: config.holidayRegion,
+        customRows: custom,
+        year,
+    });
+    const dates = [...catalog.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, name]) => ({ date, name }));
+    return c.json({ success: true as const, data: { dates } }, 200);
+});
+app.openapi(checkRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { date } = c.req.valid('query');
+    const result = await resolveInternalHolidayEffect(c.env.DB, tenantId, date);
+    return c.json({
+        success: true as const,
+        data: { effect: result.effect, name: result.name },
+    }, 200);
+});
 
-export default adminHolidayRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminHolidayRouteConfigs = [
+    listRoute,
+    createRouteDef,
+    deleteRoute,
+    previewRoute,
+    checkRoute,
+] as const;
+
+export default app;

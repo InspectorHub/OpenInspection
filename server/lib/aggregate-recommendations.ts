@@ -1,4 +1,4 @@
-import { parseFindingKey } from './finding-key';
+import { parseFindingKey } from '@core/field-ui/shared/finding-key';
 
 interface AggregatedRecItem {
     recommendationId: string;

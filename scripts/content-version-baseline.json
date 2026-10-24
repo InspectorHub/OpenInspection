@@ -36,7 +36,7 @@
       }
     },
     "c2": {
-      "combined": "c6e4c4029e7d64b98474daf3faf5874dc0b4b15fe71d9235c06d89479e7d9ba8",
+      "combined": "eee78c837f2580ff93b34041de5c9088fed5d687dd55e8cc0a2d5ded85d1ceea",
       "files": {
         "server/data/seed-templates/commercial-hospitality.json": "e3c4bd49a05e0aaa7c3681b1c57cdfedd84b22b3e798969ffb8125ad37b4df72",
         "server/data/seed-templates/commercial-industrial.json": "10107fa6d118e6c33a131808506d6b6b82e38d529862ddd5fb1fc983f6cf3e4e",
@@ -61,7 +61,7 @@
         "server/lib/people/default-role-profiles.ts": "7a0984542a32c3d5315ce1d8bb8d7f165e3511a6f23ed0dbd27a953f1ac41de4",
         "server/services/starter-content/fixtures/agreement-template.ts": "cb50e1a56238612e8c98f05f725e6e06cd58b4b534e5061c05427921ab0a36c1",
         "server/services/starter-content/fixtures/canned-comments.ts": "0fe2055871fe14a0ce1d56085992a09d2710e2e29c344d48bbb564abac6e038a",
-        "server/services/starter-content/fixtures/contractor-types.ts": "14c0d79e7a472eb3d3246dc61fe7afcea4c6d5b9cf89475387b8c9f3c9e87a24",
+        "server/services/starter-content/fixtures/contractor-types.ts": "b9b31ab9f9d29a41fe175ff5768b869fb3d718acf8dec5d95786ebf841cd05c0",
         "server/services/starter-content/fixtures/event-types.ts": "270fb8fff04e1df7df47b282a8987e63750937461c29d8faa174fd64a0930bb1",
         "server/services/starter-content/fixtures/marketplace.ts": "33ec6f278ebd04f6ba8c498cdc4652686a89767e9c63f7f70fbc0d4148ce27d9",
         "server/services/starter-content/fixtures/rating-systems.ts": "47e5d6a16f4a46269d9eb5d94fbd62e394d3fe8ea9580051e2b9e027a48e4208",

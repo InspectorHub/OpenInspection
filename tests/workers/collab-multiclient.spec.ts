@@ -38,8 +38,8 @@ import {
     revertPhoto,
     upsertCanned,
     upsertRecommendation,
-} from '../../server/lib/collab/results-doc';
-import type { PhotoEntry } from '../../server/lib/collab/results-doc.types';
+} from '@core/field-ui/shared/results-doc';
+import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
 
 // ─── Bindings ─────────────────────────────────────────────────────────────────

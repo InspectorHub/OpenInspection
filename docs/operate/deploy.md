@@ -194,6 +194,80 @@ wrangler r2 bucket lifecycle add PHOTOS ia-after-365d \
 
 > A hosted/managed deployment runs the same rule on its own `PHOTOS` bucket. Self-hosters who do not want Infrequent Access can simply skip this step — it is a cost optimization, not a correctness requirement.
 
+### Deleting an inspection
+
+Deleting an inspection removes its database rows, its objects in the `PHOTOS` bucket and, when the `INSPECTION_DOC` Durable Object is bound, the collaborative document storage behind each of its reports. The Durable Object step runs last and is best effort: if it fails the inspection is still deleted, a warning naming the inspection id appears in the Worker logs, and the `inspection.delete` audit event carries `collabPurge: "failed"` (`"ok"` on success, `"skipped"` when the binding is absent or the inspection had no report). There is no automatic retry.
+
+Two things to know when you operate native clients:
+
+- **Local copies on devices.** The native client removes its copy of a deleted inspection when it next reconciles with the server (the device side is implemented by the native client, not by this repository), so the guarantee starts at that device's next successful connection. A device that stays offline keeps its copies until it connects or until it locks after `offline_max_days`. A copy holding unuploaded data is quarantined for export or removal instead of being deleted. Screenshots, the camera roll and exported packages are outside what the app can remove. See [`../develop/native-clients.md`](../develop/native-clients.md).
+- **Known leftover.** Collaborative document storage of inspections deleted before this purge existed may remain. Durable Objects cannot be enumerated and the report ids of those deletions were not recorded, so it cannot be swept.
+
+### Importing an offline package
+
+When a device cannot sync, the native app can export what it holds as a `.zip`
+package. An owner or a manager brings it in on **Settings → Offline packages**
+(`/settings/offline-packages`). The page works with the ordinary web session and
+does not need `NATIVE_CLIENT_ENABLED`. An inspector imports from the native app
+instead, which signs in with the `native` scope and therefore needs that switch (see
+[`../develop/native-clients.md`](../develop/native-clients.md), section 1).
+
+1. Choose the file. The page reads a summary in the browser (inspections, queued
+   changes, photos, who exported it and when) and tells you whether the package was
+   exported for this company. Nothing is uploaded yet.
+2. Review and confirm. The package is then sent in as many requests as it needs;
+   keep the page open until it finishes.
+3. Read the result: how many inspections were imported, how many queued changes
+   were skipped because they had been applied before, and which inspections were
+   left behind.
+
+**Importing is safe to repeat.** Send the same file again and anything already
+applied is skipped, so an interrupted import, a retry after fixing a cause and a
+second person importing the same file all end in the same state. A queued change is
+applied only once; a later edit made in the meantime is not overwritten by a repeat.
+
+**Why an inspection is left behind.** A refusal about one inspection does not stop
+the others. The page lists each inspection that was not imported with the reason and
+the status and code of the answer behind it:
+
+| Reason shown | Meaning | Next step |
+|---|---|---|
+| Not found | The inspection does not exist in this company and the package does not create it | Check that it was not removed; keep the downloaded part |
+| Not allowed | The signed-in person cannot edit that inspection | Have an owner or manager who can open it import that part |
+| Different report | The report in the package is not the report the inspection has now | Have the person who exported it check which report is current, then import again |
+| Deleted | The inspection was deleted after the package was exported | Nothing to import; keep the part only if you still need its data |
+| Change refused | The server could not apply the inspection's data or one of its queued changes | Import the part again later; if it keeps failing, give the part and the answer shown to whoever runs the deployment |
+| Not confirmed | The server did not confirm the part in time | Nothing was lost; import the same file again |
+| Too large | The inspection alone is larger than the server accepts in one request | Export it again from the app with fewer photos |
+| Package refused | The package as a whole was refused: another company, older than the age limit, dated ahead of the server clock, or an expired session | Fix the cause (sign in to the right company, correct the device clock, export again) and import again |
+
+A queued change that the server refuses inside an accepted package is listed
+separately as a refused change: the inspection's results and photos were still
+imported, and the change is not sent again.
+
+Every left-behind inspection, and every group of them, can be downloaded as a
+package of its own. The file you chose is never changed, so nothing is lost by a
+failed import.
+
+**A package is plaintext.** It is not encrypted and it holds client personal
+information: names, addresses, contact details and photos. Whoever holds the file
+is responsible for keeping it safe and for deleting it once it has been imported
+(and any downloaded part once it is no longer needed). Treat it like an export of
+the client list: keep it off shared drives and out of email.
+
+**Size limits.** One request carries a bounded amount of work, set by the
+`NATIVE_IMPORT_*` variables (inspections, queued changes, photos, entries and bytes
+per request; defaults and allowed ranges are in the table in
+[`../develop/native-clients.md`](../develop/native-clients.md), section 10). The page
+cuts a larger package into parts that fit and sends them one at a time, so you do
+not need to split a file by hand. A file larger than the most the request-size
+limit can ever be raised to (24 MiB) is refused in the browser before it is sent;
+a smaller one that is over your deployment's limit is cut into parts. Keep the defaults unless you have checked
+the platform's current CPU-time and subrequest limits for your plan.
+
+A package more than 400 days old, or dated more than a day ahead of the server
+clock, is refused whatever its size.
+
 ### Tenant offboarding (export then purge)
 
 When a tenant is offboarded, the platform first builds a **full data export** ZIP (CSV/JSON of inspections, templates and agreements **plus the photo bytes themselves** under `photos/`, size-bounded so large tenants stay within Worker memory limits; any object beyond the budget is listed in `photos-manifest.json` with `included: false`), then purges all tenant rows, R2 objects and KV keys. The purge writes a durable, non-personal **destruction record** (`tenant_destruction_records`: tenant id, row/object/byte counts, timestamp) that intentionally has no foreign key to `tenants` so it survives the deletion as compliance proof. These run via the integration endpoints `POST /api/platform/tenants/:slug/data-export` and `.../purge`.

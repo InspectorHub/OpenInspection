@@ -410,6 +410,111 @@
         }
       }
     },
+    "/api/client/inspections/visible": {
+      "post": {
+        "operationId": "getVisibleInspections",
+        "tags": [
+          "client"
+        ],
+        "summary": "Check which local inspections the server still shows this member",
+        "description": "Takes the inspection ids a native device holds and returns the ones that still exist in the signed-in company and that this member may see, in request order. An id that is missing from the answer was deleted, never existed, or is not visible to this member; the response does not say which, so a restricted member learns nothing about inspections outside their assignments. The device compares the answer with its local copies when it is back online. A failure is an error status and never an empty list. Read-only, though it is a POST so the ids travel in the body.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Inspection ids the device holds locally. Between 1 and the server limit (300 by default; the limit is returned in details.limits.ids when exceeded). Each id is 1 to 64 characters from A-Z, a-z, 0-9, underscore and hyphen; a request that breaks any of these is refused whole with 422."
+                  }
+                },
+                "required": [
+                  "ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The requested ids that are visible to the caller",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "visible": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "The requested ids that exist in the signed-in company and that this member can see, in request order and without repeats. An id that was deleted, never existed, belongs to another company or is not assigned to this member is simply absent; the response never says which."
+                        }
+                      },
+                      "required": [
+                        "visible"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The request does not carry a native session"
+          },
+          "422": {
+            "description": "The list is empty, longer than the server limit (details.limits.ids names it), or holds an id that is not 1 to 64 characters of A-Z, a-z, 0-9, underscore or hyphen; nothing was looked up"
+          }
+        }
+      }
+    },
     "/api/client/session": {
       "get": {
         "operationId": "getClientSession",
@@ -2671,6 +2776,31 @@
         }
       }
     },
+    "/api/session/context": {
+      "get": {
+        "operationId": "getSessionContext",
+        "tags": [
+          "client"
+        ],
+        "summary": "Get branding, user and deployment context for the session",
+        "description": "Returns the company branding and display defaults, the signed-in user with resolved capabilities, the deployment flags the interface gates on, seat usage, video provider, outbound cooling window and unread message count. Requires a signed-in session; the answer is never cached.",
+        "responses": {
+          "200": {
+            "description": "Session context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionContextResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
     "/api/tags": {
       "get": {
         "tags": [
@@ -3820,6 +3950,405 @@
           "title",
           "defectCount",
           "items"
+        ]
+      },
+      "SessionContextResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Always true on success."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "branding": {
+                "type": "object",
+                "properties": {
+                  "companyName": {
+                    "type": "string",
+                    "description": "Company name from the stored settings, falling back to the platform default when none is saved."
+                  },
+                  "primaryColor": {
+                    "type": "string",
+                    "description": "Brand primary color as a CSS color string."
+                  },
+                  "logoUrl": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Company logo URL, or null when none is set."
+                  },
+                  "defaultProfileId": {
+                    "type": "string",
+                    "description": "Id of the default report profile."
+                  },
+                  "isSaas": {
+                    "type": "boolean",
+                    "description": "Whether this deployment is the hosted multi-company service."
+                  },
+                  "portalBaseUrl": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Base URL of the account portal, or null when the deployment has none."
+                  },
+                  "tenantSlug": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Company slug used in public links, or null when unknown."
+                  },
+                  "tenantStatus": {
+                    "type": "string",
+                    "description": "Company account status; active when nothing else applies."
+                  },
+                  "currentUserSlug": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Booking slug of the signed-in user, or null when they have none."
+                  },
+                  "bookingHost": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Host name that serves the public booking page, or null when not configured."
+                  },
+                  "privacyUrl": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Effective privacy policy URL for this company, or null without a company slug."
+                  },
+                  "termsUrl": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Effective terms URL for this company, or null without a company slug."
+                  },
+                  "defaultTimezone": {
+                    "type": "string",
+                    "description": "Company default display timezone as an IANA name; UTC when unset."
+                  },
+                  "holidayRegion": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Region the company works in, such as US or US-TX, or null when not stated."
+                  },
+                  "defaultLocale": {
+                    "type": "string",
+                    "description": "Company default display locale as a BCP-47 tag; en-US when unset."
+                  },
+                  "currency": {
+                    "type": "string",
+                    "description": "Company currency as an ISO 4217 code; USD when unset."
+                  },
+                  "archiveRevokesAccess": {
+                    "type": "boolean",
+                    "description": "Whether archiving a contact also revokes their report links."
+                  },
+                  "dateFormat": {
+                    "type": "string",
+                    "enum": [
+                      "us",
+                      "iso",
+                      "eu"
+                    ],
+                    "description": "Company default date order: us, iso or eu."
+                  },
+                  "timeFormat": {
+                    "type": "string",
+                    "enum": [
+                      "12h",
+                      "24h"
+                    ],
+                    "description": "Company default clock: 12h or 24h."
+                  }
+                },
+                "required": [
+                  "companyName",
+                  "primaryColor",
+                  "logoUrl",
+                  "defaultProfileId",
+                  "isSaas",
+                  "portalBaseUrl",
+                  "tenantSlug",
+                  "tenantStatus",
+                  "currentUserSlug",
+                  "bookingHost",
+                  "privacyUrl",
+                  "termsUrl",
+                  "defaultTimezone",
+                  "holidayRegion",
+                  "defaultLocale",
+                  "currency",
+                  "archiveRevokesAccess",
+                  "dateFormat",
+                  "timeFormat"
+                ],
+                "description": "Company branding and display defaults."
+              },
+              "user": {
+                "type": "object",
+                "properties": {
+                  "sessionMarker": {
+                    "type": "string",
+                    "description": "Opaque marker of this user, used by the browser to keep offline copies apart per user."
+                  },
+                  "name": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Display name of the signed-in user, or null when unreadable."
+                  },
+                  "email": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Email address of the signed-in user, or null when unreadable."
+                  },
+                  "role": {
+                    "type": "string",
+                    "description": "Role of the signed-in user; inspector when the token carries none."
+                  },
+                  "capabilities": {
+                    "type": "object",
+                    "properties": {
+                      "publish": {
+                        "type": "boolean",
+                        "description": "May publish and unpublish reports."
+                      },
+                      "scheduleOthers": {
+                        "type": "boolean",
+                        "description": "May book, reassign and act on other inspectors' inspections."
+                      },
+                      "inspectionFees": {
+                        "type": "boolean",
+                        "description": "May see and set the money on an individual inspection: its price, deposit, service lines and cancellation fee."
+                      },
+                      "companyFinance": {
+                        "type": "boolean",
+                        "description": "May see and manage company-wide money: invoices and payments, service prices and pay rules, pay splits, earnings, Stripe, QuickBooks and the fee policies."
+                      },
+                      "manageContacts": {
+                        "type": "boolean",
+                        "description": "May create, edit and archive contacts and role profiles."
+                      },
+                      "viewCommunication": {
+                        "type": "boolean",
+                        "description": "May read the per-inspection Outbox, including recipient addresses."
+                      },
+                      "templateCreate": {
+                        "type": "boolean",
+                        "description": "May create new inspection templates."
+                      },
+                      "templateEdit": {
+                        "type": "boolean",
+                        "description": "May change an existing inspection template, including through a template migration."
+                      },
+                      "templateDelete": {
+                        "type": "boolean",
+                        "description": "May delete an inspection template, directly or as part of a migration."
+                      },
+                      "templateImport": {
+                        "type": "boolean",
+                        "description": "May bring a template in from a Spectora export or the content marketplace."
+                      },
+                      "deleteInspection": {
+                        "type": "boolean",
+                        "description": "May permanently delete an inspection, its report data and its media."
+                      },
+                      "editReports": {
+                        "type": "boolean",
+                        "description": "May write report content: results, media, units, statutory and compliance inputs and cost items."
+                      },
+                      "viewAllInspections": {
+                        "type": "boolean",
+                        "description": "May see every inspection in the company. When off, only inspections assigned to this person are visible."
+                      }
+                    },
+                    "required": [
+                      "publish",
+                      "scheduleOthers",
+                      "inspectionFees",
+                      "companyFinance",
+                      "manageContacts",
+                      "viewCommunication",
+                      "templateCreate",
+                      "templateEdit",
+                      "templateDelete",
+                      "templateImport",
+                      "deleteInspection",
+                      "editReports",
+                      "viewAllInspections"
+                    ],
+                    "description": "Resolved capability set for this user: role defaults with their own overrides applied."
+                  },
+                  "initials": {
+                    "type": "string",
+                    "description": "Up to two uppercase initials taken from the name; OI when there is no name."
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Personal timezone override as an IANA name, or null to use the company default."
+                  },
+                  "locale": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Personal locale override as a BCP-47 tag, or null to use the company default."
+                  },
+                  "dateFormat": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "us",
+                      "iso",
+                      "eu",
+                      null
+                    ],
+                    "description": "Personal date order override, or null to use the company default."
+                  },
+                  "timeFormat": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "12h",
+                      "24h",
+                      null
+                    ],
+                    "description": "Personal clock override, or null to use the company default."
+                  }
+                },
+                "required": [
+                  "sessionMarker",
+                  "name",
+                  "email",
+                  "role",
+                  "capabilities",
+                  "initials",
+                  "timezone",
+                  "locale",
+                  "dateFormat",
+                  "timeFormat"
+                ],
+                "description": "The signed-in user and their resolved capabilities."
+              },
+              "deployment": {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "description": "Deployment mode, such as standalone or saas."
+                  },
+                  "hasBilling": {
+                    "type": "boolean",
+                    "description": "Whether this deployment runs subscription billing."
+                  },
+                  "hasSeatQuota": {
+                    "type": "boolean",
+                    "description": "Whether this deployment enforces a member seat limit."
+                  },
+                  "mcpEnabled": {
+                    "type": "boolean",
+                    "description": "Whether the remote MCP server is switched on."
+                  },
+                  "connectedAppsEnabled": {
+                    "type": "boolean",
+                    "description": "Whether connected applications can be granted access and listed."
+                  },
+                  "videoBackendManaged": {
+                    "type": "boolean",
+                    "description": "Whether video storage is managed by the platform."
+                  },
+                  "hasManagedCompliance": {
+                    "type": "boolean",
+                    "description": "Whether managed messaging compliance is available."
+                  },
+                  "hasAssistedMigration": {
+                    "type": "boolean",
+                    "description": "Whether the import wizard may hand an unreadable file to a person."
+                  }
+                },
+                "required": [
+                  "mode",
+                  "hasBilling",
+                  "hasSeatQuota",
+                  "mcpEnabled",
+                  "connectedAppsEnabled",
+                  "videoBackendManaged",
+                  "hasManagedCompliance",
+                  "hasAssistedMigration"
+                ],
+                "description": "Deployment capabilities the interface may gate on."
+              },
+              "seatUsage": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "used": {
+                    "type": "number",
+                    "description": "Seats currently in use."
+                  },
+                  "limit": {
+                    "type": "number",
+                    "description": "Seats the plan allows."
+                  }
+                },
+                "required": [
+                  "used",
+                  "limit"
+                ],
+                "description": "Seat usage, or null when seats are not limited or could not be read."
+              },
+              "videoProvider": {
+                "type": "string",
+                "enum": [
+                  "r2",
+                  "stream"
+                ],
+                "description": "Video backend the editor should use for this company."
+              },
+              "outboundCoolingWindow": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "unlockAtMs": {
+                    "type": "number",
+                    "description": "Epoch milliseconds when the outbound cooling window closes."
+                  },
+                  "turnstileSiteKey": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Site key for the send challenge, or null when none is configured."
+                  }
+                },
+                "required": [
+                  "unlockAtMs",
+                  "turnstileSiteKey"
+                ],
+                "description": "Open outbound cooling window, or null when none applies or it could not be read."
+              },
+              "collabEditing": {
+                "type": "boolean",
+                "description": "Whether collaborative editing is on for this company."
+              },
+              "unreadMessages": {
+                "type": "number",
+                "description": "Unread message count over what the caller may see."
+              }
+            },
+            "required": [
+              "branding",
+              "user",
+              "deployment",
+              "seatUsage",
+              "videoProvider",
+              "outboundCoolingWindow",
+              "collabEditing",
+              "unreadMessages"
+            ],
+            "description": "Session context payload."
+          }
+        },
+        "required": [
+          "success",
+          "data"
         ]
       },
       "SetPoster": {

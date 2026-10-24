@@ -114,9 +114,9 @@ const MONEY_FIELD_SHAPE =
  * exception in the inventory rather than discovering it in the code.
  */
 const FIELD_FILES = [
-    "server/lib/collab/results-doc.types.ts",
-    "app/hooks/findings/shared.ts",
-    "server/types/template-schema.ts",
+    "packages/field-ui/src/shared/results-doc.types.ts",
+    "packages/field-ui/src/hooks/findings/shared.ts", "packages/field-ui/src/shared/findings-shared.ts",
+    "packages/field-ui/src/shared/template-schema.ts",
     // The template's TS type and its Zod schema are two declarations of one
     // authoring surface, and only the second one decides what the API accepts.
     // Scanning the type alone let a money key be added back to the write
@@ -131,7 +131,7 @@ const FIELD_FILES = [
 const SOURCE_ROOTS = ["server", "app", "packages"];
 
 /** The single money-entry control. Its absence would silently empty surface 3. */
-const MONEY_CONTROL_FILE = "app/components/MoneyInput.tsx";
+const MONEY_CONTROL_FILE = "packages/field-ui/src/components/MoneyInput.tsx";
 const MONEY_CONTROL_USE = /<MoneyInput[\s/>]/;
 
 /**
@@ -204,10 +204,10 @@ const INVENTORY = [
       reason: "Commercial property-condition assessment: as above, assessor-authored." },
 
     // ── FIELDS: what an inspection persists ─────────────────────────────────
-    { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateSnapshotMin", disposition: "legacy-read",
+    { kind: "field", id: "packages/field-ui/src/shared/results-doc.types.ts#estimateSnapshotMin", disposition: "legacy-read",
       reason: "Repair-item snapshot from before repair items carried scope only. Optional and "
             + "never written; declared so an older finding still parses." },
-    { kind: "field", id: "server/lib/collab/results-doc.types.ts#estimateSnapshotMax", disposition: "legacy-read",
+    { kind: "field", id: "packages/field-ui/src/shared/results-doc.types.ts#estimateSnapshotMax", disposition: "legacy-read",
       reason: "Upper bound of the same retired repair-item snapshot range; same terms as the min." },
     // The four keys that used to sit here — `estimateLow` / `estimateHigh` on a
     // canned defect state and `estimateMin` / `estimateMax` on a result entry —
@@ -234,7 +234,7 @@ const INVENTORY = [
       reason: "Upper bound of the same report projection; null on every post-change finding." },
 
     // ── CONTROLS: every screen with a money input ───────────────────────────
-    { kind: "control", id: "app/components/editor/CostItemsPanel.tsx", disposition: "allowed",
+    { kind: "control", id: "packages/field-ui/src/components/editor/CostItemsPanel.tsx", disposition: "allowed",
       reason: "Commercial PCA cost table — assessor-authored, reviewed on its own terms." },
     { kind: "control", id: "app/components/inspector-portal/InvoiceCard.tsx", disposition: "allowed",
       reason: "Invoicing: what the tenant bills their client." },
@@ -262,7 +262,7 @@ const INVENTORY = [
       reason: "Service catalogue: the tenant's list price." },
     { kind: "control", id: "app/components/settings/EventTypeFields.tsx", disposition: "allowed",
       reason: "Booking: default fee per event type." },
-    { kind: "control", id: "app/components/MoneyInput.test.tsx", disposition: "allowed",
+    { kind: "control", id: "packages/field-ui/src/components/MoneyInput.test.tsx", disposition: "allowed",
       reason: "The control's own test." },
 ];
 

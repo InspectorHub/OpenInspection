@@ -1,4 +1,4 @@
-import { PhotoCropper } from "./PhotoCropper";
+import { PhotoCropper } from "@core/field-ui/components/media-studio/PhotoCropper";
 import { m } from "~/paraglide/messages";
 
 const AVATAR_EDGE = 512;

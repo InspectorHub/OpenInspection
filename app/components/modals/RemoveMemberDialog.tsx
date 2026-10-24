@@ -1,5 +1,6 @@
+import { Link, useInRouterContext } from "react-router";
 import { Banner, Select } from "@core/shared-ui";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -48,6 +49,8 @@ export function RemoveMemberDialog({
     onConfirm: (target: RemoveMemberTarget) => void;
     onCancel: () => void;
 }) {
+    const inRouter = useInRouterContext();
+    const importLinkClass = "font-bold text-ih-primary-text hover:underline";
     return (
         <ConfirmDialog
             open={target !== null}
@@ -60,6 +63,14 @@ export function RemoveMemberDialog({
             onCancel={onCancel}
         >
             <Banner tone="warn" className="mt-3 font-normal!">{m.settings_team_remove_member_warning()}</Banner>
+            {/* The warning ends with "give it to another team member to import"; this is where they do that.
+                Inside a router it is a client-side Link; the plain anchor is for a render outside one (this
+                dialog's specs), where a Link would throw. */}
+            <p className="mt-2 text-[13px]">
+                {inRouter
+                    ? <Link to="/settings/offline-packages" className={importLinkClass}>{m.settings_team_remove_member_import_link()}</Link>
+                    : <a href="/settings/offline-packages" className={importLinkClass}>{m.settings_team_remove_member_import_link()}</a>}
+            </p>
             {target && openInspections !== null && (
                 <div className="mt-3 space-y-2">
                     <Banner tone="warn" className="font-normal!">

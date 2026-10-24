@@ -28,7 +28,7 @@ import { m } from "~/paraglide/messages";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { bucketMessages, dayKeyInZone, dayLabel, type MessageRow } from "~/lib/communication-view";
 import { VerificationCancelledError } from "~/lib/verification-cancelled";
-import { cachedDateTimeFormat } from "~/lib/intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 
 export interface ThreadMessage extends MessageRow {
   /** Local-only: an optimistic send not yet confirmed, or one that failed. */

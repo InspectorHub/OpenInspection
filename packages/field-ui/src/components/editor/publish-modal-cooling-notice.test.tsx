@@ -1,0 +1,88 @@
+// @vitest-environment happy-dom
+/**
+ * Portal #98 §3.4, said at the moment it changes an expectation.
+ *
+ * The account-wide banner answers "does this company have a window"; it does
+ * not answer "is the thing I am about to press going to land in it". An
+ * inspector presses Publish believing the client now has their report, and
+ * inside the window that belief is wrong by up to a day — so the correction
+ * belongs on this button, not only on the page behind it.
+ *
+ * The two failure modes worth holding down are opposite: saying NOTHING inside
+ * the window (the inspector tells the client to check their inbox), and saying
+ * something to a company that is not in one (a permanent scary notice on the
+ * most-used button in the product).
+ */
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { PublishModal, type PublishModalProps } from './PublishModal';
+import { FieldDataSourceProvider } from '../../context';
+import { createEmptyEditorData, createFakeDataSource } from '../../testing/fake-data-source';
+
+/** The modal reads the viewer's zone and clock and the editor path off the data source. */
+const fake = createFakeDataSource({ data: createEmptyEditorData(), session: { timeZone: 'America/New_York', locale: 'en-US', dateFormat: 'us', timeFormat: '12h' } });
+function PM(props: PublishModalProps) {
+  return (
+    <FieldDataSourceProvider dataSource={fake}>
+      <PublishModal {...props} />
+    </FieldDataSourceProvider>
+  );
+}
+
+let unlockAtMs: number | null = null;
+
+const props = {
+  open: true,
+  inspectionId: 'insp-1',
+  progress: { rated: 10, total: 10, pct: 100 },
+  status: 'completed',
+  publishError: null,
+  isSubmitting: false,
+  onClose: () => {},
+  onPublish: () => {},
+  autoSign: false,
+  onAutoSignToggle: () => {},
+  isAmendment: false,
+};
+
+describe('PublishModal — outbound cooling window', () => {
+  it('shows the notice from its own prop (the editor data cooling window)', () => {
+    unlockAtMs = null;
+    render(<PM {...props} coolingUnlockAtMs={Date.now() + 3_600_000} />);
+    expect(screen.getByText(/less than a day old/i)).toBeTruthy();
+  });
+
+  it('says nothing when the company is not in a window', () => {
+    unlockAtMs = null;
+    render(<PM {...props} coolingUnlockAtMs={unlockAtMs} />);
+    expect(screen.queryByText(/less than a day old/i)).toBeNull();
+  });
+
+  it('names the instant the client email will go, not a relative duration', () => {
+    // 2026-08-11 14:00 UTC -> 10:00 AM EDT
+    unlockAtMs = Date.UTC(2026, 7, 11, 14, 0, 0);
+    render(<PM {...props} coolingUnlockAtMs={unlockAtMs} />);
+    const notice = screen.getByText(/less than a day old/i);
+    expect(notice.textContent).toMatch(/Aug 11, 2026/);
+    expect(notice.textContent).toMatch(/10:00\s?AM/);
+  });
+
+  it('promises a delay, never a loss, and says publishing itself still works', () => {
+    // The inspector's real question is "did I just break the delivery, and do
+    // I have to come back and press something again". Both answers are load
+    // bearing: the send re-schedules itself, and the report is live now.
+    unlockAtMs = Date.now() + 3_600_000;
+    render(<PM {...props} coolingUnlockAtMs={unlockAtMs} />);
+    const notice = screen.getByText(/less than a day old/i);
+    expect(notice.textContent).toMatch(/confirm you are a person/i);
+    expect(notice.textContent).toMatch(/goes live now/i);
+  });
+
+  it('does not block or reword the publish action', () => {
+    // A notice that disabled the button would be a gate nobody asked for: the
+    // window holds one email, not the publish.
+    unlockAtMs = Date.now() + 3_600_000;
+    render(<PM {...props} coolingUnlockAtMs={unlockAtMs} />);
+    expect(screen.getByRole('button', { name: /publish/i })).not.toBeDisabled();
+  });
+});

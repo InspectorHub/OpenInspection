@@ -10,6 +10,7 @@
 import { requireRole } from '../lib/middleware/rbac';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { resolveMetricsWindow } from '../lib/metrics-window';
@@ -42,21 +43,27 @@ const heatmapRoute = createRoute(withMcpMetadata({
     description: "Counts rated items by template section and rating level over an inclusive `from`..`to` window. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections ordered by volume, with unresolvable sections collected in a flagged catch-all row. Available to owner, manager and inspector roles. A caller whose access is limited to the inspections assigned to them receives only what is tied to those inspections."
 }, { scopes: ['read'], tier: 'extended' }));
 
-const analyticsRoutes = createApiRouter()
-    .openapi(growthRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const { months } = c.req.valid('query');
-        const out = await c.var.services.analytics.growth(tenantId, months, await resolveInspectionScope(c));
-        return c.json({ success: true as const, data: out }, 200);
-    })
-    .openapi(heatmapRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const window = resolveMetricsWindow(c.req.valid('query'));
-        const out = await c.var.services.analytics.findingsHeatmap(tenantId, await resolveInspectionScope(c), window);
-        return c.json({ success: true as const, data: out }, 200);
-    });
+const app = createApiRouter();
+app.openapi(growthRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+    const { months } = c.req.valid('query');
+    const out = await c.var.services.analytics.growth(tenantId, months, await resolveInspectionScope(c));
+    return c.json({ success: true as const, data: out }, 200);
+});
+app.openapi(heatmapRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+    const window = resolveMetricsWindow(c.req.valid('query'));
+    const out = await c.var.services.analytics.findingsHeatmap(tenantId, await resolveInspectionScope(c), window);
+    return c.json({ success: true as const, data: out }, 200);
+});
 
-export type AnalyticsApi = typeof analyticsRoutes;
-export default analyticsRoutes;
+/** Registration order. Drives `AnalyticsApi`; a test pins it to what `app` really registered. */
+export const analyticsRouteConfigs = [
+    growthRoute,
+    heatmapRoute,
+] as const;
+
+export type AnalyticsApi = ApiOf<typeof analyticsRouteConfigs>;
+export default app;

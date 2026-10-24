@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { IconButton } from "@core/shared-ui";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
-import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
+import { PhotoCropper } from "@core/field-ui/components/media-studio/PhotoCropper";
 import { BADGE_MAX_LONG_EDGE, isVectorImage, validateImageFile } from "~/lib/image-upload";
 import { m } from "~/paraglide/messages";
 

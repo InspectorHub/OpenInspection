@@ -165,7 +165,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - Stable API surface. The SaaS overlay is **not a branch** — it is `APP_MODE=saas` plus `server/portal/` in this same tree, read through `server/lib/deployment-profile.ts`. (This line named a `saas` branch; no such branch exists.)
 
 ### Inspection Engine
-- JSON-schema based inspection templates (`server/types/template-schema.ts`, single canonical v2 — see `server/lib/validations/template.schema.ts`).
+- JSON-schema based inspection templates (`packages/field-ui/src/shared/template-schema.ts`, single canonical v2 — see `server/lib/validations/template.schema.ts`).
 - 9 item types: `rich` (rating + 3 canned-comment tabs) plus `boolean / text / textarea / number / select / multi_select / date / photo_only` for non-rated data points. Inspection side stores rating on `result.rating` and non-rich values on `result.value`.
 - Template import from another product runs through ONE front door: the wizard at `/settings/imports?intent=templates.create`. The operator declares which product the file came from, an adapter under `server/lib/migration-intake/adapters/` reads it, and the run is staged so the conversion can be reviewed and repaired before anything is written. `/templates` links to that address and owns no importer of its own — the old paste-a-JSON-document modal and its `POST /api/inspections/templates/import-spectora` endpoint are both gone.
 - Support for field results, e-signatures, and report generation.
@@ -175,7 +175,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 
 - **Framework**: React Router v8 on Cloudflare Workers with Vite.
 - **Rendering**: Full SSR — RR v8 server renders on the edge, hydrates on the client.
-- **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
+- **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`packages/field-ui/src/theme.css`, imported by `app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
 - **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. RR v8 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
 - **State management**: React hooks in `app/hooks/` — `useInspection`, `useFindings`, `useKeyboard`, `useCannedComments`, `usePresence`, `useTheme`, `useUnsavedChanges`, plus the `findings/` and `inspection/` sub-hook directories. (`useOfflineQueue` was RETIRED with the rest of the bespoke offline layer in #181; do not reach for it.)
 - **Component library**: `packages/shared-ui/` — `src/index.ts` is the authoritative list (Button, IconButton, MenuItem, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, RadioCardGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar). Do not maintain a count here — read the file. See `docs/develop/design-system.md`.

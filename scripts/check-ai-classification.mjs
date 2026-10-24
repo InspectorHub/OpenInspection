@@ -292,7 +292,7 @@ for (const e of entries) {
 /* ---- Rules 1 and 2: scan the server tree ------------------------------ */
 
 const SCAN_ROOTS = ['server', 'app', 'packages', 'workers'];
-const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', '.types', '.react-router']);
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', '.types', '.types-tsgo', '.react-router']);
 const files = [];
 for (const root of SCAN_ROOTS) {
     const abs = join(ROOT, root);

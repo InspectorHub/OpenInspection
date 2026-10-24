@@ -1,6 +1,6 @@
-import { createRoute } from '@hono/zod-openapi';
+import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { z } from '@hono/zod-openapi';
+import { mounted, type ApiOf } from '../lib/api-schema';
 import { capabilitiesForProfile, type RoleKind } from '../lib/people/capabilities';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
@@ -24,8 +24,8 @@ import {
 } from '../lib/validations/agent.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
-import agentPhotoRoutes from './agent/photo';
-import agentNotificationPreferenceRoutes from './agent/notification-preferences';
+import agentPhotoRoutes, { agentPhotoRouteConfigs } from './agent/photo';
+import agentNotificationPreferenceRoutes, { agentNotificationPreferenceRouteConfigs } from './agent/notification-preferences';
 import { getDrizzle } from '../lib/route-helpers';
 
 /**
@@ -236,163 +236,164 @@ const inspectorsRoute = createRoute(withMcpMetadata({
     description: "Lists every inspecting team the signed-in agent has an active link with, with the public profile slug + slug needed to build shareable booking links for clients.",
 }, { scopes: ['agent'], tier: 'extended' }));
 
-const agentRoutes = createApiRouter()
-    // Byte-serving lives in its own module (file-size ratchet on this one).
-    .route('/', agentPhotoRoutes)
-    // Per-company notification preferences (§4) — see that module for why the
-    // agent cannot share the staff route.
-    .route('/', agentNotificationPreferenceRoutes)
-    .openapi(getReportsRoute, async (c) => {
-        // Move RBAC check inside to fix OpenAPIHono type inference issues with context
-        await requireRole('owner', 'manager')(c, async () => {});
+const app = createApiRouter();
+// Byte-serving lives in its own module (file-size ratchet on this one).
+app.route('/', agentPhotoRoutes);
+// Per-company notification preferences (§4) — see that module for why the
+// agent cannot share the staff route.
+app.route('/', agentNotificationPreferenceRoutes);
+app.openapi(getReportsRoute, async (c) => {
+    // Move RBAC check inside to fix OpenAPIHono type inference issues with context
+    await requireRole('owner', 'manager')(c, async () => {});
 
-        const tenantId = c.get('tenantId');
-        const user = c.get('user');
-        const userRole = c.get('userRole');
-        const { agentId: queryAgentId } = c.req.valid('query');
-        const db = getDrizzle(c);
+    const tenantId = c.get('tenantId');
+    const user = c.get('user');
+    const userRole = c.get('userRole');
+    const { agentId: queryAgentId } = c.req.valid('query');
+    const db = getDrizzle(c);
 
-        // Owners and managers (the only roles admitted above) may pass ?agentId=
-        // (a contact id) to view any agent's reports; without it the caller's own
-        // user id is used.
-        const mayChooseAgent = isAdminRole(userRole);
-        const agentId = mayChooseAgent ? (queryAgentId ?? user.sub) : user.sub;
+    // Owners and managers (the only roles admitted above) may pass ?agentId=
+    // (a contact id) to view any agent's reports; without it the caller's own
+    // user id is used.
+    const mayChooseAgent = isAdminRole(userRole);
+    const agentId = mayChooseAgent ? (queryAgentId ?? user.sub) : user.sub;
 
-        // Task 9 (two-layer role model) — visibility is the showsInAgentPortal
-        // CAPABILITY, not the buyer_agent key: a listing agent's seat shows
-        // here too, and a seat whose role withdrew the bit does not. Resolve
-        // seat rows with their role kind + overrides, filter on the resolved
-        // capability (SQL cannot call the pure resolver), then fetch the
-        // flat inspection rows unchanged.
-        const seatRows = await db
-            .select({
-                inspectionId: inspectionPeople.inspectionId,
-                kind: contactRoleProfiles.kind,
-                capabilityOverrides: contactRoleProfiles.capabilityOverrides,
-            })
-            .from(inspectionPeople)
-            .innerJoin(contactRoleProfiles, and(
-                eq(contactRoleProfiles.id, inspectionPeople.roleProfileId),
-                eq(contactRoleProfiles.tenantId, tenantId),
-                eq(contactRoleProfiles.active, true),
-            ))
-            .where(and(
-                eq(inspectionPeople.tenantId, tenantId),
-                eq(inspectionPeople.contactId, agentId),
-            ));
-        const inspectionIds = [...new Set(
-            seatRows
-                .filter((r) => capabilitiesForProfile(r.kind as RoleKind, r.capabilityOverrides).showsInAgentPortal)
-                .map((r) => r.inspectionId),
-        )];
+    // Task 9 (two-layer role model) — visibility is the showsInAgentPortal
+    // CAPABILITY, not the buyer_agent key: a listing agent's seat shows
+    // here too, and a seat whose role withdrew the bit does not. Resolve
+    // seat rows with their role kind + overrides, filter on the resolved
+    // capability (SQL cannot call the pure resolver), then fetch the
+    // flat inspection rows unchanged.
+    const seatRows = await db
+        .select({
+            inspectionId: inspectionPeople.inspectionId,
+            kind: contactRoleProfiles.kind,
+            capabilityOverrides: contactRoleProfiles.capabilityOverrides,
+        })
+        .from(inspectionPeople)
+        .innerJoin(contactRoleProfiles, and(
+            eq(contactRoleProfiles.id, inspectionPeople.roleProfileId),
+            eq(contactRoleProfiles.tenantId, tenantId),
+            eq(contactRoleProfiles.active, true),
+        ))
+        .where(and(
+            eq(inspectionPeople.tenantId, tenantId),
+            eq(inspectionPeople.contactId, agentId),
+        ));
+    const inspectionIds = [...new Set(
+        seatRows
+            .filter((r) => capabilitiesForProfile(r.kind as RoleKind, r.capabilityOverrides).showsInAgentPortal)
+            .map((r) => r.inspectionId),
+    )];
 
-        const rows = inspectionIds.length === 0 ? [] : await db
-            .select()
-            .from(inspections)
-            .where(and(
-                eq(inspections.tenantId, tenantId),
-                inArray(inspections.id, inspectionIds),
-            ));
+    const rows = inspectionIds.length === 0 ? [] : await db
+        .select()
+        .from(inspections)
+        .where(and(
+            eq(inspections.tenantId, tenantId),
+            inArray(inspections.id, inspectionIds),
+        ));
 
-        return c.json({
-            success: true,
-            data: { agentId, reports: rows }
-        }, 200);
-    })
-    .openapi(myRecommendationsRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        const groups = await c.var.services.agent.listRecommendationsForAgent(user.sub);
-        return c.json({ success: true, data: groups }, 200);
-    })
-    .openapi(getLeaderboardRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
+    return c.json({
+        success: true,
+        data: { agentId, reports: rows }
+    }, 200);
+});
+app.openapi(myRecommendationsRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    const groups = await c.var.services.agent.listRecommendationsForAgent(user.sub);
+    return c.json({ success: true, data: groups }, 200);
+});
+app.openapi(getLeaderboardRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
 
-        // Task 9 (two-layer role model) — attribution reads the explicit
-        // referred_by_contact_id column, not the buyer_agent seat. The old
-        // inference credited a stranger when a past client referred the job;
-        // the cutover is numerically identical because the column was
-        // backfilled from exactly the old join.
-        const rows = await db
-            .select({
-                agentId: inspections.referredByContactId,
-                name:    contacts.name,
-                agency:  contacts.agency,
-                email:   contacts.email,
-                total:   sql<number>`count(*)`,
-            })
-            .from(inspections)
-            .leftJoin(contacts, and(
-                eq(contacts.id, inspections.referredByContactId),
-                eq(contacts.tenantId, inspections.tenantId),
-            ))
-            .where(eq(inspections.tenantId, tenantId))
-            .groupBy(inspections.referredByContactId, contacts.name, contacts.agency, contacts.email)
-            .orderBy(sql`count(*) DESC`);
+    // Task 9 (two-layer role model) — attribution reads the explicit
+    // referred_by_contact_id column, not the buyer_agent seat. The old
+    // inference credited a stranger when a past client referred the job;
+    // the cutover is numerically identical because the column was
+    // backfilled from exactly the old join.
+    const rows = await db
+        .select({
+            agentId: inspections.referredByContactId,
+            name:    contacts.name,
+            agency:  contacts.agency,
+            email:   contacts.email,
+            total:   sql<number>`count(*)`,
+        })
+        .from(inspections)
+        .leftJoin(contacts, and(
+            eq(contacts.id, inspections.referredByContactId),
+            eq(contacts.tenantId, inspections.tenantId),
+        ))
+        .where(eq(inspections.tenantId, tenantId))
+        .groupBy(inspections.referredByContactId, contacts.name, contacts.agency, contacts.email)
+        .orderBy(sql`count(*) DESC`);
 
-        // Exclude rows where agentId is null (un-referred inspections)
-        const leaderboard = rows.filter((r) => r.agentId !== null);
+    // Exclude rows where agentId is null (un-referred inspections)
+    const leaderboard = rows.filter((r) => r.agentId !== null);
 
-        return c.json({
-            success: true,
-            data: { leaderboard }
-        }, 200);
-    })
-    .openapi(updateProfileRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
+    return c.json({
+        success: true,
+        data: { leaderboard }
+    }, 200);
+});
+app.openapi(updateProfileRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
 
-        const body = c.req.valid('json');
-        const patch: Parameters<typeof c.var.services.agent.updateProfile>[1] = {};
-        if (body.slug !== undefined)             patch.slug             = body.slug;
-        if (body.name !== undefined)             patch.name             = body.name;
-        if (body.timezone !== undefined)         patch.timezone         = body.timezone;
+    const body = c.req.valid('json');
+    const patch: Parameters<typeof c.var.services.agent.updateProfile>[1] = {};
+    if (body.slug !== undefined)             patch.slug             = body.slug;
+    if (body.name !== undefined)             patch.name             = body.name;
+    if (body.timezone !== undefined)         patch.timezone         = body.timezone;
 
-        await c.var.services.agent.updateProfile(user.sub, patch);
-        return c.json({ success: true as const, data: { ok: true as const } }, 200);
-    })
-    .openapi(getProfileRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
+    await c.var.services.agent.updateProfile(user.sub, patch);
+    return c.json({ success: true as const, data: { ok: true as const } }, 200);
+});
+app.openapi(getProfileRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
 
-        const data = await c.var.services.agent.getProfile(user.sub);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(conciergeBookRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const agentUserId = c.get('agentUserId');
-        if (!agentUserId) throw Errors.Unauthorized('Agent identity missing from token');
+    const data = await c.var.services.agent.getProfile(user.sub);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(conciergeBookRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const agentUserId = c.get('agentUserId');
+    if (!agentUserId) throw Errors.Unauthorized('Agent identity missing from token');
 
-        const body = c.req.valid('json');
-        // Optional fields are spread conditionally: exactOptionalPropertyTypes
-        // rejects an explicit `undefined` for an omitted one.
-        const { inspectorUserId, inspectorContactId, services, clientPhone, ...rest } = body;
-        const result = await c.var.services.concierge.createBooking({
-            ...rest,
-            agentUserId,
-            ...(inspectorUserId ? { inspectorUserId } : {}),
-            ...(inspectorContactId ? { inspectorContactId } : {}),
-            ...(services?.length ? { services } : {}),
-            ...(clientPhone ? { clientPhone } : {}),
-        });
-        return c.json({ success: true as const, data: result }, 200);
-    })
-    .openapi(referralsRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        const data = await c.var.services.agent.listReferrals(user.sub, { limit: 100 });
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(inspectorsRoute, async (c) => {
-        await requireRole('agent')(c, async () => {});
-        const user = c.get('user');
-        const data = await c.var.services.agent.listInspectors(user.sub);
-        return c.json({ success: true as const, data }, 200);
+    const body = c.req.valid('json');
+    // Optional fields are spread conditionally: exactOptionalPropertyTypes
+    // rejects an explicit `undefined` for an omitted one.
+    const { inspectorUserId, inspectorContactId, services, clientPhone, ...rest } = body;
+    const result = await c.var.services.concierge.createBooking({
+        ...rest,
+        agentUserId,
+        ...(inspectorUserId ? { inspectorUserId } : {}),
+        ...(inspectorContactId ? { inspectorContactId } : {}),
+        ...(services?.length ? { services } : {}),
+        ...(clientPhone ? { clientPhone } : {}),
     });
+    return c.json({ success: true as const, data: result }, 200);
+});
+app.openapi(referralsRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    const data = await c.var.services.agent.listReferrals(user.sub, { limit: 100 });
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(inspectorsRoute, async (c) => {
+    await requireRole('agent')(c, async () => {});
+    const user = c.get('user');
+    const data = await c.var.services.agent.listInspectors(user.sub);
+    return c.json({ success: true as const, data }, 200);
+});
 
-export type AgentApi = typeof agentRoutes;
+export const agentRouteParts = [mounted('/', agentPhotoRoutes, agentPhotoRouteConfigs), mounted('/', agentNotificationPreferenceRoutes, agentNotificationPreferenceRouteConfigs), getReportsRoute, myRecommendationsRoute, getLeaderboardRoute, updateProfileRoute, getProfileRoute, conciergeBookRoute, referralsRoute, inspectorsRoute] as const;
+export type AgentApi = ApiOf<typeof agentRouteParts>;
 
-export default agentRoutes;
+export default app;

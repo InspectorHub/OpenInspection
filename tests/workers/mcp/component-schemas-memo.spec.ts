@@ -30,6 +30,10 @@ const WIDE = ['read:inspections', 'write:inspections', 'read:contacts', 'write:c
 
 async function freshRegister() {
     vi.resetModules();
+    // The reset also discards the loader the setup file registered: register it on
+    // the registry instance `build-server` is about to import.
+    const { registerApiAppLoader } = await import('../../../server/lib/api-app');
+    registerApiAppLoader(() => import('../../../server/index').then((m) => m.app));
     const mod = await import('../../../server/lib/mcp/build-server');
     return (scopes: string[]) => mod.registerGrantedTools(new McpServer({ name: 't', version: '0' }), {} as never, props(scopes), noCtx);
 }

@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
+import type { ApiOf } from '../../lib/api-schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { Errors } from '../../lib/errors';
 import { getDrizzle } from '../../lib/route-helpers';
@@ -155,40 +156,43 @@ const historyRoute = createRoute(withMcpMetadata({
     operationId: 'listAgentTermsHistory',
 }, { scopes: [], tier: 'excluded' }));
 
-export const agentTermsRoutes = createApiRouter()
-    .openapi(acceptRoute, async (c) => {
-        // Checked HERE and not inherited from anything. The gate exempts this
-        // path, so the usual reason an unauthenticated caller does not reach an
-        // agent route is switched off for it — and the JWT middleware does not
-        // reject a request with no token, it simply sets nothing. Without this
-        // line an anonymous POST would reach a write.
-        const agentUserId = c.get('agentUserId');
-        if (!agentUserId) {
-            throw Errors.Unauthorized('Sign in as an agent to accept the agent terms');
-        }
+export const agentTermsRoutes = createApiRouter();
+agentTermsRoutes.openapi(acceptRoute, async (c) => {
+    // Checked HERE and not inherited from anything. The gate exempts this
+    // path, so the usual reason an unauthenticated caller does not reach an
+    // agent route is switched off for it — and the JWT middleware does not
+    // reject a request with no token, it simply sets nothing. Without this
+    // line an anonymous POST would reach a write.
+    const agentUserId = c.get('agentUserId');
+    if (!agentUserId) {
+        throw Errors.Unauthorized('Sign in as an agent to accept the agent terms');
+    }
 
-        const body = c.req.valid('json');
+    const body = c.req.valid('json');
 
-        const recorded = await recordAgentTermsAcceptance(getDrizzle(c) as never, {
-            userId: agentUserId,
-            shownContentHash: body.shownContentHash,
-            ip: c.req.header('cf-connecting-ip'),
-            country: c.req.header('cf-ipcountry'),
-        });
-
-        return c.json({ success: true as const, data: { version: recorded.version } }, 200);
-    })
-    .openapi(historyRoute, async (c) => {
-        // Same check, same reason as above, and stated rather than shared: the
-        // JWT middleware does not reject a token-less request, it simply sets
-        // nothing, so an anonymous GET reaches this handler.
-        const agentUserId = c.get('agentUserId');
-        if (!agentUserId) {
-            throw Errors.Unauthorized('Sign in as an agent to read your acceptance history');
-        }
-
-        const data = await agentTermsHistory(getDrizzle(c) as never, agentUserId);
-        return c.json({ success: true as const, data }, 200);
+    const recorded = await recordAgentTermsAcceptance(getDrizzle(c) as never, {
+        userId: agentUserId,
+        shownContentHash: body.shownContentHash,
+        ip: c.req.header('cf-connecting-ip'),
+        country: c.req.header('cf-ipcountry'),
     });
 
-export type AgentTermsApi = typeof agentTermsRoutes;
+    return c.json({ success: true as const, data: { version: recorded.version } }, 200);
+});
+agentTermsRoutes.openapi(historyRoute, async (c) => {
+    // Same check, same reason as above, and stated rather than shared: the
+    // JWT middleware does not reject a token-less request, it simply sets
+    // nothing, so an anonymous GET reaches this handler.
+    const agentUserId = c.get('agentUserId');
+    if (!agentUserId) {
+        throw Errors.Unauthorized('Sign in as an agent to read your acceptance history');
+    }
+
+    const data = await agentTermsHistory(getDrizzle(c) as never, agentUserId);
+    return c.json({ success: true as const, data }, 200);
+});
+
+/** Registration order. Drives `AgentTermsApi`; a test pins it to what `agentTermsRoutes` really registered. */
+export const agentTermsRouteConfigs = [acceptRoute, historyRoute] as const;
+
+export type AgentTermsApi = ApiOf<typeof agentTermsRouteConfigs>;

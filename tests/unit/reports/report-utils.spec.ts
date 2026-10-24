@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { computeReportStats, getRatingColor, getRatingBucket, bucketToSeverity } from '../../../server/lib/report-utils';
-import { findingKey, DEFAULT_UNIT } from '../../../server/lib/finding-key';
+import { findingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 
 const defaultLevels = [
   { id: 'S', label: 'Satisfactory', abbreviation: 'SAT', color: '#22c55e', severity: 'good' as const, isDefect: false },

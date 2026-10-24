@@ -1,0 +1,10 @@
+{
+  "name": "@core/offline-package",
+  "private": true,
+  "main": "index.ts",
+  "types": "index.ts",
+  "peerDependencies": {
+    "fflate": "^0.8.3",
+    "zod": "^4.4.3"
+  }
+}

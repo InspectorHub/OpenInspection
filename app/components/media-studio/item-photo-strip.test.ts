@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createElement, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { ItemPhotoStrip, type StripPhoto } from '~/components/media-studio/ItemPhotoStrip';
+import { ItemPhotoStrip, type StripPhoto } from '@core/field-ui/components/media-studio/ItemPhotoStrip';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

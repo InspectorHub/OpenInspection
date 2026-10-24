@@ -1,4 +1,4 @@
-import { formatCents } from "~/lib/money";
+import { formatCents } from "@core/field-ui/shared/money";
 import { m } from "~/paraglide/messages";
 import type { BucketRollup } from "./types";
 

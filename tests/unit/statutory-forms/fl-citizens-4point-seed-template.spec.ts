@@ -5,10 +5,10 @@ import { fieldMap, version } from '../../../server/lib/statutory/forms/fl-citize
 import { PUBLISHED_FORM_VERSIONS } from '../../../server/lib/statutory/forms';
 import { versionForInspection } from '../../../server/lib/statutory/form-registry';
 import { collectStatutoryValues } from '../../../server/lib/statutory/values';
-import { choiceLabel, choiceValue } from '../../../server/lib/template-choices';
+import { choiceLabel, choiceValue } from '@core/field-ui/shared/template-choices';
 import type {
     ItemChoice, StatutoryFormDeclaration, TemplateSchemaV2,
-} from '../../../server/types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 
 /**
  * The template that produces the Citizens four-point form, against the map of

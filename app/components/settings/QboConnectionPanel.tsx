@@ -1,6 +1,6 @@
 import { Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { QboBooksHealth } from "~/components/settings/QboBooksHealth";
 import { useQboContactMatch } from "~/components/settings/useQboContactMatch";

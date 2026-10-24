@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { Errors } from '../lib/errors';
 import { auditFromContext } from '../lib/audit';
@@ -103,70 +104,79 @@ const MAX_BADGE_BYTES = 2_000_000;
  */
 const ALLOWED = ['image/png', 'image/svg+xml', 'image/webp'];
 
-const credentialsRoutes = createApiRouter()
-  .openapi(listRoute, async (c) => {
-    const tenantId = c.get('tenantId') as string;
-    const userId = c.get('user').sub;
-    const rows = await c.var.services.credentials.listByUser(tenantId, userId);
-    return c.json({ success: true as const, data: rows.map(toDto) }, 200);
-  })
-  .openapi(createRouteDef, async (c) => {
-    const { label, memberNumber, sortOrder } = c.req.valid('json');
-    const tenantId = c.get('tenantId') as string;
-    const userId = c.get('user').sub;
-    // Zod `.optional()` produces `T | undefined`, which an omitted-key parameter
-    // (`memberNumber?: string | null`) refuses under exactOptionalPropertyTypes.
-    // Spread only the keys the caller actually sent, so "absent" stays absent
-    // instead of arriving as an explicit `undefined` — the service writes any
-    // key that is not `undefined`, so the two are not interchangeable.
-    const row = await c.var.services.credentials.create(tenantId, userId, {
-      label,
-      ...(memberNumber !== undefined ? { memberNumber } : {}),
-      ...(sortOrder !== undefined ? { sortOrder } : {}),
-    });
-    auditFromContext(c, 'credential.created', 'credential', { entityId: row.id });
-    return c.json({ success: true as const, data: toDto(row) }, 200);
-  })
-  .openapi(updateRouteDef, async (c) => {
-    const { id } = c.req.valid('param');
-    const { label, memberNumber, sortOrder } = c.req.valid('json');
-    const tenantId = c.get('tenantId') as string;
-    const userId = c.get('user').sub;
-    // Same conditional spread as create() above, and load-bearing here: the
-    // PATCH contract is "carry exactly the fields the caller sent" (see the
-    // comment on UpdateCredentialSchema), and the service branches on
-    // `!== undefined`. Passing an explicit `undefined` key would be a no-op
-    // today but is the shape that reintroduced the silent field-blanking bug.
-    const row = await c.var.services.credentials.update(id, tenantId, userId, {
-      ...(label !== undefined ? { label } : {}),
-      ...(memberNumber !== undefined ? { memberNumber } : {}),
-      ...(sortOrder !== undefined ? { sortOrder } : {}),
-    });
-    auditFromContext(c, 'credential.updated', 'credential', { entityId: id });
-    return c.json({ success: true as const, data: toDto(row) }, 200);
-  })
-  .openapi(deleteRouteDef, async (c) => {
-    const { id } = c.req.valid('param');
-    const tenantId = c.get('tenantId') as string;
-    const userId = c.get('user').sub;
-    await c.var.services.credentials.delete(id, tenantId, userId);
-    auditFromContext(c, 'credential.deleted', 'credential', { entityId: id });
-    return c.json({ success: true as const, data: { deleted: true as const } }, 200);
-  })
-  .openapi(uploadRouteDef, async (c) => {
-    const { id } = c.req.valid('param');
-    const tenantId = c.get('tenantId') as string;
-    const userId = c.get('user').sub;
-    const formData = await c.req.formData();
-    const file = formData.get('image');
-    if (!file || !(file instanceof File)) throw Errors.BadRequest('No image file provided.');
-    if (file.size > MAX_BADGE_BYTES) throw Errors.BadRequest('image > 2MB');
-    if (!ALLOWED.includes(file.type)) throw Errors.BadRequest('image must be png, svg, or webp — a badge needs a transparent background');
-    const imageUrl = await c.var.services.credentials.uploadImage(tenantId, userId, id, file);
-    auditFromContext(c, 'credential.image_uploaded', 'credential', { entityId: id });
-    return c.json({ success: true as const, data: { imageUrl } }, 200);
+const app = createApiRouter();
+app.openapi(listRoute, async (c) => {
+const tenantId = c.get('tenantId') as string;
+const userId = c.get('user').sub;
+const rows = await c.var.services.credentials.listByUser(tenantId, userId);
+return c.json({ success: true as const, data: rows.map(toDto) }, 200);
+  });
+app.openapi(createRouteDef, async (c) => {
+const { label, memberNumber, sortOrder } = c.req.valid('json');
+const tenantId = c.get('tenantId') as string;
+const userId = c.get('user').sub;
+// Zod `.optional()` produces `T | undefined`, which an omitted-key parameter
+// (`memberNumber?: string | null`) refuses under exactOptionalPropertyTypes.
+// Spread only the keys the caller actually sent, so "absent" stays absent
+// instead of arriving as an explicit `undefined` — the service writes any
+// key that is not `undefined`, so the two are not interchangeable.
+const row = await c.var.services.credentials.create(tenantId, userId, {
+  label,
+  ...(memberNumber !== undefined ? { memberNumber } : {}),
+  ...(sortOrder !== undefined ? { sortOrder } : {}),
+});
+auditFromContext(c, 'credential.created', 'credential', { entityId: row.id });
+return c.json({ success: true as const, data: toDto(row) }, 200);
+  });
+app.openapi(updateRouteDef, async (c) => {
+const { id } = c.req.valid('param');
+const { label, memberNumber, sortOrder } = c.req.valid('json');
+const tenantId = c.get('tenantId') as string;
+const userId = c.get('user').sub;
+// Same conditional spread as create() above, and load-bearing here: the
+// PATCH contract is "carry exactly the fields the caller sent" (see the
+// comment on UpdateCredentialSchema), and the service branches on
+// `!== undefined`. Passing an explicit `undefined` key would be a no-op
+// today but is the shape that reintroduced the silent field-blanking bug.
+const row = await c.var.services.credentials.update(id, tenantId, userId, {
+  ...(label !== undefined ? { label } : {}),
+  ...(memberNumber !== undefined ? { memberNumber } : {}),
+  ...(sortOrder !== undefined ? { sortOrder } : {}),
+});
+auditFromContext(c, 'credential.updated', 'credential', { entityId: id });
+return c.json({ success: true as const, data: toDto(row) }, 200);
+  });
+app.openapi(deleteRouteDef, async (c) => {
+const { id } = c.req.valid('param');
+const tenantId = c.get('tenantId') as string;
+const userId = c.get('user').sub;
+await c.var.services.credentials.delete(id, tenantId, userId);
+auditFromContext(c, 'credential.deleted', 'credential', { entityId: id });
+return c.json({ success: true as const, data: { deleted: true as const } }, 200);
+  });
+app.openapi(uploadRouteDef, async (c) => {
+const { id } = c.req.valid('param');
+const tenantId = c.get('tenantId') as string;
+const userId = c.get('user').sub;
+const formData = await c.req.formData();
+const file = formData.get('image');
+if (!file || !(file instanceof File)) throw Errors.BadRequest('No image file provided.');
+if (file.size > MAX_BADGE_BYTES) throw Errors.BadRequest('image > 2MB');
+if (!ALLOWED.includes(file.type)) throw Errors.BadRequest('image must be png, svg, or webp — a badge needs a transparent background');
+const imageUrl = await c.var.services.credentials.uploadImage(tenantId, userId, id, file);
+auditFromContext(c, 'credential.image_uploaded', 'credential', { entityId: id });
+return c.json({ success: true as const, data: { imageUrl } }, 200);
   });
 
-export type CredentialsApi = typeof credentialsRoutes;
+/** Registration order. Drives `CredentialsApi`; a test pins it to what `app` really registered. */
+export const credentialsRouteConfigs = [
+    listRoute,
+    createRouteDef,
+    updateRouteDef,
+    deleteRouteDef,
+    uploadRouteDef,
+] as const;
 
-export default credentialsRoutes;
+export type CredentialsApi = ApiOf<typeof credentialsRouteConfigs>;
+
+export default app;

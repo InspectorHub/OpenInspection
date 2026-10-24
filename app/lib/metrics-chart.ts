@@ -20,7 +20,7 @@
  * a percentage is unfalsifiable there; a px value is the same number the browser
  * would use, and a test can read it.
  */
-import { cachedDateTimeFormat } from "./intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 
 /** Height of the bar TRACK, in px. Mirrors the `h-40` (10rem) row in metrics.tsx. */
 export const BAR_TRACK_PX = 160;

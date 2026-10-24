@@ -1,5 +1,5 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import { m } from "~/paraglide/messages";
 
 export interface EventTypeFormState {

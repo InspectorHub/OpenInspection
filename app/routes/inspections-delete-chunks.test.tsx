@@ -11,7 +11,7 @@ import { render, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
 
 const purge = vi.hoisted(() => vi.fn(async () => undefined));
-vi.mock("~/lib/collab/offline-purge", () => ({ purgeInspectionOfflineData: purge }));
+vi.mock("@core/field-ui/collab/offline-purge", () => ({ purgeInspectionOfflineData: purge }));
 
 import InspectionsPage, { shouldRevalidate } from "~/routes/inspections";
 
@@ -79,7 +79,7 @@ describe("/inspections batch delete in chunks", () => {
         expect(alert.textContent).toMatch(/12 Chunk Street/);
         expect(alert.textContent).toMatch(/Not allowed/);
         expect(view.getByText("1 selected")).toBeTruthy();
-        expect(purge).not.toHaveBeenCalledWith("r12");
+        expect(purge).not.toHaveBeenCalledWith("r12", expect.anything());
     });
 
     it("names a refused row by its address when the list rows carry propertyAddress (the real loader's field)", async () => {

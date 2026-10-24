@@ -40,17 +40,22 @@ const rotateSigningKeyRoute = createRoute(withMcpMetadata({
     description: "Retire the tenant's current Ed25519 e-signature key and mint a replacement. Previously signed agreements and report versions keep verifying: the retired public key is kept forever and every audit row is checked against the key its own fingerprint names. Nothing is re-signed and no existing evidence is modified.",
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const adminSigningKeyRoutes = createApiRouter()
-    .openapi(rotateSigningKeyRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const result = await c.var.services.signingKey.rotateKeypair(tenantId);
-        // Both fingerprints in the audit record: which key stopped signing and
-        // which took over. Without the retired one, a later reader cannot tell
-        // which of a tenant's keys covers which stretch of its evidence.
-        auditFromContext(c, 'signing_key.rotate', 'signing_key', {
-            metadata: { fingerprint: result.fingerprint, retired: result.retired },
-        });
-        return c.json({ success: true as const, data: result }, 200);
+const app = createApiRouter();
+app.openapi(rotateSigningKeyRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const result = await c.var.services.signingKey.rotateKeypair(tenantId);
+    // Both fingerprints in the audit record: which key stopped signing and
+    // which took over. Without the retired one, a later reader cannot tell
+    // which of a tenant's keys covers which stretch of its evidence.
+    auditFromContext(c, 'signing_key.rotate', 'signing_key', {
+        metadata: { fingerprint: result.fingerprint, retired: result.retired },
     });
+    return c.json({ success: true as const, data: result }, 200);
+});
 
-export default adminSigningKeyRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminSigningKeyRouteConfigs = [
+    rotateSigningKeyRoute,
+] as const;
+
+export default app;

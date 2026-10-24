@@ -118,105 +118,113 @@ const logoutRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-const profileRoutes = createApiRouter()
-    .openapi(dismissChecklistRoute, async (c) => {
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized('Not signed in');
+const app = createApiRouter();
+app.openapi(dismissChecklistRoute, async (c) => {
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized('Not signed in');
 
+    const db = getDrizzle(c);
+    const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
+    const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
+    onboardingState.checklistDismissed = true;
+
+    await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
+
+    return c.json({ success: true, data: { checklistDismissed: true } }, 200);
+});
+app.openapi(meRoute, async (c) => {
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
+
+    // Email is stored only in the DB, never the JWT.
+    const db = getDrizzle(c);
+    const row = await db.select({
+        email: users.email,
+        name: users.name,
+        phone: users.phone,
+        onboardingState: users.onboardingState,
+        totpEnabled: users.totpEnabled,
+        totpRecoveryCodes: users.totpRecoveryCodes,
+    }).from(users).where(eq(users.id, user.sub)).get();
+
+    let recoveryCodesRemaining: number | null = null;
+    if (row?.totpEnabled && row.totpRecoveryCodes) {
+        try { recoveryCodesRemaining = (JSON.parse(row.totpRecoveryCodes) as string[]).length; }
+        catch { recoveryCodesRemaining = 0; }
+    }
+
+    return c.json({
+        success: true,
+        data: {
+            user: {
+                id: user.sub,
+                email: row?.email,
+                name: row?.name || null,
+                phone: row?.phone || null,
+                onboardingState: row?.onboardingState ?? null,
+                tenantId: c.get('tenantId'),
+                role: c.get('userRole'),
+                totpEnabled: !!row?.totpEnabled,
+                recoveryCodesRemaining,
+            },
+            // IA-95 (frontend half) — the resolved set, so no page ever
+            // re-derives a capability from the role string and drifts from
+            // permission_overrides.
+            capabilities: await capabilitiesFor(c),
+        }
+    }, 200);
+});
+app.openapi(updateProfileRoute, async (c) => {
+    const user = c.get('user');
+    if (!user?.sub) throw Errors.Unauthorized();
+
+    const body = c.req.valid('json');
+    const updates: Record<string, string | null> = {};
+    if (body.name !== undefined) updates.name = body.name || null;
+    if (body.phone !== undefined) updates.phone = body.phone || null;
+
+    if (Object.keys(updates).length > 0) {
         const db = getDrizzle(c);
-        const me = await db.select().from(users).where(eq(users.id, user.sub)).get();
-        const onboardingState = ((me?.onboardingState ?? {}) as Record<string, boolean>);
-        onboardingState.checklistDismissed = true;
+        await db.update(users).set(updates).where(eq(users.id, user.sub)).run();
+    }
 
-        await db.update(users).set({ onboardingState }).where(eq(users.id, user.sub));
+    return c.json({ success: true, data: { updated: true } }, 200);
+});
+app.openapi(logoutRoute, async (c) => {
+    // If the request carries a valid token, revoke all of this user's tokens server-side.
+    // The JS client can't clear an HttpOnly cookie — we must do it via Set-Cookie.
+    const user = c.get('user');
+    if (user?.sub) {
+        await c.var.services.auth.invalidateUserSessions(user.sub);
+    }
 
-        return c.json({ success: true, data: { checklistDismissed: true } }, 200);
-    })
-    .openapi(meRoute, async (c) => {
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
-
-        // Email is stored only in the DB, never the JWT.
-        const db = getDrizzle(c);
-        const row = await db.select({
-            email: users.email,
-            name: users.name,
-            phone: users.phone,
-            onboardingState: users.onboardingState,
-            totpEnabled: users.totpEnabled,
-            totpRecoveryCodes: users.totpRecoveryCodes,
-        }).from(users).where(eq(users.id, user.sub)).get();
-
-        let recoveryCodesRemaining: number | null = null;
-        if (row?.totpEnabled && row.totpRecoveryCodes) {
-            try { recoveryCodesRemaining = (JSON.parse(row.totpRecoveryCodes) as string[]).length; }
-            catch { recoveryCodesRemaining = 0; }
-        }
-
-        return c.json({
-            success: true,
-            data: {
-                user: {
-                    id: user.sub,
-                    email: row?.email,
-                    name: row?.name || null,
-                    phone: row?.phone || null,
-                    onboardingState: row?.onboardingState ?? null,
-                    tenantId: c.get('tenantId'),
-                    role: c.get('userRole'),
-                    totpEnabled: !!row?.totpEnabled,
-                    recoveryCodesRemaining,
-                },
-                // IA-95 (frontend half) — the resolved set, so no page ever
-                // re-derives a capability from the role string and drifts from
-                // permission_overrides.
-                capabilities: await capabilitiesFor(c),
-            }
-        }, 200);
-    })
-    .openapi(updateProfileRoute, async (c) => {
-        const user = c.get('user');
-        if (!user?.sub) throw Errors.Unauthorized();
-
-        const body = c.req.valid('json');
-        const updates: Record<string, string | null> = {};
-        if (body.name !== undefined) updates.name = body.name || null;
-        if (body.phone !== undefined) updates.phone = body.phone || null;
-
-        if (Object.keys(updates).length > 0) {
-            const db = getDrizzle(c);
-            await db.update(users).set(updates).where(eq(users.id, user.sub)).run();
-        }
-
-        return c.json({ success: true, data: { updated: true } }, 200);
-    })
-    .openapi(logoutRoute, async (c) => {
-        // If the request carries a valid token, revoke all of this user's tokens server-side.
-        // The JS client can't clear an HttpOnly cookie — we must do it via Set-Cookie.
-        const user = c.get('user');
-        if (user?.sub) {
-            await c.var.services.auth.invalidateUserSessions(user.sub);
-        }
-
-        deleteCookie(c, '__Host-inspector_token', {
-            path: '/',
-            secure: true,
-            sameSite: 'Strict',
-        });
-
-        // iter-2 production bug #4 — clear the CSRF cookie alongside the auth
-        // cookie. Without this, `__Host-csrf_token` outlives the session and
-        // becomes a fixation vector: a subsequent login on the same browser
-        // inherits the same CSRF token, which an attacker who exfiltrated it
-        // pre-logout can replay against the new session. Same `__Host-` prefix
-        // rules apply (Secure + Path=/).
-        deleteCookie(c, '__Host-csrf_token', {
-            path: '/',
-            secure: true,
-            sameSite: 'Strict',
-        });
-
-        return c.json({ success: true }, 200);
+    deleteCookie(c, '__Host-inspector_token', {
+        path: '/',
+        secure: true,
+        sameSite: 'Strict',
     });
 
-export default profileRoutes;
+    // iter-2 production bug #4 — clear the CSRF cookie alongside the auth
+    // cookie. Without this, `__Host-csrf_token` outlives the session and
+    // becomes a fixation vector: a subsequent login on the same browser
+    // inherits the same CSRF token, which an attacker who exfiltrated it
+    // pre-logout can replay against the new session. Same `__Host-` prefix
+    // rules apply (Secure + Path=/).
+    deleteCookie(c, '__Host-csrf_token', {
+        path: '/',
+        secure: true,
+        sameSite: 'Strict',
+    });
+
+    return c.json({ success: true }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const profileRouteConfigs = [
+    dismissChecklistRoute,
+    meRoute,
+    updateProfileRoute,
+    logoutRoute,
+] as const;
+
+export default app;

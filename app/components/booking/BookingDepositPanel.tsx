@@ -19,7 +19,7 @@
 import { useState } from "react";
 import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { formatCurrency } from "~/lib/format";
+import { formatCurrency } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";

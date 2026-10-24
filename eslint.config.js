@@ -107,6 +107,9 @@ export default tseslint.config(
         // type-aware parser can't resolve them. They don't need type-aware
         // linting — ignore them rather than widen the tsconfig projects.
         //
+        // `.types-tsgo/**` is the same kind of output from the optional native check
+        // (`npm run type-check:native`) and is ignored for the same reason.
+        //
         // `.types/**` is tsc project-reference output (the .d.ts tsconfig.api.json
         // emits for the app program). Generated, gitignored, and in no lintable
         // TS project — leaving it in produced 803 "file not found in any of the
@@ -177,7 +180,7 @@ export default tseslint.config(
         // directory does not exist. That divergence is worse than the lint it
         // skips: it makes the local pre-push gate disagree with the gate it exists
         // to predict.
-        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'backups/**', 'app/paraglide/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.types-tsgo/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'backups/**', 'app/paraglide/**', 'packages/field-ui/src/i18n/generated/**', 'eslint.config.js', '*.config.ts', 'packages/*/tsup.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],
@@ -571,7 +574,7 @@ export default tseslint.config(
         // genuine bug class (error, verified 0 violations); everything else is
         // warn-first per task-hooks-brief.md — this is existing-code surfacing,
         // not a fix-it-now gate.
-        files: ['app/**/*.{ts,tsx}', 'packages/shared-ui/src/**/*.{ts,tsx}'],
+        files: ['app/**/*.{ts,tsx}', 'packages/shared-ui/src/**/*.{ts,tsx}', 'packages/field-ui/src/**/*.{ts,tsx}'],
         plugins: {
             'react-hooks': reactHooks,
             react,
@@ -592,7 +595,7 @@ export default tseslint.config(
         rules: {
             // DOWNGRADED from the intended 'error' (task-hooks-brief.md Tier 2) to
             // 'warn' — auditing found a genuine violation, not a false positive:
-            // app/components/editor/ItemEditor.tsx:343 calls useMemo() AFTER an
+            // packages/field-ui/src/components/editor/ItemEditor.tsx:343 calls useMemo() AFTER an
             // early `if (!item) return null;` at line 242, so the hook only runs on
             // some renders. Real bug, left unfixed here per the hard invariant (no
             // mass-fix in this task) — flagged prominently in task-hooks-report.md

@@ -36,7 +36,7 @@ import { INSPECTION_RESULTS_TEST_DDL } from '../helpers/inline-ddl';
 import { env, runInDurableObject } from 'cloudflare:test';
 import * as Y from 'yjs';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
-import { seedResultsDoc, applyItemPatch } from '../../server/lib/collab/results-doc';
+import { seedResultsDoc, applyItemPatch } from '@core/field-ui/shared/results-doc';
 
 const b = env as unknown as {
     DB: D1Database;

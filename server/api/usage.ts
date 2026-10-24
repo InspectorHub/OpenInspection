@@ -20,6 +20,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { createRoute } from '@hono/zod-openapi';
 import { count, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -43,69 +44,74 @@ const summaryRoute = createRoute(withMcpMetadata({
     description: "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. Available to owner, manager and inspector roles."
 }, { scopes: ['read'], tier: 'extended' }));
 
-const usageRoutes = createApiRouter()
-    .openapi(summaryRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized();
+const app = createApiRouter();
+app.openapi(summaryRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized();
 
-        const metering = new MeteringService(c.env.DB);
-        const [
-            inspections, sms, email, smsByo, emailByo, r2Bytes,
-            aiTranslate, aiTranslateByo, aiAssist, aiAssistByo,
-            seatUsage, tier,
-        ] = await Promise.all([
-            metering.lifetimeTotal(tenantId, 'inspections'),
-            metering.lifetimeTotal(tenantId, 'sms'),
-            metering.lifetimeTotal(tenantId, 'email'),
-            metering.lifetimeTotal(tenantId, 'sms_byo'),
-            metering.lifetimeTotal(tenantId, 'email_byo'),
-            metering.lifetimeTotal(tenantId, 'r2_bytes'),
-            // AI is reported platform/bring-your-own separately for the same
-            // reason sends are: only platform-funded volume is ever something
-            // this deployment could cap.
-            metering.lifetimeTotal(tenantId, 'ai_translate'),
-            metering.lifetimeTotal(tenantId, 'ai_translate_byo'),
-            metering.lifetimeTotal(tenantId, 'ai_assist'),
-            metering.lifetimeTotal(tenantId, 'ai_assist_byo'),
-            getSeatUsage(tenantId, c.env.DB),
-            readTenantTier(c.env.DB, tenantId),
-        ]);
+    const metering = new MeteringService(c.env.DB);
+    const [
+        inspections, sms, email, smsByo, emailByo, r2Bytes,
+        aiTranslate, aiTranslateByo, aiAssist, aiAssistByo,
+        seatUsage, tier,
+    ] = await Promise.all([
+        metering.lifetimeTotal(tenantId, 'inspections'),
+        metering.lifetimeTotal(tenantId, 'sms'),
+        metering.lifetimeTotal(tenantId, 'email'),
+        metering.lifetimeTotal(tenantId, 'sms_byo'),
+        metering.lifetimeTotal(tenantId, 'email_byo'),
+        metering.lifetimeTotal(tenantId, 'r2_bytes'),
+        // AI is reported platform/bring-your-own separately for the same
+        // reason sends are: only platform-funded volume is ever something
+        // this deployment could cap.
+        metering.lifetimeTotal(tenantId, 'ai_translate'),
+        metering.lifetimeTotal(tenantId, 'ai_translate_byo'),
+        metering.lifetimeTotal(tenantId, 'ai_assist'),
+        metering.lifetimeTotal(tenantId, 'ai_assist_byo'),
+        getSeatUsage(tenantId, c.env.DB),
+        readTenantTier(c.env.DB, tenantId),
+    ]);
 
-        const isFreeTierQuota = tier === 'free' && c.var.profile.hasUsageQuota;
+    const isFreeTierQuota = tier === 'free' && c.var.profile.hasUsageQuota;
 
-        // The number shown against a cap must be the number the cap is enforced
-        // against. `PlanQuotaGuard.consumeInspection` gates on the inspection
-        // ROWS a tenant has, and `usage_counters.value` is only a self-healing
-        // cache of that — it reads stale-high between a delete and the next
-        // create, which would tell a tenant "5 of 5 used" while creating still
-        // works. So capped tenants get the live count.
-        //
-        // Everyone else keeps the cumulative lifetime counter: with `caps: null`
-        // it is measured against nothing, and quietly redefining it from "how
-        // many they have ever created" to "how many they have now" would change
-        // an analytics figure nobody asked to change.
-        const inspectionsUsed = isFreeTierQuota
-            ? (await getDrizzle(c).select({ n: count() }).from(inspectionsTable)
-                .where(eq(inspectionsTable.tenantId, tenantId)).get())?.n ?? 0
-            : inspections;
+    // The number shown against a cap must be the number the cap is enforced
+    // against. `PlanQuotaGuard.consumeInspection` gates on the inspection
+    // ROWS a tenant has, and `usage_counters.value` is only a self-healing
+    // cache of that — it reads stale-high between a delete and the next
+    // create, which would tell a tenant "5 of 5 used" while creating still
+    // works. So capped tenants get the live count.
+    //
+    // Everyone else keeps the cumulative lifetime counter: with `caps: null`
+    // it is measured against nothing, and quietly redefining it from "how
+    // many they have ever created" to "how many they have now" would change
+    // an analytics figure nobody asked to change.
+    const inspectionsUsed = isFreeTierQuota
+        ? (await getDrizzle(c).select({ n: count() }).from(inspectionsTable)
+            .where(eq(inspectionsTable.tenantId, tenantId)).get())?.n ?? 0
+        : inspections;
 
-        return c.json({
-            success: true as const,
-            data: {
-                tier,
-                caps: isFreeTierQuota ? FREE_TIER_CAPS : null,
-                usage: {
-                    inspections: inspectionsUsed, sms, email,
-                    smsByo, emailByo,
-                    aiTranslate, aiTranslateByo,
-                    aiAssist, aiAssistByo,
-                    seatsUsed: seatUsage.used,
-                    seatsMax: seatUsage.max,
-                    r2Bytes,
-                },
+    return c.json({
+        success: true as const,
+        data: {
+            tier,
+            caps: isFreeTierQuota ? FREE_TIER_CAPS : null,
+            usage: {
+                inspections: inspectionsUsed, sms, email,
+                smsByo, emailByo,
+                aiTranslate, aiTranslateByo,
+                aiAssist, aiAssistByo,
+                seatsUsed: seatUsage.used,
+                seatsMax: seatUsage.max,
+                r2Bytes,
             },
-        }, 200);
-    });
+        },
+    }, 200);
+});
 
-export type UsageApi = typeof usageRoutes;
-export default usageRoutes;
+/** Registration order. Drives `UsageApi`; a test pins it to what `app` really registered. */
+export const usageRouteConfigs = [
+    summaryRoute,
+] as const;
+
+export type UsageApi = ApiOf<typeof usageRouteConfigs>;
+export default app;

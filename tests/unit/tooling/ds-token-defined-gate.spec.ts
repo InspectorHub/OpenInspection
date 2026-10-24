@@ -29,7 +29,8 @@ import path from 'node:path';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../../..');
-const CSS = readFileSync(path.join(ROOT, 'app/styles/tailwind.css'), 'utf8');
+const CSS = `${readFileSync(path.join(ROOT, 'app/styles/tailwind.css'), 'utf8')}
+${readFileSync(path.join(ROOT, 'packages/field-ui/src/theme.css'), 'utf8')}`;
 
 type Violation = { path: string; line: number; utility: string; why: string };
 

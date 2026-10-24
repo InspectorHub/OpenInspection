@@ -1,4 +1,4 @@
-import { formatCurrency } from "~/lib/format";
+import { formatCurrency } from "@core/field-ui/shared/format";
 import { remainingCents } from "~/lib/hub-blocks";
 import { m } from "~/paraglide/messages";
 

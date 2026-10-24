@@ -39,7 +39,14 @@ export default defineConfig({
         // has to agree on that — tsconfig.api.json's paths, vitest.api.config.ts,
         // vite.config.ts and here — and it is the one that only fails inside
         // real workerd, long after the other three are green.
-        alias: { '~': path.resolve(__dirname, 'app') },
+        //
+        // `@core/offline-package` is a runtime package (schemas and limits the
+        // import path executes), so it needs the same alias the other resolvers carry.
+        alias: {
+            '~': path.resolve(__dirname, 'app'),
+            '@core/offline-package': path.resolve(__dirname, 'packages/offline-package/index.ts'),
+            '@core/field-ui': path.resolve(__dirname, 'packages/field-ui/src'),
+        },
     },
     plugins: [
         cloudflareTest({
@@ -93,5 +100,7 @@ export default defineConfig({
     ],
     test: {
         include: ['tests/workers/**/*.spec.ts'],
+        // Registers the API app loader the production entry registers.
+        setupFiles: ['tests/workers/setup-api-app.ts'],
     },
 });

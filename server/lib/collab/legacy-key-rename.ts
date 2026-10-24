@@ -13,7 +13,7 @@
  */
 
 import * as Y from 'yjs';
-import { findingKey, findingKeysFromTemplateSnapshot } from '../finding-key';
+import { findingKey, findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-key';
 
 export interface LegacyRenameCounts {
     /** Legacy items moved onto their composite key. */
@@ -114,7 +114,7 @@ type KeyClass =
  * than three colon-separated parts; of those, an underscore prefix marks meta
  * data (the inspector signature). Composite keys also start with `_default:`,
  * which is why the colon count comes first. This is the same rule as `isMetaKey`
- * in `server/lib/finding-key.ts`, spelled out here because the composite check
+ * in `packages/field-ui/src/shared/finding-key.ts`, spelled out here because the composite check
  * has to come before the meta check.
  */
 function classify(key: string, value: unknown, itemSections: Map<string, string[]>): KeyClass {

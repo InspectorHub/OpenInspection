@@ -2,9 +2,6 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { apiCors } from './lib/native/cors-origins';
 import { serveStatic } from 'hono/cloudflare-workers';
-import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
-import * as schema from './lib/db/schema';
 
 import { brandingMiddleware } from './lib/middleware/branding';
 import { contextBootstrap } from './lib/middleware/context-bootstrap';
@@ -652,17 +649,6 @@ app.get('/api/public/verify/:envelopeId/document', async (c) => {
     return c.redirect(agreementRenderPath(data.tenantSlug, data.reqRow.id), 302);
 });
 
-app.get('/api/public/verify-by-token/:token', async (c) => {
-    const token = c.req.param('token') as string;
-    const db = drizzle(c.env.DB, { schema });
-    const row = await db.select({ id: schema.agreementRequests.id })
-        .from(schema.agreementRequests)
-        .where(eq(schema.agreementRequests.verificationToken, token))
-        .get();
-    if (!row) return c.json({ success: false, error: { message: 'Not found', code: 'NOT_FOUND' } }, 404);
-    return c.json({ success: true, data: { envelopeId: row.id } });
-});
-
 app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
     const envelopeId = c.req.param('envelopeId') as string;
     const data = await loadVerifyData(c, envelopeId);
@@ -720,14 +706,12 @@ export default {
     // the default export keeps its full shape for any other consumer.
     queue: queueConsumer,
 };
-export { SignCompletionWorkflow } from './workflows/sign-completion-workflow';
 
-// Design System 0520 subsystem B phase 2 — presence Durable Objects.
-// wrangler needs them re-exported from the entrypoint so it can discover
-// the class names referenced by [[durable_objects.bindings]] in wrangler.jsonc.
-export { InspectionPresenceDO } from './durable-objects/inspection-presence';
-export { TenantPresenceDO     } from './durable-objects/tenant-presence';
-export { InspectionDocDO      } from './durable-objects/inspection-doc';
+// The signing workflow and the presence / collaboration Durable Objects. wrangler needs
+// them exported from the entrypoint so it can discover the class names referenced by
+// [[durable_objects.bindings]] in wrangler.jsonc; they are defined in one place,
+// `./lib/worker-exports`, so the generated worker types can name them without this module.
+export { SignCompletionWorkflow, InspectionPresenceDO, TenantPresenceDO, InspectionDocDO } from './lib/worker-exports';
 
 // Exported for the route-metadata vitest gate; OpenAPIHono.getOpenAPIDocument()
 // inspects the doc without needing a live request.

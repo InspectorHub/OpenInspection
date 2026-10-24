@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 
 import { RemoveMemberDialog } from "./RemoveMemberDialog";
 
@@ -29,6 +30,41 @@ describe("RemoveMemberDialog", () => {
         // the text assertion alone while losing the emphasis.
         const alert = within(dialog).getByRole("alert");
         expect(alert.textContent).toBe(WARNING);
+    });
+
+    it("links the hand-over sentence to the offline package import page", () => {
+        render(<RemoveMemberDialog target={TARGET} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />);
+        const link = within(screen.getByRole("dialog")).getByRole("link", { name: "Import an offline package" });
+        expect(link.getAttribute("href")).toBe("/settings/offline-packages");
+    });
+
+    it("inside a router the link navigates client-side instead of reloading the page", () => {
+        const Where = () => <p data-testid="where">{useLocation().pathname}</p>;
+        render(
+            <MemoryRouter initialEntries={["/team"]}>
+                <Routes>
+                    <Route path="/team" element={<RemoveMemberDialog target={TARGET} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />} />
+                    <Route path="/settings/offline-packages" element={<Where />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        const link = within(screen.getByRole("dialog")).getByRole("link", { name: "Import an offline package" });
+        expect(link.getAttribute("href")).toBe("/settings/offline-packages");
+        const proceeded = fireEvent.click(link);
+        // A router Link cancels the browser's own navigation; a plain anchor would not.
+        expect(proceeded).toBe(false);
+        expect(screen.getByTestId("where").textContent).toBe("/settings/offline-packages");
+    });
+
+    it("outside a router the link is a plain anchor the browser follows (positive control)", () => {
+        render(<RemoveMemberDialog target={TARGET} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />);
+        const link = within(screen.getByRole("dialog")).getByRole("link", { name: "Import an offline package" });
+        expect(fireEvent.click(link)).toBe(true);
+    });
+
+    it("offers no link while the dialog is closed (positive control)", () => {
+        render(<RemoveMemberDialog target={null} busy={false} error={null} onConfirm={() => {}} onCancel={() => {}} />);
+        expect(screen.queryByRole("link", { name: "Import an offline package" })).toBeNull();
     });
 
     it("hands the same target back on confirm", () => {

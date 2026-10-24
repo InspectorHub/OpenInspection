@@ -17,32 +17,35 @@ import {
     seedResultsDoc,
     projectResults,
     appendPhoto,
-} from '../../../server/lib/collab/results-doc';
+} from '@core/field-ui/shared/results-doc';
 import {
     appendPendingPhoto,
     markPhotoPending,
     resolvePendingPhoto,
-} from '../../../app/lib/collab/results-binding';
+} from '@core/field-ui/collab/results-binding';
 import {
     enqueueMedia,
     drainMediaQueue,
     type MediaUploader,
-} from '../../../app/lib/collab/media-upload-queue';
-import {
-    listPendingMedia,
-    deletePendingMedia,
-} from '../../../app/lib/collab/media-pending-store';
+} from '@core/field-ui/collab/media-upload-queue';
+import { webMediaStore } from '~/lib/field/web-media-store';
+import type { PendingMediaRecord } from '@core/field-ui/media-types';
 
 const FK = '_default:s1:i1';
 
 async function clearStore(): Promise<void> {
-    const all = await listPendingMedia();
-    for (const r of all) await deletePendingMedia(r.pendingId);
+    const all = await webMediaStore.list();
+    for (const r of all) await webMediaStore.delete(r.pendingId);
 }
 
 beforeEach(async () => {
     await clearStore();
 });
+
+/** The drain's doc swap, as the editor hook performs it. */
+function swap(doc: Y.Doc, rec: PendingMediaRecord, result: { key?: string; croppedKey?: string; annotatedKey?: string }): void {
+    resolvePendingPhoto(doc, rec.meta.findingKey, rec.pendingId, rec.kind, rec.kind === 'photo' ? undefined : rec.meta.photoKey, result);
+}
 
 function freshDoc(): Y.Doc {
     const doc = new Y.Doc();
@@ -61,13 +64,13 @@ describe('offline photo ADD → pending entry → drain swaps to real key', () =
         const blob = new Blob(['photo-bytes'], { type: 'image/jpeg' });
 
         // Offline capture: enqueue + write the pending doc entry.
-        await enqueueMedia({
+        await enqueueMedia(webMediaStore, {
             pendingId,
             inspectionId: 'insp-1',
-            findingKey: FK,
             kind: 'photo',
             blob,
-            enqueuedAt: Date.now(),
+            meta: { targetType: 'item', findingKey: FK, itemId: 'i1' },
+            createdAt: Date.now(),
         });
         appendPendingPhoto(doc, FK, pendingId);
 
@@ -88,9 +91,9 @@ describe('offline photo ADD → pending entry → drain swaps to real key', () =
         };
         const summary = await drainMediaQueue({
             inspectionId: 'insp-1',
+            store: webMediaStore,
             uploader,
-            onUploaded: (rec, result) =>
-                resolvePendingPhoto(doc, rec.findingKey, rec.pendingId, rec.kind, rec.photoKey, result),
+            onUploaded: (rec, result) => swap(doc, rec, result),
         });
 
         expect(summary).toEqual({ uploaded: 1, failed: 0 });
@@ -104,13 +107,13 @@ describe('offline photo ADD → pending entry → drain swaps to real key', () =
         expect(after[0].pendingKind).toBeUndefined();
 
         // The local blob was drained out of the store.
-        expect(await listPendingMedia('insp-1')).toHaveLength(0);
+        expect(await webMediaStore.list('insp-1')).toHaveLength(0);
     });
 
     it('two concurrent offline adds resolve independently (matched by pendingId)', async () => {
         const doc = freshDoc();
-        await enqueueMedia({ pendingId: 'A', inspectionId: 'insp-1', findingKey: FK, kind: 'photo', blob: new Blob(['a']), enqueuedAt: 1 });
-        await enqueueMedia({ pendingId: 'B', inspectionId: 'insp-1', findingKey: FK, kind: 'photo', blob: new Blob(['b']), enqueuedAt: 2 });
+        await enqueueMedia(webMediaStore, { pendingId: 'A', inspectionId: 'insp-1', kind: 'photo', blob: new Blob(['a']), meta: { targetType: 'item', findingKey: FK, itemId: 'i1' }, createdAt: 1 });
+        await enqueueMedia(webMediaStore, { pendingId: 'B', inspectionId: 'insp-1', kind: 'photo', blob: new Blob(['b']), meta: { targetType: 'item', findingKey: FK, itemId: 'i1' }, createdAt: 2 });
         appendPendingPhoto(doc, FK, 'A');
         appendPendingPhoto(doc, FK, 'B');
 
@@ -120,9 +123,9 @@ describe('offline photo ADD → pending entry → drain swaps to real key', () =
         };
         await drainMediaQueue({
             inspectionId: 'insp-1',
+            store: webMediaStore,
             uploader,
-            onUploaded: (rec, result) =>
-                resolvePendingPhoto(doc, rec.findingKey, rec.pendingId, rec.kind, rec.photoKey, result),
+            onUploaded: (rec, result) => swap(doc, rec, result),
         });
 
         const keys = photos(doc).map((p) => p.key).sort();
@@ -138,15 +141,13 @@ describe('offline CROP of an existing photo → keeps base key, drain sets cropp
 
         const pendingId = 'pid-crop-1';
         const crop = { aspect: '3:2', orientation: 'landscape' as const, x: 0, y: 0, width: 100, height: 66 };
-        await enqueueMedia({
+        await enqueueMedia(webMediaStore, {
             pendingId,
             inspectionId: 'insp-1',
-            findingKey: FK,
             kind: 'crop',
             blob: new Blob(['cropped']),
-            photoKey: 'r2/base.jpg',
-            crop,
-            enqueuedAt: Date.now(),
+            meta: { findingKey: FK, itemId: 'i1', photoIndex: 0, photoKey: 'r2/base.jpg', crop },
+            createdAt: Date.now(),
         });
         markPhotoPending(doc, FK, 'r2/base.jpg', pendingId, 'crop', { crop });
 
@@ -163,9 +164,9 @@ describe('offline CROP of an existing photo → keeps base key, drain sets cropp
         };
         await drainMediaQueue({
             inspectionId: 'insp-1',
+            store: webMediaStore,
             uploader,
-            onUploaded: (rec, result) =>
-                resolvePendingPhoto(doc, rec.findingKey, rec.pendingId, rec.kind, rec.photoKey, result),
+            onUploaded: (rec, result) => swap(doc, rec, result),
         });
 
         const after = photos(doc)[0];
@@ -184,15 +185,13 @@ describe('offline ANNOTATE of an existing photo → keeps base/cropped key', () 
 
         const pendingId = 'pid-anno-1';
         const nodesJson = '[{"type":"rect"}]';
-        await enqueueMedia({
+        await enqueueMedia(webMediaStore, {
             pendingId,
             inspectionId: 'insp-1',
-            findingKey: FK,
             kind: 'annotate',
             blob: new Blob(['annotated']),
-            photoKey: 'r2/base.jpg',
-            nodesJson,
-            enqueuedAt: Date.now(),
+            meta: { findingKey: FK, itemId: 'i1', photoIndex: 0, photoKey: 'r2/base.jpg', nodesJson },
+            createdAt: Date.now(),
         });
         markPhotoPending(doc, FK, 'r2/base.jpg', pendingId, 'annotate', { annotationsJson: nodesJson });
 
@@ -208,9 +207,9 @@ describe('offline ANNOTATE of an existing photo → keeps base/cropped key', () 
         };
         await drainMediaQueue({
             inspectionId: 'insp-1',
+            store: webMediaStore,
             uploader,
-            onUploaded: (rec, result) =>
-                resolvePendingPhoto(doc, rec.findingKey, rec.pendingId, rec.kind, rec.photoKey, result),
+            onUploaded: (rec, result) => swap(doc, rec, result),
         });
 
         const after = photos(doc)[0];

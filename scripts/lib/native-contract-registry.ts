@@ -8,8 +8,8 @@
  *    by `npm run native:contract`, and CI diffs that file against the base branch
  *    with oasdiff so a breaking change to a shipped app is a red build.
  *  - NATIVE_NON_OPENAPI_CONTRACT: endpoints OpenAPI cannot describe (WebSocket
- *    upgrades, binary bodies, the OAuth endpoints a library serves, plain JSON
- *    routes). Their shape is pinned by tests/unit/native/contract-non-openapi.spec.ts.
+ *    upgrades, binary bodies, the OAuth endpoints a library serves). Their shape
+ *    is pinned by tests/unit/native/contract-non-openapi.spec.ts.
  *
  * A shipped app binary cannot be recalled, so removing or reshaping anything
  * listed here breaks installed clients. Adding an entry is how a new endpoint
@@ -27,7 +27,7 @@ export interface NativeContractEntry {
     path: string;
 }
 
-type NativeNonOpenApiKind = 'websocket' | 'binary' | 'json' | 'oauth';
+type NativeNonOpenApiKind = 'websocket' | 'binary' | 'oauth';
 
 export interface NativeNonOpenApiEntry {
     kind: NativeNonOpenApiKind;
@@ -39,10 +39,13 @@ export interface NativeNonOpenApiEntry {
 }
 
 export const NATIVE_CONTRACT: readonly NativeContractEntry[] = [
-    // Version handshake, identity and offline package import.
+    // Version handshake, identity, offline package import and reconcile.
     { method: 'get', path: '/api/client/compat' },
     { method: 'get', path: '/api/client/session' },
+    // Branding, user, tenant locale and timezone for the signed-in session.
+    { method: 'get', path: '/api/session/context' },
     { method: 'post', path: '/api/client/import' },
+    { method: 'post', path: '/api/client/inspections/visible' },
     // Inspection record: list, create (client-supplied id), read, update, complete.
     { method: 'get', path: '/api/inspections' },
     { method: 'post', path: '/api/inspections' },
@@ -99,10 +102,6 @@ export const NATIVE_NON_OPENAPI_CONTRACT: readonly NativeNonOpenApiEntry[] = [
     {
         kind: 'binary', method: 'post', path: '/api/public/uploads/video',
         note: 'Video bytes as multipart field "file", authorized by the signed token from the create-upload call.',
-    },
-    {
-        kind: 'json', method: 'get', path: '/api/session/context',
-        note: 'Branding, user, tenant locale and timezone for the signed-in session; a plain JSON route with no OpenAPI declaration.',
     },
     {
         kind: 'oauth', method: 'get', path: '/oauth/authorize',

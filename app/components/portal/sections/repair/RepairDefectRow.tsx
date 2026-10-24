@@ -10,7 +10,7 @@
 import type { Defect } from "../RepairBuilderSection";
 import { parseRepairActionTag, type RepairActionTag } from "~/lib/repair-action-tag";
 import { Select } from "@core/shared-ui";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import { RepairDefectRowView } from "./RepairDefectRowView";
 import { m } from "~/paraglide/messages";
 

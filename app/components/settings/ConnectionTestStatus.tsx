@@ -16,7 +16,7 @@ import {
   formatShapedDate,
   formatShapedDateTime,
   type InspectionDateTimeFormat,
-} from "~/lib/format-date";
+} from "@core/field-ui/shared/format-date";
 import { m } from "~/paraglide/messages";
 
 export type { ConnectionTestResult };

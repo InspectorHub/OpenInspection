@@ -29,7 +29,7 @@ import { collectStatutoryValues } from '../../../server/lib/statutory/values';
 import type { StatutoryInspectionFacts } from '../../../server/lib/statutory/values';
 import type { FieldMap } from '../../../server/lib/statutory/field-map';
 import type { FieldGroup, StatutoryFormDeclaration, TemplateSchemaV2 }
-    from '../../../server/types/template-schema';
+    from '@core/field-ui/shared/template-schema';
 import { buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
 import { drawnRuns } from '../helpers/pdf-drawn-runs';
 

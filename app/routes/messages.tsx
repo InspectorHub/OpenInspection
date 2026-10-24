@@ -26,7 +26,7 @@ import { VerificationCancelledError } from "~/lib/verification-cancelled";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
-import { cachedDateTimeFormat } from "~/lib/intl-cache";
+import { cachedDateTimeFormat } from "@core/field-ui/shared/intl-cache";
 
 export function meta() {
   return [{ title: m.messages_meta_title() }];

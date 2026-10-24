@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { Button } from "@core/shared-ui";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { ActionFailureAlert } from "~/components/ActionFailureAlert";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 

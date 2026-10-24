@@ -18,8 +18,8 @@
  * for a human to set it — the one field the whole feature exists to collect.
  */
 import * as Y from 'yjs';
-import { applyItemPatch } from './results-doc';
-import type { FindingKey } from './results-doc.types';
+import { applyItemPatch } from '@core/field-ui/shared/results-doc';
+import type { FindingKey } from '@core/field-ui/shared/results-doc.types';
 
 export type CarriedKeyResolution =
     | { ok: true; findingKey: FindingKey }

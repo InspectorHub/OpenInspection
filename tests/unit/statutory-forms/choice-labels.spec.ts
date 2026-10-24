@@ -26,11 +26,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { renderStatutoryForm } from '../../../server/lib/statutory/render';
 import { collectStatutoryValues } from '../../../server/lib/statutory/values';
-import { choiceLabel, choiceValue } from '../../../server/lib/template-choices';
+import { choiceLabel, choiceValue } from '@core/field-ui/shared/template-choices';
 import type { FieldMap } from '../../../server/lib/statutory/field-map';
 import type {
     ItemChoice, StatutoryFormDeclaration, TemplateSchemaV2,
-} from '../../../server/types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 import {
     buildCheckboxPdf, readCheckBox, type PdfFixture,
 } from '../helpers/statutory-pdf-fixtures';

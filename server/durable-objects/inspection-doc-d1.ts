@@ -14,8 +14,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, type SQL } from 'drizzle-orm';
 import { inspectionResults, inspections } from '../lib/db/schema';
-import type { ResultsProjection } from '../lib/collab/results-doc.types';
-import { isMetaKey } from '../lib/finding-key';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
+import { isMetaKey } from '@core/field-ui/shared/finding-key';
 
 export type ProjectionWrite = 'written' | 'inspection_gone';
 

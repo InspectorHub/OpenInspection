@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import {
@@ -119,47 +120,57 @@ const reorderContractorTypesRoute = createRoute(withMcpMetadata({
         + "Owner or manager only."
 }, { scopes: ['write'], tier: 'extended' }));
 
-const contractorTypesRoutes = createApiRouter()
-    .openapi(listContractorTypesRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const data = await c.var.services.contractorType.listByTenant(tenantId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(createContractorTypeRoute, async (c) => {
-        const input = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const r = await c.var.services.contractorType.create(tenantId, input);
-        auditFromContext(c, 'contractor_type.created', 'contractor_type', { entityId: r.id, metadata: { name: r.name } });
-        return c.json({ success: true as const, data: r }, 200);
-    })
-    .openapi(updateContractorTypeRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const r = await c.var.services.contractorType.update(id, tenantId, patch);
-        auditFromContext(c, 'contractor_type.updated', 'contractor_type', { entityId: r.id });
-        return c.json({ success: true as const, data: r }, 200);
-    })
-    .openapi(contractorTypeDeletePreflightRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        const data = await c.var.services.contractorType.countReferences(id, tenantId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(deleteContractorTypeRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        await c.var.services.contractorType.delete(id, tenantId);
-        auditFromContext(c, 'contractor_type.deleted', 'contractor_type', { entityId: id });
-        return c.json({ success: true as const, data: { deleted: true as const } }, 200);
-    })
-    .openapi(reorderContractorTypesRoute, async (c) => {
-        const { ids } = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        await c.var.services.contractorType.reorder(tenantId, ids);
-        return c.json({ success: true as const, data: { reordered: true as const } }, 200);
-    });
+const app = createApiRouter();
+app.openapi(listContractorTypesRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const data = await c.var.services.contractorType.listByTenant(tenantId);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(createContractorTypeRoute, async (c) => {
+    const input = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const r = await c.var.services.contractorType.create(tenantId, input);
+    auditFromContext(c, 'contractor_type.created', 'contractor_type', { entityId: r.id, metadata: { name: r.name } });
+    return c.json({ success: true as const, data: r }, 200);
+});
+app.openapi(updateContractorTypeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const r = await c.var.services.contractorType.update(id, tenantId, patch);
+    auditFromContext(c, 'contractor_type.updated', 'contractor_type', { entityId: r.id });
+    return c.json({ success: true as const, data: r }, 200);
+});
+app.openapi(contractorTypeDeletePreflightRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    const data = await c.var.services.contractorType.countReferences(id, tenantId);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(deleteContractorTypeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    await c.var.services.contractorType.delete(id, tenantId);
+    auditFromContext(c, 'contractor_type.deleted', 'contractor_type', { entityId: id });
+    return c.json({ success: true as const, data: { deleted: true as const } }, 200);
+});
+app.openapi(reorderContractorTypesRoute, async (c) => {
+    const { ids } = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    await c.var.services.contractorType.reorder(tenantId, ids);
+    return c.json({ success: true as const, data: { reordered: true as const } }, 200);
+});
 
-export type ContractorTypesApi = typeof contractorTypesRoutes;
+/** Registration order. Drives `ContractorTypesApi`; a test pins it to what `app` really registered. */
+export const contractorTypesRouteConfigs = [
+    listContractorTypesRoute,
+    createContractorTypeRoute,
+    updateContractorTypeRoute,
+    contractorTypeDeletePreflightRoute,
+    deleteContractorTypeRoute,
+    reorderContractorTypesRoute,
+] as const;
 
-export default contractorTypesRoutes;
+export type ContractorTypesApi = ApiOf<typeof contractorTypesRouteConfigs>;
+
+export default app;

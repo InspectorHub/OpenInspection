@@ -10,8 +10,8 @@
 
 import * as Y from 'yjs';
 import { logger } from '../lib/logger';
-import { replacePhotoByPendingId } from '../lib/collab/results-doc';
-import type { PhotoEntry } from '../lib/collab/results-doc.types';
+import { replacePhotoByPendingId } from '@core/field-ui/shared/results-doc';
+import type { PhotoEntry } from '@core/field-ui/shared/results-doc.types';
 
 /**
  * Transaction origin for imported updates. It is deliberately NOT one of the

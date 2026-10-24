@@ -4,7 +4,7 @@ import type { Route } from "./+types/v.$token";
 import { createApi } from "~/lib/api-client.server";
 import { brandFormat, EMPTY_BRAND } from "~/lib/brand";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
-import { formatShapedDate, type InspectionDateTimeFormat } from "~/lib/format-date";
+import { formatShapedDate, type InspectionDateTimeFormat } from "@core/field-ui/shared/format-date";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 

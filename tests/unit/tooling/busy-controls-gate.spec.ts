@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 // @ts-expect-error -- plain .mjs helper, no types alongside it (same as the other tooling specs).
 import { detectBusyControls } from '../../../scripts/lib/busy-controls-detect.mjs';
 
-interface Hit { line: number; rule: string }
+interface Hit { line: number; rule: string; message: string }
 const run = (src: string) => detectBusyControls(src) as { sites: number; submits: number; violations: Hit[] };
 const rules = (src: string) => run(src).violations.map((v) => v.rule);
 
@@ -282,6 +282,49 @@ describe('busy-controls detector', () => {
         });
         it('honours the allow marker with a reason', () => {
             expect(rules('function s() {' + nl + '// busy-controls-allow: the server short-circuits a repeat' + nl + 'saveFetcher.submit(fd, { method: "post" }); }')).toEqual([]);
+        });
+    });
+    describe('raw-submit-unlatched: <expr>.execute( is the field-ui command channel and always a write', () => {
+        it('flags dataSource.execute( with no guard, with no method to inspect', () => {
+            expect(rules('async function go() { await dataSource.execute(id, { type: "complete" }); }')).toEqual(['raw-submit-unlatched']);
+            expect(rules('const go = () => { source?.execute(id, cmd); };')).toEqual(['raw-submit-unlatched']);
+            expect(rules('function go() { useData().execute(id, cmd); }')).toEqual(['raw-submit-unlatched']);
+        });
+        it('flags the dodges a moved component is likely to write: destructured execute, non-null receiver, line break, alias', () => {
+            const flagged = ['raw-submit-unlatched'];
+            expect(rules('function go() { const { execute } = useFieldDataSource(); execute(id, cmd); }')).toEqual(flagged);
+            expect(rules('function go() { const { session, execute: run } = ds; run(cmd); execute(id, cmd); }')).toEqual(flagged);
+            expect(rules('function go() { ds!.execute(id, cmd); }')).toEqual(flagged);
+            expect(rules('function go() { ref.current!.execute(id, cmd); }')).toEqual(flagged);
+            expect(rules('function go() { ds\n  .execute(id, cmd); }')).toEqual(flagged);
+            expect(rules('function go() { ds.execute (id, cmd); }')).toEqual(flagged);
+            expect(rules('function go() { ds.execute?.(id, cmd); }')).toEqual(flagged);
+            expect(rules('function go() { const run = ds.execute; run(id, cmd); }')).toEqual(flagged);
+            expect(rules('function go() { list[0].execute(id, cmd); }')).toEqual(flagged);
+        });
+        it('keeps a destructured execute clean when a guard is reachable, and a lone execute( clean when nothing destructures it', () => {
+            expect(rules('function go() { const { execute } = ds; latch(() => execute(id, cmd)); }')).toEqual([]);
+            expect(rules('function go() { const run = useFieldCommand(); const { execute } = ds; execute(id, cmd); }')).toEqual([]);
+            expect(rules('function go() { execute(id, cmd); }')).toEqual([]);
+        });
+        it('names the call in the message', () => {
+            expect(run('function go() { dataSource.execute(id, cmd); }').violations[0].message).toContain('dataSource.execute(');
+        });
+        it('is clean when a same-frame guard is reachable, including useFieldCommand', () => {
+            expect(rules('function go() { latch(() => dataSource.execute(id, cmd)); }')).toEqual([]);
+            expect(rules('function useFieldCommand() { const inFlight = { current: false }; return (c) => dataSource.execute(id, c); }')).toEqual([]);
+            expect(rules('function go() { const run = useFieldCommand(); return dataSource.execute(id, cmd); }')).toEqual([]);
+        });
+        it('does not flag a method or function merely named execute, nor a mention in a comment or string', () => {
+            expect(rules('function go() { execute(cmd); }')).toEqual([]);
+            expect(rules('class A { async execute(id, cmd) { return 1; } }')).toEqual([]);
+            expect(rules('function go() { // dataSource.execute(id, cmd)\n const s = "dataSource.execute(id)"; }')).toEqual([]);
+        });
+        it('honours only the busy-controls-allow marker with a reason', () => {
+            const src = ['function go() {', '  // busy-controls-allow: the hook guards this call itself', '  return dataSource.execute(id, cmd);', '}'].join(String.fromCharCode(10));
+            expect(rules(src)).toEqual([]);
+            expect(rules(src.replace('busy-controls-allow: the hook guards this call itself', 'busy-controls-allow:'))).toEqual(['raw-submit-unlatched']);
+            expect(rules(src.replace('busy-controls-allow', 'some-other-allow'))).toEqual(['raw-submit-unlatched']);
         });
     });
 });

@@ -1,0 +1,56 @@
+{
+  "name": "@inspectorhub/field-ui",
+  "version": "0.1.0",
+  "description": "The OpenInspection field inspection editor as an embeddable React package.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/InspectorHub/OpenInspection",
+    "directory": "packages/field-ui"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "import": "./dist/testing.js"
+    },
+    "./theme.css": "./dist/theme.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "devDependencies": {
+    "konva": "^10.2.5",
+    "react-easy-crop": "^6.0.2",
+    "react-konva": "^19.2.5",
+    "react-photo-album": "^3.6.0",
+    "sortablejs": "^1.15.7",
+    "yet-another-react-lightbox": "^3.32.0"
+  },
+  "peerDependencies": {
+    "konva": "^10.2.5",
+    "lib0": "^0.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-easy-crop": "^6.0.2",
+    "react-konva": "^19.2.5",
+    "react-photo-album": "^3.6.0",
+    "sortablejs": "^1.15.7",
+    "yet-another-react-lightbox": "^3.32.0",
+    "y-indexeddb": "^9.0.0",
+    "y-protocols": "^1.0.0",
+    "yjs": "^13.6.0"
+  },
+  "scripts": {
+    "build": "paraglide-js compile --project ./project.inlang --outdir ./src/i18n/generated --strategy globalVariable baseLocale --output-structure locale-modules --emit-ts-declarations && tsup"
+  }
+}

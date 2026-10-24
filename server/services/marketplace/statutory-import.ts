@@ -15,7 +15,7 @@ import { fieldMapFor } from '../../lib/statutory/forms';
 import { unsuppliableRequiredFields, unsuppliableRefusal } from '../statutory/install-gaps';
 import { r2Keys } from '../../lib/r2-keys';
 import { versionForInspection, type StatutoryFormVersion } from '../../lib/statutory/form-registry';
-import type { StatutoryFormDeclaration } from '../../types/statutory-declaration';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/statutory-declaration';
 
 /**
  * Gate a `kind='statutory'` catalogue entry on the EXTENDED validator.

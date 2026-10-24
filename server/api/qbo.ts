@@ -1,10 +1,9 @@
-import { Hono } from 'hono';
-import type { HonoConfig } from '../types/hono';
+import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { getCookie } from 'hono/cookie';
 import { verifyJwt } from '../lib/jwt-keyring';
 import { bearerToken } from '../lib/auth-helpers';
 import { requireRole } from '../lib/middleware/rbac';
-import { requireCapability } from '../lib/middleware/require-capability';
 import { logger } from '../lib/logger';
 import { checkRateLimit } from '../lib/rate-limit';
 import { fireAndForget } from '../lib/fire-and-forget';
@@ -15,9 +14,13 @@ import { describeCredentialSource } from '../services/qbo/credential-source';
 import { checkIntuitCredentials } from '../services/qbo/credential-check';
 import { qboRedirectUri } from '../lib/qbo-oauth-paths';
 import { qboEnvironmentName, type QBOConnectionStatus } from '../services/qbo/api-base';
+import {
+    qboStatusRoute, qboDisconnectRoute, qboPauseRoute, qboSyncRoute, qboDismissErrorRoute, qboCustomersRoute,
+    qboCredentialCheckRoute, qboContactLinkReadRoute, qboContactLinkSetRoute, qboContactLinkRemoveRoute,
+} from './qbo-route-defs';
 import { QBOCustomerSearchQuerySchema, QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';
 
-const api = new Hono<HonoConfig>();
+const api = createApiRouter();
 
 // These routes serve JSON to the settings page's Alpine controller. The
 // global JWT middleware in index.ts only short-circuits when no token is
@@ -49,9 +52,10 @@ api.use('*', async (c, next) => {
  * existed, any signed-in inspector could do that, while listing a Stripe
  * webhook log next door (`integrations.ts`) already required owner/manager.
  *
- * Applied router-wide rather than per route: a uniform surface has no per-route
- * reasoning for a future edit to get wrong, and the read (`/status`) exposes the
- * connected realm, company name and sync errors, which is company books state.
+ * The capability is declared per route (each route's `middleware`, which is also its
+ * `x-capability` in the OpenAPI document); a test reads the router's dispatch table and
+ * fails for a route that lacks it. The read (`/status`) exposes the connected realm,
+ * company name and sync errors, which is company books state.
  *
  * `requireRole` also refuses a caller with no role, which is what an agent
  * (client/realtor) JWT is — it satisfies the verifier above and deliberately
@@ -69,12 +73,12 @@ api.use('*', async (c, next) => {
  * authorization gate can see a hand-rolled Hono router.
  */
 api.use('*', requireRole('owner', 'manager'));
-// The books are money state: a manager whose `companyFinance` capability is off loses the integration too.
-api.use('*', requireCapability('companyFinance'));
+// The books are money state: a manager whose `companyFinance` capability is off loses the integration too. That guard
+// is mounted per route, in each route's `middleware` (qbo-route-defs.ts), so the OpenAPI document declares it.
 
-api.get('/status', async (c) => {
+api.openapi(qboStatusRoute, async (c) => {
     const state = await c.var.services.qbo.getConnectionStatus(c.get('tenantId'));
-    if (!state) return c.json({ success: true, data: null });
+    if (!state) return c.json({ success: true as const, data: null }, 200);
     // Assembled here because only this request knows it: the service is built
     // from the already-merged env, which no longer says which side a value
     // came from. Origins only; the values never leave the server.
@@ -82,18 +86,18 @@ api.get('/status', async (c) => {
         ...state,
         credentialSource: describeCredentialSource(c.env, c.get('tenantSecretKeys') ?? []),
     };
-    return c.json({ success: true, data: status });
+    return c.json({ success: true as const, data: status }, 200);
 });
 
-api.post('/disconnect', async (c) => {
+api.openapi(qboDisconnectRoute, async (c) => {
     await c.var.services.qbo.disconnect(c.get('tenantId'));
-    return c.json({ success: true });
+    return c.json({ success: true as const }, 200);
 });
 
-api.post('/pause', async (c) => {
+api.openapi(qboPauseRoute, async (c) => {
     const result = await c.var.services.qbo.setSyncEnabled(c.get('tenantId'));
-    if (result === null) return c.json({ success: false, error: { code: 'not_connected', message: 'Not connected' } }, 404);
-    return c.json({ success: true, data: { syncEnabled: result } });
+    if (result === null) return c.json({ success: false as const, error: { code: 'not_connected', message: 'Not connected' } }, 404);
+    return c.json({ success: true as const, data: { syncEnabled: result } }, 200);
 });
 
 /**
@@ -104,7 +108,7 @@ api.post('/pause', async (c) => {
  * way to learn that the scan failed. One scan is a bounded number of page
  * queries, so it is awaited here and its outcome is the response.
  */
-api.post('/sync', async (c) => {
+api.openapi(qboSyncRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const svc = c.var.services.qbo;
     const invoiceSvc = c.var.services.invoice;
@@ -129,9 +133,9 @@ api.post('/sync', async (c) => {
         }
         case 'completed':
             return c.json({
-                success: true,
+                success: true as const,
                 data: { processed: result.processed, checkedAt: Math.floor(Date.now() / 1000) },
-            });
+            }, 200);
     }
 });
 
@@ -145,9 +149,9 @@ api.post('/sync', async (c) => {
  * never-worked paths. Re-attempting a push is what "Sync now" is for, and it
  * re-detects anything still broken into a fresh row.
  */
-api.post('/errors/:id/dismiss', async (c) => {
-    await c.var.services.qbo.resolveError(c.get('tenantId'), c.req.param('id'));
-    return c.json({ success: true });
+api.openapi(qboDismissErrorRoute, async (c) => {
+    await c.var.services.qbo.resolveError(c.get('tenantId'), c.req.valid('param').id);
+    return c.json({ success: true as const }, 200);
 });
 
 /**
@@ -156,9 +160,9 @@ api.post('/errors/:id/dismiss', async (c) => {
  * is rate limited per company (not per caller address) and the search text is
  * bounded by the schema before any call is made.
  */
-api.get('/customers', async (c) => {
+api.openapi(qboCustomersRoute, async (c) => {
     const parsed = QBOCustomerSearchQuerySchema.safeParse(c.req.query());
-    if (!parsed.success) return c.json({ success: false, error: { code: 'validation_error', message: 'Invalid query' } }, 400);
+    if (!parsed.success) return c.json({ success: false as const, error: { code: 'validation_error', message: 'Invalid query' } }, 400);
     const tenantId = c.get('tenantId');
     await checkRateLimit(c, 'qbo-customer-search', tenantId);
     const found = await c.var.services.qbo.searchCustomers(tenantId, parsed.data.q, parsed.data.startPosition, parsed.data.limit);
@@ -174,7 +178,7 @@ api.get('/customers', async (c) => {
         linkedContactId: r.linkedContactId,
         linkedContactName: r.linkedContactName,
     }));
-    return c.json({ success: true, data: { customers, nextStartPosition: found.nextStartPosition } });
+    return c.json({ success: true as const, data: { customers, nextStartPosition: found.nextStartPosition } }, 200);
 });
 
 /**
@@ -187,13 +191,13 @@ api.get('/customers', async (c) => {
  * connect flow uses. They are never read from the request, and the response
  * carries the verdict only.
  */
-api.post('/credentials/check', async (c) => {
+api.openapi(qboCredentialCheckRoute, async (c) => {
     const missing = (['QBO_CLIENT_ID', 'QBO_CLIENT_SECRET'] as const).filter((k) => !c.env[k]);
     if (missing.length > 0) {
-        return c.json({ success: false, error: { code: 'credentials_missing', message: 'Client ID and Client Secret are both required', details: missing } }, 400);
+        return c.json({ success: false as const, error: { code: 'credentials_missing', message: 'Client ID and Client Secret are both required', details: [...missing] } }, 400);
     }
     if (!c.env.APP_BASE_URL) {
-        return c.json({ success: false, error: { code: 'app_base_url_missing', message: 'APP_BASE_URL is not set' } }, 400);
+        return c.json({ success: false as const, error: { code: 'app_base_url_missing', message: 'APP_BASE_URL is not set' } }, 400);
     }
     // Each check is a call to Intuit under this company's app. The shared limiter
     // allows 10 per minute per key; keyed by company, not caller address.
@@ -207,39 +211,39 @@ api.post('/credentials/check', async (c) => {
         },
     );
     return c.json({
-        success: true,
+        success: true as const,
         data: {
             result,
             environment: qboEnvironmentName(c.env.QBO_ENV),
             checkedAt: Math.floor(Date.now() / 1000),
         },
-    });
+    }, 200);
 });
 
-api.get('/contacts/:contactId/link', async (c) => {
-    const link = await c.var.services.qbo.getContactLink(c.get('tenantId'), c.req.param('contactId'));
+api.openapi(qboContactLinkReadRoute, async (c) => {
+    const link = await c.var.services.qbo.getContactLink(c.get('tenantId'), c.req.valid('param').contactId);
     return c.json({
-        success: true,
+        success: true as const,
         data: {
             linked: link.linked,
             qboCustomerId: link.qboCustomerId,
             displayName: link.displayName,
             openErrorCount: link.openErrorCount,
         },
-    });
+    }, 200);
 });
 
 // Safe to repeat: matching a contact to the customer it already holds rewrites
 // the same row and reports replacedQboCustomerId: null.
-api.post('/contacts/:contactId/link', async (c) => {
+api.openapi(qboContactLinkSetRoute, async (c) => {
     const parsed = QBOLinkCustomerBodySchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ success: false, error: { code: 'validation_error', message: 'Invalid body' } }, 400);
+    if (!parsed.success) return c.json({ success: false as const, error: { code: 'validation_error', message: 'Invalid body' } }, 400);
     // The actor is recorded in the audit trail, so a request with no verified
     // user behind it is refused rather than written as an anonymous match.
     const actorUserId = c.get('user')?.sub;
-    if (!actorUserId) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
+    if (!actorUserId) return c.json({ success: false as const, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
     const tenantId = c.get('tenantId');
-    const contactId = c.req.param('contactId');
+    const contactId = c.req.valid('param').contactId;
     const svc = c.var.services.qbo;
     const result = await svc.linkExistingCustomer(tenantId, contactId, parsed.data.qboCustomerId, actorUserId);
     // The match is done and is the answer. Pushing the invoices that were waiting
@@ -249,23 +253,30 @@ api.post('/contacts/:contactId/link', async (c) => {
         logger.info('QBO re-sync after match finished', { tenantId, contactId, ...r });
     }), 'QBO re-sync after match', { tenantId, contactId });
     return c.json({
-        success: true,
+        success: true as const,
         data: {
             qboCustomerId: result.qboCustomerId,
             displayName: result.displayName,
             replacedQboCustomerId: result.replacedQboCustomerId,
             resolvedErrorCount: result.resolvedErrorCount,
         },
-    });
+    }, 200);
 });
 
 // Safe to repeat: removing a match that is already gone answers removed: false.
 // Nothing is sent to QuickBooks.
-api.delete('/contacts/:contactId/link', async (c) => {
+api.openapi(qboContactLinkRemoveRoute, async (c) => {
     const actorUserId = c.get('user')?.sub;
-    if (!actorUserId) return c.json({ success: false, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
-    const result = await c.var.services.qbo.unlinkCustomer(c.get('tenantId'), c.req.param('contactId'), actorUserId);
-    return c.json({ success: true, data: { removed: result.removed } });
+    if (!actorUserId) return c.json({ success: false as const, error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
+    const result = await c.var.services.qbo.unlinkCustomer(c.get('tenantId'), c.req.valid('param').contactId, actorUserId);
+    return c.json({ success: true as const, data: { removed: result.removed } }, 200);
 });
+
+/** Registration order; drives the typed client and is pinned to the router by a test. */
+export const qboRouteConfigs = [
+    qboStatusRoute, qboDisconnectRoute, qboPauseRoute, qboSyncRoute, qboDismissErrorRoute, qboCustomersRoute,
+    qboCredentialCheckRoute, qboContactLinkReadRoute, qboContactLinkSetRoute, qboContactLinkRemoveRoute,
+] as const;
+export type QboApi = ApiOf<typeof qboRouteConfigs>;
 
 export default api;

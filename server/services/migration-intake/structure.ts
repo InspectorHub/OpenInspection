@@ -21,7 +21,7 @@
  * `textarea` to the browser would put the temptation one property away.
  */
 import type { BundleTemplate, EntityCounts } from '../../lib/migration-intake/bundle';
-import type { ItemType } from '../../types/template-schema';
+import type { ItemType } from '@core/field-ui/shared/template-schema';
 
 /** How one item came out of the conversion. */
 type ItemLanding = 'rated' | 'choices' | 'plain';

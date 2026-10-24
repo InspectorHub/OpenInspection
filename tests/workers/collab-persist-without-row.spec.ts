@@ -22,7 +22,7 @@ import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
-import { seedResultsDoc, applyItemPatch } from '../../server/lib/collab/results-doc';
+import { seedResultsDoc, applyItemPatch } from '@core/field-ui/shared/results-doc';
 
 const b = env as unknown as {
     DB: D1Database;

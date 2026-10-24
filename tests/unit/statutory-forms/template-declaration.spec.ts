@@ -8,7 +8,7 @@
  * rather than in the date the inspection happened.
  */
 import { describe, it, expect } from 'vitest';
-import type { TemplateSchemaV2 } from '../../../server/types/template-schema';
+import type { TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
 describe('a template declares the statutory form it produces', () => {
     it('a declaration names a form and binds every value to a source', () => {

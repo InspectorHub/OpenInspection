@@ -15,7 +15,7 @@ import { render, screen, fireEvent, waitFor, act, within } from "@testing-librar
 import { createRoutesStub, Outlet } from "react-router";
 
 const purge = vi.hoisted(() => vi.fn(async () => undefined));
-vi.mock("~/lib/collab/offline-purge", () => ({ purgeInspectionOfflineData: purge }));
+vi.mock("@core/field-ui/collab/offline-purge", () => ({ purgeInspectionOfflineData: purge }));
 vi.mock("~/components/inspector-portal/CancelInspectionModal", () => ({
   CancelInspectionModal: ({ inspectionId }: { inspectionId: string }) => <div role="dialog" aria-label="cancel flow">CANCEL FLOW {inspectionId}</div>,
 }));
@@ -175,7 +175,7 @@ describe("DeleteInspectionBlock", () => {
     tick();
     fireEvent.click(confirmButton());
     expect(await screen.findByText("THE LIST")).toBeTruthy();
-    await waitFor(() => expect(purge).toHaveBeenCalledWith("insp-1"));
+    await waitFor(() => expect(purge).toHaveBeenCalledWith("insp-1", expect.anything()));
   });
 
   it("an inspection that is already gone is the same success (the action reports ok)", async () => {

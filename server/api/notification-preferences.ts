@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { getDrizzle } from '../lib/route-helpers';
 import { buildScreenModel } from '../lib/notifications/screen-model';
@@ -154,70 +155,78 @@ const grantRoute = createRoute(withMcpMetadata({
         'recipient_type staff so it never counts as consumer opt-in evidence.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-const notificationPreferenceRoutes = createApiRouter()
-    .openapi(getScreenRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const userId = c.get('user')?.sub as string;
-        const db = getDrizzle(c);
+const app = createApiRouter();
+app.openapi(getScreenRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const userId = c.get('user')?.sub as string;
+    const db = getDrizzle(c);
 
-        // Only DIFFERENCES from the class default are stored, so this map stays
-        // small — a row that restates the default would make the table grow
-        // with the user base instead of with the decisions (§3.2).
-        const chosen = await readChoices(db, tenantId, 'user', userId);
-        // A staff member IS a valid consent subject now — a `users` row, with
-        // `contact_id` left null. They are never granted (implied, like an
-        // agent); the block exists so their STOP has somewhere to land.
-        const smsConsent = await readSmsConsent(
-            db, tenantId, 'staff', [{ kind: 'user', id: userId }], null,
-        );
-        return c.json({
-            success: true as const,
-            data: { ...buildScreenModel('staff', chosen), smsConsent },
-        }, 200);
-    })
-    .openapi(saveRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const userId = c.get('user')?.sub as string;
-        const { classId, channel, enabled } = c.req.valid('json');
+    // Only DIFFERENCES from the class default are stored, so this map stays
+    // small — a row that restates the default would make the table grow
+    // with the user base instead of with the decisions (§3.2).
+    const chosen = await readChoices(db, tenantId, 'user', userId);
+    // A staff member IS a valid consent subject now — a `users` row, with
+    // `contact_id` left null. They are never granted (implied, like an
+    // agent); the block exists so their STOP has somewhere to land.
+    const smsConsent = await readSmsConsent(
+        db, tenantId, 'staff', [{ kind: 'user', id: userId }], null,
+    );
+    return c.json({
+        success: true as const,
+        data: { ...buildScreenModel('staff', chosen), smsConsent },
+    }, 200);
+});
+app.openapi(saveRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const userId = c.get('user')?.sub as string;
+    const { classId, channel, enabled } = c.req.valid('json');
 
-        // Refused at the edge as well as at the send boundary. The boundary is
-        // what makes it true; this is what makes it HONEST — a screen that
-        // accepts the change and then ignores it is worse than one that says no.
-        assertChoosable(classId, 'staff');
+    // Refused at the edge as well as at the send boundary. The boundary is
+    // what makes it true; this is what makes it HONEST — a screen that
+    // accepts the change and then ignores it is worse than one that says no.
+    assertChoosable(classId, 'staff');
 
-        await writeChoice(getDrizzle(c), {
-            tenantId, subjectKind: 'user', subjectId: userId, classId, channel, enabled,
-        });
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(bulkRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const userId = c.get('user')?.sub as string;
-        const change = c.req.valid('json');
-        const db = getDrizzle(c);
-        const stored = await applyBulk(
-            db, { tenantId, subjectKind: 'user', subjectId: userId }, 'staff', change,
-        );
-        // Stopping the whole text channel is a consent act here too — recorded
-        // as `staff` basis, so it never reads as consumer evidence.
-        if (change.action === 'disable' && change.channel === 'sms' && !change.classId) {
-            const block = await readSmsConsent(db, tenantId, 'staff', [{ kind: 'user', id: userId }], null);
-            await revokeChannel(new SmsConsentService(c.env.DB), tenantId, 'sms', block, 'staff');
-        }
-        return c.json({ success: true as const, stored }, 200);
-    })
-    .openapi(grantRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const userId = c.get('user')?.sub as string;
-        const db = getDrizzle(c);
-        const block = await readSmsConsent(db, tenantId, 'staff', [{ kind: 'user', id: userId }], null);
-        if (!block) throw Errors.BadRequest('There is nothing to change here.');
-        await grantSms(new SmsConsentService(c.env.DB), tenantId, block, 'staff', {
-            ip: c.req.header('cf-connecting-ip'),
-            userAgent: c.req.header('user-agent'),
-        });
-        return c.json({ success: true as const }, 200);
+    await writeChoice(getDrizzle(c), {
+        tenantId, subjectKind: 'user', subjectId: userId, classId, channel, enabled,
     });
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(bulkRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const userId = c.get('user')?.sub as string;
+    const change = c.req.valid('json');
+    const db = getDrizzle(c);
+    const stored = await applyBulk(
+        db, { tenantId, subjectKind: 'user', subjectId: userId }, 'staff', change,
+    );
+    // Stopping the whole text channel is a consent act here too — recorded
+    // as `staff` basis, so it never reads as consumer evidence.
+    if (change.action === 'disable' && change.channel === 'sms' && !change.classId) {
+        const block = await readSmsConsent(db, tenantId, 'staff', [{ kind: 'user', id: userId }], null);
+        await revokeChannel(new SmsConsentService(c.env.DB), tenantId, 'sms', block, 'staff');
+    }
+    return c.json({ success: true as const, stored }, 200);
+});
+app.openapi(grantRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    const userId = c.get('user')?.sub as string;
+    const db = getDrizzle(c);
+    const block = await readSmsConsent(db, tenantId, 'staff', [{ kind: 'user', id: userId }], null);
+    if (!block) throw Errors.BadRequest('There is nothing to change here.');
+    await grantSms(new SmsConsentService(c.env.DB), tenantId, block, 'staff', {
+        ip: c.req.header('cf-connecting-ip'),
+        userAgent: c.req.header('user-agent'),
+    });
+    return c.json({ success: true as const }, 200);
+});
 
-export default notificationPreferenceRoutes;
-export type NotificationPreferencesApi = typeof notificationPreferenceRoutes;
+/** Registration order. Drives `NotificationPreferencesApi`; a test pins it to what `app` really registered. */
+export const notificationPreferenceRouteConfigs = [
+    getScreenRoute,
+    saveRoute,
+    bulkRoute,
+    grantRoute,
+] as const;
+
+export default app;
+export type NotificationPreferencesApi = ApiOf<typeof notificationPreferenceRouteConfigs>;

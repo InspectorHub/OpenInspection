@@ -228,170 +228,172 @@ const scheduleConflictsRoute = createRoute(withMcpMetadata({
     description: "IA-6 — advisory same-day-hour collision check counting lead and helper assignments, for the inspector named by inspectorId (default: the caller). Returns the colliding inspections' ids, property addresses and dates. Callers render a warning; scheduling is never blocked. Available to owner, manager and inspector roles; checking an inspector other than yourself requires owner or manager, or an inspector granted the scheduleOthers capability, and other inspectors get 403.",
 }, { scopes: ['read'], tier: 'extended' }));
 
-const bulkRoutes = createApiRouter()
-    .openapi(dashboardRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        // Capabilities serve both the visibility scope and the money redaction: read once, started now so
-        // that for a caller who sees everything the read overlaps the inspection reads.
-        const capabilities = capabilitiesFor(c);
-        capabilities.catch(() => undefined); // surfaced where awaited below
-        const scope    = await resolveInspectionScope(c);
-        // Agent Accounts A3 — concierge bookings awaiting this inspector's approval (UPCOMING card substate line).
-        const concierge = (async () => (await c.var.services.concierge.listAwaitingInspector(tenantId, scope)).count)()
-            .catch((err: unknown) => {
-                logger.warn('inspections.dashboard.concierge.failed', { tenantId, error: err instanceof Error ? err.message : String(err) });
-                return 0;
-            });
-        const [buckets, conciergePending, caps] = await Promise.all([c.var.services.inspection.getDashboardBuckets(tenantId, scope), concierge, capabilities]);
-        return c.json({
-            success: true,
-            data: moneyViewWith({
-                ...buckets,
-                needsAttention: toWireDates(buckets.needsAttention),
-                today:          toWireDates(buckets.today),
-                thisWeek:       toWireDates(buckets.thisWeek),
-                later:          toWireDates(buckets.later),
-                recentReports:  toWireDates(buckets.recentReports),
-                cancelled:      toWireDates(buckets.cancelled),
-                conciergePending,
-            }, caps, 'inspectionFees'),
+const app = createApiRouter();
+app.openapi(dashboardRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    // Capabilities serve both the visibility scope and the money redaction: read once, started now so
+    // that for a caller who sees everything the read overlaps the inspection reads.
+    const capabilities = capabilitiesFor(c);
+    capabilities.catch(() => undefined); // surfaced where awaited below
+    const scope    = await resolveInspectionScope(c);
+    // Agent Accounts A3 — concierge bookings awaiting this inspector's approval (UPCOMING card substate line).
+    const concierge = (async () => (await c.var.services.concierge.listAwaitingInspector(tenantId, scope)).count)()
+        .catch((err: unknown) => {
+            logger.warn('inspections.dashboard.concierge.failed', { tenantId, error: err instanceof Error ? err.message : String(err) });
+            return 0;
         });
-    })
-    .openapi(listInspectionsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const params = c.req.valid('query');
-        const service = c.var.services.inspection;
-
-        // Filter undefined values for exactOptionalPropertyTypes compliance
-        const serviceParams = Object.fromEntries(
-            Object.entries(params).filter(([_, v]) => v !== undefined)
-        ) as typeof params;
-
-        const scope = await resolveInspectionScope(c);
-        const result = await service.listInspections(tenantId, serviceParams, scope);
-
-        // Add stats on the first page
-        let counts;
-        if (!params.cursor) {
-            counts = await service.getStats(tenantId, scope);
-        }
-
-        return c.json({
-            success: true,
-            data: result.inspections,
-            meta: {
-                nextCursor: result.nextCursor,
-                counts
-            }
-        }, 200);
-    })
-    .openapi(listInspectorsRoute, async (c) => {
-        const service = c.var.services.admin;
-        const { members } = await service.getMembers(c.get('tenantId'));
-        // The picker offers people who can be assigned; staff cannot.
-        return c.json({ success: true, data: members.filter((m) => isFieldRole(m.role)) }, 200);
-    })
-    .openapi(bulkUpdateRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const db = getDrizzle(c);
-
-        // Staff reassign (a schedule act, gated by scheduleOthers above) but do not
-        // change the status of an inspection.
-        if (c.get('userRole') === 'staff' && body.action !== 'assignInspector') {
-            throw deniedByRule(c, 'Office staff can reassign inspections but cannot change their status', 'An owner or manager');
-        }
-
-        if (body.action === 'assignInspector') {
-            if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
-            // Staff cannot move a job that has started; the whole batch is refused, as for a cancelled member below.
-            await assertStaffMayMove(c, body.ids);
-            const assignee = await db.select({ id: users.id }).from(users)
-                .where(and(eq(users.id, body.inspectorId), eq(users.tenantId, tenantId), inArray(users.role, [...FIELD_ROLES])))
-                .limit(1).get();
-            if (!assignee) throw Errors.BadRequest('inspectorId is not a member of this tenant who can inspect.');
-            // DB-8: fetch team fields BEFORE the update so the link-table mirror
-            // carries the ids being reassigned.
-            const affected = await db.select({
-                id: inspectionTable.id,
-            }).from(inspectionTable)
-                .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)))
-                .all();
-            await db.update(inspectionTable).set({ inspectorId: body.inspectorId })
-                .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
-            // DB-8: re-sync the link table for each reassigned inspection. B-29:
-            // one db.batch round trip for all N resyncs (was a 2N-statement loop).
-            const inspectorId = body.inspectorId;
-            await syncInspectionAssignmentsBatch(db, tenantId,
-                affected.map(row => ({ inspectionId: row.id, inspectorId })));
-
-            auditFromContext(c, 'inspection.bulk_assign', 'inspection', {
-                metadata: { ids: body.ids, inspectorId: body.inspectorId },
-            });
-        } else {
-            if (!body.status) throw Errors.BadRequest('status is required for updateStatus.');
-
-            // #78 — the surface the cancel route's own comment predicted. A
-            // bulk cancel is not one confirmation covering N jobs: each has its
-            // own price, its own notice window and its own fee, so there is no
-            // single figure a caller could have acknowledged. See
-            // ./cancel-write-path.
-            const cancelRefusal = refuseCancelViaStatusWrite(body.status);
-            if (cancelRefusal) return c.json({ success: false as const, error: cancelRefusal }, 400);
-
-            // #81 — and the other direction, which was the WORSE of the two here.
-            // This write never consulted the row it was overwriting, so a bulk
-            // move of a cancelled inspection back to `scheduled` left
-            // `cancel_reason = 'no_show'` attached to a live job: the one lie the
-            // single PATCH went out of its way to prevent. Recovery is
-            // per-inspection anyway — it is a decision about one mis-click, not a
-            // batch operation — so the whole batch is refused rather than the
-            // cancelled members silently skipped.
-            const stuck = await db.select({ id: inspectionTable.id }).from(inspectionTable)
-                .where(and(
-                    inArray(inspectionTable.id, body.ids),
-                    eq(inspectionTable.tenantId, tenantId),
-                    eq(inspectionTable.status, INSPECTION_STATUS.CANCELLED),
-                ))
-                .limit(1).get();
-            const leaveRefusal = refuseLeaveCancelledViaStatusWrite(
-                stuck ? INSPECTION_STATUS.CANCELLED : null,
-            );
-            if (leaveRefusal) return c.json({ success: false as const, error: leaveRefusal }, 400);
-
-            await db.update(inspectionTable).set({ status: body.status })
-                .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
-
-            auditFromContext(c, 'inspection.bulk_status', 'inspection', {
-                metadata: { ids: body.ids, status: body.status },
-            });
-        }
-
-        return c.json({ success: true, data: { count: body.ids.length } }, 200);
-    })
-    .openapi(getCountsRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const counts = await c.var.services.inspection.getCounts(tenantId, await resolveInspectionScope(c));
-        return c.json({ success: true, data: counts });
-    })
-    // IA-6 — advisory schedule conflict check; placed before /{id} to prevent
-    // 'schedule-conflicts' being matched as a param value.
-    .openapi(scheduleConflictsRoute, async (c) => {
-        const { inspectorId, date, excludeId } = c.req.valid('query');
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
-        // Solo wizard flow sends no inspectorId — the inspection will be
-        // assigned to the creator, so that is who we check against.
-        const callerId = c.get('user').sub;
-        const targetId = inspectorId || callerId;
-        // Another inspector's schedule (their addresses and dates) is the same
-        // "act on others' bookings" verb the assignee picker and bulk reassign gate
-        // on. Checking yourself is the wizard's own flow and stays open to all.
-        if (targetId !== callerId && !(await capabilitiesFor(c)).scheduleOthers) {
-            throw deniedNeedsPermission(c, 'scheduleOthers', "You cannot check another inspector's schedule");
-        }
-        const conflicts = await findScheduleConflicts(db, tenantId, targetId, date, excludeId);
-        return c.json({ success: true, data: { conflicts } }, 200);
+    const [buckets, conciergePending, caps] = await Promise.all([c.var.services.inspection.getDashboardBuckets(tenantId, scope), concierge, capabilities]);
+    return c.json({
+        success: true,
+        data: moneyViewWith({
+            ...buckets,
+            needsAttention: toWireDates(buckets.needsAttention),
+            today:          toWireDates(buckets.today),
+            thisWeek:       toWireDates(buckets.thisWeek),
+            later:          toWireDates(buckets.later),
+            recentReports:  toWireDates(buckets.recentReports),
+            cancelled:      toWireDates(buckets.cancelled),
+            conciergePending,
+        }, caps, 'inspectionFees'),
     });
+});
+app.openapi(listInspectionsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const params = c.req.valid('query');
+    const service = c.var.services.inspection;
 
-export default bulkRoutes;
+    // Filter undefined values for exactOptionalPropertyTypes compliance
+    const serviceParams = Object.fromEntries(
+        Object.entries(params).filter(([_, v]) => v !== undefined)
+    ) as typeof params;
+
+    const scope = await resolveInspectionScope(c);
+    const result = await service.listInspections(tenantId, serviceParams, scope);
+
+    // Add stats on the first page
+    let counts;
+    if (!params.cursor) {
+        counts = await service.getStats(tenantId, scope);
+    }
+
+    return c.json({
+        success: true,
+        data: result.inspections,
+        meta: {
+            nextCursor: result.nextCursor,
+            counts
+        }
+    }, 200);
+});
+app.openapi(listInspectorsRoute, async (c) => {
+    const service = c.var.services.admin;
+    const { members } = await service.getMembers(c.get('tenantId'));
+    // The picker offers people who can be assigned; staff cannot.
+    return c.json({ success: true, data: members.filter((m) => isFieldRole(m.role)) }, 200);
+});
+app.openapi(bulkUpdateRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const db = getDrizzle(c);
+
+    // Staff reassign (a schedule act, gated by scheduleOthers above) but do not
+    // change the status of an inspection.
+    if (c.get('userRole') === 'staff' && body.action !== 'assignInspector') {
+        throw deniedByRule(c, 'Office staff can reassign inspections but cannot change their status', 'An owner or manager');
+    }
+
+    if (body.action === 'assignInspector') {
+        if (!body.inspectorId) throw Errors.BadRequest('inspectorId is required for assignInspector.');
+        // Staff cannot move a job that has started; the whole batch is refused, as for a cancelled member below.
+        await assertStaffMayMove(c, body.ids);
+        const assignee = await db.select({ id: users.id }).from(users)
+            .where(and(eq(users.id, body.inspectorId), eq(users.tenantId, tenantId), inArray(users.role, [...FIELD_ROLES])))
+            .limit(1).get();
+        if (!assignee) throw Errors.BadRequest('inspectorId is not a member of this tenant who can inspect.');
+        // DB-8: fetch team fields BEFORE the update so the link-table mirror
+        // carries the ids being reassigned.
+        const affected = await db.select({
+            id: inspectionTable.id,
+        }).from(inspectionTable)
+            .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)))
+            .all();
+        await db.update(inspectionTable).set({ inspectorId: body.inspectorId })
+            .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
+        // DB-8: re-sync the link table for each reassigned inspection. B-29:
+        // one db.batch round trip for all N resyncs (was a 2N-statement loop).
+        const inspectorId = body.inspectorId;
+        await syncInspectionAssignmentsBatch(db, tenantId,
+            affected.map(row => ({ inspectionId: row.id, inspectorId })));
+
+        auditFromContext(c, 'inspection.bulk_assign', 'inspection', {
+            metadata: { ids: body.ids, inspectorId: body.inspectorId },
+        });
+    } else {
+        if (!body.status) throw Errors.BadRequest('status is required for updateStatus.');
+
+        // #78 — the surface the cancel route's own comment predicted. A
+        // bulk cancel is not one confirmation covering N jobs: each has its
+        // own price, its own notice window and its own fee, so there is no
+        // single figure a caller could have acknowledged. See
+        // ./cancel-write-path.
+        const cancelRefusal = refuseCancelViaStatusWrite(body.status);
+        if (cancelRefusal) return c.json({ success: false as const, error: cancelRefusal }, 400);
+
+        // #81 — and the other direction, which was the WORSE of the two here.
+        // This write never consulted the row it was overwriting, so a bulk
+        // move of a cancelled inspection back to `scheduled` left
+        // `cancel_reason = 'no_show'` attached to a live job: the one lie the
+        // single PATCH went out of its way to prevent. Recovery is
+        // per-inspection anyway — it is a decision about one mis-click, not a
+        // batch operation — so the whole batch is refused rather than the
+        // cancelled members silently skipped.
+        const stuck = await db.select({ id: inspectionTable.id }).from(inspectionTable)
+            .where(and(
+                inArray(inspectionTable.id, body.ids),
+                eq(inspectionTable.tenantId, tenantId),
+                eq(inspectionTable.status, INSPECTION_STATUS.CANCELLED),
+            ))
+            .limit(1).get();
+        const leaveRefusal = refuseLeaveCancelledViaStatusWrite(
+            stuck ? INSPECTION_STATUS.CANCELLED : null,
+        );
+        if (leaveRefusal) return c.json({ success: false as const, error: leaveRefusal }, 400);
+
+        await db.update(inspectionTable).set({ status: body.status })
+            .where(and(inArray(inspectionTable.id, body.ids), eq(inspectionTable.tenantId, tenantId)));
+
+        auditFromContext(c, 'inspection.bulk_status', 'inspection', {
+            metadata: { ids: body.ids, status: body.status },
+        });
+    }
+
+    return c.json({ success: true, data: { count: body.ids.length } }, 200);
+});
+app.openapi(getCountsRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const counts = await c.var.services.inspection.getCounts(tenantId, await resolveInspectionScope(c));
+    return c.json({ success: true, data: counts });
+});
+// IA-6 — advisory schedule conflict check; placed before /{id} to prevent
+// 'schedule-conflicts' being matched as a param value.
+app.openapi(scheduleConflictsRoute, async (c) => {
+    const { inspectorId, date, excludeId } = c.req.valid('query');
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
+    // Solo wizard flow sends no inspectorId — the inspection will be
+    // assigned to the creator, so that is who we check against.
+    const callerId = c.get('user').sub;
+    const targetId = inspectorId || callerId;
+    // Another inspector's schedule (their addresses and dates) is the same
+    // "act on others' bookings" verb the assignee picker and bulk reassign gate
+    // on. Checking yourself is the wizard's own flow and stays open to all.
+    if (targetId !== callerId && !(await capabilitiesFor(c)).scheduleOthers) {
+        throw deniedNeedsPermission(c, 'scheduleOthers', "You cannot check another inspector's schedule");
+    }
+    const conflicts = await findScheduleConflicts(db, tenantId, targetId, date, excludeId);
+    return c.json({ success: true, data: { conflicts } }, 200);
+});
+
+export const bulkRouteConfigs = [dashboardRoute, listInspectionsRoute, listInspectorsRoute, bulkUpdateRoute, getCountsRoute, scheduleConflictsRoute] as const;
+
+export default app;

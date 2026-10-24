@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * Unit tests for app/lib/collab/results-doc-connection.ts
+ * Unit tests for packages/field-ui/src/collab/results-doc-connection.ts
  *
  * Uses fake-indexeddb (imported below, not via a global setup file — that loaded
  * the polyfill for all 561 specs to serve three) and a minimal WebSocket stub to
@@ -16,15 +16,19 @@ import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 import {
-    buildCollabWsUrl,
     connectResultsDoc,
-    deleteResultsDb,
     reconnectDelayMs,
-} from '../../../app/lib/collab/results-doc-connection';
+} from '@core/field-ui/collab/results-doc-connection';
+import {
+    buildCollabWsUrl,
+    webClearResultsData,
+    webPersistence,
+    webSubscribeOnline,
+} from '~/lib/field/web-collab';
 import {
     seedResultsDoc,
     applyItemPatch,
-} from '../../../server/lib/collab/results-doc';
+} from '@core/field-ui/shared/results-doc';
 
 // ─── Frame helpers (ported from collab-multiclient.spec.ts) ──────────────────
 
@@ -183,6 +187,13 @@ let stubSocket: StubWebSocket;
 
 const testLoc = { protocol: 'https:', host: 'test.host' };
 
+/** The web host pieces (real fake-indexeddb persistence), as the app wires them. */
+const hostOpts = {
+    persistence: webPersistence,
+    wsUrl: (id: string) => buildCollabWsUrl(id, testLoc),
+    subscribeOnline: webSubscribeOnline,
+};
+
 function makeWsImpl(): typeof WebSocket {
     return StubWebSocket as unknown as typeof WebSocket;
 }
@@ -206,27 +217,8 @@ beforeEach(() => {
     stubSocket = undefined as unknown as StubWebSocket;
 });
 
-// ── Test 1: buildCollabWsUrl ──────────────────────────────────────────────────
-
-describe('buildCollabWsUrl', () => {
-    it('returns wss:// for https: and encodes the id', () => {
-        const url = buildCollabWsUrl('insp-123', { protocol: 'https:', host: 'example.com' });
-        expect(url).toBe('wss://example.com/api/inspections/insp-123/collab/ws');
-    });
-
-    it('returns ws:// for http:', () => {
-        const url = buildCollabWsUrl('insp-abc', { protocol: 'http:', host: 'localhost:8788' });
-        expect(url).toBe('ws://localhost:8788/api/inspections/insp-abc/collab/ws');
-    });
-
-    it('percent-encodes ids containing special characters', () => {
-        const id = 'insp/with spaces&more';
-        const url = buildCollabWsUrl(id, { protocol: 'https:', host: 'example.com' });
-        expect(url).toContain(encodeURIComponent(id));
-        // Verify the path is correct
-        expect(url).toBe(`wss://example.com/api/inspections/${encodeURIComponent(id)}/collab/ws`);
-    });
-});
+// (The URL builder moved to app/lib/field/web-collab.ts; its tests are in
+// app/lib/field/web-collab.test.ts.)
 
 // ── Test 2: Step1 is sent on open (after persistence synced) ─────────────────
 
@@ -235,7 +227,7 @@ describe('connectResultsDoc — step1 on open', () => {
         const id = `test-step1-${Date.now()}`;
         const { handle, destroy } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
         });
 
         // Wait for fake-indexeddb to resolve the synced event and the socket
@@ -263,7 +255,7 @@ describe('connectResultsDoc — inbound step2', () => {
         const id = `test-step2-${Date.now()}`;
         const { handle, destroy } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
         });
 
         await flushAsync(10);
@@ -320,7 +312,7 @@ describe('connectResultsDoc — local update forwarding', () => {
         const id = `test-forward-${Date.now()}`;
         const { handle, destroy } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
         });
 
         await flushAsync(10);
@@ -356,7 +348,7 @@ describe('connectResultsDoc — IndexedDB persistence', () => {
         // First connection: write data.
         const { handle: h1, destroy: d1 } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
         });
         await flushAsync(10);
 
@@ -372,7 +364,7 @@ describe('connectResultsDoc — IndexedDB persistence', () => {
         // Second connection: same id, new doc — should see stored data.
         const { handle: h2, destroy: d2 } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
         });
 
         // Wait for persistence to restore.
@@ -386,18 +378,6 @@ describe('connectResultsDoc — IndexedDB persistence', () => {
         expect(item?.get('rating')).toBe('IN');
 
         d2();
-    });
-});
-
-// ── Test 6: SSR guard ────────────────────────────────────────────────────────
-
-describe('buildCollabWsUrl — safe without window (SSR guard)', () => {
-    it('can build a URL without requiring a live window.location', () => {
-        // buildCollabWsUrl is the only part of the module safe to call without a
-        // real browser environment. This verifies it takes an explicit loc arg and
-        // does not reach for window.location.
-        const url = buildCollabWsUrl('insp-ssr', { protocol: 'https:', host: 'ssr.host' });
-        expect(url).toBe('wss://ssr.host/api/inspections/insp-ssr/collab/ws');
     });
 });
 
@@ -415,7 +395,7 @@ describe('connectResultsDoc — MSG_RESTORE drop+resync convergence', () => {
         const onChangeDocs: Y.Doc[] = [];
         const { handle, destroy } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
             onChange: (h) => { onChangeDocs.push(h.doc); },
         });
 
@@ -484,7 +464,7 @@ describe('connectResultsDoc — MSG_RESTORE drop+resync convergence', () => {
         const id = `test-additive-${Date.now()}`;
         const { handle, destroy } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
         });
 
         await flushAsync(10);
@@ -566,7 +546,7 @@ describe('connectResultsDoc — auto-reconnect on close', () => {
         const id = `test-reconnect-${Date.now()}`;
         const { destroy } = connectResultsDoc(id, {
             WebSocketImpl: CountingStub as unknown as typeof WebSocket,
-            location: testLoc,
+            ...hostOpts,
         });
 
         await flushAsync(10);
@@ -601,7 +581,7 @@ describe('connectResultsDoc — auto-reconnect on close', () => {
         const id = `test-noreconnect-${Date.now()}`;
         const { destroy } = connectResultsDoc(id, {
             WebSocketImpl: CountingStub as unknown as typeof WebSocket,
-            location: testLoc,
+            ...hostOpts,
         });
         await flushAsync(10);
         expect(constructions).toBe(1);
@@ -633,7 +613,7 @@ describe('connectResultsDoc — window online event', () => {
         const id = `test-online-${Date.now()}`;
         const { destroy } = connectResultsDoc(id, {
             WebSocketImpl: CountingStub as unknown as typeof WebSocket,
-            location: testLoc,
+            ...hostOpts,
         });
         await flushAsync(10);
         expect(constructions).toBe(1);
@@ -667,7 +647,7 @@ describe('connectResultsDoc — onSynced trigger', () => {
         const id = `test-onsynced-${Date.now()}`;
         const { handle, destroy } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
             onSynced: () => { syncedCalls += 1; },
         });
 
@@ -702,16 +682,16 @@ describe('connectResultsDoc — onSynced trigger', () => {
     });
 });
 
-// ── Test 8: deleteResultsDb resolves and clears stored state ───────────────────
+// ── Test 8: webClearResultsData resolves and clears stored state ───────────────────
 
-describe('deleteResultsDb', () => {
+describe('webClearResultsData', () => {
     it('clears persisted state so a later connection starts empty', async () => {
         const id = `test-deldb-${Date.now()}`;
 
         // First connection: write data and persist to IndexedDB.
         const { handle: h1, destroy: d1 } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
         });
         await flushAsync(10);
         seedResultsDoc(h1.doc, [{ findingKey: '_default:s1:i9' }]);
@@ -720,13 +700,13 @@ describe('deleteResultsDb', () => {
         d1();
 
         // Delete the database (the restore-path cleanup helper).
-        await deleteResultsDb(id);
+        await webClearResultsData(id);
         await flushAsync(5);
 
         // Reconnect with the same id — the store is gone, so no data restores.
         const { handle: h2, destroy: d2 } = connectResultsDoc(id, {
             WebSocketImpl: makeCapturingImpl(),
-            location: testLoc,
+            ...hostOpts,
         });
         await flushAsync(20);
         expect(h2.persistenceSynced).toBe(true);

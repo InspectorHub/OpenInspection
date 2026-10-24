@@ -2,14 +2,14 @@ import { useMemo, useRef, useState } from "react";
 import { Icon } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import type { TemplateItem, TemplateSection } from "./types";
-import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
-import { CommentTypeahead } from "../editor/CommentTypeahead";
-import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
+import { CannedCommentRow } from "@core/field-ui/components/editor-shared/CannedCommentRow";
+import { CommentTypeahead } from "@core/field-ui/components/editor/CommentTypeahead";
+import { useCommentTypeahead } from "@core/field-ui/hooks/useCommentTypeahead";
 import {
   flattenItemTabs,
   fragmentBeforeCaret,
   replaceFragmentBeforeCaret,
-} from "../../lib/comment-typeahead";
+} from "@core/field-ui/shared/comment-typeahead";
 
 export interface ItemCommentsPanelProps {
   selectedItem: TemplateItem;

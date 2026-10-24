@@ -19,7 +19,7 @@ import { EnglishSpanBadge } from "./TranslationNotice";
 import { useAnchorId } from "./report-half-scope";
 import { getSectionIcon } from "~/lib/report-helpers";
 import { ReportItemCard } from "./ReportItemCard";
-import { itemDepths, subtreeOf } from "../../../../../server/lib/template-hierarchy";
+import { itemDepths, subtreeOf } from "@core/field-ui/shared/template-hierarchy";
 import {
   PRINT_SECTION_HEADING_CLASS,
   REPORT_HEADING_STYLE,

@@ -99,90 +99,97 @@ function brandAssetResponse(obj: R2ObjectBody): Response {
     return new Response(obj.body, { status: 200, headers });
 }
 
-const publicInspectorProfileRoutes = createApiRouter()
-    .openapi(brandRoute, async (c) => {
-        const { tenant } = c.req.valid('param');
-        // Resolve by slug directly (works in every deploy mode — the slug is
-        // the public tenant identifier; same pattern as GET /book/:tenant/:slug).
-        const db = getDrizzle(c);
-        const row = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, tenant)).get();
-        if (!row) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404);
-        const brand = await c.var.services.branding.getBrand(row.id, {
-            slug: tenant,
-            baseUrl: getBaseUrl(c),
-        });
-        return c.json({ success: true as const, data: brand }, 200);
-    })
-    .openapi(legalDocRoute, async (c) => {
-        const { tenant, doc } = c.req.valid('param');
-        const db = getDrizzle(c);
-        const row = await db.select({ id: tenants.id, name: tenantDisplayName })
-            .from(tenants)
-            .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
-            .where(eq(tenants.slug, tenant)).get();
-        if (!row) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404);
-        const cfg = await db.select({
-            companyName: tenantConfigs.companyName,
-            privacyBody: tenantConfigs.privacyBody,
-            termsBody: tenantConfigs.termsBody,
-        }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, row.id)).get();
-        const companyName = cfg?.companyName?.trim() || row.name;
-        const body = doc === 'privacy'
-            ? (cfg?.privacyBody?.trim() || null)
-            : (cfg?.termsBody?.trim() || null);
-        // "Last updated" comes from the version REGISTRY, never from the config
-        // row's own timestamp: the registry is the only thing that knows a save
-        // changed the text rather than some neighbouring setting. Null until the
-        // tenant has published once, and the page then says nothing rather than
-        // inventing a date.
-        const latest = await c.var.services.legalVersion.latest(row.id, doc);
-        return c.json({ success: true as const, data: {
-            companyName, body, lastUpdated: latest?.version ?? null,
-        } }, 200);
-    })
-    .openapi(brandAssetRoute, async (c) => {
-        const { key, v } = c.req.valid('query');
-        if (!c.env.PHOTOS) return c.notFound();
-        // Public brand-asset endpoint may ONLY serve branding logos (never arbitrary
-        // R2 objects). New layout: {tenantId}/branding/logo-{uuid}.{ext}; legacy:
-        // branding/{tenantId}/logo-{ts}.{ext}. Segments must be non-empty alphanumeric
-        // identifiers (no ".." path traversal).
-        if (!isServableBrandAsset(key)) return c.notFound();
-        const obj = await r2Get(c.env.PHOTOS, key);
-        if (!obj) return c.notFound();
-
-        // Serve-time downscale. This is what reaches the badges ALREADY in R2 —
-        // an upload-time rule only ever helps the next upload, and the 2 MB
-        // photograph somebody has already saved is the one costing every
-        // recipient of every email.
-        //
-        // FAILS OPEN IN EVERY DIRECTION: no variant asked for, no IMAGES
-        // binding, a vector, or a transform that throws — all serve the
-        // original. A badge that is larger than it needed to be is a cost; a
-        // badge that does not render is a broken document.
-        const variant = resolveBadgeVariant(v);
-        const images = imagesBinding(c.env);
-        if (variant && images && !isVectorBadge(obj.httpMetadata?.contentType)) {
-            try {
-                const out = await images.input(obj.body)
-                    .transform({ width: variant.width })
-                    .output({ format: variant.format });
-                const r = out.response();
-                const h = new Headers(r.headers);
-                // Immutable: the key carries a uuid, so a replaced badge is a
-                // new key. Longer than the original's hour for that reason.
-                h.set('Cache-Control', 'public, max-age=31536000, immutable');
-                return new Response(r.body, { status: 200, headers: h });
-            } catch (err) {
-                logger.warn('[brand-asset] badge transform failed — serving original', {
-                    key, variant: v, error: String(err),
-                });
-                const orig = await r2Get(c.env.PHOTOS, key);
-                if (!orig) return c.notFound();
-                return brandAssetResponse(orig);
-            }
-        }
-        return brandAssetResponse(obj);
+const app = createApiRouter();
+app.openapi(brandRoute, async (c) => {
+    const { tenant } = c.req.valid('param');
+    // Resolve by slug directly (works in every deploy mode — the slug is
+    // the public tenant identifier; same pattern as GET /book/:tenant/:slug).
+    const db = getDrizzle(c);
+    const row = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, tenant)).get();
+    if (!row) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404);
+    const brand = await c.var.services.branding.getBrand(row.id, {
+        slug: tenant,
+        baseUrl: getBaseUrl(c),
     });
+    return c.json({ success: true as const, data: brand }, 200);
+});
+app.openapi(legalDocRoute, async (c) => {
+    const { tenant, doc } = c.req.valid('param');
+    const db = getDrizzle(c);
+    const row = await db.select({ id: tenants.id, name: tenantDisplayName })
+        .from(tenants)
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, tenants.id))
+        .where(eq(tenants.slug, tenant)).get();
+    if (!row) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404);
+    const cfg = await db.select({
+        companyName: tenantConfigs.companyName,
+        privacyBody: tenantConfigs.privacyBody,
+        termsBody: tenantConfigs.termsBody,
+    }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, row.id)).get();
+    const companyName = cfg?.companyName?.trim() || row.name;
+    const body = doc === 'privacy'
+        ? (cfg?.privacyBody?.trim() || null)
+        : (cfg?.termsBody?.trim() || null);
+    // "Last updated" comes from the version REGISTRY, never from the config
+    // row's own timestamp: the registry is the only thing that knows a save
+    // changed the text rather than some neighbouring setting. Null until the
+    // tenant has published once, and the page then says nothing rather than
+    // inventing a date.
+    const latest = await c.var.services.legalVersion.latest(row.id, doc);
+    return c.json({ success: true as const, data: {
+        companyName, body, lastUpdated: latest?.version ?? null,
+    } }, 200);
+});
+app.openapi(brandAssetRoute, async (c) => {
+    const { key, v } = c.req.valid('query');
+    if (!c.env.PHOTOS) return c.notFound();
+    // Public brand-asset endpoint may ONLY serve branding logos (never arbitrary
+    // R2 objects). New layout: {tenantId}/branding/logo-{uuid}.{ext}; legacy:
+    // branding/{tenantId}/logo-{ts}.{ext}. Segments must be non-empty alphanumeric
+    // identifiers (no ".." path traversal).
+    if (!isServableBrandAsset(key)) return c.notFound();
+    const obj = await r2Get(c.env.PHOTOS, key);
+    if (!obj) return c.notFound();
 
-export default publicInspectorProfileRoutes;
+    // Serve-time downscale. This is what reaches the badges ALREADY in R2 —
+    // an upload-time rule only ever helps the next upload, and the 2 MB
+    // photograph somebody has already saved is the one costing every
+    // recipient of every email.
+    //
+    // FAILS OPEN IN EVERY DIRECTION: no variant asked for, no IMAGES
+    // binding, a vector, or a transform that throws — all serve the
+    // original. A badge that is larger than it needed to be is a cost; a
+    // badge that does not render is a broken document.
+    const variant = resolveBadgeVariant(v);
+    const images = imagesBinding(c.env);
+    if (variant && images && !isVectorBadge(obj.httpMetadata?.contentType)) {
+        try {
+            const out = await images.input(obj.body)
+                .transform({ width: variant.width })
+                .output({ format: variant.format });
+            const r = out.response();
+            const h = new Headers(r.headers);
+            // Immutable: the key carries a uuid, so a replaced badge is a
+            // new key. Longer than the original's hour for that reason.
+            h.set('Cache-Control', 'public, max-age=31536000, immutable');
+            return new Response(r.body, { status: 200, headers: h });
+        } catch (err) {
+            logger.warn('[brand-asset] badge transform failed — serving original', {
+                key, variant: v, error: String(err),
+            });
+            const orig = await r2Get(c.env.PHOTOS, key);
+            if (!orig) return c.notFound();
+            return brandAssetResponse(orig);
+        }
+    }
+    return brandAssetResponse(obj);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const publicInspectorProfileRouteConfigs = [
+    brandRoute,
+    legalDocRoute,
+    brandAssetRoute,
+] as const;
+
+export default app;

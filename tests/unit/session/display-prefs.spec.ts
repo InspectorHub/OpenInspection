@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveDisplayPrefs } from '../../../server/lib/session/display-prefs';
+import { resolveDisplayPrefs } from '@core/field-ui/shared/display-prefs';
 
 describe('display preference resolution', () => {
     it('prefers the user override', () => {

@@ -27,7 +27,7 @@ import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { users, inspectorCredentials } from '../../lib/db/schema';
 import { isPreInspectionFact, provenanceOfBinding } from '../../lib/statutory/fact-provenance';
 import type { FieldMap } from '../../lib/statutory/field-map';
-import type { StatutoryFormDeclaration } from '../../types/template-schema';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/template-schema';
 
 /** One form field nobody in this workspace can currently supply. */
 export interface UnsuppliableField {

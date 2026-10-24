@@ -7,9 +7,9 @@
  */
 import { describe, it, expect } from 'vitest';
 import * as Y from 'yjs';
-import { isMetaKey } from '../../../server/lib/finding-key';
-import { loadResultsProjection, projectResults, seedResultsDoc } from '../../../server/lib/collab/results-doc';
-import type { ResultsProjection } from '../../../server/lib/collab/results-doc.types';
+import { isMetaKey } from '@core/field-ui/shared/finding-key';
+import { loadResultsProjection, projectResults, seedResultsDoc } from '@core/field-ui/shared/results-doc';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 import { writeResultsProjection } from '../../../server/durable-objects/inspection-doc-d1';
 
 const SIGNATURE = { signatureBase64: 'sig', signedAt: 1 };

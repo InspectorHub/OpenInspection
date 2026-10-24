@@ -12,7 +12,7 @@
  */
 
 import { isReportPublished, INSPECTION_STATUS } from '~/lib/status';
-import { formatCurrency } from '~/lib/format';
+import { formatCurrency } from '@core/field-ui/shared/format';
 import { m } from '~/paraglide/messages';
 // Type-only — erased at build, so the API's zod module never reaches the client
 // bundle. This is the single source of truth for the hub payload's shape.

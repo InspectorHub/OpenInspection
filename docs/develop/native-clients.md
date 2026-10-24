@@ -145,6 +145,57 @@ local data. The **device enforces it**; the server only publishes it, in
 `GET /api/client/session`. Change it with `PATCH /api/admin/tenant-config`.
 A company with no configuration row reports the default.
 
+### Deleted inspections and local copies
+
+When an inspection is hard-deleted on the server, a device that already holds a
+local copy is told on its next successful connection, not at the moment of
+deletion.
+
+**Who implements what.** The server half is in this repository: the
+`POST /api/client/inspections/visible` endpoint and the hard delete that removes
+what the server holds. The device half described next (the reconcile on
+connecting, removing a local copy, and quarantining a copy that holds unsent data)
+is implemented by the native client. Nothing in this repository runs on a device,
+so the guarantees below hold only for a client that implements them.
+
+**How a device reconciles.** On connecting, the device sends the ids of its local
+inspections to `POST /api/client/inspections/visible` and receives the subset the
+signed-in user can still see. For each local inspection that is not in that
+subset:
+
+- if the device holds **no unuploaded data** for it, the local copy is removed;
+- if it holds **unuploaded data** (edits or photos not yet sent), the copy is
+  **quarantined**: it is hidden from normal lists and kept so the user can export
+  it or remove it deliberately. Nothing is deleted from under unsent work.
+
+A reconcile that fails (no network, a server error, a rejected request) removes
+nothing. The device treats an error as "unknown", never as "everything is gone".
+
+**What is guaranteed.** After a device's next successful reconcile, it no longer
+shows a copy of an inspection the server has deleted, apart from a quarantined
+copy that holds unuploaded data.
+
+**What is not guaranteed.**
+
+- A device that stays offline keeps its copies until it connects again, or until
+  it locks its local data after `offline_max_days`, whichever the device reaches
+  first.
+- Copies made outside the app are out of scope: system screenshots, the camera
+  roll and exported packages are not tracked or removed.
+
+**Server side.** Hard-deleting an inspection removes its rows, its stored media
+and, when the collaborative editing Durable Object (`INSPECTION_DOC`) is bound, the
+stored document behind each of its reports. That last step runs after the delete
+has completed and is best effort: if it fails, the delete still succeeds, the
+failure is logged as a warning with the inspection id, and the `inspection.delete`
+audit event records `collabPurge: "failed"` (`"ok"` when it worked, `"skipped"`
+when the namespace is not bound or the inspection had no report).
+
+**Known leftover.** The collaborative document storage of inspections deleted
+before this purge existed may still hold content. A Durable Object cannot be
+enumerated and the report ids of those deletions were not recorded, so there is no
+sweep that can find them.
+
 ---
 
 ## 4. Version handshake
@@ -480,6 +531,25 @@ Reading a variable never throws. A missing, blank or non-numeric value falls
 back to the default, and a number outside the range is clamped into it, so a
 misconfiguration can never switch a limit off.
 
+The reconcile call (`POST /api/client/inspections/visible`, which a device uses
+to learn which of its local inspections the server no longer shows it) has one
+limit of the same kind:
+
+| Variable | Default | Allowed range |
+|---|---|---|
+| `NATIVE_VISIBLE_MAX_IDS` (ids per request) | 300 | 1 to 2000 |
+
+A request over the limit, an empty one, or one with an id outside `A-Z a-z 0-9 _ -`
+(1 to 64 characters) is refused with 422 and `details.limits.ids`. The server
+looks the ids up in chunks of 80. A statement binds those ids, the company id and, for a caller limited to their assigned inspections, four more parameters, so the worst case is 85 and no statement binds more than 90.
+
+Each chunk is one D1 round trip, and every round trip counts against the
+invocation's subrequest budget. At the default of 300 ids that is 4 lookups. At the
+ceiling of 2000 it is 25 lookups for the ids alone, on top of whatever the request's
+own middleware has already spent. Keep the default unless a device really holds more
+inspections than that, and check the platform's current subrequest limit for your plan
+before raising it.
+
 Three constants are fixed rather than configurable, because together they define
 how long the server remembers what it has applied:
 
@@ -534,6 +604,71 @@ also lists `details.inspectionIds`), and on a failure while its results or photo
 were being applied. A client that gets one of these should write the inspection
 named into a package of its own, send the rest as a package without it, and keep
 the named one on the device for the person to resolve.
+
+`409` `PACKAGE_INSPECTION_DELETED` carries both `details.inspectionId` (the first
+deleted inspection) and `details.inspectionIds` (every one of them). A client that
+reads only `inspectionId` still makes progress, one inspection per request; a client
+that reads `inspectionIds` removes them all at once.
+
+A failure while the results or photos of one inspection were being applied happens
+after validation and may have written part of the package. Its `details` carry
+`inspectionId` and also `reason`, for example `empty` or `malformed` (the
+inspection's results entry is not a usable Yjs update), `unmet_dependencies` (the
+update depends on state the server does not have) or `persist_failed` (the results
+object could not store what it was given). The status is `400` or `422` when the
+package itself is at fault and `503` when the server could not complete the work.
+`reason` is for display. It must not decide how to split:
+the inspection named is the one to take out, whatever the reason, and a client has
+to tolerate a `reason` it does not know. Sending the same part again is safe,
+because every step is idempotent.
+
+**Refusals of the whole package name no inspection.** A different company
+(`403`), an importer whose report editing is switched off (`403`), a package that is
+too old or dated ahead of the server clock (`422` `PACKAGE_EXPIRED` and
+`PACKAGE_FROM_THE_FUTURE`), a package over a count or size limit (`422` or `413`
+`PACKAGE_TOO_LARGE`) and a malformed package (`400`: not a zip archive, an invalid
+manifest, outbox or media index, an entry that names an inspection outside the
+manifest, a declared inspection with no Yjs state, an entry whose size differs from
+the one declared) carry no `details.inspectionId`. Splitting does not help with
+these, so a client must not try. The over-limit refusal is the exception that has
+its own remedy: cut the package to the sizes in `details.limits`
+(see "When a package is over a limit"). A `403` or `400` that does carry an
+`inspectionId` is the first kind, not this one.
+
+### Reference implementation
+
+`packages/offline-package` (imported as `@core/offline-package`) is the client side
+of everything in sections 9 and 10: it reads and writes the archive, plans the parts
+of a package that is over a limit, classifies each answer, and sends, splits and
+resends until every inspection is either imported or held back with a reason. The
+server's own validators live in the same package, so the two cannot disagree about
+what a valid package is. `runImport` is the reference implementation of the
+behaviour described above; a client in another language should reproduce its
+classification of answers, which is the table below. The classification is
+`classifyResponse` in `packages/offline-package/src/classify.ts`, checked in this
+order.
+
+| Answer | Class | What the client does |
+|---|---|---|
+| `200` with the counts of the report (`inspections`, `photos`, `outbox`, `yjs`) | confirmed | Mark the part imported. A `200` whose counts are missing, malformed, or count another number of inspections than the part held is not a confirmation, and is treated as a retry |
+| Any other answer under 400, or no answer | retry | Send the same part again after a pause |
+| `413`, or `422` `PACKAGE_TOO_LARGE` | too large | Cut the package to `details.limits`, or in half when the answer gave none. An inspection that is over the limit on its own is held back |
+| `PACKAGE_EXPIRED`, `PACKAGE_FROM_THE_FUTURE` | whole package | Stop. Hold every inspection back, keeping `details` (`maxAgeDays`, `maxFutureSkewDays`) for display |
+| `409` `PACKAGE_INSPECTION_DELETED` | splittable | Take out `inspectionIds` (or `inspectionId`), send the rest. With no id in the answer it is a whole-package refusal |
+| `409` with `details.reason` `idempotency_in_flight` | retry | Another request holds the key of a queued write. Wait longer than for other failures, within a time limit, then send again |
+| `408`, `429`, any `5xx` (the application-phase `503` included) | retry | Send the same part again. If the part keeps failing on one inspection that the failure named with a `reason`, take that one out and send the rest |
+| `400` naming a queued write (`details.idempotencyKey`) whose `details.status` is `408`, `429` or `5xx` | retry | The server turned a transient failure of the write into a `400`. Send again |
+| Any other answer whose `details` carry `inspectionId` or `inspectionIds` (`403`, `404`, `400`, application-phase `400` and `422`) | splittable | Take out the inspections named, send the rest, keep the named ones on the device |
+| Anything else (`401`, `411`, `403` or `400` without an id, `4xx` unknown to the client) | whole package | Stop. Hold every inspection back |
+
+A queued write that the server refuses inside an otherwise accepted package is not
+an answer of any of these classes: it arrives in a `200` as `outbox.failed`, and
+the client keeps it for the person to resolve (see "Import semantics").
+
+When the whole backend is failing, a client that cuts around the inspection each
+`5xx` names can end up holding every inspection back as a refused apply rather than
+as "not confirmed". Nothing is lost either way: a held-back inspection can be
+written into a package of its own and imported again later.
 
 ---
 

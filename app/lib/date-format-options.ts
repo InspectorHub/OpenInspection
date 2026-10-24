@@ -1,6 +1,6 @@
-import { DATE_FORMATS, TIME_FORMATS } from "../../server/lib/session/display-prefs";
-import { formatShapedDate } from "./format-date";
-import { formatTime } from "./format";
+import { DATE_FORMATS, TIME_FORMATS } from "@core/field-ui/shared/display-prefs";
+import { formatShapedDate } from "@core/field-ui/shared/format-date";
+import { formatTime } from "@core/field-ui/shared/format";
 
 /**
  * #270 — the option lists for the date/time format pickers.

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pill, Button } from "@core/shared-ui";
 import { RequestDetail } from "~/components/agreements/RequestDetail";
 import { pillToneFor, pillLabelFor } from "~/components/agreements/agreements-helpers";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { useInspectionDateTimeFormat } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 

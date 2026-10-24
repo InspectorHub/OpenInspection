@@ -7,7 +7,7 @@
  */
 import type { RatingLevel } from "~/components/template/types";
 import type { EditorLevel } from "~/components/RatingSystemEditor";
-import { isSeverity } from "~/lib/severity";
+import { isSeverity } from "@core/field-ui/lib/severity";
 
 /** Template `RatingLevel` → canonical `EditorLevel` (fills defaults for optional fields). */
 export function toEditorLevel(l: RatingLevel): EditorLevel {

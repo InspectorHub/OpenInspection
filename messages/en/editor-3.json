@@ -21,6 +21,7 @@
   "editor_signmodal_failed": "Failed to save signature. Please try again.",
   "editor_speedmode_aria_label": "Speed-rate inspection items",
   "editor_speedmode_exit": "Exit Speed Mode",
+  "editor_speedmode_all_rated": "All items rated",
   "editor_speedmode_gesture_hint": "Swipe to navigate · Long-press to jump",
   "editor_speedmode_prev": "Prev",
   "editor_speedmode_footer_press": "Press",

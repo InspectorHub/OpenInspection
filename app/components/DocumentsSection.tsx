@@ -14,8 +14,8 @@
  */
 import { useRef, useState } from "react";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
-import { ConfirmDialog } from "./ConfirmDialog";
-import { formatDate } from "~/lib/format";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 // Values only. This module is deliberately free of I/O so importing it does not

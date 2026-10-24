@@ -30,7 +30,7 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, inspectionResults, tenantConfigs } from '../db/schema';
 import { collabDocName } from '../collab/doc-name';
-import { isMetaKey } from '../finding-key';
+import { isMetaKey } from '@core/field-ui/shared/finding-key';
 import { logger } from '../logger';
 import { templateSnapshotSectionsOrNone } from '../../services/inspection/shared';
 import { LegacyRenameCountsSchema, type FindingKeyMigrationResult, type LegacyRenameCounts } from '../validations/admin/finding-keys';

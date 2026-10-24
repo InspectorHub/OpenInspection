@@ -60,12 +60,17 @@ const uninstallRoute = createRoute(withMcpMetadata({
     operationId: 'uninstallMarketplaceEntry',
 }, { scopes: ['write'], tier: 'extended' }));
 
-const marketplaceUninstallRoutes = createApiRouter()
-    .openapi(uninstallRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const userId = (c.get('user')?.sub as string) || 'system';
-        const result = await c.var.services.marketplace.uninstall(id, userId);
-        return c.json({ success: true, data: result }, 200);
-    });
+const app = createApiRouter();
+app.openapi(uninstallRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const userId = (c.get('user')?.sub as string) || 'system';
+    const result = await c.var.services.marketplace.uninstall(id, userId);
+    return c.json({ success: true, data: result }, 200);
+});
 
-export default marketplaceUninstallRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const marketplaceUninstallRouteConfigs = [
+    uninstallRoute,
+] as const;
+
+export default app;

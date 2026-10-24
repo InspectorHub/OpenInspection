@@ -24,7 +24,7 @@ vi.mock("~/hooks/useGuardedSubmit", () => ({
 }));
 const revalidate = vi.hoisted(() => vi.fn());
 vi.mock("react-router", async (orig) => ({ ...(await orig<typeof import("react-router")>()), useRevalidator: () => ({ revalidate, state: "idle" }) }));
-vi.mock("~/lib/collab/offline-purge", () => ({ purgeInspectionOfflineData: vi.fn(async () => undefined) }));
+vi.mock("@core/field-ui/collab/offline-purge", () => ({ purgeInspectionOfflineData: vi.fn(async () => undefined) }));
 
 import { useBatchDelete } from "~/hooks/useBatchDelete";
 

@@ -7,7 +7,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Table, Modal, PENDING_CLASS, pendingProps, useActionLatch } from "@core/shared-ui";
 import { EventTypeFields } from "~/components/settings/EventTypeFields";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { m } from "~/paraglide/messages";
 
 interface EventType {

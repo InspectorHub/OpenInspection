@@ -31,7 +31,7 @@ import type { RepairActionTag } from "~/lib/repair-action-tag";
 import { resolveQuickPhrases, seedQuickPhrases } from "~/lib/repair-quick-phrases";
 import { RepairIntroPanel } from "./repair/RepairIntroPanel";
 import { RepairSharePanel } from "./repair/RepairSharePanel";
-import { formatCents } from "~/lib/money";
+import { formatCents } from "@core/field-ui/shared/money";
 import { usePageOrigin } from "~/hooks/usePageOrigin";
 
 // ---------------------------------------------------------------------------

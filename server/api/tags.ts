@@ -10,6 +10,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { auditFromContext } from '../lib/audit';
 import { Errors } from '../lib/errors';
@@ -129,49 +130,51 @@ const deleteTagRoute = createRoute(withMcpMetadata({
     description: "Delete a tag from the company, which also detaches it from every inspection item it was attached to. An unknown tag id is a not-found."
 }, { scopes: ['write'], tier: 'extended' }));
 
-const tagsRoutes = createApiRouter()
-    .openapi(listTagsRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        // Lazy-seed canonical tags so first-time tenants always see the five.
-        const data = await c.var.services.tag.listWithDefaults(tenantId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(createTagRoute, async (c) => {
-        const input = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const tag = await c.var.services.tag.create(tenantId, input);
-        auditFromContext(c, 'tag.created', 'tag', { entityId: tag.id, metadata: { name: tag.name } });
-        return c.json({ success: true as const, data: tag }, 200);
-    })
-    .openapi(replaceTagRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
-        const tag = await c.var.services.tag.update(id, tenantId, patch);
-        auditFromContext(c, 'tag.updated', 'tag', { entityId: tag.id });
-        return c.json({ success: true as const, data: tag }, 200);
-    })
-    .openapi(listTagInspectionsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        // Tenant-scope guard via lookup — refuses cross-tenant ids.
-        const tag = await c.var.services.tag.get(id, tenantId);
-        if (!tag) throw Errors.NotFound('Tag not found');
-        const tagged = await c.var.services.tag.listInspectionsByTag(tenantId, id);
-        // Only the inspections the caller can see; for everyone else the list is unchanged.
-        const visible = await filterVisibleInspectionIds(getDrizzle(c), await resolveInspectionScope(c), tenantId, tagged);
-        const inspectionIds = tagged.filter((x) => visible.has(x));
-        return c.json({ success: true as const, data: { inspectionIds } }, 200);
-    })
-    .openapi(deleteTagRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        const result = await c.var.services.tag.delete(id, tenantId);
-        auditFromContext(c, 'tag.deleted', 'tag', { entityId: id });
-        return c.json({ success: true as const, data: result }, 200);
-    });
+const tagsRoutes = createApiRouter();
+tagsRoutes.openapi(listTagsRoute, async (c) => {
+    const tenantId = c.get('tenantId') as string;
+    // Lazy-seed canonical tags so first-time tenants always see the five.
+    const data = await c.var.services.tag.listWithDefaults(tenantId);
+    return c.json({ success: true as const, data }, 200);
+});
+tagsRoutes.openapi(createTagRoute, async (c) => {
+    const input = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const tag = await c.var.services.tag.create(tenantId, input);
+    auditFromContext(c, 'tag.created', 'tag', { entityId: tag.id, metadata: { name: tag.name } });
+    return c.json({ success: true as const, data: tag }, 200);
+});
+tagsRoutes.openapi(replaceTagRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
+    const tag = await c.var.services.tag.update(id, tenantId, patch);
+    auditFromContext(c, 'tag.updated', 'tag', { entityId: tag.id });
+    return c.json({ success: true as const, data: tag }, 200);
+});
+tagsRoutes.openapi(listTagInspectionsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    // Tenant-scope guard via lookup — refuses cross-tenant ids.
+    const tag = await c.var.services.tag.get(id, tenantId);
+    if (!tag) throw Errors.NotFound('Tag not found');
+    const tagged = await c.var.services.tag.listInspectionsByTag(tenantId, id);
+    // Only the inspections the caller can see; for everyone else the list is unchanged.
+    const visible = await filterVisibleInspectionIds(getDrizzle(c), await resolveInspectionScope(c), tenantId, tagged);
+    const inspectionIds = tagged.filter((x) => visible.has(x));
+    return c.json({ success: true as const, data: { inspectionIds } }, 200);
+});
+tagsRoutes.openapi(deleteTagRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    const result = await c.var.services.tag.delete(id, tenantId);
+    auditFromContext(c, 'tag.deleted', 'tag', { entityId: id });
+    return c.json({ success: true as const, data: result }, 200);
+});
 
-export type TagsApi = typeof tagsRoutes;
+export const tagsRouteConfigs = [listTagsRoute, createTagRoute, replaceTagRoute, listTagInspectionsRoute, deleteTagRoute] as const;
+
+export type TagsApi = ApiOf<typeof tagsRouteConfigs>;
 
 /* ─── Item-link sub-routes ────────────────────────────────────────────── */
 //
@@ -257,49 +260,51 @@ const listInspectionTagMapRoute = createRoute(withMcpMetadata({
     description: "Return, for one inspection, a map from each checklist item id to the tags attached to that item."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const inspectionTagRoutes = createApiRouter()
-    .openapi(listInspectionItemTagsRoute, async (c) => {
-        const { id, itemId } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        const data = await c.var.services.tag.getItemTags(tenantId, id, itemId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(linkInspectionItemTagRoute, async (c) => {
-        const { id, itemId } = c.req.valid('param');
-        const { tagId } = c.req.valid('json');
-        const tenantId = c.get('tenantId') as string;
+export const inspectionTagRoutes = createApiRouter();
+inspectionTagRoutes.openapi(listInspectionItemTagsRoute, async (c) => {
+    const { id, itemId } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    const data = await c.var.services.tag.getItemTags(tenantId, id, itemId);
+    return c.json({ success: true as const, data }, 200);
+});
+inspectionTagRoutes.openapi(linkInspectionItemTagRoute, async (c) => {
+    const { id, itemId } = c.req.valid('param');
+    const { tagId } = c.req.valid('json');
+    const tenantId = c.get('tenantId') as string;
 
-        // Verify the inspection belongs to this tenant before linking.
-        await c.var.services.inspection.getInspection(id, tenantId);
-        await c.var.services.tag.linkToItem(tenantId, id, itemId, tagId);
-        auditFromContext(c, 'tag.linked', 'inspection_item', {
-            entityId: id,
-            metadata: { itemId, tagId },
-        });
-        return c.json({ success: true as const, data: { linked: true as const } }, 200);
-    })
-    .openapi(unlinkInspectionItemTagRoute, async (c) => {
-        const { id, itemId, tagId } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-
-        // Tenant ownership guard via inspection lookup.
-        await c.var.services.inspection.getInspection(id, tenantId);
-        await c.var.services.tag.unlinkFromItem(tenantId, id, itemId, tagId);
-        auditFromContext(c, 'tag.unlinked', 'inspection_item', {
-            entityId: id,
-            metadata: { itemId, tagId },
-        });
-        return c.json({ success: true as const, data: { unlinked: true as const } }, 200);
-    })
-    .openapi(listInspectionTagMapRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-        await c.var.services.inspection.getInspection(id, tenantId);
-        const data = await c.var.services.tag.getInspectionTagMap(tenantId, id);
-        if (!data) throw Errors.Internal('Tag map unavailable');
-        return c.json({ success: true as const, data }, 200);
+    // Verify the inspection belongs to this tenant before linking.
+    await c.var.services.inspection.getInspection(id, tenantId);
+    await c.var.services.tag.linkToItem(tenantId, id, itemId, tagId);
+    auditFromContext(c, 'tag.linked', 'inspection_item', {
+        entityId: id,
+        metadata: { itemId, tagId },
     });
+    return c.json({ success: true as const, data: { linked: true as const } }, 200);
+});
+inspectionTagRoutes.openapi(unlinkInspectionItemTagRoute, async (c) => {
+    const { id, itemId, tagId } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
 
-export type InspectionTagApi = typeof inspectionTagRoutes;
+    // Tenant ownership guard via inspection lookup.
+    await c.var.services.inspection.getInspection(id, tenantId);
+    await c.var.services.tag.unlinkFromItem(tenantId, id, itemId, tagId);
+    auditFromContext(c, 'tag.unlinked', 'inspection_item', {
+        entityId: id,
+        metadata: { itemId, tagId },
+    });
+    return c.json({ success: true as const, data: { unlinked: true as const } }, 200);
+});
+inspectionTagRoutes.openapi(listInspectionTagMapRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+    await c.var.services.inspection.getInspection(id, tenantId);
+    const data = await c.var.services.tag.getInspectionTagMap(tenantId, id);
+    if (!data) throw Errors.Internal('Tag map unavailable');
+    return c.json({ success: true as const, data }, 200);
+});
+
+export const inspectionTagRouteConfigs = [listInspectionItemTagsRoute, linkInspectionItemTagRoute, unlinkInspectionItemTagRoute, listInspectionTagMapRoute] as const;
+
+export type InspectionTagApi = ApiOf<typeof inspectionTagRouteConfigs>;
 
 export default tagsRoutes;

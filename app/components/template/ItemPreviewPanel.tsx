@@ -1,5 +1,5 @@
 import type { TemplateItem } from "./types";
-import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
+import { CannedCommentRow } from "@core/field-ui/components/editor-shared/CannedCommentRow";
 
 export interface ItemPreviewPanelProps {
   selectedItem: TemplateItem;

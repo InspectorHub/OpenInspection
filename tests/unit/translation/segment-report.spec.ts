@@ -28,7 +28,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { InspectionReportService } from '../../../server/services/inspection/inspection-report.service';
-import { RELIANCE_TEMPLATES } from '../../../server/lib/pca-reliance-text';
+import { RELIANCE_TEMPLATES } from '@core/field-ui/shared/pca-reliance-text';
 import { NON_TRANSLATABLE_MANIFEST } from '../../../server/lib/legal/non-translatable-manifest';
 import {
     REPORT_SPAN_REGISTER,

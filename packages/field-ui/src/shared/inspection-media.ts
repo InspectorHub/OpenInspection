@@ -1,0 +1,79 @@
+/**
+ * Media Studio — flatten the Media Center API ({attached, pool}) into one
+ * deduped, labeled photo list for the gallery + cover picker. Dedup by R2 key.
+ */
+export interface GalleryPhoto {
+  key: string;
+  url: string;
+  label: string;
+  // `| undefined` is explicit because `flattenMedia` copies these straight from an API row whose
+  // fields are optional, and the server program checks this file with exactOptionalPropertyTypes.
+  itemId?: string | undefined;
+  photoIndex?: number | undefined;
+  annotated?: boolean | undefined;
+  originalKey?: string | undefined;
+  defectId?: string | undefined;
+  /** Plan 4 — the baked cropped derivative key, when this photo has one. */
+  croppedKey?: string;
+  /** Plan 7 — media discriminator. Absent ⇒ treated as 'photo'. */
+  mediaType?: "photo" | "video";
+  /** Plan 7 — video backend provider. 'stream' = Cloudflare Stream; 'r2' = R2 bucket. */
+  provider?: "stream" | "r2";
+  /** Plan 7 — Cloudflare Stream UID (Stream videos only). */
+  streamUid?: string;
+  /** Plan 7 — pool row id / media id (R2 videos: used to build r2-object URLs). */
+  mediaId?: string;
+  /** Plan 7 — poster timestamp as a fraction of duration (0..1). */
+  posterPct?: number;
+  /** Plan 7 — video duration in seconds (for the m:ss strip badge). */
+  durationSec?: number;
+  /**
+   * #181 PR-G — this photo (or its crop/annotate derivative) is still uploading
+   * from the local offline pending store. The strip/viewer shows an "uploading"
+   * affordance. `url` points at the LOCAL objectURL when this client owns the
+   * blob; when `pendingPlaceholder` is also set the blob lives on ANOTHER device
+   * and there is nothing local to render (show a placeholder, not a broken image).
+   */
+  pending?: boolean;
+  /** #181 PR-G — pending entry whose blob is on another device (no local URL). */
+  pendingPlaceholder?: boolean;
+}
+export interface MediaApiBody {
+  data?: {
+    attached?: Array<{
+      key: string;
+      url: string;
+      itemLabel?: string;
+      itemId?: string;
+      photoIndex?: number;
+      annotated?: boolean;
+      originalKey?: string;
+      defectId?: string;
+    }>;
+    pool?: Array<{ key: string; url: string }>;
+  };
+}
+export function flattenMedia(body: MediaApiBody | null | undefined): GalleryPhoto[] {
+  const out: GalleryPhoto[] = [];
+  const seen = new Set<string>();
+  for (const a of body?.data?.attached ?? []) {
+    if (!a?.key || !a?.url || seen.has(a.key)) continue;
+    seen.add(a.key);
+    out.push({
+      key: a.key,
+      url: a.url,
+      label: a.itemLabel ?? '',
+      itemId: a.itemId,
+      photoIndex: a.photoIndex,
+      annotated: a.annotated,
+      originalKey: a.originalKey,
+      defectId: a.defectId,
+    });
+  }
+  for (const p of body?.data?.pool ?? []) {
+    if (!p?.key || !p?.url || seen.has(p.key)) continue;
+    seen.add(p.key);
+    out.push({ key: p.key, url: p.url, label: 'Unattached' });
+  }
+  return out;
+}

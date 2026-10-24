@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildBatchStructure } from '../../../server/services/migration-intake/structure';
 import type { BundleTemplate } from '../../../server/lib/migration-intake/bundle';
-import type { TemplateItem } from '../../../server/types/template-schema';
+import type { TemplateItem } from '@core/field-ui/shared/template-schema';
 
 function item(over: Partial<TemplateItem> = {}): TemplateItem {
     return {

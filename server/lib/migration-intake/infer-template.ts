@@ -35,7 +35,7 @@ import { AI_PROMPTS } from '../ai/prompts';
 import type { AiRequest } from '../ai/provider';
 import { TemplateSchemaV2Schema } from '../validations/template.schema';
 import { DEFAULT_IMPORTED_RATING_OPTIONS } from './bundle';
-import type { TemplateSchemaV2, TemplateItem, TemplateSection } from '../../types/template-schema';
+import type { TemplateSchemaV2, TemplateItem, TemplateSection } from '@core/field-ui/shared/template-schema';
 
 /**
  * The whole of what this capability would send, as an object rather than as a

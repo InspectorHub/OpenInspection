@@ -1,7 +1,7 @@
 // tests/unit/reports/pca-document-catalog.spec.ts
 import { describe, it, expect } from 'vitest';
 import { DOCUMENT_REVIEW_CATALOG } from '../../../server/lib/pca-document-catalog';
-import { RELIANCE_TEMPLATES } from '../../../server/lib/pca-reliance-text';
+import { RELIANCE_TEMPLATES } from '@core/field-ui/shared/pca-reliance-text';
 
 describe('DOCUMENT_REVIEW_CATALOG', () => {
   it('has unique stable keys and monotonic sort order', () => {

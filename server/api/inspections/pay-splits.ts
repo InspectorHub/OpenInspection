@@ -163,50 +163,59 @@ const correctPaySplitRoute = createRoute(withMcpMetadata({
     description: 'Adjusts an already-exported pay row by writing a NEW row carrying the delta, leaving the original untouched so both what was paid and what was owed stay answerable. An in-place edit after payroll has run destroys that, which is why this is a separate verb.',
 }, { scopes: ['write'], tier: 'extended', capability: 'companyFinance' }));
 
-const paySplitRoutes = createApiRouter()
-    .openapi(listPaySplitsRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const caps = await capabilitiesFor(c);
-        const rows = await getSplitsForInspection(getDrizzle(c), tenantId, id);
-        const self = c.get('user')?.sub ?? '';
-        const visible = caps.companyFinance ? rows : rows.filter(s => s.userId === self);
-        return c.json({
-            success: true,
-            data: {
-                canEdit: caps.companyFinance,
-                scope: caps.companyFinance ? ('all' as const) : ('self' as const),
-                splits: visible.map(toWire),
-            },
-        });
-    })
-    .openapi(previewRefreshRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const changes = await previewRefresh(getDrizzle(c), getTenantId(c), id);
-        return c.json({ success: true, data: { changes } });
-    })
-    .openapi(setPaySplitRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id, splitId } = c.req.valid('param');
-        const { amountCents, reason } = c.req.valid('json');
-        const db = getDrizzle(c);
-        await requireOnInspection(db, tenantId, id, splitId);
-        const row = await setSplitManually(db, tenantId, splitId, amountCents, reason);
-        return c.json({ success: true, data: toWire(row) });
-    })
-    .openapi(refreshPaySplitsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const changed = await refreshSplits(getDrizzle(c), getTenantId(c), id);
-        return c.json({ success: true, data: { changed } });
-    })
-    .openapi(correctPaySplitRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id, splitId } = c.req.valid('param');
-        const input = c.req.valid('json');
-        const db = getDrizzle(c);
-        await requireOnInspection(db, tenantId, id, splitId);
-        const row = await correctSplit(db, tenantId, splitId, input);
-        return c.json({ success: true, data: toWire(row) }, 201);
+const app = createApiRouter();
+app.openapi(listPaySplitsRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const caps = await capabilitiesFor(c);
+    const rows = await getSplitsForInspection(getDrizzle(c), tenantId, id);
+    const self = c.get('user')?.sub ?? '';
+    const visible = caps.companyFinance ? rows : rows.filter(s => s.userId === self);
+    return c.json({
+        success: true,
+        data: {
+            canEdit: caps.companyFinance,
+            scope: caps.companyFinance ? ('all' as const) : ('self' as const),
+            splits: visible.map(toWire),
+        },
     });
+});
+app.openapi(previewRefreshRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const changes = await previewRefresh(getDrizzle(c), getTenantId(c), id);
+    return c.json({ success: true, data: { changes } });
+});
+app.openapi(setPaySplitRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id, splitId } = c.req.valid('param');
+    const { amountCents, reason } = c.req.valid('json');
+    const db = getDrizzle(c);
+    await requireOnInspection(db, tenantId, id, splitId);
+    const row = await setSplitManually(db, tenantId, splitId, amountCents, reason);
+    return c.json({ success: true, data: toWire(row) });
+});
+app.openapi(refreshPaySplitsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const changed = await refreshSplits(getDrizzle(c), getTenantId(c), id);
+    return c.json({ success: true, data: { changed } });
+});
+app.openapi(correctPaySplitRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id, splitId } = c.req.valid('param');
+    const input = c.req.valid('json');
+    const db = getDrizzle(c);
+    await requireOnInspection(db, tenantId, id, splitId);
+    const row = await correctSplit(db, tenantId, splitId, input);
+    return c.json({ success: true, data: toWire(row) }, 201);
+});
 
-export default paySplitRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const paySplitRouteConfigs = [
+    listPaySplitsRoute,
+    previewRefreshRoute,
+    setPaySplitRoute,
+    refreshPaySplitsRoute,
+    correctPaySplitRoute,
+] as const;
+
+export default app;

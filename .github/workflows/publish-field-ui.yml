@@ -1,0 +1,116 @@
+name: publish-field-ui
+
+# Publishes @inspectorhub/field-ui to npm with trusted publishing (OIDC, no
+# token). The filename is bound to the trusted-publisher entry on npmjs.com:
+# renaming this file breaks publishing until that entry is edited to match.
+#
+# Trigger: release-please.yml dispatches this workflow, with the release tag as
+# the ref, right after release-please cuts a `field-ui-vX.Y.Z` release. A tag or
+# release created with the default GITHUB_TOKEN does not start other workflows,
+# but workflow_dispatch is the documented exception, so no PAT is needed. This
+# workflow is also the one that runs, so the OIDC token names this file (a
+# workflow_call would present the CALLER's filename to npm instead).
+#
+# Two jobs, so that code from the dependency tree never runs next to the
+# identity that can publish:
+#   build   - checks out the tag, installs (npm ci runs dependency lifecycle
+#             scripts), builds, scans and packs. It can read the repository and
+#             nothing else: no id-token, so it cannot mint the OIDC token.
+#   publish - holds id-token: write. It checks nothing out and installs no
+#             dependencies; it runs npm itself on the one tarball the build job
+#             scanned and uploaded.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Upstream only: forks have no trusted-publisher entry.
+    if: >-
+      github.repository == 'InspectorHub/OpenInspection' &&
+      github.ref_type == 'tag' &&
+      startsWith(github.ref_name, 'field-ui-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22.22.x
+          cache: npm
+      - run: npm ci
+      # The tag and the package must agree, or the registry gets a version the
+      # release does not describe.
+      - name: Check tag matches package version
+        run: |
+          expected="field-ui-v$(node -p "require('./packages/field-ui/package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package version ($expected)" >&2
+            exit 1
+          fi
+      - run: npm run build -w @inspectorhub/field-ui
+      - name: Pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/field-ui-pack"
+          npm pack -w @inspectorhub/field-ui --pack-destination "$RUNNER_TEMP/field-ui-pack"
+      # Scan the very file that will be published, before it can no longer be taken back.
+      # Terms that must not be written into this public repository come in at run time as a
+      # JSON array of regex sources (repository secret PACKAGE_SCAN_EXTRA_PATTERNS). The run
+      # REQUIRES the secret: an unset or empty one fails here instead of quietly dropping the
+      # private-term check. To publish without those patterns on purpose, set the secret to [].
+      - name: Scan the tarball
+        env:
+          PACKAGE_SCAN_EXTRA_PATTERNS: ${{ secrets.PACKAGE_SCAN_EXTRA_PATTERNS }}
+          PACKAGE_SCAN_REQUIRE_EXTRA: '1'
+        run: |
+          set -- "$RUNNER_TEMP"/field-ui-pack/*.tgz
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one packed tarball, found $#" >&2; exit 1; }
+          node scripts/check-package-tarball.mjs --tarball="$1"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: field-ui-tarball
+          path: ${{ runner.temp }}/field-ui-pack/*.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    if: >-
+      github.repository == 'InspectorHub/OpenInspection' &&
+      github.ref_type == 'tag' &&
+      startsWith(github.ref_name, 'field-ui-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22.22.x
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm >= 11.5.1; the npm bundled with Node 22 is 10.x. Pinned to the
+      # 11 line, not `latest`, so a new major cannot change how this job publishes unannounced.
+      - run: npm install -g npm@11
+      - uses: actions/download-artifact@v4
+        with:
+          name: field-ui-tarball
+          path: ${{ runner.temp }}/field-ui-pack
+      - name: Publish the scanned tarball
+        run: |
+          set -- "$RUNNER_TEMP"/field-ui-pack/*.tgz
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one tarball, found $#" >&2; exit 1; }
+          # The tarball must be the package the tag names.
+          packed="$(tar -xzOf "$1" package/package.json | node -p "const p=JSON.parse(require('fs').readFileSync(0,'utf8'));p.name+'@'+p.version")"
+          if [ "field-ui-v${packed#*@}" != "$GITHUB_REF_NAME" ] || [ "${packed%@*}" != "@inspectorhub/field-ui" ]; then
+            echo "tarball is $packed, which the tag $GITHUB_REF_NAME does not name" >&2
+            exit 1
+          fi
+          npm publish "$1" --provenance --access public

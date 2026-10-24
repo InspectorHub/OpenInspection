@@ -54,45 +54,8 @@
  * limit off.
  */
 
+import { DEFAULT_IMPORT_LIMITS, IMPORT_LIMIT_CEILINGS, type ImportLimitName, type ImportLimits } from '@core/offline-package';
 import { AppError, ErrorCode } from '../errors';
-
-const MIB = 1024 * 1024;
-
-export interface ImportLimits {
-    /** Largest request body, in bytes. */
-    compressedBytes: number;
-    /** Largest sum of every entry's decompressed size, in bytes. */
-    uncompressedBytes: number;
-    /** Most zip entries (manifest, outbox, media index, Yjs states and photos). */
-    entries: number;
-    /** Most inspections the manifest may name. */
-    inspections: number;
-    /** Most queued writes in the outbox. */
-    outbox: number;
-    /** Most photos in the media index. */
-    photos: number;
-}
-
-export type ImportLimitName = keyof ImportLimits;
-
-export const DEFAULT_IMPORT_LIMITS: ImportLimits = {
-    compressedBytes: 16 * MIB,
-    uncompressedBytes: 48 * MIB,
-    entries: 200,
-    inspections: 8,
-    outbox: 20,
-    photos: 50,
-};
-
-/** The most an operator can raise each limit to. Also the bound the package schemas enforce. */
-export const IMPORT_LIMIT_CEILINGS: ImportLimits = {
-    compressedBytes: 24 * MIB,
-    uncompressedBytes: 72 * MIB,
-    entries: 2000,
-    inspections: 200,
-    outbox: 500,
-    photos: 1500,
-};
 
 /** The least an operator can lower each limit to: a package needs at least these to mean anything. */
 const IMPORT_LIMIT_FLOORS: ImportLimits = {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resolveMediaType, isVideoEntry } from '../../../server/lib/media/media-type';
-import type { MediaEntry } from '../../../server/types/inspection-item-state';
+import { resolveMediaType, isVideoEntry } from '@core/field-ui/shared/media-type';
+import type { MediaEntry } from '@core/field-ui/shared/inspection-item-state';
 
 describe('resolveMediaType', () => {
     // `resolveMediaType` narrows its parameter to `{ mediaType?: string }`, so the

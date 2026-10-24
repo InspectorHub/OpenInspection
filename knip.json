@@ -20,13 +20,17 @@
     "vitest.typecheck.config.ts",
     "vitest.workers.config.ts",
     "vite.config.ts",
-    "app/components/media-studio/react-konva.ssr-stub.tsx",
+    "packages/field-ui/src/components/media-studio/react-konva.ssr-stub.tsx",
     "server/lib/compliance/retention-policy.ts",
     "**/*.test.{ts,tsx}",
     "**/*.spec.{ts,tsx}",
     "tests/**/*.ts",
     "packages/shared-ui/src/index.ts",
-    "packages/api-types/index.ts"
+    "packages/api-types/index.ts",
+    "packages/offline-package/index.ts",
+    "packages/field-ui/src/index.ts",
+    "packages/field-ui/src/testing/fake-data-source.ts",
+    "packages/field-ui/tsup.config.ts"
   ],
   "project": [
     "app/**/*.{ts,tsx}",
@@ -51,13 +55,21 @@
     "-gateConsumed",
     "-declarationEmit"
   ],
+  // Top-level options configure the ROOT workspace only. packages/field-ui is a workspace of its own and is
+  // checked by knip with its own package.json: an unlisted import there is reported (verified by adding one),
+  // so nothing below hides a field-ui dependency problem. What it hides is the ROOT's view of these names.
   "ignoreDependencies": [
+    // Tooling the config files and scripts use without importing: knip cannot see the use.
     "@fontsource/.+",
     "swagger-ui-dist",
     "tailwindcss",
     "miniflare",
     "lint-staged",
     "cloudflare",
-    "@inlang/plugin-message-format"
+    "@inlang/plugin-message-format",
+    // Path aliases (tsconfig paths and vite aliases), not packages.
+    "@core/shared-ui",
+    "@core/api-types",
+    "@core/offline-package"
   ]
 }

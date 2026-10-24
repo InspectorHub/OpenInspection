@@ -3,6 +3,7 @@ import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
 import { overwriteGetLocale } from "~/paraglide/runtime";
 import { resolveClientLocale } from "~/lib/i18n/client-locale";
+import { bindFieldUiLocale } from "~/lib/field/web-locale";
 
 // i18n — make the client-side getLocale() PURE before React hydrates.
 //
@@ -33,6 +34,9 @@ import { resolveClientLocale } from "~/lib/i18n/client-locale";
 // document the client is hydrating. Reading it back is how the two agree without a
 // second resolution path that could disagree with the first.
 overwriteGetLocale(() => resolveClientLocale(document.documentElement.lang));
+// The field editor package has its own runtime; point it at the one above (after the
+// overwrite, so it reads the pure resolver; the binding is a thunk either way).
+bindFieldUiLocale();
 
 startTransition(() => {
   hydrateRoot(

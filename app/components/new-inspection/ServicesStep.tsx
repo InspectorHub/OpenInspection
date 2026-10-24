@@ -1,6 +1,6 @@
 import { formatPriceCents } from "~/lib/wizard-steps";
 import { getEffectivePriceCents } from "../../../server/lib/effective-price";
-import { MoneyInput } from "~/components/MoneyInput";
+import { MoneyInput } from "@core/field-ui/components/MoneyInput";
 import type { WizardService } from "../NewInspectionWizard";
 import { m } from "~/paraglide/messages";
 

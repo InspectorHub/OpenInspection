@@ -36,10 +36,14 @@
  *                       A guard that lives in another file (a parent component, a shared hook) is invisible;
  *                       that is what the allow marker is for, with the reason naming where the guard is.
  *
+ * raw-submit-unlatched also covers `<expr>.execute(`, the field-ui command channel: every execute is a write, so no method is
+ *                       read, and `useFieldCommand` is a recognised guard. The hook's own implementation uses the marker.
+ *
  * Exception: a comment `busy-controls-allow: <reason>` inside the tag or on the line(s) just above it;
  * it exempts exactly the next opening tag and needs a real reason (see jsx-scan.mjs hasAllowMarker).
  */
 import { analyze, elementBody, findOpeningTags, hasAllowMarker, lineOf } from './jsx-scan.mjs';
+import { executeCallIndices } from './execute-call-sites.mjs';
 
 // A bare aria-disabled / aria-busy does not stop a submit: only pendingProps' inert click cancels
 // the click that Enter in a field synthesizes on the default button. Anything else needs a marker.
@@ -54,7 +58,7 @@ const STRING_COMPARISON = /[A-Za-z_$][\w$.]*\s*[!=]==?\s*(["'`])(?:\.|(?!\1).)*\
 const STRING_LITERAL = /(["'`])(?:\.|(?!\1).)*\1/g;
 const FORM_NAME = /^(?:form|Form|[A-Za-z_$][\w$]*\.Form)$/;
 
-const SAME_FRAME_GUARD = /\b(?:useSubmitLatch|useActionLatch|useGuardedSubmit|inFlight|gatedSubmit|guardedSubmit|busyRef)\b|\b\w*[lL]atch\w*\(|\b\w*[iI]nFlight\b/g;
+const SAME_FRAME_GUARD = /\b(?:useSubmitLatch|useActionLatch|useGuardedSubmit|useFieldCommand|inFlight|gatedSubmit|guardedSubmit|busyRef)\b|\b\w*[lL]atch\w*\(|\b\w*[iI]nFlight\b/g;
 const GUARD_TEST = new RegExp(SAME_FRAME_GUARD.source);
 const KEYWORDS = new Set(['const', 'let', 'var', 'function', 'async', 'await', 'return', 'if', 'else', 'new', 'true', 'false', 'null', 'undefined', 'typeof', 'void', 'this', 'e', 'ev', 'event', 'preventDefault', 'currentTarget', 'target']);
 const LITERAL_GET = /^\{?\s*(["'`])get\1\s*\}?$/i;
@@ -254,10 +258,15 @@ export function detectBusyControls(src) {
     const calls = [
         ...code.matchAll(/\b([A-Za-z_$][\w$]*)\.submit\(/g),
         ...code.matchAll(/(?<![.\w$])(?:(?:window|globalThis)\.)?(fetch)\(/g),
+        // `<expr>.execute(` is the field-ui command channel (FieldDataSource.execute), including a destructured
+        // `execute(` and an alias of it. Every command is a write (reads go through load / resources.*.list), so
+        // unlike submit( and fetch( there is no method to inspect. See execute-call-sites.mjs for the shapes.
+        ...executeCallIndices(code).map(({ index, label }) => ({ index, 0: label, execute: true })),
     ];
     for (const m of calls) {
         const at = m.index;
-        if (!mutates(callArgs(a.text, a.str, at + m[0].length))) continue;
+        const isExecute = m.execute === true;
+        if (!isExecute && !mutates(callArgs(a.text, a.str, at + m[0].length))) continue;
         const line = lineOf(a.src, at);
         if (guardedAt(code, at)) continue;
         // The marker sits above the STATEMENT (`const res = await fetch(`), so anchor it at the statement's first character.
@@ -269,7 +278,7 @@ export function detectBusyControls(src) {
         violations.push({
             line,
             rule: 'raw-submit-unlatched',
-            message: `${m[1]}${m[1] === "fetch" ? "(" : ".submit("} is called from a function that reaches no same-frame guard; a double click issues the request twice before pending renders (useActionLatch / useGuardedSubmit)`,
+            message: `${isExecute ? m[0] : `${m[1]}${m[1] === "fetch" ? "(" : ".submit("}`} is called from a function that reaches no same-frame guard; a double click issues the request twice before pending renders (useActionLatch / useGuardedSubmit)`,
         });
     }
     return { sites: tags.length, submits, violations };

@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import { Modal } from "@core/shared-ui";
 import { calendarItemHref, type CalendarEvent } from "~/components/calendar/calendar-helpers";
-import { formatDate, formatDateTime } from "~/lib/format";
+import { formatDate, formatDateTime } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 import { EVENT_STATUS } from "~/lib/status";
 

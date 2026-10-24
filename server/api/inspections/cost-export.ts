@@ -54,60 +54,66 @@ const costExportXlsxRoute = createRoute(withMcpMetadata({
     description: 'Multi-sheet XLSX export of the commercial PCA cost tables (Opinion of Cost +, when enabled, the Reserve Schedule), reconciled against the same tenant reserve configuration the rendered report uses.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-const costExportRoutes = createApiRouter()
-    .openapi(costExportCsvRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const items = await new CostItemService(c.env.DB).listByInspection(id, tenantId);
-        const csv = costItemsToCsv(items);
-        return new Response(csv, {
-            status: 200,
-            headers: {
-                'Content-Type': 'text/csv; charset=utf-8',
-                'Content-Disposition': contentDisposition(`cost-items-${id}.csv`, true),
-            },
-        });
-    })
-    .openapi(costExportXlsxRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const items = await new CostItemService(c.env.DB).listByInspection(id, tenantId);
-
-        // Reserve config + building area — mirror InspectionReportService.getReportData's
-        // reserve-config read exactly, so the exported Reserve Schedule sheet never
-        // diverges from the rendered report (reconciliation invariant).
-        const db = getDrizzle(c);
-        const cfg = await db.select({
-            reserveScheduleEnabled: tenantConfigs.reserveScheduleEnabled,
-            reserveTermYears: tenantConfigs.reserveTermYears,
-            inflationRateBps: tenantConfigs.inflationRateBps,
-        })
-            .from(tenantConfigs)
-            .where(eq(tenantConfigs.tenantId, tenantId))
-            .get();
-        const insp = await db.select({ sqft: inspections.sqft })
-            .from(inspections)
-            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
-            .get();
-
-        const tables = buildCostTables(
-            items,
-            {
-                reserveScheduleEnabled: Boolean(cfg?.reserveScheduleEnabled),
-                reserveTermYears: cfg?.reserveTermYears ?? 12,
-                inflationRateBps: cfg?.inflationRateBps ?? null,
-            },
-            new Date().getFullYear(),
-            insp?.sqft ?? null,
-        );
-        const buffer = await costTablesToXlsxBuffer(tables);
-        return new Response(buffer, {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition': contentDisposition(`cost-items-${id}.xlsx`, true),
-            },
-        });
+const app = createApiRouter();
+app.openapi(costExportCsvRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const items = await new CostItemService(c.env.DB).listByInspection(id, tenantId);
+    const csv = costItemsToCsv(items);
+    return new Response(csv, {
+        status: 200,
+        headers: {
+            'Content-Type': 'text/csv; charset=utf-8',
+            'Content-Disposition': contentDisposition(`cost-items-${id}.csv`, true),
+        },
     });
+});
+app.openapi(costExportXlsxRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const items = await new CostItemService(c.env.DB).listByInspection(id, tenantId);
 
-export default costExportRoutes;
+    // Reserve config + building area — mirror InspectionReportService.getReportData's
+    // reserve-config read exactly, so the exported Reserve Schedule sheet never
+    // diverges from the rendered report (reconciliation invariant).
+    const db = getDrizzle(c);
+    const cfg = await db.select({
+        reserveScheduleEnabled: tenantConfigs.reserveScheduleEnabled,
+        reserveTermYears: tenantConfigs.reserveTermYears,
+        inflationRateBps: tenantConfigs.inflationRateBps,
+    })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get();
+    const insp = await db.select({ sqft: inspections.sqft })
+        .from(inspections)
+        .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+        .get();
+
+    const tables = buildCostTables(
+        items,
+        {
+            reserveScheduleEnabled: Boolean(cfg?.reserveScheduleEnabled),
+            reserveTermYears: cfg?.reserveTermYears ?? 12,
+            inflationRateBps: cfg?.inflationRateBps ?? null,
+        },
+        new Date().getFullYear(),
+        insp?.sqft ?? null,
+    );
+    const buffer = await costTablesToXlsxBuffer(tables);
+    return new Response(buffer, {
+        status: 200,
+        headers: {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': contentDisposition(`cost-items-${id}.xlsx`, true),
+        },
+    });
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const costExportRouteConfigs = [
+    costExportCsvRoute,
+    costExportXlsxRoute,
+] as const;
+
+export default app;

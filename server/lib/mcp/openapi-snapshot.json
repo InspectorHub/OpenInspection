@@ -979,6 +979,31 @@
     "description": "Hard-deletes a pending tenant_invites row that belongs to the caller tenant. 404 when the token is unknown, already accepted, or belongs to another tenant."
   },
   {
+    "operationId": "captureCollabSnapshot",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/snapshots",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Capture a snapshot of a report document",
+    "description": "Takes a snapshot of the inspection report document now, for the version history. No body. Callers on the inspection roster only."
+  },
+  {
     "operationId": "changeMyPassword",
     "method": "POST",
     "pathTemplate": "/api/auth/change-password",
@@ -1041,6 +1066,20 @@
     },
     "summary": "Check internal holiday policy for a date",
     "description": "Used by the New Inspection wizard to show advisory/block UI for company closed days."
+  },
+  {
+    "operationId": "checkQboCredentials",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/credentials/check",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Check the QuickBooks Client ID and Secret",
+    "description": "Asks Intuit whether the configured Client ID and Client Secret belong together. Nothing is connected or stored and the response carries the verdict only. Rate limited per company. Owner or manager with the companyFinance capability."
   },
   {
     "operationId": "cloneInspection",
@@ -2048,6 +2087,31 @@
     },
     "summary": "Create a cost item for an inspection",
     "description": "Create a new commercial PCA cost line item on the inspection. When findingKey is set and no explicit cost/remedy is given, the line is best-effort seeded from the finding's recommendation snapshot."
+  },
+  {
+    "operationId": "createInspectionEvent",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{inspectionId}/events",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "inspectionId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection the visit is scheduled on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection the visit is scheduled on."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Schedule a visit on an inspection",
+    "description": "Schedules a visit (event) of an event type on one inspection. The JSON body is {eventTypeId, scheduledAt, durationMin, inspectorId?, priceCents?, notes?}: scheduledAt is an ISO 8601 date-time, durationMin a positive whole number of minutes, and priceCents defaults to 0. A body that is not valid answers 400 with the field errors. A price is refused without the inspection-fees capability."
   },
   {
     "operationId": "createInspectionExportWord",
@@ -4550,6 +4614,24 @@
     "description": "Create a new inspection template. (POST /templates, inspections domain)."
   },
   {
+    "operationId": "createInspectionType",
+    "method": "POST",
+    "pathTemplate": "/api/admin/inspection-types",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/CreateInspectionType"
+      }
+    },
+    "summary": "Create an inspection subtype",
+    "description": "Creates a company-defined inspection subtype such as Medical Office, optionally based on a platform property subtype. Owner or manager only."
+  },
+  {
     "operationId": "createInspectionUncancel",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/uncancel",
@@ -5655,6 +5737,20 @@
     "description": "Save the company's non-sensitive integration settings (appBaseUrl, turnstileSiteKey, googleClientId, streamCustomerSubdomain). The body is merged into what is stored: keys that are sent overwrite, keys that are left out are kept, and a key sent as an empty string is removed. The values are stored as plaintext, so secrets never go through this route. The change is audit-logged. Idempotent for the same body. Restricted to the owner."
   },
   {
+    "operationId": "createVisitEventType",
+    "method": "POST",
+    "pathTemplate": "/api/event-types",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Create a visit event type",
+    "description": "Creates an event type the company schedules visits with. The JSON body is {name, slug, defaultDurationMin?, defaultPriceCents?, color?, sortOrder?, followUpDelayHours?}: name and slug are required, slug is lowercase letters, digits and underscores, color is a six-digit hex value, and the omitted fields take 30 minutes, a price of 0, #6366f1, sort order 0 and the stored follow-up default. A body that is not valid answers 400 with the field errors. Owner or manager only; a price is refused without the inspection-fees capability."
+  },
+  {
     "operationId": "createWidgetEvent",
     "method": "POST",
     "pathTemplate": "/api/public/widget/event",
@@ -5898,6 +5994,41 @@
     "description": "Deletes an owned calendar block. Owners and managers can delete any block in their company."
   },
   {
+    "operationId": "deleteClientDocument",
+    "method": "DELETE",
+    "pathTemplate": "/api/public/inspections/{id}/documents/{docId}",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose documents are addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose documents are addressed."
+          }
+        },
+        {
+          "name": "docId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the document to act on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the document to act on."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a document the client uploaded",
+    "description": "Client-portal delete of one document on an inspection. Only the seat that uploaded the document may remove it. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
+  },
+  {
     "operationId": "deleteContact",
     "method": "DELETE",
     "pathTemplate": "/api/contacts/{id}",
@@ -6103,6 +6234,70 @@
     "description": "Delete a commercial PCA cost line item, tenant-scoped. Removing an item never touches the finding it was linked from."
   },
   {
+    "operationId": "deleteInspectionDocument",
+    "method": "DELETE",
+    "pathTemplate": "/api/inspections/{id}/documents/{docId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose documents are addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose documents are addressed."
+          }
+        },
+        {
+          "name": "docId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the document to act on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the document to act on."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete any document on an inspection",
+    "description": "Staff delete of one document on an inspection, whoever uploaded it. Owners, managers and inspectors only."
+  },
+  {
+    "operationId": "deleteInspectionEvent",
+    "method": "DELETE",
+    "pathTemplate": "/api/events/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the visit to delete.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the visit to delete."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a visit from an inspection",
+    "description": "Deletes one scheduled visit (event). Owner or manager only."
+  },
+  {
     "operationId": "deleteInspectionItemsPhoto",
     "method": "DELETE",
     "pathTemplate": "/api/inspections/{id}/items/{itemId}/photos/{photoIndex}",
@@ -6257,6 +6452,33 @@
     },
     "summary": "Delete inspection template for current tenant",
     "description": "Permanently delete a template and write a template.delete audit entry. Refused with 409 while anything still references it: an inspection created from it, a service that uses it as its default, a report generated from it, or a marketplace import whose local copy it is (remove the import first). Returns 404 for an unknown template and 403 without the template delete capability. Not reversible. Restricted to owners, managers and inspectors."
+  },
+  {
+    "operationId": "deleteInspectionType",
+    "method": "DELETE",
+    "pathTemplate": "/api/admin/inspection-types/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection subtype to act on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection subtype to act on."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete an inspection subtype",
+    "description": "Deletes one company inspection subtype. Owner or manager only."
   },
   {
     "operationId": "deleteInspectionUnit",
@@ -6964,6 +7186,20 @@
     "description": "Disconnects the calling user calendar and removes what it synced, in one atomic batch scoped to the caller and their company: the connection, the busy blocks imported from it (date overrides with that source), the read-calendar choices and the links to events on the calendar. Hand-entered overrides are never touched, and events in the external calendar are not changed. The optional provider limits the disconnect to google or apple; omitted, every provider the caller is connected to is disconnected. An unknown provider is a 400."
   },
   {
+    "operationId": "disconnectQbo",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/disconnect",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Disconnect QuickBooks from the company",
+    "description": "Revokes the Intuit refresh token and deletes the company mapping between invoices and QuickBooks invoices, which reconnecting does not restore. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "dismissOnboardingChecklist",
     "method": "POST",
     "pathTemplate": "/api/auth/checklist/dismiss",
@@ -6976,6 +7212,31 @@
     },
     "summary": "Dismiss the onboarding checklist",
     "description": "Marks the dashboard onboarding checklist as dismissed for the current user. Idempotent — safe to call multiple times."
+  },
+  {
+    "operationId": "dismissQboError",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/errors/{id}/dismiss",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the sync row to dismiss.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the sync row to dismiss."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Dismiss one open QuickBooks sync row",
+    "description": "Marks one open QuickBooks sync row as resolved because a person has looked at it; nothing is retried. Owner or manager with the companyFinance capability."
   },
   {
     "operationId": "downloadCertificatePdf",
@@ -7631,6 +7892,36 @@
     "description": "Returns the routing strategy, lead time and cutoff, plus whether the company address and per-inspector service origins have coordinates — which is what decides whether `closest` can run at all."
   },
   {
+    "operationId": "getCalendarIcsLinks",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/ics-links",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get the calendar subscribe feed links",
+    "description": "Returns the paths of the calendar feeds the signed-in user can subscribe to: the public busy-time feed, a sealed-token schedule feed, and for owners and managers the company-wide feed. Paths only; the caller supplies the origin."
+  },
+  {
+    "operationId": "getCalendarReadSet",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/read-set",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get the calendar read set",
+    "description": "Returns everything the My Schedule calendar picker needs for the signed-in user connection: the calendars the provider lists, the current read set and the write target. Answers { connected: false } when no calendar is connected."
+  },
+  {
     "operationId": "getCancellationQuote",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/cancellation-quote",
@@ -7725,6 +8016,41 @@
     "description": "Returns the identity behind a native access token and the tenant offline access limit, which the device uses to decide when to lock local data. When the request carries X-Client-Platform and X-Client-Version, the server also notes that this version was seen."
   },
   {
+    "operationId": "getCollabSnapshot",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/collab/snapshots/{seq}",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        },
+        {
+          "name": "seq",
+          "in": "path",
+          "required": true,
+          "description": "Snapshot sequence number, a whole number of zero or more.",
+          "schema": {
+            "type": "string",
+            "description": "Snapshot sequence number, a whole number of zero or more."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get one snapshot of a report document",
+    "description": "Returns one snapshot in full, including the projection of the report document, so two versions can be compared. A sequence number the document has no snapshot for answers 404 from the Durable Object with a plain-text body. Callers on the inspection roster only."
+  },
+  {
     "operationId": "getCommunicationConfig",
     "method": "GET",
     "pathTemplate": "/api/admin/communication",
@@ -7739,6 +8065,31 @@
     },
     "summary": "Get tenant communication settings",
     "description": "Returns the tenant transactional-email identity (sender + reply-to) plus delivery/integration status flags (Resend configured, ICS URL, Google Calendar connected) for the Settings → Communication page."
+  },
+  {
+    "operationId": "getCompanyBookingProfile",
+    "method": "GET",
+    "pathTemplate": "/api/public/book/{tenant}",
+    "scopes": [],
+    "tag": "bookings",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug from the booking page URL; resolved server-side to the company.",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug from the booking page URL; resolved server-side to the company."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get a company public booking profile",
+    "description": "Public, unauthenticated, rate-limited read of what a company offers on its booking page: display name, whether online booking is open and why not, its active services with prices and deposits, and the inspector list when the company lets visitors choose. The company is resolved from the slug and 404s if unknown."
   },
   {
     "operationId": "getContactDetail",
@@ -7891,6 +8242,22 @@
     },
     "summary": "Change history for a template / comment / entity",
     "description": "Returns the tenant-scoped audit_logs entries for a single entity id, newest first, with the actor name resolved."
+  },
+  {
+    "operationId": "getGoogleCalendarStatus",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/status",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get the calendar connection status",
+    "description": "Reports whether the signed-in user has a calendar connected, which provider and capability it uses, whether Google OAuth is configured on this deployment, and when the last sync ran or why it failed."
   },
   {
     "operationId": "getImportRun",
@@ -8489,6 +8856,41 @@
     },
     "summary": "Get full snapshot for a specific version",
     "description": "Returns the full frozen snapshot captured when version n was published: the inspection record, its results data, its units, the inspectors credited at the time and the resolved report style. Reads the stored copy, so later edits to the live inspection do not change it. Returns 404 when no such version exists for the inspection in this company. Read-only. Available to owner, manager, inspector and agent roles."
+  },
+  {
+    "operationId": "getInspectorBookingProfile",
+    "method": "GET",
+    "pathTemplate": "/api/public/book/{tenant}/{slug}",
+    "scopes": [],
+    "tag": "bookings",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug from the booking page URL; resolved server-side to the company.",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug from the booking page URL; resolved server-side to the company."
+          }
+        },
+        {
+          "name": "slug",
+          "in": "path",
+          "required": true,
+          "description": "Inspector slug within the company, from the legacy deep link.",
+          "schema": {
+            "type": "string",
+            "description": "Inspector slug within the company, from the legacy deep link."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get an inspector public booking profile",
+    "description": "Public, unauthenticated, rate-limited read of one inspector booking profile: name, photo, whether that inspector is taking bookings, and the company active services. Both the company and the inspector are resolved from slugs and 404 if unknown."
   },
   {
     "operationId": "getIntegrationOverview",
@@ -9161,6 +9563,31 @@
     "description": "Public, no-login signature-chain verification for a signed agreement envelope. Returns chain validity + key fingerprint for independent verification."
   },
   {
+    "operationId": "getPublicVerifyByToken",
+    "method": "GET",
+    "pathTemplate": "/api/public/verify-by-token/{token}",
+    "scopes": [],
+    "tag": "public",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "description": "Verification token printed on the signed agreement document.",
+          "schema": {
+            "type": "string",
+            "description": "Verification token printed on the signed agreement document."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Resolve a verification token to an envelope",
+    "description": "Public, no-login lookup that turns the verification token printed on a signed agreement into the signature envelope id, which the public verification route then reads. Answers 404 when no envelope carries the token."
+  },
+  {
     "operationId": "getPublicViewTracking",
     "method": "GET",
     "pathTemplate": "/api/public/inspections/{id}/view-tracking",
@@ -9194,6 +9621,49 @@
     },
     "summary": "Whether this recipient has objected to report-view measurement",
     "description": "Reads the recipient's GDPR Art. 21 objection to report-view measurement. Gated by the recipient's own portal token (?token=) or the unified-portal session cookie."
+  },
+  {
+    "operationId": "getQboConnectionStatus",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/qbo/status",
+    "scopes": [
+      "read"
+    ],
+    "tag": "qbo",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Read the QuickBooks connection status",
+    "description": "Reports the QuickBooks connection of the company: realm, company name, last sync, open sync rows, payment discrepancies and where each credential comes from (never the credential). Owner or manager with the companyFinance capability."
+  },
+  {
+    "operationId": "getQboContactLink",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/qbo/contacts/{contactId}/link",
+    "scopes": [
+      "read"
+    ],
+    "tag": "qbo",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the contact whose QuickBooks match is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the contact whose QuickBooks match is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Read the QuickBooks match of a contact",
+    "description": "Reports whether one contact is matched to a QuickBooks customer, which customer, and how many open sync rows concern the contact. Owner or manager with the companyFinance capability."
   },
   {
     "operationId": "getRatingSystem",
@@ -9586,6 +10056,20 @@
     "description": "Returns the inspector restriction list for a service. An empty userIds array means all non-agent staff are qualified (no restriction rows). Admin or owner only."
   },
   {
+    "operationId": "getSessionContext",
+    "method": "GET",
+    "pathTemplate": "/api/session/context",
+    "scopes": [],
+    "tag": "client",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get branding, user and deployment context for the session",
+    "description": "Returns the company branding and display defaults, the signed-in user with resolved capabilities, the deployment flags the interface gates on, seat usage, video provider, outbound cooling window and unread message count. Requires a signed-in session; the answer is never cached."
+  },
+  {
     "operationId": "getSetupStatus",
     "method": "GET",
     "pathTemplate": "/api/auth/setup-status",
@@ -9895,6 +10379,36 @@
     },
     "summary": "Get the current tenant's usage summary (inspections/sms/email/storage/seats + free-tier caps)",
     "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against. Available to owner, manager and inspector roles."
+  },
+  {
+    "operationId": "getVisibleInspections",
+    "method": "POST",
+    "pathTemplate": "/api/client/inspections/visible",
+    "scopes": [
+      "read"
+    ],
+    "tag": "client",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Inspection ids the device holds locally. Between 1 and the server limit (300 by default; the limit is returned in details.limits.ids when exceeded). Each id is 1 to 64 characters from A-Z, a-z, 0-9, underscore and hyphen; a request that breaks any of these is refused whole with 422."
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      }
+    },
+    "summary": "Check which local inspections the server still shows this member",
+    "description": "Takes the inspection ids a native device holds and returns the ones that still exist in the signed-in company and that this member may see, in request order. An id that is missing from the answer was deleted, never existed, or is not visible to this member; the response does not say which, so a restricted member learns nothing about inspections outside their assignments. The device compares the answer with its local copies when it is back online. A failure is an error status and never an empty list. Read-only, though it is a POST so the ids travel in the body."
   },
   {
     "operationId": "grantAgentSmsConsent",
@@ -10311,6 +10825,31 @@
     },
     "summary": "Leaderboard agent for current tenant",
     "description": "Ranks referral sources by how many of the company's inspections each referred, most first, with the contact's name, agency and email and the total. Counts every inspection of the company with a referring contact, with no date window and no status or archive filter; inspections without a referrer are left out. Not paginated. Read-only. Available to owner and manager roles; inspectors and agents get 403."
+  },
+  {
+    "operationId": "linkQboContact",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/contacts/{contactId}/link",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the contact whose QuickBooks match is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the contact whose QuickBooks match is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Match a contact to a QuickBooks customer",
+    "description": "Matches one contact to an existing QuickBooks customer; the JSON body is {qboCustomerId} with a non-empty customer id. Safe to repeat. Invoices waiting for the match are pushed after the response. Owner or manager with the companyFinance capability."
   },
   {
     "operationId": "listAgentInspectors",
@@ -10855,6 +11394,81 @@
     "description": "Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers, and anyone holding the scheduleOthers capability, may select other users; everyone else is restricted to themselves. Inspections and scheduled visits are limited to the inspections the caller can see in the inspection list."
   },
   {
+    "operationId": "listClientDocuments",
+    "method": "GET",
+    "pathTemplate": "/api/public/inspections/{id}/documents",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose documents are addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose documents are addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List client-visible inspection documents",
+    "description": "Client-portal read of the documents on one inspection that the client may see: everything clients uploaded plus inspector uploads marked client visible. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
+  },
+  {
+    "operationId": "listClientMessages",
+    "method": "GET",
+    "pathTemplate": "/api/public/inspections/{id}/messages",
+    "scopes": [],
+    "tag": "messages",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose conversation is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose conversation is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the client conversation for an inspection",
+    "description": "Client-portal read of the message thread between the caller and the inspector, oldest first. It marks the staff messages in that thread read. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
+  },
+  {
+    "operationId": "listCollabSnapshots",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/collab/snapshots",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the version history of a report document",
+    "description": "Lists the snapshots kept for the inspection report document, taken automatically and on demand, without their contents. Callers on the inspection roster only; the response is the Durable Object answer unchanged."
+  },
+  {
     "operationId": "listComplianceAiAssurance",
     "method": "GET",
     "pathTemplate": "/api/admin/compliance/ai-assurance",
@@ -11173,6 +11787,60 @@
     },
     "summary": "List cost items for an inspection",
     "description": "List every commercial PCA cost line item recorded for the inspection, in display order, for the editor panel and downstream export routes."
+  },
+  {
+    "operationId": "listInspectionDocuments",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/documents",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose documents are addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose documents are addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List all documents on an inspection",
+    "description": "Staff read of every document attached to one inspection, including internal ones the client cannot see. Open to any signed-in staff member of the company."
+  },
+  {
+    "operationId": "listInspectionEvents",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{inspectionId}/events",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "inspectionId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose visits to list.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose visits to list."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the visits of an inspection",
+    "description": "Lists the scheduled visits (events) of one inspection, earliest first. The price is left out for callers without the inspection-fees capability."
   },
   {
     "operationId": "listInspectionInspectors",
@@ -11790,6 +12458,22 @@
     },
     "summary": "List duplicate marketplace imports",
     "description": "Returns one entry per marketplace template ID that has more than one local copy."
+  },
+  {
+    "operationId": "listInspectionTypes",
+    "method": "GET",
+    "pathTemplate": "/api/admin/inspection-types",
+    "scopes": [
+      "read"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the company inspection subtypes",
+    "description": "Lists the inspection subtypes the company defined (for example Medical Office), ordered by their sort order. Open to owners, managers and inspectors."
   },
   {
     "operationId": "listInspectionUnitProgress",
@@ -13323,6 +14007,22 @@
     },
     "summary": "Get current widget allowed-origin list",
     "description": "Returns the company's allowlist of website origins that may embed the booking widget, as saved by the replace-list route. An empty array when none has been set. Not paginated. Read-only. Restricted to owners and managers."
+  },
+  {
+    "operationId": "listVisitEventTypes",
+    "method": "GET",
+    "pathTemplate": "/api/event-types",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the company visit event types",
+    "description": "Lists the event types the company schedules visits with, such as a radon drop-off, ordered by sort order. Price fields are left out for callers without the inspection-fees capability."
   },
   {
     "operationId": "loginWithPassword",
@@ -17228,6 +17928,31 @@
     "description": "Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields."
   },
   {
+    "operationId": "recordCollabFollowup",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/followup",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Record the follow-up verdict of a carried item",
+    "description": "Records the follow-up verdict of one item carried into a re-inspection. The JSON body is {itemId, status, notes?}: status is a follow-up status key of the company, or null to clear the answer, and notes of at most 4000 characters replace the note when present. Callers on the inspection roster only."
+  },
+  {
     "operationId": "recordInvoiceOfflinePayment",
     "method": "POST",
     "pathTemplate": "/api/invoices/{id}/payments",
@@ -18385,6 +19110,31 @@
     "description": "A PURE READ. Resolves the signed token to the company, the one notification it covers, and whether that notification is already off for this address. Writes nothing — link scanners and mail clients fetch every URL in an email, so acting here would unsubscribe people who never opened the message."
   },
   {
+    "operationId": "restoreCollabSnapshot",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/restore",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Restore a report document to a snapshot",
+    "description": "Replaces the live report document with a snapshot and makes every connected editor reload it. The JSON body is {seq}, the whole-number sequence number of the snapshot to restore. A sequence number the document has no snapshot for answers 404 from the Durable Object with a plain-text body. Callers on the inspection roster only."
+  },
+  {
     "operationId": "restoreContact",
     "method": "POST",
     "pathTemplate": "/api/contacts/{id}/restore",
@@ -18411,6 +19161,31 @@
     },
     "summary": "Restore an archived contact",
     "description": "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued. For a caller whose access is limited to the inspections assigned to them, a contact outside that set is answered as not found."
+  },
+  {
+    "operationId": "restructureCollabDocument",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/collab/restructure",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose report document is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose report document is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Converge a report document after a template change",
+    "description": "Called after the template snapshot of the inspection changed: the live document is diffed against the new snapshot, added items are seeded, removed ones are dropped, and every connected editor resyncs. No body. Callers on the inspection roster only."
   },
   {
     "operationId": "resubmitSmsCompliance",
@@ -18767,6 +19542,31 @@
     "description": "Blank values mean UNSET and are stored as null, which is how a workspace clears a destination. Turning the switch off keeps the endpoint and model — the control says so, and this is what makes that true. Every save bumps a version so anything holding a resolved endpoint can tell it is stale. A save that enables AI while the model or endpoint is blank, with nothing to fall back on, is refused with 422 naming the field."
   },
   {
+    "operationId": "saveCalendarReadSet",
+    "method": "PUT",
+    "pathTemplate": "/api/calendar/connections/{id}/calendars",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the signed-in user calendar connection whose read set is saved.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the signed-in user calendar connection whose read set is saved."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Save the calendar read set",
+    "description": "Saves which of the signed-in user calendars are read for busy time and which one new events are written to. The JSON body is {readCalendarIds, writeCalendarId}: readCalendarIds lists at least one calendar id, writeCalendarId is one of them and must be a calendar the user can edit, and the Primary calendar is always kept in the read set. Only the caller own connection can be saved; any other id answers 404."
+  },
+  {
     "operationId": "saveEmailTemplate",
     "method": "PUT",
     "pathTemplate": "/api/admin/email-templates/{trigger}",
@@ -18872,6 +19672,20 @@
     "description": "Stores users.default_signature_base64 for the authenticated user. Reused by D2 auto-sign-on-publish + Settings -> Profile pad."
   },
   {
+    "operationId": "searchQboCustomers",
+    "method": "GET",
+    "pathTemplate": "/api/integrations/qbo/customers",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Search QuickBooks customers by name or email",
+    "description": "Searches the connected QuickBooks company for customers. Query parameters: q (2 to 100 characters), startPosition (1-based) and limit (1 to 20). Every call goes to Intuit and is rate limited per company. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "seedDefaultsRecommendation",
     "method": "POST",
     "pathTemplate": "/api/recommendations/seed-defaults",
@@ -18913,6 +19727,31 @@
     },
     "summary": "Seed the Document Review checklist",
     "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched."
+  },
+  {
+    "operationId": "sendClientMessage",
+    "method": "POST",
+    "pathTemplate": "/api/public/inspections/{id}/messages",
+    "scopes": [],
+    "tag": "messages",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose conversation is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose conversation is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Send a message as the client",
+    "description": "Client-portal send of one message into the caller thread; the inspector is notified by email. The JSON body is {body, attachments?}: body is 1 to 5000 characters and attachments holds at most 5 descriptors from the upload route. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session."
   },
   {
     "operationId": "sendMessageThread",
@@ -19497,6 +20336,31 @@
     "description": "Records the recipient's own choice for the ONE notification the token names, on the email channel, against the same `notification_preferences` row the signed-in screen writes. Needs no session. Two-directional on purpose — a recipient with no account has no other way back."
   },
   {
+    "operationId": "signInspectionAgreementInPerson",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/sign",
+    "scopes": [],
+    "tag": "inspections",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection whose agreement is signed in person.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection whose agreement is signed in person."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Record an in-person agreement signature",
+    "description": "Records a signature drawn on the inspector device for the inspection agreement, on the signing envelope so it carries the content snapshot, the audit chain and a receipt. The JSON body is {signatureBase64, signerId?, onBehalfOf?, onBehalfDisclaimer?}: signatureBase64 is the signature image as a data URL or raw base64, signerId defaults to the first signer who has not finished, and onBehalfOf and onBehalfDisclaimer name the party an authorized agent signs for. A body that is not valid answers 400. Signing again once the signer or the envelope has signed answers 200 with alreadySigned. Owner, manager or inspector only."
+  },
+  {
     "operationId": "signInspectionCompliance",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/compliance/signoff",
@@ -19741,6 +20605,20 @@
     "description": "Pulls upcoming busy time blocks from the inspector's connected calendar and merges them into availability overrides."
   },
   {
+    "operationId": "syncQboNow",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/sync",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Check QuickBooks for invoice payments now",
+    "description": "Runs one payment scan against QuickBooks and waits for it. Answers 409 when QuickBooks is not connected or the sync is paused, and 503 when QuickBooks does not respond. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "testAiConnection",
     "method": "POST",
     "pathTemplate": "/api/integrations/ai/test",
@@ -19893,6 +20771,20 @@
     "description": "Flips tenant_configs.enable_pdf_pipeline (Spec 5A / Spec 5H gate). Verify env.BROWSER liveness with GET /api/admin/system/br-smoke first."
   },
   {
+    "operationId": "toggleQboSync",
+    "method": "POST",
+    "pathTemplate": "/api/integrations/qbo/pause",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Pause or resume the QuickBooks sync",
+    "description": "Toggles automatic QuickBooks sync for the company and returns the new setting; 404 not_connected when there is no connection. Owner or manager with the companyFinance capability."
+  },
+  {
     "operationId": "touchTenantComment",
     "method": "POST",
     "pathTemplate": "/api/admin/comments/{id}/touch",
@@ -19947,6 +20839,31 @@
     },
     "summary": "Stop offering an installed catalogue entry",
     "description": "Takes an installed pack out of service for this workspace. Nothing is deleted for a 1:1 kind: the local template is retired so it leaves the new-inspection picker, and inspections already using it keep producing from their own snapshot. A comment pack's imported rows ARE removed; comments the workspace wrote itself are never touched. Installing the entry again brings it back."
+  },
+  {
+    "operationId": "unlinkQboContact",
+    "method": "DELETE",
+    "pathTemplate": "/api/integrations/qbo/contacts/{contactId}/link",
+    "scopes": [],
+    "tag": "qbo",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Id of the contact whose QuickBooks match is addressed.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the contact whose QuickBooks match is addressed."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Remove the QuickBooks match of a contact",
+    "description": "Removes the match between one contact and a QuickBooks customer. Nothing is sent to QuickBooks and removing a match that is already gone answers removed false. Owner or manager with the companyFinance capability."
   },
   {
     "operationId": "unlockInspectionReport",
@@ -20384,6 +21301,31 @@
     },
     "summary": "Update an existing inspection cost item",
     "description": "Patch any subset of fields on an existing commercial PCA cost line item, tenant-scoped and restricted to the inspection it already belongs to."
+  },
+  {
+    "operationId": "updateInspectionEventStatus",
+    "method": "PUT",
+    "pathTemplate": "/api/events/{id}",
+    "scopes": [],
+    "tag": "calendar",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the visit whose status changes.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the visit whose status changes."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Change the status of a visit",
+    "description": "Moves one visit to a new lifecycle status. The JSON body is {status}, one of scheduled, completed, results_received or cancelled. The status decides who may make the change, so it is checked after the body is read: office staff accounts are refused for any status, and results_received is owner or manager only. A visit of an inspection the caller cannot see answers 404."
   },
   {
     "operationId": "updateInspectionMediaAnnotation",
@@ -22831,6 +23773,35 @@
     },
     "summary": "Update inspection template for current tenant",
     "description": "Update a template's name, checklist schema or default report profile. Despite the PUT verb it is a partial update: only the fields sent change. The schema is validated, the property type columns are re-derived from it, the template version number goes up by one on every call even if nothing changed, and a template.update audit entry is written. Returns 404 for an unknown template and 403 when the template produces an official form supplied with the software (its structure is read-only; duplicate it instead) or the user lacks the template edit capability. Restricted to owners, managers and inspectors."
+  },
+  {
+    "operationId": "updateInspectionType",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/inspection-types/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Id of the inspection subtype to act on.",
+          "schema": {
+            "type": "string",
+            "description": "Id of the inspection subtype to act on."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/UpdateInspectionType"
+      }
+    },
+    "summary": "Update an inspection subtype",
+    "description": "Changes the fields given for one company inspection subtype; fields left out keep their value. Owner or manager only."
   },
   {
     "operationId": "updateInspectorCredential",

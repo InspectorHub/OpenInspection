@@ -94,79 +94,84 @@ const repairRequestLogRoute = createRoute(withMcpMetadata({
         + 'be reporting on a document nobody has been given.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-const inspectionRepairRequestRoutes = createApiRouter()
-    .openapi(repairRequestLogRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
+const app = createApiRouter();
+app.openapi(repairRequestLogRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
 
-        const insp = await getDrizzle(c)
-            .select({
-                reportStatus: inspections.reportStatus,
-                propertyAddress: inspections.propertyAddress,
-            })
-            .from(inspections)
-            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
-            .get();
-        if (!insp) {
-            return c.json({ success: false as const, error: 'Inspection not found' }, 404);
-        }
+    const insp = await getDrizzle(c)
+        .select({
+            reportStatus: inspections.reportStatus,
+            propertyAddress: inspections.propertyAddress,
+        })
+        .from(inspections)
+        .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+        .get();
+    if (!insp) {
+        return c.json({ success: false as const, error: 'Inspection not found' }, 404);
+    }
 
-        // The publish gate, and it fails CLOSED: on the unpublished branch the
-        // lists are never queried, so there is no ordering of later edits that
-        // can leak one. Same predicate and same column as `runBuilderGate`, so
-        // the surface that WRITES these lists and the surface that reads them
-        // cannot disagree about when they exist.
-        //
-        // NOT also gated on `tenant_configs.enable_customer_repair_export`,
-        // unlike the builder. That flag decides whether a client may build a
-        // new list; a company that switches it off afterwards still owns the
-        // asks already made of it, and hiding its own records behind a
-        // feature toggle would look like data loss.
-        if (!isReportPublished(insp.reportStatus)) {
-            return c.json({
-                success: true as const,
-                data: {
-                    propertyAddress: insp.propertyAddress,
-                    published: false,
-                    lists: [],
-                },
-            }, 200);
-        }
-
-        const rows: RepairRequestWithItems[] = await c.var.services.repairRequest.listForInspection(tenantId, id);
-
+    // The publish gate, and it fails CLOSED: on the unpublished branch the
+    // lists are never queried, so there is no ordering of later edits that
+    // can leak one. Same predicate and same column as `runBuilderGate`, so
+    // the surface that WRITES these lists and the surface that reads them
+    // cannot disagree about when they exist.
+    //
+    // NOT also gated on `tenant_configs.enable_customer_repair_export`,
+    // unlike the builder. That flag decides whether a client may build a
+    // new list; a company that switches it off afterwards still owns the
+    // asks already made of it, and hiding its own records behind a
+    // feature toggle would look like data loss.
+    if (!isReportPublished(insp.reportStatus)) {
         return c.json({
             success: true as const,
             data: {
                 propertyAddress: insp.propertyAddress,
-                published: true,
-                lists: rows.map((rr) => ({
-                    id: rr.id,
-                    createdByKind: rr.createdByKind,
-                    createdByRef: rr.createdByRef,
-                    customIntro: rr.customIntro,
-                    createdAt: rr.createdAt instanceof Date ? rr.createdAt.getTime() : Number(rr.createdAt),
-                    // An EXPLICIT projection, not a spread: `repair_requests`
-                    // carries a live `share_token`, and spreading the row would
-                    // put a bearer credential for the client's own list into a
-                    // staff page's HTML the day someone adds a column.
-                    items: rr.items.map((item) => ({
-                        id: item.id,
-                        findingKey: item.findingKey,
-                        sectionTitle: item.sectionTitle,
-                        itemLabel: item.itemLabel,
-                        defectTitleSnapshot: item.defectTitleSnapshot,
-                        locationSnapshot: item.locationSnapshot,
-                        categorySnapshot: item.categorySnapshot,
-                        tradeSnapshot: item.tradeSnapshot,
-                        commentSnapshot: item.commentSnapshot,
-                        note: item.note,
-                        requestedCreditCents: item.requestedCreditCents,
-                        repairActionTag: item.repairActionTag,
-                    })),
-                })),
+                published: false,
+                lists: [],
             },
         }, 200);
-    });
+    }
 
-export default inspectionRepairRequestRoutes;
+    const rows: RepairRequestWithItems[] = await c.var.services.repairRequest.listForInspection(tenantId, id);
+
+    return c.json({
+        success: true as const,
+        data: {
+            propertyAddress: insp.propertyAddress,
+            published: true,
+            lists: rows.map((rr) => ({
+                id: rr.id,
+                createdByKind: rr.createdByKind,
+                createdByRef: rr.createdByRef,
+                customIntro: rr.customIntro,
+                createdAt: rr.createdAt instanceof Date ? rr.createdAt.getTime() : Number(rr.createdAt),
+                // An EXPLICIT projection, not a spread: `repair_requests`
+                // carries a live `share_token`, and spreading the row would
+                // put a bearer credential for the client's own list into a
+                // staff page's HTML the day someone adds a column.
+                items: rr.items.map((item) => ({
+                    id: item.id,
+                    findingKey: item.findingKey,
+                    sectionTitle: item.sectionTitle,
+                    itemLabel: item.itemLabel,
+                    defectTitleSnapshot: item.defectTitleSnapshot,
+                    locationSnapshot: item.locationSnapshot,
+                    categorySnapshot: item.categorySnapshot,
+                    tradeSnapshot: item.tradeSnapshot,
+                    commentSnapshot: item.commentSnapshot,
+                    note: item.note,
+                    requestedCreditCents: item.requestedCreditCents,
+                    repairActionTag: item.repairActionTag,
+                })),
+            })),
+        },
+    }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const inspectionRepairRequestRouteConfigs = [
+    repairRequestLogRoute,
+] as const;
+
+export default app;

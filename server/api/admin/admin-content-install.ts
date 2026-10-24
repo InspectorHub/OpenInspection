@@ -76,18 +76,23 @@ const installBundledContentRoute = createRoute(withMcpMetadata({
     description: 'Idempotently adds the bundled starter content (templates, agreements, canned comments, event types, tags, repair items, rating systems, contractor types, services) this workspace does not already have. Matching is by name, so existing rows are never updated and a renamed row is re-added under its original name.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const adminContentInstallRoutes = createApiRouter()
-    .openapi(installBundledContentRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        // Dynamic import mirrors both existing callers: the fixture payload
-        // (seed templates, 250+ canned comments, …) is only pulled in when
-        // someone actually installs.
-        const { seedStarterContent } = await import('../../services/starter-content.service');
-        const data = await seedStarterContent(c.env.DB, tenantId);
+const app = createApiRouter();
+app.openapi(installBundledContentRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    // Dynamic import mirrors both existing callers: the fixture payload
+    // (seed templates, 250+ canned comments, …) is only pulled in when
+    // someone actually installs.
+    const { seedStarterContent } = await import('../../services/starter-content.service');
+    const data = await seedStarterContent(c.env.DB, tenantId);
 
-        auditFromContext(c, 'data.import', 'starter_content', { metadata: { ...data } });
+    auditFromContext(c, 'data.import', 'starter_content', { metadata: { ...data } });
 
-        return c.json({ success: true as const, data }, 200);
-    });
+    return c.json({ success: true as const, data }, 200);
+});
 
-export default adminContentInstallRoutes;
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminContentInstallRouteConfigs = [
+    installBundledContentRoute,
+] as const;
+
+export default app;

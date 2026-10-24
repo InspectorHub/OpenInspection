@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { produceStatutoryForm } from '../../../server/services/statutory/produce.service';
 import type { StatutoryFormVersion } from '../../../server/lib/statutory/form-registry';
 import type { FieldMap } from '../../../server/lib/statutory/field-map';
-import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '../../../server/types/template-schema';
+import type { StatutoryFormDeclaration, TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 import type { StatutoryInspectionFacts } from '../../../server/lib/statutory/values';
 import { buildFlatPdf, type PdfFixture } from '../helpers/statutory-pdf-fixtures';
 import { r2Keys } from '../../../server/lib/r2-keys';

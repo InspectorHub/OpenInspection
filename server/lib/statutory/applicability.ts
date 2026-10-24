@@ -65,7 +65,7 @@
 import type {
     StatutoryFieldDependency,
     StatutoryFormDeclaration,
-} from '../../types/template-schema';
+} from '@core/field-ui/shared/template-schema';
 import type { StatutoryValue } from './field-map';
 import { dependencyOrder } from './dependency-order';
 import { fail } from './resolve-source';

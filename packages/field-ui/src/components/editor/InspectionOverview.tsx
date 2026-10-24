@@ -1,0 +1,138 @@
+import type { ComponentProps } from "react";
+import { useFieldDataSource } from "../../context";
+import { PropertyInfoForm } from "./PropertyInfoForm";
+import { StatutoryDetailsHost } from "../statutory/StatutoryDetailsHost";
+import { StatutoryCoveragePanel } from "../statutory/StatutoryCoveragePanel";
+import { PcaNarrativePanel } from "../inspection/PcaNarrativePanel";
+import { CompliancePanel } from "../inspection-edit/CompliancePanel";
+import { CommercialReportControls, type ReportTier } from "./CommercialReportControls";
+import { PropertyTypeControl } from "./PropertyTypeControl";
+
+/**
+ * The "Inspection Details" overview — property facts, the statutory form
+ * details panel, and the commercial-only controls beneath them.
+ *
+ * -- WHY IT IS A COMPONENT AND NOT JSX INSIDE THE ROUTE ----------------------
+ * The route renders TWO separate trees, mobile and desktop, not one tree with a
+ * breakpoint. This markup lived inline in the desktop tree only, so choosing
+ * "Inspection Details" in the mobile Sections drawer set `activeView` to
+ * "property" and the mobile `<main>` — which knows only about the item editor —
+ * rendered NOTHING: no PROPERTY INFO heading and no statutory panel, at any
+ * width. Measured at 390.
+ *
+ * The same shape of bug is recorded twice already in the route, on the photo
+ * inputs and the add-media overlays, with the same fix: define it once and
+ * mount it from both shells. Naming it also stops the two from drifting, which
+ * hoisting it into a local would not have — a local is still 60 lines of markup
+ * living in a 2,600-line file that is at its size cap.
+ *
+ * Every prop is derived by the route, and this component adds no state or
+ * write channel of its own, so it renders identically from either shell. Several
+ * of its children DO own one (a guarded command each) — they always did, each
+ * for a reason written down where it lives — and this changes none of that: only
+ * ONE shell is rendered at a time, so no child gained a second instance.
+ */
+interface InspectionOverviewProps {
+    inspection: ComponentProps<typeof PropertyInfoForm>["inspection"];
+    templateFields: ComponentProps<typeof PropertyInfoForm>["templateFields"];
+    onSaveField: ComponentProps<typeof PropertyInfoForm>["onSave"];
+    onCommitFacts: ComponentProps<typeof PropertyInfoForm>["onCommit"];
+    statutoryDetails: ComponentProps<typeof StatutoryDetailsHost>["details"];
+    statutoryCoverage: ComponentProps<typeof StatutoryCoveragePanel>["coverage"];
+    pcaNarrative: ComponentProps<typeof PcaNarrativePanel>["narrative"];
+    complianceData: ComponentProps<typeof CompliancePanel>["data"];
+    savingCommercial: boolean;
+    onChangeSubtype: (subtype: string | null) => void;
+    onChangeTier: (tier: ReportTier) => void;
+}
+
+export function InspectionOverview({
+    inspection,
+    templateFields,
+    onSaveField,
+    onCommitFacts,
+    statutoryDetails,
+    statutoryCoverage,
+    pcaNarrative,
+    complianceData,
+    savingCommercial,
+    onChangeSubtype,
+    onChangeTier,
+}: InspectionOverviewProps) {
+    const { urls } = useFieldDataSource();
+    // Read once, so the three gates below cannot disagree about the same house.
+    const bag = inspection as Record<string, unknown>;
+    const isCommercial = bag.propertyType === "commercial";
+    const reportTier = (bag.reportTier as ReportTier | null | undefined) ?? null;
+    return (
+        <>
+            <PropertyInfoForm
+                inspection={inspection}
+                templateFields={templateFields}
+                onSave={onSaveField}
+                onCommit={onCommitFacts}
+            />
+            {/* Above the details form on purpose: this says WHAT is still
+                needed, and the form below is where some of it is typed. The
+                other half points at Settings, which is not on this page at
+                all -- so the reader needs the list before the form, not after. */}
+            <StatutoryCoveragePanel
+                coverage={statutoryCoverage}
+                previewHref={urls.statutoryPreviewPdf(String(bag.id))}
+            />
+            <StatutoryDetailsHost inspectionId={String(bag.id)} details={statutoryDetails} />
+            {/* Reclassification. UNGATED on purpose — every other control in this
+                block appears only once `propertyType === 'commercial'`, so a
+                selector hidden behind the same gate could never be what gets an
+                inspection there. Sits immediately above the commercial controls it
+                unlocks, because the order of operations is: classify, then pick the
+                subtype, then the tier. Owns its own write guard (like the narrative and
+                compliance panels below) and its own lossy-confirm modal. */}
+            <div className="mt-8 border-t border-ih-border pt-6">
+                <PropertyTypeControl
+                    inspectionId={String(bag.id)}
+                    propertyType={(bag.propertyType as string | null | undefined) ?? null}
+                    commercialSubtype={(bag.commercialSubtype as string | null | undefined) ?? null}
+                    reportTier={reportTier}
+                    perUnitMode={bag.unitInspectionMode === "per_unit"}
+                    onSaved={(next) => onSaveField?.("propertyType", next)}
+                    hasPcaNarrative={Object.values(pcaNarrative ?? {})
+                        .some((v) => typeof v === "string" && v.trim().length > 0)}
+                />
+            </div>
+            {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on
+                the same propertyType === 'commercial' flag section-applicability.ts
+                uses to decide PCA-only sections apply. Sits above the narrative
+                panel so the subtype (which the Building Profile / cost tables key
+                off) is set before the inspector writes narrative for a tier. */}
+            {isCommercial ? (
+                <div className="mt-8 border-t border-ih-border pt-6">
+                    <CommercialReportControls
+                        commercialSubtype={(bag.commercialSubtype as string | null | undefined) ?? null}
+                        reportTier={reportTier}
+                        saving={savingCommercial}
+                        onChangeSubtype={onChangeSubtype}
+                        onChangeTier={onChangeTier}
+                    />
+                </div>
+            ) : null}
+            {/* Commercial PCA Phase S — narrative editor panel, on the same gate. */}
+            {isCommercial ? (
+                <div className="mt-8 border-t border-ih-border pt-6">
+                    <PcaNarrativePanel inspectionId={String(bag.id)} narrative={pcaNarrative} />
+                </div>
+            ) : null}
+            {/* Commercial PCA Phase M Task 10 — compliance panel (dual sign-off /
+                PSQ / doc-review checklist / conformance preview). Rendered ONLY at
+                reportTier === 'full_pca' — a light_commercial report has no
+                compliance surface (the Task 6 API 409s writes at any other tier).
+                Self-manages its own guarded commands; the loader only supplies the
+                read-side artifacts. */}
+            {isCommercial && reportTier === "full_pca" ? (
+                <div className="mt-8 border-t border-ih-border pt-6">
+                    <CompliancePanel inspectionId={String(bag.id)} data={complianceData} />
+                </div>
+            ) : null}
+        </>
+    );
+}

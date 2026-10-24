@@ -18,9 +18,9 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { inspectionResults } from '../lib/db/schema';
 import { logger } from '../lib/logger';
-import { projectResults } from '../lib/collab/results-doc';
-import { isMetaKey } from '../lib/finding-key';
-import type { ResultsProjection } from '../lib/collab/results-doc.types';
+import { projectResults } from '@core/field-ui/shared/results-doc';
+import { isMetaKey } from '@core/field-ui/shared/finding-key';
+import type { ResultsProjection } from '@core/field-ui/shared/results-doc.types';
 
 /**
  * Narrow a D1 `inspection_results.data` json value to a non-empty projection.

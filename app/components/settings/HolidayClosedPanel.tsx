@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Banner } from "@core/shared-ui";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import type { action } from "~/routes/settings-booking";
 import { HolidayAdvancedDetails } from "./HolidayAdvancedDetails";
 import {

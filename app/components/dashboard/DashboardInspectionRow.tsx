@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { formatInspectionDateTime } from "~/lib/format-date";
+import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { STAFF_ORDER_STATUSES } from "../../../server/lib/inspection/order-fields";
 import { INSPECTION_STATUS, isReportPublished, statusTone } from "~/lib/status";
 import { reportStateLabel } from "~/lib/dashboard-filters";
@@ -7,7 +7,7 @@ import { REPORT_STATE_TONE, type Inspection } from "~/lib/dashboard-schema";
 import { Pill, Icon } from "@core/shared-ui";
 import { RestoreInspectionAction } from "~/components/RestoreInspectionAction";
 import { m } from "~/paraglide/messages";
-import { formatDollars } from "~/lib/money";
+import { formatDollars } from "@core/field-ui/shared/money";
 import { useDisplayLocale, useDisplayCurrency, useTenantFormatPrefs } from "~/hooks/useSessionContext";
 
 interface DashboardInspectionRowProps {

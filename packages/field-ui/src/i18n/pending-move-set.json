@@ -1,0 +1,12 @@
+[
+  "app/components/editor/EditorHumanCheck.tsx",
+  "app/components/media-studio/AvatarCropper.tsx",
+  "app/components/media-studio/LogoUploader.tsx",
+  "app/components/media-studio/SignaturePad.tsx",
+  "app/components/media-studio/signaturePad.logic.ts",
+  "app/components/statutory/StatutoryDeliverable.tsx",
+  "app/components/statutory/StatutoryFormNotice.tsx",
+  "app/components/statutory/StatutoryReadinessCard.tsx",
+  "app/components/statutory/StatutorySourceRow.tsx",
+  "app/hooks/usePdfExport.ts"
+]

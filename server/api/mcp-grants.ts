@@ -17,6 +17,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { oauthProviderEnabled } from '../lib/mcp/flag';
@@ -119,112 +120,119 @@ function mapGrant(g: RawGrant, extra?: { userId?: string; userEmail?: string; us
 
 // ─── Router ─────────────────────────────────────────────────────────────────
 
-const mcpGrantsRoutes = createApiRouter()
-    // GET /grants — self: list caller's own grants only
-    .openapi(listSelfGrantsRoute, async (c) => {
-        const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
-        if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
-            throw Errors.NotFound('Neither MCP nor native clients are enabled');
+const app = createApiRouter();
+// GET /grants — self: list caller's own grants only
+app.openapi(listSelfGrantsRoute, async (c) => {
+    const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
+    if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
+        throw Errors.NotFound('Neither MCP nor native clients are enabled');
+    }
+
+    const userId = c.get('user').sub;
+    const result = await oauth.listUserGrants(userId);
+    const grants = result.items.map((g) => mapGrant(g));
+
+    return c.json({ data: grants }, 200);
+});
+
+// DELETE /grants/:id — self or admin revoke
+app.openapi(revokeMcpGrantRoute, async (c) => {
+    const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
+    if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
+        throw Errors.NotFound('Neither MCP nor native clients are enabled');
+    }
+
+    const { id } = c.req.valid('param');
+    const { admin: adminFlag } = c.req.valid('query');
+    const isAdminPath = adminFlag === '1';
+    const callerId = c.get('user').sub;
+    const tenantId = c.get('tenantId');
+
+    if (isAdminPath) {
+        // Inline role check — NOT via middleware so non-admins can still reach
+        // the self-revoke path on the same DELETE /grants/:id route.
+        const userRole = c.get('userRole');
+        if (userRole !== 'owner' && userRole !== 'manager') {
+            throw deniedNeedsRole(c, ['owner', 'manager'], 'Reviewing or revoking other people\'s connected-app grants is an owner or manager action');
         }
 
-        const userId = c.get('user').sub;
-        const result = await oauth.listUserGrants(userId);
-        const grants = result.items.map((g) => mapGrant(g));
-
-        return c.json({ data: grants }, 200);
-    })
-
-    // DELETE /grants/:id — self or admin revoke
-    .openapi(revokeMcpGrantRoute, async (c) => {
-        const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
-        if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
-            throw Errors.NotFound('Neither MCP nor native clients are enabled');
-        }
-
-        const { id } = c.req.valid('param');
-        const { admin: adminFlag } = c.req.valid('query');
-        const isAdminPath = adminFlag === '1';
-        const callerId = c.get('user').sub;
-        const tenantId = c.get('tenantId');
-
-        if (isAdminPath) {
-            // Inline role check — NOT via middleware so non-admins can still reach
-            // the self-revoke path on the same DELETE /grants/:id route.
-            const userRole = c.get('userRole');
-            if (userRole !== 'owner' && userRole !== 'manager') {
-                throw deniedNeedsRole(c, ['owner', 'manager'], 'Reviewing or revoking other people\'s connected-app grants is an owner or manager action');
-            }
-
-            // Enumerate tenant members and their grants to find the target grant
-            // owner. This is the cross-tenant guard: we only ever call
-            // revokeGrant() with a userId that belongs to this tenant.
-            const adminService = c.var.services.admin;
-            const { members } = await adminService.getMembers(tenantId);
-
-            let ownerUserId: string | null = null;
-            for (const member of members) {
-                const memberResult = await oauth.listUserGrants(member.id);
-                const found = memberResult.items.find((g) => g.id === id);
-                if (found) {
-                    ownerUserId = member.id;
-                    break;
-                }
-            }
-
-            if (!ownerUserId) {
-                // Grant not found in this tenant — either it doesn't exist or it
-                // belongs to a different tenant. 404 without leaking cross-tenant
-                // grant existence.
-                throw Errors.NotFound('Grant not found in this tenant');
-            }
-
-            await oauth.revokeGrant(id, ownerUserId);
-            auditFromContext(c, 'mcp.grant.revoked', 'mcp_grant', {
-                entityId: id,
-                metadata: { admin: true, targetUserId: ownerUserId },
-            });
-            return c.json({ success: true as const }, 200);
-        }
-
-        // Self path: verify the grant is among the caller's own grants before
-        // revoking. 404 if not found — never reveal that another user's grant
-        // exists (avoids grant-id enumeration via error-code differences).
-        const result = await oauth.listUserGrants(callerId);
-        const ownGrant = result.items.find((g) => g.id === id);
-        if (!ownGrant) {
-            throw Errors.NotFound('Grant not found');
-        }
-
-        await oauth.revokeGrant(id, callerId);
-        auditFromContext(c, 'mcp.grant.revoked', 'mcp_grant', { entityId: id });
-        return c.json({ success: true as const }, 200);
-    })
-
-    // GET /grants/all — admin: list grants for all tenant members
-    .openapi(listAllGrantsRoute, async (c) => {
-        const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
-        if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
-            throw Errors.NotFound('Neither MCP nor native clients are enabled');
-        }
-
-        const tenantId = c.get('tenantId');
+        // Enumerate tenant members and their grants to find the target grant
+        // owner. This is the cross-tenant guard: we only ever call
+        // revokeGrant() with a userId that belongs to this tenant.
         const adminService = c.var.services.admin;
         const { members } = await adminService.getMembers(tenantId);
 
-        const grants: McpGrant[] = [];
+        let ownerUserId: string | null = null;
         for (const member of members) {
-            const result = await oauth.listUserGrants(member.id);
-            for (const g of result.items) {
-                grants.push(mapGrant(g, {
-                    userId: member.id,
-                    userEmail: member.email,
-                    userRole: member.role,
-                }));
+            const memberResult = await oauth.listUserGrants(member.id);
+            const found = memberResult.items.find((g) => g.id === id);
+            if (found) {
+                ownerUserId = member.id;
+                break;
             }
         }
 
-        return c.json({ data: grants }, 200);
-    });
+        if (!ownerUserId) {
+            // Grant not found in this tenant — either it doesn't exist or it
+            // belongs to a different tenant. 404 without leaking cross-tenant
+            // grant existence.
+            throw Errors.NotFound('Grant not found in this tenant');
+        }
 
-export type McpGrantsApi = typeof mcpGrantsRoutes;
-export default mcpGrantsRoutes;
+        await oauth.revokeGrant(id, ownerUserId);
+        auditFromContext(c, 'mcp.grant.revoked', 'mcp_grant', {
+            entityId: id,
+            metadata: { admin: true, targetUserId: ownerUserId },
+        });
+        return c.json({ success: true as const }, 200);
+    }
+
+    // Self path: verify the grant is among the caller's own grants before
+    // revoking. 404 if not found — never reveal that another user's grant
+    // exists (avoids grant-id enumeration via error-code differences).
+    const result = await oauth.listUserGrants(callerId);
+    const ownGrant = result.items.find((g) => g.id === id);
+    if (!ownGrant) {
+        throw Errors.NotFound('Grant not found');
+    }
+
+    await oauth.revokeGrant(id, callerId);
+    auditFromContext(c, 'mcp.grant.revoked', 'mcp_grant', { entityId: id });
+    return c.json({ success: true as const }, 200);
+});
+
+// GET /grants/all — admin: list grants for all tenant members
+app.openapi(listAllGrantsRoute, async (c) => {
+    const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
+    if (!oauthProviderEnabled(c.env as { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string }) || !oauth) {
+        throw Errors.NotFound('Neither MCP nor native clients are enabled');
+    }
+
+    const tenantId = c.get('tenantId');
+    const adminService = c.var.services.admin;
+    const { members } = await adminService.getMembers(tenantId);
+
+    const grants: McpGrant[] = [];
+    for (const member of members) {
+        const result = await oauth.listUserGrants(member.id);
+        for (const g of result.items) {
+            grants.push(mapGrant(g, {
+                userId: member.id,
+                userEmail: member.email,
+                userRole: member.role,
+            }));
+        }
+    }
+
+    return c.json({ data: grants }, 200);
+});
+
+/** Registration order. Drives `McpGrantsApi`; a test pins it to what `app` really registered. */
+export const mcpGrantsRouteConfigs = [
+    listSelfGrantsRoute,
+    revokeMcpGrantRoute,
+    listAllGrantsRoute,
+] as const;
+
+export type McpGrantsApi = ApiOf<typeof mcpGrantsRouteConfigs>;
+export default app;

@@ -136,112 +136,120 @@ async function ensureConfigRow(db: Db, tenantId: string): Promise<void> {
     if (!row) await db.insert(tenantConfigs).values({ tenantId, updatedAt: new Date() });
 }
 
-const adminBookingRoutingRoutes = createApiRouter()
-    .openapi(getRoutingRoute, async (c) => {
-        const data = await readRouting(getDrizzle(c), c.get('tenantId'), !!c.env.GOOGLE_PLACES_API_KEY);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(patchRoutingRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const db = getDrizzle(c);
-        await ensureConfigRow(db, tenantId);
+const app = createApiRouter();
+app.openapi(getRoutingRoute, async (c) => {
+    const data = await readRouting(getDrizzle(c), c.get('tenantId'), !!c.env.GOOGLE_PLACES_API_KEY);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(patchRoutingRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const db = getDrizzle(c);
+    await ensureConfigRow(db, tenantId);
 
-        const update: Record<string, unknown> = { updatedAt: new Date() };
-        if (body.routingStrategy !== undefined) {
-            update.bookingRoutingStrategy = body.routingStrategy as RoutingStrategy;
-        }
-        if (body.minLeadHours !== undefined) update.bookingMinLeadHours = body.minLeadHours;
-        // `undefined` = untouched, `null` = cleared. Collapsing the two here is
-        // how a PATCH silently loses a field the caller never mentioned.
-        if (body.sameDayCutoffTime !== undefined) update.bookingSameDayCutoffTime = body.sameDayCutoffTime;
+    const update: Record<string, unknown> = { updatedAt: new Date() };
+    if (body.routingStrategy !== undefined) {
+        update.bookingRoutingStrategy = body.routingStrategy as RoutingStrategy;
+    }
+    if (body.minLeadHours !== undefined) update.bookingMinLeadHours = body.minLeadHours;
+    // `undefined` = untouched, `null` = cleared. Collapsing the two here is
+    // how a PATCH silently loses a field the caller never mentioned.
+    if (body.sameDayCutoffTime !== undefined) update.bookingSameDayCutoffTime = body.sameDayCutoffTime;
 
-        await db.update(tenantConfigs).set(update).where(eq(tenantConfigs.tenantId, tenantId));
-        auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
-            entityId: tenantId, metadata: { bookingRouting: body },
-        });
-        return c.json({
-            success: true as const,
-            data: await readRouting(db, tenantId, !!c.env.GOOGLE_PLACES_API_KEY),
-        }, 200);
-    })
-    .openapi(geocodeCompanyRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const db = getDrizzle(c);
-        const apiKey = c.env.GOOGLE_PLACES_API_KEY;
-        const miss = (reason: 'no_api_key' | 'no_address' | 'not_found') =>
-            c.json({ success: true as const, data: { resolved: false, formatted: null, lat: null, lng: null, reason } }, 200);
-        if (!apiKey) return miss('no_api_key');
-
-        const cfg = await db.select({ companyAddress: tenantConfigs.companyAddress })
-            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
-        const address = (cfg?.companyAddress ?? '').trim();
-        if (!address) return miss('no_address');
-
-        const place = await geocodeAddressText(apiKey, address);
-        if (!place) return miss('not_found');
-
-        await db.update(tenantConfigs).set({
-            companyLat: place.lat,
-            companyLng: place.lng,
-            companyGeocodedAt: new Date(),
-            updatedAt: new Date(),
-        }).where(eq(tenantConfigs.tenantId, tenantId));
-        auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
-            entityId: tenantId, metadata: { companyGeocode: place.formatted },
-        });
-        return c.json({
-            success: true as const,
-            data: { resolved: true, formatted: place.formatted, lat: place.lat, lng: place.lng, reason: null },
-        }, 200);
-    })
-    .openapi(putServiceOriginRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { userId, address } = c.req.valid('json');
-        const db = getDrizzle(c);
-
-        const member = await db.select({ id: users.id }).from(users)
-            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId))).get();
-        if (!member) throw Errors.NotFound('Inspector not found.');
-
-        const trimmed = (address ?? '').trim();
-        if (trimmed === '') {
-            // Clearing all three columns is the ONLY way to inherit again —
-            // leaving a stale lat/lng behind would keep routing to an office
-            // the inspector no longer starts from.
-            await db.update(users)
-                .set({ serviceOriginAddress: null, serviceOriginLat: null, serviceOriginLng: null })
-                .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-            auditFromContext(c, 'config.tenant_config.patch', 'user_service_origin', { entityId: userId });
-            return c.json({
-                success: true as const,
-                data: { resolved: false, formatted: null, lat: null, lng: null, reason: 'no_address' as const },
-            }, 200);
-        }
-
-        const apiKey = c.env.GOOGLE_PLACES_API_KEY;
-        const place = apiKey ? await geocodeAddressText(apiKey, trimmed) : null;
-        // The typed address is stored either way, so the setting is not lost
-        // when Google is unreachable — but without coordinates this inspector
-        // is simply not an input to `closest`, which the strategy reports.
-        await db.update(users).set({
-            serviceOriginAddress: trimmed,
-            serviceOriginLat: place?.lat ?? null,
-            serviceOriginLng: place?.lng ?? null,
-        }).where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-        auditFromContext(c, 'config.tenant_config.patch', 'user_service_origin', {
-            entityId: userId, metadata: { resolved: !!place },
-        });
-        return c.json({
-            success: true as const,
-            data: {
-                resolved: !!place,
-                formatted: place?.formatted ?? null,
-                lat: place?.lat ?? null,
-                lng: place?.lng ?? null,
-                reason: place ? null : (apiKey ? 'not_found' as const : 'no_api_key' as const),
-            },
-        }, 200);
+    await db.update(tenantConfigs).set(update).where(eq(tenantConfigs.tenantId, tenantId));
+    auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
+        entityId: tenantId, metadata: { bookingRouting: body },
     });
+    return c.json({
+        success: true as const,
+        data: await readRouting(db, tenantId, !!c.env.GOOGLE_PLACES_API_KEY),
+    }, 200);
+});
+app.openapi(geocodeCompanyRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const db = getDrizzle(c);
+    const apiKey = c.env.GOOGLE_PLACES_API_KEY;
+    const miss = (reason: 'no_api_key' | 'no_address' | 'not_found') =>
+        c.json({ success: true as const, data: { resolved: false, formatted: null, lat: null, lng: null, reason } }, 200);
+    if (!apiKey) return miss('no_api_key');
 
-export default adminBookingRoutingRoutes;
+    const cfg = await db.select({ companyAddress: tenantConfigs.companyAddress })
+        .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+    const address = (cfg?.companyAddress ?? '').trim();
+    if (!address) return miss('no_address');
+
+    const place = await geocodeAddressText(apiKey, address);
+    if (!place) return miss('not_found');
+
+    await db.update(tenantConfigs).set({
+        companyLat: place.lat,
+        companyLng: place.lng,
+        companyGeocodedAt: new Date(),
+        updatedAt: new Date(),
+    }).where(eq(tenantConfigs.tenantId, tenantId));
+    auditFromContext(c, 'config.tenant_config.patch', 'tenant_config', {
+        entityId: tenantId, metadata: { companyGeocode: place.formatted },
+    });
+    return c.json({
+        success: true as const,
+        data: { resolved: true, formatted: place.formatted, lat: place.lat, lng: place.lng, reason: null },
+    }, 200);
+});
+app.openapi(putServiceOriginRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { userId, address } = c.req.valid('json');
+    const db = getDrizzle(c);
+
+    const member = await db.select({ id: users.id }).from(users)
+        .where(and(eq(users.id, userId), eq(users.tenantId, tenantId))).get();
+    if (!member) throw Errors.NotFound('Inspector not found.');
+
+    const trimmed = (address ?? '').trim();
+    if (trimmed === '') {
+        // Clearing all three columns is the ONLY way to inherit again —
+        // leaving a stale lat/lng behind would keep routing to an office
+        // the inspector no longer starts from.
+        await db.update(users)
+            .set({ serviceOriginAddress: null, serviceOriginLat: null, serviceOriginLng: null })
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+        auditFromContext(c, 'config.tenant_config.patch', 'user_service_origin', { entityId: userId });
+        return c.json({
+            success: true as const,
+            data: { resolved: false, formatted: null, lat: null, lng: null, reason: 'no_address' as const },
+        }, 200);
+    }
+
+    const apiKey = c.env.GOOGLE_PLACES_API_KEY;
+    const place = apiKey ? await geocodeAddressText(apiKey, trimmed) : null;
+    // The typed address is stored either way, so the setting is not lost
+    // when Google is unreachable — but without coordinates this inspector
+    // is simply not an input to `closest`, which the strategy reports.
+    await db.update(users).set({
+        serviceOriginAddress: trimmed,
+        serviceOriginLat: place?.lat ?? null,
+        serviceOriginLng: place?.lng ?? null,
+    }).where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+    auditFromContext(c, 'config.tenant_config.patch', 'user_service_origin', {
+        entityId: userId, metadata: { resolved: !!place },
+    });
+    return c.json({
+        success: true as const,
+        data: {
+            resolved: !!place,
+            formatted: place?.formatted ?? null,
+            lat: place?.lat ?? null,
+            lng: place?.lng ?? null,
+            reason: place ? null : (apiKey ? 'not_found' as const : 'no_api_key' as const),
+        },
+    }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const adminBookingRoutingRouteConfigs = [
+    getRoutingRoute,
+    patchRoutingRoute,
+    geocodeCompanyRoute,
+    putServiceOriginRoute,
+] as const;
+
+export default app;

@@ -3,7 +3,7 @@ import {
     MAX_ITEM_DEPTH, itemDepths, subtreeOf, hasCycle, normalizeItemOrder,
     moveSubtreeAmongSiblings, reorderSubtree, deleteSubtree, duplicateSubtree,
     remapParentIds, outlineNumbers,
-} from '../../../server/lib/template-hierarchy';
+} from '@core/field-ui/shared/template-hierarchy';
 
 /** A three-level shape, as a template would carry it. */
 const nested = [

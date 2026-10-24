@@ -11,7 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub, Outlet } from "react-router";
 
-vi.mock("~/lib/collab/offline-purge", () => ({ purgeInspectionOfflineData: vi.fn(async () => undefined) }));
+vi.mock("@core/field-ui/collab/offline-purge", () => ({ purgeInspectionOfflineData: vi.fn(async () => undefined) }));
 
 import InspectionsPage from "~/routes/inspections";
 

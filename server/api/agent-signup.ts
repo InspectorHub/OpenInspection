@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
 import { verifyTurnstile, resolveTurnstile, TURNSTILE_TEST_KEY_WARNING } from '../lib/middleware/bot-protection';
@@ -109,134 +110,137 @@ const signupRoute = createRoute(withMcpMetadata({
     operationId: "createAgent"
 }, { scopes: ['write'], tier: 'extended' }));
 
-const agentSignupRoutes = createApiRouter()
-    .openapi(agentTermsRoute, async (c) => {
-        const { DeploymentLegalService } = await import('../services/deployment-legal.service');
-        const legal = new DeploymentLegalService(getDrizzle(c) as never);
-        const inForce = await legal.latest('agent_terms');
-        if (!inForce) {
-            // 404 rather than an empty 200. "No agent terms exist" and "here are
-            // the empty agent terms" are different facts, and the signup page has
-            // to be able to tell them apart to close itself honestly.
-            throw Errors.NotFound('This deployment has not published agent terms');
+const app = createApiRouter();
+app.openapi(agentTermsRoute, async (c) => {
+    const { DeploymentLegalService } = await import('../services/deployment-legal.service');
+    const legal = new DeploymentLegalService(getDrizzle(c) as never);
+    const inForce = await legal.latest('agent_terms');
+    if (!inForce) {
+        // 404 rather than an empty 200. "No agent terms exist" and "here are
+        // the empty agent terms" are different facts, and the signup page has
+        // to be able to tell them apart to close itself honestly.
+        throw Errors.NotFound('This deployment has not published agent terms');
+    }
+    return c.json({
+        success: true as const,
+        data: {
+            version: inForce.version,
+            contentHash: inForce.contentHash,
+            body: inForce.bodySnapshot,
+        },
+    }, 200);
+});
+app.openapi(signupRoute, async (c) => {
+    const body = c.req.valid('json');
+
+    // Bot protection. A deployment capability, not a test on whether someone
+    // remembered to set a key: saas always challenges (on Cloudflare's
+    // published test key when unconfigured, so the path stays live),
+    // standalone leaves it to the operator. See `resolveTurnstile`.
+    const turnstile = resolveTurnstile(c.env);
+    if (turnstile.enforced) {
+        if (turnstile.usingTestKey) {
+            logger.warn('agent.signup.turnstile.test_key', { detail: TURNSTILE_TEST_KEY_WARNING });
         }
-        return c.json({
-            success: true as const,
-            data: {
-                version: inForce.version,
-                contentHash: inForce.contentHash,
-                body: inForce.bodySnapshot,
-            },
-        }, 200);
-    })
-    .openapi(signupRoute, async (c) => {
-        const body = c.req.valid('json');
-
-        // Bot protection. A deployment capability, not a test on whether someone
-        // remembered to set a key: saas always challenges (on Cloudflare's
-        // published test key when unconfigured, so the path stays live),
-        // standalone leaves it to the operator. See `resolveTurnstile`.
-        const turnstile = resolveTurnstile(c.env);
-        if (turnstile.enforced) {
-            if (turnstile.usingTestKey) {
-                logger.warn('agent.signup.turnstile.test_key', { detail: TURNSTILE_TEST_KEY_WARNING });
-            }
-            if (!body.turnstileToken) {
-                throw Errors.BadRequest('Bot challenge required');
-            }
-            let ok = false;
-            try {
-                ok = await verifyTurnstile(body.turnstileToken, turnstile.secret);
-            } catch (err) {
-                logger.warn('agent.signup.turnstile.failed', {
-                    error: err instanceof Error ? err.message : String(err),
-                });
-            }
-            if (!ok) throw Errors.BadRequest('Bot challenge failed');
+        if (!body.turnstileToken) {
+            throw Errors.BadRequest('Bot challenge required');
         }
-
-        // The acceptance is assembled SERVER-SIDE from the text actually in
-        // force. `body.termsAccepted` is the user's tick — a fact about what they
-        // did — and nothing more: a client-supplied version or hash would be the
-        // client asserting what it read, which is precisely the evidence this
-        // record exists to replace.
-        //
-        // No published agent terms means no signup. That gate is expressed as
-        // behaviour rather than as a note: a deployment
-        // that has not published a document written for agents cannot take an
-        // agent's agreement to one. The message says so plainly, because an
-        // operator hitting this needs to know it is their action that is missing.
-        //
-        // WHOSE terms. An agent has no tenant, so the counterparty is whoever
-        // OPERATES this deployment — and that is why the document lives in
-        // `deployment_legal_versions` rather than under a tenant. This used to read
-        // `profile.fixedTenantId`, which is the single tenant in standalone and
-        // NULL in SaaS, so every SaaS signup was refused for a reason that had
-        // nothing to do with the caller. One document with no tenant answers both
-        // modes with the same query, and the branch is gone rather than widened.
-        const { DeploymentLegalService } = await import('../services/deployment-legal.service');
-        const legal = new DeploymentLegalService(getDrizzle(c) as never);
-        const inForce = await legal.latest('agent_terms');
-        if (!inForce) {
-            logger.error('[agent-signup] refused: no agent terms published on this deployment');
-            throw Errors.BadRequest(
-                'Agent signup is unavailable until this deployment publishes its agent terms.',
-            );
+        let ok = false;
+        try {
+            ok = await verifyTurnstile(body.turnstileToken, turnstile.secret);
+        } catch (err) {
+            logger.warn('agent.signup.turnstile.failed', {
+                error: err instanceof Error ? err.message : String(err),
+            });
         }
-        // Staleness, not evidence. The recorded hash is always the one the server
-        // read above — a client-supplied hash would be the client asserting what it
-        // read, which is what this record exists to replace. But a page that
-        // rendered an older version is a real thing to catch: the tick was given
-        // against text that is no longer in force, so the acceptance would name a
-        // version the signer was never shown. Refuse and let them re-read.
-        if (body.shownContentHash && body.shownContentHash !== inForce.contentHash) {
-            logger.info('[agent-signup] refused: stale page — shown hash is not the version in force');
-            throw Errors.BadRequest(
-                'The agent terms were updated while this page was open. Reload and review the current version.',
-            );
-        }
-        if (body.termsAccepted !== true) {
-            // Logged, because the status code alone cannot say which of this
-            // endpoint's four refusals fired — bot challenge, no published terms,
-            // a stale page, or an unticked box all answer 400, and an operator
-            // reading "400" learns nothing. Two round trips of an e2e diagnosis
-            // were spent on exactly that.
-            logger.info('[agent-signup] refused: terms not accepted');
-            throw Errors.BadRequest('The agent terms must be accepted to create an account');
-        }
+        if (!ok) throw Errors.BadRequest('Bot challenge failed');
+    }
 
-        const result = await c.var.services.agent.signup({
-            email: body.email,
-            password: body.password,
-            name: body.name,
-            termsAccepted: {
-                at: new Date().toISOString(),
-                version: inForce.version,
-                contentHash: inForce.contentHash,
-                ...(c.req.header('cf-connecting-ip') ? { ip: c.req.header('cf-connecting-ip')! } : {}),
-                ...(c.req.header('cf-ipcountry') ? { country: c.req.header('cf-ipcountry')! } : {}),
-            },
-        });
+    // The acceptance is assembled SERVER-SIDE from the text actually in
+    // force. `body.termsAccepted` is the user's tick — a fact about what they
+    // did — and nothing more: a client-supplied version or hash would be the
+    // client asserting what it read, which is precisely the evidence this
+    // record exists to replace.
+    //
+    // No published agent terms means no signup. That gate is expressed as
+    // behaviour rather than as a note: a deployment
+    // that has not published a document written for agents cannot take an
+    // agent's agreement to one. The message says so plainly, because an
+    // operator hitting this needs to know it is their action that is missing.
+    //
+    // WHOSE terms. An agent has no tenant, so the counterparty is whoever
+    // OPERATES this deployment — and that is why the document lives in
+    // `deployment_legal_versions` rather than under a tenant. This used to read
+    // `profile.fixedTenantId`, which is the single tenant in standalone and
+    // NULL in SaaS, so every SaaS signup was refused for a reason that had
+    // nothing to do with the caller. One document with no tenant answers both
+    // modes with the same query, and the branch is gone rather than widened.
+    const { DeploymentLegalService } = await import('../services/deployment-legal.service');
+    const legal = new DeploymentLegalService(getDrizzle(c) as never);
+    const inForce = await legal.latest('agent_terms');
+    if (!inForce) {
+        logger.error('[agent-signup] refused: no agent terms published on this deployment');
+        throw Errors.BadRequest(
+            'Agent signup is unavailable until this deployment publishes its agent terms.',
+        );
+    }
+    // Staleness, not evidence. The recorded hash is always the one the server
+    // read above — a client-supplied hash would be the client asserting what it
+    // read, which is what this record exists to replace. But a page that
+    // rendered an older version is a real thing to catch: the tick was given
+    // against text that is no longer in force, so the acceptance would name a
+    // version the signer was never shown. Refuse and let them re-read.
+    if (body.shownContentHash && body.shownContentHash !== inForce.contentHash) {
+        logger.info('[agent-signup] refused: stale page — shown hash is not the version in force');
+        throw Errors.BadRequest(
+            'The agent terms were updated while this page was open. Reload and review the current version.',
+        );
+    }
+    if (body.termsAccepted !== true) {
+        // Logged, because the status code alone cannot say which of this
+        // endpoint's four refusals fired — bot challenge, no published terms,
+        // a stale page, or an unticked box all answer 400, and an operator
+        // reading "400" learns nothing. Two round trips of an e2e diagnosis
+        // were spent on exactly that.
+        logger.info('[agent-signup] refused: terms not accepted');
+        throw Errors.BadRequest('The agent terms must be accepted to create an account');
+    }
 
-        const keyring = await c.var.keyringPromise!;
-        const now = Math.floor(Date.now() / 1000);
-        const token = await signJwt({
-            sub: result.userId,
-            role: 'agent',
-            'custom:userRole': 'agent',
-            email: result.email,
-            iat: now,
-            exp: now + 60 * 60 * 24,
-        }, keyring);
-
-        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
-
-        return c.json({
-            success: true as const,
-            data: { redirect: '/agent-dashboard', userId: result.userId },
-        }, 200);
+    const result = await c.var.services.agent.signup({
+        email: body.email,
+        password: body.password,
+        name: body.name,
+        termsAccepted: {
+            at: new Date().toISOString(),
+            version: inForce.version,
+            contentHash: inForce.contentHash,
+            ...(c.req.header('cf-connecting-ip') ? { ip: c.req.header('cf-connecting-ip')! } : {}),
+            ...(c.req.header('cf-ipcountry') ? { country: c.req.header('cf-ipcountry')! } : {}),
+        },
     });
 
-export type AgentSignupApi = typeof agentSignupRoutes;
+    const keyring = await c.var.keyringPromise!;
+    const now = Math.floor(Date.now() / 1000);
+    const token = await signJwt({
+        sub: result.userId,
+        role: 'agent',
+        'custom:userRole': 'agent',
+        email: result.email,
+        iat: now,
+        exp: now + 60 * 60 * 24,
+    }, keyring);
 
-export default agentSignupRoutes;
+    setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
+
+    return c.json({
+        success: true as const,
+        data: { redirect: '/agent-dashboard', userId: result.userId },
+    }, 200);
+});
+
+/** Registration order. Drives `AgentSignupApi`; a test pins it to what `app` really registered. */
+export const agentSignupRouteConfigs = [agentTermsRoute, signupRoute] as const;
+
+export type AgentSignupApi = ApiOf<typeof agentSignupRouteConfigs>;
+
+export default app;

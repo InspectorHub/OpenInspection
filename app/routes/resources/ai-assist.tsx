@@ -30,11 +30,7 @@
 import type { Route } from "./+types/ai-assist";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-
-export type AiAssistResult =
-    | { ok: true; intent: "assist"; text: string; aiCallId: string }
-    | { ok: true; intent: "review" }
-    | { ok: false; error: string };
+import type { AiAssistResult } from "@core/field-ui/data-source-types";
 
 /**
  * The message shown when the API refuses. The server's own refusal text is

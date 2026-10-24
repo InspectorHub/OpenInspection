@@ -1,7 +1,7 @@
 import { Banner, SegmentedControl, Select, pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import type { CustomHoliday, HolidayInternalPolicy, HolidayPublicPolicy } from "./HolidayClosedPanel";
 import { SUPPORTED_STATE_CODES, regionOptionLabel } from "./holiday-region-options";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 

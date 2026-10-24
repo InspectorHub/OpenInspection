@@ -14,7 +14,7 @@ import app from '../../../server/index';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { NATIVE_SCOPE, type NativeProps } from '../../../server/lib/auth/native-token';
 import { internalJwtPayload } from '../../../server/lib/mcp/identity-bridge';
-import { seedResultsDoc, applyItemPatch } from '../../../server/lib/collab/results-doc';
+import { seedResultsDoc, applyItemPatch } from '@core/field-ui/shared/results-doc';
 import { applyMigrations } from '../migration-replay';
 import { buildPackage, type PackageSpec } from '../../unit/helpers/offline-package-fixture';
 

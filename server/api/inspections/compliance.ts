@@ -217,126 +217,137 @@ const setPsqStatusRoute = createRoute(withMcpMetadata({
 
 // ── handlers ─────────────────────────────────────────────────────────────────
 
-const complianceRoutes = createApiRouter()
-    .openapi(getComplianceRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const db = getDrizzle(c);
+const app = createApiRouter();
+app.openapi(getComplianceRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const db = getDrizzle(c);
 
-        const ctx = await loadComplianceContext(db, id, tenantId);
-        const { reportSignoffs, psq, documentReview } = await c.var.services.compliance.getCompliance(tenantId, id);
+    const ctx = await loadComplianceContext(db, id, tenantId);
+    const { reportSignoffs, psq, documentReview } = await c.var.services.compliance.getCompliance(tenantId, id);
 
-        const deviations = ctx.deviations ?? [];
-        const psqDisclosedInDeviations = deviations.some((d) => d.area === 'PSQ');
-        const conformance = computeConformance(deriveConformanceInput({
-            reportSignoffs,
-            deviations,
-            psqStatus: psq?.status ?? null,
-            psqDisclosedInDeviations,
-        }));
+    const deviations = ctx.deviations ?? [];
+    const psqDisclosedInDeviations = deviations.some((d) => d.area === 'PSQ');
+    const conformance = computeConformance(deriveConformanceInput({
+        reportSignoffs,
+        deviations,
+        psqStatus: psq?.status ?? null,
+        psqDisclosedInDeviations,
+    }));
 
-        return c.json({
-            success: true as const,
-            data: {
-                reportSignoffs: reportSignoffs.map(serializeSignoff),
-                psq: serializePsq(psq),
-                documentReview,
-                conformance,
-            },
-        }, 200);
-    })
-    .openapi(signoffRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const body = c.req.valid('json');
-        const db = getDrizzle(c);
+    return c.json({
+        success: true as const,
+        data: {
+            reportSignoffs: reportSignoffs.map(serializeSignoff),
+            psq: serializePsq(psq),
+            documentReview,
+            conformance,
+        },
+    }, 200);
+});
+app.openapi(signoffRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const db = getDrizzle(c);
 
-        const ctx = await loadComplianceContext(db, id, tenantId);
-        assertFullPcaTier(ctx);
+    const ctx = await loadComplianceContext(db, id, tenantId);
+    assertFullPcaTier(ctx);
 
-        const row = await c.var.services.compliance.signOff(tenantId, id, {
-            role: body.role,
-            personId: body.personId,
-            name: body.name,
-            license: body.license ?? null,
-            qualificationsRef: body.qualificationsRef ?? null,
-            dualRole: body.dualRole ?? false,
-        });
-        auditFromContext(c, 'inspection.compliance.signoff', 'inspection', {
-            entityId: id,
-            metadata: { role: body.role, dualRole: body.dualRole ?? false },
-        });
-        return c.json({ success: true as const, data: row }, 200);
-    })
-    .openapi(removeSignoffRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id, role } = c.req.valid('param');
-        const db = getDrizzle(c);
-
-        const ctx = await loadComplianceContext(db, id, tenantId);
-        assertFullPcaTier(ctx);
-
-        await c.var.services.compliance.removeSignOff(tenantId, id, role);
-        auditFromContext(c, 'inspection.compliance.signoff_removed', 'inspection', { entityId: id, metadata: { role } });
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(seedDocReviewRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        await c.var.services.compliance.seedDocumentReview(tenantId, id);
-        auditFromContext(c, 'inspection.compliance.doc_review_seeded', 'inspection', { entityId: id });
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(patchDocReviewItemRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id, documentKey } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        await c.var.services.compliance.updateDocumentReviewItem(tenantId, id, documentKey, patch);
-        auditFromContext(c, 'inspection.compliance.doc_review_updated', 'inspection', {
-            entityId: id,
-            metadata: { documentKey, fields: Object.keys(patch) },
-        });
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(upsertPsqRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const { responses } = c.req.valid('json');
-        const db = getDrizzle(c);
-
-        const ctx = await loadComplianceContext(db, id, tenantId);
-        assertFullPcaTier(ctx);
-
-        await c.var.services.compliance.upsertPsq(tenantId, id, responses);
-        auditFromContext(c, 'inspection.compliance.psq_updated', 'inspection', { entityId: id });
-        return c.json({ success: true as const }, 200);
-    })
-    .openapi(setPsqStatusRoute, async (c) => {
-        const tenantId = getTenantId(c);
-        const { id } = c.req.valid('param');
-        const { status, reason } = c.req.valid('json');
-        const db = getDrizzle(c);
-
-        const ctx = await loadComplianceContext(db, id, tenantId);
-        assertFullPcaTier(ctx);
-
-        await c.var.services.compliance.setPsqStatus(tenantId, id, status);
-
-        // A declined PSQ is a mandatory-exhibit omission (ASTM §8.5) — disclose
-        // it in the Deviations store (Phase S) so §11.4.3 conformance can still
-        // be claimed once every other gate passes. appendDeviation is
-        // idempotent, so re-declining never duplicates the disclosure.
-        if (status === 'declined') {
-            await c.var.services.inspection.appendDeviation(id, tenantId, {
-                area: 'PSQ',
-                baselineRequirement: 'ASTM §8.5 Pre-Survey Questionnaire included as exhibit',
-                deviation: 'PSQ not obtained from point-of-contact',
-                reason: reason ?? '(no reason provided)',
-            });
-        }
-
-        auditFromContext(c, 'inspection.compliance.psq_status_changed', 'inspection', { entityId: id, metadata: { status } });
-        return c.json({ success: true as const }, 200);
+    const row = await c.var.services.compliance.signOff(tenantId, id, {
+        role: body.role,
+        personId: body.personId,
+        name: body.name,
+        license: body.license ?? null,
+        qualificationsRef: body.qualificationsRef ?? null,
+        dualRole: body.dualRole ?? false,
     });
+    auditFromContext(c, 'inspection.compliance.signoff', 'inspection', {
+        entityId: id,
+        metadata: { role: body.role, dualRole: body.dualRole ?? false },
+    });
+    return c.json({ success: true as const, data: row }, 200);
+});
+app.openapi(removeSignoffRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id, role } = c.req.valid('param');
+    const db = getDrizzle(c);
 
-export default complianceRoutes;
+    const ctx = await loadComplianceContext(db, id, tenantId);
+    assertFullPcaTier(ctx);
+
+    await c.var.services.compliance.removeSignOff(tenantId, id, role);
+    auditFromContext(c, 'inspection.compliance.signoff_removed', 'inspection', { entityId: id, metadata: { role } });
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(seedDocReviewRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    await c.var.services.compliance.seedDocumentReview(tenantId, id);
+    auditFromContext(c, 'inspection.compliance.doc_review_seeded', 'inspection', { entityId: id });
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(patchDocReviewItemRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id, documentKey } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    await c.var.services.compliance.updateDocumentReviewItem(tenantId, id, documentKey, patch);
+    auditFromContext(c, 'inspection.compliance.doc_review_updated', 'inspection', {
+        entityId: id,
+        metadata: { documentKey, fields: Object.keys(patch) },
+    });
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(upsertPsqRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const { responses } = c.req.valid('json');
+    const db = getDrizzle(c);
+
+    const ctx = await loadComplianceContext(db, id, tenantId);
+    assertFullPcaTier(ctx);
+
+    await c.var.services.compliance.upsertPsq(tenantId, id, responses);
+    auditFromContext(c, 'inspection.compliance.psq_updated', 'inspection', { entityId: id });
+    return c.json({ success: true as const }, 200);
+});
+app.openapi(setPsqStatusRoute, async (c) => {
+    const tenantId = getTenantId(c);
+    const { id } = c.req.valid('param');
+    const { status, reason } = c.req.valid('json');
+    const db = getDrizzle(c);
+
+    const ctx = await loadComplianceContext(db, id, tenantId);
+    assertFullPcaTier(ctx);
+
+    await c.var.services.compliance.setPsqStatus(tenantId, id, status);
+
+    // A declined PSQ is a mandatory-exhibit omission (ASTM §8.5) — disclose
+    // it in the Deviations store (Phase S) so §11.4.3 conformance can still
+    // be claimed once every other gate passes. appendDeviation is
+    // idempotent, so re-declining never duplicates the disclosure.
+    if (status === 'declined') {
+        await c.var.services.inspection.appendDeviation(id, tenantId, {
+            area: 'PSQ',
+            baselineRequirement: 'ASTM §8.5 Pre-Survey Questionnaire included as exhibit',
+            deviation: 'PSQ not obtained from point-of-contact',
+            reason: reason ?? '(no reason provided)',
+        });
+    }
+
+    auditFromContext(c, 'inspection.compliance.psq_status_changed', 'inspection', { entityId: id, metadata: { status } });
+    return c.json({ success: true as const }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const complianceRouteConfigs = [
+    getComplianceRoute,
+    signoffRoute,
+    removeSignoffRoute,
+    seedDocReviewRoute,
+    patchDocReviewItemRoute,
+    upsertPsqRoute,
+    setPsqStatusRoute,
+] as const;
+
+export default app;

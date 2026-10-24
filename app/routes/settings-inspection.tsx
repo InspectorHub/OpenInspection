@@ -6,7 +6,8 @@ import { useGuardedSubmit } from '~/hooks/useGuardedSubmit';
 import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
 import { createApi } from '~/lib/api-client.server';
-import { useInspectionPrefs } from '~/hooks/useInspectionPrefs';
+import { useInspectionPrefs } from '@core/field-ui/hooks/useInspectionPrefs';
+import { WebFieldHost } from '~/components/field/WebFieldHost';
 import { LinkExpiryControl } from '~/components/inspection/LinkExpiryControl';
 import type { ReportLinkTtl } from '../../server/lib/report-link-ttl';
 import { m } from "~/paraglide/messages";
@@ -97,7 +98,17 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 }
 
-export default function SettingsInspectionPage() {
+// The preferences hook reads the editor package's data source; this page is not an editor route, so it
+// mounts the same web host with no inspection behind it (as the template editor does).
+export default function SettingsInspectionRoute() {
+    return (
+        <WebFieldHost editor={null}>
+            <SettingsInspectionPage />
+        </WebFieldHost>
+    );
+}
+
+function SettingsInspectionPage() {
     const { prefs, loaded, patch, saveFailed } = useInspectionPrefs();
     const { tags, liveLinks, archiveRevokesAccess: initialArchiveRevokes } = useLoaderData<typeof loader>();
     // IA-100 — optimistic so the checkbox does not appear to ignore a click

@@ -18,11 +18,11 @@ import {
     ResultsBatchResponseSchema,
 } from '../../lib/validations/inspection.schema';
 import { PcaNarrativePatchSchema } from '../../lib/validations/pca-narrative.schema';
-import { resolvePcaNarrative } from '../../lib/pca-narrative';
+import { resolvePcaNarrative } from '@core/field-ui/shared/pca-narrative';
 import { TemplateSchemaV2Schema } from '../../lib/validations/template.schema';
 import { AggregatedRecommendationsResponseSchema } from '../../lib/validations/recommendation.schema';
 import { aggregateAttachedRecommendations } from '../../lib/aggregate-recommendations';
-import { findingsForUnit } from '../../lib/finding-key';
+import { findingsForUnit } from '@core/field-ui/shared/finding-key';
 import { applyResultsBatch } from '../../services/inspection-results.service';
 import { inspectionResults } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -309,140 +309,143 @@ const resultsBatchRoute = createRoute(withMcpMetadata({
     description: 'Folds an array of { itemId, sectionId, field, value } patches into inspection_results.data using the same composite findingKey, with forced last-writer-wins per field.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-const resultsRoutes = createApiRouter()
-    .openapi(getPropertyFactsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const facts = await c.var.services.inspection.getPropertyFacts(id, tenantId);
-        return c.json({ success: true, data: facts }, 200);
-    })
-    .openapi(updatePropertyFactsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const facts = await c.var.services.inspection.updatePropertyFacts(id, tenantId, body);
-        auditFromContext(c, 'inspection.property_facts.update', 'inspection', {
-            entityId: id,
-            metadata: { fields: Object.keys(body) },
-        });
-        return c.json({ success: true, data: facts }, 200);
-    })
-    .openapi(updatePcaNarrativeRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const patch = c.req.valid('json');
+const app = createApiRouter();
+app.openapi(getPropertyFactsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const facts = await c.var.services.inspection.getPropertyFacts(id, tenantId);
+    return c.json({ success: true, data: facts }, 200);
+});
+app.openapi(updatePropertyFactsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const body = c.req.valid('json');
+    const facts = await c.var.services.inspection.updatePropertyFacts(id, tenantId, body);
+    auditFromContext(c, 'inspection.property_facts.update', 'inspection', {
+        entityId: id,
+        metadata: { fields: Object.keys(body) },
+    });
+    return c.json({ success: true, data: facts }, 200);
+});
+app.openapi(updatePcaNarrativeRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const patch = c.req.valid('json');
 
-        // Tenant-scoped lookup — mirrors the property-facts handler's
-        // ownership guard, and gives us the stored pca_narrative object to
-        // merge the patch onto.
-        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
-        const stored = ((inspection as { pcaNarrative?: Record<string, string> | null }).pcaNarrative ?? {}) as Record<string, string>;
-        const merged: Record<string, string> = { ...stored };
-        for (const [k, v] of Object.entries(patch)) {
-            if (typeof v === 'string') merged[k] = v;
-        }
+    // Tenant-scoped lookup — mirrors the property-facts handler's
+    // ownership guard, and gives us the stored pca_narrative object to
+    // merge the patch onto.
+    const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+    const stored = ((inspection as { pcaNarrative?: Record<string, string> | null }).pcaNarrative ?? {}) as Record<string, string>;
+    const merged: Record<string, string> = { ...stored };
+    for (const [k, v] of Object.entries(patch)) {
+        if (typeof v === 'string') merged[k] = v;
+    }
 
-        await c.var.services.inspection.updatePcaNarrative(id, tenantId, merged);
-        auditFromContext(c, 'inspection.pca_narrative.update', 'inspection', {
-            entityId: id,
-            metadata: { fields: Object.keys(patch) },
-        });
-        return c.json({ success: true, data: resolvePcaNarrative(merged) }, 200);
-    })
-    .openapi(autofillPropertyFactsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const { addressString } = c.req.valid('json');
+    await c.var.services.inspection.updatePcaNarrative(id, tenantId, merged);
+    auditFromContext(c, 'inspection.pca_narrative.update', 'inspection', {
+        entityId: id,
+        metadata: { fields: Object.keys(patch) },
+    });
+    return c.json({ success: true, data: resolvePcaNarrative(merged) }, 200);
+});
+app.openapi(autofillPropertyFactsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    const { addressString } = c.req.valid('json');
 
-        // Tenant ownership guard — refuses cross-tenant lookups.
-        await c.var.services.inspection.getInspection(id, tenantId);
+    // Tenant ownership guard — refuses cross-tenant lookups.
+    await c.var.services.inspection.getInspection(id, tenantId);
 
-        const result = await c.var.services.propertyLookup.lookup(addressString);
-        auditFromContext(c, 'inspection.property_facts.autofill', 'inspection', {
-            entityId: id,
-            metadata: { source: result.source ?? 'manual_required', reason: result.reason },
-        });
-
-        return c.json({
-            success: true as const,
-            data: {
-                facts:  result.data,
-                source: result.source ?? ('manual_required' as const),
-                ...(result.reason ? { reason: result.reason } : {}),
-            },
-        }, 200);
-    })
-    .openapi(getResultsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { scope } = c.req.valid('query');
-        const db = getDrizzle(c);
-        await c.var.services.inspection.getInspection(id, c.get('tenantId'));
-        const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
-        const data = (results?.data || {}) as Record<string, unknown>;
-        // Phase U — read-slice to one scope's findings when requested; no scope
-        // ⇒ full map, unchanged. Write model (Yjs/DO) is untouched.
-        const sliced = scope ? findingsForUnit(data, scope) : data;
-        return c.json({ success: true, data: { results: sliced, resultId: results?.id ?? null } }, 200);
-    })
-    .openapi(updateTemplateSnapshotRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { snapshot } = c.req.valid('json');
-        await c.var.services.inspection.updateTemplateSnapshot(id, c.get('tenantId'), snapshot);
-        auditFromContext(c, 'inspection.template_snapshot.update', 'inspection', {
-            entityId: id,
-            metadata: { sectionCount: snapshot.sections?.length ?? 0 },
-        });
-        return c.json({ success: true }, 200);
-    })
-    .openapi(switchRatingSystemRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { ratingSystemId, mode } = c.req.valid('json');
-        const stats = await c.var.services.inspection.switchRatingSystem(id, c.get('tenantId'), ratingSystemId, mode);
-        auditFromContext(c, 'inspection.rating_system.switch', 'inspection', {
-            entityId: id,
-            metadata: { ratingSystemId, mode, ...stats },
-        });
-        return c.json({ success: true, data: stats }, 200);
-    })
-    .openapi(aggregateRecommendationsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-
-        const db = getDrizzle(c);
-        const row = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
-        const { items, totals } = aggregateAttachedRecommendations(row?.data as Record<string, unknown> | undefined);
-        return c.json({ success: true as const, data: { items, totals } }, 200);
-    })
-    .openapi(preflightRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const out = await c.var.services.inspection.computePreflight(id, tenantId);
-        return c.json({ success: true as const, data: out }, 200);
-    })
-    .openapi(resultsBatchRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { patches } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const user     = c.get('user') as { sub?: string } | undefined;
-        const userId   = user?.sub;
-        if (!userId) throw Errors.Unauthorized('Missing user identity');
-
-        // Ownership guard — 404 on tenant mismatch keeps the existence-
-        // enumeration leak closed.
-        try {
-            await c.var.services.inspection.getInspection(id, tenantId);
-        } catch {
-            throw Errors.NotFound('Inspection not found');
-        }
-
-        const db = getDrizzle(c);
-        const data = await applyResultsBatch(db, id, patches, { tenantId, userId });
-        auditFromContext(c, 'inspection.results_batch_patched', 'inspection', {
-            entityId: id, metadata: { applied: data.applied, by: userId },
-        });
-        return c.json({ success: true as const, data }, 200);
+    const result = await c.var.services.propertyLookup.lookup(addressString);
+    auditFromContext(c, 'inspection.property_facts.autofill', 'inspection', {
+        entityId: id,
+        metadata: { source: result.source ?? 'manual_required', reason: result.reason },
     });
 
-export default resultsRoutes;
+    return c.json({
+        success: true as const,
+        data: {
+            facts:  result.data,
+            source: result.source ?? ('manual_required' as const),
+            ...(result.reason ? { reason: result.reason } : {}),
+        },
+    }, 200);
+});
+app.openapi(getResultsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { scope } = c.req.valid('query');
+    const db = getDrizzle(c);
+    await c.var.services.inspection.getInspection(id, c.get('tenantId'));
+    const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
+    const data = (results?.data || {}) as Record<string, unknown>;
+    // Phase U — read-slice to one scope's findings when requested; no scope
+    // ⇒ full map, unchanged. Write model (Yjs/DO) is untouched.
+    const sliced = scope ? findingsForUnit(data, scope) : data;
+    return c.json({ success: true, data: { results: sliced, resultId: results?.id ?? null } }, 200);
+});
+app.openapi(updateTemplateSnapshotRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { snapshot } = c.req.valid('json');
+    await c.var.services.inspection.updateTemplateSnapshot(id, c.get('tenantId'), snapshot);
+    auditFromContext(c, 'inspection.template_snapshot.update', 'inspection', {
+        entityId: id,
+        metadata: { sectionCount: snapshot.sections?.length ?? 0 },
+    });
+    return c.json({ success: true }, 200);
+});
+app.openapi(switchRatingSystemRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { ratingSystemId, mode } = c.req.valid('json');
+    const stats = await c.var.services.inspection.switchRatingSystem(id, c.get('tenantId'), ratingSystemId, mode);
+    auditFromContext(c, 'inspection.rating_system.switch', 'inspection', {
+        entityId: id,
+        metadata: { ratingSystemId, mode, ...stats },
+    });
+    return c.json({ success: true, data: stats }, 200);
+});
+app.openapi(aggregateRecommendationsRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId') as string;
+
+    const db = getDrizzle(c);
+    const row = await db.select().from(inspectionResults)
+        .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
+    const { items, totals } = aggregateAttachedRecommendations(row?.data as Record<string, unknown> | undefined);
+    return c.json({ success: true as const, data: { items, totals } }, 200);
+});
+app.openapi(preflightRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const tenantId = c.get('tenantId');
+    if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+    const out = await c.var.services.inspection.computePreflight(id, tenantId);
+    return c.json({ success: true as const, data: out }, 200);
+});
+app.openapi(resultsBatchRoute, async (c) => {
+    const { id } = c.req.valid('param');
+    const { patches } = c.req.valid('json');
+    const tenantId = c.get('tenantId');
+    const user     = c.get('user') as { sub?: string } | undefined;
+    const userId   = user?.sub;
+    if (!userId) throw Errors.Unauthorized('Missing user identity');
+
+    // Ownership guard — 404 on tenant mismatch keeps the existence-
+    // enumeration leak closed.
+    try {
+        await c.var.services.inspection.getInspection(id, tenantId);
+    } catch {
+        throw Errors.NotFound('Inspection not found');
+    }
+
+    const db = getDrizzle(c);
+    const data = await applyResultsBatch(db, id, patches, { tenantId, userId });
+    auditFromContext(c, 'inspection.results_batch_patched', 'inspection', {
+        entityId: id, metadata: { applied: data.applied, by: userId },
+    });
+    return c.json({ success: true as const, data }, 200);
+});
+
+/** Registration order. Drives the typed client; a test pins it to what `app` really registered. */
+export const resultsRouteConfigs = [getPropertyFactsRoute, updatePropertyFactsRoute, updatePcaNarrativeRoute, autofillPropertyFactsRoute, getResultsRoute, updateTemplateSnapshotRoute, switchRatingSystemRoute, aggregateRecommendationsRoute, preflightRoute, resultsBatchRoute] as const;
+
+export default app;

@@ -16,7 +16,8 @@
  *   DB       `inspection_units` (per inspection, `parent_unit_id` for the
  *            building -> unit hierarchy) and `inspections.unit_inspection_mode`
  *   service  `server/services/unit.service.ts`
- *   editor   `UnitsManager`, mounted in `app/routes/inspection-edit.tsx`
+ *   editor   `UnitsManager`, mounted in `packages/field-ui/src/editor/SharedOverlays.tsx`
+ *            (the editor lives in the field-ui package; the route only hosts it)
  *   report   `PerUnitReportBlock`, rendered from `ReportView.tsx`
  *   template section-level `defaultScope: 'common' | 'unit'`, already accepted
  *            by the validator
@@ -34,6 +35,8 @@ import { describe, it, expect } from 'vitest';
 import { inspections, inspectionUnits } from '../../../server/lib/db/schema';
 
 const APP = path.join(process.cwd(), 'app');
+/** The editor moved out of `app/routes/inspection-edit.tsx` into the field-ui package. */
+const EDITOR_OVERLAYS = path.join(process.cwd(), 'packages/field-ui/src/editor/SharedOverlays.tsx');
 
 function source(rel: string): string {
     return fs.readFileSync(path.join(APP, rel), 'utf8');
@@ -56,9 +59,9 @@ describe('the live multi-unit model', () => {
      * is exactly what an unmounted component also does.
      */
     it('is reachable from the editor', () => {
-        const editor = source('routes/inspection-edit.tsx');
-        expect(editor).toContain('UnitsManager');
-        expect(editor).toMatch(/<UnitsManager/);
+        const overlays = fs.readFileSync(EDITOR_OVERLAYS, 'utf8');
+        expect(overlays).toContain('UnitsManager');
+        expect(overlays).toMatch(/<UnitsManager/);
     });
 
     it('is rendered in the report', () => {
@@ -73,8 +76,8 @@ describe('the live multi-unit model', () => {
      * pass against an unmounted component just as happily.
      */
     it('does not find a component that is not there', () => {
-        const editor = source('routes/inspection-edit.tsx');
-        expect(editor).not.toContain('NoSuchUnitsManagerXyz');
-        expect(editor.length).toBeGreaterThan(1000);
+        const overlays = fs.readFileSync(EDITOR_OVERLAYS, 'utf8');
+        expect(overlays).not.toContain('NoSuchUnitsManagerXyz');
+        expect(overlays.length).toBeGreaterThan(1000);
     });
 });

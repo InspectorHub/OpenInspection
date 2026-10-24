@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Modal, Button } from "@core/shared-ui";
-import type { Severity } from "~/lib/severity";
-import { SEVERITIES, SEVERITY_LABEL } from "~/lib/severity";
+import type { Severity } from "@core/field-ui/lib/severity";
+import { SEVERITIES, SEVERITY_LABEL } from "@core/field-ui/lib/severity";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { m } from "~/paraglide/messages";
 

@@ -11,6 +11,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { CreateRoleProfileSchema, UpdateRoleProfileSchema, RoleProfileSchema } from '../lib/validations/role-profile.schema';
@@ -97,41 +98,49 @@ const deleteRoute = createRoute(withMcpMetadata({
     description: 'Soft-deletes a role profile by setting active:false. System profiles (isSystem:true) are protected and respond with a 409 conflict instead.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-const roleProfilesRoutes = createApiRouter()
-    .openapi(listRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const data = await c.var.services.people.listProfiles(tenantId);
-        return c.json({ success: true as const, data }, 200);
-    })
-    .openapi(createRoute_, async (c) => {
-        const tenantId = c.get('tenantId');
-        const input = c.req.valid('json');
-        const data = await c.var.services.people.createProfile(tenantId, input);
-        return c.json({ success: true as const, data }, 201);
-    })
-    .openapi(updateRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        const patch = c.req.valid('json');
-        const { capabilityDiff } = await c.var.services.people.updateProfile(tenantId, id, patch);
-        // Role-profile edits are permission-bearing now, so they join the audit
-        // trail staff permission_overrides changes already have — before/after
-        // resolved sets, not just "role updated".
-        if (capabilityDiff) {
-            auditFromContext(c, 'role_profile.capabilities_updated', 'contact_role_profile', {
-                entityId: id,
-                metadata: capabilityDiff,
-            });
-        }
-        return c.json({ success: true as const, data: { updated: true as const } }, 200);
-    })
-    .openapi(deleteRoute, async (c) => {
-        const tenantId = c.get('tenantId');
-        const { id } = c.req.valid('param');
-        await c.var.services.people.deactivateProfile(tenantId, id);
-        return c.json({ success: true as const, data: { deactivated: true as const } }, 200);
-    });
+const app = createApiRouter();
+app.openapi(listRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const data = await c.var.services.people.listProfiles(tenantId);
+    return c.json({ success: true as const, data }, 200);
+});
+app.openapi(createRoute_, async (c) => {
+    const tenantId = c.get('tenantId');
+    const input = c.req.valid('json');
+    const data = await c.var.services.people.createProfile(tenantId, input);
+    return c.json({ success: true as const, data }, 201);
+});
+app.openapi(updateRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    const patch = c.req.valid('json');
+    const { capabilityDiff } = await c.var.services.people.updateProfile(tenantId, id, patch);
+    // Role-profile edits are permission-bearing now, so they join the audit
+    // trail staff permission_overrides changes already have — before/after
+    // resolved sets, not just "role updated".
+    if (capabilityDiff) {
+        auditFromContext(c, 'role_profile.capabilities_updated', 'contact_role_profile', {
+            entityId: id,
+            metadata: capabilityDiff,
+        });
+    }
+    return c.json({ success: true as const, data: { updated: true as const } }, 200);
+});
+app.openapi(deleteRoute, async (c) => {
+    const tenantId = c.get('tenantId');
+    const { id } = c.req.valid('param');
+    await c.var.services.people.deactivateProfile(tenantId, id);
+    return c.json({ success: true as const, data: { deactivated: true as const } }, 200);
+});
 
-export type RoleProfilesApi = typeof roleProfilesRoutes;
+/** Registration order. Drives `RoleProfilesApi`; a test pins it to what `app` really registered. */
+export const roleProfilesRouteConfigs = [
+    listRoute,
+    createRoute_,
+    updateRoute,
+    deleteRoute,
+] as const;
 
-export default roleProfilesRoutes;
+export type RoleProfilesApi = ApiOf<typeof roleProfilesRouteConfigs>;
+
+export default app;

@@ -5,7 +5,7 @@ import { brandTokens, EMPTY_BRAND } from "~/lib/brand";
 // Shared with the Hub's payment section — one declaration of this wire shape,
 // so the two callers cannot drift apart again.
 import type { RawInvoice } from "~/lib/section-loaders";
-import { formatDate } from "~/lib/format";
+import { formatDate } from "@core/field-ui/shared/format";
 import { portalHubUrl } from "~/lib/portal-hub-url";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { PaymentSection, type InvoiceData } from "~/components/portal/sections/PaymentSection";

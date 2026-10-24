@@ -77,7 +77,7 @@ const CONDITIONS = [
 
 const ROOTS = ['server', 'app'];
 const EXT = /\.(ts|tsx)$/;
-const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.types', 'paraglide']);
+const SKIP_DIR = new Set(['node_modules', 'dist', 'build', '.types', '.types-tsgo', 'paraglide']);
 const ANCHOR = /view-invariant:\s*([a-z0-9-]+)/g;
 
 function walk(dir, out = []) {

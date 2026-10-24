@@ -23,11 +23,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import * as Y from "yjs";
 import { IndexeddbPersistence } from "y-indexeddb";
 
-import { purgeInspectionOfflineData } from "../../../app/lib/collab/offline-purge";
-import {
-    putPendingMedia,
-    listPendingMedia,
-} from "../../../app/lib/collab/media-pending-store";
+import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
+import { webOfflinePurgeHost } from "~/lib/field/web-collab";
+import { webMediaStore } from "~/lib/field/web-media-store";
+import type { PendingMediaRecord } from "@core/field-ui/media-types";
 
 const DELETED = "a1f069f7-0000-4000-8000-000000000001";
 const SURVIVOR = "e7cf4375-0000-4000-8000-000000000002";
@@ -53,14 +52,14 @@ async function resultsDbHasData(inspectionId: string): Promise<boolean> {
     return value !== undefined;
 }
 
-function pendingPhoto(inspectionId: string, pendingId: string) {
+function pendingPhoto(inspectionId: string, pendingId: string): PendingMediaRecord {
     return {
         pendingId,
         inspectionId,
-        findingKey: "roof/shingles",
-        kind: "photo" as const,
+        kind: "photo",
         blob: new Blob([new Uint8Array([1, 2, 3, 4])], { type: "image/jpeg" }),
-        enqueuedAt: Date.now(),
+        createdAt: Date.now(),
+        meta: { targetType: "item", findingKey: "roof/shingles", itemId: "shingles" },
     };
 }
 
@@ -68,9 +67,9 @@ describe("purgeInspectionOfflineData", () => {
     beforeEach(async () => {
         await seedResultsDb(DELETED, "deficient: active leak at the valley");
         await seedResultsDb(SURVIVOR, "still an open inspection");
-        await putPendingMedia(pendingPhoto(DELETED, "pend-deleted-1"));
-        await putPendingMedia(pendingPhoto(DELETED, "pend-deleted-2"));
-        await putPendingMedia(pendingPhoto(SURVIVOR, "pend-survivor-1"));
+        await webMediaStore.put(pendingPhoto(DELETED, "pend-deleted-1"));
+        await webMediaStore.put(pendingPhoto(DELETED, "pend-deleted-2"));
+        await webMediaStore.put(pendingPhoto(SURVIVOR, "pend-survivor-1"));
     });
 
     it("starts from a device that really is holding the data", async () => {
@@ -78,30 +77,30 @@ describe("purgeInspectionOfflineData", () => {
         // empty device and prove nothing — which is the failure mode the repo
         // notes as "an empty collection reads as green".
         expect(await resultsDbHasData(DELETED)).toBe(true);
-        expect((await listPendingMedia(DELETED)).length).toBe(2);
+        expect((await webMediaStore.list(DELETED)).length).toBe(2);
     });
 
     it("removes the deleted inspection's Yjs database and queued media", async () => {
-        const result = await purgeInspectionOfflineData(DELETED);
+        const result = await purgeInspectionOfflineData(DELETED, webOfflinePurgeHost);
 
         expect(result.attempted).toBe(true);
         expect(result.pendingMediaDeleted).toBe(2);
 
-        expect(await listPendingMedia(DELETED)).toEqual([]);
+        expect(await webMediaStore.list(DELETED)).toEqual([]);
         // The field content itself — the thing that was surviving indefinitely.
         expect(await resultsDbHasData(DELETED)).toBe(false);
     });
 
     it("leaves every other inspection on the device untouched", async () => {
-        await purgeInspectionOfflineData(DELETED);
+        await purgeInspectionOfflineData(DELETED, webOfflinePurgeHost);
 
         expect(await resultsDbHasData(SURVIVOR)).toBe(true);
-        const survivors = await listPendingMedia(SURVIVOR);
+        const survivors = await webMediaStore.list(SURVIVOR);
         expect(survivors.map((r) => r.pendingId)).toEqual(["pend-survivor-1"]);
     });
 
     it("is safe to call for an inspection this device never opened", async () => {
-        const result = await purgeInspectionOfflineData("never-seen-here");
+        const result = await purgeInspectionOfflineData("never-seen-here", webOfflinePurgeHost);
         expect(result.attempted).toBe(true);
         expect(result.pendingMediaDeleted).toBe(0);
         // And it did not take the others with it.
@@ -109,6 +108,6 @@ describe("purgeInspectionOfflineData", () => {
     });
 
     it("is a no-op without an id, and never rejects", async () => {
-        await expect(purgeInspectionOfflineData("")).resolves.toMatchObject({ attempted: false });
+        await expect(purgeInspectionOfflineData("", webOfflinePurgeHost)).resolves.toMatchObject({ attempted: false });
     });
 });

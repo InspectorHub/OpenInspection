@@ -13,7 +13,7 @@
  */
 import { timeWindows } from "./booking-constants";
 import { formatBookingDate } from "./booking-date-rules";
-import { formatCurrency } from "~/lib/format";
+import { formatCurrency } from "@core/field-ui/shared/format";
 import { m } from "~/paraglide/messages";
 
 export function BookingSummaryCard({

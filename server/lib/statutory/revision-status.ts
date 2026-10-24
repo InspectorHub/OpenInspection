@@ -58,7 +58,7 @@ import {
 } from './form-registry';
 import { utcMidnightOf } from './inspection-date';
 import { PUBLISHED_FORM_VERSIONS } from './forms';
-import type { StatutoryFormDeclaration } from '../../types/statutory-declaration';
+import type { StatutoryFormDeclaration } from '@core/field-ui/shared/statutory-declaration';
 
 export type RevisionStatus =
     /** Nothing to say: this template produces the revision this inspection needs. */

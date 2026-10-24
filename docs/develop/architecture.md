@@ -352,7 +352,7 @@ The DI proxy in `server/lib/middleware/di.ts` lazy-instantiates each service on 
 
 - **React Router v8 SSR**: Routes in `app/routes/` use `loader()` for data fetching and `action()` for mutations. Full server-side rendering on Cloudflare Workers.
 - **React components**: `app/components/`, organized by domain (inspection, template, booking, media-studio, portal, …). Counts are not written here because they go stale between releases; `ls app/components` is the answer.
-- **Hooks**: `app/hooks/` holds the state hooks the editor is built from — `useInspection`, `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`, and the `findings/` and `inspection/` sub-hook directories.
+- **Hooks**: `app/hooks/` holds the state hooks the editor is built from — `useInspection`, `useFindings`, `useKeyboard` (shortcuts), `useCannedComments`, `usePresence` (WebSocket), `useTheme`, `useUnsavedChanges`, `useSessionContext`, and the `findings/` and `inspection/` sub-hook directories. `useInspection`, `useFindings`, `useKeyboard`, `usePresence`, `useScopeLoader`, `useInspectionPrefs`, `useCannedComments`, `usePhotoOps`, `useMediaDrain` and the `findings/` and `inspection/` sub-hooks now live in `packages/field-ui/src/hooks/`.
 - **Design tokens**: Tailwind v4 with Design System 0523 tokens in `app/styles/tailwind.css`.
 - **Shared UI**: `packages/shared-ui/` provides the design-system components (Button, Pill, Card, …) consumed by the frontend; its `src/index.ts` is the list.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
@@ -395,8 +395,8 @@ which is the tell: the fork was not expressing a difference, it was losing
 fixes on whichever copy the next change did not touch.
 
 The structural components now exist once, under
-`app/components/editor-shared/`, and take `mode: 'author' | 'fill'`
-(`editor-shared/editor-mode.ts`):
+`packages/field-ui/src/components/editor-shared/`, and take `mode: 'author' | 'fill'`
+(`packages/field-ui/src/components/editor-shared/editor-mode.ts`):
 
 | Component | `author` renders | `fill` renders |
 |---|---|---|
@@ -404,17 +404,17 @@ The structural components now exist once, under
 | `ItemList` | item-type badges | rating state, batch selection |
 | `SideRail` | Preview / Library | Preview / Library / Photos |
 
-`SideRail` is the exception to the directory: it still lives at
-`app/components/editor/SideRail.tsx` and imports `EditorMode` from
+`SideRail` is the exception to the directory: it lives at
+`packages/field-ui/src/components/editor/SideRail.tsx` and imports `EditorMode` from
 `editor-shared/`. It is mode-aware but has not moved.
 
 **The item detail panel is the one thing that stays forked, and it says why.**
 Configuring an item's type and its canned entries
 (`components/template/ItemPropertiesPanel.tsx`, `ItemCommentsPanel.tsx`) and
-rating one in the field (`components/editor/ItemEditor.tsx`) are different jobs,
+rating one in the field (`packages/field-ui/src/components/editor/ItemEditor.tsx`) are different jobs,
 not one job with a flag. They share the atoms instead of the panel —
 `ItemHeader`, `CannedCommentRow`, `DefectCategoryChip`, `InlineRename`,
-`RatingSegment`, all under `editor-shared/`.
+`RatingSegment`, all under `packages/field-ui/src/components/editor-shared/`.
 `components/template/preview-parity.test.ts` renders one canned entry through
 both the template preview and the editor's SideRail and compares what a reader
 sees, so the two cannot drift in silence.
@@ -427,7 +427,7 @@ Five things were retired to get here, and none of them should come back:
   and it was also the only place the eight non-`rich` item types and
   `item.description` were ever rendered, so the live editor was the one missing
   them. Both now render in `ItemEditor`; the route and its renderer are gone.
-  `FormField` (`app/components/form/FormField.tsx`) survives as the building
+  `FormField` (`packages/field-ui/src/components/form/FormField.tsx`) survives as the building
   block `ItemEditor` reuses for non-`rich` input, which writes to
   `result.value`. `item.description` is inspector-facing guidance: it shows in
   the editor and is never emitted to the report or to the client.
@@ -449,7 +449,7 @@ Five things were retired to get here, and none of them should come back:
   isDefect, pausesAdvance?, hotkey?, order }`.
 - **Three different reorder gestures** for the same operation (drag here, arrow
   buttons there, a dropdown menu somewhere else). Dragging is the gesture, via
-  `editor-shared/useSortableReorder.ts`, with the arrow/menu path kept as the
+  `packages/field-ui/src/components/editor-shared/useSortableReorder.ts`, with the arrow/menu path kept as the
   keyboard-reachable fallback rather than as a second way of doing it.
 
 ### A feature that touches the editor extends a dimension
@@ -497,11 +497,11 @@ A finding carries two independent classifications, and collapsing them into one
 is the recurring mistake.
 
 **`severity` is how bad it is.** One vocabulary, four words —
-`good | marginal | significant | minor` — declared in `app/lib/severity.ts` and
+`good | marginal | significant | minor` — declared in `packages/field-ui/src/lib/severity.ts` and
 in `server/lib/validations/rating-system.schema.ts`. A rating level carries it;
 a canned comment carries it (`comments.severity`); the editor's library filter
 matches the two **structurally**, by reading the active level's own `severity`
-field (`severityForRatingId` in `app/hooks/useCannedComments.ts`).
+field (`severityForRatingId` in `packages/field-ui/src/hooks/useInspection.ts`).
 
 > Two details of that are worth keeping. The vocabulary used to be two
 > vocabularies for one axis — rating levels said `severity`, comments said a

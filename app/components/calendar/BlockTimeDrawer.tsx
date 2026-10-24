@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useFetcher } from "react-router";
 import { useFetcherResult } from "~/hooks/useFetcherResult";
-import { ConfirmDialog } from "~/components/ConfirmDialog";
-import { formatDate } from "~/lib/format";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
+import { formatDate } from "@core/field-ui/shared/format";
 import { useDisplayLocale } from "~/hooks/useSessionContext";
 import type { BlockConflict, BlockConflictsPayload } from "~/routes/resources/block-conflicts";
 import { Drawer, Modal, PENDING_CLASS, pendingProps } from "@core/shared-ui";

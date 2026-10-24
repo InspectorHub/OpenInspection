@@ -10,8 +10,8 @@
  * editor; revive only under a future spec that re-introduces authored applicability.
  */
 
-import type { TemplateSection } from '../types/template-schema';
-import type { } from './commercial-subtypes';
+import type { TemplateSection } from '@core/field-ui/shared/template-schema';
+import type { } from '@core/field-ui/shared/commercial-subtypes';
 
 export function sectionApplies(
     section: TemplateSection,

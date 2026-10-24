@@ -20,7 +20,8 @@
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import { pdfActionLabel, pdfBusyHint, type PdfExportState } from "~/hooks/usePdfExport";
-import { CostExportButtons } from "~/components/CostExportButtons";
+import { CostExportButtons } from "@core/field-ui/components/CostExportButtons";
+import { createWebUrls } from "~/lib/field/web-urls";
 import { WordExportButton } from "./WordExportButton";
 
 export interface ReportExportBarProps {
@@ -47,7 +48,7 @@ export function ReportExportBar({
   return (
     <div className="print:hidden fixed bottom-6 right-6 z-50 flex flex-wrap items-center justify-end gap-2 max-w-[calc(100vw-3rem)]">
       {commercialOwner && hasCostTables ? (
-        <CostExportButtons inspectionId={inspectionId} variant="fab" />
+        <CostExportButtons hrefFor={(format) => createWebUrls().costExport(inspectionId, format)} variant="fab" />
       ) : null}
       {commercialOwner ? (
         <WordExportButton inspectionId={inspectionId} />

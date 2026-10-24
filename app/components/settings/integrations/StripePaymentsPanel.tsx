@@ -5,7 +5,7 @@ import { StripeStepTest } from "~/components/settings/StripeStepTest";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import { WebhookStatusBadge } from "./WebhookStatusBadge";
 import { useChromeDateTimeFormat, useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { formatShapedDateTime } from "~/lib/format-date";
+import { formatShapedDateTime } from "@core/field-ui/shared/format-date";
 import { m } from "~/paraglide/messages";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
