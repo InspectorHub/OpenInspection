@@ -167,6 +167,23 @@ describe('workflows', () => {
     expect(verdict('@other/field-ui@0.2.0', 'field-ui-v0.2.0')).toBe('MISMATCH');
   });
 
+  it('publish: the post-publish visibility check waits up to 5 minutes and warns instead of failing the job', () => {
+    const steps = publish.jobs.publish.steps;
+    const step = steps.find((x: { name?: string }) => x.name === 'Check the registry shows the version');
+    expect(step, 'the visibility check step must exist').toBeDefined();
+    const run: string = step.run;
+    // 30 attempts x 10 seconds = 5 minutes.
+    expect(run).toContain('seq 1 30');
+    expect(run).toContain('sleep 10');
+    // The publish already succeeded: a version that is slow to appear is a warning, never a failed run.
+    expect(run).toContain('::warning::');
+    expect(run).not.toMatch(/exit 1/);
+    expect(step.if).toContain('!inputs.dry_run');
+    // It must come after the publish step itself.
+    const names = steps.map((x: { name?: string }) => x.name);
+    expect(names.indexOf('Check the registry shows the version')).toBeGreaterThan(names.indexOf('Publish the scanned tarball'));
+  });
+
   it('publish: the publish step is skipped for dry runs and for an already published version', () => {
     const steps = publish.jobs.publish.steps;
     const step = steps.find((s: { name?: string }) => s.name === 'Publish the scanned tarball');
