@@ -180,7 +180,7 @@ export default tseslint.config(
         // directory does not exist. That divergence is worse than the lint it
         // skips: it makes the local pre-push gate disagree with the gate it exists
         // to predict.
-        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.types-tsgo/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'backups/**', 'app/paraglide/**', 'packages/field-ui/src/i18n/generated/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.types/**', '.types-tsgo/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'backups/**', 'app/paraglide/**', 'packages/field-ui/src/i18n/generated/**', 'eslint.config.js', '*.config.ts', 'packages/*/tsup.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],
