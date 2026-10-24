@@ -12,9 +12,9 @@ export function SectionDonut({ rated, total, hasDefect, size = 18 }: SectionDonu
     const pct    = total === 0 ? 0 : Math.min(1, rated / total);
     const dash   = circ * pct;
     const color = hasDefect
-        ? 'var(--ih-bad)'
+        ? 'var(--ih-status-bad)'
         : (rated === total && total > 0)
-            ? 'var(--ih-ok)'
+            ? 'var(--ih-status-ok)'
             : 'var(--ih-fg-4)';
     return (
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>

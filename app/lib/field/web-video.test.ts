@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { VideoUploadTicket } from "@core/field-ui/data-source-types";
-import { apiErrorReason, createWebVideo, posterRoute, uploadWithProgressBody } from "./web-video";
+import { apiErrorReason, createWebVideo, posterRoute, uploadWithProgressBody, VIDEO_UPLOAD_TIMEOUT_MS } from "./web-video";
 
 const ok = (body: unknown = { success: true }) =>
     new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" } });
@@ -40,6 +40,14 @@ describe("createWebVideo.setPoster", () => {
             expect(result.ok).toBe(false);
             expect(typeof result.error).toBe("string");
         }
+    });
+});
+
+describe("createWebVideo paths", () => {
+    it("an inspection id with path characters stays one segment", async () => {
+        const fetchImpl = vi.fn(async () => ok());
+        await createWebVideo(asFetch(fetchImpl)).setPoster("a/../b", { streamUid: "u", posterPct: 0 });
+        expect((fetchImpl.mock.calls[0] as unknown as [string])[0]).toBe("/api/inspections/a%2F..%2Fb/media/video/poster");
     });
 });
 
@@ -168,6 +176,66 @@ describe("createWebVideo.uploadFile", () => {
 
     it("exports the progress uploader", () => {
         expect(typeof uploadWithProgressBody).toBe("function");
+    });
+
+    describe("uploadWithProgressBody time limit", () => {
+        class FakeXhr {
+            static last: FakeXhr | null = null;
+            timeout = 0;
+            withCredentials = false;
+            status = 0;
+            responseText = "";
+            upload: { onprogress: ((e: unknown) => void) | null } = { onprogress: null };
+            onload: (() => void) | null = null;
+            onerror: (() => void) | null = null;
+            ontimeout: (() => void) | null = null;
+            onabort: (() => void) | null = null;
+            constructor() { FakeXhr.last = this; }
+            open() { /* noop */ }
+            send() { /* the test settles it */ }
+        }
+
+        it("sets an XHR timeout and settles (rejects) when it fires, so the caller can release its latch", async () => {
+            vi.stubGlobal("XMLHttpRequest", FakeXhr);
+            try {
+                const pending = uploadWithProgressBody("/up", new Blob(["x"]), () => undefined, true);
+                expect(FakeXhr.last?.timeout).toBe(VIDEO_UPLOAD_TIMEOUT_MS);
+                FakeXhr.last?.ontimeout?.();
+                await expect(pending).rejects.toThrow(/timed out/);
+            } finally {
+                vi.unstubAllGlobals();
+            }
+        });
+
+        it("CONTROL - a 2xx answer still resolves with the response text", async () => {
+            vi.stubGlobal("XMLHttpRequest", FakeXhr);
+            try {
+                const pending = uploadWithProgressBody("/up", new Blob(["x"]), () => undefined, false, 5);
+                const xhr = FakeXhr.last as FakeXhr;
+                expect(xhr.timeout).toBe(5);
+                xhr.status = 200;
+                xhr.responseText = "{}";
+                xhr.onload?.();
+                await expect(pending).resolves.toBe("{}");
+            } finally {
+                vi.unstubAllGlobals();
+            }
+        });
+
+        it("uploadFile answers { ok: false } on a timeout instead of hanging", async () => {
+            vi.stubGlobal("XMLHttpRequest", FakeXhr);
+            try {
+                const pending = createWebVideo(asFetch(async () => ok())).uploadFile(
+                    { uploadURL: "/api/up", provider: "r2", ref: { provider: "r2", mediaId: "m", r2Key: "k" } },
+                    new Blob(["x"]),
+                    () => undefined,
+                );
+                FakeXhr.last?.ontimeout?.();
+                expect((await pending).ok).toBe(false);
+            } finally {
+                vi.unstubAllGlobals();
+            }
+        });
     });
 });
 

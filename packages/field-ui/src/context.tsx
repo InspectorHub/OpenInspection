@@ -99,10 +99,32 @@ export interface FieldCommandRunner {
  */
 function requestIdentity(inspectionId: string, cmd: FieldCommand): string {
   try {
-    return `${inspectionId}|${JSON.stringify(cmd)}`;
+    return `${inspectionId}|${JSON.stringify(cmd, blobReplacer)}`;
   } catch {
     return `${inspectionId}|${'op' in cmd ? `${cmd.type}:${cmd.op}` : cmd.type}`;
   }
+}
+
+/** One stable number per Blob object, for the lifetime of that object. */
+const blobTokens = new WeakMap<Blob, number>();
+let nextBlobToken = 1;
+
+/**
+ * `JSON.stringify` turns a Blob or File into `{}`, which would make an upload of one photo and an upload of
+ * another read as the same request (the second would then carry the first one's held key). A Blob stands for
+ * itself: its size, type, name and modification time, plus a per-object token, so the same object is the same
+ * request and any other object is a different one even when its bytes happen to match.
+ */
+function blobReplacer(_key: string, value: unknown): unknown {
+  if (typeof Blob === 'undefined' || !(value instanceof Blob)) return value;
+  let token = blobTokens.get(value);
+  if (token === undefined) {
+    token = nextBlobToken;
+    nextBlobToken += 1;
+    blobTokens.set(value, token);
+  }
+  const file = value as Partial<File>;
+  return { blob: token, size: value.size, type: value.type, name: file.name ?? null, lastModified: file.lastModified ?? null };
 }
 
 /** `crypto.randomUUID` needs a secure context and a recent WebView; fall back so a missing one cannot block a write. */

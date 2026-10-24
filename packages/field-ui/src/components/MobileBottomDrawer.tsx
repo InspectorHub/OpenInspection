@@ -40,7 +40,9 @@ export function MobileBottomDrawer({ open, onClose, title, children, heightFract
                 className={`fixed left-0 right-0 bottom-0 z-50 bg-ih-bg-card rounded-t-2xl shadow-ih-popover flex flex-col outline-none transition-transform ${
                     open ? 'translate-y-0' : 'translate-y-full'
                 }`}
-                style={{ height: `${Math.round(heightFraction * 100)}vh` }}
+                // `vh` first, then `dvh` as a cap: a browser without dynamic viewport units ignores the cap and keeps the `vh`
+                // height, and one with them stops the sheet from reaching under the mobile browser's address bar.
+                style={{ height: `${Math.round(heightFraction * 100)}vh`, maxHeight: `${Math.round(heightFraction * 100)}dvh` }}
             >
                 <div className="flex justify-center pt-2 pb-1">
                     <div className="w-10 h-1 rounded-full bg-ih-border" />

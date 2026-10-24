@@ -187,7 +187,7 @@ describe('useInspectionPrefs: IA-129, a failed save must not stand', () => {
     expect(h.latest().saveFailed).toBe(false);
   });
 
-  it('rolls back to where a BURST started, not to its second-to-last step, and the burst carries the union', async () => {
+  it('serialises saves: a second change is not sent until the first settled, then goes out alone', async () => {
     const { m, h } = await loaded();
     act(() => {
       h.latest().patch({ autoAdvance: 'off' });
@@ -195,21 +195,87 @@ describe('useInspectionPrefs: IA-129, a failed save must not stand', () => {
     act(() => {
       h.latest().patch({ autoAdvanceDelayMs: 900 });
     });
-    // The second request carries both deltas, so superseding the first loses nothing.
-    expect(m.patches[1].delta).toEqual({ autoAdvance: 'off', autoAdvanceDelayMs: 900 });
-
-    // The first request is superseded: its answer (even a failure) is not applied.
-    m.patches[0].resolve({ ok: false, error: 'stale' });
-    await flush();
-    expect(h.latest().saveFailed).toBe(false);
-    expect(h.latest().prefs.autoAdvance).toBe('off');
+    // Two requests in flight could land out of order on the server and lose the newer value.
+    expect(m.patches).toHaveLength(1);
+    expect(h.latest().prefs.autoAdvanceDelayMs).toBe(900);
     expect(h.latest().saving).toBe(true);
 
+    m.patches[0].resolve({ ok: true, data: { ...DEFAULT_INSPECTION_PREFS, autoAdvance: 'off' } });
+    await flush();
+    expect(m.patches).toHaveLength(2);
+    expect(m.patches[1].delta).toEqual({ autoAdvanceDelayMs: 900 });
+    // The echo of the first request must not undo the change that is still waiting to be saved.
+    expect(h.latest().prefs.autoAdvanceDelayMs).toBe(900);
+    expect(h.latest().saving).toBe(true);
+
+    m.patches[1].resolve({ ok: true, data: { ...DEFAULT_INSPECTION_PREFS, autoAdvance: 'off', autoAdvanceDelayMs: 900 } });
+    await flush();
+    expect(h.latest().saving).toBe(false);
+    expect(h.latest().saveFailed).toBe(false);
+  });
+
+  it('changes made while a save is in flight are merged into ONE follow-up request', async () => {
+    const { m, h } = await loaded();
+    act(() => {
+      h.latest().patch({ autoAdvance: 'off' });
+    });
+    act(() => {
+      h.latest().patch({ autoAdvanceDelayMs: 900 });
+    });
+    act(() => {
+      h.latest().patch({ autoAdvanceDelayMs: 500, pinnedTagIds: ['t1'] });
+    });
+    m.patches[0].resolve({ ok: true, data: { ...DEFAULT_INSPECTION_PREFS, autoAdvance: 'off' } });
+    await flush();
+    expect(m.patches).toHaveLength(2);
+    expect(m.patches[1].delta).toEqual({ autoAdvanceDelayMs: 500, pinnedTagIds: ['t1'] });
+  });
+
+  it('a failure rolls back only what THAT request changed: an earlier saved value stays', async () => {
+    const { m, h } = await loaded();
+    act(() => {
+      h.latest().patch({ autoAdvance: 'off' });
+    });
+    act(() => {
+      h.latest().patch({ autoAdvanceDelayMs: 900 });
+    });
+    m.patches[0].resolve({ ok: true, data: { ...DEFAULT_INSPECTION_PREFS, autoAdvance: 'off' } });
+    await flush();
     m.patches[1].resolve({ ok: false, error: 'nope' });
     await flush();
-    expect(h.latest().prefs.autoAdvance).toBe('always');
+    expect(h.latest().prefs.autoAdvance).toBe('off');
     expect(h.latest().prefs.autoAdvanceDelayMs).toBe(200);
     expect(h.latest().saveFailed).toBe(true);
+  });
+
+  it('a failed request does not roll back a key that was edited again since, and that edit is still sent', async () => {
+    const { m, h } = await loaded();
+    act(() => {
+      h.latest().patch({ autoAdvance: 'off' });
+    });
+    act(() => {
+      h.latest().patch({ autoAdvance: 'keyboard', autoAdvanceDelayMs: 900 });
+    });
+    m.patches[0].resolve({ ok: false, error: 'nope' });
+    await flush();
+    expect(h.latest().prefs.autoAdvance).toBe('keyboard');
+    expect(m.patches).toHaveLength(2);
+    expect(m.patches[1].delta).toEqual({ autoAdvance: 'keyboard', autoAdvanceDelayMs: 900 });
+  });
+
+  it('a failed change to a key that already saved once falls back to the saved value, not to the default', async () => {
+    const { m, h } = await loaded();
+    act(() => {
+      h.latest().patch({ autoAdvanceDelayMs: 900 });
+    });
+    m.patches[0].resolve({ ok: true, data: { ...DEFAULT_INSPECTION_PREFS, autoAdvanceDelayMs: 900 } });
+    await flush();
+    act(() => {
+      h.latest().patch({ autoAdvanceDelayMs: 500 });
+    });
+    m.patches[1].resolve({ ok: false });
+    await flush();
+    expect(h.latest().prefs.autoAdvanceDelayMs).toBe(900);
   });
 
   it('a stale success must not overwrite what a newer change already shows', async () => {

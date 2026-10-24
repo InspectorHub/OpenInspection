@@ -2,7 +2,7 @@
  * Per-defect structured field vocabularies, for app-side use.
  *
  * The vocabularies themselves are NOT defined here. They are re-exported from
- * `server/types/defect-fields.ts`, because that list is what decides whether a
+ * `packages/field-ui/src/shared/defect-fields.types.ts`, because that list is what decides whether a
  * value survives a write: `server/services/inspection/shared.ts` sanitizes
  * every incoming defect state against it and stores NULL for anything it does
  * not recognise, and `contractor_types.trade_slug` is seeded from the same

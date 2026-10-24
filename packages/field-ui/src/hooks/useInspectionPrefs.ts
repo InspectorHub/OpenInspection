@@ -28,6 +28,8 @@ export function useInspectionPrefs() {
     const [loaded, setLoaded] = useState(false);
     const [saving, setSaving] = useState(false);
     const requested = useRef(false);
+    /** The last state the host acknowledged (the load, or a saved echo): the baseline a failed save falls back to. */
+    const committed = useRef<InspectionPrefs>(DEFAULT_INSPECTION_PREFS);
     const mounted = useRef(true);
     useEffect(() => {
         mounted.current = true;
@@ -44,6 +46,7 @@ export function useInspectionPrefs() {
         }
         void prefsStore.load().then(
             (loadedPrefs) => {
+                committed.current = loadedPrefs;
                 if (!mounted.current) return;
                 setPrefs(loadedPrefs);
                 setLoaded(true);
@@ -56,58 +59,67 @@ export function useInspectionPrefs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one request per mount; the guard ref makes a changed store a no-op
     }, []);
 
-    // B-17 lesson: a newer save supersedes an in-flight one, so consecutive deltas
-    // accumulate and every request carries the union; only the answer to the LATEST
-    // request is applied (the older one used to be aborted by the router and never
-    // delivered); the echo clears the accumulator.
-    const pendingDelta = useRef<Partial<InspectionPrefs>>({});
-    const latestRequest = useRef(0);
-
-    // IA-129 — the value to fall back to if the save fails. Captured at the
-    // moment of the optimistic update, because by the time the failure arrives
-    // `prefs` already contains the change we need to undo.
-    const rollbackTo = useRef<InspectionPrefs | null>(null);
+    // Saves are SERIALISED: one request in flight, and every change made meanwhile accumulates in `queued` and
+    // goes out as ONE request when the in-flight one settles. Concurrent requests could land out of order on
+    // the server (an older delta applied last, losing the newer value) and could not be told apart on failure.
+    // `committed` is the last state the host acknowledged; a failed request puts back ONLY the keys that
+    // request carried (and only those not edited again since), taken from `committed`, so a value that did
+    // save is never rolled back with one that did not.
+    const queued = useRef<Partial<InspectionPrefs>>({});
+    const pumping = useRef(false);
     const [saveFailed, setSaveFailed] = useState(false);
+
+    const pump = useCallback(async (store: NonNullable<typeof prefsStore>) => {
+        pumping.current = true;
+        try {
+            while (Object.keys(queued.current).length > 0) {
+                const sent = queued.current;
+                queued.current = {};
+                const result = await store.patch(sent).then(
+                    (r) => r,
+                    (): { ok: false; data?: undefined } => ({ ok: false }),
+                );
+                if (result.ok) {
+                    // Adopt the host's validated, merged answer; without one, the delta itself is now saved.
+                    committed.current = result.data ?? { ...committed.current, ...sent };
+                    if (mounted.current) {
+                        const later = queued.current;
+                        const base = committed.current;
+                        setPrefs({ ...base, ...later });
+                    }
+                } else {
+                    // The optimistic values of THIS request would otherwise stand, nothing would say anything,
+                    // and the control would keep showing a value that had just failed to save. On a page of
+                    // workspace-wide editor defaults that means an operator walks away believing they changed
+                    // how every inspector's editor behaves.
+                    const back: Partial<Record<keyof InspectionPrefs, unknown>> = {};
+                    for (const key of Object.keys(sent) as Array<keyof InspectionPrefs>) {
+                        if (!(key in queued.current)) back[key] = committed.current[key];
+                    }
+                    if (mounted.current) {
+                        setPrefs((prev) => ({ ...prev, ...(back as Partial<InspectionPrefs>) }));
+                        setSaveFailed(true);
+                    }
+                }
+            }
+        } finally {
+            pumping.current = false;
+            if (mounted.current) setSaving(false);
+        }
+    }, []);
 
     const patch = useCallback((delta: Partial<InspectionPrefs>) => {
         // Optimistic update; the answer adopts the server echo.
-        setPrefs(prev => {
-            // Remember the pre-change state for the rollback. Only the
-            // FIRST pending change records it, so a burst of edits rolls back to
-            // where the burst started rather than to its second-to-last step.
-            if (!rollbackTo.current) rollbackTo.current = prev;
-            return { ...prev, ...delta };
-        });
+        setPrefs(prev => ({ ...prev, ...delta }));
         setSaveFailed(false);
-        pendingDelta.current = { ...pendingDelta.current, ...delta };
         if (!prefsStore) return;
-        const request = ++latestRequest.current;
+        queued.current = { ...queued.current, ...delta };
+        if (pumping.current) return;
         setSaving(true);
-        // A repeat is harmless: the PATCH carries the accumulated delta, which the server merges into the same row,
-        // and a newer call supersedes this one's answer via latestRequest.
-        void prefsStore.patch(pendingDelta.current).then(
-            (result) => result,
-            (): { ok: false; data?: undefined } => ({ ok: false }),
-        ).then((result) => {
-            if (!mounted.current || request !== latestRequest.current) return;
-            setSaving(false);
-            if (result.ok && result.data) {
-                // Server echo after a PATCH — adopt the validated, merged result.
-                setPrefs(result.data);
-                rollbackTo.current = null;
-                pendingDelta.current = {};
-            } else if (!result.ok) {
-                // A PATCH that comes back NOT ok. The optimistic `setPrefs` would otherwise stand, nothing
-                // would say anything, and the control would keep showing the value that had just failed to
-                // save. On a page of workspace-wide editor defaults that means an operator walks away
-                // believing they changed how every inspector's editor behaves.
-                if (rollbackTo.current) setPrefs(rollbackTo.current);
-                rollbackTo.current = null;
-                pendingDelta.current = {};
-                setSaveFailed(true);
-            }
-        });
-    }, [prefsStore]);
+        // `pumping` is set synchronously inside `pump`, before its first await, so a second call in the same
+        // frame only queues.
+        void pump(prefsStore);
+    }, [prefsStore, pump]);
 
     return {
         prefs,

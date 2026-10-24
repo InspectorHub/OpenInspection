@@ -77,10 +77,10 @@ export const DATA: EditorData = createEmptyEditorData({
   ratingLevels: [{ id: "ok", label: "Satisfactory", color: "#0a0" }],
 });
 
-export type ResourceKey = "aiAssist" | "commentsLibrary" | "costItems" | "mediaPool" | "repairItems" | "settingsSheet" | "templateSearch" | "versionHistory" | "video";
-export type SlotKey = "renderThemeControl" | "pdf";
+type ResourceKey = "aiAssist" | "commentsLibrary" | "costItems" | "mediaPool" | "repairItems" | "settingsSheet" | "templateSearch" | "versionHistory" | "video";
+type SlotKey = "renderThemeControl" | "pdf";
 /** The device itself: no camera API, as on a plain-http origin or a desktop without one. */
-export type EnvironmentKey = "cameraCapture";
+type EnvironmentKey = "cameraCapture";
 export type Absent = ResourceKey | SlotKey | EnvironmentKey;
 
 /** Gives the page a camera API (or not). `getUserMedia` calls are counted so a test can tell how many cameras opened. */
@@ -102,7 +102,7 @@ export function stubCamera(present: boolean) {
   return calls;
 }
 
-function fullResources(): FieldResources {
+export function fullResources(): FieldResources {
   return {
     aiAssist: createFakeAiAssist(),
     commentsLibrary: createFakeCommentsLibrary(),

@@ -17,12 +17,12 @@ afterEach(() => {
 });
 
 const ITEMS = [
-  { id: "i1", label: "One", sectionName: "S", sectionIdx: 0, itemIdx: 0, rating: null },
-  { id: "i2", label: "Two", sectionName: "S", sectionIdx: 0, itemIdx: 1, rating: null },
+  { id: "i1", label: "One", sectionName: "S", sectionIdx: 0, rating: null },
+  { id: "i2", label: "Two", sectionName: "S", sectionIdx: 0, rating: null },
 ];
 const LEVELS = [{ id: "ok", label: "OK" }, { id: "def", label: "Def" }];
 
-function setup(opts: { activeUnitId?: string | null } = {}) {
+function setup(opts: { activeUnitId?: string | null; noDoc?: boolean; onUndoUnavailable?: () => void } = {}) {
   const doc = new Y.Doc();
   const writes: unknown[][] = [];
   const hook = renderHook(
@@ -38,7 +38,7 @@ function setup(opts: { activeUnitId?: string | null } = {}) {
         setDirty: () => {},
       };
       const commitRating = (sid: string, id: string, r: string | null) => { writes.push([sid, id, r]); };
-      return { state, api: useSpeedRating({ state, commitRating, doc, activeUnitId }) };
+      return { state, api: useSpeedRating({ state, commitRating, doc: opts.noDoc ? null : doc, activeUnitId, onUndoUnavailable: opts.onUndoUnavailable }) };
     },
     { initialProps: { activeUnitId: opts.activeUnitId ?? null } },
   );
@@ -89,5 +89,25 @@ describe("useSpeedRating", () => {
     expect(writes.filter((w) => w[2] === "ok")).toHaveLength(0);
     expect(readResultMap(doc)["u1:s1:i1"]?.rating).toBe("ok");
     expect(readResultMap(doc)["_default:s1:i1"]).toBeUndefined();
+  });
+
+  it("an Undo for another unit with no live document says so instead of doing nothing", () => {
+    const onUndoUnavailable = vi.fn();
+    const { hook, writes } = setup({ activeUnitId: "u1", noDoc: true, onUndoUnavailable });
+    act(() => hook.result.current.api.speedRate(1));
+    hook.rerender({ activeUnitId: null });
+    act(() => hook.result.current.api.undoSpeedRating("i1", "ok"));
+    expect(onUndoUnavailable).toHaveBeenCalledTimes(1);
+    expect(writes.filter((w) => w[2] === "ok")).toHaveLength(0);
+  });
+
+  it("CONTROL - with a live document the same Undo writes and does not complain", () => {
+    const onUndoUnavailable = vi.fn();
+    const { hook, doc } = setup({ activeUnitId: "u1", onUndoUnavailable });
+    act(() => hook.result.current.api.speedRate(1));
+    hook.rerender({ activeUnitId: null });
+    act(() => hook.result.current.api.undoSpeedRating("i1", "ok"));
+    expect(onUndoUnavailable).not.toHaveBeenCalled();
+    expect(readResultMap(doc)["u1:s1:i1"]?.rating).toBe("ok");
   });
 });

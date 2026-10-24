@@ -34,6 +34,16 @@ describe("createWebUrls golden strings", () => {
         expect(urls.videoObject("i1", "m9")).toBe("/api/inspections/i1/media/video/r2-object/m9");
         expect(urls.videoObject("i1", "")).toBeNull();
     });
+    it("videoObject keeps a hostile ref inside its one path segment", () => {
+        // `ref` comes from the collab document, which any collaborator can write.
+        expect(urls.videoObject("i1", "../../x?y#z")).toBe("/api/inspections/i1/media/video/r2-object/..%2F..%2Fx%3Fy%23z");
+        expect(urls.videoObject("i1", "..")).toBe("/api/inspections/i1/media/video/r2-object/%2E%2E");
+        expect(urls.videoObject("i1", "a/b")).not.toContain("r2-object/a/b");
+    });
+    it("an id with path characters cannot leave its segment", () => {
+        expect(urls.photo("a/../b", "k")).toBe("/api/inspections/a%2F..%2Fb/photo?key=k");
+        expect(urls.editorPath("..")).toBe("/inspections/%2E%2E/edit");
+    });
     it("inspectionsList is the path the header link used to hard-code", () => {
         expect(urls.inspectionsList?.()).toBe("/inspections");
     });

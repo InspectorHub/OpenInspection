@@ -243,7 +243,7 @@ export function ItemList({
                   data-drag-handle
                   aria-label={m.editor_shared_drag_label({ label: item.label })}
                   title={m.editor_shared_drag_to_reorder()}
-                  className={`shrink-0 w-5 flex items-center justify-center cursor-grab select-none text-ih-fg-4 touch-none ${REVEAL}`}
+                  className={`shrink-0 w-5 flex items-center justify-center cursor-grab select-none text-ih-fg-4 touch-none pointer-coarse:min-w-11 pointer-coarse:min-h-11 ${REVEAL}`}
                 >☰</span>
               )}
 
@@ -311,11 +311,11 @@ export function ItemList({
 
               {/* Reserved ⋯ slot — own column, never overlaps the rating dot. */}
               {structuralEditing && !batchMode && (
-                <div className={`shrink-0 w-6 flex items-center justify-center ${REVEAL}`}>
+                <div className={`shrink-0 w-6 pointer-coarse:min-w-11 flex items-center justify-center ${REVEAL}`}>
                   <IconButton
                     onClick={(e) => { e.stopPropagation(); menuAnchorRef.current = e.currentTarget; openItemMenu(item.id); }}
                     size="sm"
-                    className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2"
+                    className="w-6 h-6 pointer-coarse:min-w-11 pointer-coarse:min-h-11 text-ih-fg-4 hover:text-ih-fg-2"
                     aria-label={m.editor_shared_edit_label({ label: item.label })}
                     aria-haspopup="true"
                     aria-expanded={menuItemId === item.id}

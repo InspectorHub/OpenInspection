@@ -19,6 +19,9 @@ import {
     openItem,
     openSeededEditor,
     ratingRadios,
+    awaitCollabSynced,
+    readStoredResults,
+    seededInspectionId,
     type EditorLayout,
 } from './helpers/editor-layout';
 import { validPngFile } from './helpers/valid-png';
@@ -93,7 +96,16 @@ for (const vp of [...VIEWPORTS, ...DESKTOP_WIDTHS]) {
     });
 }
 
-for (const vp of VIEWPORTS) {
+/**
+ * The rating the previous viewport stored on the shared Roof item. All five viewports edit the same item (one
+ * seeded inspection per project), so a viewport that picked the level already stored, or wrote the note already
+ * there, would pass without changing anything. Each viewport therefore picks its own level and writes its own note,
+ * and reads the change back from the API. The tests run in file order in one worker, which is what makes this
+ * chain meaningful; it is not read when it is unset (a retry in a fresh worker).
+ */
+let previousStoredRating: string | null = null;
+
+for (const [viewportIndex, vp] of VIEWPORTS.entries()) {
     const expected: EditorLayout = layoutForWidth(vp.width);
 
     test.describe(`working path at ${vp.name} (${expected})`, () => {
@@ -108,18 +120,43 @@ for (const vp of VIEWPORTS) {
             test.setTimeout(90_000);
             await openItem(page, 'Roof', expected);
 
-            // Rate: the first level of the rating system.
+            // Rate: this viewport's own level of the rating system (the one before it chose another).
             const radios = ratingRadios(page);
             await expect(radios.first()).toBeVisible();
-            await radios.first().click();
-            await expect(radios.first()).toHaveAttribute('aria-checked', 'true');
+            const levels = await radios.count();
+            expect(levels, 'the rating system has at least two levels').toBeGreaterThanOrEqual(2);
+            const level = viewportIndex % levels;
+            await radios.nth(level).click();
+            await expect(radios.nth(level)).toHaveAttribute('aria-checked', 'true');
 
-            // Notes: typed into the field and committed by leaving it.
+            // Notes: typed into the field and committed by leaving it. The text is unique to this viewport.
             const notes = page.locator('#notes-textarea');
             const text = `Responsive path ${vp.name}`;
             await notes.fill(text);
             await notes.blur();
             await expect(notes).toHaveValue(text);
+
+            // Read it back from what the server stored, not from what the field echoes: the finding that carries
+            // this viewport's note must exist, carry a rating, and not be the level the previous viewport stored.
+            let storedRating: string | null = null;
+            await expect
+                .poll(async () => {
+                    const results = await readStoredResults(page, seededInspectionId());
+                    const entry = Object.values(results).find((r) => r.notes === text);
+                    storedRating = typeof entry?.rating === 'string' ? entry.rating : null;
+                    return storedRating;
+                }, { timeout: 30_000, message: `the stored results hold "${text}" with a rating` })
+                .not.toBeNull();
+            if (previousStoredRating !== null) expect(storedRating, 'this viewport stored a different level than the last').not.toBe(previousStoredRating);
+            previousStoredRating = storedRating;
+
+            // And a reload shows the same thing (the editor reads it back from the server too).
+            await page.reload();
+            await expect(page.locator('[data-layout]')).toHaveAttribute('data-layout', expected, { timeout: 30_000 });
+            await awaitCollabSynced(page);
+            await openItem(page, 'Roof', expected);
+            await expect(page.locator('#notes-textarea')).toHaveValue(text);
+            await expect(ratingRadios(page).nth(level)).toHaveAttribute('aria-checked', 'true');
 
             // Photo from the library, through the Add media chooser (the hidden input takes the file).
             const before = await page.locator('[data-testid^="thumb-"]').count();

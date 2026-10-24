@@ -222,6 +222,34 @@ describe('media-upload-queue', () => {
         expect(summary).toEqual({ uploaded: 1, failed: 0 });
     });
 
+    it('after a failed delete the next drain retries ONLY the delete: no second upload, no second swap', async () => {
+        const rec = makeRecord();
+        await enqueueMedia(store, rec);
+        let failDelete = true;
+        const flaky: PendingMediaStore = {
+            ...store,
+            delete: async (id) => { if (failDelete) throw new Error('idb'); await store.delete(id); },
+        };
+        const { uploader, calls } = okUploader();
+        const swaps: string[] = [];
+        const cleanupErrors: string[] = [];
+        const deps = {
+            inspectionId: 'insp-1',
+            store: flaky,
+            uploader,
+            onUploaded: (r: PendingMediaRecord) => { swaps.push(r.pendingId); },
+            onCleanupFailed: (r: PendingMediaRecord) => { cleanupErrors.push(r.pendingId); },
+        };
+        expect(await drainMediaQueue(deps)).toEqual({ uploaded: 1, failed: 0 });
+        expect(cleanupErrors).toEqual([rec.pendingId]);
+
+        failDelete = false;
+        expect(await drainMediaQueue(deps)).toEqual({ uploaded: 0, failed: 0 });
+        expect(calls).toHaveLength(1);
+        expect(swaps).toEqual([rec.pendingId]);
+        expect(await store.list('insp-1')).toHaveLength(0);
+    });
+
     it('a second concurrent drain for the same inspection is coalesced (no double upload)', async () => {
         await enqueueMedia(store, makeRecord());
         let release: () => void = () => { /* replaced below */ };

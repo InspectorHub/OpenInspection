@@ -165,7 +165,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - Stable API surface. The SaaS overlay is **not a branch** — it is `APP_MODE=saas` plus `server/portal/` in this same tree, read through `server/lib/deployment-profile.ts`. (This line named a `saas` branch; no such branch exists.)
 
 ### Inspection Engine
-- JSON-schema based inspection templates (`server/types/template-schema.ts`, single canonical v2 — see `server/lib/validations/template.schema.ts`).
+- JSON-schema based inspection templates (`packages/field-ui/src/shared/template-schema.ts`, single canonical v2 — see `server/lib/validations/template.schema.ts`).
 - 9 item types: `rich` (rating + 3 canned-comment tabs) plus `boolean / text / textarea / number / select / multi_select / date / photo_only` for non-rated data points. Inspection side stores rating on `result.rating` and non-rich values on `result.value`.
 - Template import from another product runs through ONE front door: the wizard at `/settings/imports?intent=templates.create`. The operator declares which product the file came from, an adapter under `server/lib/migration-intake/adapters/` reads it, and the run is staged so the conversion can be reviewed and repaired before anything is written. `/templates` links to that address and owns no importer of its own — the old paste-a-JSON-document modal and its `POST /api/inspections/templates/import-spectora` endpoint are both gone.
 - Support for field results, e-signatures, and report generation.

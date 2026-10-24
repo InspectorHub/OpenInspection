@@ -84,6 +84,13 @@ import { getCloudflareEnv, type LoadContext } from "~/lib/load-context";
 export interface CreateApiOptions {
     /** Session JWT — attached as `Authorization: Bearer <token>` when present. */
     token?: string;
+    /**
+     * An `Idempotency-Key` for the FIRST write (non-GET) this client sends. Later writes of the same client
+     * carry none: the server claims a key per request path and payload, so one key reused for a second,
+     * different write would be refused as a mismatch. Use it for an action whose one real effect is a
+     * non-idempotent create and whose follow-up writes are idempotent anyway.
+     */
+    idempotencyKey?: string;
 }
 
 const NON_GET = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -94,8 +101,9 @@ const NON_GET = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  *   - CSRF token + matching `__Host-csrf_token` cookie on non-GET requests
  *   - Service Binding (`env.API_WORKER.fetch`) when available; falls back to global fetch
  */
-function buildFetch(context: LoadContext, token?: string): typeof fetch {
+function buildFetch(context: LoadContext, token?: string, idempotencyKey?: string): typeof fetch {
     const env = getCloudflareEnv(context);
+    let keyPending = Boolean(idempotencyKey);
 
     return (async (input: Request | string | URL, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(input, init);
@@ -108,6 +116,10 @@ function buildFetch(context: LoadContext, token?: string): typeof fetch {
         if (NON_GET.has(method)) {
             const { headerValue, cookieValue } = makeCsrfPair();
             headers.set("x-csrf-token", headerValue);
+            if (keyPending && idempotencyKey) {
+                keyPending = false;
+                headers.set("Idempotency-Key", idempotencyKey);
+            }
             const existingCookie = headers.get("Cookie") ?? "";
             headers.set("Cookie", existingCookie ? `${existingCookie}; ${cookieValue}` : cookieValue);
         }
@@ -229,7 +241,7 @@ export interface Api {
  */
 export function createApi(context: LoadContext, opts: CreateApiOptions = {}): Api {
     const baseUrl = getApiUrl(context);
-    const fetcher = buildFetch(context, opts.token);
+    const fetcher = buildFetch(context, opts.token, opts.idempotencyKey);
 
     // `hc<T>` constrains `T extends Hono<...>`. Each per-module type (`AdminApi`,
     // etc.) is `typeof <x>Routes` where `<x>Routes` is an `OpenAPIHono` instance —

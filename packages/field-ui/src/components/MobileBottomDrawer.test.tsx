@@ -19,6 +19,17 @@ describe("MobileBottomDrawer", () => {
     expect(sheet(container).getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("sizes the sheet in vh with a dvh cap, so the address bar cannot push it off screen and an old browser still gets a height", () => {
+    const { container } = render(
+      <MobileBottomDrawer open onClose={vi.fn()} title="Jump to" heightFraction={0.7}>
+        <button type="button">Item</button>
+      </MobileBottomDrawer>,
+    );
+    const style = sheet(container).getAttribute("style") ?? "";
+    expect(style).toContain("height: 70vh");
+    expect(style).toContain("max-height: 70dvh");
+  });
+
   it("is reachable while open", () => {
     const { container } = render(
       <MobileBottomDrawer open onClose={vi.fn()} title="Jump to">

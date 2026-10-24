@@ -10,7 +10,7 @@ import type { FieldResources } from "@core/field-ui/data-source";
 import type { SettingsSheetData } from "@core/field-ui/data-source-types";
 import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
 
-export const SETTINGS_SHEET_ROUTE = "/resources/inspection-settings-sheet";
+const SETTINGS_SHEET_ROUTE = "/resources/inspection-settings-sheet";
 
 type SettingsSheet = NonNullable<FieldResources["settingsSheet"]>;
 

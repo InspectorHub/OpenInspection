@@ -12,6 +12,8 @@ export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
   <span
   data-testid="save-status"
   data-status={status}
+  role="status"
+  aria-live="polite"
   className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${
    status === "saving"
    ? "text-ih-watch-fg"

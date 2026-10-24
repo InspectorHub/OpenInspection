@@ -395,7 +395,7 @@ which is the tell: the fork was not expressing a difference, it was losing
 fixes on whichever copy the next change did not touch.
 
 The structural components now exist once, under
-`app/components/editor-shared/`, and take `mode: 'author' | 'fill'`
+`packages/field-ui/src/components/editor-shared/`, and take `mode: 'author' | 'fill'`
 (`packages/field-ui/src/components/editor-shared/editor-mode.ts`):
 
 | Component | `author` renders | `fill` renders |
@@ -414,8 +414,7 @@ Configuring an item's type and its canned entries
 rating one in the field (`packages/field-ui/src/components/editor/ItemEditor.tsx`) are different jobs,
 not one job with a flag. They share the atoms instead of the panel —
 `ItemHeader`, `CannedCommentRow`, `DefectCategoryChip`, `InlineRename`,
-`RatingSegment`, all under `editor-shared/` (`ItemHeader` in `app/components/`, the
-rest in `packages/field-ui/src/components/`).
+`RatingSegment`, all under `packages/field-ui/src/components/editor-shared/`.
 `components/template/preview-parity.test.ts` renders one canned entry through
 both the template preview and the editor's SideRail and compares what a reader
 sees, so the two cannot drift in silence.

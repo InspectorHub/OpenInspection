@@ -2,7 +2,7 @@ import { Icon, IconButton } from "@core/shared-ui";
 import { m } from "../../i18n";
 
 /** Which host the editor runs in: the web app, or the native shell on iOS or Android. */
-export type AppBarPlatform = "web" | "ios" | "android";
+type AppBarPlatform = "web" | "ios" | "android";
 
 export interface AppBarProps {
     platform: AppBarPlatform;

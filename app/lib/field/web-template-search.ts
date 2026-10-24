@@ -8,7 +8,7 @@
 import type { FieldResources } from "@core/field-ui/data-source";
 import type { TemplateSearchResult, TemplateSummary } from "@core/field-ui/data-source-types";
 
-export const TEMPLATE_SEARCH_ROUTE = "/resources/template-search";
+const TEMPLATE_SEARCH_ROUTE = "/resources/template-search";
 
 type TemplateSearch = NonNullable<FieldResources["templateSearch"]>;
 

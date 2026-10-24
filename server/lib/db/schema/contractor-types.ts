@@ -12,7 +12,7 @@ export const contractorTypes = sqliteTable('contractor_types', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     /**
      * Soft link to the immutable trade vocabulary in
-     * `server/types/defect-fields.ts` (see #277).
+     * `packages/field-ui/src/shared/defect-fields.types.ts` (see #277).
      *
      * WHY A SECOND KEY WHEN `name` IS ALREADY HERE. `name` is free text a tenant
      * may rename at will — "Licensed Electrician" becomes "Our Sparky" — and the

@@ -14,9 +14,9 @@ interface TemplateItem {
 ```
 
 Why it is shaped like that, and where getting it wrong is silent, is the rest of this
-page. The item type itself lives in `server/types/template-schema.ts`; every function
+page. The item type itself lives in `packages/field-ui/src/shared/template-schema.ts`; every function
 that knows the items form a tree lives in one module,
-`server/lib/template-hierarchy.ts`.
+`packages/field-ui/src/shared/template-hierarchy.ts`.
 
 For the surrounding data model — `templates.schema`, results, report snapshots — see
 [`inspection-workflow.md`](inspection-workflow.md).
@@ -102,7 +102,7 @@ document order, with no change to the renderer at all.
 
 Documents that violate the invariant (hand-written, imported, or written by some
 future bug) are not each renderer's problem: `normalizeItemOrder` in
-`server/lib/template-hierarchy.ts` is a pure function that restores pre-order, and it
+`packages/field-ui/src/shared/template-hierarchy.ts` is a pure function that restores pre-order, and it
 keeps every item even when the pointers form a cycle.
 
 ## Depth is capped at three levels
@@ -172,7 +172,7 @@ boundary, tedious to reason about afterwards.
 ## The other structural axis: statutory slots
 
 Do not confuse `parentId` with the slot headings derived in
-`app/lib/editor/statutory-groups.ts`. They are different axes, and on a three-level
+`packages/field-ui/src/shared/statutory-groups.ts`. They are different axes, and on a three-level
 statutory form they coexist:
 
 - **Group / slot** — which items *this statutory form* prints inside one block.
@@ -193,9 +193,9 @@ what keys an item has, and **only two of them complain when they disagree**:
 
 | Place | On disagreement |
 |---|---|
-| `server/types/template-schema.ts` — the authority interface | compile error — loud |
+| `packages/field-ui/src/shared/template-schema.ts` — the authority interface | compile error — loud |
 | `server/lib/validations/template.schema.ts` — Zod discriminated union, `.strict()` members | 400 `unrecognized_keys` — loud |
-| `app/lib/editor/structure-ops.ts` — the `ITEM_KEYS` runtime allowlist | **silently stripped** |
+| `packages/field-ui/src/shared/structure-ops.ts` — the `ITEM_KEYS` runtime allowlist | **silently stripped** |
 | `app/lib/editor/serialize-template.ts` — the save serializer | **silently never sent** |
 | `app/components/template/types.ts` — the editor's own item type | compiles; the panel simply cannot see the field |
 | `packages/field-ui/src/components/form/FormField.tsx` — the field renderer's own item type | same |

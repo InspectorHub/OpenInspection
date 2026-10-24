@@ -25,12 +25,28 @@ export function dropMediaSave(
 /**
  * Runs `task` while `key` is held in `inFlight`, and releases it when the task settles, whatever
  * the outcome. The caller checks `inFlight.has(key)` first and drops a repeat; the key is added
- * synchronously here, so a second call in the same frame sees it. A rejection of `task` is left
- * unhandled, exactly as the bare `void` chains this replaces left it.
+ * synchronously here, so a second call in the same frame sees it. A task that REJECTS is reported to the
+ * person (the edit was applied on screen optimistically and did not reach the inspection) instead of
+ * surfacing as an unhandled rejection nobody sees; the optimistic state stays as the caller left it.
  */
-export function guardedSave(inFlight: Set<string>, key: string, task: () => Promise<unknown>): void {
+export function guardedSave(
+  dataSource: Pick<FieldDataSource, 'notify'>,
+  inFlight: Set<string>,
+  key: string,
+  task: () => Promise<unknown>,
+): void {
   inFlight.add(key);
-  void task().finally(() => {
-    inFlight.delete(key);
-  });
+  let started: Promise<unknown>;
+  try {
+    started = task();
+  } catch (err) {
+    started = Promise.reject(err);
+  }
+  void started
+    .catch(() => {
+      dataSource.notify(m.editor_photo_save_failed(), 'error');
+    })
+    .finally(() => {
+      inFlight.delete(key);
+    });
 }

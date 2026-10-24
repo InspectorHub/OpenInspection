@@ -94,7 +94,7 @@ PDF renders (via `env.BROWSER.quickAction('pdf', ...)`) cannot embed video. `ser
 | `tests/unit/media/media-video.spec.ts` | `MediaVideoService` (Stream) + `StreamVideoBackend` tenant guard and finalize |
 | `tests/unit/reports/report-video.spec.ts` | `selectReportMedia` — image / video-player / video-poster branches |
 | `tests/unit/media/session-context-video.spec.ts` | `sessionContext` video fields exposed to the frontend |
-| `app/components/media-studio/VideoPlayer.test.tsx` | `VideoPlayer` — Stream iframe vs native `<video>`, and the three fail-closed paths (no subdomain, missing R2 ids, still transcoding) |
+| `packages/field-ui/src/components/media-studio/VideoPlayer.test.tsx` | `VideoPlayer` — Stream iframe vs native `<video>`, and the three fail-closed paths (no subdomain, missing R2 ids, still transcoding) |
 | `packages/field-ui/src/components/media-studio/VideoCapture.test.tsx` | `VideoCapture` — privacy notice present (R2) / absent (Stream), and that accepting it is what ENABLES the pick button |
 
 ⚠️ The last two live beside the components (`app/**/*.test.tsx`), not under

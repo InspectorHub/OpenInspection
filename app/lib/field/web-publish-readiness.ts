@@ -9,7 +9,7 @@
 import type { FieldResources } from "@core/field-ui/data-source";
 import type { PublishReadiness } from "@core/field-ui/shared/types";
 
-export const PUBLISH_READINESS_ROUTE = "/resources/publish-readiness";
+const PUBLISH_READINESS_ROUTE = "/resources/publish-readiness";
 
 type PublishReadinessCheck = NonNullable<FieldResources["publishReadiness"]>;
 

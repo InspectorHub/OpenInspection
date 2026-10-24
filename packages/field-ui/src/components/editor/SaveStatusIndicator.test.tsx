@@ -19,6 +19,13 @@ describe("SaveStatusIndicator", () => {
     expect(el.className).toContain(tone);
   });
 
+  it.each(["saving", "saved", "error"] as const)("%s is announced politely to a screen reader", (status) => {
+    render(<SaveStatusIndicator status={status} />);
+    const el = screen.getByTestId("save-status");
+    expect(el.getAttribute("role")).toBe("status");
+    expect(el.getAttribute("aria-live")).toBe("polite");
+  });
+
   it("idle shows nothing", () => {
     const { container } = render(<SaveStatusIndicator status="idle" />);
     expect(container.firstChild).toBeNull();

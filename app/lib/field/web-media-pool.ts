@@ -6,7 +6,7 @@
 import type { FieldResources } from "@core/field-ui/data-source";
 import type { MediaPoolListing } from "@core/field-ui/data-source-types";
 
-export const MEDIA_POOL_ROUTE = "/resources/inspection-media";
+const MEDIA_POOL_ROUTE = "/resources/inspection-media";
 
 type MediaPool = NonNullable<FieldResources["mediaPool"]>;
 

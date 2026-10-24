@@ -71,3 +71,17 @@ test('author section has a drag handle when onReorderSection is wired', () => {
   render(<SectionRail mode="author" sections={sections} activeSection="s1" onSelect={()=>{}} onReorderSection={()=>{}} onAddSection={()=>{}} />);
   expect(screen.getByLabelText('Drag Roof')).toBeTruthy();
 });
+
+test('touch targets: the drag handle and the options button grow to 44px on a coarse pointer, and keep their size with a mouse', () => {
+  render(
+    <SectionRail mode="author" sections={sections} activeSection="s1" onSelect={() => {}} onAddSection={() => {}} onMoveSection={() => {}} onReorderSection={() => {}} />
+  );
+  const handle = screen.getByLabelText('Drag Roof');
+  expect(handle.className).toContain('pointer-coarse:min-w-11');
+  expect(handle.className).toContain('pointer-coarse:min-h-11');
+  expect(handle.className).toContain('w-5');
+  const options = screen.getAllByRole('button').find((el) => el.getAttribute('aria-haspopup') === 'true' && /Roof/.test(el.getAttribute('aria-label') ?? ''));
+  expect(options?.className).toContain('pointer-coarse:min-w-11');
+  expect(options?.className).toContain('pointer-coarse:min-h-11');
+  expect(options?.className).toContain('w-6 h-6');
+});

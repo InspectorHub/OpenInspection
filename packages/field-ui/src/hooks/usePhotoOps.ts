@@ -532,7 +532,7 @@ export function usePhotoOps(ctx: {
       // The drain (on reconnect) uploads the derivative and swaps in croppedKey.
       if (!dataSource.isOnline()) {
         if (collabDoc) {
-          guardedSave(mediaSavesInFlight.current, saveKey, () =>
+          guardedSave(dataSource, mediaSavesInFlight.current, saveKey, () =>
             enqueueMedia(dataSource.media.store, rec).then(() => {
               bindingMarkPhotoPending(collabDoc, fk, originalKey, rec.pendingId, "crop", { crop: cropTransform });
             }),
@@ -544,7 +544,7 @@ export function usePhotoOps(ctx: {
       // Online: the data source's uploader bakes the crop. A save that returns no key changes
       // nothing further: no toast, no revalidate — the doc drives the UI.
       const uploader = dataSource.media.uploader(String(state.inspection.id), collabDoc);
-      guardedSave(mediaSavesInFlight.current, saveKey, async () => {
+      guardedSave(dataSource, mediaSavesInFlight.current, saveKey, async () => {
         const res = await uploader.upload(rec);
         if (collabDoc && res.ok) {
           bindingSetPhotoCrop(collabDoc, fk, originalKey, res.key, cropTransform, current as PhotoEntry);
@@ -589,7 +589,7 @@ export function usePhotoOps(ctx: {
       // doc photo pending-annotate (KEEP base/cropped key — annotation layers on
       // top; the report serves the base until the derivative drains).
       if (!dataSource.isOnline()) {
-        guardedSave(mediaSavesInFlight.current, saveKey, () =>
+        guardedSave(dataSource, mediaSavesInFlight.current, saveKey, () =>
           enqueueMedia(dataSource.media.store, rec).then(() => {
             bindingMarkPhotoPending(collabDoc, fk, originalKey, rec.pendingId, "annotate", { annotationsJson: nodesJson });
           }),
@@ -600,7 +600,7 @@ export function usePhotoOps(ctx: {
       // Online: the data source's uploader bakes the annotation; no key back changes nothing
       // further. No revalidate — the doc drives the UI under collab.
       const uploader = dataSource.media.uploader(String(state.inspection.id), collabDoc);
-      guardedSave(mediaSavesInFlight.current, saveKey, async () => {
+      guardedSave(dataSource, mediaSavesInFlight.current, saveKey, async () => {
         const res = await uploader.upload(rec);
         if (res.ok) bindingSetPhotoAnnotation(collabDoc, fk, originalKey, res.key, nodesJson);
       });

@@ -16,8 +16,17 @@
  * supplied at run time: PACKAGE_SCAN_EXTRA_PATTERNS is a JSON array of regex sources,
  * e.g. from a CI secret or a local shell. They are applied to every packed text file.
  *
+ * Requiring the run-time patterns: without `--require-extra` (or PACKAGE_SCAN_REQUIRE_EXTRA=1) an
+ * unset variable simply means "no extra patterns" and the scan says so. A release pipeline sets the
+ * requirement, so a secret that was never configured, or was deleted, FAILS the run instead of silently
+ * dropping the private-term check. An explicit empty list (`[]`) is the accepted way to opt out.
+ *
+ * Scanning a tarball that already exists: `--tarball=<file>` reads that file instead of packing the
+ * workspace, so a pipeline can scan the exact bytes it is about to publish.
+ *
  * Usage:
- *   node scripts/check-package-tarball.mjs [workspace]      (default @inspectorhub/field-ui)
+ *   node scripts/check-package-tarball.mjs [workspace] [--require-extra] [--tarball=<file.tgz>]
+ *   (workspace defaults to @inspectorhub/field-ui)
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -101,6 +110,29 @@ export function readTarball(gz) {
     return files;
 }
 
+/**
+ * The run-time patterns from the environment. Throws (with the reason) when the value is not a JSON array of
+ * strings, or, when `require` is set, when it is unset or empty. `[]` is a deliberate opt-out and is accepted.
+ */
+export function resolveExtraPatterns(raw, require = false) {
+    if (raw === undefined || raw.trim() === '') {
+        if (require) {
+            throw new Error('PACKAGE_SCAN_EXTRA_PATTERNS is not set (or is empty) but the run requires it. Set it to a JSON array of regex sources, or to [] to run without private-term patterns on purpose.');
+        }
+        return [];
+    }
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        throw new Error('PACKAGE_SCAN_EXTRA_PATTERNS is not valid JSON; expected an array of regex sources.');
+    }
+    if (!Array.isArray(parsed) || !parsed.every((p) => typeof p === 'string')) {
+        throw new Error('PACKAGE_SCAN_EXTRA_PATTERNS must be a JSON array of strings.');
+    }
+    return parsed;
+}
+
 function pack(workspace) {
     const dir = mkdtempSync(join(tmpdir(), 'pkg-scan-'));
     try {
@@ -117,9 +149,18 @@ function pack(workspace) {
 }
 
 function main() {
-    const workspace = process.argv[2] ?? '@inspectorhub/field-ui';
-    const extra = process.env.PACKAGE_SCAN_EXTRA_PATTERNS ? JSON.parse(process.env.PACKAGE_SCAN_EXTRA_PATTERNS) : [];
-    const files = pack(workspace);
+    const args = process.argv.slice(2);
+    const workspace = args.find((a) => !a.startsWith('--')) ?? '@inspectorhub/field-ui';
+    const require = args.includes('--require-extra') || process.env.PACKAGE_SCAN_REQUIRE_EXTRA === '1';
+    let extra;
+    try {
+        extra = resolveExtraPatterns(process.env.PACKAGE_SCAN_EXTRA_PATTERNS, require);
+    } catch (err) {
+        console.error(`check-package-tarball: ${err.message}`);
+        process.exit(1);
+    }
+    const tarballArg = args.find((a) => a.startsWith('--tarball='));
+    const files = tarballArg ? readTarball(readFileSync(tarballArg.slice('--tarball='.length))) : pack(workspace);
     const count = Object.keys(files).length;
     if (count === 0) {
         console.error(`check-package-tarball: 0 files in the tarball of ${workspace} — an empty scan is not a pass.`);

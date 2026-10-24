@@ -9,8 +9,15 @@
  * as an `Idempotency-Key` header. The BFF idempotency middleware claims any
  * request carrying that header, and a multipart body fingerprints as null, so
  * two different commands sharing a key would replay each other's stored answer.
- * The editor action does not read the field today; it is sent for parity with
- * `useGuardedSubmit`.
+ * The editor action (`action.server.ts`, via `writeKeyFor`) reads the field for the
+ * commands whose first write would duplicate a record if repeated (unit create,
+ * duplicate and bulk create, add-statutory-instance, upload-cover) and lifts it to
+ * the header on that one API write. So a command abandoned by the time limit below
+ * and retried with the same key does not run twice; every other command is
+ * idempotent by nature and the field is ignored. A retry that arrives while the
+ * first attempt is still running is refused by the server (409), which reads as a
+ * plain failure: the abandoned attempt may still land, and the editor refreshes
+ * its data after a write, so the person sees the real state.
  */
 import type { CommandData, CommandResult, FieldCommand } from "@core/field-ui/commands";
 import type { ExecuteOptions } from "@core/field-ui/data-source";

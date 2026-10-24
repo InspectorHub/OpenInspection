@@ -15,10 +15,11 @@ import type { CommandResult } from "@core/field-ui/commands";
 import type { FieldResources } from "@core/field-ui/data-source";
 import type { VideoFinalizeInput, VideoUploadTicket } from "@core/field-ui/data-source-types";
 import { m } from "~/paraglide/messages";
+import { pathSegment } from "./url-segment";
 
 type VideoStore = NonNullable<FieldResources["video"]>;
 
-const base = (inspectionId: string) => `/api/inspections/${inspectionId}/media/video`;
+const base = (inspectionId: string) => `/api/inspections/${pathSegment(inspectionId)}/media/video`;
 
 export const posterRoute = (inspectionId: string) => `${base(inspectionId)}/poster`;
 
@@ -30,7 +31,7 @@ const notWired = (what: string) => `${what} is not wired to the web data source 
  * request is blocked. A worker route (`/api/...`) is always reachable on the current origin, so it is sent as
  * a relative path. Anything else (the Stream provider's external direct-upload URL) is left untouched.
  */
-export function sameOriginUploadUrl(uploadURL: string): string {
+function sameOriginUploadUrl(uploadURL: string): string {
     try {
         const url = new URL(uploadURL, "http://host.invalid");
         return url.pathname.startsWith("/api/") ? `${url.pathname}${url.search}` : uploadURL;
@@ -56,17 +57,33 @@ export async function apiErrorReason(res: Response): Promise<string> {
     return m.media_video_err_upload_status({ status: res.status });
 }
 
-/** POST a file with an upload progress callback; resolves with the response text on 2xx. */
-export function uploadWithProgressBody(url: string, file: Blob, onProgress: (pct: number) => void, withCredentials: boolean): Promise<string> {
+/**
+ * Longest a clip upload may take before it is abandoned. The other transports give up after 60 s (a command)
+ * or 180 s (an image); a clip is far larger, so this is longer, but it is still bounded: a stalled connection
+ * must not hold the capture sheet (and its same-frame latch) for ever. XHR's timeout covers the whole request.
+ */
+export const VIDEO_UPLOAD_TIMEOUT_MS = 600_000;
+
+/** POST a file with an upload progress callback; resolves with the response text on 2xx, rejects on error or timeout. */
+export function uploadWithProgressBody(
+    url: string,
+    file: Blob,
+    onProgress: (pct: number) => void,
+    withCredentials: boolean,
+    timeoutMs: number = VIDEO_UPLOAD_TIMEOUT_MS,
+): Promise<string> {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", url);
+        xhr.timeout = timeoutMs;
         if (withCredentials) xhr.withCredentials = true;
         xhr.upload.onprogress = (e) => {
             if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
         };
         xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.responseText) : reject(new Error(`upload ${xhr.status}`)));
         xhr.onerror = () => reject(new Error("upload network error"));
+        xhr.ontimeout = () => reject(new Error("upload timed out"));
+        xhr.onabort = () => reject(new Error("upload aborted"));
         const fd = new FormData();
         fd.append("file", file);
         xhr.send(fd);

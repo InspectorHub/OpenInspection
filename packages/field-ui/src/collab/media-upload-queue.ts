@@ -56,6 +56,12 @@ export interface DrainDeps {
      * idempotent / retriable); the upload itself already succeeded.
      */
     onUploaded: (rec: PendingMediaRecord, result: UploadResult) => void;
+    /**
+     * Called when the local blob of an UPLOADED record could not be deleted. The doc swap and the upload
+     * already happened, so nothing is lost; the next drain retries only the delete (it never uploads the
+     * record again). Optional: the host decides whether to log it.
+     */
+    onCleanupFailed?: (rec: PendingMediaRecord, error: unknown) => void;
 }
 
 export interface DrainSummary {
@@ -72,6 +78,14 @@ export interface DrainSummary {
  * it twice). Keyed by inspectionId so distinct inspections drain in parallel.
  */
 const draining = new Set<string>();
+
+/**
+ * Records whose upload AND doc swap succeeded but whose local delete has not (yet). If the delete fails, the
+ * record is still listed by the next drain; without this set that drain would upload the same blob a second
+ * time and swap the doc entry again. Held for the session (module lifetime): after a reload the doc entry no
+ * longer says "pending", and the swap that resolves it is a no-op on an already resolved entry.
+ */
+const swapped = new Set<string>();
 
 // ─── Public API ─────────────────────────────────────────────────────────────────
 
@@ -111,19 +125,27 @@ export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
         // Oldest first, whatever order the store happens to list in.
         const pending = [...(await store.list(inspectionId))].sort((a, b) => a.createdAt - b.createdAt);
         for (const rec of pending) {
-            let result: UploadResult;
-            try {
-                result = await uploader.upload(rec);
-            } catch {
-                // Upload failed — leave the record queued for the next drain.
-                failed += 1;
-                continue;
+            if (!swapped.has(rec.pendingId)) {
+                let result: UploadResult;
+                try {
+                    result = await uploader.upload(rec);
+                } catch {
+                    // Upload failed — leave the record queued for the next drain.
+                    failed += 1;
+                    continue;
+                }
+                // Upload succeeded — swap the doc entry, then drop the local blob.
+                onUploaded(rec, result);
+                swapped.add(rec.pendingId);
+                uploaded += 1;
             }
-            // Upload succeeded — swap the doc entry, then drop the local blob.
-            onUploaded(rec, result);
-            // A failed cleanup must not wedge the drain: the next drain re-attempts it.
-            await store.delete(rec.pendingId).catch(() => undefined);
-            uploaded += 1;
+            // A failed cleanup must not wedge the drain: the next drain re-attempts the delete only.
+            try {
+                await store.delete(rec.pendingId);
+                swapped.delete(rec.pendingId);
+            } catch (error) {
+                deps.onCleanupFailed?.(rec, error);
+            }
         }
     } finally {
         draining.delete(inspectionId);

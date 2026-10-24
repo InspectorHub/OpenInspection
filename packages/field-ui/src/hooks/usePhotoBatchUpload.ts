@@ -4,7 +4,7 @@ import { useFieldDataSource } from '../context';
 import type { MediaFileResult, PendingMediaRecord, PhotoUploadMeta } from '../media-types';
 
 /** The defect row an uploaded photo is pinned to instead of the item. */
-export interface PhotoBatchTarget {
+interface PhotoBatchTarget {
   kind: 'canned' | 'custom';
   id: string;
 }
@@ -23,7 +23,7 @@ export interface PhotoBatch {
  * logic reads the same names: `keys` holds the stored keys of the files that succeeded, in input order, and
  * `results[i]` is file `i`'s own outcome.
  */
-export interface PhotoBatchOutcome {
+interface PhotoBatchOutcome {
   /** Every file was stored (and there was at least one, for an item). */
   ok: boolean;
   keys: string[];

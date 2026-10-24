@@ -63,6 +63,9 @@ import { AppBar } from "../components/editor/AppBar";
 import { TabletActions } from "../components/editor/TabletActions";
 import { SpeedEntryButton } from "../components/editor/SpeedEntryButton";
 import { TabletTree } from "./TabletTree";
+import { useItemEditorUiStore } from "../components/editor/item-editor-ui";
+import { useResetBatchOnPhone } from "../hooks/useResetBatchOnPhone";
+import { countUnratedItems } from "./speed-queue";
 import { SaveStatusIndicator } from "../components/editor/SaveStatusIndicator";
 import { InspectionIdentity } from "../components/editor/InspectionIdentity";
 import { MobileDrawerTriggers, type MobileDrawerId } from "../components/editor/MobileDrawerTriggers";
@@ -713,6 +716,10 @@ export function FieldEditor({ data }: { data: EditorData }) {
  const isPhone = layout === "phone";
  const isMobile = layout !== "desktop";
  const [mobileDrawer, setMobileDrawer] = useState<MobileDrawerId | null>(null);
+ // Owned here, above the layout, so a swap of the tree keeps what is half typed and what is half committed.
+ const itemUi = useItemEditorUiStore();
+ const notesFlushRef = useRef<(() => void) | null>(null);
+ useResetBatchOnPhone(isPhone, state.batchMode, state.setBatchMode, state.setBatchSelected);
 
  const PRESET_TAGS = useMemo(() => [
   { id: "follow-up", name: "Follow Up", color: "#ef4444" },
@@ -872,7 +879,6 @@ export function FieldEditor({ data }: { data: EditorData }) {
  label: item.label || item.name || "",
  sectionName: sec.title || sec.name || "",
  sectionIdx: s,
- itemIdx: i,
  rating: (r?.rating as string) || null,
  });
  }
@@ -884,8 +890,9 @@ export function FieldEditor({ data }: { data: EditorData }) {
  return { flatItems, queue };
  }, [state.sections, state.getResult]);
 
- // How many items Speed mode would walk: the label of its touch entry points, which are left out at zero.
- const speedUnrated = useMemo(() => buildSpeedQueue().queue.length, [buildSpeedQueue, state.results]);
+ // How many items Speed mode would walk: the label of its touch entry points, which are left out at zero. Only the
+ // touch layouts show it, so only they count, and only as a number (the queue itself is built when Speed opens).
+ const speedUnrated = useMemo(() => (isMobile ? countUnratedItems(state.sections, state.getResult) : 0), [isMobile, state.sections, state.getResult, state.results]);
 
  const toggleSpeedMode = useCallback(() => {
  if (!state.speedMode) {
@@ -899,10 +906,13 @@ export function FieldEditor({ data }: { data: EditorData }) {
  state.setSpeedMode(false);
  }
  }, [state, buildSpeedQueue]);
+ // The touch entry points only OPEN Speed mode (the keyboard shortcut toggles): a press while it is already open must not close it.
+ const openSpeedMode = useCallback(() => { if (!state.speedMode) toggleSpeedMode(); }, [state.speedMode, toggleSpeedMode]);
 
  // Rating and Undo in Speed mode (every write goes through `commitRating`); see the hook for the queue rules.
  const { speedRate, undoSpeedRating, finishedItem, pendingUndo, setPendingUndo } = useSpeedRating({
  state, commitRating, doc: collab?.doc ?? null, activeUnitId,
+ onUndoUnavailable: () => dataSource.notify(m.editor_speedmode_undo_unavailable(), "error"),
  });
 
  /* ---------------------------------------------------------------- */
@@ -1381,6 +1391,8 @@ export function FieldEditor({ data }: { data: EditorData }) {
 
  const itemEditorEl = state.activeItemId ? (
  <ItemEditor
+ uiControl={itemUi(state.activeItemId)}
+ notesFlushRef={notesFlushRef}
  item={state.activeItem || undefined}
  sectionTitle={state.currentSection?.title}
  /* #61 — the artifact an AI content-review row cites. */
@@ -1914,11 +1926,12 @@ export function FieldEditor({ data }: { data: EditorData }) {
  // Back out one level: the overview to the items, an open item to the list (phone only: the tablet shows both at
  // once), then out of the editor through the host's exit, so the unsaved-changes guard still runs.
  const goBack = (itemLevel: boolean) => {
+  notesFlushRef.current?.();
   if (state.activeView === "property") { state.setActiveView("items"); return; }
   if (itemLevel && state.activeItemId) { state.setActiveItemId(null); return; }
   dataSource.exit();
  };
- const openSpeedFromDrawer = () => { setMobileDrawer(null); toggleSpeedMode(); };
+ const openSpeedFromDrawer = () => { setMobileDrawer(null); openSpeedMode(); };
  const appBarTitles = {
   sectionTitle: state.currentSection?.title ?? "",
   itemLabel: ((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? m.editor_route_select_an_item(),
@@ -1967,7 +1980,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}
  onUpdateSourceTemplate={structure.canSaveBack ? () => structure.openSaveTemplate("back") : null}
  onOpenTheme={caps.themeControl ? () => setMobileDrawer('theme') : null}
- onSpeedMode={speedUnrated > 0 ? toggleSpeedMode : null}
+ onSpeedMode={speedUnrated > 0 ? openSpeedMode : null}
  onBurstCamera={caps.cameraCapture && state.activeItemId ? () => { state.setBurstCameraItemId(state.activeItemId || null); state.setBurstCameraOpen(true); } : null}
  onOpenVersionHistory={fieldSession.collabEditing && caps.versionHistory ? () => setVersionHistoryOpen(true) : null}
  onOpenUnits={showUnitsSurface ? () => setUnitsManagerOpen(true) : null}
@@ -1984,13 +1997,29 @@ export function FieldEditor({ data }: { data: EditorData }) {
  </>
  );
 
- if (isPhone) {
- return (
- <div data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+ // Everything that is not part of one layout's frame: file inputs, the capture and annotate overlays, every
+ // dialog and sheet, Speed mode, the keyboard help and the drawers. It is rendered ONCE, as the first child of
+ // the fragment every layout returns, so its position in the element tree never depends on the layout. A
+ // rotation across a breakpoint swaps only the tree below it: a burst camera holding captured frames, a video
+ // capture, an annotator mid-stroke, a modal with typed text and an open drawer all stay mounted.
+ const overlaysEl = (
+ <>
  {photoInputsEl}
  {addMediaOverlaysEl}
  {sharedOverlaysEl}
  {speedModeEl}
+ {!isPhone && state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}
+ {isMobile && mobileDrawersEl}
+ {finishActionsEl}
+ {unsavedGuardEl}
+ </>
+ );
+
+ if (isPhone) {
+ return (
+ <>
+ {overlaysEl}
+ <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
  <AppBar
  platform={dataSource.platform}
  {...appBarTitles}
@@ -2016,17 +2045,17 @@ export function FieldEditor({ data }: { data: EditorData }) {
  ))}
  </main>
  <MobileDrawerTriggers onOpen={(id) => setMobileDrawer(id)} showTheme={caps.themeControl} />
- {mobileDrawersEl}
- {finishActionsEl}
- {unsavedGuardEl}
  </div>
+ </>
  );
  }
 
  if (layout === "tablet") {
  return (
+ <>
+ {overlaysEl}
  <TabletTree
- overlays={<>{photoInputsEl}{addMediaOverlaysEl}{sharedOverlaysEl}{speedModeEl}{state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}{mobileDrawersEl}{finishActionsEl}{unsavedGuardEl}</>}
+ key="tablet"
  appBar={
   <AppBar
   tablet
@@ -2046,7 +2075,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
   <InspectionIdentity address={state.inspection.propertyAddress as string | undefined} id={String(state.inspection.id)} date={state.formattedDate} status={String(state.inspection.status)} />
   {scopeSwitcherEl && <div className="px-3 py-2 border-b border-ih-border">{scopeSwitcherEl}</div>}
   {itemFilterBarEl}
-  {speedUnrated > 0 && <div className="px-3 py-2 border-b border-ih-border"><SpeedEntryButton unrated={speedUnrated} onOpen={toggleSpeedMode} className="w-full" /></div>}
+  {speedUnrated > 0 && <div className="px-3 py-2 border-b border-ih-border"><SpeedEntryButton unrated={speedUnrated} onOpen={openSpeedMode} className="w-full" /></div>}
   </>
  }
  sectionTitle={state.currentSection?.title ?? ""}
@@ -2056,11 +2085,15 @@ export function FieldEditor({ data }: { data: EditorData }) {
  batchBar={batchBarEl}
  tools={toolsDockEl}
  />
+ </>
  );
  }
 
  return (
+ <>
+ {overlaysEl}
  <div
+  key="desktop"
   /* Desktop editor minimum design width 1024px (iPad landscape fits without
      scroll). Phones and tablets never reach here: the phone and tablet trees
      above own everything under 1024px. The minimum stays as a floor for a
@@ -2071,22 +2104,6 @@ export function FieldEditor({ data }: { data: EditorData }) {
   data-collab-synced={collabSynced ? "true" : "false"}
   className="flex h-screen bg-ih-bg-card overflow-x-auto"
  >
- {photoInputsEl}
-
- {speedModeEl}
-
- {/* Keyboard cheatsheet overlay */}
- {state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}
-
- {sharedOverlaysEl}
-
- {addMediaOverlaysEl}
-
- {/* Unsaved changes guard (the host renders its own stay-or-leave dialog) */}
- {unsavedGuardEl}
-
- {finishActionsEl}
-
  {/* ------------------------------------------------------------ */}
  {/* Fixed top header with progress bar */}
  {/* ------------------------------------------------------------ */}
@@ -2226,5 +2243,6 @@ export function FieldEditor({ data }: { data: EditorData }) {
 
  {toolsDockEl}
  </div>
+ </>
  );
 }

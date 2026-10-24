@@ -65,3 +65,19 @@ test('author mode shows item type badge and a drag handle, no filter chips', () 
   expect(screen.getByText('number')).toBeTruthy(); // type badge
   expect(screen.getByLabelText('Drag Roof Covering')).toBeTruthy();
 });
+
+test('touch targets: the drag handle and the options button grow to 44px on a coarse pointer, and keep their size with a mouse', () => {
+  render(
+    <ItemList mode="author" items={items} sectionId="s1" activeItemId="i1" onSelect={() => {}}
+      onMoveItem={() => {}} onReorderItem={() => {}} onAddItem={() => {}} />
+  );
+  const handle = screen.getByLabelText('Drag Roof Covering');
+  expect(handle.className).toContain('pointer-coarse:min-w-11');
+  expect(handle.className).toContain('pointer-coarse:min-h-11');
+  // The fine-pointer size is untouched: the base width class is still the only unconditional size.
+  expect(handle.className).toContain('w-5');
+  const options = screen.getAllByRole('button', { name: /^Edit Roof Covering/i })[0] ?? screen.getAllByLabelText(/Roof Covering/i).find((el) => el.getAttribute('aria-haspopup'));
+  expect(options?.className).toContain('pointer-coarse:min-w-11');
+  expect(options?.className).toContain('pointer-coarse:min-h-11');
+  expect(options?.className).toContain('w-6 h-6');
+});

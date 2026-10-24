@@ -89,7 +89,7 @@ catalogue.
    and stay in whatever language the tenant typed. A tenant who renamed their
    rating scale sees their own words, not these.
 6. **Numbers, dates, money and addresses are formatted by code**
-   (`app/lib/format.ts`, `app/lib/money.ts`), never spelled into a message. Do
+   (`packages/field-ui/src/shared/format.ts`, `packages/field-ui/src/shared/money.ts`), never spelled into a message. Do
    not hardcode a currency symbol or a date pattern in a translated string.
 7. **A format literal a parser matches on stays English.** Some strings show the
    user an input format that code then compares against, character for

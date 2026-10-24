@@ -29,6 +29,8 @@ import { FollowupPanel, hasCarriedBaseline } from "./FollowupPanel";
 import { useFieldDataSource } from "../../context";
 import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
 import { m } from "../../i18n";
+import { useItemEditorUi, type ItemEditorUiControl } from "./item-editor-ui";
+import { useNotesCommitOnLeave } from "../../hooks/useNotesCommitOnLeave";
 
 export type { LibraryMatch };
 
@@ -150,6 +152,8 @@ interface ItemEditorProps {
   *  Absent/null ⇒ the AI writing-assistance affordance is not offered at all,
   *  because a review recorded against no artifact is not evidence of anything. */
  resultId?: string | null;
+ /** The owner's store for the interface state (so it outlives a layout swap; absent: kept here), and a ref this fills with a function that commits uncommitted note text. */
+ uiControl?: ItemEditorUiControl; notesFlushRef?: { current: (() => void) | null };
 }
 
 /* ------------------------------------------------------------------ */
@@ -199,18 +203,11 @@ export function ItemEditor({
  videoPosterUrl,
  pendingPhotoUrl,
  resultId,
+ uiControl, notesFlushRef,
 }: ItemEditorProps) {
  const { urls } = useFieldDataSource();
- const [activeTab, setActiveTab] = useState<CannedTabId>("information");
- const [defectQuery, setDefectQuery] = useState("");
- const [customFormOpen, setCustomFormOpen] = useState(false);
- const [customTitle, setCustomTitle] = useState("");
- const [customComment, setCustomComment] = useState("");
- const [customCategory, setCustomCategory] = useState<CustomDefectCategory>("recommendation");
- // IA-85 — "" means the inspector picked no trade; the defect is written without the key.
- const [customTrade, setCustomTrade] = useState<DefectTrade | "">("");
- const [saveToLibrary, setSaveToLibrary] = useState(false);
-
+ const { activeTab, setActiveTab, defectQuery, setDefectQuery, customFormOpen, setCustomFormOpen, customTitle, setCustomTitle, customComment, setCustomComment, customCategory, setCustomCategory, customTrade, setCustomTrade, saveToLibrary, setSaveToLibrary } = useItemEditorUi(uiControl);
+ const notesCommit = useNotesCommitOnLeave(item?.id, onNotesBlur, notesFlushRef);
  // Task 4 — inline comment typeahead on the notes textarea (Tier 1 item.tabs).
  const notesRef = useRef<HTMLTextAreaElement | null>(null);
  const [taOpen, setTaOpen] = useState(false);
@@ -223,6 +220,7 @@ export function ItemEditor({
   const value = (result.notes as string) || "";
   const caret = el?.selectionStart ?? value.length;
   const next = replaceFragmentBeforeCaret(value, caret, commentText);
+  notesCommit.track(next.value);
   onNotes(next.value);
   setTaOpen(false);
   setTaQuery("");
@@ -469,12 +467,13 @@ export function ItemEditor({
   ref={notesRef}
   value={(result.notes as string) || ""}
   onChange={(e) => {
+   notesCommit.track(e.target.value);
    onNotes(e.target.value);
    const frag = fragmentBeforeCaret(e.target.value, e.target.selectionStart ?? 0);
    setTaQuery(frag);
    setTaOpen(frag.trim().length >= 2);
   }}
-  onBlur={(e) => { onNotesBlur(e.target.value); setTaOpen(false); }}
+  onBlur={(e) => { notesCommit.settle(); onNotesBlur(e.target.value); setTaOpen(false); }}
   onKeyDown={(e) => {
    if (taOpen && ta.matches.length > 0) {
     if (e.key === "ArrowDown") { e.preventDefault(); ta.move(1); return; }
@@ -522,7 +521,7 @@ export function ItemEditor({
    notes={(result.notes as string) || ""}
    context={`${sectionTitle} — ${item.label}`}
    resultId={resultId}
-   onAccept={(text) => { onNotes(text); onNotesBlur(text); }}
+   onAccept={(text) => { onNotes(text); notesCommit.settle(); onNotesBlur(text); }}
   />
  )}
  {tagChipRow}

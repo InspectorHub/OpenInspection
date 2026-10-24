@@ -6,7 +6,7 @@
  * moves to the real layout. A spec therefore waits for the attribute with a retrying assertion before it clicks
  * anything: a click before that lands on a tree that is about to be replaced.
  */
-import { expect, test, type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { readEditorSeed } from './editor-seed';
 import { apiGet } from './seed-login';
 
@@ -23,13 +23,15 @@ export function layoutForWidth(width: number): EditorLayout {
 export async function openSeededEditor(page: Page, width: number): Promise<EditorLayout> {
     // Read at runtime: the editor-seed dependency writes the handoff during the run.
     const seed = readEditorSeed();
-    test.skip(!seed, 'editor-seed handoff missing — run with the editor-seed setup project.');
+    // A failure, not a skip: a skipped spec reports green with nothing run, and a missing handoff means the
+    // setup project did not run, which is exactly what a green run must not hide.
+    if (!seed) throw new Error('editor-seed handoff missing: the editor-seed setup project did not run before this spec (run it with its dependency, not with --no-deps).');
     await page.goto('/login');
-    await page.fill('input[name=email]', seed!.email);
-    await page.fill('input[name=password]', seed!.password);
+    await page.fill('input[name=email]', seed.email);
+    await page.fill('input[name=password]', seed.password);
     await page.click('button[type=submit]');
     await page.waitForURL('**/inspections');
-    await page.goto(`/inspections/${seed!.inspectionId}/edit`);
+    await page.goto(`/inspections/${seed.inspectionId}/edit`);
     const layout = layoutForWidth(width);
     await expect(page.locator('[data-layout]')).toHaveAttribute('data-layout', layout, { timeout: 30_000 });
     await awaitCollabSynced(page);

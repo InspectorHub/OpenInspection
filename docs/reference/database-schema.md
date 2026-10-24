@@ -653,7 +653,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `name` | text | NN |  |  |  |
 | `sort_order` | integer | NN | `0` |  | *Display order within its tenant; lower sorts first.* |
 | `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
-| `trade_slug` | text | UQ |  |  | Soft link to the immutable trade vocabulary in `server/types/defect-fields.ts` (see #277). **[more]** |
+| `trade_slug` | text | UQ |  |  | Soft link to the immutable trade vocabulary in `packages/field-ui/src/shared/defect-fields.types.ts` (see #277). **[more]** |
 
 **Indexes**
 

@@ -202,7 +202,7 @@ export function SectionRail({
     data-drag-handle
     aria-label={m.editor_shared_drag_label({ label: section.title })}
     title={m.editor_shared_drag_to_reorder()}
-    className={`shrink-0 w-5 flex items-center justify-center cursor-grab select-none text-ih-fg-4 touch-none ${REVEAL}`}
+    className={`shrink-0 w-5 flex items-center justify-center cursor-grab select-none text-ih-fg-4 touch-none pointer-coarse:min-w-11 pointer-coarse:min-h-11 ${REVEAL}`}
    >☰</span>
   )}
 
@@ -237,11 +237,11 @@ export function SectionRail({
 
   {/* Reserved ⋯ slot — its own column, never overlaps the donut. */}
   {hasStructuralOps && (
-  <div className={`shrink-0 w-6 flex items-center justify-center ${REVEAL}`}>
+  <div className={`shrink-0 w-6 pointer-coarse:min-w-11 flex items-center justify-center ${REVEAL}`}>
    <IconButton
    onClick={(e) => { e.stopPropagation(); openSectionMenu(section.id, e.currentTarget); }}
    size="sm"
-   className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2"
+   className="w-6 h-6 pointer-coarse:min-w-11 pointer-coarse:min-h-11 text-ih-fg-4 hover:text-ih-fg-2"
    aria-label={m.editor_shared_section_options({ title: section.title })}
    aria-haspopup="true"
    aria-expanded={menuOpen}

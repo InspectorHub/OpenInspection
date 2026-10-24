@@ -20,18 +20,18 @@ export function ProgressStripText({ rated, total, defects, monitor, etaMinutes }
     return (
         <div className="flex items-center gap-3 text-[12px] font-mono tabular-nums">
             <span>
-                <Dot color="var(--ih-ok)" />
+                <Dot color="var(--ih-status-ok)" />
                 {m.editor_progress_rated({ rated, total })}
             </span>
             {defects > 0 && (
                 <span>
-                    <Dot color="var(--ih-bad)" />
+                    <Dot color="var(--ih-status-bad)" />
                     {defects === 1 ? m.editor_progress_defect_one({ count: defects }) : m.editor_progress_defect_other({ count: defects })}
                 </span>
             )}
             {monitor > 0 && (
                 <span>
-                    <Dot color="var(--ih-watch)" />
+                    <Dot color="var(--ih-status-watch)" />
                     {m.editor_progress_monitor({ count: monitor })}
                 </span>
             )}

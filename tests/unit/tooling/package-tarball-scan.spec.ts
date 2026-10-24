@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error - plain .mjs gate script, no type declarations
-import { readTarball, scanFiles } from '../../../scripts/check-package-tarball.mjs';
+import { readTarball, resolveExtraPatterns, scanFiles } from '../../../scripts/check-package-tarball.mjs';
 
 type Finding = { path: string; id: string };
 const scan = (files: Record<string, string>, extra: string[] = []): Finding[] => scanFiles(files, extra);
@@ -53,5 +53,30 @@ describe('check-package-tarball', () => {
     const files = { ...clean, 'dist/a.js': '// mentions Widgetron' };
     expect(ids(files)).toEqual([]);
     expect(ids(files, ['widgetron'])).toEqual(['extra-pattern']);
+  });
+});
+
+describe('resolveExtraPatterns', () => {
+  it('without the requirement an unset or empty variable means no extra patterns', () => {
+    expect(resolveExtraPatterns(undefined)).toEqual([]);
+    expect(resolveExtraPatterns('')).toEqual([]);
+  });
+
+  it('with the requirement an unset or empty variable is a failure, not a quiet skip', () => {
+    expect(() => resolveExtraPatterns(undefined, true)).toThrow(/not set/);
+    expect(() => resolveExtraPatterns('', true)).toThrow(/not set/);
+    expect(() => resolveExtraPatterns('   ', true)).toThrow(/not set/);
+  });
+
+  it('an explicit empty list is the accepted opt-out, with or without the requirement', () => {
+    expect(resolveExtraPatterns('[]', true)).toEqual([]);
+    expect(resolveExtraPatterns('[]')).toEqual([]);
+  });
+
+  it('returns the patterns when given, and rejects anything that is not a JSON array of strings', () => {
+    expect(resolveExtraPatterns('["a","b"]', true)).toEqual(['a', 'b']);
+    expect(() => resolveExtraPatterns('not json')).toThrow(/valid JSON/);
+    expect(() => resolveExtraPatterns('{"a":1}')).toThrow(/array of strings/);
+    expect(() => resolveExtraPatterns('[1]')).toThrow(/array of strings/);
   });
 });

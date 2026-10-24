@@ -9,7 +9,6 @@ export interface SpeedItem {
   label: string;
   sectionName: string;
   sectionIdx: number;
-  itemIdx: number;
   rating: string | null;
 }
 
@@ -28,7 +27,7 @@ export interface SpeedStateSlice {
 }
 
 /** After the last item is rated the overlay stays this long, a little longer than the Undo toast, then closes. */
-export const SPEED_DONE_LINGER_MS = 3500;
+const SPEED_DONE_LINGER_MS = 3500;
 
 /**
  * Speed mode's rating and Undo. Every write goes through the editor's one `commitRating`.
@@ -41,11 +40,13 @@ export const SPEED_DONE_LINGER_MS = 3500;
  * - A previous value of '' (an old document's cleared rating) is written back as null.
  * - The toast's state is held here, above any layout tree, so it survives a rotation across a breakpoint.
  */
-export function useSpeedRating({ state, commitRating, doc, activeUnitId }: {
+export function useSpeedRating({ state, commitRating, doc, activeUnitId, onUndoUnavailable }: {
   state: SpeedStateSlice;
   commitRating: (sectionId: string, itemId: string, rating: string | null) => void;
   doc: Y.Doc | null;
   activeUnitId: string | null;
+  /** Called when an Undo cannot be written (no live document to write the other unit's finding into), so the person is told instead of seeing nothing happen. */
+  onUndoUnavailable?: () => void;
 }) {
   // The toast outlives the render that rated: what it needs later is read from refs, not from that render's closure.
   const queueRef = useRef(state.speedQueue);
@@ -87,6 +88,8 @@ export function useSpeedRating({ state, commitRating, doc, activeUnitId }: {
         if (doc) {
           bindingSetRating(doc, sid, itemId, restored, unit);
           state.setDirty(true);
+        } else {
+          onUndoUnavailable?.();
         }
         return;
       }
@@ -98,7 +101,7 @@ export function useSpeedRating({ state, commitRating, doc, activeUnitId }: {
       state.setSpeedQueue(queue);
       state.setSpeedCurrent(queue.indexOf(flatIdx));
     },
-    [state, commitRating, doc],
+    [state, commitRating, doc, onUndoUnavailable],
   );
 
   // Everything rated: linger for the toast, then close. An Undo refills the queue, which cancels this.

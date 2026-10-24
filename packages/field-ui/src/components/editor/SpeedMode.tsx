@@ -6,6 +6,9 @@ import { SpeedModeUndoToast } from './SpeedModeUndoToast';
 import { shouldShowSpeedModeCoach, markSpeedModeCoached } from '../../shared/speedmode-coach';
 import { m } from "../../i18n";
 
+/** The touch Prev and Next buttons: at least 44px high, and no double-tap zoom delay. */
+const TOUCH_NAV = "min-h-11 touch-manipulation";
+
 interface JumpToSection {
   id: string;
   title?: string;
@@ -223,8 +226,8 @@ export function SpeedMode({
 
         {/* Nav */}
         {!finished && <div className={`flex gap-4 ${touch ? "mt-2" : "mt-8"}`}>
-          <Button variant="secondary" onClick={onPrev} disabled={currentIndex === 0} icon={<Icon name="chevL" size={16} />}>{m.editor_speedmode_prev()}</Button>
-          <Button variant="secondary" onClick={onNext} disabled={currentIndex >= totalCount - 1}>{m.common_next()} <Icon name="chevR" size={16} /></Button>
+          <Button variant="secondary" onClick={onPrev} disabled={currentIndex === 0} className={touch ? TOUCH_NAV : undefined} icon={<Icon name="chevL" size={16} />}>{m.editor_speedmode_prev()}</Button>
+          <Button variant="secondary" onClick={onNext} disabled={currentIndex >= totalCount - 1} className={touch ? TOUCH_NAV : undefined}>{m.common_next()} <Icon name="chevR" size={16} /></Button>
         </div>}
       </div>
 

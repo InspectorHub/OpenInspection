@@ -77,6 +77,26 @@ describe("SpeedMode touch layout", () => {
   });
 });
 
+describe("SpeedMode navigation buttons", () => {
+  const nav = () => [screen.getByRole("button", { name: m.editor_speedmode_prev() }), screen.getByRole("button", { name: new RegExp(m.common_next()) })];
+
+  it("touch: Prev and Next are at least 44px high and skip the double-tap delay", () => {
+    render(<SpeedMode {...base} touch currentIndex={1} />);
+    for (const button of nav()) {
+      expect(button.className).toContain("min-h-11");
+      expect(button.className).toContain("touch-manipulation");
+    }
+  });
+
+  it("CONTROL - desktop Prev and Next keep their size", () => {
+    render(<SpeedMode {...base} currentIndex={1} />);
+    for (const button of nav()) {
+      expect(button.className).not.toContain("min-h-11");
+      expect(button.className).not.toContain("touch-manipulation");
+    }
+  });
+});
+
 describe("SpeedMode rating and undo", () => {
   it("advanceOnRate={false}: a rating tap does not call onNext (the host already moved the cursor)", () => {
     const onNext = vi.fn();

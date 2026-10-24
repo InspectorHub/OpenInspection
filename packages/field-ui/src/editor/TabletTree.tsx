@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 export interface TabletTreeProps {
   /** The top bar. */
   appBar: ReactNode;
-  /** Everything mounted once per tree: file inputs, overlays, drawers, the unsaved guard, the finish dialogs. */
-  overlays: ReactNode;
   /** The item filter chips and the Speed rate button, above the list. */
   listHeader: ReactNode;
   /** The current section's title, pinned above the list. */
@@ -28,15 +26,14 @@ export interface TabletTreeProps {
 /**
  * The tablet layout (768-1023): a top bar over two panes, the item list on the left and the item editor on the
  * right, each scrolling on its own. The tree is only the frame: `FieldEditor` owns all state and hands in the
- * elements, so a rotation across a breakpoint keeps the open item and every overlay.
+ * elements, and the overlays are mounted outside this frame, so a rotation across a breakpoint keeps the open item and every overlay.
  *
  * Frame rules: the page is one dynamic-viewport-high column that never scrolls; both panes are `min-w-0` so a long
  * label truncates instead of widening the page; the list pane is a clamp (288px at 768, 300px at 834, 360px cap).
  */
-export function TabletTree({ appBar, overlays, listHeader, sectionTitle, list, main, emptyTemplate, tools, batchBar, footer, collabSynced }: TabletTreeProps) {
+export function TabletTree({ appBar, listHeader, sectionTitle, list, main, emptyTemplate, tools, batchBar, footer, collabSynced }: TabletTreeProps) {
   return (
     <div data-layout="tablet" data-collab-synced={collabSynced ? "true" : "false"} className="flex flex-col h-dvh min-w-0 bg-ih-bg-card overflow-hidden pb-9">
-      {overlays}
       {appBar}
       {emptyTemplate ? (
         <div className="flex-1 min-h-0 flex">{emptyTemplate}</div>

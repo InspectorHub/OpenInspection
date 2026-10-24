@@ -13,10 +13,11 @@ import type { FieldResources } from "@core/field-ui/data-source";
 import type { VersionSnapshotContent, VersionSnapshotEntry } from "@core/field-ui/data-source-types";
 import type { ResultsProjection } from "@core/field-ui/shared/results-doc.types";
 import { m } from "~/paraglide/messages";
+import { pathSegment } from "./url-segment";
 
 type VersionHistory = NonNullable<FieldResources["versionHistory"]>;
 
-export const collabBase = (inspectionId: string) => `/api/inspections/${inspectionId}/collab`;
+export const collabBase = (inspectionId: string) => `/api/inspections/${pathSegment(inspectionId)}/collab`;
 
 /** Narrow an `unknown` JSON payload to the snapshot list shape. */
 function parseSnapshots(raw: unknown): VersionSnapshotEntry[] {

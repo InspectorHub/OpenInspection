@@ -70,6 +70,10 @@ export function useMediaDrain(
                 );
                 revokeRef.current?.(rec.pendingId);
             },
+            onCleanupFailed: (rec, error) => {
+                // The photo is uploaded and swapped in; only the local copy stays until the next drain deletes it.
+                console.error('Could not remove an uploaded photo from the local queue:', rec.pendingId, error);
+            },
         });
     }, [dataSource, inspectionId]);
 

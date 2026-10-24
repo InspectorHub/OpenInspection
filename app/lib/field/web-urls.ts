@@ -1,4 +1,5 @@
 import type { FieldUrls } from "@core/field-ui/data-source";
+import { pathSegment } from "./url-segment";
 
 /** Where the presence socket's origin comes from. Injected so the function is testable. */
 export interface PresenceLocation {
@@ -16,21 +17,21 @@ export interface PresenceLocation {
  */
 export function createWebUrls(location?: PresenceLocation): FieldUrls {
     return {
-        photo: (inspectionId, key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
+        photo: (inspectionId, key) => `/api/inspections/${pathSegment(inspectionId)}/photo?key=${encodeURIComponent(key)}`,
         reportPreview: (tenantSlug, inspectionId) =>
-            tenantSlug ? `/report-view/${tenantSlug}/${inspectionId}` : null,
-        reportPdf: (inspectionId) => `/api/inspections/${inspectionId}/pdf?type=full`,
+            tenantSlug ? `/report-view/${pathSegment(tenantSlug)}/${pathSegment(inspectionId)}` : null,
+        reportPdf: (inspectionId) => `/api/inspections/${pathSegment(inspectionId)}/pdf?type=full`,
         costExport: (inspectionId, format) =>
             `/resources/cost-export?inspectionId=${encodeURIComponent(inspectionId)}&format=${format}`,
-        statutoryPreviewPdf: (inspectionId) => `/api/inspections/${inspectionId}/statutory-form/preview.pdf`,
+        statutoryPreviewPdf: (inspectionId) => `/api/inspections/${pathSegment(inspectionId)}/statutory-form/preview.pdf`,
         videoObject: (inspectionId, ref) =>
-            ref ? `/api/inspections/${inspectionId}/media/video/r2-object/${ref}` : null,
+            ref ? `/api/inspections/${pathSegment(inspectionId)}/media/video/r2-object/${pathSegment(ref)}` : null,
         presenceSocket: (inspectionId) => {
             const loc = location ?? browserLocation();
             const scheme = loc.protocol === "https:" ? "wss:" : "ws:";
-            return `${scheme}//${loc.host}/api/inspections/${inspectionId}/presence/ws`;
+            return `${scheme}//${loc.host}/api/inspections/${pathSegment(inspectionId)}/presence/ws`;
         },
-        editorPath: (inspectionId) => `/inspections/${inspectionId}/edit`,
+        editorPath: (inspectionId) => `/inspections/${pathSegment(inspectionId)}/edit`,
         inspectionsList: () => "/inspections",
     };
 }

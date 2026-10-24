@@ -217,7 +217,6 @@ export function useInspectionState(opts: UseInspectionOptions) {
       label: string;
       sectionName: string;
       sectionIdx: number;
-      itemIdx: number;
       rating: string | null;
     }>
   >([]);

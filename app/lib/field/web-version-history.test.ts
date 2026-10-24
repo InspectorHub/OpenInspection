@@ -39,3 +39,12 @@ describe("createWebVersionHistory failures", () => {
         expect(await history.get("i1", 1)).toEqual({ ok: false });
     });
 });
+
+describe("createWebVersionHistory paths", () => {
+    it("an inspection id with path characters stays one segment", async () => {
+        const urls: string[] = [];
+        const history = createWebVersionHistory(asFetch(async (url: string) => { urls.push(url); return json(200, []); }));
+        await history.list("a/../b");
+        expect(urls[0]).toBe("/api/inspections/a%2F..%2Fb/collab/snapshots");
+    });
+});

@@ -101,7 +101,7 @@ export interface CustomCommentEntry {
     included:  boolean;
     category?: string;
     location?: string;
-    /** One of `DEFECT_TRADES` (`server/types/defect-fields.ts`), or null.
+    /** One of `DEFECT_TRADES` (`packages/field-ui/src/shared/defect-fields.types.ts`), or null.
      *  Same field, same vocabulary and same sanitizer rule as `DefectState.trade`:
      *  a hand-written defect states WHO should fix it exactly as a canned one
      *  does, and the contractor-facing repair list reads both by this key. Typed

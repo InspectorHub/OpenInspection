@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const completePost = vi.fn();
 const publishPost = vi.fn();
 const inspectionPatch = vi.fn();
+const unitsPost = vi.fn();
 /** Call order across endpoints — the whole point of the auto-sign specs. */
 const calls: string[] = [];
 
@@ -20,6 +21,7 @@ vi.mock('~/lib/api-client.server', () => ({
                 complete: { $post: completePost },
                 publish: { $post: publishPost },
                 $patch: inspectionPatch,
+                units: { $post: unitsPost },
             },
         },
     })),
@@ -227,5 +229,33 @@ describe('editor action: the inspection id must be a single path segment', () =>
         const res = await postWithId('3f1c2d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
         expect(completePost).toHaveBeenCalledTimes(1);
         expect(res).toMatchObject({ ok: true, intent: 'complete' });
+    });
+});
+
+
+/**
+ * The web transport sends the command's idempotency key as a form field. A timed-out create is retried with
+ * the same key, so the action must hand it to the API client for the intents that would otherwise duplicate.
+ */
+describe('editor action - idempotency key for non-idempotent intents', () => {
+    beforeEach(() => {
+        vi.mocked(createApi).mockClear();
+        unitsPost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+        completePost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+    });
+
+    it('unit-create passes the key to the API client', async () => {
+        await post({ intent: 'unit-create', name: 'Unit 4', idempotencyKey: 'key-123' });
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]).toMatchObject({ idempotencyKey: 'key-123' });
+    });
+
+    it('unit-create without a key passes none', async () => {
+        await post({ intent: 'unit-create', name: 'Unit 4' });
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]?.idempotencyKey).toBeUndefined();
+    });
+
+    it('an idempotent intent never forwards the key', async () => {
+        await post({ intent: 'complete', idempotencyKey: 'key-123' });
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]?.idempotencyKey).toBeUndefined();
     });
 });

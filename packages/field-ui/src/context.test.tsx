@@ -154,6 +154,29 @@ describe('useFieldCommand', () => {
     expect(keys[2]).toBe(keys[1]);
   });
 
+  it('treats two different Blobs as different requests, and the same Blob as the same request', async () => {
+    const { fake, keys, settle } = deferredFake();
+    const a = new Blob(['aaaa'], { type: 'image/jpeg' });
+    const b = new Blob(['bbbb'], { type: 'image/jpeg' });
+    const { rerender } = renderWith(fake, <Harness cmd={{ type: 'upload-cover', file: a }} />);
+    act(() => { screen.getByRole('button').click(); });
+    settle(0, { ok: false, error: 'timed out' });
+    await flush();
+    // Another photo is another request: it must not inherit the key of the timed-out upload.
+    rerender(
+      <FieldDataSourceProvider dataSource={fake}>
+        <Harness cmd={{ type: 'upload-cover', file: b }} />
+      </FieldDataSourceProvider>,
+    );
+    act(() => { screen.getByRole('button').click(); });
+    expect(keys[1]).not.toBe(keys[0]);
+    settle(1, { ok: false, error: 'timed out' });
+    await flush();
+    // Retrying the SAME blob still holds its key.
+    act(() => { screen.getByRole('button').click(); });
+    expect(keys[2]).toBe(keys[1]);
+  });
+
   it('releases the guard when something throws before execute: a later call still reaches the host', async () => {
     const { fake, spy } = deferredFake();
     const original = globalThis.crypto.randomUUID;

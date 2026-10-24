@@ -5,7 +5,7 @@
 import type { FieldResources } from "@core/field-ui/data-source";
 import type { RepairItemOption } from "@core/field-ui/data-source-types";
 
-export const REPAIR_ITEMS_ROUTE = "/resources/repair-items";
+const REPAIR_ITEMS_ROUTE = "/resources/repair-items";
 
 type RepairItems = NonNullable<FieldResources["repairItems"]>;
 

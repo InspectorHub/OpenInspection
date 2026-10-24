@@ -143,11 +143,11 @@ export interface NotifyOptions {
 }
 
 /**
- * Per-call options of `execute`. The key is the write's idempotency key: the
- * host adapter forwards it as the `Idempotency-Key` (the web host writes it into
- * the `idempotencyKey` form field the route action relays). `useFieldCommand`
- * owns its lifetime; calling `execute` directly without one is allowed and simply
- * is not idempotent.
+ * Per-call options of `execute`. The key is the write's idempotency key; how it reaches the server is the host's
+ * business. The web host sends it as the `idempotencyKey` form field and its route action lifts it to an
+ * `Idempotency-Key` header on the one write of each command that would duplicate a record if repeated (unit create,
+ * statutory instance, cover upload); other commands are idempotent and ignore it. `useFieldCommand` holds the key
+ * across a retry of a failed attempt and rotates it after an `ok` answer; without one `execute` is not idempotent.
  */
 export interface ExecuteOptions {
   idempotencyKey?: string;

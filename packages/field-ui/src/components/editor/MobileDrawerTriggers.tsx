@@ -21,7 +21,7 @@ export interface MobileDrawerTriggersProps {
  */
 export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerTriggersProps) {
     return (
-        <nav className="fixed left-0 right-0 bottom-0 z-30 h-[calc(3.5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-ih-bg-card border-t border-ih-border flex">
+        <nav aria-label={m.editor_mobile_nav_label()} className="fixed left-0 right-0 bottom-0 z-30 h-[calc(3.5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-ih-bg-card border-t border-ih-border flex">
             {([
                 { id: 'sections', label: m.editor_mobile_drawer_sections(), icon: '☰' },
                 { id: 'items',    label: m.editor_mobile_drawer_items(),    icon: '≣' },
@@ -33,7 +33,7 @@ export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerT
                     onClick={() => onOpen(t.id)}
                     className="flex-1 min-h-11 touch-manipulation flex flex-col items-center justify-center text-ih-fg-2 hover:bg-ih-bg-muted active:bg-ih-bg-muted"
                 >
-                    <span className="text-[16px]">{t.icon}</span>
+                    <span className="text-[16px]" aria-hidden="true">{t.icon}</span>
                     <span className="text-[10px] uppercase tracking-[0.1em]">{t.label}</span>
                 </button>
             ))}

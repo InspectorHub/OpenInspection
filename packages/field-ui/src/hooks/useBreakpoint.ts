@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 
 /**
  * Returns true when viewport is below the Tailwind `md` breakpoint (768px).
@@ -55,14 +55,20 @@ export function useEditorLayout(): EditorLayout {
  */
 export function useMaxWidth(px: number): boolean {
     const query = `(max-width: ${px}px)`;
-    return useSyncExternalStore(
-        (onChange) => {
+    // Stable per query: a new `subscribe` identity on every render makes the store unsubscribe and resubscribe
+    // on each render of the caller (the editor re-renders on every keystroke).
+    const subscribe = useCallback(
+        (onChange: () => void) => {
             if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
             const mq = window.matchMedia(query);
             mq.addEventListener('change', onChange);
             return () => mq.removeEventListener('change', onChange);
         },
-        () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches,
-        () => false,
+        [query],
     );
+    const getSnapshot = useCallback(
+        () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches,
+        [query],
+    );
+    return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }
