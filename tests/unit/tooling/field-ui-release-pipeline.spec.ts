@@ -7,6 +7,8 @@ import { checkCoherence, formatReport, parsePackJson } from '../../../scripts/re
 // @ts-expect-error - plain .mjs script, no type declarations
 import { dirtyLines, isOfficialRegistry, parseRegistry, versionExists, versionsEqual } from '../../../scripts/publish-field-ui.mjs';
 
+const OFFICIAL_REGISTRY = 'https://registry.npmjs.org';
+
 const ROOT = resolve(__dirname, '..', '..', '..');
 type Exec = (cmd: string, args: string[]) => { status: number; stdout: string; stderr: string };
 
@@ -110,7 +112,9 @@ describe('publish helper checks', () => {
     expect(() => versionExists(exec({ status: 1, stderr: 'npm error code ENOTFOUND' }), '@x/y', '0.1.0')).toThrow(/could not read/);
     expect(() => versionExists(exec({ status: 1, stderr: '' }), '@x/y', '0.1.0')).toThrow(/exit 1/);
     // Every lookup names the registry explicitly.
-    expect(calls.every((a) => a.includes('--registry') && a.includes('https://registry.npmjs.org'))).toBe(true);
+    // The value that follows --registry is exactly the official registry (an exact comparison, not a substring match).
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((a) => a[a.indexOf('--registry') + 1] === OFFICIAL_REGISTRY)).toBe(true);
   });
 
   it('versionExists does not treat a different version string as published', () => {
