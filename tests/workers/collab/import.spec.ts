@@ -52,6 +52,7 @@ interface DOInternals {
     tenantId: string | null;
     inspectionId: string | null;
     identityPersisted: boolean;
+    hadStoredState: boolean;
     persist(): Promise<void>;
     ctx: {
         storage: { put(key: string, value: unknown): Promise<void> };
@@ -98,6 +99,12 @@ async function seededServer(): Promise<Fixture> {
         io.tenantId = TENANT;
         io.inspectionId = inspectionId;
         io.identityPersisted = true;
+        // A server that "has been edited online" holds prior collab state, which is what the object
+        // records when it loads one from storage. Without it the first request re-imports the D1 row
+        // the debounced persist wrote about a second after this seed, as a write concurrent with the
+        // import; Yjs breaks that tie by random client id, so the outcome flipped about half the time
+        // whenever a slow runner let the persist land first.
+        io.hadStoredState = true;
         seedResultsDoc(io.doc, [{ findingKey: KEY }]);
         applyItemPatch(io.doc, KEY, 'rating', 'NI');
         return Y.encodeStateAsUpdate(io.doc);
