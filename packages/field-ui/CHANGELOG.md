@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.2.0...field-ui-v0.2.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* **ci:** read the version after the last @ in the publish tag check ([9a1168c](https://github.com/InspectorHub/OpenInspection/commit/9a1168c0cdb3b550b6c891b531dd11826a3a960d))
+* **field-ui:** use the normalised git repository url ([abd18c8](https://github.com/InspectorHub/OpenInspection/commit/abd18c8aaad6c4459aecf485fa71a713723fa941))
+
 ## [0.2.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.1.0...field-ui-v0.2.0) (2026-10-24)
 
 
