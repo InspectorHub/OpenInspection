@@ -147,9 +147,10 @@ jobs:
         run: |
           set -- "$RUNNER_TEMP"/field-ui-pack/*.tgz
           [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one tarball, found $#" >&2; exit 1; }
-          # The tarball must be the package the tag names.
+          # The tarball must be the package the tag names. The scoped name starts with an @, so the version is
+          # everything after the LAST @ (##), not after the first.
           packed="$(tar -xzOf "$1" package/package.json | node -p "const p=JSON.parse(require('fs').readFileSync(0,'utf8'));p.name+'@'+p.version")"
-          if [ "field-ui-v${packed#*@}" != "$GITHUB_REF_NAME" ] || [ "${packed%@*}" != "@inspectorhub/field-ui" ]; then
+          if [ "field-ui-v${packed##*@}" != "$GITHUB_REF_NAME" ] || [ "${packed%@*}" != "@inspectorhub/field-ui" ]; then
             echo "tarball is $packed, which the tag $GITHUB_REF_NAME does not name" >&2
             exit 1
           fi

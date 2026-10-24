@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { parse } from 'yaml';
@@ -144,6 +145,26 @@ describe('workflows', () => {
     }
     expect(publish.jobs.build.permissions['id-token']).toBeUndefined();
     expect(publish.jobs.publish.permissions['id-token']).toBe('write');
+  });
+
+  it('publish: the tarball-versus-tag check reads the version after the LAST @ of a scoped name', () => {
+    const step = publish.jobs.publish.steps.find((x: { run?: string }) => x.run?.includes('does not name'));
+    expect(step, 'the tag check step must exist').toBeDefined();
+    const run: string = step.run;
+    // The scoped name starts with an @: stripping up to the FIRST @ leaves "inspectorhub/field-ui@0.2.0", so the
+    // check refused every real release (it did, on the first CI publish).
+    expect(run).toContain('${packed##*@}');
+    expect(run).not.toContain('${packed#*@}');
+    // Run the real condition in bash when bash is available (CI always has it).
+    const probe = spawnSync('bash', ['-c', 'echo ok'], { encoding: 'utf8' });
+    if (probe.status !== 0 || probe.stdout.trim() !== 'ok') return;
+    const cond = /^\s*if (\[ "field-ui-v.*\]); then$/m.exec(run)?.[1];
+    expect(cond, 'the condition line must be found').toBeDefined();
+    const verdict = (packed: string, ref: string) =>
+      spawnSync('bash', ['-c', `packed='${packed}'; GITHUB_REF_NAME='${ref}'; if ${cond}; then echo MISMATCH; else echo MATCH; fi`], { encoding: 'utf8' }).stdout.trim();
+    expect(verdict('@inspectorhub/field-ui@0.2.0', 'field-ui-v0.2.0')).toBe('MATCH');
+    expect(verdict('@inspectorhub/field-ui@0.2.0', 'field-ui-v0.2.1')).toBe('MISMATCH');
+    expect(verdict('@other/field-ui@0.2.0', 'field-ui-v0.2.0')).toBe('MISMATCH');
   });
 
   it('publish: the publish step is skipped for dry runs and for an already published version', () => {
