@@ -23,6 +23,18 @@ export function findingsForUnit(
     return result;
 }
 
+/**
+ * A meta key of a results blob (`_inspector_signature`): underscore-prefixed with
+ * fewer than three colon-separated parts. It is not a finding, and the results
+ * document never holds it: importing a blob skips it, and projecting a document
+ * skips one an older document may still carry as an empty item map (either would
+ * otherwise replace the real value in the blob with `{}`). Composite finding keys
+ * start with `_default:` too, which is why the prefix alone cannot decide.
+ */
+export function isMetaKey(key: string): boolean {
+    return key.startsWith('_') && key.split(':').length < 3;
+}
+
 export function isLegacyKey(key: string): boolean {
     return key.split(':').length < 3;
 }

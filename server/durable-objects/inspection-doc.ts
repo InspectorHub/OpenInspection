@@ -54,6 +54,8 @@ import { logger } from '../lib/logger';
 import { purgePathMatches } from './purge-path';
 import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
+import { isNonEmptyProjection, logDivergence, projectionsEqual } from './results-divergence';
+import { loadTemplateSnapshot, renameLegacyKeysResponse } from './inspection-doc-legacy-keys';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -136,6 +138,7 @@ interface ResultsSnapshot {
      *                BEFORE its buffered offline edits merge (preserves the
      *                about-to-be-overwritten value for the H2 compare/recover UI).
      *   'import'   — the mandatory capture before an offline client's update is applied.
+     *   'pre-rename' — the capture before legacy finding keys are renamed inside the document.
      * Optional so legacy snapshots persisted before this field stay readable.
      */
     reason?:    SnapshotReason;
@@ -143,7 +146,7 @@ interface ResultsSnapshot {
 }
 
 /** Discriminator for why a snapshot was captured. */
-type SnapshotReason = 'periodic' | 'manual' | 'connect' | 'import';
+type SnapshotReason = 'periodic' | 'manual' | 'connect' | 'import' | 'pre-rename';
 
 /** Snapshot metadata (the list view omits the heavy `projection` payload). */
 type ResultsSnapshotMeta = Omit<ResultsSnapshot, 'projection'>;
@@ -176,39 +179,12 @@ function matchSnapshotBySeqPath(pathname: string): number | null {
     return Number.isSafeInteger(seq) ? seq : null;
 }
 
-/**
- * Stable deep-equality for two result projections. `projectResults` emits a
- * plain, JSON-serialisable object with a deterministic key/element order (Yjs
- * iteration order is insertion order, which is stable across reads of the same
- * doc), so a `JSON.stringify` compare is both correct and cheap here. Used by
- * the connect-time dedup to skip a no-op snapshot when nothing changed since the
- * last capture.
- */
-function projectionsEqual(a: ResultsProjection, b: ResultsProjection): boolean {
-    return JSON.stringify(a) === JSON.stringify(b);
-}
-
 /** Shape of the persisted identity stored across hibernation. */
 interface PersistedIdentity {
     tenantId:     string;
     inspectionId: string;
     /** Optional for identities written before report-grained documents shipped. */
     reportId?:    string | null;
-}
-
-/**
- * Narrow a D1 `inspection_results.data` json value to a non-empty projection.
- * The column is `text({ mode: 'json' })`, so drizzle returns the parsed value
- * as `unknown`. Empty / null / non-object / `{}` blobs are not worth importing
- * (an empty doc projects to `{}`), so the guard rejects them.
- */
-function isNonEmptyProjection(value: unknown): value is ResultsProjection {
-    return (
-        typeof value === 'object' &&
-        value !== null &&
-        !Array.isArray(value) &&
-        Object.keys(value).length > 0
-    );
 }
 
 // ─── InspectionDocDO ─────────────────────────────────────────────────────────
@@ -421,6 +397,20 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             return out.ok
                 ? Response.json({ ok: true })
                 : new Response('snapshot not found', { status: 404 });
+        }
+
+        // Legacy bare finding keys -> composite keys, inside the document; same trust boundary as /followup.
+        if (url.pathname.endsWith('/rename-legacy-keys') && req.method === 'POST') {
+            if (!this.adoptIdentityHeaders(req)) return new Response('missing tenant/inspection identity', { status: 400 });
+            const { tenantId, inspectionId } = this;
+            if (!tenantId || !inspectionId) return new Response('missing tenant/inspection identity', { status: 400 });
+            return renameLegacyKeysResponse(this.doc, {
+                inspectionId,
+                loadSnapshot: () => loadTemplateSnapshot(this.env.DB, tenantId, inspectionId),
+                hydrate:      () => this.hydrateFromD1Once(),
+                snapshot:     () => this.captureSnapshot(null, 'pre-rename'),
+                persist:      () => this.persist(),
+            });
         }
 
         // D8: re-read the already-updated templateSnapshot from D1, diff the
@@ -933,6 +923,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             if (isNonEmptyProjection(blob)) {
                 loadResultsProjection(this.doc, blob);
             }
+        } else {
+            // The blob is deliberately not imported here; say so when it disagrees with the document.
+            await logDivergence(this.env.DB, { tenantId, inspectionId, reportId: this.reportId }, resultsRow?.data, this.doc);
         }
     }
 

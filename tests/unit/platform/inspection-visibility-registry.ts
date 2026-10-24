@@ -163,7 +163,6 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
     'server/api/agreements-render.ts': E('public-token', 'internal /m2m surface, reached with the service credential and never by a staff session'),
     // Admin-only.
     'server/api/admin/admin-esign.ts': E('admin-only', 'every route is requireRole(owner, manager)'),
-    'server/api/admin/admin-finding-keys.ts': E('admin-only', 'requireRole(owner)'),
     // Reached by a token the recipient holds.
     'server/api/bookings/agreement.ts': E('public-token', 'signing and checkout tokens'),
     'server/api/public-report.ts': E('public-token', 'published report links'),
