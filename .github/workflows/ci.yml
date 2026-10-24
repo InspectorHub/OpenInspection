@@ -386,6 +386,12 @@ jobs:
       # Bundle-size gate (Workers Free 3 MiB gzipped). Reuses the build/ output
       # from the previous step (--skip-build); also enforced in pre-commit.
       - run: npm run check:bundle -- --skip-build
+      # The npm package of @inspectorhub/field-ui, checked on the pull request instead of on
+      # release day: build, stage, scan the staged directory, dry-run the pack, and check that the
+      # release manifest and package.json agree. Generic scan rules only: no --require-extra here,
+      # because the run-time patterns come from a repository secret and secrets are absent on
+      # pull requests from forks. The publish workflow runs the same script WITH --require-extra.
+      - run: npm run release:check:field-ui
 
   # ── The required check ───────────────────────────────────────────────────
   # Does no work; exists so branch protection has a single stable name to
