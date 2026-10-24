@@ -57,11 +57,19 @@ describe("WebFieldHost serves the editor loader's viewer", () => {
         expect(ds!.session()).toMatchObject({ locale: "en-GB", timeZone: "Asia/Tokyo", dateFormat: "iso", timeFormat: "24h" });
     });
 
-    it("keeps today's fallbacks when the loader read no viewer", async () => {
+    it("a viewer without a session marker has no presence identity either (no shared id)", async () => {
+        let ds: FieldDataSource | null = null;
+        const userWithoutMarker = Object.fromEntries(Object.entries(SESSION_CONTEXT.user).filter(([k]) => k !== "sessionMarker"));
+        mount(loaderPayload({ viewer: viewerFromSessionContext({ ...SESSION_CONTEXT, user: userWithoutMarker }) }), (d) => { ds = d; });
+        await screen.findByText("probe");
+        expect(ds!.session().userId).toBeNull();
+    });
+
+    it("keeps today's fallbacks when the loader read no viewer, with no identity for presence", async () => {
         let ds: FieldDataSource | null = null;
         mount(loaderPayload({ viewer: null }), (d) => { ds = d; });
         await screen.findByText("probe");
-        expect(ds!.session()).toMatchObject({ locale: "en-US", timeZone: "UTC", dateFormat: "us", timeFormat: "12h", userId: "current-user", role: "" });
+        expect(ds!.session()).toMatchObject({ locale: "en-US", timeZone: "UTC", dateFormat: "us", timeFormat: "12h", userId: null, role: "" });
     });
 });
 

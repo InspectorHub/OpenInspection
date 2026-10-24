@@ -12,8 +12,11 @@ export interface PresenceUser {
   focusItemId?: string | null;
 }
 
-/** FE-5 — tri-state so the UI can distinguish "still connecting" from "lost". */
-export type PresenceStatus = "connecting" | "connected" | "reconnecting";
+/**
+ * FE-5 — so the UI can distinguish "still connecting" from "lost". `unavailable` is a host that cannot say who the
+ * viewer is (`session().userId` is null): no socket is opened and nothing is announced.
+ */
+export type PresenceStatus = "connecting" | "connected" | "reconnecting" | "unavailable";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -63,6 +66,11 @@ export function usePresence(options: {
 
     const wsUrl = dataSource.urls.presenceSocket(inspectionId);
     const { userId } = dataSource.session();
+    if (userId === null) {
+      setStatus("unavailable");
+      setConnected(false);
+      return;
+    }
 
     try {
       const ws = new WebSocket(wsUrl);

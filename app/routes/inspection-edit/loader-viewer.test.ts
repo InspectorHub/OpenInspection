@@ -34,7 +34,7 @@ vi.mock("~/lib/api-client.server", () => ({
 import { loader } from "~/routes/inspection-edit/loader.server";
 import { routeArgs } from "../../../tests/helpers/route-args";
 
-const run = () => loader(routeArgs(new Request("http://localhost/inspections/i1/edit"), {
+const run = (cookie?: string) => loader(routeArgs(new Request("http://localhost/inspections/i1/edit", cookie ? { headers: { cookie } } : undefined), {
     params: { id: "i1" },
     context: new RouterContextProvider() as unknown as Parameters<typeof loader>[0]["context"],
 }) as never) as Promise<Record<string, unknown>>;
@@ -48,5 +48,14 @@ describe("editor loader viewer", () => {
             branding: { defaultTimezone: "Europe/Paris", defaultLocale: "fr-FR", dateFormat: "eu", timeFormat: "24h" },
         });
         expect(JSON.stringify(out.viewer)).not.toContain("p@x.test");
+    });
+
+    it("passes the remembered layout band from the cookie as initialLayout, and 'desktop' for a missing or hostile one", async () => {
+        expect((await run("ih-editor-layout=phone")).initialLayout).toBe("phone");
+        expect((await run("a=1; ih-editor-layout=tablet; b=2")).initialLayout).toBe("tablet");
+        expect((await run()).initialLayout).toBe("desktop");
+        expect((await run("ih-editor-layout=<script>")).initialLayout).toBe("desktop");
+        expect((await run("ih-editor-layout=PHONE")).initialLayout).toBe("desktop");
+        expect((await run("x-" + "ih-" + "editor-layout=phone")).initialLayout).toBe("desktop");
     });
 });

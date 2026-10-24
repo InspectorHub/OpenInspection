@@ -122,7 +122,7 @@ export function fullResources(): FieldResources {
   };
 }
 
-function fullSlots(): FieldHostSlots {
+export function fullSlots(): FieldHostSlots {
   return {
     renderThemeControl: () => <div data-testid="theme-control" />,
     pdf: { run: () => {}, busy: false, error: null, actionLabel: (label) => label },

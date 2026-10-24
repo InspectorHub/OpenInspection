@@ -56,12 +56,6 @@ export interface SessionLoaderBits {
 }
 
 /**
- * Stop-gap for `SessionInfo.userId` when the context carries no marker. This is the
- * literal the editor route hard-codes for presence today (`inspection-edit.tsx`).
- */
-export const STOPGAP_USER_ID = "current-user";
-
-/**
  * Build the editor's `SessionInfo` so that it answers EXACTLY what the existing
  * hooks answer for the same context (no behaviour change).
  *
@@ -79,7 +73,8 @@ export const STOPGAP_USER_ID = "current-user";
  *
  * - `userId`: the context's opaque session marker (per-user and stable, which is what
  *   presence needs; it is not the user's database id, which the session context does not
- *   carry), else `STOPGAP_USER_ID` when there is no context at all.
+ *   carry), else null. There is deliberately NO shared placeholder id: with no identity the
+ *   editor announces no presence, and nothing is attributed to a made-up user.
  * - `role`: the context's role if there is one, else "" (unknown). Nothing may treat ""
  *   as a privilege level.
  */
@@ -91,7 +86,7 @@ export function webSessionInfo(ctx: SessionContextLike | null, bits: SessionLoad
         videoProvider: bits.videoProvider,
         streamCustomerSubdomain: bits.streamCustomerSubdomain,
         collabEditing: bits.collabEditing,
-        userId: ctx?.user.sessionMarker || STOPGAP_USER_ID,
+        userId: ctx?.user.sessionMarker || null,
         role: ctx?.user.role ?? "",
         locale: ctx?.user.locale || ctx?.branding.defaultLocale || "en-US",
         timeZone: ctx?.user.timezone || ctx?.branding.defaultTimezone || "UTC",

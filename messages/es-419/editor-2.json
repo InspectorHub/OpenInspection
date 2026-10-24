@@ -47,6 +47,8 @@
   "editor_footer_status_connected": "Conectado",
   "editor_footer_status_reconnecting": "Reconectando…",
   "editor_footer_status_connecting": "Conectando…",
+  "editor_footer_status_unavailable": "Presencia no disponible",
+  "editor_command_still_saving": "Esto todavía se está guardando. Revisa la inspección antes de intentarlo de nuevo.",
   "editor_fullscreen_exit_title": "Salir de pantalla completa (Esc)",
   "editor_fullscreen_enter_title": "Pantalla completa (F)",
   "editor_fullscreen_exit_aria": "Salir de pantalla completa",

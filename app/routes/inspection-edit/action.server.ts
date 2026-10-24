@@ -14,7 +14,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  if (!isPathSegment(params.id)) return Response.json({ ok: false, error: "Invalid inspection id" }, { status: 400 });
  const formData = await request.formData();
  const intent = formData.get("intent");
- const api = createApi(context, { token, idempotencyKey: writeKeyFor(intent, formData) });
+ const api = createApi(context, { token, idempotencyKey: writeKeyFor(intent, formData), inFlightAsResponse: new URL(request.url).pathname.startsWith("/resources/") });
  // B-17: every branch must record whether the API write actually landed — returning { ok: true }
  // unconditionally turned failed PATCHes into silent data loss (the save pill said "Saved" either way).
  let ok = true;

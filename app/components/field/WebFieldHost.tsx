@@ -12,6 +12,7 @@ import { createWebFieldDataSource } from "~/lib/field/web-data-source";
 import { editorDataFromLoader, type EditorLoaderData } from "~/lib/field/web-editor-data";
 import { createWebUrls } from "~/lib/field/web-urls";
 import type { SessionLoaderBits } from "~/lib/field/web-session";
+import { rememberEditorLayout } from "~/lib/field/editor-layout-cookie";
 
 const NO_EDITOR_BITS: SessionLoaderBits = {
     tenantSlug: null,
@@ -104,6 +105,8 @@ export function WebFieldHost({ editor, children }: WebFieldHostProps) {
             // The same check `EditorHumanCheck` mounts around the editor; read through a ref so the slot keeps its identity.
             ensureHuman: () => ensureHumanRef.current(),
             renderUnsavedGuard: ({ atRisk }) => <WebUnsavedGuard atRisk={atRisk} />,
+            // Remembered per device so the next load can render this band on the server (editor-layout-cookie.ts).
+            onLayoutObserved: (layout) => rememberEditorLayout(layout),
         }),
         [busy, error, generating, cooldown],
     );

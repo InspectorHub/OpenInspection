@@ -114,3 +114,61 @@ describe("createWebExecute with a stalled connection", () => {
         }
     });
 });
+
+describe("createWebExecute: a repeat refused as still running", () => {
+    const refusal = () => jsonResponse(
+        { success: false, error: { message: "An identical request is already being processed.", code: "IDEMPOTENCY_IN_FLIGHT" } },
+        { status: 409 },
+    );
+    const keyOf = (init: RequestInit | undefined) => (init?.body as FormData).get(IDEMPOTENCY_FIELD);
+
+    function setup(answers: Array<() => Response>) {
+        const queue = [...answers];
+        const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => (queue.shift() ?? answers[answers.length - 1]!)());
+        const waits: number[] = [];
+        const execute = createWebExecute({ fetchImpl, sleep: async (ms) => { waits.push(ms); } });
+        return { fetchImpl, waits, execute };
+    }
+
+    it("waits and re-sends the SAME key, and answers the real result when the first attempt finished meanwhile", async () => {
+        const { fetchImpl, waits, execute } = setup([refusal, () => jsonResponse({ ok: true, intent: "unit-create" })]);
+        const result = await execute("insp-1", SAMPLES.complete, { idempotencyKey: "key-1" });
+        expect(result).toEqual({ ok: true });
+        expect(fetchImpl).toHaveBeenCalledTimes(2);
+        expect(fetchImpl.mock.calls.map(([, init]) => keyOf(init))).toEqual(["key-1", "key-1"]);
+        expect(waits).toEqual([1500]);
+    });
+
+    it("re-sends at most twice with a longer second wait, then answers a distinct still-saving result", async () => {
+        const { fetchImpl, waits, execute } = setup([refusal]);
+        const result = await execute("insp-1", SAMPLES.complete, { idempotencyKey: "key-1" });
+        expect(fetchImpl).toHaveBeenCalledTimes(3);
+        expect(waits).toEqual([1500, 4000]);
+        expect(waits.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(10_000);
+        expect(fetchImpl.mock.calls.map(([, init]) => keyOf(init))).toEqual(["key-1", "key-1", "key-1"]);
+        expect(result).toEqual({ ok: false, inProgress: true, error: "This is still being saved. Check the inspection before trying again." });
+    });
+
+    it("a failure that is not the still-running refusal is a plain failure, with no waiting and no re-send", async () => {
+        const conflict = () => jsonResponse({ success: false, error: { message: "Duplicate", code: "DUPLICATE" } }, { status: 409 });
+        const { fetchImpl, waits, execute } = setup([conflict]);
+        const result = await execute("insp-1", SAMPLES.complete, { idempotencyKey: "key-1" });
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        expect(waits).toEqual([]);
+        expect(result).toMatchObject({ ok: false });
+        expect(result).not.toHaveProperty("inProgress");
+        // A 500 and a 422 (key reused with another payload) are plain failures too.
+        for (const status of [500, 422]) {
+            const s = setup([() => jsonResponse({ error: { code: "IDEMPOTENCY_KEY_REUSED" } }, { status })]);
+            expect(await s.execute("insp-1", SAMPLES.complete, { idempotencyKey: "k" })).toMatchObject({ ok: false });
+            expect(s.fetchImpl).toHaveBeenCalledTimes(1);
+        }
+    });
+
+    it("a success is sent once", async () => {
+        const { fetchImpl, waits, execute } = setup([() => jsonResponse({ ok: true })]);
+        await execute("insp-1", SAMPLES.complete, { idempotencyKey: "key-1" });
+        expect(fetchImpl).toHaveBeenCalledTimes(1);
+        expect(waits).toEqual([]);
+    });
+});

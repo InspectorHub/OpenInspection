@@ -1,5 +1,4 @@
 import type * as Y from 'yjs';
-import type { ReactNode } from 'react';
 import type { DateFormat, TimeFormat } from './shared/display-prefs';
 import type { PublishReadiness } from './shared/types';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
@@ -89,6 +88,8 @@ export interface EditorData {
   outboundCoolingWindow: OutboundCoolingWindow | null;
   /** Null on legacy inspections created before every inspection got a results row. */
   resultId: string | null;
+  /** The layout band this device showed last time, if the host remembers it: the first frame renders in it, then the viewport decides. Absent means 'desktop'. */
+  initialLayout?: 'phone' | 'tablet' | 'desktop';
 }
 
 export interface SessionInfo {
@@ -97,8 +98,8 @@ export interface SessionInfo {
   videoProvider: 'r2' | 'stream';
   streamCustomerSubdomain: string | null;
   collabEditing: boolean;
-  /** Replaces the editor's hard-coded presence user id. */
-  userId: string;
+  /** Who the viewer is for presence. Null when the host cannot tell: no presence is announced. Never a placeholder shared by several people. */
+  userId: string | null;
   role: string;
   /**
    * The VIEWER's display language: user override, else the tenant default, else
@@ -316,49 +317,7 @@ export interface FieldResources {
   };
 }
 
-/**
- * Host-supplied UI, injected through `FieldDataSourceProvider` rather than read
- * from the data source: the package renders the entry point, the host owns the
- * implementation.
- */
-export interface FieldHostSlots {
-  /** The theme switch shown in the header (the web host passes `ThemeSegmentControl`). Absent hides it. */
-  renderThemeControl?: (props: { className?: string }) => ReactNode;
-  /**
-   * PDF export, kept in the host (it needs the host's download machinery).
-   * `run` starts the export for the inspection; the rest is what the header
-   * reads off `usePdfExport`. Absent hides the PDF entry points.
-   */
-  pdf?: {
-    run(inspectionId: string): void;
-    busy: boolean;
-    /** The last failure's sentence, or null. */
-    error: string | null;
-    /** Button text: the host's `pdfActionLabel`, which swaps in "Generating" / "Retry in N s". */
-    actionLabel(defaultLabel: string): string;
-  };
-  /**
-   * The human check that gates an outbound send (publish). Resolves `true` when the person may go on (the
-   * check passed, or none is due) and `false` when they cancelled it. Read it through `useFieldEnsureHuman`,
-   * which hands back a stable function.
-   *
-   * FAIL-CLOSED: a host that provides neither this nor `humanCheck: 'not-required'` gets a check that refuses
-   * every send and tells the person why. A forgotten slot must never turn the gate off; the client check is the
-   * only gate on publishing, so skipping it has to be a decision the host writes down.
-   */
-  ensureHuman?: () => Promise<boolean>;
-  /**
-   * The explicit opt-out of the human check, for a host that has none by design (a native shell with its own
-   * signed-in session). Only this exact value lets sends through without `ensureHuman`; it is not a default.
-   */
-  humanCheck?: 'not-required';
-  /**
-   * The unsaved-changes guard: a component the editor mounts once, which watches `atRisk` and, while it is
-   * true, stops the person leaving the page without asking. The host owns the mechanism (a router blocker, the
-   * browser's close prompt) and renders its own confirmation. Absent means leaving is never intercepted.
-   */
-  renderUnsavedGuard?: (props: { atRisk: boolean }) => ReactNode;
-}
+export type { FieldHostSlots } from './host-slots';
 
 export interface FieldDataSource {
   load(inspectionId: string, scope?: string): Promise<EditorData>;

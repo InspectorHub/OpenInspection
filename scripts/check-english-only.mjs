@@ -29,13 +29,16 @@ const ROOT = process.cwd();
  * works.)
  *
  * Ranges: CJK unified ideographs, extension A, CJK symbols and punctuation,
- * and halfwidth/fullwidth forms.
+ * halfwidth/fullwidth forms, Hiragana and Katakana, and Hangul (syllables and Jamo).
  */
 const CJK_RANGES = [
     [0x4e00, 0x9fff],
     [0x3400, 0x4dbf],
     [0x3000, 0x303f],
     [0xff00, 0xffef],
+    [0x3040, 0x30ff], // Hiragana and Katakana
+    [0xac00, 0xd7af], // Hangul syllables
+    [0x1100, 0x11ff], // Hangul Jamo
 ];
 
 function firstCjkIndex(text) {

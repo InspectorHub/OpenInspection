@@ -7,7 +7,8 @@
  *   - rate item A in Speed mode and item B in the item editor, with the same level;
  *   - reload, and read both back from the API: the stored entries have the same shape and the same rating;
  *   - the unrated count is the same before and after the reload and is down by two.
- * A second run does the Speed mode rating with no connection and checks it arrives once the connection is back.
+ * A second run does the Speed mode rating with no connection and checks it arrives once the connection is back, as
+ * exactly one stored entry (a duplicate would show as a second key for the item).
  *
  * One Playwright project per viewport (`speed-mode-parity-390`, `-834`, `-1280`; the viewport is the project's), so
  * each has its own seeded inspection with three unrated items and the runs cannot rate each other's rows.
@@ -71,6 +72,12 @@ async function unratedCount(page: Page, layout: EditorLayout): Promise<number> {
     if ((await entry.count()) === 0) return 0;
     const text = (await entry.textContent()) ?? '';
     return Number(/(\d+) unrated/.exec(text)?.[1] ?? NaN);
+}
+
+/** Every stored key that belongs to an item, whatever scope it sits under. A replayed write that landed under a second key shows here. */
+async function storedKeysFor(page: Page, itemId: string): Promise<string[]> {
+    const results = await readStoredResults(page, seededInspectionId());
+    return Object.keys(results).filter((k) => k === itemId || k.endsWith(`:${itemId}`));
 }
 
 /** The stored entry for an item of the seeded inspection, whatever scope key it sits under. */
@@ -139,7 +146,7 @@ test.describe('speed mode parity', () => {
         expect([roofChecked, plumbingChecked]).toEqual(['true', 'true']);
     });
 
-    test('a rating given in Speed mode with no connection arrives once the connection is back, once', async ({ page, context }) => {
+    test('a rating given in Speed mode with no connection arrives once the connection is back, as one stored entry', async ({ page, context }) => {
         test.setTimeout(120_000);
         // The previous test rated Roof and Plumbing; Electrical is the one left.
         await expect.poll(() => unratedCount(page, layout), { timeout: 30_000 }).toBe(1);
@@ -159,5 +166,20 @@ test.describe('speed mode parity', () => {
         expect(Object.keys(electrical).sort()).toEqual(Object.keys(roof).sort());
         expect(electrical.rating).toBe(roof.rating);
         await expect.poll(() => unratedCount(page, layout), { timeout: 30_000 }).toBe(0);
+
+        // Single arrival, as far as the API shows it. The results store is a map keyed by item, so a replayed write
+        // cannot make a second rating for the same key; what a duplicate CAN do is land under a second key (another
+        // scope), or leave the rating of an item that was already stored different from its sibling. Neither may
+        // happen: exactly one stored entry per item, for the offline one and for the two rated earlier. The server's
+        // own write count is not exposed through the API, so that is as close to "once" as this spec can observe.
+        for (const itemId of ['roof', 'plumbing', 'electrical']) {
+            expect(await storedKeysFor(page, itemId), `one stored entry for ${itemId}`).toHaveLength(1);
+        }
+        // Settling takes a moment after the first sighting; a late duplicate would show up here.
+        await page.waitForTimeout(2_000);
+        for (const itemId of ['roof', 'plumbing', 'electrical']) {
+            expect(await storedKeysFor(page, itemId), `still one stored entry for ${itemId} after the queue drained`).toHaveLength(1);
+        }
+        expect((await storedEntry(page, 'electrical'))?.rating, 'the rating did not change after the queue drained').toBe(electrical.rating);
     });
 });

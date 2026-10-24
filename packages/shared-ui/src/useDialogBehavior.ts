@@ -93,7 +93,16 @@ export function useDialogBehavior(
    * [open] only, preserving the focus-stability invariant below.
    */
   initialFocusRef?: React.RefObject<HTMLElement | null>,
+  /**
+   * `trapTab: false` is for a dialog whose host owns the Tab key as a shortcut (Speed Mode:
+   * Tab and Shift+Tab are next and previous). The keydown wrap is then off, because it would
+   * swallow the shortcut at the edges; focus is contained instead, by pulling it back when
+   * it lands outside the dialog (Shift+Tab to the last control, Tab to the first). A Tab the
+   * host cancels moves no focus, so the containment never fires for it.
+   */
+  options?: { trapTab?: boolean },
 ): void {
+  const trapTab = options?.trapTab !== false;
   // useLayer stashes onClose in a ref, so the effect below never depends on its identity.
   // Real callers pass an inline arrow fn whose identity changes on every parent re-render;
   // re-running the focus effect on those would restore focus to the trigger and then steal
@@ -154,7 +163,26 @@ export function useDialogBehavior(
         first.focus();
       }
     };
-    document.addEventListener("keydown", handler);
+    // Containment for a dialog that does not wrap Tab itself (trapTab: false).
+    let lastShift = false;
+    const noteTab = (e: KeyboardEvent) => {
+      if (e.key === "Tab") lastShift = e.shiftKey;
+    };
+    const contain = (e: FocusEvent) => {
+      const liveRoot = ref.current;
+      if (!liveRoot || layer.coverage() !== "none") return;
+      const target = e.target as Node | null;
+      if (!target || liveRoot.contains(target)) return;
+      const nodes = focusableIn(liveRoot);
+      const dest = nodes.length === 0 ? liveRoot : lastShift ? nodes[nodes.length - 1] : nodes[0];
+      dest.focus();
+    };
+    if (trapTab) {
+      document.addEventListener("keydown", handler);
+    } else {
+      document.addEventListener("keydown", noteTab);
+      document.addEventListener("focusin", contain);
+    }
 
     // Prefer an explicit initial-focus target when it lives inside the dialog;
     // otherwise fall back to the first focusable (default behavior).
@@ -172,6 +200,8 @@ export function useDialogBehavior(
 
     return () => {
       document.removeEventListener("keydown", handler);
+      document.removeEventListener("keydown", noteTab);
+      document.removeEventListener("focusin", contain);
       // Hand focus back to the trigger. useLayer's cleanup ran first (it is declared
       // first), so ask it, not the stack. On top: restore now. Not on top: a layer above is
       // still open and keeps focus, or it closes in this same commit (React runs parent

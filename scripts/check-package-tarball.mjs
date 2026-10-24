@@ -38,12 +38,15 @@ import { fileURLToPath } from 'node:url';
 /** Only these top-level entries may appear in the tarball. */
 export const ALLOWED_TOP_LEVEL = ['dist/', 'README.md', 'LICENSE', 'package.json'];
 
-/** Code-point ranges, so this file holds no CJK of its own: ideographs, extension A, symbols, fullwidth. */
+/** Code-point ranges, so this file holds no CJK of its own: ideographs, extension A, symbols, fullwidth, Kana, Hangul. */
 const CJK_RANGES = [
     [0x4e00, 0x9fff],
     [0x3400, 0x4dbf],
     [0x3000, 0x303f],
     [0xff00, 0xffef],
+    [0x3040, 0x30ff], // Hiragana and Katakana
+    [0xac00, 0xd7af], // Hangul syllables
+    [0x1100, 0x11ff], // Hangul Jamo
 ];
 
 const hasCjk = (text) => {

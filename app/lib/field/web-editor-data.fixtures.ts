@@ -33,6 +33,7 @@ export function loaderPayload(over: Partial<EditorLoaderData> = {}): EditorLoade
         statutoryDetails: null,
         statutoryCoverage: null,
         nextPublishIsAmendment: false,
+        initialLayout: "desktop" as const,
     };
     return { ...base, ...over };
 }

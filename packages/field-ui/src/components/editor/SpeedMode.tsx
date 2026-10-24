@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Icon, Button, useLayer } from '@core/shared-ui';
+import { Icon, Button, useDialogBehavior } from '@core/shared-ui';
 import { usePointerGesture } from '../../hooks/usePointerGesture';
 import { MobileBottomDrawer } from '../MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
@@ -148,10 +148,12 @@ export function SpeedMode({
     if (undoRef.current && !undoRef.current.keep) setPendingUndo(null);
   }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Joins the shared layer stack for Escape and scroll lock, so a dialog opened from here
-  // (add-media chooser, camera, dock) sits above and Escape closes only the top layer.
-  // No Tab trap on purpose: Tab / Shift+Tab are Speed Mode's next/prev shortcuts (useKeyboard).
-  useLayer(!!item, { onEscape: onExit, lockScroll: true });
+  // The shared dialog behaviour: it joins the layer stack for Escape and scroll lock (so a dialog opened
+  // from here sits above and Escape closes only the top layer), moves focus into the overlay on open and
+  // hands it back to the control that opened it on close. Tab is NOT wrapped on keydown: Tab / Shift+Tab are
+  // Speed Mode's next/prev shortcuts (useKeyboard), so focus is contained instead (trapTab: false).
+  const rootRef = useRef<HTMLDivElement>(null);
+  useDialogBehavior(!!item, onExit, rootRef, rootRef, { trapTab: false });
 
   if (!item) return null;
 
@@ -195,9 +197,15 @@ export function SpeedMode({
 
   return (
     <div
+      ref={rootRef}
       role="dialog"
       aria-modal="true"
       aria-label={m.editor_speedmode_aria_label()}
+      tabIndex={-1}
+      // Focus now lives in the dialog, so the single-key shortcuts (0 clear, N not applicable, P photo) must be
+      // allowed from it; they are otherwise scoped to <body> and data-shortcut-scope containers.
+      data-shortcut-scope=""
+      style={{ outline: 'none' }}
       className={`fixed inset-0 z-[100] bg-ih-bg-card flex flex-col${touch ? " h-dvh pt-[env(safe-area-inset-top)] pb-[max(1rem,env(safe-area-inset-bottom))]" : ""}`}
     >
       {/* Top bar */}

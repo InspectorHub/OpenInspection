@@ -47,6 +47,8 @@
   "editor_footer_status_connected": "Connected",
   "editor_footer_status_reconnecting": "Reconnecting…",
   "editor_footer_status_connecting": "Connecting…",
+  "editor_footer_status_unavailable": "Presence unavailable",
+  "editor_command_still_saving": "This is still being saved. Check the inspection before trying again.",
   "editor_fullscreen_exit_title": "Exit fullscreen (Esc)",
   "editor_fullscreen_enter_title": "Fullscreen (F)",
   "editor_fullscreen_exit_aria": "Exit fullscreen",

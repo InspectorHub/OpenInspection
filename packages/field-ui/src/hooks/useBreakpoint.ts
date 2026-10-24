@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 /**
  * Returns true when viewport is below the Tailwind `md` breakpoint (768px).
@@ -41,12 +41,33 @@ function subscribeLayout(onChange: () => void): () => void {
 /**
  * The editor's layout band: phone (< 768), tablet (768-1023), desktop (>= 1024), decided by width alone.
  *
- * A store subscription with a FIXED server snapshot ('desktop'), so the server render and the client's first
- * render agree and the client then moves to the real band. The `useState(() => matchMedia(...))` form read the
- * browser on the first client render and produced a hydration mismatch on every phone load.
+ * A store subscription whose server snapshot is FIXED for a given host answer (`initialLayout`, 'desktop' when the
+ * host knows nothing), so the server render and the client's first render agree and the client then moves to the
+ * real band. The `useState(() => matchMedia(...))` form read the browser on the first client render and produced a
+ * hydration mismatch on every phone load.
+ *
+ * `initialLayout` is the band the host remembered from this device's last visit (the web host keeps it in a
+ * cookie the server can read). With it a phone is server-rendered and hydrated as a phone instead of mounting the
+ * desktop tree first and swapping it; matchMedia still has the last word, so a wrong memory is corrected right after
+ * mount.
+ *
+ * `onObserved` is told the band the browser really shows: once after mount, then on every change. It is how a host
+ * learns what to remember; it is not called while rendering.
  */
-export function useEditorLayout(): EditorLayout {
-    return useSyncExternalStore(subscribeLayout, readLayout, () => 'desktop');
+export function useEditorLayout(initialLayout: EditorLayout = 'desktop', onObserved?: (layout: EditorLayout) => void): EditorLayout {
+    const serverSnapshot = useCallback(() => initialLayout, [initialLayout]);
+    const layout = useSyncExternalStore(subscribeLayout, readLayout, serverSnapshot);
+    const observer = useRef(onObserved);
+    observer.current = onObserved;
+    const told = useRef<EditorLayout | null>(null);
+    useEffect(() => {
+        // Read the browser, not `layout`: on the first commit `layout` is still the host's remembered band.
+        const seen = readLayout();
+        if (told.current === seen) return;
+        told.current = seen;
+        observer.current?.(seen);
+    }, [layout]);
+    return layout;
 }
 
 /**

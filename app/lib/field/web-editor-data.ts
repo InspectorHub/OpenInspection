@@ -50,5 +50,6 @@ export function editorDataFromLoader(d: EditorLoaderData): EditorData {
         nextPublishIsAmendment: d.nextPublishIsAmendment,
         outboundCoolingWindow: d.outboundCoolingWindow,
         resultId: d.resultId,
+        initialLayout: d.initialLayout,
     };
 }

@@ -2,6 +2,7 @@ import type { Route } from "../+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { viewerFromSessionContext } from "~/lib/field/web-session";
+import { layoutFromCookieHeader } from "~/lib/field/editor-layout-cookie";
 import { unwrapResultsResponse } from "~/lib/results";
 import type { RatingLevel, ResultMap } from "@core/field-ui/hooks/useInspection";
 import { resolvePcaNarrative } from "@core/field-ui/shared/pca-narrative";
@@ -12,7 +13,6 @@ import { getCloudflareEnv } from "~/lib/load-context";
 import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
 import { isReportPublished } from "~/lib/status";
 import { resolveReportTier } from "../../../server/lib/report-tier";
-
 type Api = ReturnType<typeof createApi>;
 
 /**
@@ -395,5 +395,5 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // Returned values are written into the page source: the snapshot goes once (top-level), and no token.
  const inspectionRow: Record<string, unknown> = { ...inspection };
  delete inspectionRow.templateSnapshot;
- return { inspection: inspectionRow, schema, results, resultId, ratingLevels, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, viewer, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment };
+ return { inspection: inspectionRow, schema, results, resultId, ratingLevels, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, viewer, outboundCoolingWindow, templateSnapshot, revisionStatus, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets, statutoryDetails, statutoryCoverage, nextPublishIsAmendment, initialLayout: layoutFromCookieHeader(request.headers.get("cookie")) };
 }

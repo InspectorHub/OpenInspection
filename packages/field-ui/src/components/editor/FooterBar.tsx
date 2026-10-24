@@ -90,12 +90,16 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
             ? 'bg-ih-ok'
             : effectiveStatus === 'reconnecting'
             ? 'bg-ih-watch'
+            : effectiveStatus === 'unavailable'
+            ? 'bg-ih-fg-4'
             : 'bg-ih-fg-4 animate-pulse'
         }`} />
         {effectiveStatus === 'connected'
           ? m.editor_footer_status_connected()
           : effectiveStatus === 'reconnecting'
           ? m.editor_footer_status_reconnecting()
+          : effectiveStatus === 'unavailable'
+          ? m.editor_footer_status_unavailable()
           : m.editor_footer_status_connecting()}
       </span>
     </div>

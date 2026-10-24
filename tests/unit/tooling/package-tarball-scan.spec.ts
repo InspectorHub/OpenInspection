@@ -45,6 +45,21 @@ describe('check-package-tarball', () => {
     expect(ids({ ...clean, 'dist/a.js': '// see /home/someone/proj/x' })).toEqual(['local-path']);
   });
 
+  it('flags Kana and Hangul as well as ideographs, each against a clean control', () => {
+    const samples: Record<string, string> = {
+      hiragana: String.fromCodePoint(0x3042),
+      katakana: String.fromCodePoint(0x30a2),
+      'hangul syllable': String.fromCodePoint(0xd55c),
+      'hangul jamo': String.fromCodePoint(0x1112),
+    };
+    for (const [name, ch] of Object.entries(samples)) {
+      expect(ids({ ...clean, 'dist/a.js': `// ${ch}` }), name).toEqual(['cjk']);
+    }
+    // Neighbours just outside the ranges stay clean (accented Latin, Greek, Cyrillic, and code points either side of the Hangul ranges).
+    const outside = String.fromCodePoint(0x3b1, 0x44f, 0xe9, 0x10ff, 0x1200, 0xd7b0);
+    expect(ids({ ...clean, 'dist/a.js': `// ${outside}` })).toEqual([]);
+  });
+
   it('rejects files outside the allowed set', () => {
     expect(ids({ ...clean, 'src/index.ts': 'x', '.env': 'A=1' })).toEqual(['unexpected-file', 'unexpected-file']);
   });

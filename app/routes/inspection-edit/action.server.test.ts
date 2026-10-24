@@ -259,3 +259,28 @@ describe('editor action - idempotency key for non-idempotent intents', () => {
         expect(vi.mocked(createApi).mock.calls[0]?.[1]?.idempotencyKey).toBeUndefined();
     });
 });
+
+describe('editor action — who may receive a thrown "still running" answer', () => {
+    function postTo(url: string) {
+        const request = new Request(url, {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ intent: 'unit-create', name: 'A', idempotencyKey: 'k-1' }).toString(),
+        });
+        return action(routeArgs(request, { params: { id: 'insp-1' }, context: CONTEXT }));
+    }
+    beforeEach(() => {
+        unitsPost.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+        vi.mocked(createApi).mockClear();
+    });
+
+    it('the resource route (the command channel) asks for it', async () => {
+        await postTo('https://acme.example.com/resources/inspection-editor-command/insp-1');
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]).toMatchObject({ idempotencyKey: 'k-1', inFlightAsResponse: true });
+    });
+
+    it('the page route does not: a thrown Response there would render the error boundary', async () => {
+        await postTo('https://acme.example.com/inspections/insp-1/edit');
+        expect(vi.mocked(createApi).mock.calls[0]?.[1]).toMatchObject({ idempotencyKey: 'k-1', inFlightAsResponse: false });
+    });
+});

@@ -8,7 +8,7 @@ import {
     useDisplayTimeZone,
     useInspectionDateTimeFormat,
 } from "~/hooks/useSessionContext";
-import { webSessionInfo, STOPGAP_USER_ID, type SessionContextLike, type SessionLoaderBits } from "./web-session";
+import { webSessionInfo, type SessionContextLike, type SessionLoaderBits } from "./web-session";
 
 /**
  * The AUTHORITY for every display value is the real hooks in
@@ -130,10 +130,16 @@ describe("webSessionInfo non-display fields", () => {
         expect(info).toMatchObject(BITS);
     });
 
-    it("uses the stop-gap user id and an empty role without a context", () => {
+    it("has no user id and an empty role without a context: there is no shared placeholder identity", () => {
         const info = webSessionInfo(null, BITS);
-        expect(info.userId).toBe(STOPGAP_USER_ID);
+        expect(info.userId).toBeNull();
         expect(info.role).toBe("");
+        expect(JSON.stringify(info)).not.toContain("current-user");
+    });
+
+    it("has no user id when the context carries no session marker", () => {
+        expect(webSessionInfo(ctx({ user: { role: "owner" } }), BITS).userId).toBeNull();
+        expect(webSessionInfo(ctx({ user: { sessionMarker: "" } }), BITS).userId).toBeNull();
     });
 
     it("prefers the session marker and the context role when present", () => {

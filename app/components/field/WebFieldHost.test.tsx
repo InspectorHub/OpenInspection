@@ -49,7 +49,7 @@ describe("WebFieldHost", () => {
         const session = ds!.session();
         expect(session).toMatchObject({ tenantSlug: "acme", videoProvider: "stream", streamCustomerSubdomain: "cust", collabEditing: true });
         // The editor routes carry no session context today: every display value is its fallback.
-        expect(session).toMatchObject({ locale: "en-US", timeZone: "UTC", dateFormat: "us", timeFormat: "12h", userId: "current-user", role: "" });
+        expect(session).toMatchObject({ locale: "en-US", timeZone: "UTC", dateFormat: "us", timeFormat: "12h", userId: null, role: "" });
         expect(ds!.platform).toBe("web");
     });
 
@@ -60,6 +60,21 @@ describe("WebFieldHost", () => {
         const data = await ds!.load("i7");
         expect(data.inspection).toMatchObject({ id: "i7", propertyAddress: "9 Elm" });
         expect(data.resultId).toBe("r7");
+    });
+
+    it("passes a layout observer that remembers the band in the layout cookie, and only when it changes", async () => {
+        let slots: FieldHostSlots | null = null;
+        mount(loaderPayload(), (_d, s) => { slots = s; });
+        await screen.findByText("probe");
+        expect(typeof slots!.onLayoutObserved).toBe("function");
+        const jar = vi.spyOn(document, "cookie", "set");
+        slots!.onLayoutObserved!("phone");
+        slots!.onLayoutObserved!("phone");
+        expect(document.cookie).toContain("ih-editor-layout=phone");
+        expect(jar).toHaveBeenCalledTimes(1);
+        slots!.onLayoutObserved!("tablet");
+        expect(jar).toHaveBeenCalledTimes(2);
+        jar.mockRestore();
     });
 
     it("passes the theme and pdf slots through", async () => {

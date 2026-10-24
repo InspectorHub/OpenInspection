@@ -712,7 +712,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  /* Mobile shell state */
  // The layout band decides the tree. `isMobile` is every touch layout (phone and tablet), which share the
  // touch entry points (the add-media chooser, the library button, drawers that close on a pick).
- const layout = useEditorLayout();
+ const layout = useEditorLayout(data.initialLayout, slots.onLayoutObserved);
  const isPhone = layout === "phone";
  const isMobile = layout !== "desktop";
  const [mobileDrawer, setMobileDrawer] = useState<MobileDrawerId | null>(null);

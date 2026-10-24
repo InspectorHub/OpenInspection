@@ -41,7 +41,7 @@ signatures):
 - `load(inspectionId, scope?)` returns the `EditorData` the editor opens with
   (inspection, template schema, results, rating levels, tag library, units,
   and so on).
-- `session()` returns `SessionInfo`: the viewer's id, role, locale, time zone,
+- `session()` returns `SessionInfo`: the viewer's id (null when the host cannot tell; the editor then announces no presence), role, locale, time zone,
   date and clock formats, and the video backend.
 - `execute(inspectionId, command, { idempotencyKey })` runs one typed
   `FieldCommand` and answers a `CommandResult`.
@@ -60,6 +60,15 @@ signatures):
 
 `FieldHostSlots` carries host-owned UI (theme switch, PDF export, human
 verification). An absent slot hides its entry point.
+
+A host that can render on a server may remember which layout band (`phone`,
+`tablet`, `desktop`) a device showed last time, so the server render matches the
+client's first render instead of always assuming `desktop`. It receives the band
+through the optional `FieldHostSlots.onLayoutObserved(layout)` (called after mount
+and when the band changes), stores it however it likes, and returns it as the
+optional `EditorData.initialLayout` on the next load. The real viewport still
+decides right after mount, so a wrong memory is corrected. The package never
+stores the value itself.
 
 Use `@inspectorhub/field-ui/testing` for a ready-made in-memory implementation.
 

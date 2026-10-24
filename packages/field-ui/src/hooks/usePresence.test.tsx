@@ -43,10 +43,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function mount(urls: Parameters<typeof createFakeDataSource>[0]['urls'], userId: string | undefined) {
+function mount(urls: Parameters<typeof createFakeDataSource>[0]['urls'], userId: string | null | undefined) {
+  const seen: { status?: string } = {};
   const ds = createFakeDataSource({ data: createEmptyEditorData(), urls, session: userId === undefined ? {} : { userId } });
   function Probe() {
-    usePresence({ inspectionId: 'insp-1', userName: 'Inspector' });
+    const p = usePresence({ inspectionId: 'insp-1', userName: 'Inspector' });
+    seen.status = p.status;
     return null;
   }
   render(
@@ -54,6 +56,7 @@ function mount(urls: Parameters<typeof createFakeDataSource>[0]['urls'], userId:
       <Probe />
     </FieldDataSourceProvider>,
   );
+  return seen;
 }
 
 describe('usePresence', () => {
@@ -70,5 +73,12 @@ describe('usePresence', () => {
       name: 'Inspector',
       photoUrl: null,
     });
+  });
+
+  it('a host with no identity for the viewer opens no socket and announces nothing', () => {
+    const presenceSocket = vi.fn((id: string) => `wss://host.example/api/inspections/${id}/presence/ws`);
+    const seen = mount({ presenceSocket }, null);
+    expect(FakeSocket.instances).toEqual([]);
+    expect(seen.status).toBe('unavailable');
   });
 });

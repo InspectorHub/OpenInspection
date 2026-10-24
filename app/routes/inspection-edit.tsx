@@ -14,6 +14,21 @@ export function meta() {
 export { loader } from "./inspection-edit/loader.server";
 
 /**
+ * The document depends on the viewer (their session) AND on a cookie (the remembered layout band the loader reads),
+ * so no shared cache may keep it and hand it to anyone else. `private` forbids shared caches and still lets the
+ * browser restore the page on back and forward (`no-store` would defeat that); `Vary: Cookie` states the dependency
+ * for any cache that ignores it. This is the only HTML document that sets its own cache directive. Only `Set-Cookie`
+ * is taken from the loader, as in `auth-layout`: forwarding every loader header could let a caching directive leak
+ * onto the page.
+ */
+export function headers({ loaderHeaders }: { loaderHeaders: Headers }) {
+ const out = new Headers({ "Cache-Control": "private", Vary: "Cookie" });
+ const setCookie = loaderHeaders.get("Set-Cookie");
+ if (setCookie) out.append("Set-Cookie", setCookie);
+ return out;
+}
+
+/**
  * The editor holds its own optimistic state (useInspection) and persists every
  * change through fetchers. Re-running this heavy loader after each mutation
  * (rate / notes / save-settings / set-cover / upload-cover …) just reloads and

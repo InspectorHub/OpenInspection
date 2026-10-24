@@ -12,7 +12,7 @@ describe("editorDataFromLoader", () => {
         const data = editorDataFromLoader(loaderPayload({ resultId: null, nextPublishIsAmendment: true, unitInspectionMode: "per_unit" }));
         expect(Object.keys(data).sort()).toEqual(
             [
-                "commercialPresets", "compliance", "defectCategories", "inspection", "nextPublishIsAmendment",
+                "commercialPresets", "compliance", "defectCategories", "initialLayout", "inspection", "nextPublishIsAmendment",
                 "outboundCoolingWindow", "pcaNarrative", "ratingLevels", "relianceText", "resultId", "results",
                 "revisionStatus", "schema", "statutoryCoverage", "statutoryDetails", "tagLibrary", "templateSnapshot",
                 "unitInspectionMode", "unitProgress", "units",
@@ -21,6 +21,11 @@ describe("editorDataFromLoader", () => {
         expect(data.resultId).toBeNull();
         expect(data.nextPublishIsAmendment).toBe(true);
         expect(data.unitInspectionMode).toBe("per_unit");
+    });
+
+    it("carries the remembered layout band the loader read", () => {
+        expect(editorDataFromLoader(loaderPayload({ initialLayout: "phone" })).initialLayout).toBe("phone");
+        expect(editorDataFromLoader(loaderPayload()).initialLayout).toBe("desktop");
     });
 
     it("keeps the inspection row and its id", () => {

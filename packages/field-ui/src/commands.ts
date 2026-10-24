@@ -175,4 +175,10 @@ export interface CommandResult<D = undefined> {
   ok: boolean;
   error?: string;
   data?: D;
+  /**
+   * True on a failure that is NOT a refusal: the host re-sent the command with the same key while the server was
+   * still processing it, and gave up waiting. The write may still land. The caller should say so (the `error` text
+   * does) and must not roll back or retry blindly; checking the inspection shows the real state.
+   */
+  inProgress?: boolean;
 }
