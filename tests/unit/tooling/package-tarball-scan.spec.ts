@@ -1,7 +1,7 @@
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error - plain .mjs gate script, no type declarations
-import { readTarball, resolveExtraPatterns, scanFiles } from '../../../scripts/check-package-tarball.mjs';
+import { readTarball, resolveExtraPatterns, scanFiles, stagedDirFor } from '../../../scripts/check-package-tarball.mjs';
 
 type Finding = { path: string; id: string };
 const scan = (files: Record<string, string>, extra: string[] = []): Finding[] => scanFiles(files, extra);
@@ -109,5 +109,26 @@ describe('resolveExtraPatterns', () => {
     expect(() => resolveExtraPatterns('not json')).toThrow(/valid JSON/);
     expect(() => resolveExtraPatterns('{"a":1}')).toThrow(/array of strings/);
     expect(() => resolveExtraPatterns('[1]')).toThrow(/array of strings/);
+  });
+});
+
+describe('check-package-tarball for offline-package', () => {
+  const plainLicense = 'GNU AFFERO GENERAL PUBLIC LICENSE\nVersion 3, 19 November 2007\n';
+  const clean = { 'dist/index.js': 'export const x = 1;\n', 'dist/index.d.ts': 'export declare const x = 1;\n', 'README.md': '# pkg\n', LICENSE: plainLicense, 'package.json': '{}' };
+
+  it('a clean offline-package file set passes, and both numbers are visible', () => {
+    expect([Object.keys(clean).length, scan(clean).length]).toEqual([5, 0]);
+  });
+
+  it('flags a leaked alias and a self-hosted mention in the README, each against the clean control', () => {
+    expect(ids({ ...clean, 'dist/index.js': 'import "@core/offline-package";' })).toEqual(['alias-leak']);
+    expect(ids({ ...clean, 'README.md': '# pkg\nfor self-hosted operators\n' })).toEqual(['license-extra-permission-mention']);
+    expect(ids({ ...clean, 'src/index.ts': 'x' })).toEqual(['unexpected-file']);
+  });
+
+  it('resolves the staged directory per package and defaults to field-ui', () => {
+    const norm = (p: string) => p.split('\\').join('/');
+    expect(norm(stagedDirFor())).toMatch(/packages\/field-ui\/\.publish$/);
+    expect(norm(stagedDirFor('offline-package'))).toMatch(/packages\/offline-package\/\.publish$/);
   });
 });

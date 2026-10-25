@@ -18,18 +18,34 @@
  * so npm's own prompt takes the one-time code (it is never read or stored here), and finally a
  * post-publish `npm view` check printing the version and dist.integrity.
  *
- * Usage: node scripts/publish-field-ui.mjs [--confirm]
+ * It serves every package in scripts/lib/release-packages.mjs; `--package <slug>` picks one (default
+ * field-ui). CI refuses to run it for any of them.
+ *
+ * Usage: node scripts/publish-field-ui.mjs [--package <slug>] [--confirm]
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ROOT, getPackage, packageDirFor, packageSlugFromArgs, stagedDirFor } from './lib/release-packages.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHELL = process.platform === 'win32';
 export const OFFICIAL_REGISTRY = 'https://registry.npmjs.org';
-export const PACKAGE_NAME = '@inspectorhub/field-ui';
-export const STAGED = join(ROOT, 'packages', 'field-ui', '.publish');
+export const PACKAGE_NAME = getPackage('field-ui').name;
+export const STAGED = stagedDirFor('field-ui');
+
+/** Pure. Where the package `slug` is built from, staged to, and what it must be called. */
+export function publishTarget(slug = 'field-ui') {
+    const { name, workflow } = getPackage(slug);
+    return {
+        slug,
+        name,
+        workflow,
+        staged: stagedDirFor(slug),
+        sourceManifest: join(packageDirFor(slug), 'package.json'),
+        stageCommand: `npm run build -w ${name} && npm run stage:${slug}`,
+    };
+}
 
 /** Pure. `npm config get` prints "undefined" or "null" for an unset key. Returns the URL without a trailing slash, or null. */
 export function parseRegistry(output) {
@@ -69,6 +85,14 @@ function main() {
         process.exit(1);
     }
     const confirm = process.argv.includes('--confirm');
+    const target = (() => {
+        try {
+            return publishTarget(packageSlugFromArgs(process.argv.slice(2)));
+        } catch (err) {
+            console.error(`publish-field-ui: ${err.message}`);
+            process.exit(1);
+        }
+    })();
     const fail = (msg) => {
         console.error(`publish-field-ui: ${msg}`);
         process.exit(1);
@@ -84,11 +108,11 @@ function main() {
         console.log('ok  git tree is clean');
     }
 
-    const source = JSON.parse(readFileSync(join(ROOT, 'packages', 'field-ui', 'package.json'), 'utf8'));
-    if (!existsSync(join(STAGED, 'package.json'))) fail('the staged package is missing. Run: npm run build -w @inspectorhub/field-ui && npm run stage:field-ui');
-    const staged = JSON.parse(readFileSync(join(STAGED, 'package.json'), 'utf8'));
-    if (staged.name !== PACKAGE_NAME) fail(`the staged package is ${staged.name}, expected ${PACKAGE_NAME}.`);
-    if (!versionsEqual(staged.version, source.version)) fail(`the staged version ${staged.version} differs from the source version ${source.version}. Re-run: npm run stage:field-ui`);
+    const source = JSON.parse(readFileSync(target.sourceManifest, 'utf8'));
+    if (!existsSync(join(target.staged, 'package.json'))) fail(`the staged package is missing. Run: ${target.stageCommand}`);
+    const staged = JSON.parse(readFileSync(join(target.staged, 'package.json'), 'utf8'));
+    if (staged.name !== target.name) fail(`the staged package is ${staged.name}, expected ${target.name}.`);
+    if (!versionsEqual(staged.version, source.version)) fail(`the staged version ${staged.version} differs from the source version ${source.version}. Re-run: npm run stage:${target.slug}`);
     console.log(`ok  staged ${staged.name}@${staged.version} matches the source`);
 
     let exists = false;
@@ -118,10 +142,10 @@ function main() {
 
     const requireExtra = Boolean(process.env.PACKAGE_SCAN_EXTRA_PATTERNS && process.env.PACKAGE_SCAN_EXTRA_PATTERNS.trim());
     console.log(`scan mode: ${requireExtra ? 'with run-time patterns (--require-extra)' : 'generic rules only (PACKAGE_SCAN_EXTRA_PATTERNS is not set)'}`);
-    const scan = spawnSync(process.execPath, ['scripts/check-package-tarball.mjs', ...(requireExtra ? ['--require-extra'] : [])], { cwd: ROOT, stdio: 'inherit' });
+    const scan = spawnSync(process.execPath, ['scripts/check-package-tarball.mjs', '--package', target.slug, ...(requireExtra ? ['--require-extra'] : [])], { cwd: ROOT, stdio: 'inherit' });
     if (scan.status !== 0) fail('the scan found problems; nothing was published.');
 
-    const publishArgs = ['publish', STAGED, '--access', 'public', '--registry', OFFICIAL_REGISTRY];
+    const publishArgs = ['publish', target.staged, '--access', 'public', '--registry', OFFICIAL_REGISTRY];
     if (!confirm) {
         console.log(`\nwould run: npm ${publishArgs.join(' ')}\ndry run complete; nothing was published.`);
         return;

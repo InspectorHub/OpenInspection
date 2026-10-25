@@ -13,7 +13,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  # Dispatches publish-field-ui.yml (see the last step).
+  # Dispatches publish-field-ui.yml and publish-offline-package.yml (see the last steps).
   actions: write
 
 jobs:
@@ -44,3 +44,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.release.outputs['packages/field-ui--tag_name'] }}
         run: gh workflow run publish-field-ui.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+
+      # The same dispatch for @inspectorhub/offline-package; its workflow file name is bound to
+      # its own trusted-publisher entry.
+      - name: Publish @inspectorhub/offline-package
+        if: >-
+          github.repository == 'InspectorHub/OpenInspection' &&
+          steps.release.outputs['packages/offline-package--release_created'] == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs['packages/offline-package--tag_name'] }}
+        run: gh workflow run publish-offline-package.yml --repo "$GITHUB_REPOSITORY" --ref "$TAG"

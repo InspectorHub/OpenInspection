@@ -66,5 +66,14 @@
     "packages/field-ui/src/shared/**/*.ts",
     "worker-configuration.d.ts"
   ],
-  "exclude": ["node_modules", "dist", ".types"]
+  // The package build output, the staged copy and the build config sit under an included directory but are
+  // not program inputs (a composite project must list every input; `dist` alone matches only the root one).
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".types",
+    "packages/offline-package/dist",
+    "packages/offline-package/.publish",
+    "packages/offline-package/tsup.config.ts"
+  ]
 }

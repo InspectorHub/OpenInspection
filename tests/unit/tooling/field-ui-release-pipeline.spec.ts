@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 // @ts-expect-error - plain .mjs script, no type declarations
 import { checkCoherence, formatReport, parsePackJson } from '../../../scripts/release-check-field-ui.mjs';
 // @ts-expect-error - plain .mjs script, no type declarations
-import { dirtyLines, isOfficialRegistry, parseRegistry, versionExists, versionsEqual } from '../../../scripts/publish-field-ui.mjs';
+import { PACKAGE_NAME, STAGED, dirtyLines, isOfficialRegistry, parseRegistry, publishTarget, versionExists, versionsEqual } from '../../../scripts/publish-field-ui.mjs';
 
 const OFFICIAL_REGISTRY = 'https://registry.npmjs.org';
 
@@ -40,6 +40,36 @@ describe('release-check coherence', () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, 'packages', 'field-ui', 'package.json'), 'utf8'));
     const manifest = JSON.parse(readFileSync(join(ROOT, '.release-please-manifest.json'), 'utf8'));
     expect(checkCoherence({ manifestVersion: manifest['packages/field-ui'], packageVersion: pkg.version })).toEqual([]);
+  });
+});
+
+describe('release-check coherence for offline-package', () => {
+  const slug = 'offline-package';
+
+  it('passes when manifest, package and tag agree on the offline-package prefix', () => {
+    expect(checkCoherence({ slug, manifestVersion: '0.1.0', packageVersion: '0.1.0' })).toEqual([]);
+    expect(checkCoherence({ slug, manifestVersion: '0.1.0', packageVersion: '0.1.0', tag: 'offline-package-v0.1.0' })).toEqual([]);
+  });
+
+  it('fails a field-ui tag and a version mismatch, naming the offline-package files', () => {
+    const wrongTag: string[] = checkCoherence({ slug, manifestVersion: '0.1.0', packageVersion: '0.1.0', tag: 'field-ui-v0.1.0' });
+    expect(wrongTag).toHaveLength(1);
+    expect(wrongTag[0]).toMatch(/expected offline-package-v0\.1\.0/);
+    const skew: string[] = checkCoherence({ slug, manifestVersion: '0.2.0', packageVersion: '0.1.0' });
+    expect(skew).toHaveLength(1);
+    expect(skew[0]).toContain('packages/offline-package/package.json');
+    expect(skew[0]).toContain('.release-please-manifest.json');
+  });
+
+  it('the default slug is still field-ui (a field-ui tag passes without naming a slug)', () => {
+    expect(checkCoherence({ manifestVersion: '0.1.0', packageVersion: '0.1.0', tag: 'field-ui-v0.1.0' })).toEqual([]);
+    expect(checkCoherence({ manifestVersion: '0.1.0', packageVersion: '0.1.0', tag: 'offline-package-v0.1.0' })).toHaveLength(1);
+  });
+
+  it('the repository itself is coherent right now', () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, 'packages', 'offline-package', 'package.json'), 'utf8'));
+    const manifest = JSON.parse(readFileSync(join(ROOT, '.release-please-manifest.json'), 'utf8'));
+    expect(checkCoherence({ slug, manifestVersion: manifest['packages/offline-package'], packageVersion: pkg.version })).toEqual([]);
   });
 });
 
@@ -131,40 +161,80 @@ describe('publish helper checks', () => {
   });
 });
 
-describe('workflows', () => {
-  const load = (f: string) => parse(readFileSync(join(ROOT, '.github', 'workflows', f), 'utf8'));
-  const publish = load('publish-field-ui.yml');
+describe('publish helper target', () => {
+  it('defaults to field-ui and keeps the exports the older callers read', () => {
+    expect(PACKAGE_NAME).toBe('@inspectorhub/field-ui');
+    expect(STAGED).toBe(join(ROOT, 'packages', 'field-ui', '.publish'));
+    expect(publishTarget()).toMatchObject({ name: '@inspectorhub/field-ui', staged: STAGED });
+  });
+
+  it('points at the offline-package directory for --package offline-package', () => {
+    const t = publishTarget('offline-package');
+    expect(t.name).toBe('@inspectorhub/offline-package');
+    expect(t.staged).toBe(join(ROOT, 'packages', 'offline-package', '.publish'));
+    expect(t.sourceManifest).toBe(join(ROOT, 'packages', 'offline-package', 'package.json'));
+    expect(t.stageCommand).toContain('stage:offline-package');
+  });
+});
+
+const loadWorkflow = (f: string) => parse(readFileSync(join(ROOT, '.github', 'workflows', f), 'utf8'));
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Every hardening point of the field-ui workflow must hold for each published package.
+describe.each([
+  { slug: 'field-ui', file: 'publish-field-ui.yml', prefix: 'field-ui-v', name: '@inspectorhub/field-ui' },
+  { slug: 'offline-package', file: 'publish-offline-package.yml', prefix: 'offline-package-v', name: '@inspectorhub/offline-package' },
+])('publish workflow: $slug', ({ slug, file, prefix, name }) => {
+  const publish = loadWorkflow(file);
 
   it('publish: concurrency group without cancellation, dry_run input, guards kept, id-token only on publish', () => {
-    expect(publish.concurrency).toEqual({ group: 'publish-field-ui', 'cancel-in-progress': false });
+    expect(publish.concurrency).toEqual({ group: `publish-${slug}`, 'cancel-in-progress': false });
     expect(publish.on.workflow_dispatch.inputs.dry_run).toMatchObject({ type: 'boolean', default: false });
     for (const job of ['build', 'publish']) {
       expect(publish.jobs[job].if).toContain("github.repository == 'InspectorHub/OpenInspection'");
       expect(publish.jobs[job].if).toContain("github.ref_type == 'tag'");
-      expect(publish.jobs[job].if).toContain("startsWith(github.ref_name, 'field-ui-v')");
+      expect(publish.jobs[job].if).toContain(`startsWith(github.ref_name, '${prefix}')`);
     }
     expect(publish.jobs.build.permissions['id-token']).toBeUndefined();
     expect(publish.jobs.publish.permissions['id-token']).toBe('write');
+  });
+
+  it('publish: exactly two jobs; the publish job checks nothing out and runs no npm ci, the build job does both', () => {
+    expect(Object.keys(publish.jobs).sort()).toEqual(['build', 'publish']);
+    const uses = (job: string) => publish.jobs[job].steps.map((s: { uses?: string }) => s.uses ?? '');
+    const runs = (job: string) => publish.jobs[job].steps.map((s: { run?: string }) => s.run ?? '').join('\n');
+    expect(uses('build').some((u: string) => u.startsWith('actions/checkout'))).toBe(true);
+    expect(runs('build')).toContain('npm ci');
+    expect(uses('publish').some((u: string) => u.startsWith('actions/checkout'))).toBe(false);
+    expect(runs('publish')).not.toContain('npm ci');
+    expect(publish.jobs.publish.needs).toBe('build');
+  });
+
+  it('publish: the tag must equal the package version, and the tarball must be this package', () => {
+    const build = publish.jobs.build.steps.map((s: { run?: string }) => s.run ?? '').join('\n');
+    expect(build).toContain(`expected="${prefix}$(node -p "require('./packages/${slug}/package.json').version")"`);
+    const run: string = publish.jobs.publish.steps.find((x: { run?: string }) => x.run?.includes('does not name')).run;
+    expect(run).toContain(`"${name}"`);
   });
 
   it('publish: the tarball-versus-tag check reads the version after the LAST @ of a scoped name', () => {
     const step = publish.jobs.publish.steps.find((x: { run?: string }) => x.run?.includes('does not name'));
     expect(step, 'the tag check step must exist').toBeDefined();
     const run: string = step.run;
-    // The scoped name starts with an @: stripping up to the FIRST @ leaves "inspectorhub/field-ui@0.2.0", so the
+    // The scoped name starts with an @: stripping up to the FIRST @ leaves "inspectorhub/<slug>@0.2.0", so the
     // check refused every real release (it did, on the first CI publish).
     expect(run).toContain('${packed##*@}');
     expect(run).not.toContain('${packed#*@}');
     // Run the real condition in bash when bash is available (CI always has it).
     const probe = spawnSync('bash', ['-c', 'echo ok'], { encoding: 'utf8' });
     if (probe.status !== 0 || probe.stdout.trim() !== 'ok') return;
-    const cond = /^\s*if (\[ "field-ui-v.*\]); then$/m.exec(run)?.[1];
+    const cond = new RegExp(`^\\s*if (\\[ "${escapeRe(prefix)}.*\\]); then$`, 'm').exec(run)?.[1];
     expect(cond, 'the condition line must be found').toBeDefined();
     const verdict = (packed: string, ref: string) =>
       spawnSync('bash', ['-c', `packed='${packed}'; GITHUB_REF_NAME='${ref}'; if ${cond}; then echo MISMATCH; else echo MATCH; fi`], { encoding: 'utf8' }).stdout.trim();
-    expect(verdict('@inspectorhub/field-ui@0.2.0', 'field-ui-v0.2.0')).toBe('MATCH');
-    expect(verdict('@inspectorhub/field-ui@0.2.0', 'field-ui-v0.2.1')).toBe('MISMATCH');
-    expect(verdict('@other/field-ui@0.2.0', 'field-ui-v0.2.0')).toBe('MISMATCH');
+    expect(verdict(`${name}@0.2.0`, `${prefix}0.2.0`)).toBe('MATCH');
+    expect(verdict(`${name}@0.2.0`, `${prefix}0.2.1`)).toBe('MISMATCH');
+    expect(verdict(`@other/${slug}@0.2.0`, `${prefix}0.2.0`)).toBe('MISMATCH');
   });
 
   it('publish: the post-publish visibility check waits up to 5 minutes and warns instead of failing the job', () => {
@@ -193,16 +263,42 @@ describe('workflows', () => {
     expect(step.run).toContain('npm publish "$1" --provenance --access public');
   });
 
-  it('publish: the build job runs the release check with --require-extra', () => {
+  it('publish: the build job runs the release check with --require-extra, for its own package', () => {
     const run = publish.jobs.build.steps.map((s: { run?: string }) => s.run ?? '').join('\n');
-    expect(run).toContain('release:check:field-ui -- --require-extra');
+    expect(run).toContain(`release:check:${slug} -- --require-extra`);
+    // Not the other package's check.
+    const other = slug === 'field-ui' ? 'offline-package' : 'field-ui';
+    expect(run).not.toContain(`release:check:${other}`);
   });
 
-  it('ci: the build job runs the release check WITHOUT --require-extra', () => {
-    const ci = load('ci.yml');
+  it('release-please dispatches this exact workflow file for this package', () => {
+    const rp = loadWorkflow('release-please.yml');
+    const step = rp.jobs['release-please'].steps.find((s: { name?: string }) => s.name === `Publish ${name}`);
+    expect(step, 'the dispatch step must exist').toBeDefined();
+    expect(step.if).toContain(`steps.release.outputs['packages/${slug}--release_created'] == 'true'`);
+    expect(step.env.TAG).toContain(`packages/${slug}--tag_name`);
+    expect(step.run).toContain(`gh workflow run ${file} `);
+  });
+});
+
+describe('workflows: ci', () => {
+  it('the build job runs both release checks WITHOUT --require-extra', () => {
+    const ci = loadWorkflow('ci.yml');
     const run = ci.jobs.build.steps.map((s: { run?: string }) => s.run ?? '').join('\n');
     expect(run).toContain('npm run release:check:field-ui');
+    expect(run).toContain('npm run release:check:offline-package');
     expect(run).not.toContain('--require-extra');
     expect(ci.jobs.verify.needs).toContain('build');
+  });
+});
+
+describe('release-please configuration', () => {
+  const config = JSON.parse(readFileSync(join(ROOT, 'release-please-config.json'), 'utf8'));
+
+  it('the root package excludes both published packages, and each has its own component and tag prefix', () => {
+    expect(config.packages['.']['exclude-paths']).toEqual(['packages/field-ui', 'packages/offline-package']);
+    for (const slug of ['field-ui', 'offline-package']) {
+      expect(config.packages[`packages/${slug}`]).toMatchObject({ component: slug, 'include-component-in-tag': true, 'bump-minor-pre-major': true });
+    }
   });
 });

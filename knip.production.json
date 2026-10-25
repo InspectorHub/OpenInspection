@@ -41,6 +41,7 @@
     "packages/shared-ui/src/index.ts",
     "packages/field-ui/src/index.ts",
     "packages/field-ui/src/testing/fake-data-source.ts",
+    "packages/offline-package/index.ts",
     "packages/api-types/index.ts"
   ],
   "project": [

@@ -12,35 +12,40 @@
  * ["packages/field-ui"], packages/field-ui/package.json, and, in CI on a tag, the tag
  * (`field-ui-vX.Y.Z`). The first release-please release bumps the first two together.
  *
- * Usage: node scripts/release-check-field-ui.mjs [--skip-build] [--require-extra]
+ * It serves every package in scripts/lib/release-packages.mjs; `--package <slug>` picks one
+ * (default field-ui) and the names above change accordingly (tag prefix, manifest key, directory).
+ *
+ * Usage: node scripts/release-check-field-ui.mjs [--package <slug>] [--skip-build] [--require-extra]
  *   --skip-build     reuse the existing packages/field-ui/dist
  *   --require-extra  passed to the scan (a release pipeline sets it; pull requests do not,
  *                    because secrets are absent on fork PRs)
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { ROOT, getPackage, packageSlugFromArgs } from './lib/release-packages.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHELL = process.platform === 'win32';
-export const TAG_PREFIX = 'field-ui-v';
+export const TAG_PREFIX = getPackage('field-ui').tagPrefix;
 
 /**
- * Pure. Returns the list of problems (empty when coherent). `tag` is optional.
- * @param {{ manifestVersion?: string, packageVersion?: string, tag?: string }} v
+ * Pure. Returns the list of problems (empty when coherent). `tag` is optional; `slug` names the package
+ * (default field-ui).
+ * @param {{ slug?: string, manifestVersion?: string, packageVersion?: string, tag?: string }} v
  */
-export function checkCoherence({ manifestVersion, packageVersion, tag }) {
+export function checkCoherence({ slug = 'field-ui', manifestVersion, packageVersion, tag }) {
+    const { dir, manifestKey, tagPrefix } = getPackage(slug);
     const problems = [];
-    if (!packageVersion) problems.push('packages/field-ui/package.json has no version.');
-    if (!manifestVersion) problems.push('.release-please-manifest.json has no "packages/field-ui" entry.');
+    if (!packageVersion) problems.push(`${dir}/package.json has no version.`);
+    if (!manifestVersion) problems.push(`.release-please-manifest.json has no "${manifestKey}" entry.`);
     if (manifestVersion && packageVersion && manifestVersion !== packageVersion) {
         problems.push(
-            `version mismatch: .release-please-manifest.json says ${manifestVersion} but packages/field-ui/package.json says ${packageVersion}. They must be bumped together.`,
+            `version mismatch: .release-please-manifest.json says ${manifestVersion} but ${dir}/package.json says ${packageVersion}. They must be bumped together.`,
         );
     }
-    if (tag !== undefined && packageVersion && tag !== `${TAG_PREFIX}${packageVersion}`) {
-        problems.push(`tag mismatch: the tag is ${tag} but packages/field-ui/package.json says ${packageVersion} (expected ${TAG_PREFIX}${packageVersion}).`);
+    if (tag !== undefined && packageVersion && tag !== `${tagPrefix}${packageVersion}`) {
+        problems.push(`tag mismatch: the tag is ${tag} but ${dir}/package.json says ${packageVersion} (expected ${tagPrefix}${packageVersion}).`);
     }
     return problems;
 }
@@ -83,6 +88,49 @@ export function formatReport(pack, { markdown = false } = {}) {
     ].join('\n');
 }
 
+/**
+ * Pure. The names a built declaration file exports: the specifiers of its `export { ... }` (values)
+ * and `export type { ... }` (types) statements, using the exported name of `x as y`. Throws when it
+ * finds none, because an empty surface would read as a match against an empty list.
+ */
+export function parseDtsExports(text) {
+    const values = [];
+    const types = [];
+    for (const m of text.matchAll(/^export (type )?\{([^}]*)\}/gm)) {
+        const into = m[1] ? types : values;
+        for (const raw of m[2].split(',')) {
+            const spec = raw.trim();
+            if (spec === '') continue;
+            const inlineType = /^type\s+/.test(spec);
+            const name = spec.replace(/^type\s+/, '').split(/\s+as\s+/).pop().trim();
+            (inlineType ? types : into).push(name);
+        }
+    }
+    if (values.length + types.length === 0) throw new Error('the declaration file has no export statement to read.');
+    return { values: [...new Set(values)].sort(), types: [...new Set(types)].sort() };
+}
+
+/**
+ * Pure. Compares the committed surface (api-surface.json) with the built one; returns the problems
+ * (empty when they match). A committed surface with no names is itself a problem.
+ */
+export function surfaceProblems(expected, built) {
+    const problems = [];
+    if (expected.values.length + expected.types.length === 0) {
+        problems.push('api-surface.json is empty: an empty list proves nothing.');
+        return problems;
+    }
+    const diff = (kind, want, got) => {
+        const missing = want.filter((n) => !got.includes(n));
+        const extra = got.filter((n) => !want.includes(n));
+        if (missing.length > 0) problems.push(`${kind} exports missing from the build: ${missing.join(', ')}`);
+        if (extra.length > 0) problems.push(`${kind} exports in the build that are not in api-surface.json: ${extra.join(', ')}`);
+    };
+    diff('value', expected.values, built.values);
+    diff('type', expected.types, built.types);
+    return problems;
+}
+
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 
 function step(title, cmd, args) {
@@ -94,28 +142,60 @@ function step(title, cmd, args) {
     }
 }
 
+/**
+ * When the package commits an api-surface.json, the built declaration file must export exactly those
+ * names. With `"loadable": true` the built dist/index.js is also imported in a child process and its
+ * runtime keys must equal `values`. A package without the file is not checked (field-ui has none).
+ */
+function checkBuiltSurface(dir) {
+    const file = join(ROOT, ...dir.split('/'), 'api-surface.json');
+    if (!existsSync(file)) {
+        console.log('\n== surface\nno api-surface.json for this package; skipped');
+        return;
+    }
+    console.log('\n== surface');
+    const expected = readJson(file);
+    const built = parseDtsExports(readFileSync(join(ROOT, ...dir.split('/'), 'dist', 'index.d.ts'), 'utf8'));
+    const problems = surfaceProblems(expected, built);
+    if (expected.loadable === true) {
+        const url = pathToFileURL(join(ROOT, ...dir.split('/'), 'dist', 'index.js')).href;
+        const out = execFileSync(process.execPath, ['--input-type=module', '-e', `import(${JSON.stringify(url)}).then((m) => console.log(JSON.stringify(Object.keys(m).sort())))`], { encoding: 'utf8' });
+        const runtime = JSON.parse(out);
+        const want = [...expected.values].sort();
+        if (JSON.stringify(runtime) !== JSON.stringify(want)) problems.push(`runtime keys of dist/index.js differ from api-surface.json: built ${runtime.length} keys, listed ${want.length}.`);
+    }
+    if (problems.length > 0) {
+        for (const p of problems) console.error(`release-check-field-ui: ${p}`);
+        process.exit(1);
+    }
+    console.log(`built declaration file matches api-surface.json: ${built.values.length} values, ${built.types.length} types${expected.loadable === true ? '; runtime keys match' : ''}`);
+}
+
 function main() {
     const args = process.argv.slice(2);
-    const pkg = readJson(join(ROOT, 'packages', 'field-ui', 'package.json'));
+    const slug = packageSlugFromArgs(args);
+    const { name, dir, manifestKey } = getPackage(slug);
+    const pkg = readJson(join(ROOT, dir, 'package.json'));
     const manifest = readJson(join(ROOT, '.release-please-manifest.json'));
     const tag = process.env.GITHUB_REF_TYPE === 'tag' ? process.env.GITHUB_REF_NAME : undefined;
 
     console.log('== coherence');
-    const problems = checkCoherence({ manifestVersion: manifest['packages/field-ui'], packageVersion: pkg.version, tag });
+    const problems = checkCoherence({ slug, manifestVersion: manifest[manifestKey], packageVersion: pkg.version, tag });
     if (problems.length > 0) {
         for (const p of problems) console.error(`release-check-field-ui: ${p}`);
         process.exit(1);
     }
     console.log(`manifest, package.json${tag ? ' and tag' : ''} agree on ${pkg.version}`);
 
-    if (!args.includes('--skip-build')) step('build', 'npm', ['run', 'build', '-w', '@inspectorhub/field-ui']);
-    step('stage', 'npm', ['run', 'stage:field-ui']);
-    const scanArgs = ['scripts/check-package-tarball.mjs'];
+    if (!args.includes('--skip-build')) step('build', 'npm', ['run', 'build', '-w', name]);
+    checkBuiltSurface(dir);
+    step('stage', 'npm', ['run', `stage:${slug}`]);
+    const scanArgs = ['scripts/check-package-tarball.mjs', '--package', slug];
     if (args.includes('--require-extra')) scanArgs.push('--require-extra');
     step('scan', process.execPath, scanArgs);
 
     console.log('\n== pack (dry run)');
-    const out = execFileSync('npm', ['pack', '--dry-run', '--json', join('packages', 'field-ui', '.publish')], {
+    const out = execFileSync('npm', ['pack', '--dry-run', '--json', join(...dir.split('/'), '.publish')], {
         cwd: ROOT,
         encoding: 'utf8',
         shell: SHELL,

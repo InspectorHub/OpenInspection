@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 // @ts-expect-error - plain .mjs script, no type declarations
-import { NOTICE_RELATIVE, stageFieldUi } from '../../../scripts/stage-field-ui-package.mjs';
+import { NOTICE_RELATIVE, stageFieldUi, stagePackage } from '../../../scripts/stage-field-ui-package.mjs';
 
 const ROOT = resolve(__dirname, '..', '..', '..');
 const PKG = join(ROOT, 'packages', 'field-ui');
@@ -95,5 +95,49 @@ describe('field-ui licence design', () => {
   it('.gitignore ignores the staging directory', () => {
     const lines = read(join(ROOT, '.gitignore')).split('\n');
     expect(lines).toContain('/packages/field-ui/.publish/');
+  });
+});
+
+describe('offline-package licence design', () => {
+  const OP = join(ROOT, 'packages', 'offline-package');
+
+  it('the repository copy of the LICENSE equals the root LICENSE byte for byte', () => {
+    expect(read(join(OP, 'LICENSE'))).toBe(read(join(ROOT, 'LICENSE')));
+  });
+
+  it('the published notice is the plain AGPL notice and identical to the field-ui one', () => {
+    const text = read(join(OP, NOTICE_RELATIVE as string));
+    expect(text).toContain('GNU AFFERO GENERAL PUBLIC LICENSE');
+    expect(text).not.toMatch(/ADDITIONAL PERMISSION/i);
+    expect(text).not.toMatch(/Section 7/i);
+    expect(text.endsWith('\n')).toBe(true);
+    expect(text).not.toContain('\r');
+    expect(text).toBe(notice());
+  });
+
+  it('the README and package.json say nothing about a permission or self-hosting', () => {
+    const readme = read(join(OP, 'README.md'));
+    expect(readme.length).toBeGreaterThan(200);
+    expect(readme).not.toMatch(/additional permission|section 7|self-hosted/i);
+    const manifest = JSON.parse(read(join(OP, 'package.json')));
+    expect(manifest.license).toBe('AGPL-3.0-only');
+    expect(manifest.private).toBeUndefined();
+    expect(JSON.stringify(manifest)).not.toMatch(/additional permission|section 7|self-hosted/i);
+  });
+
+  it('staging a fake offline-package directory produces the same four entries', () => {
+    const pkg = fakePackage();
+    const { files } = stagePackage({ slug: 'offline-package', packageDir: pkg, outDir: join(pkg, '.publish') });
+    expect(files).toEqual(['LICENSE', 'README.md', 'dist/index.js', 'package.json']);
+  });
+
+  it('staging names the offline-package build command when dist is missing, not the field-ui one', () => {
+    const pkg = fakePackage(false);
+    expect(() => stagePackage({ slug: 'offline-package', packageDir: pkg, outDir: join(pkg, '.publish') })).toThrow(/npm run build -w @inspectorhub\/offline-package/);
+    expect(() => stageFieldUi({ packageDir: pkg, outDir: join(pkg, '.publish') })).toThrow(/npm run build -w @inspectorhub\/field-ui/);
+  });
+
+  it('.gitignore ignores the offline-package staging directory', () => {
+    expect(read(join(ROOT, '.gitignore')).split('\n')).toContain('/packages/offline-package/.publish/');
   });
 });

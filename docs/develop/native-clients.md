@@ -637,7 +637,8 @@ its own remedy: cut the package to the sizes in `details.limits`
 
 ### Reference implementation
 
-`packages/offline-package` (imported as `@core/offline-package`) is the client side
+`packages/offline-package` (imported as `@core/offline-package`; it is also published
+to npm as `@inspectorhub/offline-package`, which is how a native client installs it) is the client side
 of everything in sections 9 and 10: it reads and writes the archive, plans the parts
 of a package that is over a limit, classifies each answer, and sends, splits and
 resends until every inspection is either imported or held back with a reason. The
