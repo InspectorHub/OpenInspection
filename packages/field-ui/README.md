@@ -4,12 +4,10 @@ The OpenInspection field inspection editor as an embeddable React package, so
 the web app and other hosts (for example the offline-first native client) can
 share one editor.
 
-**Status: pre-1.0 and incomplete.** The package is being extracted from the
-OpenInspection web app in steps. What the published build exports today is the
-host contract (the data source, its types, the provider and hooks, locale
-binding) and an in-memory fake for tests. The editor components themselves are
-not exported yet; this README says so again where it matters, and will change
-when they land.
+**Status: pre-1.0.** The editor page component (`FieldEditor`) is exported,
+together with the host contract it runs on. While the version is below 1.0 a
+minor release can change the exported surface; pin a minor range such as
+`~0.3.0` until 1.0.
 
 ## What the build exports
 
@@ -18,9 +16,77 @@ external):
 
 | Entry | Contents |
 |---|---|
-| `@inspectorhub/field-ui` | `FieldDataSourceProvider`, `useFieldDataSource`, `useFieldCommand`, `useFieldEnsureHuman`, `useFieldSlots`, `isIgnored`, `setFieldLocale`, `bindFieldLocaleSource`, and the TypeScript types of the contract |
+| `@inspectorhub/field-ui` | The editor and the host contract, listed below |
 | `@inspectorhub/field-ui/testing` | `createFakeDataSource` and fakes for each optional resource, for host test suites |
 | `@inspectorhub/field-ui/theme.css` | The design-token and base-layer CSS (see Theme) |
+
+The root entry exports:
+
+| Group | Exports |
+|---|---|
+| The editor | `FieldEditor` (props: `{ data: EditorData }`) |
+| Host contract | `FieldDataSourceProvider`, `useFieldDataSource`, `useFieldCommand`, `useFieldEnsureHuman`, `useFieldSlots`, `isIgnored`, `setFieldLocale`, `bindFieldLocaleSource`, and the TypeScript types of the contract (`FieldDataSource`, `FieldHostSlots`, `FieldUrls`, `FieldResources`, `EditorData`, `SessionInfo`, and so on) |
+| Finding keys | `findingKey`, `findingsForUnit`, `isMetaKey` (the same functions the server uses to address a result) |
+| Results document | `resolvePendingPhoto` (swaps a pending offline photo entry in the results document for its uploaded key; needs the finding key) |
+| Commercial report text | `resolvePcaNarrative`, `RELIANCE_TEMPLATES`, `METADATA_PRESETS` |
+| Preferences | `DEFAULT_INSPECTION_PREFS` |
+| Overlay stack | `hasOpenLayer`, `escapeWillBeHandled` (see "Back key and open dialogs") |
+| Types | `GalleryPhoto`, `CoverPhotoOption`, `ReportProfileOption`, `VideoUploadRef`, `PublishReadiness`, `PublishBlockingDefect` |
+
+## Mounting the editor
+
+```tsx
+import { FieldDataSourceProvider, FieldEditor, setFieldLocale } from '@inspectorhub/field-ui';
+
+setFieldLocale(session.locale); // and keep it in step with the host's own locale
+
+<FieldDataSourceProvider dataSource={myDataSource} slots={mySlots}>
+  <FieldEditor data={editorData} />
+</FieldDataSourceProvider>
+```
+
+What the host has to provide:
+
+- A `FieldDataSource` (next section). `editorData` is what its `load()` returns.
+  It must follow the host's revalidation: units, publish state and the rest are
+  read from it on every render, so pass the fresh value after each reload.
+- `slots` (`FieldHostSlots`). Publishing is guarded by a human check that fails
+  closed: a host that provides neither `slots.ensureHuman` nor
+  `slots.humanCheck: 'not-required'` gets a check that refuses every send. A
+  host that has no such check by design must write `humanCheck: 'not-required'`
+  down explicitly; leaving the slot out does not turn the gate off.
+- `slots.renderUnsavedGuard`, if leaving the editor with unsaved work should be
+  intercepted. Absent means leaving is never intercepted.
+- The theme (see Theme) and the peer dependencies (see below).
+
+A member of `urls`, `resources` or `slots` that the host leaves out hides the
+entry point that needs it. In particular `urls.costExport` is optional: a host
+without a cost download omits it and the Cost Items panel shows no export
+links.
+
+### Back key and open dialogs
+
+The editor opens dialogs and drawers on an overlay stack that lives inside this
+package (it is bundled, so a host cannot read it from anywhere else). A host
+that handles a hardware back key or a back gesture asks this copy first:
+
+```ts
+import { escapeWillBeHandled, hasOpenLayer } from '@inspectorhub/field-ui';
+
+if (hasOpenLayer()) {
+  // an editor dialog is open: let it consume the key instead of leaving the page
+}
+```
+
+`hasOpenLayer()` is true while any layer is open (dialog, drawer, popover or
+menu). `escapeWillBeHandled()` is true when the next Escape will be taken by an
+overlay.
+
+### Server rendering
+
+The editor is built for a client that renders it. A host that renders on a
+server must give `react-konva` a server stub of its own: the photo annotator
+only renders in the browser.
 
 ## The data source contract
 
@@ -91,24 +157,28 @@ output. In your global stylesheet:
 
 The editor's photo gallery and lightbox use `react-photo-album` and
 `yet-another-react-lightbox`. Those libraries are peers and their CSS is not
-copied into `dist`. The current build does not import any of them yet (the
-editor components are not exported), so nothing is required today. Once the
-editor components ship, the host must import, from its own copy of each
-library:
-
-```ts
-import 'yet-another-react-lightbox/styles.css';
-import 'react-photo-album/rows.css';
-```
+copied into `dist`. Instead `dist/index.js` keeps two bare side-effect imports,
+`import "react-photo-album/rows.css"` and
+`import "yet-another-react-lightbox/styles.css"`, which your bundler resolves
+from its own copy of each library. The bundler therefore has to handle `.css`
+imports from `node_modules` (Vite and webpack with a CSS loader do). If yours
+does not, import the two files yourself from your global stylesheet entry.
 
 ## Peer dependencies
 
 Declared in `package.json` and resolved by the host so there is one copy of
-each: `react` and `react-dom` ^19, `yjs`, `lib0`, `y-indexeddb`, `y-protocols`,
-`konva`, `react-konva`, `react-easy-crop`, `react-photo-album`, `sortablejs`,
-`yet-another-react-lightbox`. Today only `react` and `yjs` (in
-`/testing`) are imported by the build; the rest are declared ahead of the
-editor components.
+each: `react` and `react-dom` ^19, `yjs`, `lib0`, `y-protocols`, `konva`,
+`react-konva`, `react-easy-crop`, `react-photo-album`, `sortablejs`,
+`yet-another-react-lightbox`. `y-indexeddb` is also declared, but as an
+optional peer: this package never imports it, and only a host that persists the
+results document in the browser through its own `CollabConnector` needs it.
+
+The built root entry imports `react`, `react-dom`, `yjs`, `react-konva` (which
+needs `konva`), `react-easy-crop`, `react-photo-album`, `sortablejs` and
+`yet-another-react-lightbox`, so a host that mounts `FieldEditor` installs all
+of those. `lib0` and `y-protocols` are declared as peers but the built root
+entry does not import them today; they matter to a host that writes its own
+`CollabConnector` on the Yjs sync protocol.
 
 ## Licence
 

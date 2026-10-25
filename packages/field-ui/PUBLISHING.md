@@ -2,6 +2,10 @@
 
 This file is for maintainers. It is not shipped in the npm package.
 
+The scripts and the workflow design described here are shared with
+`@inspectorhub/offline-package`; see `packages/offline-package/PUBLISHING.md` for
+what differs. The scripts take `--package <slug>` and default to `field-ui`.
+
 ## Why the published LICENSE differs from the repository copy
 
 The published package carries the plain GNU Affero General Public License v3

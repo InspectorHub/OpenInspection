@@ -193,8 +193,11 @@ export interface FieldUrls {
   photo(inspectionId: string, key: string): string;
   reportPreview(tenantSlug: string, inspectionId: string): string | null;
   reportPdf(inspectionId: string): string | null;
-  /** The cost tables' download (`csv` or `xlsx`); a plain link the browser follows. */
-  costExport(inspectionId: string, format: 'csv' | 'xlsx'): string;
+  /**
+   * The cost tables' download (`csv` or `xlsx`); a plain link the browser follows. Optional: a host with no
+   * such download (a native shell) leaves it out and the Cost Items panel shows no export links.
+   */
+  costExport?(inspectionId: string, format: 'csv' | 'xlsx'): string;
   statutoryPreviewPdf(inspectionId: string): string | null;
   videoObject(inspectionId: string, ref: string): string | null;
   /**

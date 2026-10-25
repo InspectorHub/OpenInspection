@@ -123,10 +123,10 @@ export function CostItemsPanel({
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[13px] font-bold uppercase tracking-widest text-ih-fg-3">{m.editor_cost_items_title()}</h2>
         <div className="flex items-center gap-3">
-          {/* Export the current Opinion of Cost — only worth offering once at
-              least one line exists (empty exports are just a header row). */}
-          {rows.length > 0 && (
-            <CostExportButtons hrefFor={(format) => dataSource.urls.costExport(inspectionId, format)} variant="panel" />
+          {/* Export the current Opinion of Cost — only once a line exists (empty exports are just a
+              header row) and only if the host has a download (`urls.costExport` is optional). */}
+          {rows.length > 0 && dataSource.urls.costExport && (
+            <CostExportButtons hrefFor={(format) => dataSource.urls.costExport?.(inspectionId, format) ?? ""} variant="panel" />
           )}
           <Button variant="link" size="sm" onClick={() => addLatch(addRow)}>
             {m.editor_cost_add_item()}
