@@ -145,6 +145,26 @@ local data. The **device enforces it**; the server only publishes it, in
 `GET /api/client/session`. Change it with `PATCH /api/admin/tenant-config`.
 A company with no configuration row reports the default.
 
+The same response carries two more fields a device needs while it is locked or
+offline:
+
+- `serverNowMs`: the server clock when it answered, in whole milliseconds since
+  the Unix epoch. It is read on the server after all other work and is never
+  derived from anything the client sends (not the `Date` request header, not a
+  query parameter, not the token). Treat it as "now, give or take network delay".
+  A device uses it to re-anchor the clock behind its offline limit. The response
+  carries `Cache-Control: private, no-store`, so an older answer cannot be
+  replayed to set the device clock back. A response without this key comes from
+  an older server.
+- `tenantName`: the display name the company set for itself, trimmed and cut to
+  200 characters, or `null` when it has none. It is never replaced by a default
+  or by the deployment's own name; a device shows its own neutral wording for
+  `null`. A response without this key comes from an older server.
+
+The `Date` response header is also readable by the app's WebView (see section 5),
+but it has one-second resolution, and the edge adds it to the response, so prefer
+`serverNowMs`.
+
 ### Deleted inspections and local copies
 
 When an inspection is hard-deleted on the server, a device that already holds a
@@ -208,6 +228,7 @@ variables set, no app is ever asked to update.
 | `NATIVE_MIN_VERSION_<PLATFORM>` | Lowest version still allowed to make changes. Below it, ordinary API calls answer `426`. |
 | `NATIVE_RECOMMENDED_VERSION_<PLATFORM>` | Below it, the response carries a "recommended" signal and nothing is blocked. |
 | `NATIVE_DOWNLOAD_URL_<PLATFORM>` | Where the client points the user to update. |
+| `NATIVE_ACCOUNT_URL` | A page where a person manages or deletes their account, for example `https://example.com/account`. One value for every platform. Only an `https` URL without embedded credentials is accepted; anything else is ignored and logged. |
 
 `<PLATFORM>` is `IOS`, `ANDROID` or `WINDOWS`. Versions are up to three numeric
 components (`1`, `1.4`, `1.4.2`).
@@ -243,7 +264,14 @@ not listed: it has no ticket route, so a WebView cannot open it.
 
 **`GET /api/client/compat?platform=<platform>`** is public, so a client can call
 it before signing in. It returns `minSupported`, `recommended`, `downloadUrl`
-(each possibly `null`) and `serverContractVersion`.
+(each possibly `null`) and `serverContractVersion`. When `NATIVE_ACCOUNT_URL` is
+set to a valid `https` URL the response also carries `accountUrl`; when it is
+unset or invalid the key is absent (never `null` or an empty string).
+
+`serverContractVersion` rises only when a client cannot tell from the response
+itself that something new exists, for example a new endpoint. New response fields
+are detected by their key: `primaryReportId`, `serverNowMs` and `tenantName` are
+always present on a server that has them, so a missing key means an older server.
 
 ### Which versions are still in use
 
@@ -286,7 +314,8 @@ A Capacitor WebView serves its pages from `capacitor://localhost` (iOS) or
 exactly those two origins the API answers with:
 
 - the request headers `Idempotency-Key`, `X-Client-Version` and
-  `X-Client-Platform` allowed, and `X-Client-Upgrade` exposed;
+  `X-Client-Platform` allowed, and `X-Client-Upgrade` and `Date` exposed (`Date`
+  is not a CORS-safelisted header, so a WebView cannot read it otherwise);
 - **no `Access-Control-Allow-Credentials`** and no `Set-Cookie` exposure.
 
 The convention is **Bearer only, no credentials**: the app never relies on a
@@ -427,6 +456,13 @@ Identifiers match `^[A-Za-z0-9_-]{1,64}$`, so an id can never smuggle a path
 separator into a zip entry name or a storage key.
 
 ### Import semantics
+
+A package that names an inspection the server already has, without carrying an
+`inspection.create` for it, must state the id of that inspection's primary
+report in the manifest (`inspections[].reportId`), or the whole package is
+refused. `GET /api/inspections/{id}` returns that id as `primaryReportId` (a
+string, or `null` when the inspection has no primary report yet). Write it into
+the manifest when exporting.
 
 An import has two phases and the line between them is the point.
 
