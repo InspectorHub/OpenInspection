@@ -175,6 +175,10 @@
                         "serverContractVersion": {
                           "type": "integer",
                           "description": "Native API contract version this server implements"
+                        },
+                        "accountUrl": {
+                          "type": "string",
+                          "description": "Https page where a person manages or deletes their account. Present only when the operator configured one; absent otherwise (never null or empty)"
                         }
                       },
                       "required": [
@@ -554,13 +558,24 @@
                         "offlineMaxDays": {
                           "type": "integer",
                           "description": "Days the device may stay offline before locking"
+                        },
+                        "tenantName": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Display name the company set for itself, trimmed and cut to 200 characters, or null when it has none. Never replaced by a default name. A missing key means an older server"
+                        },
+                        "serverNowMs": {
+                          "type": "integer",
+                          "description": "The server clock when it answered this request, in whole milliseconds since the Unix epoch. Read on the server after all other work and never derived from anything the client sent. Treat it as the current time give or take network delay. The response is not cacheable. A missing key means an older server"
                         }
                       },
                       "required": [
                         "userId",
                         "tenantId",
                         "role",
-                        "offlineMaxDays"
+                        "offlineMaxDays",
+                        "tenantName",
+                        "serverNowMs"
                       ],
                       "description": "Response payload"
                     },
@@ -991,10 +1006,16 @@
                         "template": {
                           "nullable": true,
                           "description": "The associated template schema"
+                        },
+                        "primaryReportId": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Id of the primary report of this inspection, or null when it has none yet. A native device writes it into the manifest of an exported package; the importer refuses a package for an existing inspection whose report id differs from this one. The key is always present on a server that supports it; a missing key means an older server."
                         }
                       },
                       "required": [
-                        "inspection"
+                        "inspection",
+                        "primaryReportId"
                       ],
                       "description": "Response payload"
                     },

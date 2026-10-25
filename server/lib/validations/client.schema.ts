@@ -11,6 +11,7 @@ export const ClientCompatResponseSchema = createApiResponseSchema(z.object({
     recommended: z.string().nullable().describe('Version the app should prompt users to install'),
     downloadUrl: z.string().nullable().describe('Where a sideloaded build can be downloaded'),
     serverContractVersion: z.number().int().describe('Native API contract version this server implements'),
+    accountUrl: z.string().optional().describe('Https page where a person manages or deletes their account. Present only when the operator configured one; absent otherwise (never null or empty)'),
 }));
 
 export const ClientSessionResponseSchema = createApiResponseSchema(z.object({
@@ -18,6 +19,8 @@ export const ClientSessionResponseSchema = createApiResponseSchema(z.object({
     tenantId: z.string().describe('Tenant the session belongs to'),
     role: z.string().describe('Role of the signed-in user'),
     offlineMaxDays: z.number().int().describe('Days the device may stay offline before locking'),
+    tenantName: z.string().nullable().describe('Display name the company set for itself, trimmed and cut to 200 characters, or null when it has none. Never replaced by a default name. A missing key means an older server'),
+    serverNowMs: z.number().int().describe('The server clock when it answered this request, in whole milliseconds since the Unix epoch. Read on the server after all other work and never derived from anything the client sent. Treat it as the current time give or take network delay. The response is not cacheable. A missing key means an older server'),
 }));
 
 export const VisibleInspectionsRequestSchema = z.object({
