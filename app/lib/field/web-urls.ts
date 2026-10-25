@@ -11,11 +11,14 @@ export interface PresenceLocation {
  * The web host's `FieldUrls`: relative strings byte-identical to the ones the call
  * sites build today (see `web-urls.test.ts`, which pins them and greps the call sites).
  *
+ * The return type keeps `costExport` required (the contract made it optional for hosts with no cost download;
+ * the web host always has it, and the report toolbar calls it directly).
+ *
  * Pure: nothing is read at construction. `presenceSocket` reads `window.location` only
  * inside its own body, only when no location was injected, and throws a clear error on
  * the server rather than guessing a host.
  */
-export function createWebUrls(location?: PresenceLocation): FieldUrls {
+export function createWebUrls(location?: PresenceLocation): FieldUrls & Required<Pick<FieldUrls, "costExport">> {
     return {
         photo: (inspectionId, key) => `/api/inspections/${pathSegment(inspectionId)}/photo?key=${encodeURIComponent(key)}`,
         reportPreview: (tenantSlug, inspectionId) =>
