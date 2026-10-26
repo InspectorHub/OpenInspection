@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.2.1...field-ui-v0.3.0) (2026-10-26)
+
+
+### Features
+
+* **field-ui:** export the field editor and host helpers, make costExport optional ([9f5514e](https://github.com/InspectorHub/OpenInspection/commit/9f5514e4c9d86eafe7c195d9947169ae74a07c13))
+* **field-ui:** let an uploader report a photo kept on the device, and export appendPendingPhoto ([ba7a482](https://github.com/InspectorHub/OpenInspection/commit/ba7a4829c5b96b434abb2122a99e212ff9348031))
+* **field-ui:** optional decodeImage host capability for HEIC photos ([8e46835](https://github.com/InspectorHub/OpenInspection/commit/8e46835bbe4fdfa92f82e3359c83e78aa32e0812))
+
+
+### Bug Fixes
+
+* **field-ui:** keep the rest of an offline photo batch when the host store rejects a file ([d708917](https://github.com/InspectorHub/OpenInspection/commit/d708917fb43f3d9fdcdb8ee19ab7a30d0959583d))
+* **field-ui:** say why a compliance sign-off was not recorded ([192da83](https://github.com/InspectorHub/OpenInspection/commit/192da832b1e43bf832ee6a6208eb264f4a7b06f6))
+* **native:** behaviour fixes from the contract review ([a3db14b](https://github.com/InspectorHub/OpenInspection/commit/a3db14b8c044d6a7f24707ebe05a5ac6ed3e9700))
+
 ## [0.2.1](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.2.0...field-ui-v0.2.1) (2026-10-24)
 
 
