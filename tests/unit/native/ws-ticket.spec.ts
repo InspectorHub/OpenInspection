@@ -108,9 +108,10 @@ describe('one-time WebSocket tickets (real app)', () => {
     const t = await setup();
     const res = await t.issue(MINE);
     expect(res.status, await res.clone().text()).toBe(200);
-    const body = await res.json() as { success: boolean; data: { ticket: string; expiresIn: number } };
+    const body = await res.json() as { success: boolean; data: { ticket: string; expiresIn: number; features: string[] } };
     expect(body.success).toBe(true);
     expect(body.data.expiresIn).toBe(60);
+    expect(body.data.features).toEqual(['ack-v1']);
     expect(body.data.ticket.length).toBeGreaterThanOrEqual(32);
     const [key, value, options] = t.kv.put.mock.calls.find((c) => String(c[0]).startsWith('wsticket:')) ?? [];
     expect(key).toBe(`wsticket:${body.data.ticket}`);
@@ -149,6 +150,27 @@ describe('one-time WebSocket tickets (real app)', () => {
     expect(fwd?.headers.get('x-tenant-id')).toBe(TENANT_ID);
     expect(fwd?.headers.get('x-user-id')).toBe(INSPECTOR_ID);
     expect(fwd?.headers.get('x-inspection-id')).toBe(MINE);
+  });
+
+  it('forwards x-collab-ack only when the upgrade asks for it with ack=1, never a client-supplied header', async () => {
+    const t = await setup();
+    const path = `/api/inspections/${MINE}/collab/ws`;
+    const headerOf = () => t.collab.stubFetch.mock.calls.at(-1)?.[0].headers.get('x-collab-ack');
+
+    expect((await t.upgrade(path, await t.issued(MINE))).status).toBe(200);
+    expect(headerOf()).toBeNull();
+
+    const ticket = await t.issued(MINE);
+    expect((await t.call(`${path}?ticket=${ticket}&ack=1`, { headers: { Upgrade: 'websocket' } })).status).toBe(200);
+    expect(headerOf()).toBe('1');
+
+    // A client-supplied header is not copied, and ack=0 is not an opt-in.
+    const spoof = await t.issued(MINE);
+    expect((await t.call(`${path}?ticket=${spoof}`, { headers: { Upgrade: 'websocket', 'x-collab-ack': '1' } })).status).toBe(200);
+    expect(headerOf()).toBeNull();
+    const zero = await t.issued(MINE);
+    expect((await t.call(`${path}?ticket=${zero}&ack=0`, { headers: { Upgrade: 'websocket' } })).status).toBe(200);
+    expect(headerOf()).toBeNull();
   });
 
   it('a ticket opens the inspection presence socket too', async () => {

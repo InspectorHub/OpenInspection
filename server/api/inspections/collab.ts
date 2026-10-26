@@ -74,7 +74,7 @@ collabRoutes.openapi(issueCollabTicketRoute, async (c) => {
         const ticket = await issueWsTicket(kv, {
             tenantId: auth.tenantId, userId: auth.userId, role, inspectionId: auth.inspectionId,
         });
-        return c.json({ success: true as const, data: { ticket, expiresIn: WS_TICKET_TTL_S } }, 200);
+        return c.json({ success: true as const, data: { ticket, expiresIn: WS_TICKET_TTL_S, features: ['ack-v1'] } }, 200);
     });
 // ── GET /:id/collab/snapshots — list version history ──────────────────────
 collabRoutes.openapi(collabSnapshotListRoute, async (c) => {
@@ -264,6 +264,7 @@ collabRoutes.get('/:id/collab/ws', async (c) => {
         if (!(await mayEditReports(c))) return new Response('forbidden', { status: 403 });
 
         // ── Forward the WS upgrade to the INSPECTION_DOC Durable Object ────────
+        // `?ack=1` opts the socket in to ack frames. The header is set here from the query, never copied from the client.
         const stub = collabStub(c, auth.tenantId, auth.reportId);
         const fwd = new Request('https://do.local/ws', {
             method:  'GET',
@@ -273,6 +274,7 @@ collabRoutes.get('/:id/collab/ws', async (c) => {
                 'x-inspection-id': auth.inspectionId,
                 'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
+                ...(c.req.query('ack') === '1' ? { 'x-collab-ack': '1' } : {}),
             },
         });
         return stub.fetch(fwd);

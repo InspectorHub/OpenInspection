@@ -427,6 +427,16 @@ for a ticket and opens the socket with `?ticket=`.
 - Every failure (unknown, expired, used, wrong inspection, member gone, native
   clients disabled) is a `401`.
 
+The ticket response lists `features`. When it contains `ack-v1`, a client may add
+`&ack=1` to the collab socket URL to receive ack frames: byte `3` followed by a
+length-prefixed Yjs snapshot (state vector and delete set) of the document as it
+stands in the Durable Object's storage. The frame is sent after the storage write
+succeeds, to every socket opened with `ack=1`, at most once per write and only
+when the document changed since the last ack; a snapshot over 64 KiB is skipped.
+`Y.snapshotContainsUpdate(snapshot, update)` tells whether an edit, deletions
+included, is stored. It does not mean the edit reached other clients or the D1
+projection. A socket opened without `ack=1` receives no such frame.
+
 ---
 
 ## 8. Signed media uploads

@@ -73,6 +73,7 @@ describe('native non-OpenAPI contract', () => {
         const doc = source('server/durable-objects/inspection-doc.ts');
         expect(doc).toMatch(/\bconst MSG_SYNC = 0;/);
         expect(doc).toMatch(/\bconst MSG_RESTORE = 2;/);
+        expect(doc).toMatch(/\bconst MSG_ACK = 3;/);
     });
 
     it.each(NATIVE_NON_OPENAPI_CONTRACT.filter((e) => e.kind === 'oauth').map((e) => [e.path] as const))(

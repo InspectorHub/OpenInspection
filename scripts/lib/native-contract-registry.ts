@@ -130,7 +130,7 @@ export const NATIVE_CONTRACT: readonly NativeContractEntry[] = [
 export const NATIVE_NON_OPENAPI_CONTRACT: readonly NativeNonOpenApiEntry[] = [
     {
         kind: 'websocket', method: 'get', path: '/api/inspections/{id}/collab/ws',
-        note: 'Yjs results document sync; authenticated by a one-time ticket query parameter. Frames: MSG_SYNC = 0, MSG_RESTORE = 2.',
+        note: 'Yjs results document sync; authenticated by a one-time ticket query parameter. Frames: MSG_SYNC = 0, MSG_RESTORE = 2, MSG_ACK = 3 (optional: sent only to sockets opened with ack=1, after the document reached the Durable Object storage).',
     },
     {
         kind: 'websocket', method: 'get', path: '/api/inspections/{id}/presence/ws',

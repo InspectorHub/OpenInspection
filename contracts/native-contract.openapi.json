@@ -6723,11 +6723,19 @@
                         "expiresIn": {
                           "type": "integer",
                           "description": "Seconds the ticket stays valid"
+                        },
+                        "features": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Optional collab socket features this server supports; ack-v1 means ack frames are sent to sockets opened with ack=1"
                         }
                       },
                       "required": [
                         "ticket",
-                        "expiresIn"
+                        "expiresIn",
+                        "features"
                       ],
                       "description": "Response payload"
                     },

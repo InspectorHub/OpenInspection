@@ -16,15 +16,13 @@
  *      to also write the projected results to D1 (without touching the DO
  *      sync or hydration logic).
  *
- * WebSocket message framing:
- *   byte 0 = 0 → sync (y-protocols/sync message: step1 / step2 / update)
- *   (byte 0 = 1 was awareness — dropped in this production DO)
- *   byte 0 = 2 → restore (a bare control frame, no body): the authoritative doc
- *                was replaced by a version restore. The DO only SENDS this; it
- *                tells every connected client to drop its local state and resync
- *                from scratch (Yjs updates are additive/union, so a plain update
- *                broadcast cannot revert deletions on a live client — see #181
- *                Task 12b). Unknown inbound framing bytes are silently dropped.
+ * WebSocket message framing (byte 0; 1 was awareness, dropped here):
+ *   0 = sync (y-protocols/sync: step1 / step2 / update)
+ *   2 = restore, a bare control frame the DO only SENDS after a version restore:
+ *       clients drop local state and resync (a plain update cannot revert
+ *       deletions on a live client, #181 Task 12b)
+ *   3 = ack, sent only to sockets that opted in, after the storage write
+ *       (inspection-doc-ack.ts). Unknown inbound framing bytes are dropped.
  *
  * Identity: tenantId + inspectionId are passed in request headers by the
  * authorized route (Task 5). The DO reads them for logging only and never
@@ -56,6 +54,8 @@ import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
 import { isNonEmptyProjection, logDivergence, projectionsEqual } from './results-divergence';
 import { loadTemplateSnapshot, renameLegacyKeysResponse } from './inspection-doc-legacy-keys';
+import { matchSnapshotBySeqPath } from './inspection-doc-snapshot-path';
+import { ACK_TAG, AckTracker, ackTags, logPersistFailure } from './inspection-doc-ack';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -70,6 +70,9 @@ const MSG_SYNC = 0;
  * package; keep the two in sync (mirrors the duplicated MSG_SYNC = 0 pattern).
  */
 const MSG_RESTORE = 2;
+
+/** Framing byte for the ack frame; the native client holds the same literal (no shared package). */
+const MSG_ACK = 3;
 
 /** Debounce window before flushing the Y.Doc to DO storage (ms). */
 const PERSIST_DEBOUNCE_MS = 1_000;
@@ -160,25 +163,6 @@ function asSnapshotArray(value: unknown): ResultsSnapshot[] {
     return Array.isArray(value) ? (value as ResultsSnapshot[]) : [];
 }
 
-/**
- * Match a `…/snapshots/<seq>` path and parse the trailing `seq` as a
- * non-negative integer. Returns the parsed seq, or `null` when the path is not
- * a snapshot-by-seq request or the trailing segment is not a valid non-negative
- * integer (so the caller falls through to the generic 404). Trailing slashes are
- * ignored. The `/snapshots` (list/capture) path has no trailing segment and
- * therefore never matches here.
- */
-function matchSnapshotBySeqPath(pathname: string): number | null {
-    const segments = pathname.replace(/\/+$/, '').split('/');
-    const last = segments[segments.length - 1];
-    const parent = segments[segments.length - 2];
-    if (parent !== 'snapshots') return null;
-    // Strict non-negative integer (no signs, decimals, or whitespace).
-    if (!/^\d+$/.test(last)) return null;
-    const seq = Number(last);
-    return Number.isSafeInteger(seq) ? seq : null;
-}
-
 /** Shape of the persisted identity stored across hibernation. */
 interface PersistedIdentity {
     tenantId:     string;
@@ -202,6 +186,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * When it reaches SNAPSHOT_EVERY, a snapshot is captured and it resets to 0.
      */
     private updatesSinceSnapshot = 0;
+    private readonly ack = new AckTracker(MSG_ACK);
     /**
      * In-flight guard so concurrent triggers (auto + on-demand + restore's
      * pre-capture) never double-write the snapshot array.
@@ -342,7 +327,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             const server = pair[1];
 
             // Hibernation API — the DO can sleep between messages.
-            this.ctx.acceptWebSocket(server);
+            this.ctx.acceptWebSocket(server, ackTags(req));
 
             // Send sync step 1 (our current state vector) to the new client.
             const syncEncoder = encoding.createEncoder();
@@ -551,7 +536,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
     protected async persist(): Promise<void> {
         // ── DO storage ────────────────────────────────────────────────────────
         const stateUpdate = Y.encodeStateAsUpdate(this.doc);
+        const sendAck = this.ack.prepare(this.doc, this.ackTargets()); // same tick as the line above
         await this.ctx.storage.put(STORAGE_KEY, stateUpdate);
+        sendAck?.();
 
         // ── D1 projection write ───────────────────────────────────────────────
         const { tenantId, inspectionId } = this;
@@ -578,6 +565,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         );
         if (written === 'inspection_gone') await this.abandon();
     }
+
+    protected ackTargets(): WebSocket[] { return this.ctx.getWebSockets(ACK_TAG); }
 
     /**
      * The inspection this document belongs to was hard-deleted. Stop: cancel the
@@ -939,7 +928,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         if (this.persistTimer !== null) clearTimeout(this.persistTimer);
         this.persistTimer = setTimeout(() => {
             this.persistTimer = null;
-            void this.persist();
+            this.persist().catch(logPersistFailure);
         }, PERSIST_DEBOUNCE_MS);
 
         // Alarm is overwritten (idempotent) on every update burst — it always
