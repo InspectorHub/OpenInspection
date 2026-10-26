@@ -41,7 +41,7 @@ import { Errors, type AppError } from '../lib/errors';
 import { offlineImportApplied } from '../lib/db/schema';
 import { findTombstonedIds } from '../lib/inspection/tombstones';
 import { getDrizzle } from '../lib/route-helpers';
-import { createCredentialScope, isInProcessRequest, REQUEST_SCOPE } from '../lib/request-scope';
+import { createCredentialScope, isInProcessRequest, OFFLINE_IMPORT_REPLAY, REQUEST_SCOPE } from '../lib/request-scope';
 import { logger } from '../lib/logger';
 import { getApiApp } from '../lib/api-app';
 import { APPLIED_RECORD_RETENTION_DAYS, APPLIED_RECORD_SWEEP_BATCH, type OutboxEntry } from '@core/offline-package';
@@ -216,7 +216,7 @@ export async function applyOutbox(
     const app = await getApiApp();
     // Every replay carries the same bearer. Share the credential lookups across them (and only
     // those) instead of resolving the token and re-reading the credential-change marker per entry.
-    const replayEnv = isInProcessRequest(c.env) ? c.env : { ...c.env, [REQUEST_SCOPE]: createCredentialScope() };
+    const replayEnv = { ...c.env, ...(isInProcessRequest(c.env) ? {} : { [REQUEST_SCOPE]: createCredentialScope() }), [OFFLINE_IMPORT_REPLAY]: true };
 
     // Inspections whose update the server refused in this replay.
     const refusedUpdates = new Set<string>();

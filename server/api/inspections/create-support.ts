@@ -13,6 +13,7 @@ import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard'
 import { templates } from '../../lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { AppError, ErrorCode, Errors } from '../../lib/errors';
+import { isOfflineImportReplay } from '../../lib/request-scope';
 import { findTombstonedIds } from '../../lib/inspection/tombstones';
 import { noticeFor } from '../../features/plan-quota/notice';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
@@ -86,8 +87,9 @@ export async function assertCanCreate(
     body: { id?: string | undefined; templateId?: string | undefined; client?: unknown; newAgent?: unknown; clientName?: string | undefined },
 ): Promise<void> {
     // A client-minted id that names a deleted inspection is refused before anything else, whether or not the request
-    // carries contacts: the row is gone, so only the tombstone says the id must not be reused.
-    if (body.id) {
+    // carries contacts: the row is gone, so only the tombstone says the id must not be reused. The offline import
+    // has already looked up every create of its package in one query, so its replays skip this one.
+    if (body.id && !isOfflineImportReplay(c.env)) {
         const [deleted] = await findTombstonedIds(getDrizzle(c), c.get('tenantId'), [body.id]);
         if (deleted) {
             throw new AppError(409, ErrorCode.INSPECTION_ID_DELETED, 'That inspection id belongs to an inspection that was deleted.', { inspectionId: deleted });
