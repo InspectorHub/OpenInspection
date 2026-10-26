@@ -180,8 +180,10 @@ so the guarantees below hold only for a client that implements them.
 
 **How a device reconciles.** On connecting, the device sends the ids of its local
 inspections to `POST /api/client/inspections/visible` and receives the subset the
-signed-in user can still see. For each local inspection that is not in that
-subset:
+signed-in user can still see. Only the `owner`, `manager` and `inspector` roles
+may call it; any other staff role gets a `403`, so a device signed in as such a
+member must not treat that answer as "everything was deleted". For each local
+inspection that is not in that subset:
 
 - if the device holds **no unuploaded data** for it, the local copy is removed;
 - if it holds **unuploaded data** (edits or photos not yet sent), the copy is
