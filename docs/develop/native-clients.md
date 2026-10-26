@@ -430,6 +430,45 @@ Rules the upload route applies, in order:
 - The storage key is a pure function of the token, so sending the same token
   twice overwrites one object instead of adding another.
 
+### Reading inspection photos
+
+A client that knows a photo's storage key downloads it with an ordinary
+authenticated request:
+
+```
+GET /api/inspections/{id}/photo?key=<storage key>[&w=<width>]
+Authorization: Bearer <native access token>
+```
+
+The route is in the contract. It answers the same `404` for a key that does not
+start with `<your company id>/inspections/{id}/`, for an inspection the signed-in
+member may not see (an inspector limited to assigned inspections gets `404` for
+the others), and for an object that does not exist; it never confirms which of
+these it was. There is no batch route and no signed read URL: a client asks for
+each photo it needs.
+
+- **Width.** `w` is clamped to 16 through 2000 pixels. A value that is not a
+  number counts as 16, so omit `w` to get the original.
+- **Thumbnails are optional.** Only a deployment with the Cloudflare Images
+  binding resizes, and the result is always `image/webp`. Without the binding,
+  without remaining allowance on your Cloudflare plan, or when the conversion
+  fails, the response is the **original bytes** with their stored type, up to the
+  10 MiB upload limit, and it can be a HEIC file. Image transformations may be
+  limited by your Cloudflare plan.
+- **Read `Content-Type`, not your request.** It says whether you received a webp
+  or an original.
+- **Pin one width and cap the bytes.** Each distinct width is a separate
+  transformation, so use a single thumbnail width for the whole app. Check
+  `Content-Length` (or count streamed bytes) and stop at a limit you choose, so
+  that an original served in place of a thumbnail cannot exhaust memory. Do not
+  hand an `image/heic` response to an `<img>` element on a WebView that cannot
+  decode it.
+- **Caching.** The response carries `Cache-Control: private, max-age=300`; an
+  original also has an `etag`, a resized one does not. Key a local cache on the
+  full storage key and the width.
+- **Browser elements cannot send the header.** Fetch the bytes with the
+  `Authorization` header and show them from a local object URL.
+
 ---
 
 ## 9. Offline package, format v1

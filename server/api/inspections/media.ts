@@ -89,7 +89,7 @@ const servePhotoRoute = createRoute(withMcpMetadata({
         query: z.object({
             key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
-            w: z.string().optional().describe('Optional max width in pixels for an on-the-fly thumbnail (grid previews); omitted serves the full-resolution original.'),
+            w: z.string().optional().describe('Optional width in pixels, clamped to 16-2000 (a value that is not a number counts as 16). Omitted serves the original. With an image service the response is a webp of that width; without one, or when the conversion fails, it is the original bytes (up to the upload limit, possibly a HEIC file). Read the response Content-Type to know which.'),
         }),
     },
     responses: {
