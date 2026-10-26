@@ -14,15 +14,18 @@ import { RouterContextProvider } from "react-router";
 
 const SNAPSHOT = { schemaVersion: 2, sections: [{ id: "s1", title: "Roof", items: [{ id: "i1", label: "Cover", type: "rich" }] }] };
 const ok = (data: unknown) => Promise.resolve({ ok: true, json: async () => ({ data }) });
+// The fixtures above use ONE constant for both the stored snapshot and the report-data sections, so
+// an overlay that wrote through to the snapshot was invisible. These let a test give them different shapes.
+const feed = vi.hoisted(() => ({ snapshot: null as unknown, sections: null as unknown }));
 
 vi.mock("~/lib/session.server", () => ({ requireToken: vi.fn().mockResolvedValue("SECRET-SESSION-TOKEN") }));
 vi.mock("~/lib/api-client.server", () => ({
     createApi: () => ({
         inspections: {
             ":id": {
-                $get: () => ok({ inspection: { id: "i1", status: "draft", propertyType: "single_family", propertyAddress: "1 Main", date: "2026-10-18T10:00:00Z", templateSnapshot: SNAPSHOT } }),
+                $get: () => ok({ inspection: { id: "i1", status: "draft", propertyType: "single_family", propertyAddress: "1 Main", date: "2026-10-18T10:00:00Z", templateSnapshot: feed.snapshot ?? SNAPSHOT } }),
                 results: { $get: () => ok({ results: {}, resultId: "r1" }) },
-                "report-data": { $get: () => ok({ sections: SNAPSHOT.sections, ratingLevels: [] }) },
+                "report-data": { $get: () => ok({ sections: feed.sections ?? SNAPSHOT.sections, ratingLevels: [] }) },
             },
         },
         tags: { index: { $get: () => ok([]) } },
@@ -57,6 +60,38 @@ describe("editor loader payload", () => {
         const out = await run();
         for (const key of ["schema", "results", "resultId", "ratingLevels", "tagLibrary", "tenantSlug", "videoProvider", "collabEditing", "defectCategories", "units", "unitProgress", "unitInspectionMode", "compliance", "relianceText", "commercialPresets", "statutoryDetails", "statutoryCoverage", "nextPublishIsAmendment", "outboundCoolingWindow", "revisionStatus", "pcaNarrative"]) {
             expect(out, key).toHaveProperty(key);
+        }
+    });
+
+    describe("snapshot aliasing", () => {
+        const deepFreeze = <T,>(v: T): T => {
+            if (v && typeof v === "object") {
+                for (const k of Object.keys(v)) deepFreeze((v as Record<string, unknown>)[k]);
+                Object.freeze(v);
+            }
+            return v;
+        };
+        const stored = () => ({ schemaVersion: 2, sections: [{ id: "s1", name: "Roof", items: [{ id: "i1", name: "Cover", type: "rich" }] }] });
+        // report-data projects a different shape: `name` only, plus a projection-only field.
+        const projected = () => [{ id: "s1", name: "Roof", projectedOnly: true, items: [{ id: "i1", name: "Cover", type: "rich", rating: null }] }];
+
+        for (const form of ["object", "string"] as const) {
+            it(`never writes the report-data overlay into the raw snapshot (${form} form)`, async () => {
+                const original = stored();
+                feed.snapshot = form === "object" ? deepFreeze(stored()) : JSON.stringify(original);
+                feed.sections = projected();
+                try {
+                    const out = await run() as { schema: { sections: Array<Record<string, unknown>> }; templateSnapshot: { sections: Array<Record<string, unknown>> } };
+                    expect(out.templateSnapshot).toEqual(original);
+                    // positive control: the overlay itself still happened on the normalized schema
+                    expect(out.schema.sections[0]).toMatchObject({ title: "Roof", projectedOnly: true });
+                    expect(out.schema).not.toBe(out.templateSnapshot);
+                    expect(out.schema.sections).not.toBe(out.templateSnapshot.sections);
+                } finally {
+                    feed.snapshot = null;
+                    feed.sections = null;
+                }
+            });
         }
     });
 });
