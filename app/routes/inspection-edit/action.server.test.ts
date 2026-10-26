@@ -8,6 +8,8 @@ const completePost = vi.fn();
 const publishPost = vi.fn();
 const inspectionPatch = vi.fn();
 const unitsPost = vi.fn();
+const snapshotPatch = vi.fn();
+const collabRestructure = vi.fn();
 /** Call order across endpoints — the whole point of the auto-sign specs. */
 const calls: string[] = [];
 
@@ -22,6 +24,8 @@ vi.mock('~/lib/api-client.server', () => ({
                 publish: { $post: publishPost },
                 $patch: inspectionPatch,
                 units: { $post: unitsPost },
+                'template-snapshot': { $patch: snapshotPatch },
+                collab: { restructure: { $post: collabRestructure } },
             },
         },
     })),
@@ -282,5 +286,118 @@ describe('editor action — who may receive a thrown "still running" answer', ()
     it('the page route does not: a thrown Response there would render the error boundary', async () => {
         await postTo('https://acme.example.com/inspections/insp-1/edit');
         expect(vi.mocked(createApi).mock.calls[0]?.[1]).toMatchObject({ idempotencyKey: 'k-1', inFlightAsResponse: false });
+    });
+});
+
+const refusal = (status: number, message: string) => new Response(JSON.stringify({ error: { code: 'X', message } }), { status });
+
+/**
+ * A refused or thrown write must not be reported as done.
+ *
+ * The signing-preference PATCH used to be fire-and-forget, so a refusal still published (with the
+ * stale flag), and the restructure PATCH result was dropped, so the editor showed a structure that
+ * was never stored while the live document was told to converge on it.
+ */
+describe('editor action: publish honours a failed signing-preference write', () => {
+    beforeEach(() => {
+        calls.length = 0;
+        completePost.mockReset().mockImplementation(async () => { calls.push('complete'); return new Response(null, { status: 200 }); });
+        publishPost.mockReset().mockImplementation(async () => { calls.push('publish'); return new Response(null, { status: 200 }); });
+        inspectionPatch.mockReset().mockImplementation(async () => { calls.push('patch'); return new Response(null, { status: 200 }); });
+    });
+
+    for (const status of [403, 500]) {
+        it(`does not publish when the preference PATCH answers ${status}, and passes the server message on`, async () => {
+            inspectionPatch.mockResolvedValue(refusal(status, 'Not allowed to change signing'));
+            const res = await post({ intent: 'publish', markComplete: 'true', autoSignOnPublish: 'true' });
+            expect(res).toEqual({ ok: false, intent: 'publish', error: 'Not allowed to change signing' });
+            expect(publishPost).not.toHaveBeenCalled();
+            // markComplete ran first and is advisory: it stays in effect.
+            expect(calls).toEqual(['complete']);
+        });
+    }
+
+    it('falls back to a fixed message when the refusal has no readable body', async () => {
+        inspectionPatch.mockResolvedValue(new Response('<html>', { status: 502 }));
+        const res = await post({ intent: 'publish', autoSignOnPublish: 'true' }) as { ok: boolean; error: string };
+        expect(res.ok).toBe(false);
+        expect(res.error).toMatch(/signing preference/i);
+        expect(publishPost).not.toHaveBeenCalled();
+    });
+
+    it('does not publish when the preference PATCH throws', async () => {
+        inspectionPatch.mockRejectedValue(new Error('socket closed'));
+        const res = await post({ intent: 'publish', autoSignOnPublish: 'false' });
+        expect(res).toMatchObject({ ok: false, intent: 'publish' });
+        expect(publishPost).not.toHaveBeenCalled();
+    });
+
+    it('positive control: an accepted PATCH still publishes, in the same order', async () => {
+        const res = await post({ intent: 'publish', autoSignOnPublish: 'true' });
+        expect(res).toEqual({ ok: true, intent: 'publish' });
+        expect(calls).toEqual(['patch', 'publish']);
+    });
+
+    it('positive control: a refused publish still carries the server message', async () => {
+        publishPost.mockResolvedValue(refusal(409, 'Inspection must be completed before publishing the report.'));
+        const res = await post({ intent: 'publish' });
+        expect(res).toEqual({ ok: false, intent: 'publish', error: 'Inspection must be completed before publishing the report.' });
+    });
+});
+
+describe('editor action: restructure honours the snapshot write', () => {
+    const snapshot = JSON.stringify({ schemaVersion: 2, sections: [] });
+    beforeEach(() => {
+        calls.length = 0;
+        snapshotPatch.mockReset().mockImplementation(async () => { calls.push('snapshot'); return new Response(null, { status: 200 }); });
+        collabRestructure.mockReset().mockImplementation(async () => { calls.push('collab'); return new Response(null, { status: 200 }); });
+    });
+
+    for (const status of [400, 403, 500]) {
+        it(`reports the failure and skips the live sync when the PATCH answers ${status}`, async () => {
+            snapshotPatch.mockResolvedValue(refusal(status, 'Statutory forms cannot be restructured'));
+            const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+            expect(res).toEqual({ ok: false, intent: 'restructure', error: 'Statutory forms cannot be restructured' });
+            expect(collabRestructure).not.toHaveBeenCalled();
+        });
+    }
+
+    it('reports a thrown PATCH as a failure and skips the live sync', async () => {
+        snapshotPatch.mockRejectedValue(new Error('socket closed'));
+        const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+        expect(res).toMatchObject({ ok: false, intent: 'restructure' });
+        expect(collabRestructure).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unparseable snapshot field without throwing and without writing', async () => {
+        const res = await post({ intent: 'restructure', snapshot: '{not json', collab: '1' });
+        expect(res).toMatchObject({ ok: false, intent: 'restructure' });
+        expect(snapshotPatch).not.toHaveBeenCalled();
+        expect(collabRestructure).not.toHaveBeenCalled();
+    });
+
+    it('positive control: PATCH ok then collab ok succeeds, in order', async () => {
+        const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+        expect(res).toEqual({ ok: true, intent: 'restructure' });
+        expect(calls).toEqual(['snapshot', 'collab']);
+        expect(snapshotPatch).toHaveBeenCalledWith({ param: { id: 'insp-1' }, json: { snapshot: JSON.parse(snapshot) } });
+    });
+
+    it('positive control: without the collab flag only the snapshot is written', async () => {
+        const res = await post({ intent: 'restructure', snapshot });
+        expect(res).toEqual({ ok: true, intent: 'restructure' });
+        expect(calls).toEqual(['snapshot']);
+    });
+
+    it('keeps the "live sync did not converge" message when the PATCH landed but collab refuses', async () => {
+        collabRestructure.mockResolvedValue(new Response(null, { status: 403 }));
+        const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+        expect(res).toMatchObject({ ok: false, intent: 'restructure', error: expect.stringContaining('live sync did not converge') });
+    });
+
+    it('keeps tolerating 501 from collab', async () => {
+        collabRestructure.mockResolvedValue(new Response(null, { status: 501 }));
+        const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+        expect(res).toEqual({ ok: true, intent: 'restructure' });
     });
 });

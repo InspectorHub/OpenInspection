@@ -136,7 +136,7 @@ export async function getToken(context: LoadContext, request: Request): Promise<
  * cheaper question: is it even worth sending? A token whose payload cannot be
  * read counts as expired, so an unreadable value can never be passed on.
  */
-function isTokenExpired(token: string, nowMs: number): boolean {
+export function isTokenExpired(token: string, nowMs: number): boolean {
   const payload = token.split(".")[1];
   if (!payload) return true;
   try {
@@ -256,6 +256,17 @@ export async function destroyUserSession(
   request: Request,
   opts: { explicit?: boolean } = {},
 ) {
+  const headers = await clearSessionHeaders(context, request);
+  const chained = opts.explicit ? chainedSignOutUrl(context, request) : null;
+  return redirect(chained ?? loginPathFor(request), { headers });
+}
+
+/**
+ * The Set-Cookie headers that remove BOTH session cookies (`__session` and the raw
+ * `__Host-inspector_token`). Shared by the sign-out path and by any redirect that must not leave
+ * a dead credential behind, such as the OAuth authorize endpoint answering a token it cannot use.
+ */
+export async function clearSessionHeaders(context: LoadContext, request: Request): Promise<Headers> {
   const session = await getSession(context, request);
   const headers = new Headers();
   // Logging out must work even when no signing secret is configured — the point
@@ -275,6 +286,5 @@ export async function destroyUserSession(
     "Set-Cookie",
     "__Host-inspector_token=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0",
   );
-  const chained = opts.explicit ? chainedSignOutUrl(context, request) : null;
-  return redirect(chained ?? loginPathFor(request), { headers });
+  return headers;
 }

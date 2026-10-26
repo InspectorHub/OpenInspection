@@ -67,6 +67,8 @@ export const NATIVE_CONTRACT: readonly NativeContractEntry[] = [
     { method: 'get', path: '/api/contractor-types' },
     // Realtime access and media.
     { method: 'post', path: '/api/inspections/{id}/collab/ticket' },
+    // Download a photo by its stored key; `w` asks for a thumbnail where the deployment has an image service.
+    { method: 'get', path: '/api/inspections/{id}/photo' },
     { method: 'post', path: '/api/inspections/{id}/media/upload-url' },
     { method: 'post', path: '/api/inspections/{id}/media/video/create-upload' },
     { method: 'post', path: '/api/inspections/{id}/media/video/finalize' },

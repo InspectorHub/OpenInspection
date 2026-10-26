@@ -252,6 +252,13 @@ export const BulkInspectionSchema = z.object({
  */
 export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionSchema)).openapi('InspectionListResponse');
 
+/** Response of GET /api/inspections/{id}. Kept inline-shaped (unnamed) so the published contract does not gain a component. */
+export const GetInspectionResponseSchema = createApiResponseSchema(z.object({
+    inspection: InspectionSchema.describe('The inspection record.'),
+    template: z.unknown().openapi({ description: 'The associated template schema' }),
+    primaryReportId: z.string().nullable().describe('Id of the primary report of this inspection, or null when it has none yet. A native device writes it into the manifest of an exported package; the importer refuses a package for an existing inspection whose report id differs from this one. The key is always present on a server that supports it; a missing key means an older server.'),
+}));
+
 // Sourced from the same constant as the drizzle enum on
 // `inspections.cancel_reason`, so the wire and the column cannot drift.
 const CancellationReasonSchema = z.enum(CANCELLATION_REASONS).openapi('CancellationReason');
