@@ -10,6 +10,8 @@ const inspectionPatch = vi.fn();
 const unitsPost = vi.fn();
 const snapshotPatch = vi.fn();
 const collabRestructure = vi.fn();
+const templateGet = vi.fn();
+const templatePut = vi.fn();
 /** Call order across endpoints — the whole point of the auto-sign specs. */
 const calls: string[] = [];
 
@@ -27,6 +29,7 @@ vi.mock('~/lib/api-client.server', () => ({
                 'template-snapshot': { $patch: snapshotPatch },
                 collab: { restructure: { $post: collabRestructure } },
             },
+            templates: { ':id': { $get: templateGet, $put: templatePut } },
         },
     })),
 }));
@@ -34,6 +37,7 @@ vi.mock('~/lib/api-client.server', () => ({
 import { action } from './action.server';
 import { createApi } from '~/lib/api-client.server';
 import { routeArgs } from '../../../tests/helpers/route-args';
+import { templatesRouteConfigs } from '../../../server/api/inspections/templates';
 /** Minimal AppLoadContext stub — the action only forwards it to createApi. */
 const CONTEXT = {} as Parameters<typeof action>[0]['context'];
 
@@ -399,5 +403,63 @@ describe('editor action: restructure honours the snapshot write', () => {
         collabRestructure.mockResolvedValue(new Response(null, { status: 501 }));
         const res = await post({ intent: 'restructure', snapshot, collab: '1' });
         expect(res).toEqual({ ok: true, intent: 'restructure' });
+    });
+});
+
+
+/**
+ * "Save back to the source template" needs the source template's NAME for the PUT. The server answers
+ * GET /api/inspections/templates/:id with the template NESTED under `data.template`; the action used to
+ * read `data.name`, so it always reported "The source template has no name." The fixtures below are built
+ * by parsing a payload with the route's own response schema, so a reader that drifts from the real shape
+ * fails here instead of in the browser.
+ */
+describe('editor action — save-structure-template back to the source', () => {
+    const getRoute = templatesRouteConfigs.find((r) => r.operationId === 'getInspectionTemplate')!;
+    const responseSchema = getRoute.responses[200].content['application/json'].schema;
+    const realResponse = (template: Record<string, unknown>) =>
+        new Response(JSON.stringify(responseSchema.parse({ success: true, data: { template } })), { status: 200 });
+    const SNAPSHOT = JSON.stringify({ schemaVersion: 2, sections: [] });
+    const back = (templateId = 'tpl-1') => post({ intent: 'save-structure-template', mode: 'back', templateId, snapshot: SNAPSHOT });
+
+    beforeEach(() => {
+        templateGet.mockReset();
+        templatePut.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+    });
+
+    it('reads the name from data.template and PUTs it back with the new structure', async () => {
+        templateGet.mockResolvedValue(realResponse({ id: 'tpl-1', name: '  Full Home Inspection ', version: 3, schema: { schemaVersion: 2, sections: [] } }));
+        const res = await back();
+        expect(templateGet).toHaveBeenCalledWith({ param: { id: 'tpl-1' } });
+        expect(templatePut).toHaveBeenCalledWith({ param: { id: 'tpl-1' }, json: { name: 'Full Home Inspection', schema: { schemaVersion: 2, sections: [] } } });
+        expect(res).toMatchObject({ ok: true, intent: 'save-structure-template' });
+    });
+
+    it('a template with a blank name fails the save without a PUT', async () => {
+        templateGet.mockResolvedValue(realResponse({ id: 'tpl-1', name: '   ', version: 1 }));
+        const res = await back();
+        expect(templatePut).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ ok: false, error: 'The source template has no name.' });
+    });
+
+    it('a response with no template fails the save without a PUT', async () => {
+        templateGet.mockResolvedValue(realResponse({}));
+        const res = await back();
+        expect(templatePut).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ ok: false, error: 'The source template has no name.' });
+    });
+
+    it('a 200 without a data envelope fails the save with the same message instead of throwing', async () => {
+        templateGet.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+        const res = await back();
+        expect(templatePut).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ ok: false, error: 'The source template has no name.' });
+    });
+
+    it('a failed load fails the save without a PUT', async () => {
+        templateGet.mockResolvedValue(new Response(null, { status: 404 }));
+        const res = await back();
+        expect(templatePut).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ ok: false, error: 'Could not load the source template to update it.' });
     });
 });

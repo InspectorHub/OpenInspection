@@ -350,8 +350,8 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   if (!tplRes.ok) {
    return { ok: false as const, intent: "save-structure-template", error: "Could not load the source template to update it." };
   }
-  const tb = (await tplRes.json()) as { data?: { name?: string } };
-  const name = tb.data?.name?.trim();
+  const tpl = (await tplRes.json()).data?.template as { name?: unknown } | null;
+  const name = typeof tpl?.name === "string" ? tpl.name.trim() : "";
   if (!name) {
    return { ok: false as const, intent: "save-structure-template", error: "The source template has no name." };
   }
