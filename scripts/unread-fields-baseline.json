@@ -306,5 +306,9 @@
   "packages/field-ui/src/testing/fake-panel-resources.ts#FakeSettingsSheet.loads": {
     "kind": "record",
     "reason": "The times the editor loaded the settings sheet on the in-memory test double. Specs read it to assert what the editor did; no production code reads it and none should, because it only exists so a test can observe the double."
+  },
+  "packages/field-ui/src/decode-image.ts#DecodeImageOptions.keepOriginal": {
+    "kind": "invisible-read",
+    "reason": "The byte budget field-ui hands to the host's image decoder when the keep-original setting is on. It is filled here and read only by the decoder a host supplies through `media.decodeImage`, which lives in the native client repository, so no consumer exists in this tree. Dropping it would leave the host unable to learn the limit."
   }
 }

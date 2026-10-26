@@ -116,6 +116,10 @@ signatures):
 - `collab`: a `CollabConnector` that opens the results Yjs document for an
   inspection (local persistence first, then network).
 - `media`: a `PendingMediaStore` and a `uploader(inspectionId, doc)` factory.
+  Optional `decodeImage(file, opts)` turns a file the browser cannot decode (HEIC) into a JPEG; return `null` to
+  decline, or reject with `DecodeImageError` (its `message` is shown to the person and that file is skipped). With
+  keep original on, `opts.keepOriginal.maxBytes` asks for full size at the best JPEG quality that fits. Absent, photos
+  behave as before.
 - `urls`: `FieldUrls`, the address builders for photos, reports, presence and
   in-app paths.
 - `resources`: `FieldResources`, optional capabilities (preferences, canned

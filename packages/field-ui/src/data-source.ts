@@ -3,6 +3,7 @@ import type { DateFormat, TimeFormat } from './shared/display-prefs';
 import type { PublishReadiness } from './shared/types';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
 import type { PendingMediaStore, MediaUploader } from './media-types';
+import type { DecodeImage } from './decode-image';
 import type {
   AiAssistInput,
   AiAssistResult,
@@ -352,6 +353,12 @@ export interface FieldDataSource {
      * `doc` at upload time and answers `{ ok: false }` when `doc` is null or the photo is gone.
      */
     uploader(inspectionId: string, doc: Y.Doc | null): MediaUploader;
+    /**
+     * Optional. Turns a file the browser cannot decode (HEIC/HEIF) into a JPEG the browser can. Return null when this
+     * host cannot decode that file (the caller keeps its own behaviour); reject with `DecodeImageError` for a file
+     * that is recognised but cannot be decoded. Absent: photos behave exactly as before.
+     */
+    decodeImage?: DecodeImage;
   };
   urls: FieldUrls;
   resources: FieldResources;

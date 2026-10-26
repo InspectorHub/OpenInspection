@@ -51,6 +51,7 @@ import { resolveActivePropertyPreset } from "../shared/property-preset";
 import { InspectionSettingsSheet } from "../components/editor/InspectionSettingsSheet";
 import { VideoCapture } from "../components/media-studio/VideoCapture";
 import { bakePhoto } from "../components/media-studio/bakePhoto";
+import { bakeBatch } from "../components/media-studio/bakeBatch";
 import { PublishGateModal } from "../components/editor/PublishGateModal";
 import { AddMediaChooser } from "../components/editor/AddMediaChooser";
 import { useStructureEdit } from "../hooks/useStructureEdit";
@@ -1016,10 +1017,10 @@ export function FieldEditor({ data }: { data: EditorData }) {
  const target = pendingPhotoTargetRef.current;
  pendingPhotoTargetRef.current = null;
  void (async () => {
- const bakedFiles: File[] = [];
- for (const f of files) {
- bakedFiles.push(orig ? f : await bakePhoto(f));
- }
+ const bakedFiles = await bakeBatch(files, orig, dataSource.media.decodeImage?.bind(dataSource.media), (err) =>
+ notify(m.editor_route_photo_not_converted({ reason: err.message }), "error", { durationMs: 8000 }));
+ if (overflow) notify(m.editor_route_photos_batch_capped(), "warning", { durationMs: 6000 });
+ if (bakedFiles.length === 0) return; // every file was skipped and reported: nothing to store or upload
 
  // #181 PR-G — offline: persist each baked photo locally + append a
  // PENDING doc entry (empty key + pendingUpload) per file. The strip
@@ -1049,9 +1050,6 @@ export function FieldEditor({ data }: { data: EditorData }) {
   });
  }
 
- if (overflow) {
-  notify(m.editor_route_photos_batch_capped(), "warning", { durationMs: 6000 });
- }
  })();
  // Reset both inputs so re-picking the same file(s) re-fires onChange
  if (cameraInputRef.current) cameraInputRef.current.value = "";

@@ -10,6 +10,7 @@ import { findingKey as hookFindingKey } from "./hooks/findings/shared";
  * purpose, in the same commit as the change to `index.ts`.
  */
 const VALUE_EXPORTS = [
+  "DecodeImageError",
   "DEFAULT_INSPECTION_PREFS",
   "FieldDataSourceProvider",
   "FieldEditor",
@@ -48,7 +49,7 @@ function typeNamesInIndex(): string[] {
 describe("@inspectorhub/field-ui root entry", () => {
   it("exports exactly the listed values, and both counts are pinned", () => {
     const actual = Object.keys(api).sort();
-    expect([actual.length, VALUE_EXPORTS.length]).toEqual([20, 20]);
+    expect([actual.length, VALUE_EXPORTS.length]).toEqual([21, 21]);
     expect(actual).toEqual([...VALUE_EXPORTS].sort());
   });
 
