@@ -1,6 +1,6 @@
 import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { inspections, reportTranslations, reports } from '../../lib/db/schema';
+import { inspections, inspectionTombstones, reportTranslations, reports } from '../../lib/db/schema';
 import { inspectionScopedTables } from '../../lib/db/scoped-tables';
 import { purgeCollabDocs, type CollabPurgeOutcome } from './collab-purge';
 
@@ -29,6 +29,13 @@ export async function deleteInspectionCascade(
     inspectionId: string,
     collab?: DurableObjectNamespace,
 ): Promise<CollabPurgeOutcome> {
+    // 0a. Remember the id first. A failed write stops the delete with nothing removed, which is the safe direction:
+    // the delete can be retried; a deleted inspection with no tombstone cannot be repaired. The row is what stops a
+    // create replayed later by a device that minted the id from bringing the inspection back.
+    await db.insert(inspectionTombstones)
+        .values({ tenantId, inspectionId, deletedAt: new Date() })
+        .onConflictDoNothing();
+
     // 0. Rows owned by a REPORT rather than by the inspection.
     //
     // The derived set below is every table carrying `inspection_id`, and it is

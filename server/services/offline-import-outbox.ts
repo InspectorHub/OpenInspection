@@ -17,8 +17,8 @@
  *    route is called, and a key is recorded only after the route answered 2xx
  *    (a create that answers 200 found the inspection already there and counts),
  *    so a refused entry stays retryable. The importer refuses a package whose
- *    recorded create names an inspection that no longer exists; see
- *    `findDeletedCreates`.
+ *    recorded create, or an inspection tombstone, names an inspection that no
+ *    longer exists; see `findDeletedCreates`.
  *
  * Crash window: the record is written straight after the route answers. If the
  * Worker dies between the two, a retry applies that one write again. That is the
@@ -39,6 +39,7 @@ import type { Context } from 'hono';
 import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import { Errors, type AppError } from '../lib/errors';
 import { offlineImportApplied } from '../lib/db/schema';
+import { findTombstonedIds } from '../lib/inspection/tombstones';
 import { getDrizzle } from '../lib/route-helpers';
 import { createCredentialScope, isInProcessRequest, REQUEST_SCOPE } from '../lib/request-scope';
 import { logger } from '../lib/logger';
@@ -172,10 +173,10 @@ async function record(c: Context<HonoConfig>, tenantId: string, userId: string, 
 }
 
 /**
- * Ids of inspections this package would create although an earlier import
- * already did: `candidates` are the creates whose inspection is NOT in the
- * database, and a recorded create among them means it was created and later
- * deleted. Reads only.
+ * Ids of inspections this package would create although they were created and
+ * deleted before: `candidates` are the creates whose inspection is NOT in the
+ * database, and a recorded create or a tombstone among them means it was created
+ * and later deleted. Reads only.
  */
 export async function findDeletedCreates(
     c: Context<HonoConfig>,
@@ -185,7 +186,8 @@ export async function findDeletedCreates(
     const creates = candidates.filter((e) => e.op === 'inspection.create');
     if (creates.length === 0) return [];
     const recorded = await recordedEntries(c, tenantId, creates);
-    return creates.filter((e) => recorded.has(e)).map((e) => e.payload.id);
+    const tombstoned = new Set(await findTombstonedIds(getDrizzle(c), tenantId, creates.map((e) => e.payload.id)));
+    return creates.filter((e) => recorded.has(e) || tombstoned.has(e.payload.id)).map((e) => e.payload.id);
 }
 
 /**

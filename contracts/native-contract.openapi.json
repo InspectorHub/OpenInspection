@@ -947,7 +947,7 @@
             }
           },
           "409": {
-            "description": "ID_CONFLICT: the supplied id already belongs to a record the caller may not open: one outside this workspace, or an inspection in it the caller is not assigned to. The answer is the same for both, so it does not reveal which"
+            "description": "ID_CONFLICT: the supplied id already belongs to a record the caller may not open: one outside this workspace, or an inspection in it the caller is not assigned to. The answer is the same for both, so it does not reveal which. INSPECTION_ID_DELETED: the supplied id belongs to an inspection this company deleted, and creating it again is refused (`details.inspectionId`); the client should keep its data and stop retrying"
           },
           "503": {
             "description": "The inspection was saved but its primary report could not be created. Retry the same request; the replay completes the create. (Any other step that fails answers 500, and the same retry applies when a client-generated id was sent.)"

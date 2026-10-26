@@ -359,6 +359,7 @@ referring to it by a name it chose. The id is not required to be a UUID.
 | New id | `201`, the inspection is created. |
 | Id already belongs to an inspection in the same company that the caller may open (an owner or manager, or a member assigned to it) | `200` with the existing inspection. None of the create's side effects run again, so a retry is safe. |
 | Id belongs to a record outside the company, or to an inspection in it that the caller is not assigned to | `409` `ID_CONFLICT`, the same answer for both, with no inspection fields. |
+| Id belongs to an inspection this company deleted | `409` `INSPECTION_ID_DELETED`, with `details.inspectionId`. Retrying cannot succeed: keep the device's data and stop retrying. |
 
 A create is several writes and cannot be one transaction. For an inspection with a
 client-chosen id the writes after the inspection row run in a fixed order whose
@@ -394,6 +395,15 @@ not on its roster) answers `409` `ID_CONFLICT`, as for an id held outside the
 company. A client should treat that `409` as the **final outcome of that outbox
 entry**: retrying it cannot succeed, and it must not be retried or silently
 dropped. Surface it to the user.
+
+Deleting an inspection records its id in the `inspection_tombstones` table, which never
+expires and is not backfilled, so only inspections deleted after that migration are
+remembered. A create that names such an id, whether sent directly or inside an offline
+package, is refused (`INSPECTION_ID_DELETED`, or `PACKAGE_INSPECTION_DELETED` for a
+package) and nothing is written. A delete whose tombstone cannot be written fails and
+removes nothing, so it can be retried. A create replayed with the same
+`Idempotency-Key` inside the 24 hour window still gets the stored answer, and the
+migration must be applied before the code that reads the table is deployed.
 
 ---
 
@@ -603,7 +613,8 @@ Further rules:
   what its stream could expand to.
 - **A deleted inspection stays deleted.** If a recorded create names an
   inspection that has since been deleted, the package is refused with `409`
-  `PACKAGE_INSPECTION_DELETED` and nothing is written.
+  `PACKAGE_INSPECTION_DELETED` and nothing is written. An inspection deleted after being
+  created over the API (no import record) is held back the same way by its tombstone.
 - The response reports `inspections`, `photos`, `outbox` (`applied`, `skipped`,
   `failed`) and `yjs` (`changed`, `unchanged`).
 
@@ -880,12 +891,13 @@ Things that apply to the whole group:
 
 ## 14. Upgrading a deployment that already runs the engine
 
-The native surface adds two forward-only migrations:
+The native surface adds forward-only migrations:
 
 | Migration | Adds |
 |---|---|
 | `0001_offline_max_days.sql` | `tenant_configs.offline_max_days` (integer, default 30) |
 | `0002_offline_import_applied.sql` | The `offline_import_applied` table and its `(tenant_id, applied_at)` index, and the `native_client_seen` table |
+| `0006_inspection_tombstones.sql` | The `inspection_tombstones` table, read by every create that names its own id and written by every inspection delete |
 
 **Apply migrations before deploying the new code.** The new code reads
 `offline_max_days` on the session route, writes `native_client_seen` there too (a

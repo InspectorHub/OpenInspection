@@ -9,8 +9,8 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 112 |
-| Columns | 1288 |
+| Tables | 113 |
+| Columns | 1291 |
 | Indexes (excluding primary keys) | 185 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 618 (48%) |
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 13 of 112. If a table you just added appears here,
+That is 13 of 113. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 212 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 213 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -1235,6 +1235,20 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 - `idx_insp_services_tenant` (tenant_id)
 - `idx_insp_services_insp` (inspection_id)
+
+---
+
+## `inspection_tombstones`
+
+<sub>server/lib/db/schema/inspection-tombstones.ts · 3 columns · primary key `tenant_id, inspection_id`</sub>
+
+> One row per inspection that was HARD-deleted, so a create replayed afterwards cannot bring it back.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `inspection_id` | text | PK NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `deleted_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 
 ---
 

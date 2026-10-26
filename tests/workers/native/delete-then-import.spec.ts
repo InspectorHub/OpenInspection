@@ -160,6 +160,32 @@ describe('deleting inspections and the native client', () => {
         },
     );
 
+    it('a package that creates an inspection created over the API and then deleted is refused whole (control: a never-created id imports)', async () => {
+        // No import ever recorded this create, so only the tombstone can tell the importer the id was deleted.
+        const id = fresh('insp-rest');
+        const made = await call('/api/inspections', {
+            method: 'POST', token: ownerJwt, headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ id, propertyAddress: `${id} Road`, templateId: TEMPLATE, date: `${DAY}T10:00:00.000Z` }),
+        });
+        expect(made.status, await made.clone().text()).toBe(201);
+        expect((await del(id)).status).toBe(200);
+        const key = fresh('k');
+        const before = await inspectionRows();
+
+        const refused = await importZip(createPackage(id, key));
+        expect(refused.status, await refused.clone().text()).toBe(409);
+        expect(await refused.text()).toContain('PACKAGE_INSPECTION_DELETED');
+        expect(await inspectionRows()).toBe(before);
+        expect(await addressOf(id)).toBeNull();
+        expect(await recorded(key)).toBe(0);
+
+        // Control: an id nobody created or deleted imports as usual.
+        const fine = fresh('insp-fine');
+        const ok = await importZip(createPackage(fine, fresh('k')));
+        expect(ok.status, await ok.clone().text()).toBe(200);
+        expect(await addressOf(fine)).not.toBeNull();
+    });
+
     it('replaying an inspection.update for a deleted inspection does not recreate it (control: the same update applies while it exists)', async () => {
         const id = fresh('insp-upd');
         expect((await importZip(createPackage(id, fresh('k')))).status).toBe(200);

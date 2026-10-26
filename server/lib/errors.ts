@@ -73,6 +73,10 @@ export enum ErrorCode {
     // see. Distinct from CONFLICT so a client that mints its own ids can tell
     // "pick another id" from every other 409.
     ID_CONFLICT = 'ID_CONFLICT',
+    // A create named an id that belongs to an inspection this company deleted (409). The id was minted by the
+    // client, and replaying the create would bring the deleted inspection back. Nothing was written.
+    // `details.inspectionId` names it. Distinct from ID_CONFLICT: picking another id is not the answer.
+    INSPECTION_ID_DELETED = 'INSPECTION_ID_DELETED',
     // An offline package would create an inspection that an earlier import of the
     // same package already created and that has since been deleted. Importing it
     // again would bring the deleted inspection back, so the whole package is
