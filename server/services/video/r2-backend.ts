@@ -52,6 +52,28 @@ function parseInspectionVideoKey(r2Key: string): ParsedVideoKey | null {
     return { tenantId, inspectionId, mediaId, ext };
 }
 
+/**
+ * What `finalize` may store for a client-supplied R2 ref, judged against the caller's company and the inspection
+ * in the request path.
+ *
+ * The clip key must belong to that company AND that inspection (a key of another inspection, or another company,
+ * is `Video not found`). The poster key is not taken from the client at all: it is stored only when it equals the
+ * key the server derives for this clip, and refused otherwise, because the poster route and the video delete act
+ * on the stored key against a bucket every company shares. A Stream ref carries no poster.
+ */
+export function verifiedPosterRef(ref: VideoRef & { posterKey?: string | undefined }, tenantId: string, inspectionId: string): { posterKey: string } | undefined {
+    if (ref.provider !== 'r2') return undefined;
+    const parsed = parseInspectionVideoKey(ref.r2Key);
+    if (!parsed || parsed.tenantId !== tenantId || parsed.inspectionId !== inspectionId) {
+        throw Errors.NotFound('Video not found');
+    }
+    if (!ref.posterKey) return undefined;
+    if (ref.posterKey !== r2Keys.inspectionVideoPoster(tenantId, inspectionId, parsed.mediaId)) {
+        throw Errors.BadRequest('posterKey is not the poster stored for this video');
+    }
+    return { posterKey: ref.posterKey };
+}
+
 // ── R2VideoBackend ────────────────────────────────────────────────────────────
 
 export class R2VideoBackend implements VideoBackend {

@@ -130,7 +130,7 @@ const signoffRoute = createRoute(withMcpMetadata({
         409: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.object({ code: z.literal('TIER_NOT_FULL_PCA'), message: z.string() }) }) } }, description: 'Inspection is not report_tier=full_pca.' },
     },
     operationId: 'signInspectionCompliance',
-    description: 'Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca.',
+    description: 'Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca (409 otherwise); 404 when the inspection is not in this company. The person recorded is whatever personId and name the request carries: they are free text and are not required to match the signed-in user.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 const removeSignoffRoute = createRoute(withMcpMetadata({
@@ -159,7 +159,7 @@ const seedDocReviewRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Seed acknowledged (idempotent — already-seeded keys are skipped).' },
     },
     operationId: 'seedInspectionComplianceDocReview',
-    description: 'Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched.',
+    description: 'Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched. The inspection id is not looked up first, so an unknown id answers 200 and writes rows no inspection shows.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 const patchDocReviewItemRoute = createRoute(withMcpMetadata({
@@ -176,7 +176,7 @@ const patchDocReviewItemRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Update acknowledged.' },
     },
     operationId: 'patchInspectionComplianceDocReviewItem',
-    description: 'Patches requested/received/reviewed/na/notes on a single Document Review checklist item.',
+    description: 'Patches requested/received/reviewed/na/notes on a single Document Review checklist item. The inspection id is not looked up first, so an unknown inspection or document key answers 200.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 const upsertPsqRoute = createRoute(withMcpMetadata({

@@ -25,7 +25,7 @@ import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
-import { patchRevisionReport } from './patch-revision-report';
+import { patchRevisionReport, revisionStatusField, withReadableSnapshot } from './patch-revision-report';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
 import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
@@ -196,7 +196,7 @@ const coreRoutes = createApiRouter()
             success: true,
             // Only the inspection row is projected: `template` is customer-authored
             // schema JSON and may legitimately contain a field called `price`.
-            data: { ...result, inspection: await moneyView(c, result.inspection, 'inspectionFees'), primaryReportId },
+            data: { ...result, inspection: await moneyView(c, withReadableSnapshot(result.inspection), 'inspectionFees'), primaryReportId, ...revisionStatusField(result.inspection) },
         }, 200);
     })
     .openapi(deleteInspectionRoute, async (c) => {

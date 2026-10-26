@@ -82,6 +82,49 @@ export const NATIVE_CONTRACT: readonly NativeContractEntry[] = [
     { method: 'post', path: '/api/inspections/{id}/cost-items' },
     { method: 'patch', path: '/api/inspections/{id}/cost-items/{itemId}' },
     { method: 'delete', path: '/api/inspections/{id}/cost-items/{itemId}' },
+    // Units: the building tree of a multi-unit inspection.
+    { method: 'post', path: '/api/inspections/{id}/units' },
+    { method: 'post', path: '/api/inspections/{id}/units/bulk' },
+    { method: 'post', path: '/api/inspections/{id}/units/{unitId}/duplicate' },
+    { method: 'patch', path: '/api/inspections/{id}/units/{unitId}' },
+    { method: 'delete', path: '/api/inspections/{id}/units/{unitId}' },
+    { method: 'post', path: '/api/inspections/{id}/unit-mode' },
+    // Inspection-level editor writes: property facts, narrative, signature, template snapshot, statutory details, publish.
+    { method: 'get', path: '/api/inspections/{id}/publish-readiness' },
+    { method: 'patch', path: '/api/inspections/{id}/property-facts' },
+    { method: 'post', path: '/api/inspections/{id}/property-facts/autofill' },
+    { method: 'patch', path: '/api/inspections/{id}/pca-narrative' },
+    { method: 'post', path: '/api/inspections/{id}/inspector-signature' },
+    { method: 'patch', path: '/api/inspections/{id}/template-snapshot' },
+    { method: 'post', path: '/api/inspections/{id}/publish' },
+    { method: 'patch', path: '/api/inspections/{id}/statutory-details' },
+    { method: 'post', path: '/api/inspections/{id}/statutory-form/instances' },
+    // Compliance: sign-off, document review, property-condition questionnaire.
+    { method: 'post', path: '/api/inspections/{id}/compliance/signoff' },
+    { method: 'delete', path: '/api/inspections/{id}/compliance/signoff/{role}' },
+    { method: 'post', path: '/api/inspections/{id}/compliance/doc-review/seed' },
+    { method: 'patch', path: '/api/inspections/{id}/compliance/doc-review/{documentKey}' },
+    { method: 'put', path: '/api/inspections/{id}/compliance/psq' },
+    { method: 'post', path: '/api/inspections/{id}/compliance/psq/status' },
+    // Collaboration JSON routes (the sync socket itself is in the non-OpenAPI list).
+    { method: 'post', path: '/api/inspections/{id}/collab/restructure' },
+    { method: 'post', path: '/api/inspections/{id}/collab/followup' },
+    { method: 'post', path: '/api/inspections/{id}/collab/restore' },
+    { method: 'post', path: '/api/inspections/{id}/collab/snapshots' },
+    { method: 'get', path: '/api/inspections/{id}/collab/snapshots' },
+    { method: 'get', path: '/api/inspections/{id}/collab/snapshots/{seq}' },
+    // Templates the editor reads and saves back to.
+    { method: 'get', path: '/api/inspections/templates' },
+    { method: 'get', path: '/api/inspections/templates/{id}' },
+    { method: 'post', path: '/api/inspections/templates' },
+    { method: 'put', path: '/api/inspections/templates/{id}' },
+    // Multipart uploads (binary bodies) and the media pool listing.
+    { method: 'get', path: '/api/inspections/{id}/media' },
+    { method: 'post', path: '/api/inspections/{id}/upload' },
+    { method: 'post', path: '/api/inspections/{id}/media/upload' },
+    { method: 'post', path: '/api/inspections/{id}/cover' },
+    { method: 'post', path: '/api/inspections/{id}/items/{itemId}/photos/{photoIndex}/annotation' },
+    { method: 'post', path: '/api/inspections/{id}/items/{itemId}/photos/{photoIndex}/crop' },
 ];
 
 export const NATIVE_NON_OPENAPI_CONTRACT: readonly NativeNonOpenApiEntry[] = [
@@ -100,6 +143,10 @@ export const NATIVE_NON_OPENAPI_CONTRACT: readonly NativeNonOpenApiEntry[] = [
     {
         kind: 'binary', method: 'post', path: '/api/public/uploads/photo',
         note: 'Photo bytes as multipart field "file", authorized by the signed token from the upload-url call.',
+    },
+    {
+        kind: 'binary', method: 'post', path: '/api/inspections/{id}/media/video/r2-upload-poster',
+        note: 'Poster image as multipart field "file", authorized by the upload token query parameter from the create-upload call; answers 404 until the clip was uploaded under that token. Any image/* type is accepted and stored with the type the client declares (SVG included), and no size cap is enforced.',
     },
     {
         kind: 'binary', method: 'post', path: '/api/public/uploads/video',

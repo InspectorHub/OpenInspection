@@ -146,6 +146,12 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'Invalid or expired upload token' }, 401);
         }
 
+        // The poster belongs to a clip that was uploaded under this token: refuse one for a media id with no clip.
+        const clips = await Promise.all([...new Set(Object.values(MIME_TO_EXT))].map((ext) => c.env.PHOTOS.head(r2Keys.inspectionVideo(tenantId, id, claims.mediaId, ext))));
+        if (clips.every((clip) => clip === null)) {
+            return c.json({ error: 'No uploaded video for this upload token' }, 404);
+        }
+
         const formData = await c.req.parseBody();
         const file = formData['file'] as File | undefined;
         if (!file) {

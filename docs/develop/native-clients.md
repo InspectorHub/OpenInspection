@@ -275,6 +275,20 @@ itself that something new exists, for example a new endpoint. New response field
 are detected by their key: `primaryReportId`, `serverNowMs` and `tenantName` are
 always present on a server that has them, so a missing key means an older server.
 
+`GET /api/inspections/{id}` also carries an optional `revisionStatus`: how the
+inspection's date sits against the statutory form revision its template produces
+(`current`, `superseding_soon`, `superseded_elsewhere`, `cannot_produce` or
+`withdrawn`, with the fields each kind documents in the contract). Unlike the keys
+above it is **omitted**, not sent as `null`, only when the inspection's template
+declares no statutory form, or declares one without naming its revision; an
+inspection that does produce a statutory form always carries it (a current one gets
+`{kind: 'current'}`). A missing key therefore means either "no statutory form" or
+an older server, and a client treats the two the same. The answer depends on the
+inspection date and on the current time, so a cached copy can show an earlier one.
+The same response declares `inspection.templateSnapshot` (optional; `null` when the
+inspection has none or the stored value is not a readable object), which the editor
+reads to render the checklist.
+
 ### Which versions are still in use
 
 Retiring an old version is only safe once nothing runs it, so the server records
@@ -793,6 +807,53 @@ npm run lint:native-contract # registry and committed document must agree
 - In CI, **oasdiff** compares the file against the base branch's copy and fails
   the pull request on any breaking change. The comparison is skipped only in the
   pull request that first introduces the file.
+
+### Editor operations in the contract
+
+The field editor's write routes are registered too, together with the reads the
+editor depends on. Unless a row says otherwise they need the owner, manager or
+inspector role. Three separate mechanisms decide who may write, so none of them is
+"all of them":
+
+- The `editReports` capability is enforced for **mutating** methods on the report
+  authoring paths (results, template snapshot, units, unit mode, media, upload,
+  cover, items, collaboration writes, compliance, statutory details and
+  instances, inspector signature, property facts, PCA narrative). A member without
+  it gets 403 on those writes. **Reads are never guarded**, so the same token can
+  still read.
+- Publishing uses the `publish` capability plus the on-the-job check (you must be on
+  the inspection or hold the `scheduleOthers` permission), not `editReports`.
+  `publish-readiness` is a read.
+- The template routes under `/api/inspections/templates` are outside the
+  `editReports` guard: list and read need only the role, create needs
+  `templateCreate`, update needs `templateEdit`.
+
+| Group | Operations | Notes |
+|---|---|---|
+| Units | create, bulk create, duplicate, rename, delete, unit-mode switch | Rename and delete answer 404 for an unknown unit or one that belongs to another inspection, and change nothing. Create and bulk create answer 400 for a parent that is not a unit of this inspection. Duplicate answers 400 (not 404) for an unknown or foreign unit. Unit-mode switch wraps every failure, a missing inspection included, as 400. Switching to `tagged` is lossy. |
+| Inspection record | property facts (patch, autofill), PCA narrative, inspector signature, template snapshot, statutory details, statutory form instances, publish, publish readiness | Autofill is owner and manager only; an inspector gets 403. The narrative patch drops keys it does not know and still answers 200. A statutory template's snapshot is read-only (403). Publish is protected against a repeat only when the request carries an `Idempotency-Key`: otherwise a repeat creates a new version. |
+| Compliance | sign-off (add, remove), document review (seed, patch), questionnaire (put, status) | Sign-off and questionnaire routes need `report_tier=full_pca` (409 otherwise). The person on a sign-off is the `personId` and `name` the request carries, as free text. Seed and document-review patch do not look the inspection up first. |
+| Collaboration | restructure, followup, restore, snapshots (capture, list, read) | Owners and managers may use these; an inspector only when on the inspection's roster as lead or helper, otherwise 403. The request bodies of `followup` (`{itemId, status, notes?}`) and `restore` (`{seq}`) are deliberately not declared in the OpenAPI schema (the route authorizes before it validates); they are stated in the operation description and pinned by `tests/unit/native/contract-editor-writes.spec.ts`. Without the collaboration Durable Object these answer 501. |
+| Templates | list, read, create, update | `GET /api/inspections/templates/{id}` returns the row under `data.template`. |
+| Multipart uploads | photo upload, media pool upload, cover, item photo annotation, item photo crop | `multipart/form-data`; the file part is `file` (uploads) or `image` (cover, annotation, crop). The two photo uploads refuse a file over 10 MiB with 400. **No size cap is enforced for the annotation, crop and cover uploads today.** |
+| Binary, not in OpenAPI | video poster upload | Pinned in `NATIVE_NON_OPENAPI_CONTRACT`; multipart field `file`, authorized by the upload token query parameter from the create-upload call, and answered 404 until the clip was uploaded under that token. Any `image/*` type is accepted (SVG included) and stored with the type the client declares; no size cap is enforced. `finalize` accepts a `posterKey` only when it is the key the server derives for that clip (400 otherwise), and the clip key must belong to the inspection in the path. |
+
+Routes the app also calls that are **not** registered: `/api/tags`,
+`/api/recommendations`, `/api/contractor-types`, `/api/admin/defect-categories`,
+`/api/admin/comments`, `/api/tenant/inspection-prefs` and the `/api/ai/*` routes
+other than the two that are registered. Their shape is not frozen by the add-only
+rule.
+
+Things that apply to the whole group:
+
+- `Idempotency-Key` is honoured on every `POST`, `PUT`, `PATCH` and `DELETE`. A JSON
+  body is fingerprinted by content; a multipart body is not, so the key plus method
+  and path decide the replay.
+- When an operator raises a minimum app version, these writes are not on the
+  never-blocked list: a client below the minimum gets 426, including writes it
+  queued earlier.
+- A response shape is promised only for operations that declare a response schema.
+  Several of the reads declare none, so registration does not freeze their body.
 
 ---
 

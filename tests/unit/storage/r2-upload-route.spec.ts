@@ -68,10 +68,16 @@ function makeR2Stub() {
         return { body: stream, size: entry.bytes.length, httpMetadata: { contentType: entry.contentType } };
     }
 
-    return { store, put, get } as {
+    async function head(key: string) {
+        const entry = store.get(key);
+        return entry ? { size: entry.bytes.length } : null;
+    }
+
+    return { store, put, get, head } as {
         store: Map<string, FakeR2Entry>;
         put: typeof put;
         get: typeof get;
+        head: typeof head;
     };
 }
 
@@ -279,11 +285,32 @@ describe('r2-upload route', () => {
 // ── Tests: r2-upload-poster ───────────────────────────────────────────────────
 
 describe('r2-upload-poster route', () => {
+    /** The poster is accepted only for a clip already uploaded under the token. */
+    function seedClip(photos: ReturnType<typeof makeR2Stub>) {
+        photos.store.set(r2Keys.inspectionVideo(TENANT_ID, INSPECTION_ID, MEDIA_ID, 'mp4'), { bytes: new Uint8Array([1]), contentType: 'video/mp4' });
+    }
+
     function setup() {
         const photos = makeR2Stub();
         const app = buildUploadApp(photos);
         return { photos, app };
     }
+
+    // ── No clip yet ───────────────────────────────────────────────────────────
+
+    it('valid token but no uploaded clip → 404, and nothing is stored (positive control: the seeded clip is accepted)', async () => {
+        const { app, photos } = setup();
+        const token = await mintToken();
+        const send = () => app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
+            method: 'POST',
+            body: makeFormData('poster.jpg', 'image/jpeg'),
+            headers: { 'x-test-tenant': TENANT_ID },
+        });
+        expect((await send()).status).toBe(404);
+        expect(photos.store.size).toBe(0);
+        seedClip(photos);
+        expect((await send()).status).toBe(200);
+    });
 
     // ── Token guard: missing token ────────────────────────────────────────────
 
@@ -348,7 +375,8 @@ describe('r2-upload-poster route', () => {
     // ── MIME validation: empty type → 400 (Fix 1) ────────────────────────────
 
     it('empty file.type → 400 (no fallback to image/jpeg)', async () => {
-        const { app } = setup();
+        const { app, photos } = setup();
+        seedClip(photos);
         const token = await mintToken();
         const blob = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: '' });
         const fd = new FormData();
@@ -366,7 +394,8 @@ describe('r2-upload-poster route', () => {
     });
 
     it('non-image MIME → 400', async () => {
-        const { app } = setup();
+        const { app, photos } = setup();
+        seedClip(photos);
         const token = await mintToken();
         const fd = makeFormData('video.mp4', 'video/mp4');
 
@@ -383,6 +412,7 @@ describe('r2-upload-poster route', () => {
 
     it('valid token + image/jpeg → 200 + stores in R2', async () => {
         const { app, photos } = setup();
+        seedClip(photos);
         const token = await mintToken();
         const jpegMagic = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
         const fd = makeFormData('poster.jpg', 'image/jpeg', jpegMagic);

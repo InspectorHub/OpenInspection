@@ -88,7 +88,7 @@ const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
     path: '/{id}/pca-narrative',
     tags: ["inspections"],
     summary: "Patch inspection PCA report narrative",
-    description: 'Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render.',
+    description: 'Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render. A key that is not one of the narrative blocks is dropped without an error: the call still answers 200 and stores nothing for it.',
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Inspection id whose PCA narrative is patched') }),
         body: { content: { 'application/json': { schema: PcaNarrativePatchSchema } } },
@@ -119,7 +119,7 @@ const autofillPropertyFactsRoute = createRoute(withMcpMetadata({
     path: '/{id}/property-facts/autofill',
     tags: ["inspections"],
     summary: 'Auto-fill property facts from public records (Estated.io)',
-    description: 'Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill.',
+    description: 'Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill. Available to owner and manager roles only: an inspector receives 403.',
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection the property-record lookup is run for.') }),
         body: { content: { 'application/json': { schema: PropertyFactsAutofillRequestSchema.describe('The street address to look up in public property records.') } } },
@@ -197,7 +197,7 @@ const updateTemplateSnapshotRoute = createRoute(withMcpMetadata({
     path: '/{id}/template-snapshot',
     tags: ["inspections"],
     summary: 'Replace the per-inspection template snapshot',
-    description: 'Replaces the templateSnapshot JSON wholesale. Validated against TemplateSchemaV2. Used by the inspection editor for inline structural edits (rating system swap, add/remove section/item).',
+    description: 'Replaces the templateSnapshot JSON wholesale. Validated against TemplateSchemaV2. Used by the inspection editor for inline structural edits (rating system swap, add/remove section/item). Refused with 403 when the inspection was made from a template that produces an official form supplied with the software: its structure is read-only.',
     // Ahead of the body validator: the editor round-trips the whole snapshot,
     // and `stripRuntimeKeys` does not filter top-level keys, so a statutory
     // declaration would otherwise be answered by `.strict()` as an unknown key.
