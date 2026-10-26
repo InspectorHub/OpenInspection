@@ -8,6 +8,7 @@
   "editor_route_photos_added": "{count} photo{s} added{toDefect}",
   "editor_route_photos_kept": "{count} photo{s} saved on this device. Will upload when you are online.",
   "editor_route_photos_rejected": "{count} photo{s} could not be added.",
+  "editor_route_photo_not_converted": "A photo could not be converted and was skipped. {reason}",
   "editor_route_photo_upload_failed": "Photo upload failed — your photo did NOT reach the server.",
   "editor_route_defect_library_copy_failed": "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.",
   "editor_route_navigate_hint_press": "Press",
