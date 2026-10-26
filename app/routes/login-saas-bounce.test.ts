@@ -11,6 +11,9 @@ import { createLoadContext } from "~/lib/load-context";
 
 type LoaderArgs = Parameters<typeof loader>[0];
 
+// A session token the loader will treat as live: an unexpired exp claim (it only reads the payload).
+const LIVE_JWT = `h.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.s`;
+
 // happy-dom enforces the Fetch spec's forbidden-header list and silently drops a
 // `Cookie` header set on `new Request(...)`, so we hand-roll a minimal request
 // object whose `headers.get('Cookie')` we fully control (the loader only reads
@@ -70,7 +73,7 @@ describe('login loader — returnTo (B3)', () => {
 
     it('redirects an already-authenticated user to the same-origin returnTo', async () => {
         const res = await loader(
-            args({}, { cookie: '__Host-inspector_token=fake.jwt.value', returnTo: '/oauth/authorize?x=1' }),
+            args({}, { cookie: `__Host-inspector_token=${LIVE_JWT}`, returnTo: '/oauth/authorize?x=1' }),
         );
         expect(res).toBeInstanceOf(Response);
         expect((res as Response).headers.get('Location')).toBe('/oauth/authorize?x=1');
@@ -78,7 +81,7 @@ describe('login loader — returnTo (B3)', () => {
 
     it('ignores an off-origin returnTo for an authenticated user (no open redirect)', async () => {
         const res = await loader(
-            args({}, { cookie: '__Host-inspector_token=fake.jwt.value', returnTo: '//evil.test/phish' }),
+            args({}, { cookie: `__Host-inspector_token=${LIVE_JWT}`, returnTo: '//evil.test/phish' }),
         );
         expect(res).toBeInstanceOf(Response);
         expect((res as Response).headers.get('Location')).toBe('/inspections');

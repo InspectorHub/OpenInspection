@@ -1,7 +1,7 @@
 import { redirect, useLoaderData, useNavigation } from "react-router";
 import type { AuthRequest, ClientInfo, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import type { Route } from "./+types/authorize";
-import { getToken } from "~/lib/session.server";
+import { clearSessionHeaders, getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { isRole, type Role } from "../../../server/lib/auth/roles";
 import type { McpProps } from "../../../server/lib/mcp/build-server";
@@ -142,16 +142,16 @@ function providerRefusal(err: unknown): { code: string; description: string; sta
  * login page can tell it is serving the app's sign-in. The scope is read from
  * the query because no session exists yet to parse the request with.
  */
-function loginRedirect(env: WorkerEnv & AuthorizeEnv, url: URL): Response {
+function loginRedirect(env: WorkerEnv & AuthorizeEnv, url: URL, headers?: Headers): Response {
   const { loginRedirectBase } = getDeploymentProfile(env);
   const app = isNativeAuthRequest(url.searchParams.get("scope")?.split(" ")) ? "app=1&" : "";
   if (loginRedirectBase) {
     // Cross-origin bounce to the portal — send the absolute authorize URL.
-    return redirect(`${loginRedirectBase}/login?${app}returnTo=${encodeURIComponent(url.href)}`);
+    return redirect(`${loginRedirectBase}/login?${app}returnTo=${encodeURIComponent(url.href)}`, { headers });
   }
   // Standalone: relative path back to this same authorize URL (incl. query).
   const here = `${url.pathname}${url.search}`;
-  return redirect(`/login?${app}returnTo=${encodeURIComponent(here)}`);
+  return redirect(`/login?${app}returnTo=${encodeURIComponent(here)}`, { headers });
 }
 
 export async function loader({ request, url, context }: Route.LoaderArgs) {
@@ -167,7 +167,10 @@ export async function loader({ request, url, context }: Route.LoaderArgs) {
   if (!token) throw loginRedirect(env, url);
 
   const identity = await resolveIdentity(context, token);
-  if (!identity) throw loginRedirect(env, url);
+  // A token that exists but resolves to no identity (expired, revoked, role unknown) is a dead
+  // credential: clear it on the way to /login, or /login would see it and send the browser straight
+  // back here.
+  if (!identity) throw loginRedirect(env, url, await clearSessionHeaders(context, request));
 
   // parseAuthRequest reads the OAuth params from THIS request's query string;
   // it only works on the initial GET. We serialize the result into a hidden
@@ -228,7 +231,10 @@ export async function action({ request, url, context }: Route.ActionArgs) {
   if (!token) throw loginRedirect(env, url);
 
   const identity = await resolveIdentity(context, token);
-  if (!identity) throw loginRedirect(env, url);
+  // A token that exists but resolves to no identity (expired, revoked, role unknown) is a dead
+  // credential: clear it on the way to /login, or /login would see it and send the browser straight
+  // back here.
+  if (!identity) throw loginRedirect(env, url, await clearSessionHeaders(context, request));
 
   const formData = await request.formData();
   let authReq: AuthRequest;

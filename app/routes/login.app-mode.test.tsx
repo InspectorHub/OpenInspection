@@ -22,6 +22,8 @@ const getToken = vi.fn(async (): Promise<string | null> => null);
 
 vi.mock("~/lib/session.server", () => ({
     getToken: () => getToken(),
+    // The fake token is not a JWT; "live" is what these specs mean by an existing session.
+    isTokenExpired: () => false,
     createSessionWithToken: (...args: unknown[]) => createSession(...args),
 }));
 vi.mock("~/lib/api-client.server", () => ({
