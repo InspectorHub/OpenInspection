@@ -161,6 +161,7 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
     'server/api/inspections/statutory.ts': E('guarded-by-path', 'helpers for the /{id}/statutory-form routes'),
     'server/api/evidence.ts': E('handler-assert', 'each download asserts the envelope belongs to a visible inspection'),
     'server/api/agreements-render.ts': E('public-token', 'internal /m2m surface, reached with the service credential and never by a staff session'),
+    'server/api/inspections/create-support.ts': E('no-inspection-data', 'create-time checks only: whether an id the caller supplied already exists or has a tombstone in the caller\'s own company; it returns no inspection data'),
     // Admin-only.
     'server/api/admin/admin-esign.ts': E('admin-only', 'every route is requireRole(owner, manager)'),
     // Reached by a token the recipient holds.
