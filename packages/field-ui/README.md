@@ -27,7 +27,7 @@ The root entry exports:
 | The editor | `FieldEditor` (props: `{ data: EditorData }`) |
 | Host contract | `FieldDataSourceProvider`, `useFieldDataSource`, `useFieldCommand`, `useFieldEnsureHuman`, `useFieldSlots`, `isIgnored`, `setFieldLocale`, `bindFieldLocaleSource`, and the TypeScript types of the contract (`FieldDataSource`, `FieldHostSlots`, `FieldUrls`, `FieldResources`, `EditorData`, `SessionInfo`, and so on) |
 | Finding keys | `findingKey`, `findingsForUnit`, `isMetaKey` (the same functions the server uses to address a result) |
-| Results document | `resolvePendingPhoto` (swaps a pending offline photo entry in the results document for its uploaded key; needs the finding key) |
+| Results document | `appendPendingPhoto` (adds a pending photo entry for a file the host stored on the device; needs the finding key and a pending id; adding the same pending id twice leaves one entry), `resolvePendingPhoto` (swaps a pending offline photo entry in the results document for its uploaded key; needs the finding key) |
 | Commercial report text | `resolvePcaNarrative`, `RELIANCE_TEMPLATES`, `METADATA_PRESETS` |
 | Preferences | `DEFAULT_INSPECTION_PREFS` |
 | Overlay stack | `hasOpenLayer`, `escapeWillBeHandled` (see "Back key and open dialogs") |

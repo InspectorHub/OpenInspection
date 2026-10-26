@@ -6,6 +6,7 @@
   "editor_route_photos_batch_capped": "Se agregaron las primeras 20 fotos; agregue el resto en otro lote.",
   "editor_route_photos_partial_upload": "Se subieron {success} de {total} fotos — {failed} fallaron.",
   "editor_route_photos_added": "+{count} foto{s}{toDefect}",
+  "editor_route_photos_kept": "Se guardó en este dispositivo: {count} foto{s}. Se subirán al tener conexión.",
   "editor_route_photo_upload_failed": "Error al subir la foto — su foto NO llegó al servidor.",
   "editor_route_defect_library_copy_failed": "Se guardó el defecto, pero la copia en la biblioteca falló — inténtelo de nuevo desde Notas › Guardar como fragmento.",
   "editor_route_navigate_hint_press": "Presione",

@@ -1118,26 +1118,26 @@ export function FieldEditor({ data }: { data: EditorData }) {
  }
  }
  }
- // Task 16 — results[] lets a batch report exactly how many of a large
- // selection made it, instead of an all-or-nothing toast. d.ok is derived
- // from results.every(ok), so without this a single failed file
- // in a 12-photo batch would fire BOTH the success toast (for the 11 that
- // attached) and a generic failure toast — keep them mutually
- // exclusive here.
+ // results[] reports how many files of a large selection made it. Success and failure toasts are mutually
+ // exclusive; a file the host kept on the device (kept) is neither: it gets a neutral toast of its own.
  const total = d.results.length;
+ const keptCount = d.results.filter((r) => !r.ok && r.kept === true).length;
  const successCount = d.results.filter((r) => r.ok).length;
- const failCount = total - successCount;
+ const failCount = total - successCount - keptCount;
+ if (total === 0) {
+ // No file reached the uploader (an empty batch): say so rather than showing nothing.
+ notify(m.editor_route_photo_upload_failed(), "error", { durationMs: 8000 });
+ continue;
+ }
+ if (keptCount > 0) notify(m.editor_route_photos_kept({ count: keptCount, s: keptCount === 1 ? "" : "s" }), "info", { durationMs: 6000 });
  if (failCount > 0) {
- notify(m.editor_route_photos_partial_upload({ success: successCount, total, failed: failCount }), "error", { durationMs: 8000 });
- } else if (total > 0) {
+ notify(m.editor_route_photos_partial_upload({ success: successCount, total: total - keptCount, failed: failCount }), "error", { durationMs: 8000 });
+ } else if (successCount > 0) {
  notify(
  m.editor_route_photos_added({ count: successCount, s: successCount === 1 ? "" : "s", toDefect: d.targetType === "defect" ? " to defect" : "" }),
  "success",
  { durationMs: 2000 },
  );
- } else {
- // No file reached the uploader (an empty batch): say so rather than showing nothing.
- notify(m.editor_route_photo_upload_failed(), "error", { durationMs: 8000 });
  }
  }
  }, [photoUpload.outcomes, photoUpload.consume, findings, notify]);

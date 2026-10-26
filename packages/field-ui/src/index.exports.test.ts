@@ -15,6 +15,7 @@ const VALUE_EXPORTS = [
   "FieldEditor",
   "METADATA_PRESETS",
   "RELIANCE_TEMPLATES",
+  "appendPendingPhoto",
   "bindFieldLocaleSource",
   "escapeWillBeHandled",
   "findingKey",
@@ -47,7 +48,7 @@ function typeNamesInIndex(): string[] {
 describe("@inspectorhub/field-ui root entry", () => {
   it("exports exactly the listed values, and both counts are pinned", () => {
     const actual = Object.keys(api).sort();
-    expect([actual.length, VALUE_EXPORTS.length]).toEqual([19, 19]);
+    expect([actual.length, VALUE_EXPORTS.length]).toEqual([20, 20]);
     expect(actual).toEqual([...VALUE_EXPORTS].sort());
   });
 

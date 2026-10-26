@@ -85,7 +85,7 @@ export { FieldEditor } from './editor/FieldEditor';
 // Pure logic a host needs to stay in step with the editor. `findingKey` is the shared one (the server uses it
 // too), not the narrower copy under hooks/findings.
 export { findingKey, findingsForUnit, isMetaKey } from './shared/finding-key';
-export { resolvePendingPhoto } from './collab/results-binding';
+export { appendPendingPhoto, resolvePendingPhoto } from './collab/results-binding';
 export { resolvePcaNarrative } from './shared/pca-narrative';
 export { RELIANCE_TEMPLATES } from './shared/pca-reliance-text';
 export { METADATA_PRESETS } from './shared/commercial-subtypes';
