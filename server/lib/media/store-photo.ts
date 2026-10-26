@@ -20,8 +20,13 @@ export function isSignedPhotoExt(ext: string | undefined): ext is string {
     return !!ext && Object.values<string>(SIGNED_PHOTO_EXT).includes(ext);
 }
 
+/** Refuses a photo body over the ceiling with 413, whichever route received it. */
+export function assertPhotoSize(size: number): void {
+    if (size > MAX_PHOTO_BYTES) throw Errors.PayloadTooLarge(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${size})`);
+}
+
 /**
- * Validate size, strip GPS/EXIF on ingest, and store the photo bytes at `key`.
+ * Validate size and type, strip GPS/EXIF on ingest, and store the photo bytes at `key`.
  * The one place the item-photo, pool-photo and signed-URL upload paths all
  * write through, so the size ceiling and the metadata strip cannot diverge.
  *
@@ -36,10 +41,11 @@ export async function storePhotoAtKey(
     key: string,
     file: File,
 ): Promise<void> {
-    if (file.size > MAX_PHOTO_BYTES) {
-        throw Errors.BadRequest(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${file.size})`);
+    assertPhotoSize(file.size);
+    if (signedPhotoExtFor(file.type) === null) {
+        throw Errors.BadRequest(`Photo type '${file.type}' is not accepted; use image/jpeg, image/png or image/heic`);
     }
-    const { bytes, contentType } = await stripExifOnIngest(images, await file.arrayBuffer(), file.type || 'image/jpeg');
+    const { bytes, contentType } = await stripExifOnIngest(images, await file.arrayBuffer(), file.type);
     await r2.put(key, bytes, {
         httpMetadata: { contentType },
         customMetadata: { originalName: file.name || 'photo' },

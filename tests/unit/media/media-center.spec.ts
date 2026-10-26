@@ -3,6 +3,7 @@ import { InspectionService } from '../../../server/services/inspection.service';
 import { ScopedDB, type DrizzleDB } from '../../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
+import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -283,5 +284,29 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
 
         await expect(svc.attachPoolPhoto(INSPECTION_ID, TENANT, 'foreign-pool', 'item-cover'))
             .rejects.toThrow(/not found/i);
+    });
+
+    describe('photo uploads accept only jpeg, png and heic, up to the size ceiling', () => {
+        const upload = {
+            'item photo': (file: File) => svc.uploadPhoto(INSPECTION_ID, TENANT, 'item-cover', file),
+            'pool photo': (file: File) => svc.uploadPoolPhoto(INSPECTION_ID, TENANT, file),
+        };
+
+        it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: a declared type outside the list is a 400 and stores nothing', async (name) => {
+            const refused = new File([new Uint8Array([1])], 'a.svg', { type: 'image/svg+xml' });
+            await expect(upload[name](refused)).rejects.toMatchObject({ status: 400 });
+            const untyped = new File([new Uint8Array([1])], 'a.jpg');
+            await expect(upload[name](untyped)).rejects.toMatchObject({ status: 400 });
+            expect(r2Mock.put).not.toHaveBeenCalled();
+            for (const type of ['image/jpeg', 'image/png', 'image/heic']) {
+                await expect(upload[name](new File([new Uint8Array([1])], 'a.jpg', { type }))).resolves.toBeDefined();
+            }
+        });
+
+        it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: a file over the ceiling is a 413 and stores nothing', async (name) => {
+            const big = new File([new Uint8Array(MAX_PHOTO_BYTES + 1)], 'big.jpg', { type: 'image/jpeg' });
+            await expect(upload[name](big)).rejects.toMatchObject({ status: 413 });
+            expect(r2Mock.put).not.toHaveBeenCalled();
+        });
     });
 });

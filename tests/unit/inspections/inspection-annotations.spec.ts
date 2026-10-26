@@ -4,6 +4,7 @@ import { InspectionService } from '../../../server/services/inspection.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
+import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -63,6 +64,14 @@ describe('saveAnnotation', () => {
       },
       lastSyncedAt: new Date(),
     });
+  });
+
+  it('refuses a rendering over the photo ceiling with 413 and stores nothing; one at the ceiling is accepted', async () => {
+    await expect(svc.saveAnnotation(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(MAX_PHOTO_BYTES + 1), '[]', undefined))
+      .rejects.toMatchObject({ status: 413 });
+    expect(r2.store.size).toBe(0);
+    const { annotatedKey } = await svc.saveAnnotation(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(MAX_PHOTO_BYTES), '[]', undefined);
+    expect(r2.store.has(annotatedKey)).toBe(true);
   });
 
   it('writes the annotatedKey to R2 and records it on the photo entry', async () => {

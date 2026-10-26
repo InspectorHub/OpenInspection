@@ -5792,6 +5792,27 @@
                                     "nullable": true
                                   },
                                   "description": "The template structure frozen onto this inspection, or null when it has none or the stored value is not a readable object. The editor reads it to render the checklist."
+                                },
+                                "coverPhotoId": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "description": "Storage key of the photo chosen as the report cover, or null when none is chosen."
+                                },
+                                "propertyFacts": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "additionalProperties": {
+                                    "nullable": true
+                                  },
+                                  "description": "The Property Facts values (year built, size, foundation and the like), or null when none are stored."
+                                },
+                                "pcaNarrative": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "additionalProperties": {
+                                    "type": "string"
+                                  },
+                                  "description": "The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders."
                                 }
                               }
                             }
@@ -7043,7 +7064,7 @@
         ],
         "summary": "Seed the Document Review checklist",
         "operationId": "seedInspectionComplianceDocReview",
-        "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched. The inspection id is not looked up first, so an unknown id answers 200 and writes rows no inspection shows.",
+        "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched. An unknown inspection id answers 404.",
         "parameters": [
           {
             "schema": {
@@ -7088,7 +7109,7 @@
         ],
         "summary": "Patch a Document Review checklist item",
         "operationId": "patchInspectionComplianceDocReviewItem",
-        "description": "Patches requested/received/reviewed/na/notes on a single Document Review checklist item. The inspection id is not looked up first, so an unknown inspection or document key answers 200.",
+        "description": "Patches requested/received/reviewed/na/notes on a single Document Review checklist item. An unknown inspection id answers 404; an unknown document key answers 200 and changes nothing.",
         "parameters": [
           {
             "schema": {
@@ -7395,7 +7416,7 @@
         ],
         "summary": "Record a dual sign-off attestation",
         "operationId": "signInspectionCompliance",
-        "description": "Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca (409 otherwise); 404 when the inspection is not in this company. The person recorded is whatever personId and name the request carries: they are free text and are not required to match the signed-in user.",
+        "description": "Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca (409 otherwise); 404 when the inspection is not in this company. The person recorded is the signed-in user: the request needs only role, license and dualRole, and personId and name are filled from the session and the user record. An inspector (or any role other than owner or manager) who sends a different personId gets 400, and a name they send is ignored. An owner or manager may record another person by sending both personId and name, which are stored as given (sending only one answers 400).",
         "parameters": [
           {
             "schema": {
@@ -7425,12 +7446,12 @@
                   "personId": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "The signer's user/identity id (accountability record)."
+                    "description": "Optional. Omit it to sign as yourself. A role other than owner or manager is refused with 400 for any value that is not its own user id; an owner or manager naming another person sends this together with name."
                   },
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "description": "The signer's display name, as rendered in the Appendix D qualifications block."
+                    "description": "Optional. Omit it to sign as yourself: the name on your user record is used, and for a role other than owner or manager a name sent here is ignored. An owner or manager naming another person sends it together with personId. Rendered in the Appendix D qualifications block."
                   },
                   "license": {
                     "type": "string",
@@ -7448,9 +7469,7 @@
                   }
                 },
                 "required": [
-                  "role",
-                  "personId",
-                  "name"
+                  "role"
                 ]
               }
             }
@@ -8275,7 +8294,7 @@
         ],
         "summary": "Set cropped report cover (baked JPEG derivative + crop transform)",
         "operationId": "setInspectionCover",
-        "description": "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain). Responds 400 when the image is missing, storage is unavailable or sourceKey does not reference a photo of this inspection, and 404 when the inspection is not in this company. No size cap is enforced for this upload today.",
+        "description": "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain). Responds 400 when the image is missing, storage is unavailable or sourceKey does not reference a photo of this inspection, and 404 when the inspection is not in this company. An image over 10 MiB is refused with 413.",
         "parameters": [
           {
             "schema": {
@@ -8462,7 +8481,7 @@
         ],
         "summary": "Save photo annotation (composite PNG + Konva nodes JSON)",
         "operationId": "createInspectionItemsPhotosAnnotation",
-        "description": "Saves an annotated version of a checklist item photo from a multipart upload: image is the flattened PNG rendering and nodes is the JSON describing the drawn shapes, kept so the annotation can be edited again. The PNG is written to photo storage next to the original, which is kept untouched, and a repeat save overwrites the previous annotated image. Unless the company edits live in the collaborative editor, the photo entry in the report results also gains the annotated image key and the shapes JSON; with the collaborative editor on, only the image is stored and the returned key must be recorded by the client. Responds 400 when the image is missing or storage is unavailable, and 404 when there is no photo at that index. No size cap is enforced for this upload today. Available to owner, manager and inspector roles.",
+        "description": "Saves an annotated version of a checklist item photo from a multipart upload: image is the flattened PNG rendering and nodes is the JSON describing the drawn shapes, kept so the annotation can be edited again. The PNG is written to photo storage next to the original, which is kept untouched, and a repeat save overwrites the previous annotated image. Unless the company edits live in the collaborative editor, the photo entry in the report results also gains the annotated image key and the shapes JSON; with the collaborative editor on, only the image is stored and the returned key must be recorded by the client. Responds 400 when the image is missing or storage is unavailable, and 404 when there is no photo at that index. An image over 10 MiB is refused with 413. Available to owner, manager and inspector roles.",
         "parameters": [
           {
             "schema": {
@@ -8597,7 +8616,7 @@
         ],
         "summary": "Bake and store a cropped derivative for an inspection-item or defect photo",
         "operationId": "cropInspectionItemPhoto",
-        "description": "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain). No size cap is enforced for this upload today.",
+        "description": "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain). An image over 10 MiB is refused with 413.",
         "parameters": [
           {
             "schema": {
@@ -8810,7 +8829,7 @@
         ],
         "summary": "Upload a photo to the inspection media pool (loose, unattached)",
         "operationId": "uploadInspectionMedia",
-        "description": "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. A file over 10 MiB is refused with 400. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles.",
+        "description": "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. A file over 10 MiB is refused with 413, and a file whose declared type is not image/jpeg, image/png or image/heic with 400. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles.",
         "parameters": [
           {
             "schema": {
@@ -9263,7 +9282,7 @@
           "inspections"
         ],
         "summary": "Patch inspection PCA report narrative",
-        "description": "Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render. A key that is not one of the narrative blocks is dropped without an error: the call still answers 200 and stores nothing for it.",
+        "description": "Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render. A key that is not one of the narrative blocks answers 400 naming it.",
         "operationId": "patchInspectionPcaNarrative",
         "parameters": [
           {
@@ -9515,7 +9534,7 @@
           "inspections"
         ],
         "summary": "Auto-fill property facts from public records (Estated.io)",
-        "description": "Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill. Available to owner and manager roles only: an inspector receives 403.",
+        "description": "Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill. Available to owner, manager and inspector roles; an inspector is limited to the inspections they may see.",
         "operationId": "autofillInspection",
         "parameters": [
           {
@@ -9560,7 +9579,7 @@
         ],
         "summary": "Publish inspection for current tenant",
         "operationId": "publishInspection",
-        "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.",
+        "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.",
         "x-capability": "publish",
         "parameters": [
           {
@@ -12879,7 +12898,7 @@
         ],
         "summary": "Upload inspection for current tenant",
         "operationId": "uploadInspection",
-        "description": "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. A file over 10 MiB is refused with 400. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles.",
+        "description": "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. A file over 10 MiB is refused with 413, and a file whose declared type is not image/jpeg, image/png or image/heic with 400. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles.",
         "parameters": [
           {
             "schema": {

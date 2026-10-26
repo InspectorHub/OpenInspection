@@ -6,7 +6,7 @@
  *  - is every route the app calls registered (and is an unregistered one noticed)?
  *  - does each registered operation exist in the committed document with its method and path?
  *  - are the shapes the registry cannot express (multipart bodies, bodies deliberately left
- *    out of the schema, the missing size cap) still stated where a client reads them?
+ *    out of the schema, the size cap) still stated where a client reads them?
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -199,9 +199,10 @@ describe('editor write routes in the native contract', () => {
         ['annotation', `${B}/items/{itemId}/photos/{photoIndex}/annotation`],
         ['crop', `${B}/items/{itemId}/photos/{photoIndex}/crop`],
         ['cover', `${B}/cover`],
-    ] as const)('%s says that no size cap is enforced', (_label, path) => {
-        expect(operation('post', path).description).toContain('No size cap is enforced for this upload today.');
-        // Control: the photo upload does have a cap and must not claim otherwise.
-        expect(operation('post', `${B}/upload`).description).not.toContain('No size cap');
+    ] as const)('%s states the 413 size cap', (_label, path) => {
+        expect(operation('post', path).description).toContain('An image over 10 MiB is refused with 413.');
+        expect(operation('post', path).description).not.toContain('No size cap');
+        // Control: the photo upload states the same cap, with 413.
+        expect(operation('post', `${B}/upload`).description).toContain('A file over 10 MiB is refused with 413');
     });
 });

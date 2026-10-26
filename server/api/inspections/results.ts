@@ -83,12 +83,12 @@ export const updatePropertyFactsRoute = createRoute(withMcpMetadata({
  * Partial-patch handler for the report narrative panel. Omitted keys are
  * unchanged. Returns the resolved narrative (seed fallbacks applied).
  */
-const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
+export const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
     method: 'patch',
     path: '/{id}/pca-narrative',
     tags: ["inspections"],
     summary: "Patch inspection PCA report narrative",
-    description: 'Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render. A key that is not one of the narrative blocks is dropped without an error: the call still answers 200 and stores nothing for it.',
+    description: 'Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render. A key that is not one of the narrative blocks answers 400 naming it.',
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Inspection id whose PCA narrative is patched') }),
         body: { content: { 'application/json': { schema: PcaNarrativePatchSchema } } },
@@ -119,12 +119,12 @@ const autofillPropertyFactsRoute = createRoute(withMcpMetadata({
     path: '/{id}/property-facts/autofill',
     tags: ["inspections"],
     summary: 'Auto-fill property facts from public records (Estated.io)',
-    description: 'Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill. Available to owner and manager roles only: an inspector receives 403.',
+    description: 'Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill. Available to owner, manager and inspector roles; an inspector is limited to the inspections they may see.',
     request: {
         params: z.object({ id: z.string().trim().min(1).describe('Id of the inspection the property-record lookup is run for.') }),
         body: { content: { 'application/json': { schema: PropertyFactsAutofillRequestSchema.describe('The street address to look up in public property records.') } } },
     },
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
         200: {
             content: { 'application/json': { schema: PropertyFactsAutofillResponseSchema } },

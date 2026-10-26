@@ -225,7 +225,7 @@ const saveAnnotationRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createInspectionItemsPhotosAnnotation",
-    description: "Saves an annotated version of a checklist item photo from a multipart upload: image is the flattened PNG rendering and nodes is the JSON describing the drawn shapes, kept so the annotation can be edited again. The PNG is written to photo storage next to the original, which is kept untouched, and a repeat save overwrites the previous annotated image. Unless the company edits live in the collaborative editor, the photo entry in the report results also gains the annotated image key and the shapes JSON; with the collaborative editor on, only the image is stored and the returned key must be recorded by the client. Responds 400 when the image is missing or storage is unavailable, and 404 when there is no photo at that index. No size cap is enforced for this upload today. Available to owner, manager and inspector roles."
+    description: "Saves an annotated version of a checklist item photo from a multipart upload: image is the flattened PNG rendering and nodes is the JSON describing the drawn shapes, kept so the annotation can be edited again. The PNG is written to photo storage next to the original, which is kept untouched, and a repeat save overwrites the previous annotated image. Unless the company edits live in the collaborative editor, the photo entry in the report results also gains the annotated image key and the shapes JSON; with the collaborative editor on, only the image is stored and the returned key must be recorded by the client. Responds 400 when the image is missing or storage is unavailable, and 404 when there is no photo at that index. An image over 10 MiB is refused with 413. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'excluded' }));
 
 // ── Media Studio (cover crop): POST /api/inspections/:id/cover ───────────────
@@ -260,7 +260,7 @@ const setCoverCropRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "setInspectionCover",
-    description: "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain). Responds 400 when the image is missing, storage is unavailable or sourceKey does not reference a photo of this inspection, and 404 when the inspection is not in this company. No size cap is enforced for this upload today."
+    description: "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain). Responds 400 when the image is missing, storage is unavailable or sourceKey does not reference a photo of this inspection, and 404 when the inspection is not in this company. An image over 10 MiB is refused with 413."
 }, { scopes: ['write'], tier: 'excluded' }));
 
 // ── Media Studio (Plan 4): crop an item/defect photo ─────────────────────────
@@ -295,7 +295,7 @@ const cropItemPhotoRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "cropInspectionItemPhoto",
-    description: "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain). No size cap is enforced for this upload today.",
+    description: "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain). An image over 10 MiB is refused with 413.",
 }, { scopes: ['write'], tier: 'excluded' }));
 
 // ── Route handlers ────────────────────────────────────────────────────────────

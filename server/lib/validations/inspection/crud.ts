@@ -257,6 +257,9 @@ export const InspectionListResponseSchema = createApiResponseSchema(z.array(Insp
 export const GetInspectionResponseSchema = createApiResponseSchema(z.object({
     inspection: InspectionSchema.extend({
         templateSnapshot: z.record(z.string(), z.unknown()).nullable().optional().describe('The template structure frozen onto this inspection, or null when it has none or the stored value is not a readable object. The editor reads it to render the checklist.'),
+        coverPhotoId: z.string().nullable().optional().describe('Storage key of the photo chosen as the report cover, or null when none is chosen.'),
+        propertyFacts: z.record(z.string(), z.unknown()).nullable().optional().describe('The Property Facts values (year built, size, foundation and the like), or null when none are stored.'),
+        pcaNarrative: z.record(z.string(), z.string()).nullable().optional().describe('The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders.'),
     }).describe('The inspection record.'),
     template: z.unknown().openapi({ description: 'The associated template schema' }),
     primaryReportId: z.string().nullable().describe('Id of the primary report of this inspection, or null when it has none yet. A native device writes it into the manifest of an exported package; the importer refuses a package for an existing inspection whose report id differs from this one. The key is always present on a server that supports it; a missing key means an older server.'),

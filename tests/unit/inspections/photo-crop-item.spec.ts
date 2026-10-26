@@ -5,6 +5,7 @@ import { InspectionService } from '../../../server/services/inspection.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
+import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 describe('PhotoCropSchema', () => {
@@ -131,6 +132,14 @@ describe('saveCroppedItemPhoto', () => {
     const entry = (JSON.parse(afterData) as Record<string, { photos: CropEntry[] }>)[ITEM_ID].photos[0];
     expect(entry.croppedKey).toBeUndefined();        // never written
     expect(entry.annotatedKey).toBe('old-ann.png');  // untouched (still present)
+  });
+
+  it('refuses a baked image over the photo ceiling with 413 and stores nothing; one at the ceiling is accepted', async () => {
+    await expect(svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(MAX_PHOTO_BYTES + 1), CROP, undefined))
+      .rejects.toMatchObject({ status: 413 });
+    expect(r2.store.size).toBe(0);
+    const { croppedKey } = await svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(MAX_PHOTO_BYTES), CROP, undefined);
+    expect(r2.store.has(croppedKey)).toBe(true);
   });
 
   it('throws NotFound when photoIndex is out of range', async () => {

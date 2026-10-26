@@ -8,8 +8,8 @@ import { z } from '@hono/zod-openapi';
 
 export const SignoffBodySchema = z.object({
     role: z.enum(['field_observer', 'pcr_reviewer']).describe('Sign-off role: the field observer who performed the walk-through, or the PCR reviewer exercising responsible control.'),
-    personId: z.string().min(1).describe('The signer\'s user/identity id (accountability record).'),
-    name: z.string().min(1).describe('The signer\'s display name, as rendered in the Appendix D qualifications block.'),
+    personId: z.string().min(1).optional().describe('Optional. Omit it to sign as yourself. A role other than owner or manager is refused with 400 for any value that is not its own user id; an owner or manager naming another person sends this together with name.'),
+    name: z.string().min(1).optional().describe('Optional. Omit it to sign as yourself: the name on your user record is used, and for a role other than owner or manager a name sent here is ignored. An owner or manager naming another person sends it together with personId. Rendered in the Appendix D qualifications block.'),
     license: z.string().nullable().optional().describe('Professional license number, if applicable.'),
     qualificationsRef: z.string().nullable().optional().describe('Pointer to the qualifications narrative/exhibit.'),
     dualRole: z.boolean().optional().describe('True when one person holds both sign-off roles (ASTM §7.6).'),

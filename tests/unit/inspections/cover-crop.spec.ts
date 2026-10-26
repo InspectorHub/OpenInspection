@@ -27,6 +27,7 @@ import { InspectionService } from '../../../server/services/inspection.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
+import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -95,6 +96,14 @@ describe('InspectionService.setCroppedCover', () => {
     expect(row!.coverImageKey).toBe(coverImageKey);
     expect(row!.coverPhotoId).toBe(POOL_KEY);
     expect(row!.coverCrop).toEqual(CROP);
+  });
+
+  it('refuses a baked cover over the photo ceiling with 413 and stores nothing; one at the ceiling is accepted', async () => {
+    await expect(svc.setCroppedCover(INSPECTION_ID, TENANT, POOL_KEY, new ArrayBuffer(MAX_PHOTO_BYTES + 1), CROP))
+      .rejects.toMatchObject({ status: 413 });
+    expect(r2.store.size).toBe(0);
+    const { coverImageKey } = await svc.setCroppedCover(INSPECTION_ID, TENANT, POOL_KEY, new ArrayBuffer(MAX_PHOTO_BYTES), CROP);
+    expect(r2.store.has(coverImageKey)).toBe(true);
   });
 
   it('rejects a sourceKey that does not belong to the inspection', async () => {

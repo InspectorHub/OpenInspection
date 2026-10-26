@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreateInspectionSchema } from '../../../server/lib/validations/inspection.schema';
+import { CreateInspectionSchema, GetInspectionResponseSchema } from '../../../server/lib/validations/inspection.schema';
 
 /**
  * iter-1 production bug #1 — `clientEmail` Zod validation rejected an empty
@@ -73,5 +73,33 @@ describe('CreateInspectionSchema.clientEmail', () => {
             const messages = result.error.issues.map((i) => i.message);
             expect(messages.some((m) => /invalid email/i.test(m))).toBe(true);
         }
+    });
+});
+
+/**
+ * GET /api/inspections/{id} returns the whole inspection row, so the cover photo, the property
+ * facts and the PCA narrative reach the client. The response schema must declare them: a schema
+ * that leaves them out hides fields the editor and the native app read.
+ */
+describe('GetInspectionResponseSchema declares the editor fields the row carries', () => {
+    const inspection = {
+        id: 'i1', propertyAddress: '1 Main St', clientName: null, clientEmail: null, status: 'requested', date: '2026-06-01',
+        inspectorId: null, templateId: null, createdAt: '2026-06-01T10:00:00.000Z',
+    };
+    const parse = (extra: Record<string, unknown>) => GetInspectionResponseSchema.parse({
+        success: true, data: { inspection: { ...inspection, ...extra }, template: null, primaryReportId: null },
+    }).data.inspection as Record<string, unknown>;
+
+    it('keeps coverPhotoId, propertyFacts and pcaNarrative', () => {
+        const out = parse({ coverPhotoId: 'k.jpg', propertyFacts: { yearBuilt: 1990 }, pcaNarrative: { purpose: 'p' } });
+        expect(out.coverPhotoId).toBe('k.jpg');
+        expect(out.propertyFacts).toEqual({ yearBuilt: 1990 });
+        expect(out.pcaNarrative).toEqual({ purpose: 'p' });
+    });
+
+    it('control: they stay optional, and null is a valid value', () => {
+        expect(parse({})).not.toHaveProperty('coverPhotoId');
+        const out = parse({ coverPhotoId: null, propertyFacts: null, pcaNarrative: null });
+        expect(out).toMatchObject({ coverPhotoId: null, propertyFacts: null, pcaNarrative: null });
     });
 });

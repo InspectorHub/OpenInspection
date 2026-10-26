@@ -120,8 +120,8 @@ export function encodeCommand(cmd: FieldCommand): EncodedCommand {
                 case "signoff":
                     return build("compliance-signoff", {
                         role: cmd.role,
-                        personId: cmd.personId,
-                        name: cmd.name,
+                        ...(cmd.personId ? { personId: cmd.personId } : {}),
+                        ...(cmd.name ? { name: cmd.name } : {}),
                         license: cmd.license ?? "",
                         dualRole: flag(cmd.dualRole),
                     });

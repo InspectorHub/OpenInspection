@@ -112,7 +112,7 @@ describe('Commercial PCA compliance routes', () => {
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await db.insert(schema.users).values({
-            id: USER_ID, tenantId: TENANT, email: 'user@example.com',
+            id: USER_ID, tenantId: TENANT, email: 'user@example.com', name: 'Real Signer',
             passwordHash: 'hash', createdAt: new Date(),
         });
     });
@@ -142,7 +142,7 @@ describe('Commercial PCA compliance routes', () => {
         const res = await app.request(`/api/inspections/${INSP_ID}/compliance/signoff`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'pcr_reviewer', personId: 'u1', name: 'Jane', license: 'PE-1', dualRole: false }),
+            body: JSON.stringify({ role: 'pcr_reviewer', personId: USER_ID, name: 'Jane', license: 'PE-1', dualRole: false }),
         }, FAKE_ENV, FAKE_EXEC_CTX);
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { role: string; signatureRef: string; signedAt: number } };
@@ -157,13 +157,89 @@ describe('Commercial PCA compliance routes', () => {
         expect(typeof getBody.data.reportSignoffs[0].signedAt).toBe('number');
     });
 
+    describe('sign-off identity: bound to the signed-in user, except that an owner or manager may record someone else', () => {
+        const signoff = (app: ReturnType<typeof buildApp>, body: Record<string, unknown>) => app.request(`/api/inspections/${INSP_ID}/compliance/signoff`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        }, FAKE_ENV, FAKE_EXEC_CTX);
+        const signer = async (res: Response) => (await res.json() as { data: { personId: string; name: string } }).data;
+
+        it.each(['owner', 'manager'] as const)('%s may record a different person, stored as given', async (role) => {
+            await seedInspection(db);
+            const res = await signoff(buildApp(db, role), { role: 'pcr_reviewer', personId: 'external-engineer', name: 'Eli Engineer' });
+            expect(res.status).toBe(200);
+            expect(await signer(res)).toMatchObject({ personId: 'external-engineer', name: 'Eli Engineer' });
+            expect((await db.select().from(schema.reportSignoff).all())[0]).toMatchObject({ personId: 'external-engineer', name: 'Eli Engineer' });
+        });
+
+        it.each(['owner', 'manager', 'inspector'] as const)('%s omitting both is recorded as themself, with the name on file', async (role) => {
+            await seedInspection(db);
+            const res = await signoff(buildApp(db, role), { role: 'pcr_reviewer' });
+            expect(res.status).toBe(200);
+            expect(await signer(res)).toMatchObject({ personId: USER_ID, name: 'Real Signer' });
+        });
+
+        it('an owner naming a person without a name (or the reverse) is a 400', async () => {
+            await seedInspection(db);
+            expect((await signoff(buildApp(db, 'owner'), { role: 'pcr_reviewer', personId: 'x' })).status).toBe(400);
+            expect((await signoff(buildApp(db, 'owner'), { role: 'pcr_reviewer', name: 'X' })).status).toBe(400);
+        });
+
+        it('an inspector sending a different personId is a 400 and stores nothing', async () => {
+            await seedInspection(db);
+            const res = await signoff(buildApp(db, 'inspector'), { role: 'pcr_reviewer', personId: 'someone-else', name: 'Jane' });
+            expect(res.status).toBe(400);
+            expect(await db.select().from(schema.reportSignoff).all()).toEqual([]);
+        });
+
+        it('control: an inspector sending their own id is accepted, and their typed name is ignored', async () => {
+            await seedInspection(db);
+            const res = await signoff(buildApp(db, 'inspector'), { role: 'pcr_reviewer', personId: USER_ID, name: 'Typed Name' });
+            expect(res.status).toBe(200);
+            expect(await signer(res)).toMatchObject({ personId: USER_ID, name: 'Real Signer' });
+        });
+
+        it('signing the same role again still replaces the prior attestation', async () => {
+            await seedInspection(db);
+            const app = buildApp(db, 'owner');
+            await signoff(app, { role: 'pcr_reviewer', license: 'PE-1' });
+            await signoff(app, { role: 'pcr_reviewer', license: 'PE-2' });
+            const rows = await db.select().from(schema.reportSignoff).all();
+            expect(rows).toHaveLength(1);
+            expect(rows[0]?.license).toBe('PE-2');
+        });
+    });
+
+    describe('doc-review writes look the inspection up first', () => {
+        it('seed for an unknown inspection is a 404 and writes no rows', async () => {
+            const app = buildApp(db, 'owner');
+            const res = await app.request('/api/inspections/no-such-inspection/compliance/doc-review/seed', { method: 'POST' }, FAKE_ENV, FAKE_EXEC_CTX);
+            expect(res.status).toBe(404);
+            expect(await db.select().from(schema.documentReviewItems).all()).toEqual([]);
+        });
+
+        it('patch for an unknown inspection is a 404', async () => {
+            const app = buildApp(db, 'owner');
+            const res = await app.request('/api/inspections/no-such-inspection/compliance/doc-review/any-key', {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requested: true }),
+            }, FAKE_ENV, FAKE_EXEC_CTX);
+            expect(res.status).toBe(404);
+        });
+
+        it('control: seed on a known inspection still answers 200 and writes rows', async () => {
+            await seedInspection(db);
+            const res = await buildApp(db, 'owner').request(`/api/inspections/${INSP_ID}/compliance/doc-review/seed`, { method: 'POST' }, FAKE_ENV, FAKE_EXEC_CTX);
+            expect(res.status).toBe(200);
+            expect((await db.select().from(schema.documentReviewItems).all()).length).toBeGreaterThan(0);
+        });
+    });
+
     it('POST /compliance/signoff on a light_commercial inspection → 409 TIER_NOT_FULL_PCA', async () => {
         await seedInspection(db, { reportTier: 'light_commercial' });
         const app = buildApp(db, 'owner');
         const res = await app.request(`/api/inspections/${INSP_ID}/compliance/signoff`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'pcr_reviewer', personId: 'u1', name: 'Jane' }),
+            body: JSON.stringify({ role: 'pcr_reviewer', personId: USER_ID, name: 'Jane' }),
         }, FAKE_ENV, FAKE_EXEC_CTX);
         expect(res.status).toBe(409);
         const body = await res.json() as { error: { code: string } };
@@ -176,7 +252,7 @@ describe('Commercial PCA compliance routes', () => {
         await app.request(`/api/inspections/${INSP_ID}/compliance/signoff`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'field_observer', personId: 'u1', name: 'Jane' }),
+            body: JSON.stringify({ role: 'field_observer', personId: USER_ID, name: 'Jane' }),
         }, FAKE_ENV, FAKE_EXEC_CTX);
         const delRes = await app.request(`/api/inspections/${INSP_ID}/compliance/signoff/field_observer`, { method: 'DELETE' }, FAKE_ENV, FAKE_EXEC_CTX);
         expect(delRes.status).toBe(200);
@@ -292,7 +368,7 @@ describe('Commercial PCA compliance routes', () => {
         await app.request(`/api/inspections/${INSP_ID}/compliance/signoff`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ role: 'pcr_reviewer', personId: 'u1', name: 'Jane' }),
+            body: JSON.stringify({ role: 'pcr_reviewer', personId: USER_ID, name: 'Jane' }),
         }, FAKE_ENV, FAKE_EXEC_CTX);
         await app.request(`/api/inspections/${INSP_ID}/compliance/psq/status`, {
             method: 'POST',

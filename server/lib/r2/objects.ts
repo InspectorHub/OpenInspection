@@ -27,6 +27,10 @@ export async function r2Get(
     return bucket.get(key, options);
 }
 
+export async function r2Head(bucket: R2Bucket, key: string): Promise<R2Object | null> {
+    return bucket.head(key);
+}
+
 export async function r2Delete(bucket: R2Bucket, keys: string | string[]): Promise<void> {
     await bucket.delete(keys);
 }

@@ -12,6 +12,7 @@ const snapshotPatch = vi.fn();
 const collabRestructure = vi.fn();
 const templateGet = vi.fn();
 const templatePut = vi.fn();
+const signoffPost = vi.fn();
 /** Call order across endpoints — the whole point of the auto-sign specs. */
 const calls: string[] = [];
 
@@ -28,6 +29,7 @@ vi.mock('~/lib/api-client.server', () => ({
                 units: { $post: unitsPost },
                 'template-snapshot': { $patch: snapshotPatch },
                 collab: { restructure: { $post: collabRestructure } },
+                compliance: { signoff: { $post: signoffPost } },
             },
             templates: { ':id': { $get: templateGet, $put: templatePut } },
         },
@@ -38,6 +40,7 @@ import { action } from './action.server';
 import { createApi } from '~/lib/api-client.server';
 import { routeArgs } from '../../../tests/helpers/route-args';
 import { templatesRouteConfigs } from '../../../server/api/inspections/templates';
+import { SignoffBodySchema } from '../../../server/lib/validations/compliance.schema';
 /** Minimal AppLoadContext stub — the action only forwards it to createApi. */
 const CONTEXT = {} as Parameters<typeof action>[0]['context'];
 
@@ -461,5 +464,33 @@ describe('editor action — save-structure-template back to the source', () => {
         const res = await back();
         expect(templatePut).not.toHaveBeenCalled();
         expect(res).toMatchObject({ ok: false, error: 'Could not load the source template to update it.' });
+    });
+});
+
+describe('editor action - compliance sign-off names a person only when one is typed', () => {
+    beforeEach(() => { signoffPost.mockReset().mockResolvedValue(new Response(null, { status: 200 })); });
+
+    it('sends only the role, license and dual-role flag, in a body the route accepts, and reports success', async () => {
+        // No personId or name field in the form: the server records the signed-in user.
+        const res = await post({ intent: 'compliance-signoff', role: 'pcr_reviewer', license: ' PE-1 ', dualRole: 'true' });
+        expect(res).toMatchObject({ ok: true, intent: 'compliance-signoff', role: 'pcr_reviewer' });
+        expect(signoffPost).toHaveBeenCalledTimes(1);
+        const json = signoffPost.mock.calls[0]?.[0].json;
+        expect(json).toEqual({ role: 'pcr_reviewer', license: 'PE-1', dualRole: true });
+        expect(SignoffBodySchema.safeParse(json).success).toBe(true);
+    });
+
+    it('control: a person typed by an owner or manager is relayed as typed', async () => {
+        const res = await post({ intent: 'compliance-signoff', role: 'pcr_reviewer', personId: ' ext-1 ', name: ' Eli Engineer ' });
+        expect(res).toMatchObject({ ok: true });
+        const json = signoffPost.mock.calls[0]?.[0].json;
+        expect(json).toMatchObject({ personId: 'ext-1', name: 'Eli Engineer' });
+        expect(SignoffBodySchema.safeParse(json).success).toBe(true);
+    });
+
+    it('control: a role that is not a sign-off role is refused without calling the route', async () => {
+        const res = await post({ intent: 'compliance-signoff', role: 'owner' });
+        expect(res).toMatchObject({ ok: false, intent: 'compliance-signoff' });
+        expect(signoffPost).not.toHaveBeenCalled();
     });
 });

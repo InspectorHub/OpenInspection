@@ -24,7 +24,7 @@ import { logger } from '../../lib/logger';
 import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
 import { getDrizzle } from '../../lib/route-helpers';
-import { r2Put, r2Get } from '../../lib/r2/objects';
+import { r2Put, r2Get, r2Head } from '../../lib/r2/objects';
 import { MAX_PHOTO_BYTES } from '../../lib/media/store-photo';
 import { ownClipKey, ownPosterKey } from '../../services/video/r2-backend';
 
@@ -151,7 +151,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
         }
 
         // The poster belongs to a clip that was uploaded under this token: refuse one for a media id with no clip.
-        const clips = await Promise.all([...new Set(Object.values(MIME_TO_EXT))].map((ext) => c.env.PHOTOS.head(r2Keys.inspectionVideo(tenantId, id, claims.mediaId, ext))));
+        const clips = await Promise.all([...new Set(Object.values(MIME_TO_EXT))].map((ext) => r2Head(c.env.PHOTOS, r2Keys.inspectionVideo(tenantId, id, claims.mediaId, ext))));
         if (clips.every((clip) => clip === null)) {
             return c.json({ error: 'No uploaded video for this upload token' }, 404);
         }

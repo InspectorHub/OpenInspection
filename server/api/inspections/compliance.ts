@@ -17,7 +17,7 @@ import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import type { reportSignoff, psqResponses } from '../../lib/db/schema';
-import { inspections } from '../../lib/db/schema';
+import { inspections, users } from '../../lib/db/schema';
 import { resolveReportTier } from '../../lib/report-tier';
 import { computeConformance, deriveConformanceInput } from '../../lib/pca-conformance';
 import {
@@ -130,7 +130,7 @@ const signoffRoute = createRoute(withMcpMetadata({
         409: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.object({ code: z.literal('TIER_NOT_FULL_PCA'), message: z.string() }) }) } }, description: 'Inspection is not report_tier=full_pca.' },
     },
     operationId: 'signInspectionCompliance',
-    description: 'Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca (409 otherwise); 404 when the inspection is not in this company. The person recorded is whatever personId and name the request carries: they are free text and are not required to match the signed-in user.',
+    description: 'Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca (409 otherwise); 404 when the inspection is not in this company. The person recorded is the signed-in user: the request needs only role, license and dualRole, and personId and name are filled from the session and the user record. An inspector (or any role other than owner or manager) who sends a different personId gets 400, and a name they send is ignored. An owner or manager may record another person by sending both personId and name, which are stored as given (sending only one answers 400).',
 }, { scopes: ['write'], tier: 'extended' }));
 
 const removeSignoffRoute = createRoute(withMcpMetadata({
@@ -159,7 +159,7 @@ const seedDocReviewRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Seed acknowledged (idempotent — already-seeded keys are skipped).' },
     },
     operationId: 'seedInspectionComplianceDocReview',
-    description: 'Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched. The inspection id is not looked up first, so an unknown id answers 200 and writes rows no inspection shows.',
+    description: 'Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched. An unknown inspection id answers 404.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 const patchDocReviewItemRoute = createRoute(withMcpMetadata({
@@ -176,7 +176,7 @@ const patchDocReviewItemRoute = createRoute(withMcpMetadata({
         200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Update acknowledged.' },
     },
     operationId: 'patchInspectionComplianceDocReviewItem',
-    description: 'Patches requested/received/reviewed/na/notes on a single Document Review checklist item. The inspection id is not looked up first, so an unknown inspection or document key answers 200.',
+    description: 'Patches requested/received/reviewed/na/notes on a single Document Review checklist item. An unknown inspection id answers 404; an unknown document key answers 200 and changes nothing.',
 }, { scopes: ['write'], tier: 'extended' }));
 
 const upsertPsqRoute = createRoute(withMcpMetadata({
@@ -254,10 +254,24 @@ app.openapi(signoffRoute, async (c) => {
     const ctx = await loadComplianceContext(db, id, tenantId);
     assertFullPcaTier(ctx);
 
+    // The signer is the signed-in user (id from the verified token, name from their user record),
+    // except that an owner or manager, by the verified role, may record another person by naming both.
+    const userId = c.get('user').sub;
+    const mayRecordOthers = ['owner', 'manager'].includes(c.get('userRole'));
+    if (!mayRecordOthers && body.personId !== undefined && body.personId !== userId) {
+        throw Errors.BadRequest('personId must be the signed-in user; omit it to sign as yourself');
+    }
+    if (mayRecordOthers && (body.personId === undefined) !== (body.name === undefined)) {
+        throw Errors.BadRequest('Name the person with both personId and name, or leave both out to sign as yourself');
+    }
+    const signer = await db.select({ name: users.name, email: users.email }).from(users)
+        .where(and(eq(users.id, userId), eq(users.tenantId, tenantId))).get();
+    if (!signer) throw Errors.BadRequest('The signed-in user has no record in this company');
+
     const row = await c.var.services.compliance.signOff(tenantId, id, {
         role: body.role,
-        personId: body.personId,
-        name: body.name,
+        personId: mayRecordOthers && body.personId !== undefined ? body.personId : userId,
+        name: mayRecordOthers && body.name !== undefined ? body.name : (signer.name ?? signer.email),
         license: body.license ?? null,
         qualificationsRef: body.qualificationsRef ?? null,
         dualRole: body.dualRole ?? false,
@@ -283,6 +297,7 @@ app.openapi(removeSignoffRoute, async (c) => {
 app.openapi(seedDocReviewRoute, async (c) => {
     const tenantId = getTenantId(c);
     const { id } = c.req.valid('param');
+    await loadComplianceContext(getDrizzle(c), id, tenantId);
     await c.var.services.compliance.seedDocumentReview(tenantId, id);
     auditFromContext(c, 'inspection.compliance.doc_review_seeded', 'inspection', { entityId: id });
     return c.json({ success: true as const }, 200);
@@ -291,6 +306,7 @@ app.openapi(patchDocReviewItemRoute, async (c) => {
     const tenantId = getTenantId(c);
     const { id, documentKey } = c.req.valid('param');
     const patch = c.req.valid('json');
+    await loadComplianceContext(getDrizzle(c), id, tenantId);
     await c.var.services.compliance.updateDocumentReviewItem(tenantId, id, documentKey, patch);
     auditFromContext(c, 'inspection.compliance.doc_review_updated', 'inspection', {
         entityId: id,

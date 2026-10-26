@@ -122,8 +122,13 @@ function SignoffRoleCard({
   // its own write is in flight, so a refused click is not reachable.
   const { run: runSign, busy: saving } = useFieldCommand(inspectionId);
   const { run: runRemove, busy: removing } = useFieldCommand(inspectionId);
-  const [personId, setPersonId] = useState(existing?.personId ?? "");
-  const [name, setName] = useState(existing?.name ?? "");
+  // Everyone signs as themselves. An owner or manager may instead name another person, by
+  // typing both fields (the server refuses just one); left blank means "me" and the server fills in the signed-in user.
+  // Mirrors isAdminRole (server/lib/auth/roles.ts): this published package cannot import the server tree.
+  // eslint-disable-next-line no-restricted-syntax
+  const mayNamePerson = session.role === "owner" || session.role === "manager";
+  const [personId, setPersonId] = useState("");
+  const [name, setName] = useState("");
   const [license, setLicense] = useState(existing?.license ?? "");
   const [dualRole, setDualRole] = useState(existing?.dualRole ?? false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -135,13 +140,12 @@ function SignoffRoleCard({
   // One reload per accepted write: the answer settles once, so there is no
   // re-render storm to guard against.
   const submitSignoff = async () => {
-    if (!personId.trim() || !name.trim()) return;
     const answer = await runSign({
       type: "compliance",
       op: "signoff",
       role,
-      personId: personId.trim(),
-      name: name.trim(),
+      ...(personId.trim() ? { personId: personId.trim() } : {}),
+      ...(name.trim() ? { name: name.trim() } : {}),
       license: license.trim(),
       dualRole,
     });
@@ -178,20 +182,9 @@ function SignoffRoleCard({
         </div>
       ) : (
         <div className="space-y-2">
-          <input
-            placeholder={m.editor_compliance_person_id()}
-            value={personId}
-            onChange={(e) => setPersonId(e.target.value)}
-            disabled={saving}
-            className="ih-input w-full"
-          />
-          <input
-            placeholder={m.editor_compliance_name()}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={saving}
-            className="ih-input w-full"
-          />
+          {mayNamePerson && ([[m.editor_compliance_person_id(), personId, setPersonId], [m.editor_compliance_name(), name, setName]] as const).map(([placeholder, value, set]) => (
+            <input key={placeholder} placeholder={placeholder} value={value} onChange={(e) => set(e.target.value)} disabled={saving} className="ih-input w-full" />
+          ))}
           <input
             placeholder={m.editor_compliance_license_optional()}
             value={license}
@@ -212,7 +205,7 @@ function SignoffRoleCard({
             variant="primary"
             size="sm"
             onClick={() => void submitSignoff()}
-            disabled={!personId.trim() || !name.trim()} pending={saving}
+            pending={saving}
             className="w-full"
           >
             {saving ? m.editor_compliance_signing() : m.editor_compliance_sign_off()}

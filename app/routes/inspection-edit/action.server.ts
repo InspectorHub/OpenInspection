@@ -380,12 +380,12 @@ if (intent === "sign-inspector") {
   const name = String(formData.get("name") ?? "").trim();
   const license = String(formData.get("license") ?? "").trim() || null;
   const dualRole = formData.get("dualRole") === "true";
-  if ((role !== "field_observer" && role !== "pcr_reviewer") || !personId || !name) {
+  if ((role !== "field_observer" && role !== "pcr_reviewer")) {
    return { ok: false as const, intent: "compliance-signoff" };
   }
   const res = await api.inspections[":id"].compliance.signoff.$post({
    param: { id: params.id },
-   json: { role, personId, name, license, dualRole },
+   json: { role, ...(personId ? { personId } : {}), ...(name ? { name } : {}), license, dualRole },
   });
   return { ok: res.ok, intent: "compliance-signoff", role };
  }

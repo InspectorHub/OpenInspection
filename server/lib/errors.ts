@@ -149,6 +149,7 @@ export const Errors = {
         new AppError(403, ErrorCode.SELF_PERMISSION_CHANGE, 'You cannot change your own permissions. Ask an owner.'),
     NotFound: (msg: string = 'Resource not found') => new AppError(404, ErrorCode.NOT_FOUND, msg),
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
+    PayloadTooLarge: (msg: string) => new AppError(413, ErrorCode.BAD_REQUEST, msg),
     Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),
     UnprocessableEntity: (msg: string, details?: unknown) =>
         new AppError(422, ErrorCode.UNPROCESSABLE_ENTITY, msg, details),
