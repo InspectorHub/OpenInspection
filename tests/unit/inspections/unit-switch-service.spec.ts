@@ -8,10 +8,12 @@
  * orchestration those pure functions are wrapped in.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { UnitSwitchService } from '../../../server/services/unit-switch.service';
 import { UnitService } from '../../../server/services/unit.service';
 import { createTestDb, setupSchema } from '../db';
+import { asD1DrizzleReturn } from '../helpers/test-db';
+import { Errors } from '../../../server/lib/errors';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -65,8 +67,7 @@ describe('UnitSwitchService', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(testDb));
         switchSvc = new UnitSwitchService({} as D1Database);
         unitSvc = new UnitService({} as D1Database);
     });
@@ -132,6 +133,77 @@ describe('UnitSwitchService', () => {
         const defect = (data['_default:kitchen:sink'] as { tabs: { defects: { location?: string }[] } }).tabs.defects[0];
         expect(defect.location).toBe('101');
         expect(await readMode(testDb)).toBe('tagged');
+    });
+
+    it('toTagged with nested promoted units deletes every one and skips none wrongly', async () => {
+        await seed(testDb, { mode: 'per_unit' });
+        const parent = await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: 'P' });
+        await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: parent.id, kind: 'unit', name: 'P-child' });
+        const sibling = await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: 'S' });
+        await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: sibling.id, kind: 'unit', name: 'S-child' });
+        // list() orders by sortOrder; put the children after their parents so the walk meets parents first.
+        await testDb.update(schema.inspectionUnits).set({ sortOrder: 50 }).where(inArray(schema.inspectionUnits.name, ['P-child', 'S-child']));
+        const deleteSpy = vi.spyOn(UnitService.prototype, 'delete');
+        try {
+            const out = await switchSvc.toTagged(TENANT, INSPECTION);
+            expect(out.locationOptions.sort()).toEqual(['P', 'P-child', 'S', 'S-child']);
+            expect(await unitSvc.list(TENANT, INSPECTION)).toHaveLength(0);
+            // Only the two top-level units are deleted explicitly; each cascade removes its child.
+            expect(deleteSpy.mock.calls.map((c) => c[2]).sort()).toEqual([parent.id, sibling.id].sort());
+        } finally {
+            deleteSpy.mockRestore();
+        }
+    });
+
+    it('toTagged tolerates a unit that a concurrent request already removed, and still deletes the rest', async () => {
+        await seed(testDb, { mode: 'per_unit' });
+        const gone = await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: 'Gone' });
+        const kept = await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: 'Kept' });
+        const realDelete = UnitService.prototype.delete;
+        const deleteSpy = vi.spyOn(UnitService.prototype, 'delete').mockImplementation(async function (this: UnitService, t: string, i: string, id: string) {
+            if (id === gone.id) throw Errors.NotFound('Unit not found');
+            return realDelete.call(this, t, i, id);
+        });
+        try {
+            const out = await switchSvc.toTagged(TENANT, INSPECTION);
+            expect(out.mode).toBe('tagged');
+            expect((await unitSvc.list(TENANT, INSPECTION)).map((u) => u.id)).toEqual([gone.id]);
+            expect(deleteSpy.mock.calls.map((c) => c[2]).sort()).toEqual([gone.id, kept.id].sort());
+            expect(await readMode(testDb)).toBe('tagged');
+        } finally {
+            deleteSpy.mockRestore();
+        }
+    });
+
+    it('toTagged still surfaces an error other than not-found from a delete', async () => {
+        await seed(testDb, { mode: 'per_unit' });
+        await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: 'U' });
+        const deleteSpy = vi.spyOn(UnitService.prototype, 'delete').mockRejectedValue(new Error('boom'));
+        try {
+            await expect(switchSvc.toTagged(TENANT, INSPECTION)).rejects.toThrow('boom');
+            expect(await readMode(testDb)).toBe('per_unit');
+        } finally {
+            deleteSpy.mockRestore();
+        }
+    });
+
+    it('toTagged terminates on a legacy parent cycle between promoted units', async () => {
+        await seed(testDb, { mode: 'per_unit' });
+        const row = (id: string, parent: string) => ({
+            id, tenantId: TENANT, inspectionId: INSPECTION, parentUnitId: parent, kind: 'unit' as const,
+            type: 'unit' as const, name: id, sortOrder: 0, createdAt: new Date(),
+        });
+        await testDb.insert(schema.inspectionUnits).values([row('cyc-a', 'cyc-b'), row('cyc-b', 'cyc-a')]);
+        // The real delete would recurse around the cycle, which is a separate legacy hazard; stub it out so
+        // this test exercises only the switch loop's own descendant walk.
+        const deleteSpy = vi.spyOn(UnitService.prototype, 'delete').mockResolvedValue(undefined);
+        try {
+            const out = await switchSvc.toTagged(TENANT, INSPECTION);
+            expect(out.mode).toBe('tagged');
+            expect(deleteSpy).toHaveBeenCalledTimes(1);
+        } finally {
+            deleteSpy.mockRestore();
+        }
     });
 
     it('round-trips tagged -> per_unit -> tagged preserving the located finding', async () => {

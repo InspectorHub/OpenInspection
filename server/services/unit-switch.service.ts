@@ -19,7 +19,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { inspections, inspectionResults } from '../lib/db/schema';
-import { Errors } from '../lib/errors';
+import { AppError, Errors } from '../lib/errors';
 import { planPromotion, rewriteKeysForPromotion, flattenUnitsToTagged } from '../lib/unit-switch';
 import { UnitService } from './unit.service';
 
@@ -102,7 +102,8 @@ export class UnitSwitchService {
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
 
-        const unitRows = (await this.units.list(tenantId, inspectionId)).filter((u) => u.kind === 'unit');
+        const allRows = await this.units.list(tenantId, inspectionId);
+        const unitRows = allRows.filter((u) => u.kind === 'unit');
         const units = unitRows.map((u) => ({ id: u.id, label: u.name }));
 
         // Every demoted unit's label MUST survive into location_options — even a
@@ -133,8 +134,23 @@ export class UnitSwitchService {
 
         // Delete the promoted unit rows (leaf 'unit' nodes; buildings/floors, if
         // any, stay as structural grouping). UnitService.delete cascades + scopes.
+        // A unit nested under another promoted unit is already gone once its parent cascades.
+        const gone = new Set<string>();
         for (const u of unitRows) {
-            await this.units.delete(tenantId, u.id);
+            if (gone.has(u.id)) continue;
+            try {
+                await this.units.delete(tenantId, inspectionId, u.id);
+            } catch (err) {
+                // Removed by a concurrent request since the list above: nothing left to delete.
+                if (!(err instanceof AppError && err.status === 404)) throw err;
+            }
+            const stack = [u.id];
+            while (stack.length) {
+                const next = stack.pop()!;
+                if (gone.has(next)) continue;
+                gone.add(next);
+                for (const r of allRows) if (r.parentUnitId === next) stack.push(r.id);
+            }
         }
 
         await db.update(inspections)

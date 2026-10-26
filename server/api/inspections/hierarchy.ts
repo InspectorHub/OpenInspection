@@ -4,7 +4,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
-import { Errors } from '../../lib/errors';
+import { AppError, Errors } from '../../lib/errors';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema, BulkCreateUnitsSchema, UnitModeSwitchSchema } from '../../lib/validations/unit.schema';
 import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -36,7 +36,7 @@ const createUnitRoute = createRoute(withMcpMetadata({
         400: { description: 'validation / depth / duplicate-name' },
     },
     operationId: "createInspectionUnits",
-    description: "Adds one node (building, floor or unit) to the inspection's unit tree and returns its id. The tree is at most three levels deep below the top, so a parent that is already at the deepest level is refused, and a name already used by a sibling under the same parent is refused; both come back as 400. The new node is sorted after its existing siblings. The inspection id is not looked up first, so an unknown id simply produces a node no inspection shows. Available to owner, manager and inspector roles."
+    description: "Adds one node (building, floor or unit) to the inspection's unit tree and returns its id. The tree is at most three levels deep below the top, so a parent that is already at the deepest level is refused, and a name already used by a sibling under the same parent is refused; both come back as 400. The new node is sorted after its existing siblings. A parent that is not a unit of this inspection is refused with 400. The inspection id itself is not looked up first, so an unknown id simply produces a node no inspection shows. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Commercial PCA Phase U — bulk-create N units (floors×stacks / CSV paste) and
@@ -57,7 +57,7 @@ const bulkCreateUnitsRoute = createRoute(withMcpMetadata({
         400: { description: 'validation' },
     },
     operationId: "bulkCreateInspectionUnits",
-    description: "Creates many units at once under one parent (or at the top level) and returns their ids. Two input styles: a floors-by-stacks grid, or pasted CSV text, each expanded into labelled units. Every created node is a regular unit. Labels that collide with an existing sibling or repeat within the batch are skipped silently, so the returned ids can be fewer than requested, or empty. All rows are inserted together. Refused with 400 when the parent is already at the deepest allowed level or the input cannot be parsed. Available to owner, manager and inspector roles."
+    description: "Creates many units at once under one parent (or at the top level) and returns their ids. Two input styles: a floors-by-stacks grid, or pasted CSV text, each expanded into labelled units. Every created node is a regular unit. Labels that collide with an existing sibling or repeat within the batch are skipped silently, so the returned ids can be fewer than requested, or empty. All rows are inserted together. Refused with 400 when the parent is not a unit of this inspection, is already at the deepest allowed level, or the input cannot be parsed. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const duplicateUnitRoute = createRoute(withMcpMetadata({
@@ -136,12 +136,12 @@ const updateUnitRoute = createRoute(withMcpMetadata({
     summary:    'Rename or re-sort a unit',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to (not checked against the unit by this route).'), unitId: z.string().min(1).describe('Unit to rename or reorder.') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to; a unit of any other inspection is reported as not found.'), unitId: z.string().min(1).describe('Unit to rename or reorder.') }),
         body: { content: { 'application/json': { schema: UpdateUnitSchema.describe('New name and or new sort position; omit a field to leave it as is.') } } },
     },
-    responses: { 200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema } } } },
+    responses: { 200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema } } }, 404: { description: 'unit not found in this inspection' } },
     operationId: "patchInspectionUnit",
-    description: "Renames a unit or changes its sort position; fields left out are unchanged. Sibling-name uniqueness is not re-checked on rename. The unit is looked up by its own id within the company only, so the inspection id in the path is not verified against it, and an unknown unit id succeeds without changing anything. Available to owner, manager and inspector roles."
+    description: "Renames a unit or changes its sort position; fields left out are unchanged. Sibling-name uniqueness is not re-checked on rename. The unit is looked up by its id within this inspection, so an unknown unit id, or one that belongs to a different inspection, answers 404 and changes nothing. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const deleteUnitRoute = createRoute(withMcpMetadata({
@@ -150,10 +150,10 @@ const deleteUnitRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary:    'Delete a unit (cascades to children)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request:    { params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to (not checked against the unit by this route).'), unitId: z.string().min(1).describe('Unit to delete along with all of its descendants.') }) },
-    responses:  { 200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema } } } },
+    request:    { params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to; a unit of any other inspection is reported as not found.'), unitId: z.string().min(1).describe('Unit to delete along with all of its descendants.') }) },
+    responses:  { 200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema } } }, 404: { description: 'unit not found in this inspection' } },
     operationId: "deleteInspectionUnit",
-    description: "Deletes a unit together with every unit nested beneath it. Findings recorded against the deleted units are not removed by this route. The unit is looked up by its own id within the company only, so the inspection id in the path is not verified against it, and an unknown unit id still returns success. Cannot be undone. Available to owner, manager and inspector roles."
+    description: "Deletes a unit together with every unit nested beneath it. Findings recorded against the deleted units are not removed by this route. The unit is looked up by its id within this inspection, so an unknown unit id, or one that belongs to a different inspection, answers 404 and deletes nothing. Cannot be undone. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const moveUnitRoute = createRoute(withMcpMetadata({
@@ -163,15 +163,16 @@ const moveUnitRoute = createRoute(withMcpMetadata({
     summary:    'Reparent + reorder atomically (cycle-detected)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to (not checked against the unit by this route).'), unitId: z.string().min(1).describe('Unit to move.') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection the unit belongs to; a unit of any other inspection is reported as not found.'), unitId: z.string().min(1).describe('Unit to move.') }),
         body: { content: { 'application/json': { schema: MoveUnitSchema.describe('The new parent (null for top level) and the new sort position.') } } },
     },
     responses: {
         200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema } } },
-        400: { description: 'cycle detected' },
+        400: { description: 'cycle detected, or the new parent is not a unit of this inspection' },
+        404: { description: 'unit not found in this inspection' },
     },
     operationId: "createInspectionUnitsMove",
-    description: "Moves a unit under a different parent (or to the top level) and sets its sort position in one step. Refused with 400 if the new parent is the unit itself or one of its descendants, since that would create a cycle. The three-level depth limit is not re-checked on a move, and the inspection id in the path is not verified against the unit. Available to owner, manager and inspector roles."
+    description: "Moves a unit under a different parent (or to the top level) and sets its sort position in one step. Refused with 400 if the new parent is the unit itself or one of its descendants, since that would create a cycle. A unit or a new parent that does not belong to this inspection is refused (404 for the unit, 400 for the parent). The three-level depth limit is not re-checked on a move. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
@@ -305,23 +306,26 @@ app.openapi(listUnitsRoute, async (c) => {
     return c.json({ success: true as const, data: { units } }, 200);
 });
 app.openapi(updateUnitRoute, async (c) => {
-    const { unitId } = c.req.valid('param');
-    const patch      = c.req.valid('json');
-    await c.var.services.unit.update(c.get('tenantId'), unitId, patch);
+    const { id, unitId } = c.req.valid('param');
+    const patch          = c.req.valid('json');
+    await c.var.services.unit.update(c.get('tenantId'), id, unitId, patch);
     return c.json({ success: true as const }, 200);
 });
 app.openapi(deleteUnitRoute, async (c) => {
-    const { unitId } = c.req.valid('param');
-    await c.var.services.unit.delete(c.get('tenantId'), unitId);
+    // An unknown or foreign unit answers 404 (not an idempotent 200). Revisit that only if the app ever
+    // queues unit deletes offline, because a replay of an already-applied delete would then see a 404.
+    const { id, unitId } = c.req.valid('param');
+    await c.var.services.unit.delete(c.get('tenantId'), id, unitId);
     return c.json({ success: true as const }, 200);
 });
 app.openapi(moveUnitRoute, async (c) => {
-    const { unitId } = c.req.valid('param');
+    const { id, unitId } = c.req.valid('param');
     const { newParentUnitId, newSortOrder } = c.req.valid('json');
     try {
-        await c.var.services.unit.move(c.get('tenantId'), unitId, newParentUnitId, newSortOrder);
+        await c.var.services.unit.move(c.get('tenantId'), id, unitId, newParentUnitId, newSortOrder);
         return c.json({ success: true as const }, 200);
     } catch (err) {
+        if (err instanceof AppError) throw err;
         throw Errors.BadRequest((err as Error).message);
     }
 });

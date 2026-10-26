@@ -14,6 +14,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, asc } from 'drizzle-orm';
 import { inspectionUnits } from '../lib/db/schema';
+import { Errors } from '../lib/errors';
 import { nextSortOrder, dedupeDrafts, copyName } from '../lib/unit-bulk';
 import type { UnitDraft } from '../lib/unit-pattern';
 import type { UnitAttrs } from '../lib/db/schema/units';
@@ -51,7 +52,8 @@ export class UnitService {
     async create(tenantId: string, input: CreateUnitInput): Promise<{ id: string }> {
         const db = this.getDrizzle();
 
-        // 1. Depth check via parent walk.
+        // 1. The parent must be a unit of this inspection, then depth check via parent walk.
+        await this._requireParent(db, tenantId, input.inspectionId, input.parentUnitId);
         const depth = await this._depthOf(db, tenantId, input.parentUnitId);
         if (depth >= MAX_DEPTH) {
             throw new Error(`Max tree depth (${MAX_DEPTH}) exceeded`);
@@ -101,6 +103,7 @@ export class UnitService {
     ): Promise<{ ids: string[] }> {
         const db = this.getDrizzle();
         const parentUnitId = opts?.parentUnitId ?? null;
+        await this._requireParent(db, tenantId, inspectionId, parentUnitId);
         // Same MAX_DEPTH invariant the single-create path enforces — a bulk
         // insert under a depth-3 parent would otherwise silently create depth-4
         // rows and break the bounded parent-walk assumption.
@@ -157,16 +160,16 @@ export class UnitService {
      * findings. Finding keys are prefixed by the source unit id, so the new
      * unit starts empty by construction; only name/kind/type/parent/attrs clone.
      */
-    async duplicate(tenantId: string, unitId: string, inspectionId?: string): Promise<{ id: string }> {
+    async duplicate(tenantId: string, unitId: string, inspectionId: string): Promise<{ id: string }> {
         const db = this.getDrizzle();
         const src = await db.select().from(inspectionUnits)
             .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId)))
             .get();
-        // When the caller supplies the inspection scope (the route does), the
-        // unit MUST belong to it — otherwise a unit from another inspection could
-        // be duplicated through this inspection's URL. Treat a mismatch as
-        // not-found so we don't confirm the unit's existence across inspections.
-        if (!src || (inspectionId !== undefined && src.inspectionId !== inspectionId)) {
+        // The unit MUST belong to the caller's inspection — otherwise a unit from
+        // another inspection could be duplicated through this inspection's URL.
+        // Treat a mismatch as not-found so we don't confirm the unit's existence
+        // across inspections.
+        if (!src || src.inspectionId !== inspectionId) {
             throw new Error('Unit not found');
         }
         const siblings = (await this.list(tenantId, src.inspectionId))
@@ -200,27 +203,35 @@ export class UnitService {
     // `| undefined` on both keys: the caller is a Zod `.optional()` PATCH body, so
     // the values arrive as `T | undefined`, and drizzle's `.set()` drops undefined
     // entries — an omitted key and an undefined one both leave the column alone.
-    async update(tenantId: string, unitId: string, patch: { name?: string | undefined; sortOrder?: number | undefined }): Promise<void> {
+    async update(tenantId: string, inspectionId: string, unitId: string, patch: { name?: string | undefined; sortOrder?: number | undefined }): Promise<void> {
         const db = this.getDrizzle();
+        await this._requireUnit(db, tenantId, inspectionId, unitId);
         await db.update(inspectionUnits).set(patch)
-            .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId)));
+            .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)));
     }
 
-    async delete(tenantId: string, unitId: string): Promise<void> {
+    async delete(tenantId: string, inspectionId: string, unitId: string): Promise<void> {
         const db = this.getDrizzle();
-        // Recursive cascade — depth ≤ 3 so worst-case ~Nchildren queries.
+        await this._requireUnit(db, tenantId, inspectionId, unitId);
+        await this._deleteCascade(db, tenantId, inspectionId, unitId);
+    }
+
+    // Recursive cascade — depth ≤ 3 so worst-case ~Nchildren queries.
+    private async _deleteCascade(db: ReturnType<typeof drizzle>, tenantId: string, inspectionId: string, unitId: string): Promise<void> {
         const children = await db.select().from(inspectionUnits)
-            .where(and(eq(inspectionUnits.parentUnitId, unitId), eq(inspectionUnits.tenantId, tenantId)))
+            .where(and(eq(inspectionUnits.parentUnitId, unitId), eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
             .all();
         for (const c of children) {
-            await this.delete(tenantId, c.id);
+            await this._deleteCascade(db, tenantId, inspectionId, c.id);
         }
         await db.delete(inspectionUnits)
-            .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId)));
+            .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)));
     }
 
-    async move(tenantId: string, unitId: string, newParentUnitId: string | null, newSortOrder: number): Promise<void> {
+    async move(tenantId: string, inspectionId: string, unitId: string, newParentUnitId: string | null, newSortOrder: number): Promise<void> {
         const db = this.getDrizzle();
+        await this._requireUnit(db, tenantId, inspectionId, unitId);
+        await this._requireParent(db, tenantId, inspectionId, newParentUnitId);
 
         if (newParentUnitId) {
             // Cycle check: walk newParent's ancestors; must not encounter unitId.
@@ -239,7 +250,37 @@ export class UnitService {
 
         await db.update(inspectionUnits)
             .set({ parentUnitId: newParentUnitId, sortOrder: newSortOrder })
-            .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId)));
+            .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)));
+    }
+
+    /**
+     * The unit must exist in this company AND belong to this inspection. A unit of another inspection or
+     * another company answers exactly like a missing one, so the id's existence is not confirmed.
+     */
+    private async _requireUnit(
+        db: ReturnType<typeof drizzle>,
+        tenantId: string,
+        inspectionId: string,
+        unitId: string,
+    ): Promise<void> {
+        const row = await db.select({ id: inspectionUnits.id }).from(inspectionUnits)
+            .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
+            .get();
+        if (!row) throw Errors.NotFound('Unit not found');
+    }
+
+    /** A named parent must be a unit of this inspection in this company; null (top level) always passes. */
+    private async _requireParent(
+        db: ReturnType<typeof drizzle>,
+        tenantId: string,
+        inspectionId: string,
+        parentUnitId: string | null,
+    ): Promise<void> {
+        if (!parentUnitId) return;
+        const row = await db.select({ id: inspectionUnits.id }).from(inspectionUnits)
+            .where(and(eq(inspectionUnits.id, parentUnitId), eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
+            .get();
+        if (!row) throw new Error('Parent unit not found');
     }
 
     private async _depthOf(
