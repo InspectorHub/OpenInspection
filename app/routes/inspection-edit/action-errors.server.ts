@@ -12,14 +12,15 @@ export interface ApiReply {
  * when the body is missing, is not JSON, or has no message. Only text the server already chose
  * to send is passed on.
  */
-export async function refusalMessage(res: ApiReply, fallback: string): Promise<string> {
-  const bodyText = await res.text().catch(() => "");
-  try {
-    const parsed = JSON.parse(bodyText) as { error?: { message?: string }; message?: string };
-    return parsed?.error?.message ?? parsed?.message ?? fallback;
-  } catch {
-    return fallback;
-  }
+export function refusalMessage(res: ApiReply, fallback: string): Promise<string> {
+  return res.text().catch(() => "").then((bodyText) => {
+    try {
+      const parsed = JSON.parse(bodyText) as { error?: { message?: string }; message?: string };
+      return parsed?.error?.message ?? parsed?.message ?? fallback;
+    } catch {
+      return fallback;
+    }
+  });
 }
 
 /**
