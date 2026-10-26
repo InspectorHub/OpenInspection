@@ -38,7 +38,7 @@
 import type { Context } from 'hono';
 import { and, eq, inArray, lt, sql } from 'drizzle-orm';
 import { Errors, type AppError } from '../lib/errors';
-import { inspections, offlineImportApplied } from '../lib/db/schema';
+import { offlineImportApplied } from '../lib/db/schema';
 import { findTombstonedIds } from '../lib/inspection/tombstones';
 import { getDrizzle } from '../lib/route-helpers';
 import { createCredentialScope, isInProcessRequest, OFFLINE_IMPORT_REPLAY, REQUEST_SCOPE } from '../lib/request-scope';
@@ -186,14 +186,7 @@ export async function findDeletedCreates(
     const creates = candidates.filter((e) => e.op === 'inspection.create');
     if (creates.length === 0) return [];
     const recorded = await recordedEntries(c, tenantId, creates);
-    const db = getDrizzle(c);
-    const tombstoned = new Set(await findTombstonedIds(db, tenantId, creates.map((e) => e.payload.id)));
-    // A delete that failed after writing the tombstone leaves the inspection in place: it was not deleted.
-    if (tombstoned.size > 0) {
-        const present = await db.select({ id: inspections.id }).from(inspections)
-            .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.id, [...tombstoned])));
-        for (const row of present) tombstoned.delete(row.id);
-    }
+    const tombstoned = new Set(await findTombstonedIds(getDrizzle(c), tenantId, creates.map((e) => e.payload.id)));
     return creates.filter((e) => recorded.has(e) || tombstoned.has(e.payload.id)).map((e) => e.payload.id);
 }
 
