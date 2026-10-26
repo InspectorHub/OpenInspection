@@ -387,7 +387,7 @@ if (intent === "sign-inspector") {
    param: { id: params.id },
    json: { role, ...(personId ? { personId } : {}), ...(name ? { name } : {}), license, dualRole },
   });
-  return { ok: res.ok, intent: "compliance-signoff", role };
+  return { ok: res.ok, intent: "compliance-signoff", role, ...(res.ok ? {} : { error: await refusalMessage(res, "The sign-off could not be recorded.") }) };
  }
 
  if (intent === "compliance-remove-signoff") {

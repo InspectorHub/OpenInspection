@@ -132,7 +132,9 @@ function SignoffRoleCard({
   const [license, setLicense] = useState(existing?.license ?? "");
   const [dualRole, setDualRole] = useState(existing?.dualRole ?? false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-
+  // The server refuses one of the two without the other, so a half-typed pair is not sent.
+  const [pairTried, setPairTried] = useState(false);
+  const pairIncomplete = personId.trim() === "" !== (name.trim() === "");
 
   // This card renders straight off `existing` (loader props) — no local
   // optimistic copy of "signed" state — so a successful sign-off or removal
@@ -140,6 +142,7 @@ function SignoffRoleCard({
   // One reload per accepted write: the answer settles once, so there is no
   // re-render storm to guard against.
   const submitSignoff = async () => {
+    if (pairIncomplete) { setPairTried(true); return; }
     const answer = await runSign({
       type: "compliance",
       op: "signoff",
@@ -149,7 +152,9 @@ function SignoffRoleCard({
       license: license.trim(),
       dualRole,
     });
-    if (!isIgnored(answer) && answer.ok) dataSource.reload();
+    if (isIgnored(answer)) return;
+    if (answer.ok) dataSource.reload();
+    else dataSource.notify(answer.error ?? m.editor_compliance_signoff_failed(), "error");
   };
 
   const confirmRemove = async () => {
@@ -192,6 +197,7 @@ function SignoffRoleCard({
             disabled={saving}
             className="ih-input w-full"
           />
+          {pairTried && pairIncomplete ? <p role="alert" className="text-[11px] text-ih-bad-fg">{m.editor_compliance_signoff_pair_needed()}</p> : null}
           <label className="flex items-center gap-1.5 text-[11px] text-ih-fg-3">
             <input
               type="checkbox"

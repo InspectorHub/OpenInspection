@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { FieldDataSourceProvider } from "../../context";
 import type { SessionInfo } from "../../data-source";
+import { m } from "../../i18n";
 import { createEmptyEditorData, createFakeDataSource } from "../../testing/fake-data-source";
 import type { FakeDataSource } from "../../testing/fake-data-source";
 import type { CompliancePanelData } from "../../data-source-types";
@@ -209,6 +210,87 @@ describe("CompliancePanel sign-off", () => {
     expect(sent(fake)).toEqual([
       { type: "compliance", op: "signoff", role: "pcr_reviewer", personId: "P-7", name: "Ada Lovelace", license: "", dualRole: false },
     ]);
+  });
+
+  describe("naming a person", () => {
+    const typeInto = (card: HTMLElement, placeholder: string, value: string) =>
+      fireEvent.change(within(card).getByPlaceholderText(placeholder), { target: { value } });
+    const signOff = (card: HTMLElement) => fireEvent.click(within(card).getByRole("button", { name: /sign off/i }));
+
+    it.each([["Person ID", "P-7"], ["Name", "Ada Lovelace"]])("typing only the %s sends nothing and says both are needed", async (placeholder, value) => {
+      const { fake } = renderPanel(base, { role: "owner" });
+      const card = screen.getByTestId("signoff-pcr_reviewer");
+      typeInto(card, placeholder, value);
+      signOff(card);
+      await settle();
+      expect(fake.commands).toEqual([]);
+      expect(within(card).getByRole("alert").textContent).toBe(m.editor_compliance_signoff_pair_needed());
+      expect(fake.reloadCount).toBe(0);
+    });
+
+    it("a whitespace-only input counts as empty: a name beside a blank person ID is still one-sided", async () => {
+      const { fake } = renderPanel(base, { role: "owner" });
+      const card = screen.getByTestId("signoff-pcr_reviewer");
+      typeInto(card, "Person ID", "   ");
+      typeInto(card, "Name", "Ada Lovelace");
+      signOff(card);
+      await settle();
+      expect(fake.commands).toEqual([]);
+      expect(within(card).getByRole("alert")).toBeTruthy();
+    });
+
+    it("CONTROL - the message is not shown before a sign-off is tried, and goes once the pair is complete", async () => {
+      const { fake } = renderPanel(base, { role: "owner" });
+      const card = screen.getByTestId("signoff-pcr_reviewer");
+      typeInto(card, "Person ID", "P-7");
+      expect(within(card).queryByRole("alert")).toBeNull();
+      signOff(card);
+      expect(within(card).getByRole("alert")).toBeTruthy();
+      typeInto(card, "Name", "Ada Lovelace");
+      expect(within(card).queryByRole("alert")).toBeNull();
+      signOff(card);
+      await waitFor(() => expect(fake.commands).toHaveLength(1));
+    });
+
+    it("CONTROL - two blank (whitespace-only) inputs sign as the signed-in user, with no pair sent", async () => {
+      const { fake } = renderPanel(base, { role: "owner" });
+      const card = screen.getByTestId("signoff-pcr_reviewer");
+      typeInto(card, "Person ID", "  ");
+      typeInto(card, "Name", " ");
+      signOff(card);
+      await waitFor(() => expect(fake.commands).toHaveLength(1));
+      expect(sent(fake)[0]).not.toHaveProperty("personId");
+      expect(within(card).queryByRole("alert")).toBeNull();
+    });
+  });
+
+  describe("a refused sign-off", () => {
+    it("shows the server's message as an error notice", async () => {
+      const { fake } = renderPanel(base);
+      fake.failExecute("compliance", "Only an owner or manager can sign for someone else.");
+      const card = fill("field_observer");
+      fireEvent.click(within(card).getByRole("button", { name: /sign off/i }));
+      await waitFor(() => expect(fake.notifications).toHaveLength(1));
+      expect(fake.notifications[0]).toMatchObject({ message: "Only an owner or manager can sign for someone else.", variant: "error" });
+    });
+
+    it("says so even when the answer carries no message", async () => {
+      const { fake } = renderPanel(base);
+      const execute = fake.execute;
+      fake.execute = (async (...args: Parameters<typeof execute>) => (args[1].type === "compliance" ? { ok: false } : execute(...args))) as typeof execute;
+      const card = fill("field_observer");
+      fireEvent.click(within(card).getByRole("button", { name: /sign off/i }));
+      await waitFor(() => expect(fake.notifications).toHaveLength(1));
+      expect(fake.notifications[0]).toMatchObject({ message: m.editor_compliance_signoff_failed(), variant: "error" });
+    });
+
+    it("CONTROL - an accepted sign-off shows no notice", async () => {
+      const { fake } = renderPanel(base);
+      const card = fill("field_observer");
+      fireEvent.click(within(card).getByRole("button", { name: /sign off/i }));
+      await waitFor(() => expect(fake.reloadCount).toBe(1));
+      expect(fake.notifications).toEqual([]);
+    });
   });
 
   it("does not reload when the sign-off is refused, and keeps what was typed", async () => {

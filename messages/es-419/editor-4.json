@@ -129,6 +129,8 @@
   "editor_compliance_dual_role": "Rol doble (la misma persona firma ambos)",
   "editor_compliance_signing": "Firmando…",
   "editor_compliance_sign_off": "Aprobar",
+  "editor_compliance_signoff_pair_needed": "Ingrese el ID de la persona y el nombre, o deje ambos vacíos para firmar usted mismo.",
+  "editor_compliance_signoff_failed": "No se pudo registrar la firma.",
   "editor_compliance_remove_signoff_title": "Quitar la aprobación",
   "editor_compliance_remove_signoff_msg": "¿Quitar la aprobación de {role}? Esto no se puede deshacer.",
   "editor_compliance_status": "Estado",

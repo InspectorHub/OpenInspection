@@ -488,6 +488,20 @@ describe('editor action - compliance sign-off names a person only when one is ty
         expect(SignoffBodySchema.safeParse(json).success).toBe(true);
     });
 
+    it('a refused sign-off carries the server message back, so the panel can show it', async () => {
+        signoffPost.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'Name both or neither.' } }), { status: 400 }));
+        const res = await post({ intent: 'compliance-signoff', role: 'pcr_reviewer', personId: 'ext-1' });
+        expect(res).toMatchObject({ ok: false, intent: 'compliance-signoff', role: 'pcr_reviewer', error: 'Name both or neither.' });
+    });
+
+    it('control: a refusal with no readable body carries a generic message, and success carries none', async () => {
+        signoffPost.mockResolvedValue(new Response(null, { status: 500 }));
+        const refused = await post({ intent: 'compliance-signoff', role: 'pcr_reviewer' });
+        expect(refused).toMatchObject({ ok: false, error: expect.stringMatching(/sign-off/i) });
+        signoffPost.mockResolvedValue(new Response(null, { status: 200 }));
+        expect(await post({ intent: 'compliance-signoff', role: 'pcr_reviewer' })).not.toHaveProperty('error');
+    });
+
     it('control: a role that is not a sign-off role is refused without calling the route', async () => {
         const res = await post({ intent: 'compliance-signoff', role: 'owner' });
         expect(res).toMatchObject({ ok: false, intent: 'compliance-signoff' });

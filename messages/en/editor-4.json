@@ -129,6 +129,8 @@
   "editor_compliance_dual_role": "Dual role (same person signs both)",
   "editor_compliance_signing": "Signing…",
   "editor_compliance_sign_off": "Sign off",
+  "editor_compliance_signoff_pair_needed": "Enter both a person ID and a name, or leave both empty to sign as yourself.",
+  "editor_compliance_signoff_failed": "The sign-off could not be recorded.",
   "editor_compliance_remove_signoff_title": "Remove sign-off",
   "editor_compliance_remove_signoff_msg": "Remove the {role} sign-off? This cannot be undone.",
   "editor_compliance_status": "Status",
