@@ -158,7 +158,7 @@ export const NATIVE_NON_OPENAPI_CONTRACT: readonly NativeNonOpenApiEntry[] = [
     },
     {
         kind: 'oauth', method: 'post', path: '/oauth/token',
-        note: 'Token endpoint: authorization code exchange and refresh.',
+        note: 'Token endpoint: authorization code exchange and refresh. A refresh refused because the member was removed answers 400 invalid_grant with an extra top-level field session_end_reason set to member_removed.',
     },
     {
         kind: 'oauth', method: 'post', path: '/oauth/register',

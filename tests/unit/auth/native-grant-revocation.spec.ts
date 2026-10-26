@@ -10,6 +10,7 @@ import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { AuthService } from '../../../server/services/auth.service';
 import { softDeleteAccount } from '../../../server/services/account.service';
+import { TeamService } from '../../../server/services/team.service';
 import { hashPassword } from '../../../server/lib/password';
 import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
@@ -86,5 +87,36 @@ describe('native grants are revoked wherever pwchanged is written', () => {
     const { oauth, grants } = fakeOauth();
     await softDeleteAccount(db as never, ALICE, 'alice@x.test', kv as unknown as KVNamespace, oauth);
     expect([...grants.keys()]).toEqual(['g-bob']);
+  });
+
+  describe('the reason a native session ended is recorded before the grant is revoked', () => {
+    /** Alice holds one native grant and one MCP grant; Bob's native grant must stay unmarked. */
+    function nativeOauth() {
+      const grants = new Map<string, { owner: string; kind: string }>([
+        ['g-alice-native', { owner: ALICE, kind: 'native' }], ['g-alice-mcp', { owner: ALICE, kind: 'mcp' }], ['g-bob-native', { owner: BOB, kind: 'native' }],
+      ]);
+      return {
+        listUserGrants: vi.fn(async (userId: string) => ({ items: [...grants].filter(([, g]) => g.owner === userId).map(([id, g]) => ({ id, metadata: { kind: g.kind } })) })),
+        revokeGrant: vi.fn(async (grantId: string) => { grants.delete(grantId); }),
+      } as unknown as OAuthHelpers;
+    }
+    const markers = () => [...(kv as unknown as { store: Map<string, string> }).store].filter(([k]) => k.startsWith('native-end:'));
+
+    it('removing a member marks the native grant of the removed member member_removed and nothing else', async () => {
+      const team = new TeamService({} as D1Database, undefined, kv as unknown as KVNamespace, nativeOauth());
+      await team.removeMember(TENANT, ALICE, BOB, 'owner');
+      expect(markers()).toEqual([['native-end:g-alice-native', 'member_removed']]);
+    });
+
+    it('self-deleting an account marks the native grant member_removed', async () => {
+      await softDeleteAccount(db as never, ALICE, 'alice@x.test', kv as unknown as KVNamespace, nativeOauth());
+      expect(markers()).toEqual([['native-end:g-alice-native', 'member_removed']]);
+    });
+
+    it('CONTROL: a password change revokes the grant but records no reason', async () => {
+      const svc = new AuthService({} as D1Database, kv as unknown as KVNamespace, undefined, nativeOauth());
+      await svc.updatePassword(ALICE, 'old-pass', 'new-pass-5');
+      expect(markers()).toEqual([]);
+    });
   });
 });

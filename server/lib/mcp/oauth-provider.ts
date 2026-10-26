@@ -3,6 +3,7 @@ import { claimsNative, currentNativeRole, isNativeProps, nativeGrantCredentialSt
 import type { McpProps } from './build-server';
 import { resourceUrlFor } from './resource-url';
 import { logger } from '../logger';
+import { markNativeSessionEnd, withSessionEndReason } from '../auth/native-session-end';
 import { mcpEnabled, nativeClientEnabled, oauthProviderEnabled } from './flag';
 import { assertCompanySlugMatches, slugFromMcpPath, stripMcpSlugPrefix } from './identity-bridge';
 import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
@@ -170,7 +171,12 @@ export function buildOAuthHandler(
             // refresh token that keeps minting access tokens.
             const props = opts.props;
             if (!isNativeProps(props) || !env.DB) return refuse('Native session cannot be verified');
-            if (!await currentNativeRole(env.DB, props.userId, props.tenantId)) return refuse('Member is no longer active');
+            if (!await currentNativeRole(env.DB, props.userId, props.tenantId)) {
+                // No longer a native member (row missing, removed, other tenant, or a role without native access).
+                // The marker goes in before refuse() revokes, like every other writer of it.
+                await markNativeSessionEnd(env.TENANT_CACHE, opts.grantId, 'member_removed');
+                return refuse('Member is no longer active');
+            }
             const credentialState = await nativeGrantCredentialState(env, props);
             if (credentialState === 'changed') return refuse('Credentials changed since sign-in');
             // An unreadable marker is a storage fault, not evidence of a change: revoking here
@@ -189,5 +195,5 @@ export function buildOAuthHandler(
     };
     const provider = new OAuthProvider<any>(options); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    return { fetch: (req, e, ctx) => provider.fetch(req, e, ctx) };
+    return { fetch: withSessionEndReason((req, e, ctx) => provider.fetch(req, e, ctx), env.TENANT_CACHE) };
 }

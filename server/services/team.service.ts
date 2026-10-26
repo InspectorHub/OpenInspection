@@ -401,7 +401,7 @@ export class TeamService {
         // identity-bridge.ts is the defense-in-depth backstop for this window.
         if (this.oauth) {
             try {
-                await revokeAllUserGrants(this.oauth, userId);
+                await revokeAllUserGrants(this.oauth, userId, { kv: this.kv, reason: 'member_removed' });
             } catch (err) {
                 logger.warn('Failed to revoke MCP OAuth grants after member removal; outstanding grants may remain usable', {
                     userId,

@@ -135,6 +135,13 @@ The refresh re-reads the member's row and the marker before it issues a token, s
 a revocation that failed when the member was removed cannot be bypassed by
 refreshing.
 
+When a refresh is refused because the member was removed (removal, account
+self-deletion, or the row re-read above), the 400 `invalid_grant` body carries one
+extra top-level field, `session_end_reason: "member_removed"`; the `error` code is
+unchanged and clients that ignore unknown fields behave as before. Every other
+refusal, including a grant that expired or never existed, has no such field. The
+value comes from a fixed list and is looked up by the grant id in the refresh token.
+
 ---
 
 ## 3. Offline time limit: `offline_max_days`
