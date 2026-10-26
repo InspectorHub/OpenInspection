@@ -194,7 +194,7 @@ wrangler r2 bucket lifecycle add PHOTOS ia-after-365d \
   --ia-transition-days 365
 ```
 
-**Unfinished chunked video uploads.** A native client uploads a large video in parts. The engine aborts the uploads that were abandoned (a scheduled sweep, about a day after the upload's token expired), and the object store itself aborts any unfinished upload after seven days. To shorten that backstop you may add a rule that aborts incomplete multipart uploads, for example `wrangler r2 bucket lifecycle add PHOTOS abort-unfinished-uploads --abort-multipart-days 2`. This rule only affects **unfinished** uploads: it never deletes a completed object, so it does not conflict with the *No expiry rule* above.
+**Unfinished chunked video uploads.** A native client uploads a large video in parts. The engine aborts the uploads that were abandoned (a scheduled sweep aborts each one on its next run after the upload's expiry, which is the token's expiry plus an hour, and deletes the ledger row a day after that), and the object store itself aborts any unfinished upload after seven days. To shorten that backstop you may add a rule that aborts incomplete multipart uploads, for example `wrangler r2 bucket lifecycle add PHOTOS abort-unfinished-uploads --abort-multipart-days 2`. This rule only affects **unfinished** uploads: it never deletes a completed object, so it does not conflict with the *No expiry rule* above.
 
 > A hosted/managed deployment runs the same rule on its own `PHOTOS` bucket. Self-hosters who do not want Infrequent Access can simply skip this step — it is a cost optimization, not a correctness requirement.
 

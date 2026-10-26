@@ -980,10 +980,12 @@ The native surface adds forward-only migrations:
 | `0001_offline_max_days.sql` | `tenant_configs.offline_max_days` (integer, default 30) |
 | `0002_offline_import_applied.sql` | The `offline_import_applied` table and its `(tenant_id, applied_at)` index, and the `native_client_seen` table |
 | `0006_inspection_tombstones.sql` | The `inspection_tombstones` table, read by every create that names its own id and written by every inspection delete |
+| `0007_video_upload_ledger.sql` | The `video_uploads` ledger and `video_upload_parts` tables for chunked video uploads, written by every chunked upload and cleaned by the inspection delete and the sweep |
 
 **Apply migrations before deploying the new code.** The new code reads
 `offline_max_days` on the session route, writes `native_client_seen` there too (a
 failed write is logged and ignored), and writes `offline_import_applied` on
 import; running it against a database that has not been migrated fails those
-routes. With the flag off, nothing else changes. See
+routes. The same holds for the tombstone table (every inspection delete and every create that names its
+own id) and the chunked video upload tables (every chunked upload). With the flag off, nothing else changes. See
 [`../operate/upgrade.md`](../operate/upgrade.md) for the upgrade procedure.

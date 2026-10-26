@@ -10,7 +10,7 @@ import { auditFromContextAwaited } from '../../lib/audit';
 import { logger } from '../../lib/logger';
 import { MeteringService } from '../../services/metering.service';
 import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
-import { templates } from '../../lib/db/schema';
+import { inspections, templates } from '../../lib/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { AppError, ErrorCode, Errors } from '../../lib/errors';
 import { isOfflineImportReplay } from '../../lib/request-scope';
@@ -90,7 +90,15 @@ export async function assertCanCreate(
     // carries contacts: the row is gone, so only the tombstone says the id must not be reused. The offline import
     // has already looked up every create of its package in one query, so its replays skip this one.
     if (body.id && !isOfflineImportReplay(c.env)) {
-        const [deleted] = await findTombstonedIds(getDrizzle(c), c.get('tenantId'), [body.id]);
+        const db = getDrizzle(c);
+        const tenantId = c.get('tenantId');
+        const [tombstoned] = await findTombstonedIds(db, tenantId, [body.id]);
+        // A delete that failed after writing the tombstone leaves the inspection in place; while the row exists the
+        // create is the idempotent replay of it, never a refusal.
+        const stillThere = tombstoned
+            ? await db.select({ id: inspections.id }).from(inspections).where(and(eq(inspections.id, body.id), eq(inspections.tenantId, tenantId))).get()
+            : undefined;
+        const deleted = stillThere ? undefined : tombstoned;
         if (deleted) {
             throw new AppError(409, ErrorCode.INSPECTION_ID_DELETED, 'That inspection id belongs to an inspection that was deleted.', { inspectionId: deleted });
         }

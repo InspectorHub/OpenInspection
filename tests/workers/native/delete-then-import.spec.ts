@@ -186,6 +186,21 @@ describe('deleting inspections and the native client', () => {
         expect(await addressOf(fine)).not.toBeNull();
     });
 
+    it('a tombstone for an inspection that still exists (a delete that failed half way) does not refuse the package', async () => {
+        const id = fresh('insp-half');
+        const key = fresh('k');
+        const zip = createPackage(id, key);
+        expect((await importZip(zip)).status).toBe(200);
+        await b.DB.prepare('INSERT INTO inspection_tombstones (tenant_id, inspection_id, deleted_at) VALUES (?, ?, ?)').bind(TENANT, id, Date.now()).run();
+        const again = await importZip(zip);
+        expect(again.status, await again.clone().text()).toBe(200);
+        // Control: once the delete really finishes, the same package is refused.
+        expect((await del(id)).status).toBe(200);
+        const refused = await importZip(zip);
+        expect(refused.status).toBe(409);
+        expect(await refused.text()).toContain('PACKAGE_INSPECTION_DELETED');
+    });
+
     it('replaying an inspection.update for a deleted inspection does not recreate it (control: the same update applies while it exists)', async () => {
         const id = fresh('insp-upd');
         expect((await importZip(createPackage(id, fresh('k')))).status).toBe(200);

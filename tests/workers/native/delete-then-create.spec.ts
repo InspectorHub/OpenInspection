@@ -10,6 +10,9 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import app from '../../../server/index';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { applyMigrations } from '../migration-replay';
+import { assertCanCreate } from '../../../server/api/inspections/create-support';
+import type { Context } from 'hono';
+import type { HonoConfig } from '../../../server/types/hono';
 
 const migrationSql = import.meta.glob('../../../migrations/*.sql', {
     query: '?raw', import: 'default', eager: true,
@@ -131,6 +134,30 @@ describe('creating an inspection with the id of one that was deleted', () => {
             method: 'PATCH', headers: auth(TENANT, { 'content-type': 'application/json' }), body: JSON.stringify({ propertyAddress: '2 Edited Road' }),
         });
         expect(res.status).toBe(404);
+    });
+
+    it('a tombstone never blocks an id whose inspection row still exists (a delete that failed after writing it), until the retried delete finishes', async () => {
+        const id = fresh('insp-half');
+        expect((await create(TENANT, id)).status).toBe(201);
+        // The state a cascade that failed after the tombstone insert leaves behind: the row and the tombstone.
+        await b.DB.prepare('INSERT INTO inspection_tombstones (tenant_id, inspection_id, deleted_at) VALUES (?, ?, ?)').bind(TENANT, id, Date.now()).run();
+
+        const replay = await create(TENANT, id);
+        expect(replay.status, await replay.clone().text()).toBe(200);
+        // assertCanCreate on its own agrees: the row exists, so the tombstone is not an answer.
+        const ctxStub = { env: testEnv, get: (k: string) => (k === 'tenantId' ? TENANT : undefined) } as unknown as Context<HonoConfig>;
+        await expect(assertCanCreate(ctxStub, { id })).resolves.toBeUndefined();
+        // Control: another tenant's view of a really deleted id is unchanged, and an id with no row is refused.
+        const gone = fresh('insp-gone-row');
+        await b.DB.prepare('INSERT INTO inspection_tombstones (tenant_id, inspection_id, deleted_at) VALUES (?, ?, ?)').bind(TENANT, gone, Date.now()).run();
+        await expect(assertCanCreate(ctxStub, { id: gone })).rejects.toMatchObject({ status: 409 });
+
+        // The retried delete completes, and from then on the same create is refused.
+        expect((await del(TENANT, id)).status).toBe(200);
+        expect(await inspectionRows(id)).toBe(0);
+        const after = await create(TENANT, id);
+        expect(after.status).toBe(409);
+        expect((await errorOf(after)).code).toBe('INSPECTION_ID_DELETED');
     });
 
     it('refuses the delete and keeps the inspection when the tombstone cannot be written', async () => {

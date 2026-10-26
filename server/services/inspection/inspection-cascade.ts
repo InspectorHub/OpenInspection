@@ -1,7 +1,8 @@
 import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { inspections, inspectionTombstones, reportTranslations, reports } from '../../lib/db/schema';
+import { inspections, inspectionTombstones, reportTranslations, reports, videoUploadParts, videoUploads } from '../../lib/db/schema';
 import { inspectionScopedTables } from '../../lib/db/scoped-tables';
+import { abortStorage } from '../video/chunked-upload.service';
 import { purgeCollabDocs, type CollabPurgeOutcome } from './collab-purge';
 
 /**
@@ -64,6 +65,23 @@ export async function deleteInspectionCascade(
         await db.delete(reportTranslations).where(and(
             eq(reportTranslations.tenantId, tenantId),
             inArray(reportTranslations.reportId, reportIds),
+        ));
+    }
+
+    // 0b. Unfinished chunked video uploads. The ledger rows go with the derived set below, and the part rows carry
+    // no `inspection_id`, so both the storage abort and the part rows must be dealt with while the ledger can still
+    // name them. The abort is best effort (a failure is logged inside and never stops the delete); a finished
+    // upload's object is removed with the rest of the inspection's media under its R2 prefix.
+    const uploadScope = and(eq(videoUploads.tenantId, tenantId), eq(videoUploads.inspectionId, inspectionId));
+    const uploads = await db.select({ r2Key: videoUploads.r2Key, uploadId: videoUploads.uploadId, state: videoUploads.state })
+        .from(videoUploads).where(uploadScope);
+    for (const upload of uploads) {
+        if (upload.state === 'open' || upload.state === 'completing') await abortStorage(r2, upload);
+    }
+    if (uploads.length > 0) {
+        await db.delete(videoUploadParts).where(and(
+            eq(videoUploadParts.tenantId, tenantId),
+            inArray(videoUploadParts.mediaId, db.select({ id: videoUploads.mediaId }).from(videoUploads).where(uploadScope)),
         ));
     }
 

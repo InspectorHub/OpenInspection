@@ -166,6 +166,65 @@ describe('deleteInspectionCascade', () => {
         });
     });
 
+    describe('unfinished video uploads', () => {
+        const upload = (id: string, inspectionId: string, state: 'open' | 'completing' | 'completed') => ({
+            id, tenantId: TENANT, inspectionId, mediaId: `m-${id}`, userId: 'u-1', uploadId: `up-${id}`, r2Key: `${TENANT}/inspections/${inspectionId}/videos/${id}.mp4`,
+            contentType: 'video/mp4' as const, totalBytes: 10, partBytes: 5, partCount: 2, state, createdAt: new Date(), expiresAt: new Date(Date.now() + 3600_000),
+        });
+        const part = (mediaId: string, n: number) => ({ tenantId: TENANT, mediaId, partNumber: n, etag: 'e', sizeBytes: 5, receivedAt: new Date() });
+        function r2WithAbort(failAbort = false) {
+            const aborted: string[] = [];
+            const base = makeR2([]);
+            const bucket = {
+                ...base.bucket,
+                resumeMultipartUpload: (key: string, uploadId: string) => ({
+                    abort: async () => { aborted.push(`${key}|${uploadId}`); if (failAbort) throw new Error('r2 down'); },
+                }),
+            } as unknown as R2Bucket;
+            return { bucket, aborted };
+        }
+        async function seed() {
+            await testDb.insert(schema.inspections).values({
+                id: 'i-2', tenantId: TENANT, propertyAddress: '2 St', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0,
+                agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+            } as never);
+            await testDb.insert(schema.videoUploads).values([upload('a', INSP, 'open'), upload('b', INSP, 'completed'), upload('c', 'i-2', 'open')]);
+            await testDb.insert(schema.videoUploadParts).values([part('m-a', 1), part('m-a', 2), part('m-c', 1)]);
+        }
+
+        it('aborts the open upload once, removes its ledger row and parts, and leaves the other inspection upload alone', async () => {
+            await seed();
+            const r2 = r2WithAbort();
+            await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, r2.bucket, TENANT, INSP);
+            expect(r2.aborted).toEqual([`${TENANT}/inspections/${INSP}/videos/a.mp4|up-a`]);
+            expect((await testDb.select().from(schema.videoUploads).all()).map((r) => r.id)).toEqual(['c']);
+            expect((await testDb.select().from(schema.videoUploadParts).all()).map((r) => r.mediaId)).toEqual(['m-c']);
+        });
+
+        it('a failed abort does not fail the delete', async () => {
+            await seed();
+            const r2 = r2WithAbort(true);
+            await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, r2.bucket, TENANT, INSP);
+            expect(r2.aborted).toHaveLength(1);
+            expect((await testDb.select().from(schema.inspections).all()).map((x) => x.id)).toEqual(['i-2']);
+            expect((await testDb.select().from(schema.videoUploadParts).all()).map((r) => r.mediaId)).toEqual(['m-c']);
+        });
+    });
+
+    describe('a delete that fails after the tombstone was written', () => {
+        it('leaves the inspection in place, and a retried delete completes', async () => {
+            const db = testDb as unknown as DrizzleD1Database;
+            const failing = { list: async () => { throw new Error('r2 list failed'); }, delete: async () => undefined } as unknown as R2Bucket;
+            await expect(deleteInspectionCascade(db, failing, TENANT, INSP)).rejects.toThrow('r2 list failed');
+            expect(await testDb.select().from(schema.inspections).all()).toHaveLength(1);
+            expect(await testDb.select().from(schema.inspectionTombstones).all()).toHaveLength(1);
+
+            await deleteInspectionCascade(db, makeR2([]).bucket, TENANT, INSP);
+            expect(await testDb.select().from(schema.inspections).all()).toHaveLength(0);
+            expect(await testDb.select().from(schema.inspectionTombstones).all()).toHaveLength(1);
+        });
+    });
+
     /**
      * A published report's courtesy translation dies with the inspection.
      *
