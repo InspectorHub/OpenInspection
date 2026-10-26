@@ -8,6 +8,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
+import { AVIF_BYTES, EXE_BYTES, HEIC_BYTES, HTML_BYTES, JPEG_BYTES, MIF1_ONLY_BYTES, MP4_BYTES, PNG_BYTES, SVG_BYTES, WEBP_BYTES, ZIP_BYTES } from '../helpers/media-bytes';
 import { signUploadToken } from '../../../server/lib/video-upload-token';
 import {
     createUploadHarness, filePart, jsonPost, INSPECTION_ID, INSPECTOR_ID, OTHER_TENANT_INSPECTION_ID, TENANT_ID, type UploadHarness,
@@ -150,9 +151,10 @@ describe('photo upload URL (real app)', () => {
         expect([...u!.r2.store.keys()]).toEqual([key]);
     });
 
-    it('refuses a type that differs from the one the URL was minted for, an oversized photo, and a missing file', async () => {
+    it('refuses a file whose real type differs from the one the URL was minted for, an oversized photo, and a missing file', async () => {
         const { url, key } = await mintUrl();
-        const wrongType = await u!.call(url, { method: 'POST', body: filePart('image/png') }, { auth: null });
+        // The declared type says jpeg (what the URL was minted for) but the bytes are png: the bytes win, so it is refused.
+        const wrongType = await u!.call(url, { method: 'POST', body: filePart('image/jpeg', PNG_BYTES) }, { auth: null });
         expect(wrongType.status).toBe(400);
         const huge = await u!.call(url, { method: 'POST', body: filePart('image/jpeg', new Uint8Array(10 * 1024 * 1024 + 1)) }, { auth: null });
         expect(huge.status).toBe(413);
@@ -165,33 +167,42 @@ describe('photo upload URL (real app)', () => {
         expect(u!.r2.store.has(key)).toBe(true);
     });
 
-    it('accepts a loose spelling of the minted type and stores the canonical content type', async () => {
+    it('decides by the bytes: a mislabelled or untyped file of the minted type is accepted and stored under the detected type', async () => {
         const jpeg = await mintUrl();
-        // An empty type is not tested here: multipart serialises a typeless Blob as application/octet-stream on the wire.
-        for (const declared of ['image/jpg', 'IMAGE/JPEG; charset=x']) {
-            const res = await u!.call(jpeg.url, { method: 'POST', body: filePart(declared) }, { auth: null });
+        for (const declared of ['image/jpg', 'IMAGE/JPEG; charset=x', 'application/octet-stream', 'image/png', 'text/plain']) {
+            const res = await u!.call(jpeg.url, { method: 'POST', body: filePart(declared, JPEG_BYTES) }, { auth: null });
             expect(res.status, declared).toBe(200);
             expect(u!.r2.store.get(jpeg.key)?.contentType, declared).toBe('image/jpeg');
         }
-        // A heif declaration satisfies a heic URL, and still cannot satisfy a jpeg one.
         const heic = await (async () => {
             const res = await mint({ pendingId: '55555555-0000-4000-8000-000000000002', contentType: 'image/heic' });
             return (await res.json() as { data: { url: string; key: string } }).data;
         })();
-        expect((await u!.call(jpeg.url, { method: 'POST', body: filePart('image/heif') }, { auth: null })).status).toBe(400);
-        expect((await u!.call(heic.url, { method: 'POST', body: filePart('image/heif') }, { auth: null })).status).toBe(200);
-        expect(u!.r2.store.get(heic.key)?.contentType).toBe('image/heic');
-        // Still refused, and nothing stored for the new key.
+        // A URL minted for heic takes heic bytes (declared heif, jpeg or octet-stream) and refuses jpeg bytes, whatever they are declared as.
+        expect((await u!.call(heic.url, { method: 'POST', body: filePart('image/heic', JPEG_BYTES) }, { auth: null })).status).toBe(400);
+        expect((await u!.call(heic.url, { method: 'POST', body: filePart('image/jpeg', JPEG_BYTES) }, { auth: null })).status).toBe(400);
+        expect(u!.r2.store.has(heic.key)).toBe(false);
+        for (const declared of ['image/heif', 'image/jpeg', 'application/octet-stream']) {
+            expect((await u!.call(heic.url, { method: 'POST', body: filePart(declared, HEIC_BYTES) }, { auth: null })).status, declared).toBe(200);
+            expect(u!.r2.store.get(heic.key)?.contentType, declared).toBe('image/heic');
+        }
+        // A heic file whose only heif brand is a compatible one is still heic.
+        expect((await u!.call(heic.url, { method: 'POST', body: filePart('image/heic', MIF1_ONLY_BYTES) }, { auth: null })).status).toBe(200);
+        // Not images at all, however they are declared: refused and nothing stored for the new key.
         const other = await (async () => {
             const res = await mint({ pendingId: '55555555-0000-4000-8000-000000000003', contentType: 'image/png' });
             return (await res.json() as { data: { url: string; key: string } }).data;
         })();
-        for (const declared of ['image/webp', 'image/gif', 'application/octet-stream', 'image/svg+xml']) {
-            expect((await u!.call(other.url, { method: 'POST', body: filePart(declared) }, { auth: null })).status, declared).toBe(400);
+        const notImages = [SVG_BYTES, HTML_BYTES, ZIP_BYTES, EXE_BYTES, WEBP_BYTES, AVIF_BYTES, new Uint8Array(0), PNG_BYTES.subarray(0, 7)];
+        for (const bytes of notImages) {
+            for (const declared of ['image/png', 'image/svg+xml', 'application/octet-stream']) {
+                expect((await u!.call(other.url, { method: 'POST', body: filePart(declared, bytes) }, { auth: null })).status, declared).toBe(400);
+            }
         }
         expect(u!.r2.store.has(other.key)).toBe(false);
-        // Control: the canonical type goes through.
-        expect((await u!.call(other.url, { method: 'POST', body: filePart('image/png') }, { auth: null })).status).toBe(200);
+        // Control: real png bytes go through.
+        expect((await u!.call(other.url, { method: 'POST', body: filePart('image/png', PNG_BYTES) }, { auth: null })).status).toBe(200);
+        expect(u!.r2.store.get(other.key)?.contentType).toBe('image/png');
     });
 
     it('refuses an upload once the inspection is gone (404), but not before', async () => {
@@ -249,13 +260,13 @@ describe('photo upload URL (real app)', () => {
         const claims = { tenantId: TENANT_ID, inspectionId: INSPECTION_ID, mediaId: PENDING };
         const photoToken = await signUploadToken({ ...claims, ext: 'jpg', userId: INSPECTOR_ID }, 600, JWT_SECRET, 'photo');
         const videoToken = await signUploadToken(claims, 600, JWT_SECRET);
-        const photoOnVideo = await u.call(`/api/public/uploads/video?token=${photoToken}`, { method: 'POST', body: filePart('video/mp4') }, { auth: null });
+        const photoOnVideo = await u.call(`/api/public/uploads/video?token=${photoToken}`, { method: 'POST', body: filePart('video/mp4', MP4_BYTES) }, { auth: null });
         const videoOnPhoto = await u.call(`/api/public/uploads/photo?token=${videoToken}`, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
         expect(photoOnVideo.status).toBe(401);
         expect(videoOnPhoto.status).toBe(401);
         expect(u.r2.store.size).toBe(0);
         // Controls: each token works on its own route.
         expect((await u.call(`/api/public/uploads/photo?token=${photoToken}`, { method: 'POST', body: filePart('image/jpeg') }, { auth: null })).status).toBe(200);
-        expect((await u.call(`/api/public/uploads/video?token=${videoToken}`, { method: 'POST', body: filePart('video/mp4') }, { auth: null })).status).toBe(200);
+        expect((await u.call(`/api/public/uploads/video?token=${videoToken}`, { method: 'POST', body: filePart('video/mp4', MP4_BYTES) }, { auth: null })).status).toBe(200);
     });
 });

@@ -122,6 +122,7 @@ describe('GET /api/inspections/{id}/photo with a native token (real app)', () =>
     const res = await t.get(MINE, keyOf(TENANT_ID, MINE));
     expect(res.status, await res.clone().text()).toBe(200);
     expect(res.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(res.headers.get('Cache-Control')).toBe('private, max-age=300');
     expect(Array.from(await bytesOf(res))).toEqual(Array.from(BYTES));
   });

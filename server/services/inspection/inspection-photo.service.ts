@@ -6,7 +6,7 @@ import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
-import { signedPhotoExtFor, storePhotoAtKey } from '../../lib/media/store-photo';
+import { sniffedPhotoExt, storePhotoAtKey } from '../../lib/media/store-photo';
 import { collectAttachedPhotos } from '../../lib/media/collect-attached';
 import { applyReorder, applyDetach, applyRevert, moveEntry } from '../../lib/media/photo-ops';
 import type { PhotoEntry } from '../../lib/media/collect-attached';
@@ -93,8 +93,7 @@ export class InspectionPhotoService extends InspectionSubService {
         await this.facade.getInspection(id, tenantId); // Ownership check
 
         const mediaId = crypto.randomUUID();
-        const ext = signedPhotoExtFor(file.type) ?? 'bin'; // an unaccepted type is refused by putPhoto
-        const key = r2Keys.inspectionPhoto(tenantId, id, mediaId, ext);
+        const key = r2Keys.inspectionPhoto(tenantId, id, mediaId, await sniffedPhotoExt(file));
         await this.putPhoto(this.r2, key, file);
         return key;
     }
@@ -239,7 +238,7 @@ export class InspectionPhotoService extends InspectionSubService {
 
         const id = crypto.randomUUID();
         const mediaId = id; // the pool row id serves as the stable mediaId
-        const key = r2Keys.inspectionPhoto(tenantId, inspectionId, mediaId, signedPhotoExtFor(file.type) ?? 'bin');
+        const key = r2Keys.inspectionPhoto(tenantId, inspectionId, mediaId, await sniffedPhotoExt(file));
         await this.putPhoto(this.r2, key, file);
 
         const uploadedAt = Date.now();

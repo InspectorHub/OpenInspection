@@ -40,7 +40,7 @@ import { nativeClientEnabled } from '../../lib/mcp/flag';
 import { r2Keys } from '../../lib/r2-keys';
 import { logger } from '../../lib/logger';
 import { imagesBinding } from '../../lib/media/serve-photo';
-import { MAX_PHOTO_BYTES, isSignedPhotoExt, signedPhotoExtFor, storePhotoAtKey } from '../../lib/media/store-photo';
+import { MAX_PHOTO_BYTES, isSignedPhotoExt, sniffedPhotoExt, storePhotoAtKey } from '../../lib/media/store-photo';
 import { MAX_VIDEO_BYTES, storeVideoUpload } from '../inspections/media-video-r2';
 
 /** Multipart framing adds a little to the file itself; this much headroom is allowed before the body is read. */
@@ -96,9 +96,9 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         const file = await readFile(c);
         if (!file) return c.json({ error: 'file field required' }, 400);
         if (file.size > MAX_PHOTO_BYTES) return c.json({ error: 'Photo is too large.' }, 413);
-        // The declared type must be the one the URL was minted for: the key's
-        // extension was fixed at issue time and the stored type has to agree.
-        if (signedPhotoExtFor(file.type) !== claims.ext) {
+        // The file's real type (its first bytes, not the declared one) must be the one the URL was
+        // minted for: the key's extension was fixed at issue time and the stored type has to agree.
+        if (await sniffedPhotoExt(file).catch(() => null) !== claims.ext) {
             return c.json({ error: 'Missing or unsupported photo type. Allowed: jpeg, png, heic.' }, 400);
         }
 

@@ -1,5 +1,6 @@
 import { Errors } from '../errors';
 import { stripExifOnIngest, type ImagesBinding } from './strip-exif';
+import { headBytes, sniffPhotoType } from './sniff';
 
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 
@@ -20,8 +21,8 @@ const PHOTO_TYPE_ALIASES: Record<string, keyof typeof SIGNED_PHOTO_EXT> = {
 /**
  * The canonical content type for a declared one, or null when it is not an accepted photo type. The declared
  * type is lowercased, trimmed and stripped of `;` parameters; an empty type counts as jpeg, `image/jpg` as
- * jpeg and `image/heif` as heic. The one place the rule lives: storage, the signed-upload check and the
- * offline-import check all go through it.
+ * jpeg and `image/heif` as heic. Only for a DECLARED type (a package manifest names its photo entries by it);
+ * what gets stored is decided by the bytes, see `sniffedPhotoType`.
  */
 function canonicalPhotoType(declared: string): keyof typeof SIGNED_PHOTO_EXT | null {
     const type = (declared.split(';')[0] ?? '').trim().toLowerCase();
@@ -39,13 +40,30 @@ export function isSignedPhotoExt(ext: string | undefined): ext is string {
     return !!ext && Object.values<string>(SIGNED_PHOTO_EXT).includes(ext);
 }
 
+/**
+ * The photo type a file really is, from its first bytes, never from its declared type: a mislabelled genuine image
+ * is stored under its real type, and a body that is not a jpeg, png or heic image (an empty one included) is a 400
+ * that does not echo what was sent.
+ */
+async function sniffedPhotoType(file: Blob): Promise<keyof typeof SIGNED_PHOTO_EXT> {
+    assertPhotoSize(file.size); // an oversized body is a 413 whatever it contains
+    const type = sniffPhotoType(await headBytes(file));
+    if (type === null) throw Errors.BadRequest('Photo is not a jpeg, png or heic image');
+    return type;
+}
+
+/** The key extension for the file's real type (see `sniffedPhotoType`). */
+export async function sniffedPhotoExt(file: Blob): Promise<string> {
+    return SIGNED_PHOTO_EXT[await sniffedPhotoType(file)];
+}
+
 /** Refuses a photo body over the ceiling with 413, whichever route received it. */
 export function assertPhotoSize(size: number): void {
     if (size > MAX_PHOTO_BYTES) throw Errors.PayloadTooLarge(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${size})`);
 }
 
 /**
- * Validate size and type, strip GPS/EXIF on ingest, and store the photo bytes at `key`.
+ * Validate size and the real (sniffed) type, strip GPS/EXIF on ingest, and store the photo bytes at `key`.
  * The one place the item-photo, pool-photo and signed-URL upload paths all
  * write through, so the size ceiling and the metadata strip cannot diverge.
  *
@@ -61,10 +79,7 @@ export async function storePhotoAtKey(
     file: File,
 ): Promise<void> {
     assertPhotoSize(file.size);
-    const type = canonicalPhotoType(file.type);
-    if (type === null) {
-        throw Errors.BadRequest(`Photo type '${file.type}' is not accepted; use image/jpeg, image/png or image/heic`);
-    }
+    const type = await sniffedPhotoType(file);
     const { bytes, contentType } = await stripExifOnIngest(images, await file.arrayBuffer(), type);
     await r2.put(key, bytes, {
         httpMetadata: { contentType },

@@ -4,6 +4,7 @@ import { ScopedDB, type DrizzleDB } from '../../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
+import { AVIF_BYTES, EXE_BYTES, HEIC_BYTES, HTML_BYTES, JPEG_BYTES, PNG_BYTES, SVG_BYTES, WEBP_BYTES, ZIP_BYTES } from '../helpers/media-bytes';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -142,8 +143,8 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
     });
 
     it('uploadPoolPhoto persists a row + getMediaCenter returns it (newest first)', async () => {
-        const file1 = new File([new Uint8Array([1, 2, 3])], 'a.jpg', { type: 'image/jpeg' });
-        const file2 = new File([new Uint8Array([4, 5, 6])], 'b.jpg', { type: 'image/jpeg' });
+        const file1 = new File([JPEG_BYTES], 'a.jpg', { type: 'image/jpeg' });
+        const file2 = new File([JPEG_BYTES], 'b.jpg', { type: 'image/jpeg' });
 
         const a = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, file1, { takenAt: 1700000000000 });
         // Stagger so uploadedAt orders deterministically.
@@ -160,7 +161,7 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
     });
 
     it('attachPoolPhoto moves a pool row into results.data and removes the pool entry', async () => {
-        const file = new File([new Uint8Array([1])], 'p.jpg', { type: 'image/jpeg' });
+        const file = new File([JPEG_BYTES], 'p.jpg', { type: 'image/jpeg' });
         const pool = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, file);
 
         const result = await svc.attachPoolPhoto(INSPECTION_ID, TENANT, pool.id, 'item-flash');
@@ -185,7 +186,7 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
             data:          { 'item-cover': { photos: [{ key: 'pre-existing' }] } } as any,
             lastSyncedAt:  new Date(),
         });
-        const pool = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([new Uint8Array([2])], 'q.jpg', { type: 'image/jpeg' }));
+        const pool = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([JPEG_BYTES], 'q.jpg', { type: 'image/jpeg' }));
 
         const out = await svc.attachPoolPhoto(INSPECTION_ID, TENANT, pool.id, 'item-cover');
         expect(out.photoIndex).toBe(1);
@@ -261,7 +262,7 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
     });
 
     it('deletePoolPhoto removes the row and calls r2.delete', async () => {
-        const pool = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([new Uint8Array([3])], 'r.jpg', { type: 'image/jpeg' }));
+        const pool = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([JPEG_BYTES], 'r.jpg', { type: 'image/jpeg' }));
         await svc.deletePoolPhoto(INSPECTION_ID, TENANT, pool.id);
         const after = await svc.getMediaCenter(INSPECTION_ID, TENANT);
         expect(after.pool).toHaveLength(0);
@@ -292,29 +293,34 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
             'pool photo': (file: File) => svc.uploadPoolPhoto(INSPECTION_ID, TENANT, file),
         };
 
-        it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: a declared type outside the list is a 400 and stores nothing', async (name) => {
-            for (const type of ['image/svg+xml', 'image/webp', 'image/gif', 'application/octet-stream', 'text/plain']) {
-                await expect(upload[name](new File([new Uint8Array([1])], 'a.jpg', { type }))).rejects.toMatchObject({ status: 400 });
+        it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: a body that is not a jpeg, png or heic image is a 400 and stores nothing, whatever it is declared as', async (name) => {
+            const notImages = [SVG_BYTES, HTML_BYTES, ZIP_BYTES, EXE_BYTES, WEBP_BYTES, AVIF_BYTES, new Uint8Array(0), JPEG_BYTES.subarray(0, 2), HEIC_BYTES.subarray(0, 11)];
+            for (const bytes of notImages) {
+                for (const type of ['image/jpeg', 'image/svg+xml', '']) {
+                    await expect(upload[name](new File([bytes], 'a.jpg', { type }))).rejects.toMatchObject({ status: 400 });
+                }
             }
             expect(r2Mock.put).not.toHaveBeenCalled();
-            // Control: an accepted type with the same name and bytes is stored.
-            await expect(upload[name](new File([new Uint8Array([1])], 'a.jpg', { type: 'image/jpeg' }))).resolves.toBeDefined();
+            // Control: real jpeg bytes under the same name and declared type are stored.
+            await expect(upload[name](new File([JPEG_BYTES], 'a.jpg', { type: 'image/jpeg' }))).resolves.toBeDefined();
             expect(r2Mock.put).toHaveBeenCalledTimes(1);
         });
 
-        // Clients misspell, omit or parameterise the type; the stored key extension and content type are always canonical.
-        it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: loose spellings are accepted and stored under the canonical type', async (name) => {
-            const cases: [string, string, string][] = [
-                ['', 'image/jpeg', 'jpg'],
-                ['image/jpg', 'image/jpeg', 'jpg'],
-                ['IMAGE/JPEG; charset=x', 'image/jpeg', 'jpg'],
-                [' image/png ', 'image/png', 'png'],
-                ['image/heif', 'image/heic', 'heic'],
-                ['image/heic', 'image/heic', 'heic'],
+        // The stored key extension and content type follow the bytes, whatever the client declared.
+        it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: the bytes decide the stored type, so a mislabelled or untyped genuine image is accepted', async (name) => {
+            const cases: [Uint8Array<ArrayBuffer>, string, string, string][] = [
+                [JPEG_BYTES, '', 'image/jpeg', 'jpg'],
+                [JPEG_BYTES, 'application/octet-stream', 'image/jpeg', 'jpg'],
+                [PNG_BYTES, 'application/octet-stream', 'image/png', 'png'],
+                [HEIC_BYTES, '', 'image/heic', 'heic'],
+                [PNG_BYTES, 'image/jpeg', 'image/png', 'png'],
+                [HEIC_BYTES, 'image/jpeg', 'image/heic', 'heic'],
+                [JPEG_BYTES, 'image/png', 'image/jpeg', 'jpg'],
+                [JPEG_BYTES, 'IMAGE/JPEG; charset=x', 'image/jpeg', 'jpg'],
             ];
-            for (const [declared, contentType, ext] of cases) {
+            for (const [bytes, declared, contentType, ext] of cases) {
                 r2Mock.put.mockClear();
-                await expect(upload[name](new File([new Uint8Array([1])], 'IMG_1.weird', { type: declared }))).resolves.toBeDefined();
+                await expect(upload[name](new File([bytes], 'IMG_1.weird', { type: declared }))).resolves.toBeDefined();
                 const [key, , opts] = r2Mock.put.mock.calls[0] as [string, unknown, { httpMetadata: { contentType: string } }];
                 expect(key.endsWith(`.${ext}`), `${declared} -> ${key}`).toBe(true);
                 expect(opts.httpMetadata.contentType).toBe(contentType);

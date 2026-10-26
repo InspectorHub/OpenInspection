@@ -24470,7 +24470,7 @@
       "body": null
     },
     "summary": "Upload inspection for current tenant",
-    "description": "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. A file over 10 MiB is refused with 413, and a file whose declared type is not image/jpeg, image/png or image/heic with 400. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
+    "description": "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. A file over 10 MiB is refused with 413, and a file whose bytes are not a jpeg, png or heic image with 400 (the declared type is ignored: the stored type and key extension follow the bytes, and an empty declared type is fine). Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "uploadInspectionMedia",
@@ -24498,7 +24498,7 @@
       "body": null
     },
     "summary": "Upload a photo to the inspection media pool (loose, unattached)",
-    "description": "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. A file over 10 MiB is refused with 413, and a file whose declared type is not image/jpeg, image/png or image/heic with 400. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
+    "description": "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. A file over 10 MiB is refused with 413, and a file whose bytes are not a jpeg, png or heic image with 400 (the declared type is ignored: the stored type and key extension follow the bytes, and an empty declared type is fine). Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "uploadInspectorCredentialImage",

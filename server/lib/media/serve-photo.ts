@@ -30,9 +30,13 @@ function parseWidth(w: string | undefined): number {
     return Math.min(Math.max(parseInt(w, 10) || 0, 16), 2000);
 }
 
+/** Raster types a photo key may be served as; an object stored under any other type (a legacy upload) is never replayed under it. */
+const SERVED_PHOTO_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'image/webp', 'image/gif']);
+
 function originalResponse(obj: R2ObjectBody, download: boolean): Response {
     const headers = new Headers();
-    headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
+    const stored = obj.httpMetadata?.contentType;
+    headers.set('Content-Type', stored && SERVED_PHOTO_TYPES.has(stored) ? stored : 'application/octet-stream');
     headers.set('Content-Disposition', contentDisposition(obj.customMetadata?.originalName, download));
     headers.set('Cache-Control', 'private, max-age=300');
     if (obj.httpEtag) headers.set('etag', obj.httpEtag);

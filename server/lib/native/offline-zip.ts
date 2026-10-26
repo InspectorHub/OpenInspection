@@ -333,15 +333,20 @@ export function readPackageEntry(zip: Uint8Array, name: string, declaredSize: nu
  * its directory entry declares. Inflates into one scratch buffer shared by all
  * entries and keeps nothing, so it costs one extra inflate of the package and no
  * extra memory beyond the largest entry. Returns the name of the first entry
- * that fails, or null when all pass.
+ * that fails, or null when all pass. `accepts`, when given, sees each inflated entry and may refuse it too.
  */
-export function verifyPackageEntries(zip: Uint8Array, wanted: ReadonlyMap<string, number>): string | null {
+export function verifyPackageEntries(
+    zip: Uint8Array,
+    wanted: ReadonlyMap<string, number>,
+    accepts?: (name: string, bytes: Uint8Array) => boolean,
+): string | null {
     const directory = readDirectory(zip);
     if (!directory.ok) return wanted.keys().next().value ?? null;
     let scratch = new Uint8Array(0);
     for (const [name, declared] of wanted) {
         if (scratch.length < declared) scratch = new Uint8Array(declared);
         if (inflateExact(zip, directory.entries.get(name), declared, scratch) === null) return name;
+        if (accepts && !accepts(name, scratch.subarray(0, declared))) return name;
     }
     return null;
 }

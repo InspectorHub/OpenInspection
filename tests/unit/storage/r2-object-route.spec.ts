@@ -262,6 +262,21 @@ describe('r2-object serve route', () => {
         expect(body).toEqual(videoBytes.slice(10, 30));
     });
 
+    it('serves the stored video type, but a legacy clip stored under a script-capable type is replayed as video/mp4 (control: quicktime is kept)', async () => {
+        const { photos, app } = setup();
+        const get = (range?: string) => app.request(`/${INSPECTION_ID}/media/video/r2-object/${MEDIA_ID}`, {
+            method: 'GET',
+            headers: { 'x-test-tenant': TENANT_ID, ...(range ? { Range: range } : {}) },
+        });
+        await photos.put(videoKey, videoBytes, { httpMetadata: { contentType: 'video/quicktime' } });
+        expect((await get()).headers.get('Content-Type')).toBe('video/quicktime');
+        for (const odd of ['text/html', 'image/svg+xml', 'application/x-msdownload']) {
+            await photos.put(videoKey, videoBytes, { httpMetadata: { contentType: odd } });
+            expect((await get()).headers.get('Content-Type'), odd).toBe('video/mp4');
+            expect((await get('bytes=0-9')).headers.get('Content-Type'), `${odd} range`).toBe('video/mp4');
+        }
+    });
+
     it('cross-tenant mediaId → 404 (tenant isolation)', async () => {
         const { photos, app } = setup();
         await photos.put(videoKey, videoBytes, { httpMetadata: { contentType: 'video/mp4' } });

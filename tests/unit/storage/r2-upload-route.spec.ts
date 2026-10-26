@@ -17,6 +17,7 @@ import { signUploadToken } from '../../../server/lib/video-upload-token';
 import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt, registerR2VideoRoutes } from '../../../server/api/inspections/media-video-r2';
 import { r2Keys } from '../../../server/lib/r2-keys';
 import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
+import { AVIF_BYTES, HTML_BYTES, JPEG_BYTES, MOV_BYTES, MP4_BYTES, PNG_BYTES, SVG_BYTES, WEBM_BYTES, WEBP_BYTES } from '../helpers/media-bytes';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ function buildUploadApp(photos: ReturnType<typeof makeR2Stub>) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /** Build FormData containing a single file field. */
-function makeFormData(filename: string, mimeType: string, content = new Uint8Array([0x00, 0x01, 0x02])): FormData {
+function makeFormData(filename: string, mimeType: string, content: Uint8Array<ArrayBuffer> = JPEG_BYTES): FormData {
     const fd = new FormData();
     // Pass an empty string as type to simulate the "no Content-Type" attack vector.
     const blob = new Blob([content], { type: mimeType });
@@ -245,18 +246,33 @@ describe('r2-upload route', () => {
         expect(body.error).toMatch(/missing|unsupported/i);
     });
 
-    it('unsupported MIME type → 400', async () => {
-        const { app } = setup();
+    it('a body that is not a video → 400 and nothing stored, whatever it is declared as (controls: real clips are stored under their real type)', async () => {
+        const { app, photos } = setup();
         const token = await mintToken();
-        const fd = makeFormData('evil.exe', 'application/octet-stream');
-
-        const res = await app.request(`/${INSPECTION_ID}/media/video/r2-upload?token=${token}`, {
+        const send = (type: string, bytes: Uint8Array<ArrayBuffer>) => app.request(`/${INSPECTION_ID}/media/video/r2-upload?token=${token}`, {
             method: 'POST',
-            body: fd,
+            body: makeFormData('clip', type, bytes),
             headers: { 'x-test-tenant': TENANT_ID },
         });
-
-        expect(res.status).toBe(400);
+        for (const bytes of [JPEG_BYTES, PNG_BYTES, HTML_BYTES, SVG_BYTES, AVIF_BYTES, new Uint8Array(0)]) {
+            for (const type of ['video/mp4', 'application/octet-stream', '']) {
+                expect((await send(type, bytes)).status, type).toBe(400);
+            }
+        }
+        expect(photos.store.size).toBe(0);
+        const cases: [Uint8Array<ArrayBuffer>, string, string, string][] = [
+            [MP4_BYTES, 'application/octet-stream', '.mp4', 'video/mp4'],
+            [MP4_BYTES, '', '.mp4', 'video/mp4'],
+            [MOV_BYTES, 'video/mp4', '.mov', 'video/quicktime'],
+            [WEBM_BYTES, 'video/mp4', '.webm', 'video/webm'],
+        ];
+        for (const [bytes, type, ext, stored] of cases) {
+            photos.store.clear();
+            expect((await send(type, bytes)).status, `${type} ${ext}`).toBe(200);
+            const [key, entry] = [...photos.store.entries()][0]!;
+            expect(key.endsWith(ext)).toBe(true);
+            expect(entry.contentType).toBe(stored);
+        }
     });
 
     // ── Happy path ────────────────────────────────────────────────────────────
@@ -264,8 +280,7 @@ describe('r2-upload route', () => {
     it('valid token + valid MIME → 200 + stores in R2', async () => {
         const { app, photos } = setup();
         const token = await mintToken();
-        const content = new Uint8Array([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]); // mp4 magic
-        const fd = makeFormData('clip.mp4', 'video/mp4', content);
+        const fd = makeFormData('clip.mp4', 'video/mp4', MP4_BYTES);
 
         const res = await app.request(`/${INSPECTION_ID}/media/video/r2-upload?token=${token}`, {
             method: 'POST',
@@ -375,30 +390,29 @@ describe('r2-upload-poster route', () => {
 
     // ── MIME validation: empty type → 400 (Fix 1) ────────────────────────────
 
-    it('empty file.type → 400 (no fallback to image/jpeg)', async () => {
+    it('empty file.type is decided by the bytes: real jpeg bytes are stored as image/jpeg, non-image bytes are a 400', async () => {
         const { app, photos } = setup();
         seedClip(photos);
         const token = await mintToken();
-        const blob = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: '' });
-        const fd = new FormData();
-        fd.append('file', blob, 'poster.jpg');
-
-        const res = await app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
+        const send = (bytes: Uint8Array<ArrayBuffer>) => app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
             method: 'POST',
-            body: fd,
+            body: makeFormData('poster.jpg', '', bytes),
             headers: { 'x-test-tenant': TENANT_ID },
         });
-
-        expect(res.status).toBe(400);
-        const body = await res.json() as { error: string };
-        expect(body.error).toMatch(/missing|unsupported/i);
+        const posterKey = r2Keys.inspectionVideoPoster(TENANT_ID, INSPECTION_ID, MEDIA_ID);
+        const refused = await send(new Uint8Array([0x00]));
+        expect(refused.status).toBe(400);
+        expect(((await refused.json()) as { error: string }).error).toMatch(/missing|unsupported/i);
+        expect(photos.store.has(posterKey)).toBe(false);
+        expect((await send(JPEG_BYTES)).status).toBe(200);
+        expect(photos.store.get(posterKey)?.contentType).toBe('image/jpeg');
     });
 
     it('non-image MIME → 400', async () => {
         const { app, photos } = setup();
         seedClip(photos);
         const token = await mintToken();
-        const fd = makeFormData('video.mp4', 'video/mp4');
+        const fd = makeFormData('video.mp4', 'image/jpeg', MP4_BYTES); // a clip declared as a poster
 
         const res = await app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
             method: 'POST',
@@ -411,23 +425,33 @@ describe('r2-upload-poster route', () => {
 
     // ── Poster type and size ──────────────────────────────────────────────────
 
-    it('accepts only jpeg, png and webp posters and stores the allowlisted type (SVG, gif, html and a missing type are refused)', async () => {
+    it('accepts only jpeg, png and webp posters by their bytes and stores the detected type (SVG, gif, html, avif and an empty body are refused)', async () => {
         const { app, photos } = setup();
         seedClip(photos);
         const token = await mintToken();
-        const send = (type: string) => app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
+        const send = (type: string, bytes: Uint8Array<ArrayBuffer>) => app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
             method: 'POST',
-            body: makeFormData('poster', type),
+            body: makeFormData('poster', type, bytes),
             headers: { 'x-test-tenant': TENANT_ID },
         });
         const posterKey = r2Keys.inspectionVideoPoster(TENANT_ID, INSPECTION_ID, MEDIA_ID);
-        for (const type of ['image/svg+xml', 'image/gif', 'text/html', '']) {
-            expect((await send(type)).status, type).toBe(400);
-            expect(photos.store.has(posterKey), type).toBe(false);
+        const gif = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+        for (const bytes of [SVG_BYTES, gif, HTML_BYTES, AVIF_BYTES, new Uint8Array(0)]) {
+            for (const type of ['image/jpeg', 'image/svg+xml', '']) {
+                expect((await send(type, bytes)).status, type).toBe(400);
+            }
+            expect(photos.store.has(posterKey)).toBe(false);
         }
-        for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
-            expect((await send(type)).status, type).toBe(200);
-            expect(photos.store.get(posterKey)?.contentType, type).toBe(type);
+        const cases: [Uint8Array<ArrayBuffer>, string, string][] = [
+            [JPEG_BYTES, 'image/jpeg', 'image/jpeg'],
+            [PNG_BYTES, 'image/png', 'image/png'],
+            [WEBP_BYTES, 'image/webp', 'image/webp'],
+            [PNG_BYTES, 'image/jpeg', 'image/png'],
+            [JPEG_BYTES, 'application/octet-stream', 'image/jpeg'],
+        ];
+        for (const [bytes, type, stored] of cases) {
+            expect((await send(type, bytes)).status, type).toBe(200);
+            expect(photos.store.get(posterKey)?.contentType, type).toBe(stored);
         }
     });
 
@@ -437,7 +461,7 @@ describe('r2-upload-poster route', () => {
         const token = await mintToken();
         const send = (size: number) => app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
             method: 'POST',
-            body: makeFormData('poster.jpg', 'image/jpeg', new Uint8Array(size)),
+            body: makeFormData('poster.jpg', 'image/jpeg', Object.assign(new Uint8Array(size), JPEG_BYTES.subarray(0, 4)) as Uint8Array<ArrayBuffer>),
             headers: { 'x-test-tenant': TENANT_ID },
         });
         const posterKey = r2Keys.inspectionVideoPoster(TENANT_ID, INSPECTION_ID, MEDIA_ID);

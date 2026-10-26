@@ -7,6 +7,7 @@
  * with a positive control on the same harness.
  */
 import { describe, it, expect, afterEach } from 'vitest';
+import { JPEG_BYTES, MP4_BYTES } from '../helpers/media-bytes';
 import { eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { r2Keys } from '../../../server/lib/r2-keys';
@@ -14,8 +15,8 @@ import {
     createUploadHarness, filePart, jsonPost, INSPECTION_ID, INSPECTOR_ID, OTHER_TENANT_ID, OTHER_TENANT_INSPECTION_ID, TENANT_ID, type UploadHarness,
 } from '../helpers/native-upload-harness';
 
-const MP4 = new Uint8Array([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]);
-const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+const MP4 = MP4_BYTES;
+const JPEG = JPEG_BYTES;
 const SECRET = new Uint8Array([83, 69, 67, 82, 69, 84]);
 const FINALIZE = `/api/inspections/${INSPECTION_ID}/media/video/finalize`;
 const SECOND_INSPECTION_ID = '44444444-0000-4000-8000-000000000002';

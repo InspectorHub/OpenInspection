@@ -26,6 +26,7 @@ import type { HonoConfig } from '../../types/hono';
 import { getDrizzle } from '../../lib/route-helpers';
 import { r2Put, r2Get, r2Head } from '../../lib/r2/objects';
 import { MAX_PHOTO_BYTES } from '../../lib/media/store-photo';
+import { headBytes, sniffPosterType, sniffVideoType } from '../../lib/media/sniff';
 import { ownClipKey, ownPosterKey } from '../../services/video/r2-backend';
 
 // ── MIME / extension helpers ─────────────────────────────────────────────────
@@ -43,6 +44,11 @@ export function mimeToExt(mime: string): string {
 export const ALLOWED_VIDEO_MIMES = new Set(Object.keys(MIME_TO_EXT));
 const POSTER_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
+
+/** The type a clip is served as: its stored one when that is a video type we accept, otherwise mp4. Never a replayed script-capable type. */
+function storedVideoType(stored: string | undefined): string {
+    return stored && ALLOWED_VIDEO_MIMES.has(stored) ? stored : 'video/mp4';
+}
 
 export type StoreVideoResult =
     | { ok: true; mediaId: string; r2Key: string }
@@ -62,12 +68,13 @@ export async function storeVideoUpload(
     claims: UploadTokenClaims,
     file: File,
 ): Promise<StoreVideoResult> {
-    const mime = file.type;
-    if (!mime || !ALLOWED_VIDEO_MIMES.has(mime)) {
-        return { ok: false, status: 400, error: 'Missing or unsupported video type. Allowed: mp4, mov, webm.' };
-    }
     if (file.size > MAX_VIDEO_BYTES) {
         return { ok: false, status: 413, error: `File exceeds the 200 MB limit (got ${Math.round(file.size / 1024 / 1024)} MB).` };
+    }
+    // The clip's real type (its first bytes) decides the stored type and the key extension, not the declared one.
+    const mime = sniffVideoType(await headBytes(file));
+    if (!mime) {
+        return { ok: false, status: 400, error: 'Missing or unsupported video type. Allowed: mp4, mov, webm.' };
     }
 
     const { tenantId, inspectionId, mediaId } = claims;
@@ -162,12 +169,12 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'file field required' }, 400);
         }
 
-        const mime = file.type;
-        if (!POSTER_MIMES.has(mime)) {
-            return c.json({ error: 'Missing or unsupported poster type. Allowed: jpeg, png, webp.' }, 400);
-        }
         if (file.size > MAX_PHOTO_BYTES) {
             return c.json({ error: 'Poster is too large.' }, 413);
+        }
+        const mime = sniffPosterType(await headBytes(file));
+        if (!mime) {
+            return c.json({ error: 'Missing or unsupported poster type. Allowed: jpeg, png, webp.' }, 400);
         }
 
         const { mediaId } = claims;
@@ -244,7 +251,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
                 return c.json({ error: 'Video not found in storage' }, 404);
             }
 
-            const contentType = obj.httpMetadata?.contentType ?? 'video/mp4';
+            const contentType = storedVideoType(obj.httpMetadata?.contentType);
             const end = endStr ? parseInt(endStr, 10) : (obj.size - 1);
             const contentLength = end - start + 1;
 
@@ -265,7 +272,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'Video not found in storage' }, 404);
         }
 
-        const contentType = obj.httpMetadata?.contentType ?? 'video/mp4';
+        const contentType = storedVideoType(obj.httpMetadata?.contentType);
 
         return new Response(obj.body, {
             status: 200,
