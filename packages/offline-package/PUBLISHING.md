@@ -45,6 +45,10 @@ node scripts/publish-field-ui.mjs --package offline-package --confirm   # publis
 The version published by hand is `0.1.0`, the version in `package.json` and in
 `.release-please-manifest.json`. Leave the two equal.
 
+After publishing `0.1.0` by hand, push the tag `offline-package-v0.1.0` at the published commit and create the GitHub
+release for it. Without that baseline tag release-please builds the changelog of its first Release PR from the whole
+earlier history of the path.
+
 ## Trusted publisher (npmjs.com, package settings)
 
 Configure it after the first publish, shortly before merging the first Release

@@ -27,6 +27,7 @@ The root entry exports:
 | The editor | `FieldEditor` (props: `{ data: EditorData }`) |
 | Host contract | `FieldDataSourceProvider`, `useFieldDataSource`, `useFieldCommand`, `useFieldEnsureHuman`, `useFieldSlots`, `isIgnored`, `setFieldLocale`, `bindFieldLocaleSource`, and the TypeScript types of the contract (`FieldDataSource`, `FieldHostSlots`, `FieldUrls`, `FieldResources`, `EditorData`, `SessionInfo`, and so on) |
 | Finding keys | `findingKey`, `findingsForUnit`, `isMetaKey` (the same functions the server uses to address a result) |
+| Photo decoding | `DecodeImageError`, `isDecodeImageError` (matches by error name, so it works across two copies of the package), and the types `DecodeImage`, `DecodeImageOptions`, `DecodedImage` (see `media` below) |
 | Results document | `appendPendingPhoto` (adds a pending photo entry for a file the host stored on the device; needs the finding key and a pending id; adding the same pending id twice leaves one entry), `resolvePendingPhoto` (swaps a pending offline photo entry in the results document for its uploaded key; needs the finding key) |
 | Commercial report text | `resolvePcaNarrative`, `RELIANCE_TEMPLATES`, `METADATA_PRESETS` |
 | Preferences | `DEFAULT_INSPECTION_PREFS` |
@@ -116,10 +117,18 @@ signatures):
 - `collab`: a `CollabConnector` that opens the results Yjs document for an
   inspection (local persistence first, then network).
 - `media`: a `PendingMediaStore` and a `uploader(inspectionId, doc)` factory.
-  Optional `decodeImage(file, opts)` turns a file the browser cannot decode (HEIC) into a JPEG; return `null` to
-  decline, or reject with `DecodeImageError` (its `message` is shown to the person and that file is skipped). With
-  keep original on, `opts.keepOriginal.maxBytes` asks for full size at the best JPEG quality that fits. Absent, photos
-  behave as before.
+  Optional `decodeImage(file, opts)` is the host's decoder for a file the browser cannot decode (HEIC/HEIF):
+  - It returns `{ blob }`, an upright JPEG, or `null` to decline (the file is then handled as before).
+  - For a file it recognises but cannot decode it rejects with `DecodeImageError(code, message)`. The `message` is
+    shown to the person and only that file is skipped; the rest of the batch continues. Test for it with
+    `isDecodeImageError(err)` (by `err.name`), not `instanceof`, if the host may hold a second copy of the package.
+  - With keep original on, a HEIC is still converted: `opts.keepOriginal.maxBytes` (10 MiB) asks for full size at the
+    best JPEG quality that fits. Otherwise `opts.maxLongEdge` bounds the size.
+  - Absent, photos behave exactly as in 0.2.1.
+
+  A failed `MediaUploader` result may carry `kept: true`: the host stored the bytes on the device and wrote the
+  pending entry itself with the exported `appendPendingPhoto(doc, findingKey, pendingId)`. The editor then shows a
+  neutral notice and counts the batch as saved, not failed.
 - `urls`: `FieldUrls`, the address builders for photos, reports, presence and
   in-app paths.
 - `resources`: `FieldResources`, optional capabilities (preferences, canned
@@ -127,6 +136,9 @@ signatures):
   publish readiness, template search, version history, video). A member the
   host leaves out hides its entry point.
 - `platform`: `'web' | 'ios' | 'android'`.
+
+The `compliance` signoff command's `personId` and `name` are optional (sent together). Absent means the signed-in
+user; the panel shows the two inputs only to an owner or manager, empty.
 
 `FieldHostSlots` carries host-owned UI (theme switch, PDF export, human
 verification). An absent slot hides its entry point.

@@ -23,6 +23,7 @@ const VALUE_EXPORTS = [
   "findingsForUnit",
   "hasOpenLayer",
   "isIgnored",
+  "isDecodeImageError",
   "isMetaKey",
   "resolvePcaNarrative",
   "resolvePendingPhoto",
@@ -49,7 +50,7 @@ function typeNamesInIndex(): string[] {
 describe("@inspectorhub/field-ui root entry", () => {
   it("exports exactly the listed values, and both counts are pinned", () => {
     const actual = Object.keys(api).sort();
-    expect([actual.length, VALUE_EXPORTS.length]).toEqual([21, 21]);
+    expect([actual.length, VALUE_EXPORTS.length]).toEqual([22, 22]);
     expect(actual).toEqual([...VALUE_EXPORTS].sort());
   });
 
