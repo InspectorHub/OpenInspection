@@ -169,6 +169,87 @@ describe('native version handshake (real app)', () => {
       expect(data.tenantName).toBeNull();
     });
 
+    it('reads the clock after every database round trip, not when the handler starts', async () => {
+      h = await createHarness('standalone');
+      const T0 = Date.UTC(2031, 4, 17, 12, 0, 0, 0);
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(T0);
+      // Every statement the request runs moves the server clock on by one second, as real I/O would.
+      const statements: { sql: string; at: number }[] = [];
+      const real = h.env.DB;
+      const DB = new Proxy(real, {
+        get(target, prop) {
+          if (prop !== 'prepare') {
+            const v = Reflect.get(target, prop) as unknown;
+            return typeof v === 'function' ? v.bind(target) : v;
+          }
+          return (sql: string) => {
+            vi.setSystemTime(Date.now() + 1000);
+            statements.push({ sql, at: Date.now() });
+            return target.prepare(sql);
+          };
+        },
+      }) as unknown as typeof real;
+      const res = await call('/api/client/session', NEW, { env: { DB } as never });
+      expect(res.status, await res.clone().text()).toBe(200);
+      const { serverNowMs } = ((await res.json()) as { data: Data }).data;
+      const config = statements.filter((st) => st.sql.includes('tenant_configs'));
+      expect(config.length).toBeGreaterThan(0);
+      const lastConfigRead = Math.max(...config.map((st) => st.at));
+      // Control: the clock really moved while the request ran.
+      expect(lastConfigRead).toBeGreaterThan(T0);
+      // The answer is at least as late as the last statement that produced data for it.
+      expect(serverNowMs).toBeGreaterThanOrEqual(lastConfigRead);
+    });
+
+    it('keeps the clock out of compat and out of error bodies (control: the 200 body has it)', async () => {
+      h = await createHarness('standalone');
+      const ok = await call('/api/client/session', NEW);
+      expect(await ok.text()).toContain('serverNowMs');
+      const compat = await call('/api/client/compat?platform=ios', {}, { auth: null });
+      expect(compat.status).toBe(200);
+      expect(await compat.text()).not.toContain('serverNowMs');
+      const noToken = await call('/api/client/session', NEW, { auth: null });
+      expect(noToken.status).toBe(401);
+      expect(await noToken.text()).not.toContain('serverNowMs');
+      const old = await call('/api/inspections', OLD);
+      expect(old.status).toBe(426);
+      expect(await old.text()).not.toContain('serverNowMs');
+    });
+
+    it('forbids caching the session answer for a HEAD request and for an app below the minimum version too', async () => {
+      h = await createHarness('standalone');
+      const head = await call('/api/client/session', NEW, { init: { method: 'HEAD' } });
+      expect(head.status).toBe(200);
+      expect(head.headers.get('Cache-Control')).toBe('private, no-store');
+      const old = await call('/api/client/session', OLD);
+      expect(old.status).toBe(200);
+      expect(old.headers.get('X-Client-Upgrade')).toBe('required');
+      expect(old.headers.get('Cache-Control')).toBe('private, no-store');
+      // Control: a route that does not carry the clock is not given the header by this rule.
+      const compat = await call('/api/client/compat?platform=ios', {}, { auth: null });
+      expect(compat.headers.get('Cache-Control')).not.toBe('private, no-store');
+    });
+
+    it('reads the name and the offline limit from the signed-in company only, even when another company has a row', async () => {
+      h = await createHarness('standalone');
+      const OTHER = '11111111-0000-4000-8000-000000000002';
+      await h.db.insert(schema.tenants).values({
+        id: OTHER, slug: 'other-scope', status: 'active', tier: 'free', maxUsers: 5, deploymentMode: 'shared', createdAt: new Date(),
+      });
+      await h.db.insert(schema.tenantConfigs).values({ tenantId: OTHER, companyName: 'Other Company Ltd', offlineMaxDays: 7, updatedAt: new Date() });
+      // This company has no row of its own, so any read that is not scoped to it would find the other one.
+      await h.db.delete(schema.tenantConfigs).where(eq(schema.tenantConfigs.tenantId, TENANT_ID));
+      const none = (await session()).data as unknown as { tenantName: string | null; offlineMaxDays: number };
+      expect(none.tenantName).toBeNull();
+      expect(none.offlineMaxDays).toBe(30);
+      // Control: once this company has its own row, that row is what is read.
+      await h.db.insert(schema.tenantConfigs).values({ tenantId: TENANT_ID, companyName: 'Own Company', offlineMaxDays: 12, updatedAt: new Date() });
+      const own = (await session()).data as unknown as { tenantName: string; offlineMaxDays: number };
+      expect(own.tenantName).toBe('Own Company');
+      expect(own.offlineMaxDays).toBe(12);
+    });
+
     it('caps a very long name at 200 characters without splitting a character', async () => {
       h = await createHarness('standalone');
       await h.db.update(schema.tenantConfigs).set({ companyName: 'x'.repeat(300) }).where(eq(schema.tenantConfigs.tenantId, TENANT_ID));

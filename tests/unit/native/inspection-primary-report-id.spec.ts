@@ -128,6 +128,16 @@ describe('GET /api/inspections/{id} primaryReportId (real app)', () => {
     expect(resolved).toBe(primaryId);
   });
 
+  it('resolves a primary report only within the asking company', async () => {
+    await setup();
+    // Same inspection id, asked as the other company: nothing, even though a primary report exists.
+    expect(await resolvePrimaryReportId(h!.db as never, OTHER_TENANT_ID, WITH_REPORT)).toBeNull();
+    expect(await resolvePrimaryReportId(h!.db as never, TENANT_ID, OTHER_TENANT_INSPECTION)).toBeNull();
+    // Control: each company resolves its own inspection.
+    expect(await resolvePrimaryReportId(h!.db as never, TENANT_ID, WITH_REPORT)).toBe(primaryId);
+    expect(await resolvePrimaryReportId(h!.db as never, OTHER_TENANT_ID, OTHER_TENANT_INSPECTION)).not.toBeNull();
+  });
+
   it('keeps the rest of the response (inspection and template) alongside the new key', async () => {
     const t = await setup();
     const d = await data(await t.get(WITH_REPORT));
