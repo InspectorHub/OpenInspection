@@ -347,6 +347,14 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
         table: 'sms_delivery_status',
         reason: 'A per-message state cell, not an append-only ledger: rows are upserted last-writer-wins by (tenant, provider_message_id). The columns are a provider message id, a normalized status enum and a provider error code — no recipient identifier and no free text. The person the delivery concerns lives on the contact row, under the erasure manifest.',
     },
+    {
+        table: 'video_uploads',
+        reason: 'Short-lived operational state of one chunked video upload, not a log: it exists so unfinished storage uploads can be found and aborted. The upload sweep reaches each row at its own `expires_at` (the upload token\'s expiry plus an hour) and deletes it after a short grace period, and a tenant purge removes the rows with the company. The columns are ids, sizes and a storage key; no person is named.',
+    },
+    {
+        table: 'video_upload_parts',
+        reason: 'The received parts of an unfinished chunked upload, one row per part (a storage tag and a size). Removed when the upload completes or is aborted, by the sweep for an upload that never ended, and by tenant purge. Holds no personal data.',
+    },
 ];
 
 /** @gateConsumed read as source text by `scripts/check-retention-manifest.mjs`. */

@@ -27,23 +27,13 @@ import { getDrizzle } from '../../lib/route-helpers';
 import { r2Put, r2Get, r2Head } from '../../lib/r2/objects';
 import { MAX_PHOTO_BYTES } from '../../lib/media/store-photo';
 import { headBytes, sniffPosterType, sniffVideoType } from '../../lib/media/sniff';
+import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, MIME_TO_EXT, mimeToExt } from '../../lib/media/video-types';
 import { ownClipKey, ownPosterKey } from '../../services/video/r2-backend';
 
-// ── MIME / extension helpers ─────────────────────────────────────────────────
+// ── MIME / extension helpers (shared with the chunked upload; see lib/media/video-types.ts) ──
+export { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt };
 
-const MIME_TO_EXT: Record<string, string> = {
-    'video/mp4': 'mp4',
-    'video/quicktime': 'mov',
-    'video/webm': 'webm',
-};
-
-export function mimeToExt(mime: string): string {
-    return MIME_TO_EXT[mime] ?? 'mp4';
-}
-
-export const ALLOWED_VIDEO_MIMES = new Set(Object.keys(MIME_TO_EXT));
 const POSTER_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
 
 /** The type a clip is served as: its stored one when that is a video type we accept, otherwise mp4. Never a replayed script-capable type. */
 function storedVideoType(stored: string | undefined): string {
@@ -67,9 +57,10 @@ export async function storeVideoUpload(
     env: { PHOTOS: R2Bucket },
     claims: UploadTokenClaims,
     file: File,
+    maxBytes: number = MAX_VIDEO_BYTES,
 ): Promise<StoreVideoResult> {
-    if (file.size > MAX_VIDEO_BYTES) {
-        return { ok: false, status: 413, error: `File exceeds the 200 MB limit (got ${Math.round(file.size / 1024 / 1024)} MB).` };
+    if (file.size > maxBytes) {
+        return { ok: false, status: 413, error: `File exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit (got ${Math.round(file.size / 1024 / 1024)} MB).` };
     }
     // The clip's real type (its first bytes) decides the stored type and the key extension, not the declared one.
     const mime = sniffVideoType(await headBytes(file));
@@ -80,9 +71,9 @@ export async function storeVideoUpload(
     const { tenantId, inspectionId, mediaId } = claims;
     const r2Key = r2Keys.inspectionVideo(tenantId, inspectionId, mediaId, mimeToExt(mime));
 
-    const bytes = await file.arrayBuffer();
     try {
-        await r2Put(env.PHOTOS, r2Key, bytes, {
+        // The File itself is the body: no second copy of the clip is made in memory.
+        await r2Put(env.PHOTOS, r2Key, file, {
             httpMetadata: { contentType: mime },
             customMetadata: { tenantId, inspectionId, mediaId },
         });
@@ -95,7 +86,7 @@ export async function storeVideoUpload(
         throw err;
     }
 
-    logger.info('r2-upload: stored video', { tenantId, inspectionId, mediaId, r2Key, bytes: bytes.byteLength });
+    logger.info('r2-upload: stored video', { tenantId, inspectionId, mediaId, r2Key, bytes: file.size });
     return { ok: true, mediaId, r2Key };
 }
 

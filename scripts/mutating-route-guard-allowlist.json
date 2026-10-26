@@ -1,6 +1,6 @@
 {
   "_comment": "Mutating routes with no principal guard (requireRole, requireCapability, ...). Each entry needs a category from CATEGORIES in scripts/lib/mutating-route-guards.mjs and a reason verified in the handler. The list may only shrink: lower maxEntries when you remove one. needs-owner-decision is temporary.",
-  "maxEntries": 62,
+  "maxEntries": 66,
   "entries": {
     "server/api/agent-signup.ts::POST /": {
       "category": "public-by-design",
@@ -185,6 +185,22 @@
     "server/api/public/uploads.ts::POST /uploads/video": {
       "category": "token-track",
       "reason": "verifyUploadToken: signed single-purpose upload token required (401 otherwise); destination re-checked"
+    },
+    "server/api/public/video-chunked.ts::POST /": {
+      "category": "token-track",
+      "reason": "verifyUploadToken: signed single-purpose upload token required (401 otherwise); issuer re-checked as an active member; upload row read by the token's own tenant and media id"
+    },
+    "server/api/public/video-chunked.ts::PUT /parts/:n": {
+      "category": "token-track",
+      "reason": "verifyUploadToken: signed single-purpose upload token required (401 otherwise); issuer re-checked as an active member; upload row read by the token's own tenant and media id"
+    },
+    "server/api/public/video-chunked.ts::POST /complete": {
+      "category": "token-track",
+      "reason": "verifyUploadToken: signed single-purpose upload token required (401 otherwise); issuer re-checked as an active member; upload row read by the token's own tenant and media id"
+    },
+    "server/api/public/video-chunked.ts::DELETE /": {
+      "category": "token-track",
+      "reason": "verifyUploadToken: signed single-purpose upload token required (401 otherwise); issuer re-checked as an active member; upload row read by the token's own tenant and media id"
     },
     "server/api/public/view-tracking.ts::POST /inspections/{id}/view-tracking-objection": {
       "category": "token-track",

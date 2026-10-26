@@ -50,12 +50,12 @@ describe('native non-OpenAPI contract', () => {
     }
 
     function concretePath(entry: NativeNonOpenApiEntry): string {
-        return entry.path.replace('{id}', 'x');
+        return entry.path.replace('{id}', 'x').replace('{n}', '1');
     }
 
     it('pins at least one endpoint of every kind', () => {
         const kinds = new Set(NATIVE_NON_OPENAPI_CONTRACT.map((e) => e.kind));
-        expect([...kinds].sort()).toEqual(['binary', 'oauth', 'websocket']);
+        expect([...kinds].sort()).toEqual(['binary', 'oauth', 'token-json', 'websocket']);
     });
 
     it('reports a path that does not exist as 404 (positive control for the route checks below)', async () => {

@@ -9,11 +9,11 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 113 |
-| Columns | 1291 |
-| Indexes (excluding primary keys) | 185 |
+| Tables | 115 |
+| Columns | 1313 |
+| Indexes (excluding primary keys) | 187 |
 | Database foreign keys (all legacy, frozen) | 51 |
-| Columns carrying a source comment | 618 (48%) |
+| Columns carrying a source comment | 619 (47%) |
 
 **Tables without `tenant_id`.** Every table holding tenant data must carry it —
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
@@ -21,10 +21,10 @@ a tenant, which is the only reason to be missing it:
 
 `agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
 
-That is 13 of 113. If a table you just added appears here,
+That is 13 of 115. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 213 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 218 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -2999,4 +2999,53 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - **UNIQUE** `uq_users_tenant_email` (tenant_id, email) — partial, `WHERE deleted_at IS NULL`
 - **UNIQUE** `idx_users_slug_per_tenant` (tenant_id, slug)
 - `idx_users_email` (email)
+
+---
+
+## `video_upload_parts`
+
+<sub>server/lib/db/schema/video-upload.ts · 6 columns · primary key `tenant_id, media_id, part_number`</sub>
+
+> One received part of an unfinished upload: its storage tag (needed to complete) and its size.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `tenant_id` | text | PK NN |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `media_id` | text | PK NN |  |  | *App-layer reference to another row — no database foreign key.* |
+| `part_number` | integer | PK NN |  |  | *An integer value.* |
+| `etag` | text | NN |  |  |  |
+| `size_bytes` | integer | NN |  |  | *A size in bytes.* |
+| `received_at` | integer | NN |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+---
+
+## `video_uploads`
+
+<sub>server/lib/db/schema/video-upload.ts · 16 columns · primary key `id`</sub>
+
+> The ledger of one chunked (multipart) video upload to object storage. The storage binding cannot list the parts of an unfinished multipart upload, and a native client's upload plugin does not hand back a response body, so the server is the only place that can remember what has arrived.
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `id` | text | PK NN |  |  | *Primary key — an application-generated string id.* |
+| `tenant_id` | text | NN UQ |  |  | *Tenant isolation key. Every read and write must filter on it.* |
+| `inspection_id` | text | NN |  |  | *The inspection (order) this belongs to. App-layer reference.* |
+| `media_id` | text | NN UQ |  |  | *App-layer reference to another row — no database foreign key.* |
+| `user_id` | text | NN |  |  | *The staff user this belongs to (`users.id`). App-layer reference.* |
+| `upload_id` | text |  |  |  | *App-layer reference to another row — no database foreign key.* |
+| `r2_key` | text |  |  |  | *Object key in the R2 bucket.* |
+| `content_type` | text |  |  | `video/mp4, video/quicktime, video/webm` |  |
+| `total_bytes` | integer | NN |  |  | *A size in bytes.* |
+| `part_bytes` | integer | NN |  |  | *A size in bytes.* |
+| `part_count` | integer | NN |  |  | *A count.* |
+| `state` | text | NN IX |  | `open, completing, completed, aborted, failed` |  |
+| `created_at` | integer | NN |  |  | *Creation time, epoch milliseconds.* |
+| `expires_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `completed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+| `completing_at` | integer |  |  |  | When the upload moved open -> completing; a row stuck there past a minute is settled by looking at the object itself. |
+
+**Indexes**
+
+- **UNIQUE** `uq_video_uploads_media` (tenant_id, media_id)
+- `idx_video_uploads_sweep` (state, expires_at)
 

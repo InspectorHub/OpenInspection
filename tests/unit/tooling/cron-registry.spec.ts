@@ -28,7 +28,7 @@ describe('cron registry', () => {
      * arrived unannounced" — and the single equality that used to carry both
      * reported the second failure using the first one's name.
      */
-    const ADDED_SINCE = ['statutory-revision-watch', 'content-seed-sweep', 'calendar-orphan-sweep'];
+    const ADDED_SINCE = ['statutory-revision-watch', 'content-seed-sweep', 'calendar-orphan-sweep', 'video-upload-sweep'];
 
     it('declares every job the monolithic handler used to run, in order', () => {
         const keys = CRON_JOBS.map((j) => j.key);

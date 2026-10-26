@@ -275,7 +275,13 @@ not listed: it has no ticket route, so a WebView cannot open it.
 it before signing in. It returns `minSupported`, `recommended`, `downloadUrl`
 (each possibly `null`) and `serverContractVersion`. When `NATIVE_ACCOUNT_URL` is
 set to a valid `https` URL the response also carries `accountUrl`; when it is
-unset or invalid the key is absent (never `null` or an empty string).
+unset or invalid the key is absent (never `null` or an empty string). While native
+clients are enabled it also carries `videoUpload`: `path` (the base of the chunked
+upload routes), `chunkBytes`, `maxBytes`, `maxOpen` and `methods` (`chunked` and
+`form`). A missing `videoUpload` means an older server, or one with native clients
+off; the client then uses the single-request route. A company may be served from a
+different video backend, so the provider in the create-upload answer, not this
+field, decides whether the chunked route applies.
 
 `serverContractVersion` rises only when a client cannot tell from the response
 itself that something new exists, for example a new endpoint. New response fields
@@ -467,12 +473,77 @@ Rules the upload route applies, in order:
   `404`.
 - The request **must declare `Content-Length`**: a missing or non-numeric length
   is `411`, and an oversized declaration is `413`, both before the body is
-  buffered. The limits are 10 MiB for a photo and 200 MiB for a video.
+  buffered. The limits are 10 MiB for a photo and 64 MiB for a video sent in one
+  request; a larger video answers `413 VIDEO_TOO_LARGE_FOR_FORM` (with
+  `limits.maxBytes` and `limits.chunkedPath`) and goes through the chunked upload
+  below, whose limit is 200 MiB.
 - The photo's real type, read from the file's first bytes and not from the declared
   content type, must be the one the URL was minted for (`image/jpeg`, `image/png`
   or `image/heic`).
 - The storage key is a pure function of the token, so sending the same token
   twice overwrites one object instead of adding another.
+
+### Chunked video upload
+
+A large clip is sent in parts through four routes under
+`/api/public/uploads/video/chunked`, authorized by the same signed video token
+(a token that does not name the member who minted it is refused here). Every part
+request is checked against a ledger the server keeps (`video_uploads`,
+`video_upload_parts`): the object store cannot list the parts of an unfinished
+upload, and a background uploader does not see the response, so the server is the
+only place that can say what has arrived. Size, part size, key and stored type
+are fixed by the server and are never read from a request.
+
+1. `POST ...?token=` with `{ "totalBytes": n }` opens the upload and answers
+   `partBytes` (8 MiB), `partCount` and `received`. Asking again resumes: the same
+   size returns the parts already received and keeps the recorded part size;
+   another size is `409 VIDEO_UPLOAD_PARAMS_MISMATCH`. `totalBytes` over 200 MiB
+   is `413 VIDEO_TOO_LARGE`. A member may have 5 uploads open at once (`429`).
+2. `PUT .../parts/{n}?token=` with the raw part. Every part is exactly `partBytes`
+   long except the last, which is the remainder, and the request must declare
+   `Content-Length`; any other length is `413 VIDEO_PART_SIZE_MISMATCH` and the
+   body is not read. Send part 1 first (`409 VIDEO_FIRST_PART_REQUIRED` otherwise):
+   its first bytes must be an mp4, mov or webm video (`400 VIDEO_FORMAT_MISMATCH`
+   and the upload ends), and the stored type and key extension follow from them,
+   not from any header. Sending a part again replaces it; the other parts may be
+   sent in any order and in parallel.
+3. `POST .../complete?token=` joins the parts and answers `{ mediaId, r2Key }`.
+   Missing parts are `409 VIDEO_PARTS_MISSING` with their numbers; if the stored
+   parts no longer agree with the ledger it is `409 VIDEO_PARTS_MISMATCH` and every
+   part must be sent again. Repeating a completed upload answers the same result,
+   and a part sent after completion is `409 VIDEO_ALREADY_COMPLETED`, so a replayed
+   token cannot change a finished video.
+4. `DELETE ...?token=` cancels an unfinished upload (`204`, repeatable, and `204`
+   too when there is nothing to cancel). A finished upload answers
+   `409 VIDEO_ALREADY_COMPLETED`.
+
+A token with no upload behind it answers `404 VIDEO_UPLOAD_NOT_FOUND` to a part or
+a completion, whichever company the media id might belong to. Every error body
+carries a stable `code`. Part and total sizes are enforced by the server; whether
+the object store accepts a single-part upload and enforces its own 5 MiB minimum
+part size is confirmed against the real service, not by the local test runtime.
+
+What a client must do:
+
+- Treat `400 VIDEO_FORMAT_MISMATCH` and `400 VIDEO_SIZE_MISMATCH` as **terminal**
+  for that upload. A retry needs a new media id and token (call create-upload
+  again), not the same one.
+- Send part 1 first, wait for its answer, then send parts 2 onward with **at most
+  two in flight**.
+- Always send `Content-Length` on a part (`411` otherwise).
+- Back off and retry on `409 VIDEO_UPLOAD_BUSY`: a completion is running (or died
+  and is about to be settled; a `completing` row older than a minute is settled by
+  looking at the stored object).
+- Do not re-send a part while a `complete` call is in flight. If one is, storage
+  and the ledger can disagree: the answer is `409 VIDEO_PARTS_MISMATCH`, the
+  ledger's parts have been reset, and **every** part must be sent again.
+- Expect the upload token to remain valid until it expires: the server does not
+  check the password-change revocation list for an upload token (the same as the
+  single-request route), so a password change does not cancel a transfer that is
+  already under way.
+
+An upload that is never finished is aborted by a scheduled sweep once its token
+has expired, and its record is deleted a day after that.
 
 ### Reading inspection photos
 

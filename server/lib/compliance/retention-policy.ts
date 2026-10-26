@@ -211,7 +211,7 @@ export interface RetentionPolicyHeader {
  * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-09-11.8',
+    version: '2026-09-11.9',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
     // The document named below remains what approved the seventeen rules it
@@ -241,11 +241,15 @@ export const RETENTION_POLICY: RetentionPolicyHeader = {
     // "we held ourselves to that standard" into "an outside reviewer signed
     // this", which is the one thing this field must never be able to say.
     //
+    // `.9` records `video_uploads` and `video_upload_parts` as OUT OF SCOPE: short-lived
+    // operational state removed by the upload sweep and by tenant purge. Nothing
+    // production deletes on a calendar window has changed; the approver does not move.
+    //
     // ⚠️ The value is deliberately an opaque identifier rather than a filename.
     // What it names is held outside this repository, which is a PUBLIC one, and
     // the mapping from the identifier to the document belongs wherever that
     // document is kept. A reader here should be able to tell that a review
     // happened and on what date, and no more than that.
     supersedes: '2026-08-19.7',
-    rulesDigest: '0d782dbd0e8afe1790a6d53b4d07819f5dfa83884e6ba1837c4b652bb737f892',
+    rulesDigest: 'c86392b6870b55e83c48c984b135be8cd1b8806298113ba31076d98d71459566',
 };

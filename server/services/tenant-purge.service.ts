@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, isNull, getTableColumns, getTableName } from 'drizzle-orm';
+import { eq, and, inArray, isNotNull, isNull, getTableColumns, getTableName } from 'drizzle-orm';
 import { logger } from '../lib/logger';
-import { tenants, tenantDestructionRecords, users, reports } from '../lib/db/schema';
+import { tenants, tenantDestructionRecords, users, reports, videoUploads } from '../lib/db/schema';
+import { abortStorage } from './video/chunked-upload.service';
 import { collabDocName } from '../lib/collab/doc-name';
 import { agentViewTokenPrefix } from '../lib/agent-view-token';
 import { DESTRUCTION_STATUS } from '../lib/status/destruction-status';
@@ -127,6 +128,14 @@ export class TenantPurgeService {
         const reportIds = (await d.select({ id: reports.id }).from(reports)
             .where(eq(reports.tenantId, tenantId)).all()).map(r => r.id as string);
 
+        //    Unfinished chunked video uploads, read HERE for the same reason: step 3 deletes the
+        //    ledger that says which storage uploads are open, and an unfinished multipart upload
+        //    has no object for the prefix sweep below to find. Each is aborted in step 4.
+        const unfinishedUploads = await d.select({ r2Key: videoUploads.r2Key, uploadId: videoUploads.uploadId }).from(videoUploads)
+            .where(and(
+                eq(videoUploads.tenantId, tenantId), inArray(videoUploads.state, ['open', 'completing']), isNotNull(videoUploads.uploadId),
+            )).all();
+
         // 2. Open the destruction record BEFORE anything is destroyed.
         //
         //    This row is the proof the deletion happened, and evidence written
@@ -211,6 +220,8 @@ export class TenantPurgeService {
         //    `abc1234/` or any other tenant's root.
         let r2Count = 0;
         let r2Bytes = 0;
+        // Best effort and never fatal: a failed abort is logged inside, and the store's own auto-abort is the backstop.
+        for (const upload of unfinishedUploads) await abortStorage(this.r2, upload);
         for (const prefix of [
             `${tenantId}/`,           // unified convention root (all new-convention assets)
             `tenants/${tenantId}/`,   // legacy: inspector photos / agreements (pre-migration)

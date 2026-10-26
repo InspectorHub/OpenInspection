@@ -12,6 +12,13 @@ export const ClientCompatResponseSchema = createApiResponseSchema(z.object({
     downloadUrl: z.string().nullable().describe('Where a sideloaded build can be downloaded'),
     serverContractVersion: z.number().int().describe('Native API contract version this server implements'),
     accountUrl: z.string().optional().describe('Https page where a person manages or deletes their account. Present only when the operator configured one; absent otherwise (never null or empty)'),
+    videoUpload: z.object({
+        path: z.string().describe('Base path of the chunked video upload routes, authorized by the signed token from create-upload'),
+        chunkBytes: z.number().int().describe('Size of every part but the last'),
+        maxBytes: z.number().int().describe('Largest video the chunked route accepts'),
+        maxOpen: z.number().int().describe('Chunked uploads one member may have open at once'),
+        methods: z.array(z.enum(['chunked', 'form'])).describe('Upload methods this server offers. A client that does not find chunked here uses the single-request route. A company may be served from another video backend: the provider in the create-upload answer decides, not this field'),
+    }).optional().describe('How a large video may be uploaded. Absent on a server that predates chunked upload and when native clients are switched off here'),
 }));
 
 export const ClientSessionResponseSchema = createApiResponseSchema(z.object({

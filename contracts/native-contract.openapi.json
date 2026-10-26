@@ -179,6 +179,46 @@
                         "accountUrl": {
                           "type": "string",
                           "description": "Https page where a person manages or deletes their account. Present only when the operator configured one; absent otherwise (never null or empty)"
+                        },
+                        "videoUpload": {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "description": "Base path of the chunked video upload routes, authorized by the signed token from create-upload"
+                            },
+                            "chunkBytes": {
+                              "type": "integer",
+                              "description": "Size of every part but the last"
+                            },
+                            "maxBytes": {
+                              "type": "integer",
+                              "description": "Largest video the chunked route accepts"
+                            },
+                            "maxOpen": {
+                              "type": "integer",
+                              "description": "Chunked uploads one member may have open at once"
+                            },
+                            "methods": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "chunked",
+                                  "form"
+                                ]
+                              },
+                              "description": "Upload methods this server offers. A client that does not find chunked here uses the single-request route. A company may be served from another video backend: the provider in the create-upload answer decides, not this field"
+                            }
+                          },
+                          "required": [
+                            "path",
+                            "chunkBytes",
+                            "maxBytes",
+                            "maxOpen",
+                            "methods"
+                          ],
+                          "description": "How a large video may be uploaded. Absent on a server that predates chunked upload and when native clients are switched off here"
                         }
                       },
                       "required": [

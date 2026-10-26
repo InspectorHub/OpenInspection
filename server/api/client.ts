@@ -12,6 +12,8 @@ import { getDrizzle } from '../lib/route-helpers';
 import { readVisibleIdsLimit, VISIBLE_ID_PATTERN } from '../lib/native/visibility-limits';
 import { findVisibleInspectionIds } from '../services/native-visibility.service';
 import { resolveInspectionScope } from '../lib/inspection/visibility';
+import { nativeClientEnabled } from '../lib/mcp/flag';
+import { MAX_OPEN_VIDEO_UPLOADS, MAX_VIDEO_BYTES, VIDEO_PART_BYTES } from '../lib/media/video-types';
 import { readAccountUrl, readVersionPolicy, SERVER_CONTRACT_VERSION } from '../lib/native/client-version';
 import { recordNativeClientSeen } from '../services/native-client-seen';
 import {
@@ -83,6 +85,10 @@ clientRoutes.openapi(getClientCompatRoute, (c) => {
     const accountUrl = readAccountUrl(c.env);
     return c.json({ success: true as const, data: {
         ...policy, serverContractVersion: SERVER_CONTRACT_VERSION, ...(accountUrl ? { accountUrl } : {}),
+        ...(nativeClientEnabled(c.env) ? { videoUpload: {
+            path: '/api/public/uploads/video/chunked', chunkBytes: VIDEO_PART_BYTES, maxBytes: MAX_VIDEO_BYTES,
+            maxOpen: MAX_OPEN_VIDEO_UPLOADS, methods: ['chunked' as const, 'form' as const],
+        } } : {}),
     } }, 200);
 });
 clientRoutes.openapi(getClientSessionRoute, async (c) => {

@@ -26,7 +26,7 @@ export interface NativeRouteException {
     reason: string;
 }
 
-export const MAX_ENTRIES = 79;
+export const MAX_ENTRIES = 83;
 
 export const NATIVE_ROUTE_EXCEPTIONS: readonly NativeRouteException[] = [
     { key: 'GET /api/inspections/{id}/collab/ws', category: 'websocket', reason: 'WebSocket upgrade for the collaborative editor; answers 426 to a plain request' },
@@ -64,6 +64,10 @@ export const NATIVE_ROUTE_EXCEPTIONS: readonly NativeRouteException[] = [
     { key: 'POST /api/public/inspections/{id}/messages/upload', category: 'multipart-upload', reason: 'Multipart attachment upload from the client portal' },
     { key: 'POST /api/public/uploads/photo', category: 'multipart-upload', reason: 'Multipart photo upload gated by a signed token' },
     { key: 'POST /api/public/uploads/video', category: 'multipart-upload', reason: 'Multipart video upload gated by a signed token' },
+    { key: 'POST /api/public/uploads/video/chunked', category: 'other-held', reason: 'Token-only JSON route that opens a chunked video upload; pinned by the native non-OpenAPI contract' },
+    { key: 'PUT /api/public/uploads/video/chunked/parts/{n}', category: 'binary-or-stream', reason: 'Raw-body video part gated by a signed token; the body is the bytes, not JSON' },
+    { key: 'POST /api/public/uploads/video/chunked/complete', category: 'other-held', reason: 'Token-only JSON route that joins the parts of a chunked video upload; native contract' },
+    { key: 'DELETE /api/public/uploads/video/chunked', category: 'other-held', reason: 'Token-only route that cancels a chunked video upload; pinned by the native non-OpenAPI contract' },
     { key: 'GET /api/ics/{token}', category: 'text-feed', reason: 'iCalendar feed (text/calendar) behind a public token' },
     { key: 'GET /api/ics/inspector/{token}', category: 'text-feed', reason: 'iCalendar feed (text/calendar) behind a sealed token' },
     { key: 'GET /inspector/{tenant}/{slug}/calendar.ics', category: 'text-feed', reason: 'iCalendar feed (text/calendar) for one inspector' },

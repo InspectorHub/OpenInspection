@@ -100,6 +100,9 @@ export type { InspectionTombstone } from './inspection-tombstones';
 // Native app versions seen per company (when an old version can be retired).
 export { nativeClientSeen } from './native-client-seen';
 export type { NativeClientSeen } from './native-client-seen';
+// Ledger of chunked video uploads (the storage binding cannot list unfinished parts).
+export { videoUploads, videoUploadParts } from './video-upload';
+export type { VideoUpload } from './video-upload';
 // Pay splits (#278) — per-service-line inspector earnings, recorded not derived.
 export { servicePayRules, inspectionServicePaySplits } from './pay-split';
 export type { ServicePayRule, InspectionServicePaySplit } from './pay-split';

@@ -3,6 +3,7 @@
  *
  *   POST /api/public/uploads/photo?token=   multipart field "file"
  *   POST /api/public/uploads/video?token=   multipart field "file"
+ *   /api/public/uploads/video/chunked?token=   chunked video upload (see video-chunked.ts)
  *
  * A background transfer can outlive the access token that started it, so these
  * routes carry no session. What they trust instead is a signed upload token
@@ -41,10 +42,19 @@ import { r2Keys } from '../../lib/r2-keys';
 import { logger } from '../../lib/logger';
 import { imagesBinding } from '../../lib/media/serve-photo';
 import { MAX_PHOTO_BYTES, isSignedPhotoExt, sniffedPhotoExt, storePhotoAtKey } from '../../lib/media/store-photo';
-import { MAX_VIDEO_BYTES, storeVideoUpload } from '../inspections/media-video-r2';
+import { storeVideoUpload } from '../inspections/media-video-r2';
+import { MAX_FORM_VIDEO_BYTES } from '../../lib/media/video-types';
+import { videoChunkedRoutes } from './video-chunked';
 
 /** Multipart framing adds a little to the file itself; this much headroom is allowed before the body is read. */
 const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+
+/** The single-request route buffers the clip, so larger ones go through the chunked route. */
+const FORM_TOO_LARGE = {
+    error: 'Video is too large for a single request; use the chunked upload.',
+    code: 'VIDEO_TOO_LARGE_FOR_FORM',
+    limits: { maxBytes: MAX_FORM_VIDEO_BYTES, chunkedPath: '/api/public/uploads/video/chunked' },
+} as const;
 
 const INVALID_TOKEN = { error: 'Invalid or expired upload token' } as const;
 
@@ -53,12 +63,12 @@ const INVALID_TOKEN = { error: 'Invalid or expired upload token' } as const;
  * is read into memory. A missing or non-numeric length is 411 rather than zero:
  * a chunked body has no declared size to check.
  */
-function checkDeclaredLength(c: Context<HonoConfig>, maxBytes: number, tooLarge: string): Response | null {
+function checkDeclaredLength(c: Context<HonoConfig>, maxBytes: number, tooLarge: Record<string, unknown>): Response | null {
     const header = c.req.header('content-length');
     if (header === undefined || !/^\d+$/.test(header.trim())) {
         return c.json({ error: 'Content-Length is required.' }, 411);
     }
-    return Number(header) > maxBytes + MULTIPART_OVERHEAD_BYTES ? c.json({ error: tooLarge }, 413) : null;
+    return Number(header) > maxBytes + MULTIPART_OVERHEAD_BYTES ? c.json(tooLarge, 413) : null;
 }
 
 /** The token's issuer is still an active member and its inspection still exists, both in the token's tenant. */
@@ -89,7 +99,7 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'photo');
         if (!claims || !claims.userId || !isSignedPhotoExt(claims.ext)) return c.json(INVALID_TOKEN, 401);
 
-        const refusedLength = checkDeclaredLength(c, MAX_PHOTO_BYTES, 'Photo is too large.');
+        const refusedLength = checkDeclaredLength(c, MAX_PHOTO_BYTES, { error: 'Photo is too large.' });
         if (refusedLength) return refusedLength;
         const refusedDestination = await checkDestination(c, claims);
         if (refusedDestination) return refusedDestination;
@@ -113,14 +123,15 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'video');
         if (!claims) return c.json(INVALID_TOKEN, 401);
 
-        const refusedLength = checkDeclaredLength(c, MAX_VIDEO_BYTES, 'Video is too large.');
+        const refusedLength = checkDeclaredLength(c, MAX_FORM_VIDEO_BYTES, FORM_TOO_LARGE);
         if (refusedLength) return refusedLength;
         const refusedDestination = await checkDestination(c, claims);
         if (refusedDestination) return refusedDestination;
         const file = await readFile(c);
         if (!file) return c.json({ error: 'file field required' }, 400);
 
-        const stored = await storeVideoUpload(c.env, claims, file);
-        if (!stored.ok) return c.json({ error: stored.error }, stored.status);
+        const stored = await storeVideoUpload(c.env, claims, file, MAX_FORM_VIDEO_BYTES);
+        if (!stored.ok) return c.json(stored.status === 413 ? FORM_TOO_LARGE : { error: stored.error }, stored.status);
         return c.json({ success: true, data: { mediaId: stored.mediaId, r2Key: stored.r2Key } }, 200);
-    });
+    })
+    .route('/uploads/video/chunked', videoChunkedRoutes);

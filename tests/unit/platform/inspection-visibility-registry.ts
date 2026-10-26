@@ -169,6 +169,7 @@ export const API_FILE_CLASSIFICATION: Record<string, Entry> = {
     'server/api/public-share.ts': E('public-token', 'share tokens'),
     'server/api/public/deposit-intent.ts': E('public-token', 'checkout token'),
     'server/api/public/uploads.ts': E('public-token', 'upload token'),
+    'server/api/public/video-chunked.ts': E('public-token', 'upload token'),
     'server/api/public/verify.ts': E('public-token', 'envelope verification'),
 };
 

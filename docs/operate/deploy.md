@@ -98,6 +98,8 @@ npm run deploy             # build + wrangler deploy (uses wrangler.local.jsonc)
 
 `npm run deploy` is the whole chain, in this order: `build` → `db:migrate:remote` → `db:lag` → `wrangler deploy` → `jwt:ensure` → `setup-code:ensure`. So **remote D1 migrations are applied by the deploy itself** — you do not need a separate `npm run db:migrate:remote` first, though running it on its own is a way to read the migration output before the build starts. `db:lag` sits between the migration and the deploy and aborts if the database and this checkout disagree about what has been applied. The build bakes whichever wrangler config wins (`WRANGLER_CONFIG` env > `wrangler.local.jsonc` > committed `wrangler.jsonc`).
 
+> **Migrations must be applied before the code that reads them.** Migration `0006` (inspection tombstones) and `0007` (the chunked video upload ledger) each add tables the new Worker reads on ordinary requests. `npm run deploy` applies them first. If you deploy the Worker by another route (a pipeline that only runs `wrangler deploy`), run `npm run db:migrate:remote` before it; a Worker started against a database that lacks them answers errors on those routes until the migration lands.
+
 > **One-click**: the committed `wrangler.jsonc` carries placeholder IDs; the README's *Deploy to Cloudflare* button provisions resources and injects real IDs automatically — no manual `setup:cloudflare` needed for that path.
 
 ### First-run setup code
@@ -191,6 +193,8 @@ Configure it once per environment:
 wrangler r2 bucket lifecycle add PHOTOS ia-after-365d \
   --ia-transition-days 365
 ```
+
+**Unfinished chunked video uploads.** A native client uploads a large video in parts. The engine aborts the uploads that were abandoned (a scheduled sweep, about a day after the upload's token expired), and the object store itself aborts any unfinished upload after seven days. To shorten that backstop you may add a rule that aborts incomplete multipart uploads, for example `wrangler r2 bucket lifecycle add PHOTOS abort-unfinished-uploads --abort-multipart-days 2`. This rule only affects **unfinished** uploads: it never deletes a completed object, so it does not conflict with the *No expiry rule* above.
 
 > A hosted/managed deployment runs the same rule on its own `PHOTOS` bucket. Self-hosters who do not want Infrequent Access can simply skip this step — it is a cost optimization, not a correctness requirement.
 

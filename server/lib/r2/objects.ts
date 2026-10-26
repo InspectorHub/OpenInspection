@@ -34,3 +34,17 @@ export async function r2Head(bucket: R2Bucket, key: string): Promise<R2Object | 
 export async function r2Delete(bucket: R2Bucket, keys: string | string[]): Promise<void> {
     await bucket.delete(keys);
 }
+
+/** Open a multipart upload. Needs a real R2 smoke check: every part but the last must be the same size and at least 5 MiB. */
+export async function r2CreateMultipart(
+    bucket: R2Bucket,
+    key: string,
+    options?: R2MultipartOptions,
+): Promise<R2MultipartUpload> {
+    return bucket.createMultipartUpload(key, options);
+}
+
+/** Re-attach to an open multipart upload from a later request; the handle carries no state of its own. */
+export function r2ResumeMultipart(bucket: R2Bucket, key: string, uploadId: string): R2MultipartUpload {
+    return bucket.resumeMultipartUpload(key, uploadId);
+}

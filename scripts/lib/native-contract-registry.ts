@@ -27,12 +27,12 @@ export interface NativeContractEntry {
     path: string;
 }
 
-type NativeNonOpenApiKind = 'websocket' | 'binary' | 'oauth';
+type NativeNonOpenApiKind = 'websocket' | 'binary' | 'oauth' | 'token-json';
 
 export interface NativeNonOpenApiEntry {
     kind: NativeNonOpenApiKind;
-    method: 'get' | 'post';
-    /** Path template; `{id}` stands for an inspection id. */
+    method: 'get' | 'post' | 'put' | 'delete';
+    /** Path template; `{id}` stands for an inspection id and `{n}` for a part number. */
     path: string;
     /** What the client relies on, in one sentence. */
     note: string;
@@ -150,7 +150,23 @@ export const NATIVE_NON_OPENAPI_CONTRACT: readonly NativeNonOpenApiEntry[] = [
     },
     {
         kind: 'binary', method: 'post', path: '/api/public/uploads/video',
-        note: 'Video bytes as multipart field "file", authorized by the signed token from the create-upload call.',
+        note: 'Video bytes as multipart field "file", authorized by the signed token from the create-upload call. The single-request path: capped at 64 MiB: over it the answer is 413 VIDEO_TOO_LARGE_FOR_FORM with limits.maxBytes and limits.chunkedPath, so a client uses the chunked routes for large clips.',
+    },
+    {
+        kind: 'token-json', method: 'post', path: '/api/public/uploads/video/chunked',
+        note: 'Opens a chunked video upload for the signed token from create-upload. Body {totalBytes}; answers {success, data:{state, mediaId, totalBytes, partBytes, partCount, r2Key, received:[{partNumber,size}]}}. Repeating it resumes: the same size returns the parts already received, another size is 409 VIDEO_UPLOAD_PARAMS_MISMATCH. Errors carry a stable `code`.',
+    },
+    {
+        kind: 'binary', method: 'put', path: '/api/public/uploads/video/chunked/parts/{n}',
+        note: 'One part as the raw body, authorized by the same token. The part must be exactly `partBytes` long (the last part is the remainder) and the request must carry Content-Length, otherwise 413 VIDEO_PART_SIZE_MISMATCH or 411. Part 1 must be sent before any other part (409 VIDEO_FIRST_PART_REQUIRED) and must start like an mp4, mov or webm video (400 VIDEO_FORMAT_MISMATCH). Re-sending a part replaces it.',
+    },
+    {
+        kind: 'token-json', method: 'post', path: '/api/public/uploads/video/chunked/complete',
+        note: 'Joins the parts into the video and answers {success, data:{mediaId, r2Key}}, the key to hand to finalize. 409 VIDEO_PARTS_MISSING lists the missing part numbers; 409 VIDEO_PARTS_MISMATCH means send every part again. Repeating it after success answers the same.',
+    },
+    {
+        kind: 'token-json', method: 'delete', path: '/api/public/uploads/video/chunked',
+        note: 'Cancels an unfinished chunked upload (204, repeatable). A finished upload answers 409 VIDEO_ALREADY_COMPLETED.',
     },
     {
         kind: 'oauth', method: 'get', path: '/oauth/authorize',
