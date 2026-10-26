@@ -38,8 +38,8 @@ export async function bakeBatch(
     try {
       out.push(keepOriginal ? await keepOriginalPhoto(f, decodeImage) : await bakePhoto(f, decodeImage));
     } catch (e) {
-      if (isDecodeImageError(e)) onDecodeError(e, f);
-      else out.push(f);
+      if (!isDecodeImageError(e)) throw e;
+      onDecodeError(e, f);
     }
   }
   return out;
