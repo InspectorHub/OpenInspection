@@ -26,10 +26,9 @@ import { useReportCoverWrites } from "../hooks/useReportCoverWrites";
 import { usePresence } from "../hooks/usePresence";
 import { useResultsDoc } from "../collab/use-results-doc";
 import { useMediaDrain } from "../hooks/useMediaDrain";
-import { appendPendingPhoto } from "../collab/results-binding";
+import { addOfflinePhotos } from "../collab/offline-photo-batch";
 import { useResultsProjection } from "../hooks/useResultsProjection";
 import { useSpeedRating } from "../hooks/useSpeedRating";
-import { enqueueMedia } from "../collab/media-upload-queue";
 import { SectionRail } from "../components/editor-shared/SectionRail";
 import { EditorHeader } from "../components/editor/EditorHeader";
 import { FullscreenToggle } from "../components/editor/FullscreenToggle";
@@ -51,7 +50,7 @@ import { InspectorToolsDock } from "../components/editor/InspectorToolsDock";
 import { resolveActivePropertyPreset } from "../shared/property-preset";
 import { InspectionSettingsSheet } from "../components/editor/InspectionSettingsSheet";
 import { VideoCapture } from "../components/media-studio/VideoCapture";
-import { preprocessImage } from "../components/media-studio/preprocessImage";
+import { bakePhoto } from "../components/media-studio/bakePhoto";
 import { PublishGateModal } from "../components/editor/PublishGateModal";
 import { AddMediaChooser } from "../components/editor/AddMediaChooser";
 import { useStructureEdit } from "../hooks/useStructureEdit";
@@ -1019,7 +1018,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  void (async () => {
  const bakedFiles: File[] = [];
  for (const f of files) {
- bakedFiles.push(orig ? f : await preprocessImage(f));
+ bakedFiles.push(orig ? f : await bakePhoto(f));
  }
 
  // #181 PR-G — offline: persist each baked photo locally + append a
@@ -1035,17 +1034,10 @@ export function FieldEditor({ data }: { data: EditorData }) {
   // Phase U (Batch C2a) — key the offline pending-photo doc entry to the active
   // unit. At activeUnitId == null this === the legacy `_default:{sid}:{itemId}`.
   const fk = findingKey(activeUnitId, sid, itemId);
-  for (const baked of bakedFiles) {
-  const pendingId = crypto.randomUUID();
-  await enqueueMedia(dataSource.media.store, {
-  pendingId,
-  inspectionId: String(state.inspection.id),
-  kind: "photo", blob: baked,
-  meta: { targetType: "item", findingKey: fk, itemId },
-  createdAt: Date.now(),
-  });
-  appendPendingPhoto(doc, fk, pendingId);
-  }
+  // The host's store may reject a file; the rest of the batch still goes through and the user hears once, with the
+  // count. It is a photo that was not added, not a save failure, so the save state is left alone.
+  const rejected = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId }, bakedFiles);
+  if (rejected > 0) notify(m.editor_route_photos_rejected({ count: rejected, s: rejected === 1 ? "" : "s" }), "error", { durationMs: 8000 });
  } else {
   // A file input's change event fires once per file-chooser selection (the chooser is modal) and the input
   // is reset after it is read, so there is no double click to repeat. A batch queues behind one in flight.
@@ -1083,7 +1075,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  const files: Blob[] = [];
  for (let i = 0; i < blobs.length; i++) {
   const f = new File([blobs[i]], `burst-${i + 1}.jpg`, { type: "image/jpeg" });
-  files.push(orig ? f : await preprocessImage(f));
+  files.push(orig ? f : await bakePhoto(f));
  }
  // The burst's "Done" guards its own repeat (BurstCamera), so each commit reaches here once.
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
