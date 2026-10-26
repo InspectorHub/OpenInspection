@@ -10,10 +10,29 @@ export const SIGNED_PHOTO_EXT = {
     'image/heic': 'heic',
 } as const;
 
-/** The key extension for a declared content type, or null when the type is not one a signed upload accepts. */
+/** Spellings clients send for a type in the list above. */
+const PHOTO_TYPE_ALIASES: Record<string, keyof typeof SIGNED_PHOTO_EXT> = {
+    '': 'image/jpeg',
+    'image/jpg': 'image/jpeg',
+    'image/heif': 'image/heic',
+};
+
+/**
+ * The canonical content type for a declared one, or null when it is not an accepted photo type. The declared
+ * type is lowercased, trimmed and stripped of `;` parameters; an empty type counts as jpeg, `image/jpg` as
+ * jpeg and `image/heif` as heic. The one place the rule lives: storage, the signed-upload check and the
+ * offline-import check all go through it.
+ */
+function canonicalPhotoType(declared: string): keyof typeof SIGNED_PHOTO_EXT | null {
+    const type = (declared.split(';')[0] ?? '').trim().toLowerCase();
+    if (type in SIGNED_PHOTO_EXT) return type as keyof typeof SIGNED_PHOTO_EXT;
+    return PHOTO_TYPE_ALIASES[type] ?? null;
+}
+
+/** The key extension for a declared content type, or null when the type is not an accepted photo type. */
 export function signedPhotoExtFor(contentType: string): string | null {
-    for (const [type, ext] of Object.entries(SIGNED_PHOTO_EXT)) if (type === contentType) return ext;
-    return null;
+    const type = canonicalPhotoType(contentType);
+    return type === null ? null : SIGNED_PHOTO_EXT[type];
 }
 
 export function isSignedPhotoExt(ext: string | undefined): ext is string {
@@ -42,10 +61,11 @@ export async function storePhotoAtKey(
     file: File,
 ): Promise<void> {
     assertPhotoSize(file.size);
-    if (signedPhotoExtFor(file.type) === null) {
+    const type = canonicalPhotoType(file.type);
+    if (type === null) {
         throw Errors.BadRequest(`Photo type '${file.type}' is not accepted; use image/jpeg, image/png or image/heic`);
     }
-    const { bytes, contentType } = await stripExifOnIngest(images, await file.arrayBuffer(), file.type);
+    const { bytes, contentType } = await stripExifOnIngest(images, await file.arrayBuffer(), type);
     await r2.put(key, bytes, {
         httpMetadata: { contentType },
         customMetadata: { originalName: file.name || 'photo' },

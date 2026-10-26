@@ -165,6 +165,35 @@ describe('photo upload URL (real app)', () => {
         expect(u!.r2.store.has(key)).toBe(true);
     });
 
+    it('accepts a loose spelling of the minted type and stores the canonical content type', async () => {
+        const jpeg = await mintUrl();
+        // An empty type is not tested here: multipart serialises a typeless Blob as application/octet-stream on the wire.
+        for (const declared of ['image/jpg', 'IMAGE/JPEG; charset=x']) {
+            const res = await u!.call(jpeg.url, { method: 'POST', body: filePart(declared) }, { auth: null });
+            expect(res.status, declared).toBe(200);
+            expect(u!.r2.store.get(jpeg.key)?.contentType, declared).toBe('image/jpeg');
+        }
+        // A heif declaration satisfies a heic URL, and still cannot satisfy a jpeg one.
+        const heic = await (async () => {
+            const res = await mint({ pendingId: '55555555-0000-4000-8000-000000000002', contentType: 'image/heic' });
+            return (await res.json() as { data: { url: string; key: string } }).data;
+        })();
+        expect((await u!.call(jpeg.url, { method: 'POST', body: filePart('image/heif') }, { auth: null })).status).toBe(400);
+        expect((await u!.call(heic.url, { method: 'POST', body: filePart('image/heif') }, { auth: null })).status).toBe(200);
+        expect(u!.r2.store.get(heic.key)?.contentType).toBe('image/heic');
+        // Still refused, and nothing stored for the new key.
+        const other = await (async () => {
+            const res = await mint({ pendingId: '55555555-0000-4000-8000-000000000003', contentType: 'image/png' });
+            return (await res.json() as { data: { url: string; key: string } }).data;
+        })();
+        for (const declared of ['image/webp', 'image/gif', 'application/octet-stream', 'image/svg+xml']) {
+            expect((await u!.call(other.url, { method: 'POST', body: filePart(declared) }, { auth: null })).status, declared).toBe(400);
+        }
+        expect(u!.r2.store.has(other.key)).toBe(false);
+        // Control: the canonical type goes through.
+        expect((await u!.call(other.url, { method: 'POST', body: filePart('image/png') }, { auth: null })).status).toBe(200);
+    });
+
     it('refuses an upload once the inspection is gone (404), but not before', async () => {
         const { url } = await mintUrl();
         const before = await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });

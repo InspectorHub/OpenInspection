@@ -293,13 +293,31 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         };
 
         it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: a declared type outside the list is a 400 and stores nothing', async (name) => {
-            const refused = new File([new Uint8Array([1])], 'a.svg', { type: 'image/svg+xml' });
-            await expect(upload[name](refused)).rejects.toMatchObject({ status: 400 });
-            const untyped = new File([new Uint8Array([1])], 'a.jpg');
-            await expect(upload[name](untyped)).rejects.toMatchObject({ status: 400 });
+            for (const type of ['image/svg+xml', 'image/webp', 'image/gif', 'application/octet-stream', 'text/plain']) {
+                await expect(upload[name](new File([new Uint8Array([1])], 'a.jpg', { type }))).rejects.toMatchObject({ status: 400 });
+            }
             expect(r2Mock.put).not.toHaveBeenCalled();
-            for (const type of ['image/jpeg', 'image/png', 'image/heic']) {
-                await expect(upload[name](new File([new Uint8Array([1])], 'a.jpg', { type }))).resolves.toBeDefined();
+            // Control: an accepted type with the same name and bytes is stored.
+            await expect(upload[name](new File([new Uint8Array([1])], 'a.jpg', { type: 'image/jpeg' }))).resolves.toBeDefined();
+            expect(r2Mock.put).toHaveBeenCalledTimes(1);
+        });
+
+        // Clients misspell, omit or parameterise the type; the stored key extension and content type are always canonical.
+        it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: loose spellings are accepted and stored under the canonical type', async (name) => {
+            const cases: [string, string, string][] = [
+                ['', 'image/jpeg', 'jpg'],
+                ['image/jpg', 'image/jpeg', 'jpg'],
+                ['IMAGE/JPEG; charset=x', 'image/jpeg', 'jpg'],
+                [' image/png ', 'image/png', 'png'],
+                ['image/heif', 'image/heic', 'heic'],
+                ['image/heic', 'image/heic', 'heic'],
+            ];
+            for (const [declared, contentType, ext] of cases) {
+                r2Mock.put.mockClear();
+                await expect(upload[name](new File([new Uint8Array([1])], 'IMG_1.weird', { type: declared }))).resolves.toBeDefined();
+                const [key, , opts] = r2Mock.put.mock.calls[0] as [string, unknown, { httpMetadata: { contentType: string } }];
+                expect(key.endsWith(`.${ext}`), `${declared} -> ${key}`).toBe(true);
+                expect(opts.httpMetadata.contentType).toBe(contentType);
             }
         });
 

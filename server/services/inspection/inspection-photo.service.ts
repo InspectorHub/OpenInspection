@@ -6,7 +6,7 @@ import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '@core/field-ui/shared/finding-key';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
-import { storePhotoAtKey } from '../../lib/media/store-photo';
+import { signedPhotoExtFor, storePhotoAtKey } from '../../lib/media/store-photo';
 import { collectAttachedPhotos } from '../../lib/media/collect-attached';
 import { applyReorder, applyDetach, applyRevert, moveEntry } from '../../lib/media/photo-ops';
 import type { PhotoEntry } from '../../lib/media/collect-attached';
@@ -15,8 +15,6 @@ import { InspectionSubService } from './base';
 import { templateSnapshotSectionsOrNone } from './shared';
 import type { InspectionService } from '../inspection.service';
 import { r2Keys } from '../../lib/r2-keys';
-
-const extFromName = (n: string) => (n.split('.').pop() || 'bin').toLowerCase();
 
 /** D1's JSON column comes back as a string (D1) or a parsed object (driver
  *  cache). Normalize either into a record; an empty object when absent. */
@@ -95,7 +93,7 @@ export class InspectionPhotoService extends InspectionSubService {
         await this.facade.getInspection(id, tenantId); // Ownership check
 
         const mediaId = crypto.randomUUID();
-        const ext = extFromName(file.name);
+        const ext = signedPhotoExtFor(file.type) ?? 'bin'; // an unaccepted type is refused by putPhoto
         const key = r2Keys.inspectionPhoto(tenantId, id, mediaId, ext);
         await this.putPhoto(this.r2, key, file);
         return key;
@@ -240,9 +238,8 @@ export class InspectionPhotoService extends InspectionSubService {
         await this.facade.getInspection(inspectionId, tenantId); // ownership check
 
         const id = crypto.randomUUID();
-        const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
         const mediaId = id; // the pool row id serves as the stable mediaId
-        const key = r2Keys.inspectionPhoto(tenantId, inspectionId, mediaId, extFromName(safeName));
+        const key = r2Keys.inspectionPhoto(tenantId, inspectionId, mediaId, signedPhotoExtFor(file.type) ?? 'bin');
         await this.putPhoto(this.r2, key, file);
 
         const uploadedAt = Date.now();
