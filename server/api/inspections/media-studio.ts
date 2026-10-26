@@ -345,7 +345,7 @@ mediaStudioRoutes.openapi(videoCreateUploadRoute, async (c) => {
     // Ownership check (404 on cross-tenant); tenantId is from the JWT.
     await c.var.services.inspection.getInspection(id, tenantId);
 
-    const { backend, provider } = await resolveVideoBackend(c);
+    const { backend, provider } = await resolveVideoBackend(c, id);
     let out: { uploadURL: string; ref: { provider: 'stream'; streamUid: string } | { provider: 'r2'; mediaId: string; r2Key: string } };
     try {
         out = await backend.createUpload(id, { native: c.var.nativeClient === true, userId: c.get('user').sub });
@@ -380,7 +380,7 @@ mediaStudioRoutes.openapi(videoFinalizeRoute, async (c) => {
     const tenantId = c.get('tenantId');
     await c.var.services.inspection.getInspection(id, tenantId);
 
-    const { backend } = await resolveVideoBackend(c);
+    const { backend } = await resolveVideoBackend(c, id);
     const posterRef = verifiedPosterRef(ref, tenantId, id);
 
     const { poolId } = await backend.finalize(ref, posterRef);
@@ -411,14 +411,14 @@ mediaStudioRoutes.openapi(videoPosterRoute, async (c) => {
     // setPoster is not part of the VideoBackend interface (R2 videos use
     // the r2-upload-poster route to store a JPEG poster image instead).
     const svc = new MediaVideoService(c.env.STREAM, tenantId, getBaseUrl(c));
-    await svc.setPoster(streamUid, posterPct);
+    await svc.setPoster(streamUid, posterPct, id);
 
     // Persist posterPct on the pool row (best-effort; the Stream side is the
     // source of truth for the rendered thumbnail).
     const db = getDrizzle(c);
     await db.update(inspectionMediaPool)
         .set({ posterPct })
-        .where(and(eq(inspectionMediaPool.streamUid, streamUid), eq(inspectionMediaPool.tenantId, tenantId)));
+        .where(and(eq(inspectionMediaPool.streamUid, streamUid), eq(inspectionMediaPool.inspectionId, id), eq(inspectionMediaPool.tenantId, tenantId)));
 
     return c.json({ success: true as const }, 200);
 });
@@ -427,7 +427,7 @@ mediaStudioRoutes.openapi(videoDeleteRoute, async (c) => {
     const tenantId = c.get('tenantId');
     await c.var.services.inspection.getInspection(id, tenantId);
 
-    const { backend, provider } = await resolveVideoBackend(c);
+    const { backend, provider } = await resolveVideoBackend(c, id);
     const db = getDrizzle(c);
 
     if (provider === 'stream') {
@@ -440,6 +440,7 @@ mediaStudioRoutes.openapi(videoDeleteRoute, async (c) => {
             .from(inspectionMediaPool)
             .where(and(
                 eq(inspectionMediaPool.id, videoRef),
+                eq(inspectionMediaPool.inspectionId, id),
                 eq(inspectionMediaPool.tenantId, tenantId),
                 eq(inspectionMediaPool.provider, 'r2'),
             ))

@@ -25,6 +25,8 @@ import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
 import { getDrizzle } from '../../lib/route-helpers';
 import { r2Put, r2Get } from '../../lib/r2/objects';
+import { MAX_PHOTO_BYTES } from '../../lib/media/store-photo';
+import { ownClipKey, ownPosterKey } from '../../services/video/r2-backend';
 
 // ── MIME / extension helpers ─────────────────────────────────────────────────
 
@@ -39,6 +41,7 @@ export function mimeToExt(mime: string): string {
 }
 
 export const ALLOWED_VIDEO_MIMES = new Set(Object.keys(MIME_TO_EXT));
+const POSTER_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
 
 export type StoreVideoResult =
@@ -131,7 +134,8 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
     /**
      * POST /:id/media/video/r2-upload-poster
      *
-     * Token-gated JPEG poster upload to R2. The same upload token used for the
+     * Token-gated poster upload to R2 (jpeg, png or webp, up to the photo size cap).
+     * The same upload token used for the
      * video clip is reused (same mediaId, tenant, inspection guard). The poster
      * is stored at a stable key derived from mediaId. Returns { posterKey } for
      * the client to include in the finalize ref.
@@ -159,8 +163,11 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
         }
 
         const mime = file.type;
-        if (!mime || !mime.startsWith('image/')) {
-            return c.json({ error: 'Missing or unsupported poster type. JPEG image required.' }, 400);
+        if (!POSTER_MIMES.has(mime)) {
+            return c.json({ error: 'Missing or unsupported poster type. Allowed: jpeg, png, webp.' }, 400);
+        }
+        if (file.size > MAX_PHOTO_BYTES) {
+            return c.json({ error: 'Poster is too large.' }, 413);
         }
 
         const { mediaId } = claims;
@@ -205,13 +212,15 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             .from(inspectionMediaPool)
             .where(and(
                 eq(inspectionMediaPool.id, mediaId),
+                eq(inspectionMediaPool.inspectionId, c.req.param('id')),
                 eq(inspectionMediaPool.tenantId, tenantId),
                 eq(inspectionMediaPool.provider, 'r2'),
                 eq(inspectionMediaPool.mediaType, 'video'),
             ))
             .get();
 
-        if (!row) {
+        const clipKey = row && ownClipKey(row.r2Key, tenantId, c.req.param('id'));
+        if (!clipKey) {
             return c.json({ error: 'Video not found' }, 404);
         }
 
@@ -225,7 +234,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             const start = parseInt(rangeMatch[1], 10);
             const endStr = rangeMatch[2];
 
-            const obj = await r2Get(c.env.PHOTOS, row.r2Key, {
+            const obj = await r2Get(c.env.PHOTOS, clipKey, {
                 range: endStr
                     ? { offset: start, length: parseInt(endStr, 10) - start + 1 }
                     : { offset: start },
@@ -251,7 +260,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
         }
 
         // Full-object request.
-        const obj = await r2Get(c.env.PHOTOS, row.r2Key);
+        const obj = await r2Get(c.env.PHOTOS, clipKey);
         if (!obj) {
             return c.json({ error: 'Video not found in storage' }, 404);
         }
@@ -280,25 +289,29 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
 
         const db = getDrizzle(c);
         const row = await db
-            .select({ posterKey: inspectionMediaPool.posterKey })
+            .select({ r2Key: inspectionMediaPool.r2Key, posterKey: inspectionMediaPool.posterKey })
             .from(inspectionMediaPool)
             .where(and(
                 eq(inspectionMediaPool.id, mediaId),
+                eq(inspectionMediaPool.inspectionId, c.req.param('id')),
                 eq(inspectionMediaPool.tenantId, tenantId),
                 eq(inspectionMediaPool.provider, 'r2'),
             ))
             .get();
 
-        if (!row || !row.posterKey) {
+        const posterKey = row && ownPosterKey(row, tenantId);
+        if (!posterKey) {
             return c.json({ error: 'Poster not found' }, 404);
         }
 
-        const obj = await r2Get(c.env.PHOTOS, row.posterKey);
+        const obj = await r2Get(c.env.PHOTOS, posterKey);
         if (!obj) {
             return c.json({ error: 'Poster not found in storage' }, 404);
         }
 
-        const contentType = obj.httpMetadata?.contentType ?? 'image/jpeg';
+        // A poster stored before the upload allowlist may carry a script-capable type; never replay one.
+        const stored = obj.httpMetadata?.contentType;
+        const contentType = stored && POSTER_MIMES.has(stored) ? stored : 'image/jpeg';
 
         return new Response(obj.body, {
             status: 200,

@@ -154,7 +154,7 @@ describe('resolveVideoBackend — 4-way decision table', () => {
     it('saas / free tenant → provider=r2', async () => {
         await seedTenant('free', 'active');
         const ctx = mockCtx({ mode: 'saas' });
-        const { provider } = await resolveVideoBackend(ctx);
+        const { provider } = await resolveVideoBackend(ctx, 'insp-1');
         expect(provider).toBe('r2');
     });
 
@@ -165,21 +165,21 @@ describe('resolveVideoBackend — 4-way decision table', () => {
             hasStream: true,
             streamSubdomain: 'customer-abc123',
         });
-        const { provider } = await resolveVideoBackend(ctx);
+        const { provider } = await resolveVideoBackend(ctx, 'insp-1');
         expect(provider).toBe('stream');
     });
 
     it('saas / pro+trial → provider=r2 (trial is not paid)', async () => {
         await seedTenant('pro', 'trial');
         const ctx = mockCtx({ mode: 'saas' });
-        const { provider } = await resolveVideoBackend(ctx);
+        const { provider } = await resolveVideoBackend(ctx, 'insp-1');
         expect(provider).toBe('r2');
     });
 
     it('standalone / videoMode=r2 (default) → provider=r2', async () => {
         await seedTenantConfig('r2');
         const ctx = mockCtx({ mode: 'standalone' });
-        const { provider } = await resolveVideoBackend(ctx);
+        const { provider } = await resolveVideoBackend(ctx, 'insp-1');
         expect(provider).toBe('r2');
     });
 
@@ -189,7 +189,7 @@ describe('resolveVideoBackend — 4-way decision table', () => {
             mode: 'standalone',
             hasStream: true,
         });
-        const { provider } = await resolveVideoBackend(ctx);
+        const { provider } = await resolveVideoBackend(ctx, 'insp-1');
         expect(provider).toBe('stream');
     });
 
@@ -201,7 +201,7 @@ describe('resolveVideoBackend — 4-way decision table', () => {
             hasStream: true,
             streamSubdomain: 'customer-ent',
         });
-        const { provider } = await resolveVideoBackend(ctx);
+        const { provider } = await resolveVideoBackend(ctx, 'insp-1');
         expect(provider).toBe('stream');
     });
 });
@@ -212,7 +212,7 @@ describe('resolveVideoBackend — backend instance type', () => {
     it('r2 path returns R2VideoBackend', async () => {
         await seedTenant('free', 'active');
         const ctx = mockCtx({ mode: 'saas' });
-        const { backend } = await resolveVideoBackend(ctx);
+        const { backend } = await resolveVideoBackend(ctx, 'insp-1');
         const { R2VideoBackend } = await import('../../../server/services/video/r2-backend');
         expect(backend).toBeInstanceOf(R2VideoBackend);
     });
@@ -224,7 +224,7 @@ describe('resolveVideoBackend — backend instance type', () => {
             hasStream: true,
             streamSubdomain: 'customer-abc123',
         });
-        const { backend } = await resolveVideoBackend(ctx);
+        const { backend } = await resolveVideoBackend(ctx, 'insp-1');
         const { StreamVideoBackend } = await import('../../../server/services/video/stream-backend');
         expect(backend).toBeInstanceOf(StreamVideoBackend);
     });
@@ -240,14 +240,14 @@ describe('resolveVideoBackend — streamSubdomain', () => {
             hasStream: true,
             streamSubdomain: 'customer-xyz',
         });
-        const { streamSubdomain } = await resolveVideoBackend(ctx);
+        const { streamSubdomain } = await resolveVideoBackend(ctx, 'insp-1');
         expect(streamSubdomain).toBe('customer-xyz');
     });
 
     it('returns null streamSubdomain on r2 path', async () => {
         await seedTenant('free', 'active');
         const ctx = mockCtx({ mode: 'saas' });
-        const { streamSubdomain } = await resolveVideoBackend(ctx);
+        const { streamSubdomain } = await resolveVideoBackend(ctx, 'insp-1');
         expect(streamSubdomain).toBeNull();
     });
 
@@ -257,7 +257,7 @@ describe('resolveVideoBackend — streamSubdomain', () => {
             mode: 'standalone',
             hasStream: true,
         });
-        const { streamSubdomain } = await resolveVideoBackend(ctx);
+        const { streamSubdomain } = await resolveVideoBackend(ctx, 'insp-1');
         expect(streamSubdomain).toBe('customer-sh');
     });
 });
@@ -273,7 +273,7 @@ describe('resolveVideoBackend — fail closed', () => {
             // No streamSubdomain — STREAM_CUSTOMER_SUBDOMAIN absent
         });
 
-        await expect(resolveVideoBackend(ctx)).rejects.toThrow(/not configured/);
+        await expect(resolveVideoBackend(ctx, 'insp-1')).rejects.toThrow(/not configured/);
     });
 
     it('throws ServiceUnavailable when stream selected but STREAM binding missing (standalone)', async () => {
@@ -283,6 +283,6 @@ describe('resolveVideoBackend — fail closed', () => {
             // hasStream: false by default — STREAM binding absent
         });
 
-        await expect(resolveVideoBackend(ctx)).rejects.toThrow(/not configured/);
+        await expect(resolveVideoBackend(ctx, 'insp-1')).rejects.toThrow(/not configured/);
     });
 });

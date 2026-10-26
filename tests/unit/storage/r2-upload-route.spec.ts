@@ -16,6 +16,7 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { signUploadToken } from '../../../server/lib/video-upload-token';
 import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt, registerR2VideoRoutes } from '../../../server/api/inspections/media-video-r2';
 import { r2Keys } from '../../../server/lib/r2-keys';
+import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -406,6 +407,44 @@ describe('r2-upload-poster route', () => {
         });
 
         expect(res.status).toBe(400);
+    });
+
+    // ── Poster type and size ──────────────────────────────────────────────────
+
+    it('accepts only jpeg, png and webp posters and stores the allowlisted type (SVG, gif, html and a missing type are refused)', async () => {
+        const { app, photos } = setup();
+        seedClip(photos);
+        const token = await mintToken();
+        const send = (type: string) => app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
+            method: 'POST',
+            body: makeFormData('poster', type),
+            headers: { 'x-test-tenant': TENANT_ID },
+        });
+        const posterKey = r2Keys.inspectionVideoPoster(TENANT_ID, INSPECTION_ID, MEDIA_ID);
+        for (const type of ['image/svg+xml', 'image/gif', 'text/html', '']) {
+            expect((await send(type)).status, type).toBe(400);
+            expect(photos.store.has(posterKey), type).toBe(false);
+        }
+        for (const type of ['image/jpeg', 'image/png', 'image/webp']) {
+            expect((await send(type)).status, type).toBe(200);
+            expect(photos.store.get(posterKey)?.contentType, type).toBe(type);
+        }
+    });
+
+    it('refuses a poster over the photo size cap with 413 and accepts one exactly at the cap (positive control)', async () => {
+        const { app, photos } = setup();
+        seedClip(photos);
+        const token = await mintToken();
+        const send = (size: number) => app.request(`/${INSPECTION_ID}/media/video/r2-upload-poster?token=${token}`, {
+            method: 'POST',
+            body: makeFormData('poster.jpg', 'image/jpeg', new Uint8Array(size)),
+            headers: { 'x-test-tenant': TENANT_ID },
+        });
+        const posterKey = r2Keys.inspectionVideoPoster(TENANT_ID, INSPECTION_ID, MEDIA_ID);
+        expect((await send(MAX_PHOTO_BYTES + 1)).status).toBe(413);
+        expect(photos.store.has(posterKey)).toBe(false);
+        expect((await send(MAX_PHOTO_BYTES)).status).toBe(200);
+        expect(photos.store.get(posterKey)?.bytes.length).toBe(MAX_PHOTO_BYTES);
     });
 
     // ── Happy path ────────────────────────────────────────────────────────────

@@ -146,7 +146,7 @@ export const NATIVE_NON_OPENAPI_CONTRACT: readonly NativeNonOpenApiEntry[] = [
     },
     {
         kind: 'binary', method: 'post', path: '/api/inspections/{id}/media/video/r2-upload-poster',
-        note: 'Poster image as multipart field "file", authorized by the upload token query parameter from the create-upload call; answers 404 until the clip was uploaded under that token. Any image/* type is accepted and stored with the type the client declares (SVG included), and no size cap is enforced.',
+        note: 'Poster image as multipart field "file", authorized by the upload token query parameter from the create-upload call; answers 404 until the clip was uploaded under that token. Only image/jpeg, image/png and image/webp are accepted (400 otherwise), up to the photo size cap (413 over it), and the object is stored with that type.',
     },
     {
         kind: 'binary', method: 'post', path: '/api/public/uploads/video',
