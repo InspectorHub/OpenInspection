@@ -8,6 +8,7 @@ import { mapPool } from "~/lib/map-pool";
 import { handleStatutoryIntent } from "./action-statutory.server";
 import { handleFollowupIntent } from "./action-followup.server";
 import { writeKeyFor } from "./action-idempotency.server";
+import { attempt, refusalMessage } from "./action-errors.server";
 
 export async function action({ request, params, context }: Route.ActionArgs) {
  const token = await requireToken(context, request);
@@ -51,7 +52,11 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // concluded they had mis-clicked. Ordering it here is what makes the
  // checkbox mean what it says on the publish it was ticked for.
  const autoSign = formData.get("autoSignOnPublish");
- if (autoSign !== null) await api.inspections[":id"].$patch({ param: { id: params.id }, json: { autoSignOnPublish: autoSign === "true" } });
+ if (autoSign !== null) {
+ // A refused or failed write must stop the publish: it would otherwise sign (or not) by the OLD flag.
+ const saved = await attempt(() => api.inspections[":id"].$patch({ param: { id: params.id }, json: { autoSignOnPublish: autoSign === "true" } }));
+ if (!saved?.ok) return { ok: false as const, intent: "publish", error: await refusalMessage(saved ?? new Response(null), "Couldn't save the signing preference, so the report was not published.") };
+ }
  // The revision reason, when the dialog collected one. Blank or absent sends
  // nothing, so the stored reason stays NULL rather than becoming an empty
  // string that the amendment trail would render as a reason someone wrote.
@@ -63,17 +68,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // autosave "Save failed" toast and swallowed the real reason. Parse the
  // AppError body ({ error: { code, message } }) and carry the message back
  // so the publish modal can show it inline.
- if (!res.ok) {
- const bodyText = await res.text().catch(() => "");
- let message = "Couldn't publish the report. Please try again.";
- try {
- const parsed = JSON.parse(bodyText) as { error?: { message?: string }; message?: string };
- message = parsed?.error?.message ?? parsed?.message ?? message;
- } catch {
- /* non-JSON body — keep the default message */
- }
- return { ok: false as const, intent: "publish", error: message };
- }
+ if (!res.ok) return { ok: false as const, intent: "publish", error: await refusalMessage(res, "Couldn't publish the report. Please try again.") };
  return { ok: true as const, intent: "publish" };
  }
 
@@ -308,8 +303,11 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // clean convergence over a drifted doc — see the status check below.
  if (intent === "restructure") {
   const id = params.id;
-  const snapshot = JSON.parse(String(formData.get("snapshot") ?? "{}"));
-  await api.inspections[":id"]["template-snapshot"].$patch({ param: { id }, json: { snapshot } });
+  let snapshot: ReturnType<typeof JSON.parse>;
+  try { snapshot = JSON.parse(String(formData.get("snapshot") ?? "{}")); } catch { return { ok: false as const, intent: "restructure", error: "The structure could not be read, so nothing was saved." }; }
+  const stored = await attempt(() => api.inspections[":id"]["template-snapshot"].$patch({ param: { id }, json: { snapshot } }));
+  const notStored = "The structure could not be saved.";
+  if (!stored?.ok) return { ok: false as const, intent: "restructure", error: stored ? await refusalMessage(stored, notStored) : notStored };
   if (formData.get("collab") === "1") {
    try {
     const res = await api.inspections[":id"].collab.restructure.$post({ param: { id } });
