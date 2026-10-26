@@ -26,10 +26,9 @@ import { useReportCoverWrites } from "../hooks/useReportCoverWrites";
 import { usePresence } from "../hooks/usePresence";
 import { useResultsDoc } from "../collab/use-results-doc";
 import { useMediaDrain } from "../hooks/useMediaDrain";
-import { appendPendingPhoto } from "../collab/results-binding";
+import { addOfflinePhotos } from "../collab/offline-photo-batch";
 import { useResultsProjection } from "../hooks/useResultsProjection";
 import { useSpeedRating } from "../hooks/useSpeedRating";
-import { enqueueMedia } from "../collab/media-upload-queue";
 import { SectionRail } from "../components/editor-shared/SectionRail";
 import { EditorHeader } from "../components/editor/EditorHeader";
 import { FullscreenToggle } from "../components/editor/FullscreenToggle";
@@ -51,7 +50,8 @@ import { InspectorToolsDock } from "../components/editor/InspectorToolsDock";
 import { resolveActivePropertyPreset } from "../shared/property-preset";
 import { InspectionSettingsSheet } from "../components/editor/InspectionSettingsSheet";
 import { VideoCapture } from "../components/media-studio/VideoCapture";
-import { preprocessImage } from "../components/media-studio/preprocessImage";
+import { bakePhoto } from "../components/media-studio/bakePhoto";
+import { bakeBatch } from "../components/media-studio/bakeBatch";
 import { PublishGateModal } from "../components/editor/PublishGateModal";
 import { AddMediaChooser } from "../components/editor/AddMediaChooser";
 import { useStructureEdit } from "../hooks/useStructureEdit";
@@ -1017,10 +1017,10 @@ export function FieldEditor({ data }: { data: EditorData }) {
  const target = pendingPhotoTargetRef.current;
  pendingPhotoTargetRef.current = null;
  void (async () => {
- const bakedFiles: File[] = [];
- for (const f of files) {
- bakedFiles.push(orig ? f : await preprocessImage(f));
- }
+ const bakedFiles = await bakeBatch(files, orig, dataSource.media.decodeImage?.bind(dataSource.media), (err) =>
+ notify(m.editor_route_photo_not_converted({ reason: err.message }), "error", { durationMs: 8000 }));
+ if (overflow) notify(m.editor_route_photos_batch_capped(), "warning", { durationMs: 6000 });
+ if (bakedFiles.length === 0) return; // every file was skipped and reported: nothing to store or upload
 
  // #181 PR-G — offline: persist each baked photo locally + append a
  // PENDING doc entry (empty key + pendingUpload) per file. The strip
@@ -1035,17 +1035,10 @@ export function FieldEditor({ data }: { data: EditorData }) {
   // Phase U (Batch C2a) — key the offline pending-photo doc entry to the active
   // unit. At activeUnitId == null this === the legacy `_default:{sid}:{itemId}`.
   const fk = findingKey(activeUnitId, sid, itemId);
-  for (const baked of bakedFiles) {
-  const pendingId = crypto.randomUUID();
-  await enqueueMedia(dataSource.media.store, {
-  pendingId,
-  inspectionId: String(state.inspection.id),
-  kind: "photo", blob: baked,
-  meta: { targetType: "item", findingKey: fk, itemId },
-  createdAt: Date.now(),
-  });
-  appendPendingPhoto(doc, fk, pendingId);
-  }
+  // The host's store may reject a file; the rest of the batch still goes through and the user hears once, with the
+  // count. It is a photo that was not added, not a save failure, so the save state is left alone.
+  const rejected = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId }, bakedFiles);
+  if (rejected > 0) notify(m.editor_route_photos_rejected({ count: rejected, s: rejected === 1 ? "" : "s" }), "error", { durationMs: 8000 });
  } else {
   // A file input's change event fires once per file-chooser selection (the chooser is modal) and the input
   // is reset after it is read, so there is no double click to repeat. A batch queues behind one in flight.
@@ -1057,9 +1050,6 @@ export function FieldEditor({ data }: { data: EditorData }) {
   });
  }
 
- if (overflow) {
-  notify(m.editor_route_photos_batch_capped(), "warning", { durationMs: 6000 });
- }
  })();
  // Reset both inputs so re-picking the same file(s) re-fires onChange
  if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -1083,7 +1073,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  const files: Blob[] = [];
  for (let i = 0; i < blobs.length; i++) {
   const f = new File([blobs[i]], `burst-${i + 1}.jpg`, { type: "image/jpeg" });
-  files.push(orig ? f : await preprocessImage(f));
+  files.push(orig ? f : await bakePhoto(f));
  }
  // The burst's "Done" guards its own repeat (BurstCamera), so each commit reaches here once.
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
@@ -1118,26 +1108,26 @@ export function FieldEditor({ data }: { data: EditorData }) {
  }
  }
  }
- // Task 16 — results[] lets a batch report exactly how many of a large
- // selection made it, instead of an all-or-nothing toast. d.ok is derived
- // from results.every(ok), so without this a single failed file
- // in a 12-photo batch would fire BOTH the success toast (for the 11 that
- // attached) and a generic failure toast — keep them mutually
- // exclusive here.
+ // results[] reports how many files of a large selection made it. Success and failure toasts are mutually
+ // exclusive; a file the host kept on the device (kept) is neither: it gets a neutral toast of its own.
  const total = d.results.length;
+ const keptCount = d.results.filter((r) => !r.ok && r.kept === true).length;
  const successCount = d.results.filter((r) => r.ok).length;
- const failCount = total - successCount;
+ const failCount = total - successCount - keptCount;
+ if (total === 0) {
+ // No file reached the uploader (an empty batch): say so rather than showing nothing.
+ notify(m.editor_route_photo_upload_failed(), "error", { durationMs: 8000 });
+ continue;
+ }
+ if (keptCount > 0) notify(m.editor_route_photos_kept({ count: keptCount, s: keptCount === 1 ? "" : "s" }), "info", { durationMs: 6000 });
  if (failCount > 0) {
- notify(m.editor_route_photos_partial_upload({ success: successCount, total, failed: failCount }), "error", { durationMs: 8000 });
- } else if (total > 0) {
+ notify(m.editor_route_photos_partial_upload({ success: successCount, total: total - keptCount, failed: failCount }), "error", { durationMs: 8000 });
+ } else if (successCount > 0) {
  notify(
  m.editor_route_photos_added({ count: successCount, s: successCount === 1 ? "" : "s", toDefect: d.targetType === "defect" ? " to defect" : "" }),
  "success",
  { durationMs: 2000 },
  );
- } else {
- // No file reached the uploader (an empty batch): say so rather than showing nothing.
- notify(m.editor_route_photo_upload_failed(), "error", { durationMs: 8000 });
  }
  }
  }, [photoUpload.outcomes, photoUpload.consume, findings, notify]);

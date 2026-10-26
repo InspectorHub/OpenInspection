@@ -9,6 +9,7 @@ import type { ImagesBinding } from '../../lib/media/strip-exif';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
 import { r2Keys } from '../../lib/r2-keys';
+import { assertPhotoSize } from '../../lib/media/store-photo';
 
 /**
  * Extract the mediaId from a new-convention R2 photo key
@@ -112,6 +113,7 @@ export class InspectionAnnotationsService extends InspectionSubService {
         sectionId?: string,
         opts?: { skipResultsWrite?: boolean },
     ): Promise<{ annotatedKey: string }> {
+        assertPhotoSize(compositeBytes.byteLength);
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(inspectionId, tenantId);
 
@@ -180,6 +182,7 @@ export class InspectionAnnotationsService extends InspectionSubService {
         bakedBytes: ArrayBuffer,
         crop: CoverCrop,
     ): Promise<{ coverImageKey: string }> {
+        assertPhotoSize(bakedBytes.byteLength);
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(inspectionId, tenantId);
         const ok = await this.facade.isInspectionPhotoKey(inspectionId, tenantId, sourceKey);
@@ -217,6 +220,7 @@ export class InspectionAnnotationsService extends InspectionSubService {
         sectionId?: string,
         opts?: { skipResultsWrite?: boolean },
     ): Promise<{ croppedKey: string }> {
+        assertPhotoSize(bakedBytes.byteLength);
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(inspectionId, tenantId);
 

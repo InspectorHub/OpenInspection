@@ -66,7 +66,7 @@ const uploadPhotoRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "uploadInspection",
-    description: "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
+    description: "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. A file over 10 MiB is refused with 413, and a file whose bytes are not a jpeg, png or heic image with 400 (the declared type is ignored: the stored type and key extension follow the bytes, and an empty declared type is fine). Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'excluded' }));
 
 /* ── A-9 — Inspection photo serve ─────────────────────────────────────────
@@ -89,7 +89,7 @@ const servePhotoRoute = createRoute(withMcpMetadata({
         query: z.object({
             key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
-            w: z.string().optional().describe('Optional max width in pixels for an on-the-fly thumbnail (grid previews); omitted serves the full-resolution original.'),
+            w: z.string().optional().describe('Optional width in pixels, clamped to 16-2000 (a value that is not a number counts as 16). Omitted serves the original. With an image service the response is a webp of that width; without one, or when the conversion fails, it is the original bytes (up to the upload limit, possibly a HEIC file). Read the response Content-Type to know which.'),
         }),
     },
     responses: {
@@ -155,7 +155,7 @@ const mediaUploadRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "uploadInspectionMedia",
-    description: "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
+    description: "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. A file over 10 MiB is refused with 413, and a file whose bytes are not a jpeg, png or heic image with 400 (the declared type is ignored: the stored type and key extension follow the bytes, and an empty declared type is fine). Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
 }, { scopes: ['write'], tier: 'excluded' }));
 
 const mediaAttachRoute = createRoute(withMcpMetadata({

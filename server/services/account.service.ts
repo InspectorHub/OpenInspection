@@ -103,7 +103,7 @@ export async function softDeleteAccount(
 
     // Grants never read the marker above; revoke them so a refresh token cannot
     // outlive the account.
-    await revokeUserGrantsBestEffort(oauth, userId, 'self-delete');
+    await revokeUserGrantsBestEffort(oauth, userId, 'self-delete', { kv, reason: 'member_removed' });
 
     return { deletedAt: deletedAt.toISOString(), identityId: userId };
 }

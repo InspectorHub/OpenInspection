@@ -4,6 +4,7 @@ import { INSPECTION_STATUSES } from '../../status/inspection-status';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
 import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 import { RESERVED_INSPECTION_SEGMENTS } from '../../inspection/reserved-segments';
+import { RevisionStatusSchema } from '../statutory-revision.schema';
 
 /**
  * Core Inspection Schema (Output)
@@ -251,6 +252,19 @@ export const BulkInspectionSchema = z.object({
  * Response Schemas
  */
 export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionSchema)).openapi('InspectionListResponse');
+
+/** Response of GET /api/inspections/{id}. Kept inline-shaped (unnamed) so the published contract does not gain a component. */
+export const GetInspectionResponseSchema = createApiResponseSchema(z.object({
+    inspection: InspectionSchema.extend({
+        templateSnapshot: z.record(z.string(), z.unknown()).nullable().optional().describe('The template structure frozen onto this inspection, or null when it has none or the stored value is not a readable object. The editor reads it to render the checklist.'),
+        coverPhotoId: z.string().nullable().optional().describe('Storage key of the photo chosen as the report cover, or null when none is chosen.'),
+        propertyFacts: z.record(z.string(), z.unknown()).nullable().optional().describe('The Property Facts values (year built, size, foundation and the like), or null when none are stored.'),
+        pcaNarrative: z.record(z.string(), z.string()).nullable().optional().describe('The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders.'),
+    }).describe('The inspection record.'),
+    template: z.unknown().openapi({ description: 'The associated template schema' }),
+    primaryReportId: z.string().nullable().describe('Id of the primary report of this inspection, or null when it has none yet. A native device writes it into the manifest of an exported package; the importer refuses a package for an existing inspection whose report id differs from this one. The key is always present on a server that supports it; a missing key means an older server.'),
+    revisionStatus: RevisionStatusSchema.optional().describe('How the inspection date sits against the statutory form revision its template produces. Present only for an inspection whose template declares a statutory form and names its revision; absent means there is nothing to say, never that nobody looked. It changes with the date and with the current time, so a cached copy can show an earlier answer.'),
+}));
 
 // Sourced from the same constant as the drizzle enum on
 // `inspections.cancel_reason`, so the wire and the column cannot drift.

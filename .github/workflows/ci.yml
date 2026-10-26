@@ -392,6 +392,9 @@ jobs:
       # because the run-time patterns come from a repository secret and secrets are absent on
       # pull requests from forks. The publish workflow runs the same script WITH --require-extra.
       - run: npm run release:check:field-ui
+      # The same check for @inspectorhub/offline-package, which also compares the built
+      # declaration file against the committed export list (packages/offline-package/api-surface.json).
+      - run: npm run release:check:offline-package
 
   # ── The required check ───────────────────────────────────────────────────
   # Does no work; exists so branch protection has a single stable name to

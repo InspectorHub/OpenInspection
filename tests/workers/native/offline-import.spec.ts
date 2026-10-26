@@ -795,7 +795,7 @@ describe('POST /api/client/import', () => {
         const spec: PackageSpec = {
             tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }],
             yjs: { [id]: deviceState('RR', 'pend-1') },
-            media: [{ pendingId: 'pend-1', inspectionId: id, contentType: 'image/jpeg', bytes: Uint8Array.from({ length: 1000 }, (_, i) => (i * 7) & 255) }],
+            media: [{ pendingId: 'pend-1', inspectionId: id, contentType: 'image/jpeg', bytes: Uint8Array.from({ length: 1000 }, (_, i) => JPEG_BYTES[i] ?? (i * 7) & 255) }],
             outbox: [{ idempotencyKey: key, op: 'inspection.create', payload: { id, propertyAddress: '3 Lying Lane, Town', templateId: TEMPLATE } }],
         };
         const entry = { photo: 'media/pend-1.jpg', yjs: `yjs/${id}.bin`, outbox: 'outbox.json' }[kind];
@@ -813,6 +813,33 @@ describe('POST /api/client/import', () => {
         const accepted = await importPackage(manager.token, honest);
         expect(accepted.status, await accepted.clone().text()).toBe(200);
         expect(await addressOf(id)).toBe('3 Lying Lane, Town');
+    });
+
+    it('decides the stored type of a photo from its bytes: a png declared as jpeg is stored as png, a file that is not an image is refused and stores nothing (positive control: the same package with real bytes)', async () => {
+        const id = fresh('insp-sniff');
+        const key = fresh('k');
+        const packageWith = (bytes: Uint8Array) => buildPackage({
+            tenantId: TENANT, exportedBy: author.id, inspections: [{ id, reportId: 'device-report' }],
+            yjs: { [id]: deviceState('RR', 'pend-1') },
+            media: [{ pendingId: 'pend-1', inspectionId: id, contentType: 'image/jpeg', bytes }],
+            outbox: [{ idempotencyKey: key, op: 'inspection.create', payload: { id, propertyAddress: '4 Sniff Street, Town', templateId: TEMPLATE } }],
+        });
+        const stored = async () => (await b.PHOTOS.list({ prefix: `${TENANT}/inspections/${id}/` })).objects;
+
+        const html = new TextEncoder().encode('<!DOCTYPE html><script>alert(1)</script>');
+        const refused = await importPackage(manager.token, packageWith(html));
+        expect(refused.status, await refused.clone().text()).toBe(400);
+        expect(await stored()).toEqual([]);
+        // Refused before any write: the inspection and the record of its create do not exist either.
+        expect(await addressOf(id)).toBeNull();
+        expect(await recordedCount(key)).toBe(0);
+
+        const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+        const accepted = await importPackage(manager.token, packageWith(png));
+        expect(accepted.status, await accepted.clone().text()).toBe(200);
+        const objects = await stored();
+        expect(objects.map((o) => o.key)).toEqual([`${TENANT}/inspections/${id}/photos/pend-1.png`]);
+        expect((await b.PHOTOS.head(objects[0]!.key))?.httpMetadata?.contentType).toBe('image/png');
     });
 
     // ── Package age and the retention of applied records ───────────────────────

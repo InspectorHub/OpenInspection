@@ -82,10 +82,12 @@ export class MediaVideoService {
 
     /**
      * Set the poster frame (`thumbnailTimestampPct`, a 0..1 fraction). Guards
-     * ownership first.
+     * ownership first: the video must belong to the caller's tenant and to `inspectionId`.
      */
-    async setPoster(streamUid: string, posterPct: number): Promise<void> {
-        await this.assertOwnershipByUid(streamUid);
+    async setPoster(streamUid: string, posterPct: number, inspectionId: string): Promise<void> {
+        const video = await this.stream.video(streamUid).details();
+        this.assertOwnership(video.meta);
+        if (video.meta.inspectionId !== inspectionId) throw Errors.NotFound('Video not found');
         await this.stream.video(streamUid).update({ thumbnailTimestampPct: posterPct });
     }
 

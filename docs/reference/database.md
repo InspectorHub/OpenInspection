@@ -83,6 +83,7 @@ Migrations are applied with wrangler (`wrangler d1 migrations apply`), not `driz
 | `tenant_configs` | Per-tenant settings, encrypted integration secrets |
 | `audit_logs` / `esign_audit_logs` | Immutable audit trail |
 | `tenant_destruction_records` | Durable, non-personal proof a tenant was purged during offboarding (no FK to `tenants` so it outlives the deletion) |
+| `video_uploads` / `video_upload_parts` | The ledger of a chunked video upload: size, part size, stored key and type, state, and each received part. Short-lived operational state: the upload sweep removes a row a day after its token expired, and a tenant purge removes it (and aborts the unfinished storage upload) with the company. `state` is `open`, `completing`, `completed`, `aborted` or `failed`; `completing_at` marks when a completion started. |
 
 For the complete schema — every table, every column, with types, nullability,
 defaults, enum vocabularies, keys and indexes — see

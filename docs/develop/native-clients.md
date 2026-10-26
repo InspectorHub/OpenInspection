@@ -135,6 +135,13 @@ The refresh re-reads the member's row and the marker before it issues a token, s
 a revocation that failed when the member was removed cannot be bypassed by
 refreshing.
 
+When a refresh is refused because the member was removed (removal, account
+self-deletion, re-invitation of a removed member, or the row re-read above), the 400 `invalid_grant` body carries one
+extra top-level field, `session_end_reason: "member_removed"`; the `error` code is
+unchanged and clients that ignore unknown fields behave as before. Every other
+refusal, including a grant that expired or never existed, has no such field. The
+value comes from a fixed list and is looked up by the grant id in the refresh token.
+
 ---
 
 ## 3. Offline time limit: `offline_max_days`
@@ -144,6 +151,26 @@ The company setting `offline_max_days` (API field `offlineMaxDays`, integer
 local data. The **device enforces it**; the server only publishes it, in
 `GET /api/client/session`. Change it with `PATCH /api/admin/tenant-config`.
 A company with no configuration row reports the default.
+
+The same response carries two more fields a device needs while it is locked or
+offline:
+
+- `serverNowMs`: the server clock when it answered, in whole milliseconds since
+  the Unix epoch. It is read on the server after all other work and is never
+  derived from anything the client sends (not the `Date` request header, not a
+  query parameter, not the token). Treat it as "now, give or take network delay".
+  A device uses it to re-anchor the clock behind its offline limit. The response
+  carries `Cache-Control: private, no-store`, so an older answer cannot be
+  replayed to set the device clock back. A response without this key comes from
+  an older server.
+- `tenantName`: the display name the company set for itself, trimmed and cut to
+  200 characters, or `null` when it has none. It is never replaced by a default
+  or by the deployment's own name; a device shows its own neutral wording for
+  `null`. A response without this key comes from an older server.
+
+The `Date` response header is also readable by the app's WebView (see section 5),
+but it has one-second resolution, and the edge adds it to the response, so prefer
+`serverNowMs`.
 
 ### Deleted inspections and local copies
 
@@ -160,8 +187,10 @@ so the guarantees below hold only for a client that implements them.
 
 **How a device reconciles.** On connecting, the device sends the ids of its local
 inspections to `POST /api/client/inspections/visible` and receives the subset the
-signed-in user can still see. For each local inspection that is not in that
-subset:
+signed-in user can still see. Only the `owner`, `manager` and `inspector` roles
+may call it; any other staff role gets a `403`, so a device signed in as such a
+member must not treat that answer as "everything was deleted". For each local
+inspection that is not in that subset:
 
 - if the device holds **no unuploaded data** for it, the local copy is removed;
 - if it holds **unuploaded data** (edits or photos not yet sent), the copy is
@@ -208,6 +237,7 @@ variables set, no app is ever asked to update.
 | `NATIVE_MIN_VERSION_<PLATFORM>` | Lowest version still allowed to make changes. Below it, ordinary API calls answer `426`. |
 | `NATIVE_RECOMMENDED_VERSION_<PLATFORM>` | Below it, the response carries a "recommended" signal and nothing is blocked. |
 | `NATIVE_DOWNLOAD_URL_<PLATFORM>` | Where the client points the user to update. |
+| `NATIVE_ACCOUNT_URL` | A page where a person manages or deletes their account, for example `https://example.com/account`. One value for every platform. Only an `https` URL without embedded credentials is accepted; anything else is ignored and logged. |
 
 `<PLATFORM>` is `IOS`, `ANDROID` or `WINDOWS`. Versions are up to three numeric
 components (`1`, `1.4`, `1.4.2`).
@@ -243,7 +273,34 @@ not listed: it has no ticket route, so a WebView cannot open it.
 
 **`GET /api/client/compat?platform=<platform>`** is public, so a client can call
 it before signing in. It returns `minSupported`, `recommended`, `downloadUrl`
-(each possibly `null`) and `serverContractVersion`.
+(each possibly `null`) and `serverContractVersion`. When `NATIVE_ACCOUNT_URL` is
+set to a valid `https` URL the response also carries `accountUrl`; when it is
+unset or invalid the key is absent (never `null` or an empty string). While native
+clients are enabled it also carries `videoUpload`: `path` (the base of the chunked
+upload routes), `chunkBytes`, `maxBytes`, `maxOpen` and `methods` (`chunked` and
+`form`). A missing `videoUpload` means an older server, or one with native clients
+off; the client then uses the single-request route. A company may be served from a
+different video backend, so the provider in the create-upload answer, not this
+field, decides whether the chunked route applies.
+
+`serverContractVersion` rises only when a client cannot tell from the response
+itself that something new exists, for example a new endpoint. New response fields
+are detected by their key: `primaryReportId`, `serverNowMs` and `tenantName` are
+always present on a server that has them, so a missing key means an older server.
+
+`GET /api/inspections/{id}` also carries an optional `revisionStatus`: how the
+inspection's date sits against the statutory form revision its template produces
+(`current`, `superseding_soon`, `superseded_elsewhere`, `cannot_produce` or
+`withdrawn`, with the fields each kind documents in the contract). Unlike the keys
+above it is **omitted**, not sent as `null`, only when the inspection's template
+declares no statutory form, or declares one without naming its revision; an
+inspection that does produce a statutory form always carries it (a current one gets
+`{kind: 'current'}`). A missing key therefore means either "no statutory form" or
+an older server, and a client treats the two the same. The answer depends on the
+inspection date and on the current time, so a cached copy can show an earlier one.
+The same response declares `inspection.templateSnapshot` (optional; `null` when the
+inspection has none or the stored value is not a readable object), which the editor
+reads to render the checklist.
 
 ### Which versions are still in use
 
@@ -286,7 +343,8 @@ A Capacitor WebView serves its pages from `capacitor://localhost` (iOS) or
 exactly those two origins the API answers with:
 
 - the request headers `Idempotency-Key`, `X-Client-Version` and
-  `X-Client-Platform` allowed, and `X-Client-Upgrade` exposed;
+  `X-Client-Platform` allowed, and `X-Client-Upgrade` and `Date` exposed (`Date`
+  is not a CORS-safelisted header, so a WebView cannot read it otherwise);
 - **no `Access-Control-Allow-Credentials`** and no `Set-Cookie` exposure.
 
 The convention is **Bearer only, no credentials**: the app never relies on a
@@ -307,6 +365,7 @@ referring to it by a name it chose. The id is not required to be a UUID.
 | New id | `201`, the inspection is created. |
 | Id already belongs to an inspection in the same company that the caller may open (an owner or manager, or a member assigned to it) | `200` with the existing inspection. None of the create's side effects run again, so a retry is safe. |
 | Id belongs to a record outside the company, or to an inspection in it that the caller is not assigned to | `409` `ID_CONFLICT`, the same answer for both, with no inspection fields. |
+| Id belongs to an inspection this company deleted | `409` `INSPECTION_ID_DELETED`, with `details.inspectionId`. Retrying cannot succeed: keep the device's data and stop retrying. |
 
 A create is several writes and cannot be one transaction. For an inspection with a
 client-chosen id the writes after the inspection row run in a fixed order whose
@@ -343,6 +402,15 @@ company. A client should treat that `409` as the **final outcome of that outbox
 entry**: retrying it cannot succeed, and it must not be retried or silently
 dropped. Surface it to the user.
 
+Deleting an inspection records its id in the `inspection_tombstones` table, which never
+expires and is not backfilled, so only inspections deleted after that migration are
+remembered. A create that names such an id, whether sent directly or inside an offline
+package, is refused (`INSPECTION_ID_DELETED`, or `PACKAGE_INSPECTION_DELETED` for a
+package) and nothing is written. A delete whose tombstone cannot be written fails and
+removes nothing, so it can be retried. A create replayed with the same
+`Idempotency-Key` inside the 24 hour window still gets the stored answer, and the
+migration must be applied before the code that reads the table is deployed.
+
 ---
 
 ## 7. One-time WebSocket tickets
@@ -364,6 +432,16 @@ for a ticket and opens the socket with `?ticket=`.
   since issue cannot open the socket.
 - Every failure (unknown, expired, used, wrong inspection, member gone, native
   clients disabled) is a `401`.
+
+The ticket response lists `features`. When it contains `ack-v1`, a client may add
+`&ack=1` to the collab socket URL to receive ack frames: byte `3` followed by a
+length-prefixed Yjs snapshot (state vector and delete set) of the document as it
+stands in the Durable Object's storage. The frame is sent after the storage write
+succeeds, to every socket opened with `ack=1`, at most once per write and only
+when the document changed since the last ack; a snapshot over 64 KiB is skipped.
+`Y.snapshotContainsUpdate(snapshot, update)` tells whether an edit, deletions
+included, is stored. It does not mean the edit reached other clients or the D1
+projection. A socket opened without `ack=1` receives no such frame.
 
 ---
 
@@ -395,11 +473,116 @@ Rules the upload route applies, in order:
   `404`.
 - The request **must declare `Content-Length`**: a missing or non-numeric length
   is `411`, and an oversized declaration is `413`, both before the body is
-  buffered. The limits are 10 MiB for a photo and 200 MiB for a video.
-- The photo's content type must be the one the URL was minted for (`image/jpeg`,
-  `image/png` or `image/heic`).
+  buffered. The limits are 10 MiB for a photo and 64 MiB for a video sent in one
+  request; a larger video answers `413 VIDEO_TOO_LARGE_FOR_FORM` (with
+  `limits.maxBytes` and `limits.chunkedPath`) and goes through the chunked upload
+  below, whose limit is 200 MiB.
+- The photo's real type, read from the file's first bytes and not from the declared
+  content type, must be the one the URL was minted for (`image/jpeg`, `image/png`
+  or `image/heic`).
 - The storage key is a pure function of the token, so sending the same token
   twice overwrites one object instead of adding another.
+
+### Chunked video upload
+
+A large clip is sent in parts through four routes under
+`/api/public/uploads/video/chunked`, authorized by the same signed video token
+(a token that does not name the member who minted it is refused here). Every part
+request is checked against a ledger the server keeps (`video_uploads`,
+`video_upload_parts`): the object store cannot list the parts of an unfinished
+upload, and a background uploader does not see the response, so the server is the
+only place that can say what has arrived. Size, part size, key and stored type
+are fixed by the server and are never read from a request.
+
+1. `POST ...?token=` with `{ "totalBytes": n }` opens the upload and answers
+   `partBytes` (8 MiB), `partCount` and `received`. Asking again resumes: the same
+   size returns the parts already received and keeps the recorded part size;
+   another size is `409 VIDEO_UPLOAD_PARAMS_MISMATCH`. `totalBytes` over 200 MiB
+   is `413 VIDEO_TOO_LARGE`. A member may have 5 uploads open at once (`429`).
+2. `PUT .../parts/{n}?token=` with the raw part. Every part is exactly `partBytes`
+   long except the last, which is the remainder, and the request must declare
+   `Content-Length`; any other length is `413 VIDEO_PART_SIZE_MISMATCH` and the
+   body is not read. Send part 1 first (`409 VIDEO_FIRST_PART_REQUIRED` otherwise):
+   its first bytes must be an mp4, mov or webm video (`400 VIDEO_FORMAT_MISMATCH`
+   and the upload ends), and the stored type and key extension follow from them,
+   not from any header. Sending a part again replaces it; the other parts may be
+   sent in any order and in parallel.
+3. `POST .../complete?token=` joins the parts and answers `{ mediaId, r2Key }`.
+   Missing parts are `409 VIDEO_PARTS_MISSING` with their numbers; if the stored
+   parts no longer agree with the ledger it is `409 VIDEO_PARTS_MISMATCH` and every
+   part must be sent again. Repeating a completed upload answers the same result,
+   and a part sent after completion is `409 VIDEO_ALREADY_COMPLETED`, so a replayed
+   token cannot change a finished video.
+4. `DELETE ...?token=` cancels an unfinished upload (`204`, repeatable, and `204`
+   too when there is nothing to cancel). A finished upload answers
+   `409 VIDEO_ALREADY_COMPLETED`.
+
+A token with no upload behind it answers `404 VIDEO_UPLOAD_NOT_FOUND` to a part or
+a completion, whichever company the media id might belong to. Every error body
+carries a stable `code`. Part and total sizes are enforced by the server; whether
+the object store accepts a single-part upload and enforces its own 5 MiB minimum
+part size is confirmed against the real service, not by the local test runtime.
+
+What a client must do:
+
+- Treat `400 VIDEO_FORMAT_MISMATCH` and `400 VIDEO_SIZE_MISMATCH` as **terminal**
+  for that upload. A retry needs a new media id and token (call create-upload
+  again), not the same one.
+- Send part 1 first, wait for its answer, then send parts 2 onward with **at most
+  two in flight**.
+- Always send `Content-Length` on a part (`411` otherwise).
+- Back off and retry on `409 VIDEO_UPLOAD_BUSY`: a completion is running (or died
+  and is about to be settled; a `completing` row older than a minute is settled by
+  looking at the stored object).
+- Do not re-send a part while a `complete` call is in flight. If one is, storage
+  and the ledger can disagree: the answer is `409 VIDEO_PARTS_MISMATCH`, the
+  ledger's parts have been reset, and **every** part must be sent again.
+- Expect the upload token to remain valid until it expires: the server does not
+  check the password-change revocation list for an upload token (the same as the
+  single-request route), so a password change does not cancel a transfer that is
+  already under way.
+
+An upload that is never finished is aborted by a scheduled sweep once its token
+has expired, and its record is deleted a day after that.
+
+### Reading inspection photos
+
+A client that knows a photo's storage key downloads it with an ordinary
+authenticated request:
+
+```
+GET /api/inspections/{id}/photo?key=<storage key>[&w=<width>]
+Authorization: Bearer <native access token>
+```
+
+The route is in the contract. It answers the same `404` for a key that does not
+start with `<your company id>/inspections/{id}/`, for an inspection the signed-in
+member may not see (an inspector limited to assigned inspections gets `404` for
+the others), and for an object that does not exist; it never confirms which of
+these it was. There is no batch route and no signed read URL: a client asks for
+each photo it needs.
+
+- **Width.** `w` is clamped to 16 through 2000 pixels. A value that is not a
+  number counts as 16, so omit `w` to get the original.
+- **Thumbnails are optional.** Only a deployment with the Cloudflare Images
+  binding resizes, and the result is always `image/webp`. Without the binding,
+  without remaining allowance on your Cloudflare plan, or when the conversion
+  fails, the response is the **original bytes** with their stored type, up to the
+  10 MiB upload limit, and it can be a HEIC file. Image transformations may be
+  limited by your Cloudflare plan.
+- **Read `Content-Type`, not your request.** It says whether you received a webp
+  or an original.
+- **Pin one width and cap the bytes.** Each distinct width is a separate
+  transformation, so use a single thumbnail width for the whole app. Check
+  `Content-Length` (or count streamed bytes) and stop at a limit you choose, so
+  that an original served in place of a thumbnail cannot exhaust memory. Do not
+  hand an `image/heic` response to an `<img>` element on a WebView that cannot
+  decode it.
+- **Caching.** The response carries `Cache-Control: private, max-age=300`; an
+  original also has an `etag`, a resized one does not. Key a local cache on the
+  full storage key and the width.
+- **Browser elements cannot send the header.** Fetch the bytes with the
+  `Authorization` header and show them from a local object URL.
 
 ---
 
@@ -427,6 +610,13 @@ Identifiers match `^[A-Za-z0-9_-]{1,64}$`, so an id can never smuggle a path
 separator into a zip entry name or a storage key.
 
 ### Import semantics
+
+A package that names an inspection the server already has, without carrying an
+`inspection.create` for it, must state the id of that inspection's primary
+report in the manifest (`inspections[].reportId`), or the whole package is
+refused. `GET /api/inspections/{id}` returns that id as `primaryReportId` (a
+string, or `null` when the inspection has no primary report yet). Write it into
+the manifest when exporting.
 
 An import has two phases and the line between them is the point.
 
@@ -505,7 +695,8 @@ Further rules:
   what its stream could expand to.
 - **A deleted inspection stays deleted.** If a recorded create names an
   inspection that has since been deleted, the package is refused with `409`
-  `PACKAGE_INSPECTION_DELETED` and nothing is written.
+  `PACKAGE_INSPECTION_DELETED` and nothing is written. An inspection deleted after being
+  created over the API (no import record) is held back the same way by its tombstone.
 - The response reports `inspections`, `photos`, `outbox` (`applied`, `skipped`,
   `failed`) and `yjs` (`changed`, `unchanged`).
 
@@ -637,7 +828,8 @@ its own remedy: cut the package to the sizes in `details.limits`
 
 ### Reference implementation
 
-`packages/offline-package` (imported as `@core/offline-package`) is the client side
+`packages/offline-package` (imported as `@core/offline-package`; it is also published
+to npm as `@inspectorhub/offline-package`, which is how a native client installs it) is the client side
 of everything in sections 9 and 10: it reads and writes the archive, plans the parts
 of a package that is over a limit, classifies each answer, and sends, splits and
 resends until every inspection is either imported or held back with a reason. The
@@ -716,6 +908,55 @@ npm run lint:native-contract # registry and committed document must agree
   the pull request on any breaking change. The comparison is skipped only in the
   pull request that first introduces the file.
 
+### Editor operations in the contract
+
+The field editor's write routes are registered too, together with the reads the
+editor depends on. Unless a row says otherwise they need the owner, manager or
+inspector role. Three separate mechanisms decide who may write, so none of them is
+"all of them":
+
+- The `editReports` capability is enforced for **mutating** methods on the report
+  authoring paths (results, template snapshot, units, unit mode, media, upload,
+  cover, items, collaboration writes, compliance, statutory details and
+  instances, inspector signature, property facts, PCA narrative). A member without
+  it gets 403 on those writes. **Reads are never guarded**, so the same token can
+  still read.
+- Publishing uses the `publish` capability plus the on-the-job check (you must be on
+  the inspection or hold the `scheduleOthers` permission), not `editReports`.
+  `publish-readiness` is a read.
+- The template routes under `/api/inspections/templates` are outside the
+  `editReports` guard: list and read need only the role, create needs
+  `templateCreate`, update needs `templateEdit`.
+
+| Group | Operations | Notes |
+|---|---|---|
+| Units | create, bulk create, duplicate, rename, delete, unit-mode switch | Rename and delete answer 404 for an unknown unit or one that belongs to another inspection, and change nothing. Create and bulk create answer 400 for a parent that is not a unit of this inspection. Duplicate answers 400 (not 404) for an unknown or foreign unit. Unit-mode switch wraps every failure, a missing inspection included, as 400. Switching to `tagged` is lossy. |
+| Inspection record | property facts (patch, autofill), PCA narrative, inspector signature, template snapshot, statutory details, statutory form instances, publish, publish readiness | Autofill is open to owner, manager and inspector (an inspector only for inspections they may see). The narrative patch answers 400, naming the key, for a key that is not a narrative block. A statutory template's snapshot is read-only (403). A repeat publish with an `Idempotency-Key` replays the first answer. Without one, a publish with nothing changed since the latest version (same results and report status, same `summary`, no `translateTo`) answers 200 in the normal shape without publishing again: no new version, automation, audit entry, translation, PDF or ISN sync, and `isnSync` is null. Any change to the results, the status or the summary, or a translation request, publishes and creates a new version. |
+| Compliance | sign-off (add, remove), document review (seed, patch), questionnaire (put, status) | Sign-off and questionnaire routes need `report_tier=full_pca` (409 otherwise). The person on a sign-off is the signed-in user: send only `role`, `license` and `dualRole`, and the server fills `personId` and the name from the session and the user record. A role other than owner or manager that sends a different `personId` gets 400 (a name it sends is ignored). An owner or manager may record another person by sending both `personId` and `name`, stored as given; sending only one answers 400. The role is the one in the verified token, never a request field. Signing a role again replaces the earlier sign-off. Seed and document-review patch answer 404 for an inspection that is not in the company. |
+| Collaboration | restructure, followup, restore, snapshots (capture, list, read) | Owners and managers may use these; an inspector only when on the inspection's roster as lead or helper, otherwise 403. The request bodies of `followup` (`{itemId, status, notes?}`) and `restore` (`{seq}`) are deliberately not declared in the OpenAPI schema (the route authorizes before it validates); they are stated in the operation description and pinned by `tests/unit/native/contract-editor-writes.spec.ts`. Without the collaboration Durable Object these answer 501. |
+| Templates | list, read, create, update | `GET /api/inspections/templates/{id}` returns the row under `data.template`. |
+| Multipart uploads | photo upload, media pool upload, cover, item photo annotation, item photo crop | `multipart/form-data`; the file part is `file` (uploads) or `image` (cover, annotation, crop). Every photo upload refuses an image over 10 MiB with 413. The two photo uploads and the signed upload URL accept JPEG, PNG and HEIC files, decided from the file's first bytes: the declared content type is never trusted (it may be empty, `application/octet-stream` or wrong), the stored content type and key extension are the detected ones, and a file that is not one of the three (AVIF, WebP, SVG, HTML, an empty body) is refused with 400 and nothing is stored. A video upload is checked the same way: an ISO media file whose major or compatible brand is an MP4-family or 3GPP one is stored as `video/mp4` (`.mp4`), a QuickTime major brand as `video/quicktime` (`.mov`), and WebM as `video/webm`; a still-image HEIF or AVIF file is never accepted as a video. |
+| Binary, not in OpenAPI | video poster upload | Pinned in `NATIVE_NON_OPENAPI_CONTRACT`; multipart field `file`, authorized by the upload token query parameter from the create-upload call, and answered 404 until the clip was uploaded under that token. Only `image/jpeg`, `image/png` and `image/webp` are accepted (400 otherwise), up to the photo size cap (413 over it), and the object is stored with that type. `finalize` accepts a `posterKey` only when it is the key the server derives for that clip (400 otherwise), and the clip key must belong to the inspection in the path. |
+
+Routes the app also calls that are **not** registered: `/api/tags`,
+`/api/recommendations`, `/api/contractor-types`, `/api/admin/defect-categories`,
+`/api/admin/comments`, `/api/tenant/inspection-prefs` and the `/api/ai/*` routes
+other than the two that are registered. Their shape is not frozen by the add-only
+rule.
+
+Things that apply to the whole group:
+
+- `Idempotency-Key` is honoured on every `POST`, `PUT`, `PATCH` and `DELETE`. A JSON
+  body is fingerprinted by content; a multipart body is not, so the key plus method
+  and path decide the replay.
+- When an operator raises a minimum app version, these writes are not on the
+  never-blocked list: a client below the minimum gets 426, including writes it
+  queued earlier. This is by design: editor writes are online commands, and an app
+  below the minimum version cannot send them. Only the calls that hand over work
+  captured on the device (see the never-blocked list above) stay open to it.
+- A response shape is promised only for operations that declare a response schema.
+  Several of the reads declare none, so registration does not freeze their body.
+
 ---
 
 ## 13. Related pages
@@ -732,16 +973,19 @@ npm run lint:native-contract # registry and committed document must agree
 
 ## 14. Upgrading a deployment that already runs the engine
 
-The native surface adds two forward-only migrations:
+The native surface adds forward-only migrations:
 
 | Migration | Adds |
 |---|---|
 | `0001_offline_max_days.sql` | `tenant_configs.offline_max_days` (integer, default 30) |
 | `0002_offline_import_applied.sql` | The `offline_import_applied` table and its `(tenant_id, applied_at)` index, and the `native_client_seen` table |
+| `0006_inspection_tombstones.sql` | The `inspection_tombstones` table, read by every create that names its own id and written by every inspection delete |
+| `0007_video_upload_ledger.sql` | The `video_uploads` ledger and `video_upload_parts` tables for chunked video uploads, written by every chunked upload and cleaned by the inspection delete and the sweep |
 
 **Apply migrations before deploying the new code.** The new code reads
 `offline_max_days` on the session route, writes `native_client_seen` there too (a
 failed write is logged and ignored), and writes `offline_import_applied` on
 import; running it against a database that has not been migrated fails those
-routes. With the flag off, nothing else changes. See
+routes. The same holds for the tombstone table (every inspection delete and every create that names its
+own id) and the chunked video upload tables (every chunked upload). With the flag off, nothing else changes. See
 [`../operate/upgrade.md`](../operate/upgrade.md) for the upgrade procedure.

@@ -79,6 +79,8 @@ describe('CORS for native app origins (real app)', () => {
       expect(res.headers.get('X-Client-Upgrade')).toBe('required');
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(origin);
       expect(csv(res.headers.get('Access-Control-Expose-Headers'))).toContain('x-client-upgrade');
+      // The session answer carries the server clock. Date is not a safelisted header, so it has to be exposed.
+      expect(csv(res.headers.get('Access-Control-Expose-Headers'))).toContain('date');
       expect(csv(res.headers.get('Access-Control-Expose-Headers'))).not.toContain('set-cookie');
       expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
     });

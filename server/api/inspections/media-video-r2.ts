@@ -24,22 +24,21 @@ import { logger } from '../../lib/logger';
 import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
 import { getDrizzle } from '../../lib/route-helpers';
-import { r2Put, r2Get } from '../../lib/r2/objects';
+import { r2Put, r2Get, r2Head } from '../../lib/r2/objects';
+import { MAX_PHOTO_BYTES } from '../../lib/media/store-photo';
+import { headBytes, sniffPosterType, sniffVideoType } from '../../lib/media/sniff';
+import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, MIME_TO_EXT, mimeToExt } from '../../lib/media/video-types';
+import { ownClipKey, ownPosterKey } from '../../services/video/r2-backend';
 
-// ── MIME / extension helpers ─────────────────────────────────────────────────
+// ── MIME / extension helpers (shared with the chunked upload; see lib/media/video-types.ts) ──
+export { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt };
 
-const MIME_TO_EXT: Record<string, string> = {
-    'video/mp4': 'mp4',
-    'video/quicktime': 'mov',
-    'video/webm': 'webm',
-};
+const POSTER_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-export function mimeToExt(mime: string): string {
-    return MIME_TO_EXT[mime] ?? 'mp4';
+/** The type a clip is served as: its stored one when that is a video type we accept, otherwise mp4. Never a replayed script-capable type. */
+function storedVideoType(stored: string | undefined): string {
+    return stored && ALLOWED_VIDEO_MIMES.has(stored) ? stored : 'video/mp4';
 }
-
-export const ALLOWED_VIDEO_MIMES = new Set(Object.keys(MIME_TO_EXT));
-export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
 
 export type StoreVideoResult =
     | { ok: true; mediaId: string; r2Key: string }
@@ -58,21 +57,23 @@ export async function storeVideoUpload(
     env: { PHOTOS: R2Bucket },
     claims: UploadTokenClaims,
     file: File,
+    maxBytes: number = MAX_VIDEO_BYTES,
 ): Promise<StoreVideoResult> {
-    const mime = file.type;
-    if (!mime || !ALLOWED_VIDEO_MIMES.has(mime)) {
-        return { ok: false, status: 400, error: 'Missing or unsupported video type. Allowed: mp4, mov, webm.' };
+    if (file.size > maxBytes) {
+        return { ok: false, status: 413, error: `File exceeds the ${Math.round(maxBytes / 1024 / 1024)} MB limit (got ${Math.round(file.size / 1024 / 1024)} MB).` };
     }
-    if (file.size > MAX_VIDEO_BYTES) {
-        return { ok: false, status: 413, error: `File exceeds the 200 MB limit (got ${Math.round(file.size / 1024 / 1024)} MB).` };
+    // The clip's real type (its first bytes) decides the stored type and the key extension, not the declared one.
+    const mime = sniffVideoType(await headBytes(file));
+    if (!mime) {
+        return { ok: false, status: 400, error: 'Missing or unsupported video type. Allowed: mp4, mov, webm.' };
     }
 
     const { tenantId, inspectionId, mediaId } = claims;
     const r2Key = r2Keys.inspectionVideo(tenantId, inspectionId, mediaId, mimeToExt(mime));
 
-    const bytes = await file.arrayBuffer();
     try {
-        await r2Put(env.PHOTOS, r2Key, bytes, {
+        // The File itself is the body: no second copy of the clip is made in memory.
+        await r2Put(env.PHOTOS, r2Key, file, {
             httpMetadata: { contentType: mime },
             customMetadata: { tenantId, inspectionId, mediaId },
         });
@@ -85,7 +86,7 @@ export async function storeVideoUpload(
         throw err;
     }
 
-    logger.info('r2-upload: stored video', { tenantId, inspectionId, mediaId, r2Key, bytes: bytes.byteLength });
+    logger.info('r2-upload: stored video', { tenantId, inspectionId, mediaId, r2Key, bytes: file.size });
     return { ok: true, mediaId, r2Key };
 }
 
@@ -131,7 +132,8 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
     /**
      * POST /:id/media/video/r2-upload-poster
      *
-     * Token-gated JPEG poster upload to R2. The same upload token used for the
+     * Token-gated poster upload to R2 (jpeg, png or webp, up to the photo size cap).
+     * The same upload token used for the
      * video clip is reused (same mediaId, tenant, inspection guard). The poster
      * is stored at a stable key derived from mediaId. Returns { posterKey } for
      * the client to include in the finalize ref.
@@ -146,15 +148,24 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'Invalid or expired upload token' }, 401);
         }
 
+        // The poster belongs to a clip that was uploaded under this token: refuse one for a media id with no clip.
+        const clips = await Promise.all([...new Set(Object.values(MIME_TO_EXT))].map((ext) => r2Head(c.env.PHOTOS, r2Keys.inspectionVideo(tenantId, id, claims.mediaId, ext))));
+        if (clips.every((clip) => clip === null)) {
+            return c.json({ error: 'No uploaded video for this upload token' }, 404);
+        }
+
         const formData = await c.req.parseBody();
         const file = formData['file'] as File | undefined;
         if (!file) {
             return c.json({ error: 'file field required' }, 400);
         }
 
-        const mime = file.type;
-        if (!mime || !mime.startsWith('image/')) {
-            return c.json({ error: 'Missing or unsupported poster type. JPEG image required.' }, 400);
+        if (file.size > MAX_PHOTO_BYTES) {
+            return c.json({ error: 'Poster is too large.' }, 413);
+        }
+        const mime = sniffPosterType(await headBytes(file));
+        if (!mime) {
+            return c.json({ error: 'Missing or unsupported poster type. Allowed: jpeg, png, webp.' }, 400);
         }
 
         const { mediaId } = claims;
@@ -199,13 +210,15 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             .from(inspectionMediaPool)
             .where(and(
                 eq(inspectionMediaPool.id, mediaId),
+                eq(inspectionMediaPool.inspectionId, c.req.param('id')),
                 eq(inspectionMediaPool.tenantId, tenantId),
                 eq(inspectionMediaPool.provider, 'r2'),
                 eq(inspectionMediaPool.mediaType, 'video'),
             ))
             .get();
 
-        if (!row) {
+        const clipKey = row && ownClipKey(row.r2Key, tenantId, c.req.param('id'));
+        if (!clipKey) {
             return c.json({ error: 'Video not found' }, 404);
         }
 
@@ -219,7 +232,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             const start = parseInt(rangeMatch[1], 10);
             const endStr = rangeMatch[2];
 
-            const obj = await r2Get(c.env.PHOTOS, row.r2Key, {
+            const obj = await r2Get(c.env.PHOTOS, clipKey, {
                 range: endStr
                     ? { offset: start, length: parseInt(endStr, 10) - start + 1 }
                     : { offset: start },
@@ -229,7 +242,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
                 return c.json({ error: 'Video not found in storage' }, 404);
             }
 
-            const contentType = obj.httpMetadata?.contentType ?? 'video/mp4';
+            const contentType = storedVideoType(obj.httpMetadata?.contentType);
             const end = endStr ? parseInt(endStr, 10) : (obj.size - 1);
             const contentLength = end - start + 1;
 
@@ -245,12 +258,12 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
         }
 
         // Full-object request.
-        const obj = await r2Get(c.env.PHOTOS, row.r2Key);
+        const obj = await r2Get(c.env.PHOTOS, clipKey);
         if (!obj) {
             return c.json({ error: 'Video not found in storage' }, 404);
         }
 
-        const contentType = obj.httpMetadata?.contentType ?? 'video/mp4';
+        const contentType = storedVideoType(obj.httpMetadata?.contentType);
 
         return new Response(obj.body, {
             status: 200,
@@ -274,25 +287,29 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
 
         const db = getDrizzle(c);
         const row = await db
-            .select({ posterKey: inspectionMediaPool.posterKey })
+            .select({ r2Key: inspectionMediaPool.r2Key, posterKey: inspectionMediaPool.posterKey })
             .from(inspectionMediaPool)
             .where(and(
                 eq(inspectionMediaPool.id, mediaId),
+                eq(inspectionMediaPool.inspectionId, c.req.param('id')),
                 eq(inspectionMediaPool.tenantId, tenantId),
                 eq(inspectionMediaPool.provider, 'r2'),
             ))
             .get();
 
-        if (!row || !row.posterKey) {
+        const posterKey = row && ownPosterKey(row, tenantId);
+        if (!posterKey) {
             return c.json({ error: 'Poster not found' }, 404);
         }
 
-        const obj = await r2Get(c.env.PHOTOS, row.posterKey);
+        const obj = await r2Get(c.env.PHOTOS, posterKey);
         if (!obj) {
             return c.json({ error: 'Poster not found in storage' }, 404);
         }
 
-        const contentType = obj.httpMetadata?.contentType ?? 'image/jpeg';
+        // A poster stored before the upload allowlist may carry a script-capable type; never replay one.
+        const stored = obj.httpMetadata?.contentType;
+        const contentType = stored && POSTER_MIMES.has(stored) ? stored : 'image/jpeg';
 
         return new Response(obj.body, {
             status: 200,

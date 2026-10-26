@@ -16,14 +16,17 @@
  * Staged: dist/, package.json (generated from the source one), README.md, LICENSE (the
  * notice). Never staged: PUBLISHING.md, the notice directory, src/.
  *
- * Usage: node scripts/stage-field-ui-package.mjs     (after: npm run build -w @inspectorhub/field-ui)
+ * It serves every package in scripts/lib/release-packages.mjs: `--package <slug>` picks one and
+ * the default is field-ui.
+ *
+ * Usage: node scripts/stage-field-ui-package.mjs [--package <slug>]     (after: npm run build -w @inspectorhub/<slug>)
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getPackage, packageDirFor, packageSlugFromArgs } from './lib/release-packages.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const DEFAULT_PACKAGE_DIR = join(ROOT, 'packages', 'field-ui');
+export const DEFAULT_PACKAGE_DIR = packageDirFor('field-ui');
 /** Not named `license/`: on a case-insensitive filesystem that collides with the LICENSE file. */
 export const NOTICE_RELATIVE = join('publish-license', 'LICENSE-AGPL-3.0-only');
 
@@ -66,16 +69,18 @@ function listFiles(dir, base = dir) {
 }
 
 /**
- * Builds `outDir` from `packageDir`. Returns the manifest and the staged file list.
- * @param {{ packageDir?: string, outDir?: string }} [opts]
+ * Builds `outDir` from `packageDir` for the package `slug`. Returns the manifest and the staged file list.
+ * @param {{ slug?: string, packageDir?: string, outDir?: string }} [opts]
  */
-export function stageFieldUi({ packageDir = DEFAULT_PACKAGE_DIR, outDir = join(packageDir, '.publish') } = {}) {
+export function stagePackage({ slug = 'field-ui', packageDir = packageDirFor(slug), outDir = join(packageDir, '.publish') } = {}) {
+    const { name } = getPackage(slug);
+    const label = `stage-${slug}`;
     const dist = join(packageDir, 'dist');
     if (!existsSync(dist) || !existsSync(join(dist, 'index.js'))) {
-        throw new Error(`stage-field-ui: ${dist} is missing or has no index.js. Run: npm run build -w @inspectorhub/field-ui`);
+        throw new Error(`${label}: ${dist} is missing or has no index.js. Run: npm run build -w ${name}`);
     }
     const notice = join(packageDir, NOTICE_RELATIVE);
-    if (!existsSync(notice)) throw new Error(`stage-field-ui: the licence notice ${notice} is missing.`);
+    if (!existsSync(notice)) throw new Error(`${label}: the licence notice ${notice} is missing.`);
 
     const manifest = stagedManifest(JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')));
 
@@ -90,10 +95,16 @@ export function stageFieldUi({ packageDir = DEFAULT_PACKAGE_DIR, outDir = join(p
     return { manifest, files: listFiles(outDir) };
 }
 
+/** The field-ui entry point the first version of this script exposed; unchanged behaviour. */
+export function stageFieldUi({ packageDir = DEFAULT_PACKAGE_DIR, outDir = join(packageDir, '.publish') } = {}) {
+    return stagePackage({ slug: 'field-ui', packageDir, outDir });
+}
+
 function main() {
     try {
-        const { manifest, files } = stageFieldUi();
-        console.log(`stage-field-ui: staged ${manifest.name}@${manifest.version} into packages/field-ui/.publish (${files.length} files)`);
+        const slug = packageSlugFromArgs(process.argv.slice(2));
+        const { manifest, files } = stagePackage({ slug });
+        console.log(`stage-${slug}: staged ${manifest.name}@${manifest.version} into ${getPackage(slug).dir}/.publish (${files.length} files)`);
         for (const f of files) console.log(`  ${f}`);
     } catch (err) {
         console.error(err.message);

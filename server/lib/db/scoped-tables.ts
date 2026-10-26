@@ -29,5 +29,8 @@ export const tenantScopedTables = (): SQLiteTable[] =>
 // would create was created before and then deliberately deleted. Deleting the
 // record with the inspection would let that package bring it back. The rows hold
 // ids only, and a tenant purge still removes them (they carry `tenant_id`).
+//
+// `inspection_tombstones` is excluded for the same reason, and more plainly: the cascade writes
+// the tombstone and must not delete it again in the same pass.
 export const inspectionScopedTables = (): SQLiteTable[] =>
-    tablesWithColumn('inspectionId', new Set(['offline_import_applied']));
+    tablesWithColumn('inspectionId', new Set(['offline_import_applied', 'inspection_tombstones']));

@@ -1,5 +1,5 @@
 {
-  "packages/field-ui/src/editor/FieldEditor.tsx": 2249,
+  "packages/field-ui/src/editor/FieldEditor.tsx": 2241,
   "app/routes/inspector-portal.tsx": 1410,
   "scripts/verify-statutory-render.mjs": 1283,
   "server/durable-objects/inspection-doc.ts": 996,
@@ -44,7 +44,7 @@
   "scripts/check-statutory-fidelity.mjs": 527,
   "app/components/settings/ManagedComplianceWizard.tsx": 520,
   "scripts/check-price-capability.mjs": 514,
-  "app/routes/inspection-edit/action.server.ts": 513,
+  "app/routes/inspection-edit/action.server.ts": 511,
   "server/services/inspection/shared.ts": 500,
   "server/services/portal-access.service.ts": 500,
   "server/api/portal.ts": 488,

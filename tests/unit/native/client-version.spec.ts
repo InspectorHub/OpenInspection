@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { logger } from '../../../server/lib/logger';
 import {
-  compareSemver, upgradeStatus, readVersionPolicy, isNeverBlocked,
+  compareSemver, upgradeStatus, readVersionPolicy, isNeverBlocked, readAccountUrl,
 } from '../../../server/lib/native/client-version';
 
 describe('compareSemver', () => {
@@ -109,5 +110,54 @@ describe('NEVER_BLOCK_RULES', () => {
   it('blocks everything else', () => {
     expect(blocked('GET', '/api/client/other')).toBe(true);
     expect(blocked('POST', '/api/inspections/abc')).toBe(true);
+  });
+});
+
+describe('readAccountUrl', () => {
+  const read = (v: string | undefined) => readAccountUrl({ NATIVE_ACCOUNT_URL: v });
+
+  it('accepts an https URL and returns its canonical form', () => {
+    expect(read('https://example.com/account')).toBe('https://example.com/account');
+    expect(read('  https://example.com/account?tab=delete  ')).toBe('https://example.com/account?tab=delete');
+    expect(read('HTTPS://Example.com/account')).toBe('https://example.com/account');
+  });
+
+  it('omits anything that is not set, blank or an https URL, and never throws', () => {
+    const rejected = [
+      undefined, '', '   ', 'http://example.com/account', 'javascript:alert(1)', 'data:text/html,<p>x</p>',
+      'ftp://example.com/x', 'not a url', 'https://', '/account', 'https://user:pass@example.com/account',
+      'https://user@example.com/account', `https://example.com/${'a'.repeat(2049)}`,
+    ];
+    for (const v of rejected) expect(read(v), String(v).slice(0, 40)).toBeUndefined();
+    // Control: the same reader accepts a good value, and a URL exactly at the length limit.
+    expect(read('https://example.com/account')).toBeDefined();
+    expect(read(`https://example.com/${'a'.repeat(2048 - 'https://example.com/'.length)}`)).toBeDefined();
+  });
+
+  it('omits a URL whose only credential is a password (empty user name), and accepts the same URL without it', () => {
+    expect(read('https://:pw@example.com/account')).toBeUndefined();
+    // Control: the same host and path without any credential is accepted.
+    expect(read('https://example.com/account')).toBe('https://example.com/account');
+  });
+
+  describe('warning log', () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('is written once for an unusable value, without the value or any part of it', () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      expect(read('https://user:secret-pw@example.com/private-path')).toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(1);
+      const written = JSON.stringify(warn.mock.calls);
+      for (const leaked of ['secret-pw', 'user', 'example.com', 'private-path']) expect(written, leaked).not.toContain(leaked);
+      expect(written).toContain('NATIVE_ACCOUNT_URL');
+    });
+
+    it('is not written for an unset, blank or valid value (control: the same spy sees an unusable one)', () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      for (const v of [undefined, '', '   ', 'https://example.com/account']) read(v);
+      expect(warn).not.toHaveBeenCalled();
+      read('http://example.com/account');
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
   });
 });

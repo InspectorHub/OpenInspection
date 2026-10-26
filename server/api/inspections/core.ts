@@ -13,7 +13,7 @@ import { Errors } from '../../lib/errors';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { getInspectionRoster } from '../../lib/inspection/roster';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
-import { InspectionSchema, UpdateInspectionSchema, PatchInspectionResponseSchema } from '../../lib/validations/inspection.schema';
+import { InspectionSchema, UpdateInspectionSchema, PatchInspectionResponseSchema, GetInspectionResponseSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
@@ -25,13 +25,14 @@ import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
-import { patchRevisionReport } from './patch-revision-report';
+import { patchRevisionReport, revisionStatusField, withReadableSnapshot } from './patch-revision-report';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
 import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
 import { assertCanCreate, fireQuotaThresholdNotice, recordCreateAudit, resolveCreateInput } from './create-support';
 import { isFieldRole } from '../../lib/auth/roles';
 import { resolveInspectionScope } from '../../lib/inspection/visibility';
+import { resolvePrimaryReportId } from '../../lib/inspection/reports';
 
 /**
  * GET /api/inspections/:id
@@ -51,10 +52,7 @@ const getInspectionRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({
-                        inspection: InspectionSchema.describe('The inspection record.'),
-                        template: z.unknown().openapi({ description: 'The associated template schema' }),
-                    })),
+                    schema: GetInspectionResponseSchema,
                 },
             },
             description: 'Success',
@@ -191,12 +189,14 @@ const coreRoutes = createApiRouter()
     .openapi(getInspectionRoute, async (c) => {
         const { id } = c.req.valid('param');
         const service = c.var.services.inspection;
-        const result = await service.getInspection(id, c.get('tenantId'));
+        const tenantId = c.get('tenantId');
+        const result = await service.getInspection(id, tenantId);
+        const primaryReportId = await resolvePrimaryReportId(getDrizzle(c), tenantId, id);
         return c.json({
             success: true,
             // Only the inspection row is projected: `template` is customer-authored
             // schema JSON and may legitimately contain a field called `price`.
-            data: { ...result, inspection: await moneyView(c, result.inspection, 'inspectionFees') },
+            data: { ...result, inspection: await moneyView(c, withReadableSnapshot(result.inspection), 'inspectionFees'), primaryReportId, ...revisionStatusField(result.inspection) },
         }, 200);
     })
     .openapi(deleteInspectionRoute, async (c) => {

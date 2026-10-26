@@ -129,7 +129,7 @@ const getTemplateRoute = createRoute(withMcpMetadata({
     path: '/templates/{id}',
     tags: ["inspections", "templates"],
     summary: "Get inspection template for current tenant",
-    description: "Retrieve a single template with its full schema. Available to owner, manager and inspector roles.",
+    description: "Retrieve a single template with its full schema. The template row is returned under data.template (its name is data.template.name, not data.name). Responds 404 for an unknown template. Available to owner, manager and inspector roles.",
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
         params: z.object({ id: z.string().describe('Id of the inspection template to retrieve.') }),

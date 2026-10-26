@@ -94,9 +94,15 @@ export type { IdempotencyKey, NewIdempotencyKey } from './idempotency';
 // Queued writes an imported offline package has applied (outlives the 24h idempotency ledger).
 export { offlineImportApplied } from './offline-import';
 export type { OfflineImportApplied } from './offline-import';
+// Ids of hard-deleted inspections, so a replayed create cannot bring one back.
+export { inspectionTombstones } from './inspection-tombstones';
+export type { InspectionTombstone } from './inspection-tombstones';
 // Native app versions seen per company (when an old version can be retired).
 export { nativeClientSeen } from './native-client-seen';
 export type { NativeClientSeen } from './native-client-seen';
+// Ledger of chunked video uploads (the storage binding cannot list unfinished parts).
+export { videoUploads, videoUploadParts } from './video-upload';
+export type { VideoUpload } from './video-upload';
 // Pay splits (#278) — per-service-line inspector earnings, recorded not derived.
 export { servicePayRules, inspectionServicePaySplits } from './pay-split';
 export type { ServicePayRule, InspectionServicePaySplit } from './pay-split';

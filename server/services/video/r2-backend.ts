@@ -52,6 +52,44 @@ function parseInspectionVideoKey(r2Key: string): ParsedVideoKey | null {
     return { tenantId, inspectionId, mediaId, ext };
 }
 
+/**
+ * What `finalize` may store for a client-supplied R2 ref, judged against the caller's company and the inspection
+ * in the request path.
+ *
+ * The clip key must belong to that company AND that inspection (a key of another inspection, or another company,
+ * is `Video not found`). The poster key is not taken from the client at all: it is stored only when it equals the
+ * key the server derives for this clip, and refused otherwise, because the poster route and the video delete act
+ * on the stored key against a bucket every company shares. A Stream ref carries no poster.
+ */
+export function verifiedPosterRef(ref: VideoRef & { posterKey?: string | undefined }, tenantId: string, inspectionId: string): { posterKey: string } | undefined {
+    if (ref.provider !== 'r2') return undefined;
+    const parsed = parseInspectionVideoKey(ref.r2Key);
+    if (!parsed || parsed.tenantId !== tenantId || parsed.inspectionId !== inspectionId) {
+        throw Errors.NotFound('Video not found');
+    }
+    if (!ref.posterKey) return undefined;
+    if (ref.posterKey !== r2Keys.inspectionVideoPoster(tenantId, inspectionId, parsed.mediaId)) {
+        throw Errors.BadRequest('posterKey is not the poster stored for this video');
+    }
+    return { posterKey: ref.posterKey };
+}
+
+/**
+ * The poster key of a stored row, or null when it is not the key the server derives for that row's own clip. Rows
+ * stored before `finalize` checked the key may hold a foreign one, and the bucket is shared by every company.
+ */
+export function ownPosterKey(row: { r2Key: string; posterKey: string | null }, tenantId: string): string | null {
+    const parsed = parseInspectionVideoKey(row.r2Key);
+    if (!parsed || !row.posterKey) return null;
+    return row.posterKey === r2Keys.inspectionVideoPoster(tenantId, parsed.inspectionId, parsed.mediaId) ? row.posterKey : null;
+}
+
+/** The clip key of a stored row, or null when it names another company or inspection than the caller's. */
+export function ownClipKey(r2Key: string, tenantId: string, inspectionId: string): string | null {
+    const parsed = parseInspectionVideoKey(r2Key);
+    return parsed && parsed.tenantId === tenantId && parsed.inspectionId === inspectionId ? r2Key : null;
+}
+
 // ── R2VideoBackend ────────────────────────────────────────────────────────────
 
 export class R2VideoBackend implements VideoBackend {
@@ -210,7 +248,7 @@ export class R2VideoBackend implements VideoBackend {
 
         // Tenant-guarded pool row lookup.
         const row = await this.db
-            .select({ id: inspectionMediaPool.id, posterKey: inspectionMediaPool.posterKey })
+            .select({ id: inspectionMediaPool.id, inspectionId: inspectionMediaPool.inspectionId, posterKey: inspectionMediaPool.posterKey })
             .from(inspectionMediaPool)
             .where(and(
                 eq(inspectionMediaPool.r2Key, ref.r2Key),
@@ -223,12 +261,16 @@ export class R2VideoBackend implements VideoBackend {
             throw Errors.NotFound('Video not found');
         }
 
-        // Delete clip from R2.
-        await this.photos.delete(ref.r2Key);
+        // Delete clip from R2, unless the stored key names another company's or inspection's object.
+        const clipKey = ownClipKey(ref.r2Key, this.tenantId, row.inspectionId);
+        if (clipKey) {
+            await this.photos.delete(clipKey);
+        }
 
         // Delete poster from R2 if one was stored.
-        if (row.posterKey) {
-            await this.photos.delete(row.posterKey);
+        const posterKey = ownPosterKey({ r2Key: ref.r2Key, posterKey: row.posterKey }, this.tenantId);
+        if (posterKey) {
+            await this.photos.delete(posterKey);
         }
 
         // Drop the pool row.

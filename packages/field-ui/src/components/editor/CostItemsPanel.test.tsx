@@ -53,6 +53,35 @@ describe("CostItemsPanel", () => {
     });
   });
 
+  describe("a host that offers no cost export", () => {
+    const oneItem: CostItemView[] = [
+      {
+        id: "a", system: "roof", component: "membrane", location: "",
+        action: "replace", costMethod: "lump_sum",
+        quantity: null, uom: null, unitCostCents: null, lumpSumCents: 500000,
+        eul: null, effAge: null, rul: null,
+        suggestedRemedy: "", bucket: "immediate",
+        sectionRef: null, photoRef: null, sortOrder: 0,
+      },
+    ];
+
+    /** A provider whose url set has no `costExport`, as a native host's would. */
+    function renderWithoutExport(ui: ReactElement) {
+      const fake = createFakeDataSource({ data: createEmptyEditorData(), resources: { costItems } });
+      delete fake.urls.costExport;
+      return rtlRender(<FieldDataSourceProvider dataSource={fake}>{ui}</FieldDataSourceProvider>);
+    }
+
+    it("renders no export links and no dead link, while the rest of the panel is still there", () => {
+      renderWithoutExport(<CostItemsPanel inspectionId="i1" items={oneItem} reserveEnabled={false} />);
+      expect(screen.queryByTestId("cost-export-panel")).toBeNull();
+      expect(screen.queryByTestId("cost-export-csv")).toBeNull();
+      expect(screen.queryByTestId("cost-export-xlsx")).toBeNull();
+      // Positive control: the same items on a host that has the export do show the links (see above), and the add control stays.
+      expect(screen.getByText(/Cost Items/i)).toBeTruthy();
+    });
+  });
+
   it("shows a threshold warning for an under-$3k item", () => {
     const { getByText } = render(
       <CostItemsPanel

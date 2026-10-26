@@ -16,6 +16,7 @@ import { isValidLocale } from '../lib/locale';
 import { DATE_FORMATS, TIME_FORMATS } from '@core/field-ui/shared/display-prefs';
 import { getDrizzle } from '../lib/route-helpers';
 import { r2Put } from '../lib/r2/objects';
+import { headBytes, sniffPosterType } from '../lib/media/sniff';
 import { FL_1802_QUALIFICATION_CATEGORIES } from '../lib/statutory/qualification-categories';
 
 /**
@@ -140,7 +141,6 @@ const patchProfileRoute = createRoute(withMcpMetadata({
 
 // ── Sprint C-1 — profile photo upload ─────────────────────────────────────────
 
-const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 const MAX_PHOTO_BYTES = 2_000_000;
 
 const photoUploadRoute = createRoute(withMcpMetadata({
@@ -277,16 +277,16 @@ app.openapi(photoUploadRoute, async (c) => {
     if (file.size > MAX_PHOTO_BYTES) {
         throw Errors.BadRequest(`photo > ${Math.round(MAX_PHOTO_BYTES / 1_000_000)}MB`);
     }
-    if (!(ALLOWED_PHOTO_TYPES as readonly string[]).includes(file.type)) {
-        throw Errors.BadRequest('photo must be jpg, png, or webp');
-    }
+    // The real type comes from the file's first bytes; the declared type is client controlled and is not read.
+    const type = sniffPosterType(await headBytes(file));
+    if (!type) throw Errors.BadRequest('photo must be jpg, png, or webp');
 
-    const ext = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
+    const ext = type === 'image/jpeg' ? 'jpg' : type === 'image/png' ? 'png' : 'webp';
     // Tenant-prefixed key keeps cross-tenant photos isolated even though the
     // serving route at /photos/:key is public — keys are unguessable + scoped.
     const key = r2Keys.inspectorPhoto(tenantId, userId, ext);
     const buf = new Uint8Array(await file.arrayBuffer());
-    await r2Put(c.env.PHOTOS, key, buf, { httpMetadata: { contentType: file.type } });
+    await r2Put(c.env.PHOTOS, key, buf, { httpMetadata: { contentType: type } });
 
     // A RELATIVE path, stored. Every consumer of `users.photo_url` is a
     // browser surface — this page, the public booking page, concierge,

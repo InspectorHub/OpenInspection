@@ -43,6 +43,20 @@
       "when": 1792224709852,
       "tag": "0005_new_inspectors_view_all",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793019157698,
+      "tag": "0006_inspection_tombstones",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793030709683,
+      "tag": "0007_video_upload_ledger",
+      "breakpoints": true
     }
   ]
 }

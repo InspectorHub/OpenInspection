@@ -16,15 +16,24 @@
  */
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { logger } from '../logger';
+import { claimsNative } from '../auth/native-token';
+import { markNativeSessionEnd, type SessionEndReason } from '../auth/native-session-end';
+
+/** Where to record why a user's native grants ended, so a later refresh can say so. */
+export interface SessionEnd { kv: KVNamespace | undefined; reason: SessionEndReason }
 
 /** Revokes every OAuth grant currently held by the given user. */
-export async function revokeAllUserGrants(oauth: OAuthHelpers, userId: string): Promise<void> {
+export async function revokeAllUserGrants(oauth: OAuthHelpers, userId: string, end?: SessionEnd): Promise<void> {
     // A page is at most `limit` grants (KV list pagination); a user with more
     // than one page would otherwise keep every grant past the first.
     let cursor: string | undefined;
     do {
         const page = await (cursor ? oauth.listUserGrants(userId, { cursor }) : oauth.listUserGrants(userId));
-        await Promise.all(page.items.map((grant) => oauth.revokeGrant(grant.id, userId)));
+        await Promise.all(page.items.map(async (grant) => {
+            // Marker first: a refresh that lands between the two still gets the reason.
+            if (end && claimsNative(grant.metadata)) await markNativeSessionEnd(end.kv, grant.id, end.reason);
+            await oauth.revokeGrant(grant.id, userId);
+        }));
         cursor = page.cursor;
     } while (cursor);
 }
@@ -41,10 +50,11 @@ export async function revokeUserGrantsBestEffort(
     oauth: OAuthHelpers | undefined,
     userId: string,
     reason: string,
+    end?: SessionEnd,
 ): Promise<void> {
     if (!oauth) return;
     try {
-        await revokeAllUserGrants(oauth, userId);
+        await revokeAllUserGrants(oauth, userId, end);
     } catch (err) {
         logger.warn(`Failed to revoke OAuth grants after ${reason}; outstanding grants may stay valid`, {
             userId,

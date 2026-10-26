@@ -10,6 +10,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole, denyStaff } from '../../lib/middleware/rbac';
 import { requireCapability } from '../../lib/middleware/require-capability';
+import { answerUnchangedPublish } from '../../lib/middleware/publish-unchanged';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { buildRenderReportUrl } from '../../lib/public-urls';
@@ -190,7 +191,7 @@ const publishRoute = createRoute(withMcpMetadata({
     // Task 10 — publish capability layered on top of the role gate. owner/admin
     // always pass; an inspector with permission_overrides {publish:false}
     // ("requires review") is 403'd here.
-    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish'), guardActOnJob] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish'), guardActOnJob, answerUnchangedPublish] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection whose report is published.') }),
         body: {
@@ -212,7 +213,7 @@ const publishRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "publishInspection",
-    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -378,13 +379,10 @@ publishRoutes.openapi(publishRoute, async (c) => {
     // throw there would drop the row for a publish that already happened.
     // F79 — says WHAT was published, deliberately not WHO was told. It used to
     // copy `notifyClient`/`notifyAgent` out of the body and nothing honoured
-    // them: `publishInspection` never read those options, and delivery is the
-    // workspace's `report.published` automation rules' decision. A publish
-    // marked "notify nobody" was therefore RECORDED as having notified nobody
-    // while every rule fired and the mail went out — the record stating the
-    // opposite of the event, in the artefact someone later reads to answer "who
-    // was told, and when". An always-guessed field is worse than an absent one;
-    // who was told is recorded in the automation logs and the delivery rows.
+    // them: delivery is the workspace's `report.published` automation rules'
+    // decision, so a publish marked "notify nobody" was RECORDED as such while
+    // every rule fired and the mail went out. An always-guessed field is worse
+    // than an absent one; who was told is in the automation logs and delivery rows.
     auditFromContext(c, 'inspection.published', 'inspection', {
         entityId: id,
         metadata: { reportId: body.reportId },

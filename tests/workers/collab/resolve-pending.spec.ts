@@ -44,7 +44,7 @@ interface DOInternals {
     inspectionId: string | null;
     identityPersisted: boolean;
     persist(): Promise<void>;
-    ctx: { getWebSockets(): unknown[] };
+    ctx: { getWebSockets(tag?: string): unknown[] };
     fetch(req: Request): Promise<Response>;
     hydrateFromD1Once(): Promise<void>;
 }
@@ -298,7 +298,8 @@ describe('DO /resolve-pending', () => {
         await runInDurableObject(f.stub, async (instance: InspectionDocDO) => {
             const io = instance as unknown as DOInternals;
             const editor = new MockWebSocket();
-            io.ctx.getWebSockets = () => [editor];
+            // Like the runtime, a tag filters: this editor did not opt in to acks, so it is in no tagged set.
+            io.ctx.getWebSockets = (tag?: string) => (tag === undefined ? [editor] : []);
 
             // Control: a call that resolves nothing broadcasts nothing.
             await io.fetch(resolveRequest(f, { Z: `${f.prefix}Z.jpg` }));

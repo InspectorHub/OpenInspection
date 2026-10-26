@@ -26,6 +26,18 @@ export const REQUEST_SCOPE = '__requestScope' as const;
  */
 export const PAGE_RENDER_CALL = '__pageRenderCall' as const;
 
+/**
+ * Env key marking a replay of one queued write by the offline import. Set only by the importer, on the env it
+ * hands to its own in-process calls, after it has checked every create in the package against the deleted-id
+ * tombstones in one lookup, so the create route does not repeat that lookup per entry.
+ */
+export const OFFLINE_IMPORT_REPLAY = '__offlineImportReplay' as const;
+
+/** True for a replay made by the offline import (see OFFLINE_IMPORT_REPLAY). */
+export function isOfflineImportReplay(env: unknown): boolean {
+    return (env as Record<string, unknown> | undefined)?.[OFFLINE_IMPORT_REPLAY] === true;
+}
+
 export interface RequestScope {
     once<T>(key: string, fn: () => Promise<T>): Promise<T>;
 }

@@ -94,7 +94,7 @@ export type UnitCommand =
 
 /**
  * Compliance panel mutations (action intents `compliance-*`). Keys per op:
- * - signoff: `role`, `personId`, `name` (all required), `license` (empty becomes null), `dualRole`
+ * - signoff: `role`; `personId` and `name` are optional and sent only together, when an owner or manager records another person (omitted means the signed-in user; the server refuses them from any other role). `license` (empty becomes null), `dualRole`
  * - remove-signoff: `role`
  * - doc-review-seed: none (populates an empty checklist)
  * - doc-review: `documentKey`, the four flags, `notes` (empty becomes null)
@@ -106,8 +106,8 @@ export type ComplianceCommand =
       type: 'compliance';
       op: 'signoff';
       role: ReportSignoffView['role'];
-      personId: string;
-      name: string;
+      personId?: string;
+      name?: string;
       license: string | null;
       dualRole: boolean;
     }

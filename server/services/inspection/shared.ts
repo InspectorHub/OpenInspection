@@ -53,7 +53,7 @@ import type { CannedDefect, TemplateSchemaV2 } from '@core/field-ui/shared/templ
  *
  * See #307.
  */
-function parseSnapshot(raw: unknown): { sections: unknown[] } | null {
+export function parseSnapshot(raw: unknown): { sections: unknown[] } | null {
     if (!raw) return null;
     let parsed: unknown = raw;
     if (typeof raw === 'string') {

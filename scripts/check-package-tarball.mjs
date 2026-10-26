@@ -30,16 +30,22 @@
  * be the plain AGPL notice, and neither it nor the README or package.json may mention an additional
  * permission. The workspace mode (`--workspace <name>`) packs the source package instead.
  *
+ * `--package <slug>` (default field-ui) picks which package's staged directory is the default target;
+ * the packages are listed in scripts/lib/release-packages.mjs. The scan rules are the same for all.
+ *
  * Usage:
- *   node scripts/check-package-tarball.mjs [--dir <path> | --workspace <name> | --tarball=<file.tgz>] [--require-extra]
+ *   node scripts/check-package-tarball.mjs [--package <slug>] [--dir <path> | --workspace <name> | --tarball=<file.tgz>] [--require-extra]
  *   (no target: the staged directory; it must exist, run `npm run stage:field-ui` first)
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import { getPackage, packageSlugFromArgs, stagedDirFor } from './lib/release-packages.mjs';
+
+export { stagedDirFor };
 
 /** Only these top-level entries may appear in the tarball. */
 export const ALLOWED_TOP_LEVEL = ['dist/', 'README.md', 'LICENSE', 'package.json'];
@@ -78,7 +84,7 @@ const RULES = [
     },
 ];
 
-export const STAGED_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'packages', 'field-ui', '.publish');
+export const STAGED_DIR = stagedDirFor('field-ui');
 
 /** Wording that must not appear in the shipped README or package.json. */
 const PERMISSION_MENTION = /additional permission|section 7|self-hosted/i;
@@ -183,7 +189,14 @@ function main() {
     const workspace = flagValue('--workspace');
     const dirArg = flagValue('--dir');
     const tarballArg = args.find((a) => a.startsWith('--tarball='));
-    const target = workspace ? { workspace } : { dir: resolve(dirArg ?? STAGED_DIR) };
+    let slug;
+    try {
+        slug = packageSlugFromArgs(args);
+    } catch (err) {
+        console.error(`check-package-tarball: ${err.message}`);
+        process.exit(1);
+    }
+    const target = workspace ? { workspace } : { dir: resolve(dirArg ?? stagedDirFor(slug)) };
     const label = workspace ?? target.dir;
     const require = args.includes('--require-extra') || process.env.PACKAGE_SCAN_REQUIRE_EXTRA === '1';
     let extra;
@@ -194,7 +207,7 @@ function main() {
         process.exit(1);
     }
     if (!tarballArg && target.dir && !existsSync(target.dir)) {
-        console.error(`check-package-tarball: ${target.dir} does not exist. Run: npm run stage:field-ui`);
+        console.error(`check-package-tarball: ${target.dir} does not exist. Run: npm run stage:${getPackage(slug).slug}`);
         process.exit(1);
     }
     const files = tarballArg ? readTarball(readFileSync(tarballArg.slice('--tarball='.length))) : pack(target);

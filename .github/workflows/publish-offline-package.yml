@@ -1,0 +1,180 @@
+name: publish-offline-package
+
+# Publishes @inspectorhub/offline-package to npm with trusted publishing (OIDC, no
+# token). The filename is bound to the trusted-publisher entry on npmjs.com:
+# renaming this file breaks publishing until that entry is edited to match.
+#
+# Trigger: release-please.yml dispatches this workflow, with the release tag as
+# the ref, right after release-please cuts a `offline-package-vX.Y.Z` release. A tag or
+# release created with the default GITHUB_TOKEN does not start other workflows,
+# but workflow_dispatch is the documented exception, so no PAT is needed. This
+# workflow is also the one that runs, so the OIDC token names this file (a
+# workflow_call would present the CALLER's filename to npm instead).
+#
+# Two jobs, so that code from the dependency tree never runs next to the
+# identity that can publish:
+#   build   - checks out the tag, installs (npm ci runs dependency lifecycle
+#             scripts), builds, scans and packs. It can read the repository and
+#             nothing else: no id-token, so it cannot mint the OIDC token.
+#   publish - holds id-token: write. It checks nothing out and installs no
+#             dependencies; it runs npm itself on the one tarball the build job
+#             scanned and uploaded.
+
+# Manual runs: the guards below (repository, tag ref, offline-package-v prefix) apply to dry runs too.
+# This workflow is dispatched with the release tag as the ref, so a manual dry run must be
+# started on an existing offline-package-v* tag ref as well; there is no way to dry-run from a branch.
+# dry_run builds, stages, scans, packs and uploads the tarball, then skips the publish itself.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run everything except the actual npm publish
+        type: boolean
+        default: false
+
+# Two releases must never publish at once; a second run waits instead of being cancelled.
+concurrency:
+  group: publish-offline-package
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # Upstream only: forks have no trusted-publisher entry.
+    if: >-
+      github.repository == 'InspectorHub/OpenInspection' &&
+      github.ref_type == 'tag' &&
+      startsWith(github.ref_name, 'offline-package-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22.22.x
+          cache: npm
+      - run: npm ci
+      # The tag and the package must agree, or the registry gets a version the
+      # release does not describe.
+      - name: Check tag matches package version
+        run: |
+          expected="offline-package-v$(node -p "require('./packages/offline-package/package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package version ($expected)" >&2
+            exit 1
+          fi
+      # Coherence (release manifest, package.json, tag) -> build -> stage -> scan -> dry-run pack,
+      # in one script that pull requests run too (scripts/release-check-field-ui.mjs). It also
+      # writes the file list, size and sha512 to the job summary. The package is built in a staging
+      # directory (packages/offline-package/.publish) so that it carries the plain AGPL LICENSE; the
+      # repository copy is never touched. See packages/offline-package/PUBLISHING.md.
+      # Terms that must not be written into this public repository come in at run time as a
+      # JSON array of regex sources (repository secret PACKAGE_SCAN_EXTRA_PATTERNS). The run
+      # REQUIRES the secret: an unset or empty one fails here instead of quietly dropping the
+      # private-term check. To publish without those patterns on purpose, set the secret to [].
+      - name: Release check (build, stage, scan, dry-run pack)
+        env:
+          PACKAGE_SCAN_EXTRA_PATTERNS: ${{ secrets.PACKAGE_SCAN_EXTRA_PATTERNS }}
+          PACKAGE_SCAN_REQUIRE_EXTRA: '1'
+        run: npm run release:check:offline-package -- --require-extra
+      # Pack the staged directory; the publish job publishes exactly this file.
+      - name: Pack
+        env:
+          PACKAGE_SCAN_EXTRA_PATTERNS: ${{ secrets.PACKAGE_SCAN_EXTRA_PATTERNS }}
+          PACKAGE_SCAN_REQUIRE_EXTRA: '1'
+        run: |
+          mkdir -p "$RUNNER_TEMP/offline-package-pack"
+          npm pack ./packages/offline-package/.publish --pack-destination "$RUNNER_TEMP/offline-package-pack"
+          set -- "$RUNNER_TEMP"/offline-package-pack/*.tgz
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one packed tarball, found $#" >&2; exit 1; }
+          # The scan read the directory; check the packed bytes too.
+          node scripts/check-package-tarball.mjs --tarball="$1"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offline-package-tarball
+          path: ${{ runner.temp }}/offline-package-pack/*.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    if: >-
+      github.repository == 'InspectorHub/OpenInspection' &&
+      github.ref_type == 'tag' &&
+      startsWith(github.ref_name, 'offline-package-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22.22.x
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm >= 11.5.1; the npm bundled with Node 22 is 10.x. Pinned to the
+      # 11 line, not `latest`, so a new major cannot change how this job publishes unannounced.
+      - run: npm install -g npm@11
+      - uses: actions/download-artifact@v4
+        with:
+          name: offline-package-tarball
+          path: ${{ runner.temp }}/offline-package-pack
+      - name: Is this version already published?
+        id: exists
+        run: |
+          set -- "$RUNNER_TEMP"/offline-package-pack/*.tgz
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one tarball, found $#" >&2; exit 1; }
+          packed="$(tar -xzOf "$1" package/package.json | node -p "const p=JSON.parse(require('fs').readFileSync(0,'utf8'));p.name+'@'+p.version")"
+          echo "spec=$packed" >> "$GITHUB_OUTPUT"
+          echo "sha512: $(sha512sum "$1" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
+          if out="$(npm view "$packed" version --registry https://registry.npmjs.org 2>&1)"; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::$packed is already on the registry; the publish step is skipped (idempotent re-run)."
+          elif echo "$out" | grep -qE 'E404|404 Not Found'; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "could not tell whether $packed is published: $out" >&2
+            exit 1
+          fi
+      - name: Publish the scanned tarball
+        if: ${{ steps.exists.outputs.published != 'true' && !inputs.dry_run }}
+        run: |
+          set -- "$RUNNER_TEMP"/offline-package-pack/*.tgz
+          [ "$#" -eq 1 ] && [ -f "$1" ] || { echo "expected exactly one tarball, found $#" >&2; exit 1; }
+          # The tarball must be the package the tag names. The scoped name starts with an @, so the version is
+          # everything after the LAST @ (##), not after the first.
+          packed="$(tar -xzOf "$1" package/package.json | node -p "const p=JSON.parse(require('fs').readFileSync(0,'utf8'));p.name+'@'+p.version")"
+          if [ "offline-package-v${packed##*@}" != "$GITHUB_REF_NAME" ] || [ "${packed%@*}" != "@inspectorhub/offline-package" ]; then
+            echo "tarball is $packed, which the tag $GITHUB_REF_NAME does not name" >&2
+            exit 1
+          fi
+          npm publish "$1" --provenance --access public
+      - name: Dry run
+        if: ${{ inputs.dry_run }}
+        run: echo "::notice::dry_run is set; nothing was published."
+      # A check, not a gate: the publish step above has already succeeded when this runs. npm says a new
+      # version "may take a few minutes to become available", so wait up to 5 minutes (30 x 10 s) for it to
+      # show up. If it does not, say so with a warning annotation and leave the job green; a published
+      # version must not be reported as a failed run. Provenance information is best effort as well.
+      - name: Check the registry shows the version
+        if: ${{ !inputs.dry_run }}
+        env:
+          SPEC: ${{ steps.exists.outputs.spec }}
+        run: |
+          spec="$SPEC"
+          for i in $(seq 1 30); do
+            if v="$(npm view "$spec" version --registry https://registry.npmjs.org 2>/dev/null)" && [ -n "$v" ]; then
+              echo "registry shows $spec"
+              npm view "$spec" dist.integrity --registry https://registry.npmjs.org || true
+              npm view "$spec" dist.attestations --json --registry https://registry.npmjs.org || echo "::notice::no provenance information available (best effort)"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::$spec was published but is not visible on the registry yet (checked for 5 minutes). Check npm view $spec later; the publish step itself succeeded."

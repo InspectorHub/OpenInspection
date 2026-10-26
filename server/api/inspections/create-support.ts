@@ -10,9 +10,11 @@ import { auditFromContextAwaited } from '../../lib/audit';
 import { logger } from '../../lib/logger';
 import { MeteringService } from '../../services/metering.service';
 import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
-import { templates } from '../../lib/db/schema';
+import { inspections, templates } from '../../lib/db/schema';
 import { and, eq } from 'drizzle-orm';
-import { Errors } from '../../lib/errors';
+import { AppError, ErrorCode, Errors } from '../../lib/errors';
+import { isOfflineImportReplay } from '../../lib/request-scope';
+import { findTombstonedIds } from '../../lib/inspection/tombstones';
 import { noticeFor } from '../../features/plan-quota/notice';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
 import type { CreateInspectionData } from '../../services/inspection/shared';
@@ -82,8 +84,25 @@ function inspectorFor(c: Context<HonoConfig>, named: string | null | undefined):
  */
 export async function assertCanCreate(
     c: Context<HonoConfig>,
-    body: { templateId?: string | undefined; client?: unknown; newAgent?: unknown; clientName?: string | undefined },
+    body: { id?: string | undefined; templateId?: string | undefined; client?: unknown; newAgent?: unknown; clientName?: string | undefined },
 ): Promise<void> {
+    // A client-minted id that names a deleted inspection is refused before anything else, whether or not the request
+    // carries contacts: the row is gone, so only the tombstone says the id must not be reused. The offline import
+    // has already looked up every create of its package in one query, so its replays skip this one.
+    if (body.id && !isOfflineImportReplay(c.env)) {
+        const db = getDrizzle(c);
+        const tenantId = c.get('tenantId');
+        const [tombstoned] = await findTombstonedIds(db, tenantId, [body.id]);
+        // A delete that failed after writing the tombstone leaves the inspection in place; while the row exists the
+        // create is the idempotent replay of it, never a refusal.
+        const stillThere = tombstoned
+            ? await db.select({ id: inspections.id }).from(inspections).where(and(eq(inspections.id, body.id), eq(inspections.tenantId, tenantId))).get()
+            : undefined;
+        const deleted = stillThere ? undefined : tombstoned;
+        if (deleted) {
+            throw new AppError(409, ErrorCode.INSPECTION_ID_DELETED, 'That inspection id belongs to an inspection that was deleted.', { inspectionId: deleted });
+        }
+    }
     // Only a request that will upsert contacts ahead of the insert has anything to protect. A create that names none
     // (the offline import's, among them) skips the look ahead, which would otherwise cost every one of them reads.
     if (!body.client && !body.newAgent && (!body.clientName || body.clientName === ANONYMOUS_CLIENT)) return;

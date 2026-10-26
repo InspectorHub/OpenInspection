@@ -3,6 +3,7 @@ import type { DateFormat, TimeFormat } from './shared/display-prefs';
 import type { PublishReadiness } from './shared/types';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
 import type { PendingMediaStore, MediaUploader } from './media-types';
+import type { DecodeImage } from './decode-image';
 import type {
   AiAssistInput,
   AiAssistResult,
@@ -193,8 +194,11 @@ export interface FieldUrls {
   photo(inspectionId: string, key: string): string;
   reportPreview(tenantSlug: string, inspectionId: string): string | null;
   reportPdf(inspectionId: string): string | null;
-  /** The cost tables' download (`csv` or `xlsx`); a plain link the browser follows. */
-  costExport(inspectionId: string, format: 'csv' | 'xlsx'): string;
+  /**
+   * The cost tables' download (`csv` or `xlsx`); a plain link the browser follows. Optional: a host with no
+   * such download (a native shell) leaves it out and the Cost Items panel shows no export links.
+   */
+  costExport?(inspectionId: string, format: 'csv' | 'xlsx'): string;
   statutoryPreviewPdf(inspectionId: string): string | null;
   videoObject(inspectionId: string, ref: string): string | null;
   /**
@@ -349,6 +353,12 @@ export interface FieldDataSource {
      * `doc` at upload time and answers `{ ok: false }` when `doc` is null or the photo is gone.
      */
     uploader(inspectionId: string, doc: Y.Doc | null): MediaUploader;
+    /**
+     * Optional. Turns a file the browser cannot decode (HEIC/HEIF) into a JPEG the browser can. Return null when this
+     * host cannot decode that file (the caller keeps its own behaviour); reject with `DecodeImageError` for a file
+     * that is recognised but cannot be decoded. Absent: photos behave exactly as before.
+     */
+    decodeImage?: DecodeImage;
   };
   urls: FieldUrls;
   resources: FieldResources;

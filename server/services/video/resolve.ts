@@ -133,10 +133,12 @@ export async function resolveVideoProvider(
  * - Self-host: loads `tenant_configs.videoMode` (default 'r2') and
  *   optionally `integrationConfig.streamCustomerSubdomain`.
  *
+ * `inspectionId` is the inspection in the request path; the Stream backend refuses videos stamped with another.
+ *
  * Throws `ServiceUnavailable` (503) when provider='stream' but the
  * required STREAM binding or customer subdomain is absent.
  */
-export async function resolveVideoBackend(c: Context<HonoConfig>): Promise<ResolvedVideoBackend> {
+export async function resolveVideoBackend(c: Context<HonoConfig>, inspectionId: string): Promise<ResolvedVideoBackend> {
     const tenantId = c.get('tenantId');
     const db = drizzle(c.env.DB);
     const baseUrl = getBaseUrl(c);
@@ -157,6 +159,7 @@ export async function resolveVideoBackend(c: Context<HonoConfig>): Promise<Resol
             tenantId,
             baseUrl,
             db,
+            inspectionId,
         );
         return { backend, provider, streamSubdomain };
     }

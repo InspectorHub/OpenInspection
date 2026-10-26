@@ -73,6 +73,10 @@ export enum ErrorCode {
     // see. Distinct from CONFLICT so a client that mints its own ids can tell
     // "pick another id" from every other 409.
     ID_CONFLICT = 'ID_CONFLICT',
+    // A create named an id that belongs to an inspection this company deleted (409). The id was minted by the
+    // client, and replaying the create would bring the deleted inspection back. Nothing was written.
+    // `details.inspectionId` names it. Distinct from ID_CONFLICT: picking another id is not the answer.
+    INSPECTION_ID_DELETED = 'INSPECTION_ID_DELETED',
     // An offline package would create an inspection that an earlier import of the
     // same package already created and that has since been deleted. Importing it
     // again would bring the deleted inspection back, so the whole package is
@@ -149,6 +153,7 @@ export const Errors = {
         new AppError(403, ErrorCode.SELF_PERMISSION_CHANGE, 'You cannot change your own permissions. Ask an owner.'),
     NotFound: (msg: string = 'Resource not found') => new AppError(404, ErrorCode.NOT_FOUND, msg),
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
+    PayloadTooLarge: (msg: string) => new AppError(413, ErrorCode.BAD_REQUEST, msg),
     Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),
     UnprocessableEntity: (msg: string, details?: unknown) =>
         new AppError(422, ErrorCode.UNPROCESSABLE_ENTITY, msg, details),

@@ -7,6 +7,7 @@
  * refusal is paired with a positive control.
  */
 import { describe, it, expect, afterEach } from 'vitest';
+import { AVIF_BYTES, HEIC_BYTES, HTML_BYTES, JPEG_BYTES, MOV_BYTES, MP4_BYTES, PNG_BYTES, SVG_BYTES, WEBM_BYTES, ZIP_BYTES } from '../helpers/media-bytes';
 import { eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
@@ -19,7 +20,7 @@ import {
 const CREATE = `/api/inspections/${INSPECTION_ID}/media/video/create-upload`;
 const FINALIZE = `/api/inspections/${INSPECTION_ID}/media/video/finalize`;
 const JWT_SECRET = 'j'.repeat(32);
-const MP4 = new Uint8Array([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]);
+const MP4 = MP4_BYTES;
 
 interface R2Ref { provider: 'r2'; mediaId: string; r2Key: string }
 interface CreateOut { uploadURL: string; provider: string; ref: R2Ref | { provider: 'stream'; streamUid: string } }
@@ -69,10 +70,10 @@ describe('video upload (real app)', () => {
             expect(first.status, await first.clone().text()).toBe(200);
             expect(((await first.json()) as { data: { mediaId: string; r2Key: string } }).data).toEqual({ mediaId: ref.mediaId, r2Key: key });
             expect(u!.r2.store.has(key)).toBe(true);
-            const second = await u!.call(pathOf(out.uploadURL), { method: 'POST', body: filePart('video/mp4', new Uint8Array([1, 2, 3])) }, { auth: null });
+            const second = await u!.call(pathOf(out.uploadURL), { method: 'POST', body: filePart('video/mp4', new Uint8Array([...MP4, 1, 2, 3])) }, { auth: null });
             expect(second.status).toBe(200);
             expect(u!.r2.store.size).toBe(1);
-            expect(u!.r2.store.get(key)?.bytes.length).toBe(3);
+            expect(u!.r2.store.get(key)?.bytes.length).toBe(MP4.length + 3);
         });
 
         it('answers 404 once native clients are switched off, even for a token minted while they were on', async () => {
@@ -102,14 +103,30 @@ describe('video upload (real app)', () => {
             expect((await u!.call(url, { method: 'POST', body: filePart('video/mp4', MP4) }, { auth: null })).status).toBe(200);
         });
 
-        it('refuses a non-video type and a missing file, then accepts the right one', async () => {
+        it('decides the type from the bytes: an image or html declared as video is refused, a mislabelled or untyped clip is stored under its real type', async () => {
             const out = await create();
             const url = pathOf(out.uploadURL);
-            expect((await u!.call(url, { method: 'POST', body: filePart('application/octet-stream', MP4) }, { auth: null })).status).toBe(400);
+            const refused = [JPEG_BYTES, PNG_BYTES, HTML_BYTES, SVG_BYTES, HEIC_BYTES, AVIF_BYTES, ZIP_BYTES, new Uint8Array(0), MP4.subarray(0, 8)];
+            for (const bytes of refused) {
+                expect((await u!.call(url, { method: 'POST', body: filePart('video/mp4', bytes) }, { auth: null })).status).toBe(400);
+            }
             expect((await u!.call(url, { method: 'POST', body: new FormData() }, { auth: null })).status).toBe(400);
             expect(u!.r2.store.size).toBe(0);
-            expect((await u!.call(url, { method: 'POST', body: filePart('video/webm', MP4) }, { auth: null })).status).toBe(200);
-            expect([...u!.r2.store.keys()][0]).toMatch(/\.webm$/);
+            // Controls: the same URL takes real clips, whatever they are declared as; the key extension follows the bytes.
+            const cases: [Uint8Array<ArrayBuffer>, string, RegExp, string][] = [
+                [MP4, 'application/octet-stream', /\.mp4$/, 'video/mp4'],
+                [MP4, 'video/webm', /\.mp4$/, 'video/mp4'],
+                [MOV_BYTES, 'video/mp4', /\.mov$/, 'video/quicktime'],
+                [WEBM_BYTES, 'video/mp4', /\.webm$/, 'video/webm'],
+            ];
+            for (const [bytes, declared, ext, type] of cases) {
+                u!.r2.store.clear();
+                expect((await u!.call(url, { method: 'POST', body: filePart(declared, bytes) }, { auth: null })).status, declared).toBe(200);
+                expect(u!.r2.store.size).toBe(1);
+                const [key, stored] = [...u!.r2.store.entries()][0]!;
+                expect(key).toMatch(ext);
+                expect(stored.contentType).toBe(type);
+            }
         });
 
         it('keeps working for the session route: the original r2-upload still takes its token', async () => {

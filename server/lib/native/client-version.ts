@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import type { HonoConfig } from '../../types/hono';
 import { AppError, ErrorCode } from '../errors';
+import { logger } from '../logger';
 
 export type ClientPlatform = 'ios' | 'android' | 'windows';
 export const CLIENT_PLATFORMS = ['ios', 'android', 'windows'] as const satisfies readonly ClientPlatform[];
@@ -28,6 +29,8 @@ export interface NativeVersionEnv {
   NATIVE_DOWNLOAD_URL_IOS?: string;
   NATIVE_DOWNLOAD_URL_ANDROID?: string;
   NATIVE_DOWNLOAD_URL_WINDOWS?: string;
+  /** Page where a person manages (or deletes) their account. One value for every platform. https only. */
+  NATIVE_ACCOUNT_URL?: string;
 }
 
 const SEMVER = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?$/;
@@ -63,6 +66,29 @@ export function readVersionPolicy(env: NativeVersionEnv, platform: ClientPlatfor
     recommended: read(keys.recommended),
     downloadUrl: read(keys.downloadUrl),
   };
+}
+
+/** Longest account URL accepted. */
+const MAX_ACCOUNT_URL_LENGTH = 2048;
+
+/**
+ * The operator's account-management URL in canonical form, or undefined when it is unset or unusable.
+ * Only an https URL without embedded credentials passes, so an app that opens the link can never be
+ * handed a script, data or plain-http address. Reading never throws; a configured but unusable value
+ * is logged (without the value, which may hold a secret) and the field is simply left out.
+ */
+export function readAccountUrl(env: NativeVersionEnv): string | undefined {
+  const raw = env.NATIVE_ACCOUNT_URL?.trim();
+  if (!raw) return undefined;
+  let url: URL | null;
+  try { url = new URL(raw); } catch { url = null; }
+  const usable = url !== null && url.protocol === 'https:' && !url.username && !url.password
+    && url.hostname !== '' && url.href.length <= MAX_ACCOUNT_URL_LENGTH;
+  if (!usable || url === null) {
+    logger.warn('NATIVE_ACCOUNT_URL is not a usable https URL; accountUrl is left out of the compat response');
+    return undefined;
+  }
+  return url.href;
 }
 
 /** Unknown, missing or unparseable versions never block: the rule fails open. */

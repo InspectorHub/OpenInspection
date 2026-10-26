@@ -23,7 +23,7 @@ function batch(over: Partial<PhotoBatch> = {}): PhotoBatch {
 function parkedSource() {
   const fake = createFakeDataSource({ data: createEmptyEditorData() });
   const started: PendingMediaRecord[] = [];
-  const settle: Array<(r: { ok: true; key: string } | { ok: false; error: string }) => void> = [];
+  const settle: Array<(r: { ok: true; key: string } | { ok: false; error: string; kept?: true }) => void> = [];
   const uploader: MediaUploader = {
     upload: (rec) =>
       new Promise((resolve) => {
@@ -233,5 +233,43 @@ describe('usePhotoBatchUpload', () => {
     await flush();
     expect(latest.busy).toBe(false);
     expect(latest.failedSinceIdle).toBe(false);
+  });
+
+  it('a kept failure is carried into the result and does not count as a failure', async () => {
+    const { ds, settle } = parkedSource();
+    mount(ds);
+    act(() => latest.submit(batch({ files: [file('a'), file('b')] })));
+    await flush();
+    await act(async () => { settle[0]({ ok: false, error: 'HTTP_500', kept: true }); settle[1]({ ok: true, key: 'k2' }); });
+    await flush();
+    const [out] = latest.outcomes;
+    expect(out.results[0]).toMatchObject({ ok: false, kept: true, error: 'HTTP_500' });
+    expect(out.ok).toBe(true);
+    expect(out.keys).toEqual(['k2']);
+    expect(latest.failedSinceIdle).toBe(false);
+  });
+
+  it('CONTROL - the same failure without kept still fails the batch and the period, and carries no kept flag', async () => {
+    const { ds, settle } = parkedSource();
+    mount(ds);
+    act(() => latest.submit(batch({ files: [file('a'), file('b')] })));
+    await flush();
+    await act(async () => { settle[0]({ ok: false, error: 'HTTP_500' }); settle[1]({ ok: true, key: 'k2' }); });
+    await flush();
+    const [out] = latest.outcomes;
+    expect(out.results[0]).not.toHaveProperty('kept');
+    expect(out.ok).toBe(false);
+    expect(latest.failedSinceIdle).toBe(true);
+  });
+
+  it('a kept failure next to a real one still fails the batch', async () => {
+    const { ds, settle } = parkedSource();
+    mount(ds);
+    act(() => latest.submit(batch({ files: [file('a'), file('b')] })));
+    await flush();
+    await act(async () => { settle[0]({ ok: false, error: 'HTTP_500', kept: true }); settle[1]({ ok: false, error: 'HTTP_500' }); });
+    await flush();
+    expect(latest.outcomes[0].ok).toBe(false);
+    expect(latest.failedSinceIdle).toBe(true);
   });
 });

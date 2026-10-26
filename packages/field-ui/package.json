@@ -50,6 +50,11 @@
     "y-protocols": "^1.0.0",
     "yjs": "^13.6.0"
   },
+  "peerDependenciesMeta": {
+    "y-indexeddb": {
+      "optional": true
+    }
+  },
   "scripts": {
     "build": "paraglide-js compile --project ./project.inlang --outdir ./src/i18n/generated --strategy globalVariable baseLocale --output-structure locale-modules --emit-ts-declarations && tsup"
   }

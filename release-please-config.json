@@ -6,10 +6,16 @@
   "packages": {
     ".": {
       "changelog-path": "CHANGELOG.md",
-      "exclude-paths": ["packages/field-ui"]
+      "exclude-paths": ["packages/field-ui", "packages/offline-package"]
     },
     "packages/field-ui": {
       "component": "field-ui",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true,
+      "changelog-path": "CHANGELOG.md"
+    },
+    "packages/offline-package": {
+      "component": "offline-package",
       "include-component-in-tag": true,
       "bump-minor-pre-major": true,
       "changelog-path": "CHANGELOG.md"

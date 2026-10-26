@@ -49,7 +49,7 @@ export class ReportVersionService {
      * for them the answer is its primary report. Callers that know which
      * deliverable they are publishing pass `reportId` and skip this.
      */
-    private async resolveReportId(
+    async resolveReportId(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         db: any, tenantId: string, inspectionId: string, reportId?: string,
     ): Promise<string | null> {
@@ -62,6 +62,35 @@ export class ReportVersionService {
             ))
             .get();
         return primary?.id ?? null;
+    }
+
+    /** What a publish would freeze now; `snapshotOnPublish` stores exactly this. */
+    async buildSnapshotJson(tenantId: string, inspectionId: string): Promise<string> {
+        const db = this.getDrizzle();
+        const ins = await db.select().from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!ins) throw new Error('Inspection not found');
+        const results = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        const data = parseResultsData(results?.data);
+        const units = await db.select().from(inspectionUnits)
+            .where(and(eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
+            .all();
+
+        const snapshot: Snapshot = {
+            schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+            inspection: ins as unknown as Record<string, unknown>,
+            data,
+            units,
+            // Spec B §1: the report freezes credentials + resolved layout at publish, so an
+            // inspector who later leaves an association cannot rewrite the cover of a report
+            // already delivered.
+            inspectors: await this.resolveInspectors(tenantId, inspectionId, ins),
+            styleProfile: await this.resolveStyleProfile(tenantId, ins),
+        };
+        return JSON.stringify(snapshot);
     }
 
     async snapshotOnPublish(
@@ -91,36 +120,7 @@ export class ReportVersionService {
             .get();
         const nextVersion = (prev?.versionNumber ?? 0) + 1;
 
-        // Read snapshot sources.
-        const ins = await db.select().from(inspections)
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-            .get();
-        if (!ins) throw new Error('Inspection not found');
-
-        const results = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .get();
-        const data = parseResultsData(results?.data);
-
-        const units = await db.select().from(inspectionUnits)
-            .where(and(eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
-            .all();
-
-        const snapshot: Snapshot = {
-            schemaVersion: SNAPSHOT_SCHEMA_VERSION,
-            inspection: ins as unknown as Record<string, unknown>,
-            data,
-            units,
-            // Spec B §1: report surfaces snapshot credentials + resolved layout
-            // at publish; live surfaces read current state. Before this, the
-            // report resolved credentials LIVE on every read — so an inspector
-            // who left an association silently rewrote the cover of every report
-            // they had ever delivered, including ones a client downloaded months
-            // earlier and may be relying on.
-            inspectors: await this.resolveInspectors(tenantId, inspectionId, ins),
-            styleProfile: await this.resolveStyleProfile(tenantId, ins),
-        };
-        const snapshotJson = JSON.stringify(snapshot);
+        const snapshotJson = await this.buildSnapshotJson(tenantId, inspectionId);
         if (snapshotJson.length > MAX_SNAPSHOT_BYTES) {
             throw new Error('Snapshot exceeds 1 MB limit');
         }

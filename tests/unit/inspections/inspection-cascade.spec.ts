@@ -33,10 +33,12 @@ function makeR2(objects: { key: string; size: number }[]) {
 
 describe('deleteInspectionCascade', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
+    let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
     beforeEach(async () => {
         const fix = createTestDb();
         testDb = fix.db;
+        sqlite = fix.sqlite;
         await setupSchema(fix.sqlite);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -96,6 +98,131 @@ describe('deleteInspectionCascade', () => {
         const names = new Set(inspectionScopedTables().map(getTableName));
         expect(names.has('offline_import_applied')).toBe(false);
         expect(names.has('inspection_results')).toBe(true);
+    });
+
+    it('keeps the tombstone out of the derived set, or the cascade would delete the row it just wrote', () => {
+        const names = new Set(inspectionScopedTables().map(getTableName));
+        expect(names.has('inspection_tombstones')).toBe(false);
+        expect(names.has('inspection_results')).toBe(true);
+    });
+
+    describe('tombstone', () => {
+        const OTHER_TENANT = '00000000-0000-0000-0000-000000000002';
+        const tombstones = () => testDb.select().from(schema.inspectionTombstones).all();
+
+        it('records exactly one (tenant, id) row, none for another company, and still empties the child tables', async () => {
+            await testDb.insert(schema.inspectionResults).values({
+                id: 'res-t', tenantId: TENANT, inspectionId: INSP, data: '{}',
+                lastSyncedAt: new Date(), createdAt: new Date(),
+            } as never);
+
+            await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, makeR2([]).bucket, TENANT, INSP);
+
+            const rows = await tombstones();
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ tenantId: TENANT, inspectionId: INSP });
+            expect(rows[0]!.deletedAt).toBeInstanceOf(Date);
+            // Control: the tombstone is not a leftover of "nothing was deleted".
+            expect(await testDb.select().from(schema.inspections).all()).toHaveLength(0);
+            expect(await testDb.select().from(schema.inspectionResults).all()).toHaveLength(0);
+        });
+
+        it('deleting the same id again is not an error and leaves one row', async () => {
+            const db = testDb as unknown as DrizzleD1Database;
+            await deleteInspectionCascade(db, makeR2([]).bucket, TENANT, INSP);
+            await deleteInspectionCascade(db, makeR2([]).bucket, TENANT, INSP);
+            expect(await tombstones()).toHaveLength(1);
+        });
+
+        it("a company's tombstone does not appear under another company that deletes an inspection with a different id", async () => {
+            await testDb.insert(schema.tenants).values({
+                id: OTHER_TENANT, slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+            });
+            await testDb.insert(schema.inspections).values({
+                id: 'i-other', tenantId: OTHER_TENANT, propertyAddress: '9 St', date: '2026-06-01',
+                status: 'requested', paymentStatus: 'unpaid', price: 0,
+                agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+            });
+            await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, makeR2([]).bucket, TENANT, INSP);
+            const rows = await tombstones();
+            expect(rows.map((r) => [r.tenantId, r.inspectionId])).toEqual([[TENANT, INSP]]);
+            // Control: the other company's inspection is untouched.
+            expect(await testDb.select().from(schema.inspections).all()).toHaveLength(1);
+        });
+
+        it('refuses the delete when the tombstone cannot be written, and removes nothing', async () => {
+            await testDb.insert(schema.inspectionResults).values({
+                id: 'res-f', tenantId: TENANT, inspectionId: INSP, data: '{}',
+                lastSyncedAt: new Date(), createdAt: new Date(),
+            } as never);
+            const r2 = makeR2([{ key: `${TENANT}/inspections/${INSP}/photos/m-1.jpg`, size: 1 }]);
+            sqlite.exec('DROP TABLE inspection_tombstones');
+
+            await expect(deleteInspectionCascade(testDb as unknown as DrizzleD1Database, r2.bucket, TENANT, INSP)).rejects.toThrow();
+
+            expect(await testDb.select().from(schema.inspections).all()).toHaveLength(1);
+            expect(await testDb.select().from(schema.inspectionResults).all()).toHaveLength(1);
+            expect(r2.deleted).toEqual([]);
+        });
+    });
+
+    describe('unfinished video uploads', () => {
+        const upload = (id: string, inspectionId: string, state: 'open' | 'completing' | 'completed') => ({
+            id, tenantId: TENANT, inspectionId, mediaId: `m-${id}`, userId: 'u-1', uploadId: `up-${id}`, r2Key: `${TENANT}/inspections/${inspectionId}/videos/${id}.mp4`,
+            contentType: 'video/mp4' as const, totalBytes: 10, partBytes: 5, partCount: 2, state, createdAt: new Date(), expiresAt: new Date(Date.now() + 3600_000),
+        });
+        const part = (mediaId: string, n: number) => ({ tenantId: TENANT, mediaId, partNumber: n, etag: 'e', sizeBytes: 5, receivedAt: new Date() });
+        function r2WithAbort(failAbort = false) {
+            const aborted: string[] = [];
+            const base = makeR2([]);
+            const bucket = {
+                ...base.bucket,
+                resumeMultipartUpload: (key: string, uploadId: string) => ({
+                    abort: async () => { aborted.push(`${key}|${uploadId}`); if (failAbort) throw new Error('r2 down'); },
+                }),
+            } as unknown as R2Bucket;
+            return { bucket, aborted };
+        }
+        async function seed() {
+            await testDb.insert(schema.inspections).values({
+                id: 'i-2', tenantId: TENANT, propertyAddress: '2 St', date: '2026-06-02', status: 'requested', paymentStatus: 'unpaid', price: 0,
+                agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+            } as never);
+            await testDb.insert(schema.videoUploads).values([upload('a', INSP, 'open'), upload('b', INSP, 'completed'), upload('c', 'i-2', 'open')]);
+            await testDb.insert(schema.videoUploadParts).values([part('m-a', 1), part('m-a', 2), part('m-c', 1)]);
+        }
+
+        it('aborts the open upload once, removes its ledger row and parts, and leaves the other inspection upload alone', async () => {
+            await seed();
+            const r2 = r2WithAbort();
+            await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, r2.bucket, TENANT, INSP);
+            expect(r2.aborted).toEqual([`${TENANT}/inspections/${INSP}/videos/a.mp4|up-a`]);
+            expect((await testDb.select().from(schema.videoUploads).all()).map((r) => r.id)).toEqual(['c']);
+            expect((await testDb.select().from(schema.videoUploadParts).all()).map((r) => r.mediaId)).toEqual(['m-c']);
+        });
+
+        it('a failed abort does not fail the delete', async () => {
+            await seed();
+            const r2 = r2WithAbort(true);
+            await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, r2.bucket, TENANT, INSP);
+            expect(r2.aborted).toHaveLength(1);
+            expect((await testDb.select().from(schema.inspections).all()).map((x) => x.id)).toEqual(['i-2']);
+            expect((await testDb.select().from(schema.videoUploadParts).all()).map((r) => r.mediaId)).toEqual(['m-c']);
+        });
+    });
+
+    describe('a delete that fails after the tombstone was written', () => {
+        it('leaves the inspection in place, and a retried delete completes', async () => {
+            const db = testDb as unknown as DrizzleD1Database;
+            const failing = { list: async () => { throw new Error('r2 list failed'); }, delete: async () => undefined } as unknown as R2Bucket;
+            await expect(deleteInspectionCascade(db, failing, TENANT, INSP)).rejects.toThrow('r2 list failed');
+            expect(await testDb.select().from(schema.inspections).all()).toHaveLength(1);
+            expect(await testDb.select().from(schema.inspectionTombstones).all()).toHaveLength(1);
+
+            await deleteInspectionCascade(db, makeR2([]).bucket, TENANT, INSP);
+            expect(await testDb.select().from(schema.inspections).all()).toHaveLength(0);
+            expect(await testDb.select().from(schema.inspectionTombstones).all()).toHaveLength(1);
+        });
     });
 
     /**

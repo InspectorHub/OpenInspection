@@ -39,7 +39,8 @@ import { inspections } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { r2Keys } from '../lib/r2-keys';
 import { imagesBinding } from '../lib/media/serve-photo';
-import { signedPhotoExtFor, storePhotoAtKey } from '../lib/media/store-photo';
+import { signedPhotoExtFor, sniffedPhotoExt, storePhotoAtKey } from '../lib/media/store-photo';
+import { HEAD_BYTES, sniffPhotoType } from '../lib/media/sniff';
 import { authorizeCollab, collabStub, type AuthResult } from '../lib/collab/authorize';
 import { resolveInspectionScope } from '../lib/inspection/visibility';
 import { importUpdateIntoDo } from '../lib/collab/import-route';
@@ -169,8 +170,14 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
 
     // Every entry must hold exactly the bytes its directory entry declares. Judged here, in the read-only
     // phase, so a package that lies about one entry's size is refused before any other entry is acted on.
-    const mismatched = verifyPackageEntries(zip, entries);
-    if (mismatched) throw Errors.BadRequest(`Invalid offline package: entry ${mismatched} does not match its declared size`);
+    // The same pass refuses a photo file that is not a jpeg, png or heic image, so such a package writes nothing.
+    const isPhoto = (name: string) => name.startsWith('media/') && name !== MEDIA_INDEX_ENTRY;
+    const mismatched = verifyPackageEntries(zip, entries, (name, bytes) => !isPhoto(name) || sniffPhotoType(bytes.subarray(0, HEAD_BYTES)) !== null);
+    if (mismatched) {
+        throw Errors.BadRequest(isPhoto(mismatched)
+            ? `Invalid offline package: photo entry ${mismatched} is not a jpeg, png or heic image, or does not match its declared size`
+            : `Invalid offline package: entry ${mismatched} does not match its declared size`);
+    }
 
     const rawOutbox = parseEntry(zip, entries, OUTBOX_ENTRY) ?? [];
     enforceLimit(limits, 'outbox', claimedLength(rawOutbox));
@@ -284,8 +291,10 @@ async function storePhotos(c: Context<HonoConfig>, zip: Uint8Array, plan: Import
         const next = inflated.next();
         const bytes = next.done || next.value[0] !== mediaEntryName(m.pendingId, ext) ? null : next.value[1];
         if (!bytes) throw Errors.BadRequest(`Photo ${m.pendingId} could not be read from the package`);
-        const key = r2Keys.inspectionPhoto(tenantId, m.inspectionId, m.pendingId, ext);
-        await storePhotoAtKey(bucket, imagesBinding(c.env), key, new File([bytes], `${m.pendingId}.${ext}`, { type: m.contentType }));
+        // The manifest's declared type named the package entry; the stored key and type follow the bytes.
+        const file = new File([bytes], `${m.pendingId}.${ext}`, { type: m.contentType });
+        const key = r2Keys.inspectionPhoto(tenantId, m.inspectionId, m.pendingId, await sniffedPhotoExt(file));
+        await storePhotoAtKey(bucket, imagesBinding(c.env), key, file);
         const keys = keysByInspection.get(m.inspectionId) ?? {};
         keys[m.pendingId] = key;
         keysByInspection.set(m.inspectionId, keys);

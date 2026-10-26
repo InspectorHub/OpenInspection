@@ -13,6 +13,7 @@ import { getCloudflareEnv } from "~/lib/load-context";
 import { revisionStatusForInspection } from "../../../server/lib/statutory/revision-status";
 import { isReportPublished } from "~/lib/status";
 import { resolveReportTier } from "../../../server/lib/report-tier";
+import { parseSnapshot } from "./loader-snapshot.server";
 type Api = ReturnType<typeof createApi>;
 
 /**
@@ -37,7 +38,7 @@ function readOptional(api: Api, id: string, body: Record<string, unknown>) {
  let declaresStatutoryForm = false;
  try {
   const raw = row.templateSnapshot || data.templateSnapshot || (data.template as { schema?: unknown } | undefined)?.schema;
-  const snap = (typeof raw === "string" ? JSON.parse(raw) : raw) as { statutoryForm?: unknown } | null | undefined;
+  const snap = parseSnapshot(raw) as { statutoryForm?: unknown } | null | undefined;
   declaresStatutoryForm = !!snap?.statutoryForm;
  } catch { /* handled where the snapshot is parsed for real */ }
  const settledNull = async <R,>(call: () => Promise<R>, label: string): Promise<R | null> => {
@@ -120,11 +121,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const rawSchema = (data?.inspection as Record<string, unknown>)?.templateSnapshot ||
  data?.templateSnapshot ||
  (data?.template as Record<string, unknown>)?.schema;
- const schema = ((typeof rawSchema === "string"
- ? JSON.parse(rawSchema)
- : rawSchema) as {
- sections: Array<Record<string, unknown>>;
- }) || { sections: [] };
+ const snapshot = parseSnapshot(rawSchema);
+ // A shallow copy: the overlay below replaces `schema.sections`, and must never reach `snapshot`.
+ const schema = (snapshot ? { ...(snapshot as object) } : { sections: [] }) as { sections: Array<Record<string, unknown>> };
 
  // The snapshot's own item attributes, captured BEFORE the overlay below
  // replaces `schema.sections` wholesale.
@@ -251,7 +250,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // duplicateSection / deleteSection / moveSection) can operate on a clean
  // TemplateSchemaV2 object. The `schema` field above is NORMALIZED (overlaid
  // with report-data) and must NOT be PATCHed to the template-snapshot endpoint.
- const templateSnapshot = ((typeof rawSchema === 'string' ? JSON.parse(rawSchema) : rawSchema) ?? { schemaVersion: 2, sections: [] }) as { schemaVersion: 2; sections: unknown[] };
+ const templateSnapshot = (snapshot ?? { schemaVersion: 2, sections: [] }) as { schemaVersion: 2; sections: unknown[] };
 
  const [unitsRes, unitProgressRes, complianceRes, statutoryDetailsRes, statutoryCoverageRes] = optional;
 

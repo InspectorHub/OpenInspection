@@ -78,7 +78,7 @@ describe('UnitService (subsystem D P1 T1.2)', () => {
         const b = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'building', name: 'B' });
         await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: b.id, kind: 'floor', name: 'F1' });
         await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: b.id, kind: 'floor', name: 'F2' });
-        await svc.delete(TENANT, b.id);
+        await svc.delete(TENANT, INSPECTION, b.id);
         const list = await svc.list(TENANT, INSPECTION);
         expect(list).toHaveLength(0);
     });
@@ -87,7 +87,7 @@ describe('UnitService (subsystem D P1 T1.2)', () => {
         const b1 = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'building', name: 'B1' });
         const b2 = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'building', name: 'B2' });
         const f1 = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: b1.id, kind: 'floor', name: 'F1' });
-        await svc.move(TENANT, f1.id, b2.id, 0);
+        await svc.move(TENANT, INSPECTION, f1.id, b2.id, 0);
         const list = await svc.list(TENANT, INSPECTION);
         const moved = list.find(u => u.id === f1.id)!;
         expect(moved.parentUnitId).toBe(b2.id);
@@ -98,7 +98,7 @@ describe('UnitService (subsystem D P1 T1.2)', () => {
         const b = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'building', name: 'B' });
         const f = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: b.id, kind: 'floor', name: 'F' });
         // Try to make B a child of F (its own descendant)
-        await expect(svc.move(TENANT, b.id, f.id, 0)).rejects.toThrow(/cycle/i);
+        await expect(svc.move(TENANT, INSPECTION, b.id, f.id, 0)).rejects.toThrow(/cycle/i);
     });
 
     it('tenant scoping — cannot see another tenant\'s units', async () => {

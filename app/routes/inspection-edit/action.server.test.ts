@@ -8,6 +8,11 @@ const completePost = vi.fn();
 const publishPost = vi.fn();
 const inspectionPatch = vi.fn();
 const unitsPost = vi.fn();
+const snapshotPatch = vi.fn();
+const collabRestructure = vi.fn();
+const templateGet = vi.fn();
+const templatePut = vi.fn();
+const signoffPost = vi.fn();
 /** Call order across endpoints — the whole point of the auto-sign specs. */
 const calls: string[] = [];
 
@@ -22,7 +27,11 @@ vi.mock('~/lib/api-client.server', () => ({
                 publish: { $post: publishPost },
                 $patch: inspectionPatch,
                 units: { $post: unitsPost },
+                'template-snapshot': { $patch: snapshotPatch },
+                collab: { restructure: { $post: collabRestructure } },
+                compliance: { signoff: { $post: signoffPost } },
             },
+            templates: { ':id': { $get: templateGet, $put: templatePut } },
         },
     })),
 }));
@@ -30,6 +39,8 @@ vi.mock('~/lib/api-client.server', () => ({
 import { action } from './action.server';
 import { createApi } from '~/lib/api-client.server';
 import { routeArgs } from '../../../tests/helpers/route-args';
+import { templatesRouteConfigs } from '../../../server/api/inspections/templates';
+import { SignoffBodySchema } from '../../../server/lib/validations/compliance.schema';
 /** Minimal AppLoadContext stub — the action only forwards it to createApi. */
 const CONTEXT = {} as Parameters<typeof action>[0]['context'];
 
@@ -282,5 +293,218 @@ describe('editor action — who may receive a thrown "still running" answer', ()
     it('the page route does not: a thrown Response there would render the error boundary', async () => {
         await postTo('https://acme.example.com/inspections/insp-1/edit');
         expect(vi.mocked(createApi).mock.calls[0]?.[1]).toMatchObject({ idempotencyKey: 'k-1', inFlightAsResponse: false });
+    });
+});
+
+const refusal = (status: number, message: string) => new Response(JSON.stringify({ error: { code: 'X', message } }), { status });
+
+/**
+ * A refused or thrown write must not be reported as done.
+ *
+ * The signing-preference PATCH used to be fire-and-forget, so a refusal still published (with the
+ * stale flag), and the restructure PATCH result was dropped, so the editor showed a structure that
+ * was never stored while the live document was told to converge on it.
+ */
+describe('editor action: publish honours a failed signing-preference write', () => {
+    beforeEach(() => {
+        calls.length = 0;
+        completePost.mockReset().mockImplementation(async () => { calls.push('complete'); return new Response(null, { status: 200 }); });
+        publishPost.mockReset().mockImplementation(async () => { calls.push('publish'); return new Response(null, { status: 200 }); });
+        inspectionPatch.mockReset().mockImplementation(async () => { calls.push('patch'); return new Response(null, { status: 200 }); });
+    });
+
+    for (const status of [403, 500]) {
+        it(`does not publish when the preference PATCH answers ${status}, and passes the server message on`, async () => {
+            inspectionPatch.mockResolvedValue(refusal(status, 'Not allowed to change signing'));
+            const res = await post({ intent: 'publish', markComplete: 'true', autoSignOnPublish: 'true' });
+            expect(res).toEqual({ ok: false, intent: 'publish', error: 'Not allowed to change signing' });
+            expect(publishPost).not.toHaveBeenCalled();
+            // markComplete ran first and is advisory: it stays in effect.
+            expect(calls).toEqual(['complete']);
+        });
+    }
+
+    it('falls back to a fixed message when the refusal has no readable body', async () => {
+        inspectionPatch.mockResolvedValue(new Response('<html>', { status: 502 }));
+        const res = await post({ intent: 'publish', autoSignOnPublish: 'true' }) as { ok: boolean; error: string };
+        expect(res.ok).toBe(false);
+        expect(res.error).toMatch(/signing preference/i);
+        expect(publishPost).not.toHaveBeenCalled();
+    });
+
+    it('does not publish when the preference PATCH throws', async () => {
+        inspectionPatch.mockRejectedValue(new Error('socket closed'));
+        const res = await post({ intent: 'publish', autoSignOnPublish: 'false' });
+        expect(res).toMatchObject({ ok: false, intent: 'publish' });
+        expect(publishPost).not.toHaveBeenCalled();
+    });
+
+    it('positive control: an accepted PATCH still publishes, in the same order', async () => {
+        const res = await post({ intent: 'publish', autoSignOnPublish: 'true' });
+        expect(res).toEqual({ ok: true, intent: 'publish' });
+        expect(calls).toEqual(['patch', 'publish']);
+    });
+
+    it('positive control: a refused publish still carries the server message', async () => {
+        publishPost.mockResolvedValue(refusal(409, 'Inspection must be completed before publishing the report.'));
+        const res = await post({ intent: 'publish' });
+        expect(res).toEqual({ ok: false, intent: 'publish', error: 'Inspection must be completed before publishing the report.' });
+    });
+});
+
+describe('editor action: restructure honours the snapshot write', () => {
+    const snapshot = JSON.stringify({ schemaVersion: 2, sections: [] });
+    beforeEach(() => {
+        calls.length = 0;
+        snapshotPatch.mockReset().mockImplementation(async () => { calls.push('snapshot'); return new Response(null, { status: 200 }); });
+        collabRestructure.mockReset().mockImplementation(async () => { calls.push('collab'); return new Response(null, { status: 200 }); });
+    });
+
+    for (const status of [400, 403, 500]) {
+        it(`reports the failure and skips the live sync when the PATCH answers ${status}`, async () => {
+            snapshotPatch.mockResolvedValue(refusal(status, 'Statutory forms cannot be restructured'));
+            const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+            expect(res).toEqual({ ok: false, intent: 'restructure', error: 'Statutory forms cannot be restructured' });
+            expect(collabRestructure).not.toHaveBeenCalled();
+        });
+    }
+
+    it('reports a thrown PATCH as a failure and skips the live sync', async () => {
+        snapshotPatch.mockRejectedValue(new Error('socket closed'));
+        const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+        expect(res).toMatchObject({ ok: false, intent: 'restructure' });
+        expect(collabRestructure).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unparseable snapshot field without throwing and without writing', async () => {
+        const res = await post({ intent: 'restructure', snapshot: '{not json', collab: '1' });
+        expect(res).toMatchObject({ ok: false, intent: 'restructure' });
+        expect(snapshotPatch).not.toHaveBeenCalled();
+        expect(collabRestructure).not.toHaveBeenCalled();
+    });
+
+    it('positive control: PATCH ok then collab ok succeeds, in order', async () => {
+        const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+        expect(res).toEqual({ ok: true, intent: 'restructure' });
+        expect(calls).toEqual(['snapshot', 'collab']);
+        expect(snapshotPatch).toHaveBeenCalledWith({ param: { id: 'insp-1' }, json: { snapshot: JSON.parse(snapshot) } });
+    });
+
+    it('positive control: without the collab flag only the snapshot is written', async () => {
+        const res = await post({ intent: 'restructure', snapshot });
+        expect(res).toEqual({ ok: true, intent: 'restructure' });
+        expect(calls).toEqual(['snapshot']);
+    });
+
+    it('keeps the "live sync did not converge" message when the PATCH landed but collab refuses', async () => {
+        collabRestructure.mockResolvedValue(new Response(null, { status: 403 }));
+        const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+        expect(res).toMatchObject({ ok: false, intent: 'restructure', error: expect.stringContaining('live sync did not converge') });
+    });
+
+    it('keeps tolerating 501 from collab', async () => {
+        collabRestructure.mockResolvedValue(new Response(null, { status: 501 }));
+        const res = await post({ intent: 'restructure', snapshot, collab: '1' });
+        expect(res).toEqual({ ok: true, intent: 'restructure' });
+    });
+});
+
+
+/**
+ * "Save back to the source template" needs the source template's NAME for the PUT. The server answers
+ * GET /api/inspections/templates/:id with the template NESTED under `data.template`; the action used to
+ * read `data.name`, so it always reported "The source template has no name." The fixtures below are built
+ * by parsing a payload with the route's own response schema, so a reader that drifts from the real shape
+ * fails here instead of in the browser.
+ */
+describe('editor action — save-structure-template back to the source', () => {
+    const getRoute = templatesRouteConfigs.find((r) => r.operationId === 'getInspectionTemplate')!;
+    const responseSchema = getRoute.responses[200].content['application/json'].schema;
+    const realResponse = (template: Record<string, unknown>) =>
+        new Response(JSON.stringify(responseSchema.parse({ success: true, data: { template } })), { status: 200 });
+    const SNAPSHOT = JSON.stringify({ schemaVersion: 2, sections: [] });
+    const back = (templateId = 'tpl-1') => post({ intent: 'save-structure-template', mode: 'back', templateId, snapshot: SNAPSHOT });
+
+    beforeEach(() => {
+        templateGet.mockReset();
+        templatePut.mockReset().mockResolvedValue(new Response(null, { status: 200 }));
+    });
+
+    it('reads the name from data.template and PUTs it back with the new structure', async () => {
+        templateGet.mockResolvedValue(realResponse({ id: 'tpl-1', name: '  Full Home Inspection ', version: 3, schema: { schemaVersion: 2, sections: [] } }));
+        const res = await back();
+        expect(templateGet).toHaveBeenCalledWith({ param: { id: 'tpl-1' } });
+        expect(templatePut).toHaveBeenCalledWith({ param: { id: 'tpl-1' }, json: { name: 'Full Home Inspection', schema: { schemaVersion: 2, sections: [] } } });
+        expect(res).toMatchObject({ ok: true, intent: 'save-structure-template' });
+    });
+
+    it('a template with a blank name fails the save without a PUT', async () => {
+        templateGet.mockResolvedValue(realResponse({ id: 'tpl-1', name: '   ', version: 1 }));
+        const res = await back();
+        expect(templatePut).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ ok: false, error: 'The source template has no name.' });
+    });
+
+    it('a response with no template fails the save without a PUT', async () => {
+        templateGet.mockResolvedValue(realResponse({}));
+        const res = await back();
+        expect(templatePut).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ ok: false, error: 'The source template has no name.' });
+    });
+
+    it('a 200 without a data envelope fails the save with the same message instead of throwing', async () => {
+        templateGet.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
+        const res = await back();
+        expect(templatePut).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ ok: false, error: 'The source template has no name.' });
+    });
+
+    it('a failed load fails the save without a PUT', async () => {
+        templateGet.mockResolvedValue(new Response(null, { status: 404 }));
+        const res = await back();
+        expect(templatePut).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ ok: false, error: 'Could not load the source template to update it.' });
+    });
+});
+
+describe('editor action - compliance sign-off names a person only when one is typed', () => {
+    beforeEach(() => { signoffPost.mockReset().mockResolvedValue(new Response(null, { status: 200 })); });
+
+    it('sends only the role, license and dual-role flag, in a body the route accepts, and reports success', async () => {
+        // No personId or name field in the form: the server records the signed-in user.
+        const res = await post({ intent: 'compliance-signoff', role: 'pcr_reviewer', license: ' PE-1 ', dualRole: 'true' });
+        expect(res).toMatchObject({ ok: true, intent: 'compliance-signoff', role: 'pcr_reviewer' });
+        expect(signoffPost).toHaveBeenCalledTimes(1);
+        const json = signoffPost.mock.calls[0]?.[0].json;
+        expect(json).toEqual({ role: 'pcr_reviewer', license: 'PE-1', dualRole: true });
+        expect(SignoffBodySchema.safeParse(json).success).toBe(true);
+    });
+
+    it('control: a person typed by an owner or manager is relayed as typed', async () => {
+        const res = await post({ intent: 'compliance-signoff', role: 'pcr_reviewer', personId: ' ext-1 ', name: ' Eli Engineer ' });
+        expect(res).toMatchObject({ ok: true });
+        const json = signoffPost.mock.calls[0]?.[0].json;
+        expect(json).toMatchObject({ personId: 'ext-1', name: 'Eli Engineer' });
+        expect(SignoffBodySchema.safeParse(json).success).toBe(true);
+    });
+
+    it('a refused sign-off carries the server message back, so the panel can show it', async () => {
+        signoffPost.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'Name both or neither.' } }), { status: 400 }));
+        const res = await post({ intent: 'compliance-signoff', role: 'pcr_reviewer', personId: 'ext-1' });
+        expect(res).toMatchObject({ ok: false, intent: 'compliance-signoff', role: 'pcr_reviewer', error: 'Name both or neither.' });
+    });
+
+    it('control: a refusal with no readable body carries a generic message, and success carries none', async () => {
+        signoffPost.mockResolvedValue(new Response(null, { status: 500 }));
+        const refused = await post({ intent: 'compliance-signoff', role: 'pcr_reviewer' });
+        expect(refused).toMatchObject({ ok: false, error: expect.stringMatching(/sign-off/i) });
+        signoffPost.mockResolvedValue(new Response(null, { status: 200 }));
+        expect(await post({ intent: 'compliance-signoff', role: 'pcr_reviewer' })).not.toHaveProperty('error');
+    });
+
+    it('control: a role that is not a sign-off role is refused without calling the route', async () => {
+        const res = await post({ intent: 'compliance-signoff', role: 'owner' });
+        expect(res).toMatchObject({ ok: false, intent: 'compliance-signoff' });
+        expect(signoffPost).not.toHaveBeenCalled();
     });
 });

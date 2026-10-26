@@ -24,7 +24,7 @@ export interface PhotoBatch {
  * `results[i]` is file `i`'s own outcome.
  */
 interface PhotoBatchOutcome {
-  /** Every file was stored (and there was at least one, for an item). */
+  /** Every file was stored or kept on the device (and there was at least one, for an item). */
   ok: boolean;
   keys: string[];
   results: MediaFileResult[];
@@ -43,7 +43,7 @@ export interface PhotoBatchUploader {
    */
   outcomes: readonly PhotoBatchOutcome[];
   /**
-   * True when any batch of the current busy period failed (some file was not stored), however many batches
+   * True when any batch of the current busy period failed (some file was neither stored nor kept on the device), however many batches
    * followed it and whether or not their outcomes were already consumed. A new period starts when a batch is
    * submitted while none is out. Read it when `busy` falls to false to decide between "saved" and "error".
    */
@@ -126,7 +126,9 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
         };
         try {
           const out = await uploader.upload(rec);
-          results[index] = out.ok ? { index, ok: true, key: out.key } : { index, ok: false, error: out.error };
+          results[index] = out.ok
+            ? { index, ok: true, key: out.key }
+            : { index, ok: false, error: out.error, ...(out.kept === true ? { kept: true } : {}) };
         } catch {
           results[index] = { index, ok: false, error: 'EXCEPTION' };
         }
@@ -135,7 +137,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, batch.files.length) }, () => worker()));
     const keys = results.filter((r) => r.ok && r.key !== undefined).map((r) => r.key as string);
     return {
-      ok: batch.files.length > 0 && batch.itemId !== '' && results.every((r) => r.ok),
+      ok: batch.files.length > 0 && batch.itemId !== '' && results.every((r) => r.ok || r.kept === true),
       keys,
       results,
       itemId: batch.itemId,

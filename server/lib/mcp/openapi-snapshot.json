@@ -696,7 +696,7 @@
       }
     },
     "summary": "Auto-fill property facts from public records (Estated.io)",
-    "description": "Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill."
+    "description": "Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill. Available to owner, manager and inspector roles; an inspector is limited to the inspections they may see."
   },
   {
     "operationId": "batchPatchInspectionResults",
@@ -799,7 +799,7 @@
       }
     },
     "summary": "Bulk-create units under an inspection (floors×stacks or CSV)",
-    "description": "Creates many units at once under one parent (or at the top level) and returns their ids. Two input styles: a floors-by-stacks grid, or pasted CSV text, each expanded into labelled units. Every created node is a regular unit. Labels that collide with an existing sibling or repeat within the batch are skipped silently, so the returned ids can be fewer than requested, or empty. All rows are inserted together. Refused with 400 when the parent is already at the deepest allowed level or the input cannot be parsed. Available to owner, manager and inspector roles."
+    "description": "Creates many units at once under one parent (or at the top level) and returns their ids. Two input styles: a floors-by-stacks grid, or pasted CSV text, each expanded into labelled units. Every created node is a regular unit. Labels that collide with an existing sibling or repeat within the batch are skipped silently, so the returned ids can be fewer than requested, or empty. All rows are inserted together. Refused with 400 when the parent is not a unit of this inspection, is already at the deepest allowed level, or the input cannot be parsed. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "bulkInspection",
@@ -2218,7 +2218,7 @@
       "body": null
     },
     "summary": "Save photo annotation (composite PNG + Konva nodes JSON)",
-    "description": "Saves an annotated version of a checklist item photo from a multipart upload: image is the flattened PNG rendering and nodes is the JSON describing the drawn shapes, kept so the annotation can be edited again. The PNG is written to photo storage next to the original, which is kept untouched, and a repeat save overwrites the previous annotated image. Unless the company edits live in the collaborative editor, the photo entry in the report results also gains the annotated image key and the shapes JSON; with the collaborative editor on, only the image is stored and the returned key must be recorded by the client. Responds 400 when the image is missing or storage is unavailable, and 404 when there is no photo at that index. Available to owner, manager and inspector roles."
+    "description": "Saves an annotated version of a checklist item photo from a multipart upload: image is the flattened PNG rendering and nodes is the JSON describing the drawn shapes, kept so the annotation can be edited again. The PNG is written to photo storage next to the original, which is kept untouched, and a repeat save overwrites the previous annotated image. Unless the company edits live in the collaborative editor, the photo entry in the report results also gains the annotated image key and the shapes JSON; with the collaborative editor on, only the image is stored and the returned key must be recorded by the client. Responds 400 when the image is missing or storage is unavailable, and 404 when there is no photo at that index. An image over 10 MiB is refused with 413. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionPhotoUploadUrl",
@@ -4686,7 +4686,7 @@
       }
     },
     "summary": "Create a unit (Building / Floor / Unit) under an inspection",
-    "description": "Adds one node (building, floor or unit) to the inspection's unit tree and returns its id. The tree is at most three levels deep below the top, so a parent that is already at the deepest level is refused, and a name already used by a sibling under the same parent is refused; both come back as 400. The new node is sorted after its existing siblings. The inspection id is not looked up first, so an unknown id simply produces a node no inspection shows. Available to owner, manager and inspector roles."
+    "description": "Adds one node (building, floor or unit) to the inspection's unit tree and returns its id. The tree is at most three levels deep below the top, so a parent that is already at the deepest level is refused, and a name already used by a sibling under the same parent is refused; both come back as 400. The new node is sorted after its existing siblings. A parent that is not a unit of this inspection is refused with 400. The inspection id itself is not looked up first, so an unknown id simply produces a node no inspection shows. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionUnitsMove",
@@ -4703,11 +4703,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Inspection the unit belongs to (not checked against the unit by this route).",
+          "description": "Inspection the unit belongs to; a unit of any other inspection is reported as not found.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Inspection the unit belongs to (not checked against the unit by this route)."
+            "description": "Inspection the unit belongs to; a unit of any other inspection is reported as not found."
           }
         },
         {
@@ -4727,7 +4727,7 @@
       }
     },
     "summary": "Reparent + reorder atomically (cycle-detected)",
-    "description": "Moves a unit under a different parent (or to the top level) and sets its sort position in one step. Refused with 400 if the new parent is the unit itself or one of its descendants, since that would create a cycle. The three-level depth limit is not re-checked on a move, and the inspection id in the path is not verified against the unit. Available to owner, manager and inspector roles."
+    "description": "Moves a unit under a different parent (or to the top level) and sets its sort position in one step. Refused with 400 if the new parent is the unit itself or one of its descendants, since that would create a cycle. A unit or a new parent that does not belong to this inspection is refused (404 for the unit, 400 for the parent). The three-level depth limit is not re-checked on a move. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "createInspectionVideoUpload",
@@ -5836,7 +5836,7 @@
       "body": null
     },
     "summary": "Bake and store a cropped derivative for an inspection-item or defect photo",
-    "description": "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain)."
+    "description": "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain). An image over 10 MiB is refused with 413."
   },
   {
     "operationId": "dashboardInspection",
@@ -6495,11 +6495,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Inspection the unit belongs to (not checked against the unit by this route).",
+          "description": "Inspection the unit belongs to; a unit of any other inspection is reported as not found.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Inspection the unit belongs to (not checked against the unit by this route)."
+            "description": "Inspection the unit belongs to; a unit of any other inspection is reported as not found."
           }
         },
         {
@@ -6517,7 +6517,7 @@
       "body": null
     },
     "summary": "Delete a unit (cascades to children)",
-    "description": "Deletes a unit together with every unit nested beneath it. Findings recorded against the deleted units are not removed by this route. The unit is looked up by its own id within the company only, so the inspection id in the path is not verified against it, and an unknown unit id still returns success. Cannot be undone. Available to owner, manager and inspector roles."
+    "description": "Deletes a unit together with every unit nested beneath it. Findings recorded against the deleted units are not removed by this route. The unit is looked up by its id within this inspection, so an unknown unit id, or one that belongs to a different inspection, answers 404 and deletes nothing. Cannot be undone. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "deleteInspectionVideo",
@@ -8816,7 +8816,7 @@
       "body": null
     },
     "summary": "Get inspection template for current tenant",
-    "description": "Retrieve a single template with its full schema. Available to owner, manager and inspector roles."
+    "description": "Retrieve a single template with its full schema. The template row is returned under data.template (its name is data.template.name, not data.name). Responds 404 for an unknown template. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "getInspectionVersion",
@@ -14491,7 +14491,7 @@
       }
     },
     "summary": "Patch a Document Review checklist item",
-    "description": "Patches requested/received/reviewed/na/notes on a single Document Review checklist item."
+    "description": "Patches requested/received/reviewed/na/notes on a single Document Review checklist item. An unknown inspection id answers 404; an unknown document key answers 200 and changes nothing."
   },
   {
     "operationId": "patchInspectionPcaNarrative",
@@ -14571,7 +14571,7 @@
       }
     },
     "summary": "Patch inspection PCA report narrative",
-    "description": "Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render."
+    "description": "Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render. A key that is not one of the narrative blocks answers 400 naming it."
   },
   {
     "operationId": "patchInspectionPropertyFact",
@@ -16840,7 +16840,7 @@
       }
     },
     "summary": "Replace the per-inspection template snapshot",
-    "description": "Replaces the templateSnapshot JSON wholesale. Validated against TemplateSchemaV2. Used by the inspection editor for inline structural edits (rating system swap, add/remove section/item)."
+    "description": "Replaces the templateSnapshot JSON wholesale. Validated against TemplateSchemaV2. Used by the inspection editor for inline structural edits (rating system swap, add/remove section/item). Refused with 403 when the inspection was made from a template that produces an official form supplied with the software: its structure is read-only."
   },
   {
     "operationId": "patchInspectionUnit",
@@ -16857,11 +16857,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Inspection the unit belongs to (not checked against the unit by this route).",
+          "description": "Inspection the unit belongs to; a unit of any other inspection is reported as not found.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Inspection the unit belongs to (not checked against the unit by this route)."
+            "description": "Inspection the unit belongs to; a unit of any other inspection is reported as not found."
           }
         },
         {
@@ -16881,7 +16881,7 @@
       }
     },
     "summary": "Rename or re-sort a unit",
-    "description": "Renames a unit or changes its sort position; fields left out are unchanged. Sibling-name uniqueness is not re-checked on rename. The unit is looked up by its own id within the company only, so the inspection id in the path is not verified against it, and an unknown unit id succeeds without changing anything. Available to owner, manager and inspector roles."
+    "description": "Renames a unit or changes its sort position; fields left out are unchanged. Sibling-name uniqueness is not re-checked on rename. The unit is looked up by its id within this inspection, so an unknown unit id, or one that belongs to a different inspection, answers 404 and changes nothing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "patchMyProfile",
@@ -17889,7 +17889,7 @@
       }
     },
     "summary": "Publish inspection for current tenant",
-    "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version. Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+    "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "putInspectorServiceOrigin",
@@ -19726,7 +19726,7 @@
       "body": null
     },
     "summary": "Seed the Document Review checklist",
-    "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched."
+    "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched. An unknown inspection id answers 404."
   },
   {
     "operationId": "sendClientMessage",
@@ -19919,10 +19919,10 @@
           "name": "w",
           "in": "query",
           "required": false,
-          "description": "Optional max width in pixels for an on-the-fly thumbnail (grid previews); omitted serves the full-resolution original.",
+          "description": "Optional width in pixels, clamped to 16-2000 (a value that is not a number counts as 16). Omitted serves the original. With an image service the response is a webp of that width; without one, or when the conversion fails, it is the original bytes (up to the upload limit, possibly a HEIC file). Read the response Content-Type to know which.",
           "schema": {
             "type": "string",
-            "description": "Optional max width in pixels for an on-the-fly thumbnail (grid previews); omitted serves the full-resolution original."
+            "description": "Optional width in pixels, clamped to 16-2000 (a value that is not a number counts as 16). Omitted serves the original. With an image service the response is a webp of that width; without one, or when the conversion fails, it is the original bytes (up to the upload limit, possibly a HEIC file). Read the response Content-Type to know which."
           }
         }
       ],
@@ -20003,7 +20003,7 @@
       "body": null
     },
     "summary": "Set cropped report cover (baked JPEG derivative + crop transform)",
-    "description": "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain)."
+    "description": "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain). Responds 400 when the image is missing, storage is unavailable or sourceKey does not reference a photo of this inspection, and 404 when the inspection is not in this company. An image over 10 MiB is refused with 413."
   },
   {
     "operationId": "setInspectionPaySplit",
@@ -20396,12 +20396,12 @@
           "personId": {
             "type": "string",
             "minLength": 1,
-            "description": "The signer's user/identity id (accountability record)."
+            "description": "Optional. Omit it to sign as yourself. A role other than owner or manager is refused with 400 for any value that is not its own user id; an owner or manager naming another person sends this together with name."
           },
           "name": {
             "type": "string",
             "minLength": 1,
-            "description": "The signer's display name, as rendered in the Appendix D qualifications block."
+            "description": "Optional. Omit it to sign as yourself: the name on your user record is used, and for a role other than owner or manager a name sent here is ignored. An owner or manager naming another person sends it together with personId. Rendered in the Appendix D qualifications block."
           },
           "license": {
             "type": "string",
@@ -20419,14 +20419,12 @@
           }
         },
         "required": [
-          "role",
-          "personId",
-          "name"
+          "role"
         ]
       }
     },
     "summary": "Record a dual sign-off attestation",
-    "description": "Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca."
+    "description": "Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca (409 otherwise); 404 when the inspection is not in this company. The person recorded is the signed-in user: the request needs only role, license and dualRole, and personId and name are filled from the session and the user record. An inspector (or any role other than owner or manager) who sends a different personId gets 400, and a name they send is ignored. An owner or manager may record another person by sending both personId and name, which are stored as given (sending only one answers 400)."
   },
   {
     "operationId": "softDeleteMyAccount",
@@ -24472,7 +24470,7 @@
       "body": null
     },
     "summary": "Upload inspection for current tenant",
-    "description": "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
+    "description": "Uploads one photo file (multipart) to the inspection's photo storage and returns its storage key. This route only stores the file: it does not add the photo to any checklist item or to the media pool, so the client must record the returned key itself. itemId must be present but is not used to place the file, and targetType and customId are only validated and echoed back (customId is required when targetType is defect). Location data is stripped from the image where the image service is available. Each call stores a new file. A file over 10 MiB is refused with 413, and a file whose bytes are not a jpeg, png or heic image with 400 (the declared type is ignored: the stored type and key extension follow the bytes, and an empty declared type is fine). Responds 400 when storage is unavailable or file or itemId is missing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "uploadInspectionMedia",
@@ -24500,7 +24498,7 @@
       "body": null
     },
     "summary": "Upload a photo to the inspection media pool (loose, unattached)",
-    "description": "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
+    "description": "Uploads one photo to the inspection's media pool, the holding area for photos not yet attached to a checklist item, and returns the pool entry with an authenticated URL to view it. The file is stored in photo storage (location data stripped where the image service is available) and a pool row is created; attach it to an item later with the attach route. Each call creates a new entry. A file over 10 MiB is refused with 413, and a file whose bytes are not a jpeg, png or heic image with 400 (the declared type is ignored: the stored type and key extension follow the bytes, and an empty declared type is fine). Responds 400 when storage is unavailable or the file is missing. Available to owner, manager and inspector roles."
   },
   {
     "operationId": "uploadInspectorCredentialImage",

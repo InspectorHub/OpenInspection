@@ -40,6 +40,7 @@ import {
 } from './jobs/integrations';
 import { orphanMediaJob, pendingAttachmentsJob } from './jobs/media';
 import { statutoryRevisionWatchJob } from './jobs/statutory';
+import { videoUploadSweepJob } from './jobs/video-uploads';
 import type { CronJob } from './types';
 
 export { TICK, DAILY_03, DAILY_04 } from './types';
@@ -78,4 +79,7 @@ export const CRON_JOBS: CronJob[] = [
     contentSeedSweepJob,
     // Added last: it only reaches rows an older release left behind; see the job.
     calendarOrphanSweepJob,
+    // Added after the calendar sweep. It reaches only chunked video uploads past their own expiry, so an
+    // idle tick is one indexed LIMIT-1 read.
+    videoUploadSweepJob,
 ];

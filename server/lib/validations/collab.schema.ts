@@ -60,6 +60,7 @@ export const CollabTicketParamSchema = z.object({
 export const CollabTicketResponseSchema = createApiResponseSchema(z.object({
     ticket: z.string().describe('Opaque one-time ticket to pass as the ticket query parameter of the WebSocket URL'),
     expiresIn: z.number().int().describe('Seconds the ticket stays valid'),
+    features: z.array(z.string()).describe('Optional collab socket features this server supports; ack-v1 means ack frames are sent to sockets opened with ack=1'),
 }));
 
 /** What the Durable Object answers when an offline update was applied and persisted. */

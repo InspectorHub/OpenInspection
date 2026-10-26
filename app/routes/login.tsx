@@ -2,7 +2,7 @@ import { Form, useActionData, useLoaderData, useNavigation, redirect } from "rea
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/login";
-import { getToken, createSessionWithToken } from "~/lib/session.server";
+import { getToken, createSessionWithToken, isTokenExpired } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeLoginSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
@@ -52,7 +52,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // "start over" link resume the same authorization instead of dropping it.
   const app = params.get("app") === "1";
   const token = await getToken(context, request);
-  if (token) return redirect(safeReturnTo(returnTo, "/inspections"));
+  // An expired token is no session: following returnTo with it would bounce between here and the
+  // page that sent the visitor to sign in (the OAuth authorize endpoint does exactly this).
+  if (token && !isTokenExpired(token, Date.now())) return redirect(safeReturnTo(returnTo, "/inspections"));
   return { returnTo, app };
 }
 
