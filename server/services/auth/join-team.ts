@@ -35,6 +35,8 @@ export interface JoinTeamDeps {
     outbox?: UserSyncOutbox | undefined;
     /** The OAuth provider's helpers, when it is mounted. Used to retire grants a reactivated row still holds. */
     oauth?: OAuthHelpers | undefined;
+    /** Where the reason a native session ended is recorded (TENANT_CACHE). */
+    kv?: KVNamespace | undefined;
 }
 
 /**
@@ -177,7 +179,9 @@ export async function joinTeam(
     // revocation had failed at removal. The person accepting may be someone
     // else entirely, so retire every grant the id still holds. Best effort:
     // the account is already written and a provider failure must not undo it.
-    if (existing) await revokeUserGrantsBestEffort(deps.oauth, existing.id, 'a member being re-invited');
+    if (existing) await revokeUserGrantsBestEffort(deps.oauth, existing.id, 'a member being re-invited', {
+        kv: deps.kv, reason: 'member_removed',
+    });
 
     // Tell portal about the new membership so its `/company/switch`
     // picker shows this company next time the identity signs in. Fires
