@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 
 const css = readFileSync(join(__dirname, "theme.css"), "utf8");
-const ruleFor = (selector: string) => new RegExp(`${selector.replace(/[.[\]]/g, "\\$&")}[^{]*\\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+const ruleFor = (selector: string) => new RegExp(`${selector.replace(/[\\.[\]]/g, "\\$&")}[^{]*\\{([^}]*)\\}`).exec(css)?.[1] ?? "";
 
 describe("placeholder colour", () => {
   it.each([".ih-input::placeholder", "textarea::placeholder"])("%s is the fg-3 text tier, fully opaque", (selector) => {
