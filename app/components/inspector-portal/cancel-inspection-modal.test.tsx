@@ -19,7 +19,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { createRoutesStub, useFetcher, useLoaderData } from "react-router";
+import { createRoutesStub, useLoaderData } from "react-router";
 
 import { LifecycleCard } from "~/components/inspector-portal/LifecycleCard";
 import { INSPECTION_STATUS } from "~/lib/status";
@@ -91,7 +91,7 @@ function CardHost({ status }: { status: string }) {
     // Reading the loader data is what subscribes this component to
     // revalidation — see the loader's comment.
     useLoaderData();
-    return <LifecycleCard status={status} inspectionId="insp-1" fetcher={useFetcher()} />;
+    return <LifecycleCard status={status} inspectionId="insp-1" />;
 }
 
 /** Waits for the card to hydrate (the harness route has a loader) and opens the flow. */

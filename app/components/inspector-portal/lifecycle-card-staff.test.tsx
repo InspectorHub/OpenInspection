@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
-import { createRoutesStub, useFetcher } from "react-router";
+import { createRoutesStub } from "react-router";
 
 import { LifecycleCard } from "~/components/inspector-portal/LifecycleCard";
 import { INSPECTION_STATUS } from "../../../server/lib/status/inspection-status";
@@ -16,7 +16,7 @@ import { INSPECTION_STATUS } from "../../../server/lib/status/inspection-status"
 type Flags = { canComplete?: boolean; canCancel?: boolean; canRestore?: boolean };
 
 function Host({ status, flags }: { status: string; flags: Flags }) {
-    return <LifecycleCard status={status} inspectionId="insp-1" fetcher={useFetcher()} {...flags} />;
+    return <LifecycleCard status={status} inspectionId="insp-1" {...flags} />;
 }
 
 function renderCard(status: string, flags: Flags = {}) {
