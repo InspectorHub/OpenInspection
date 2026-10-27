@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Button } from '@core/shared-ui';
 import { m } from "../../i18n";
+import { readableTextOn } from "../../lib/readable-text";
 
 export interface TagPin {
     id:    string;
@@ -39,7 +40,7 @@ export function TagChipRow({ pinnedTags, activeTagIds, onToggle, onOpenLibrary }
                                 ? 'text-white border-transparent'
                                 : 'text-ih-fg-3 border-ih-border bg-transparent hover:bg-ih-bg-muted'
                         }`}
-                        style={active ? { backgroundColor: tag.color } : {}}
+                        style={active ? { backgroundColor: tag.color, color: readableTextOn(tag.color) ?? undefined } : {}}
                     >
                         {tag.name}
                     </button>

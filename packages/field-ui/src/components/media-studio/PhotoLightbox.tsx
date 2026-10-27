@@ -1,3 +1,4 @@
+import { useLayer } from "@core/shared-ui";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
@@ -18,6 +19,9 @@ export function PhotoLightbox({ slides, index, open, onClose, toolbarButtons, to
   /** Plan 7 — render a custom (e.g. video) slide; return undefined to fall back to the default image render. */
   renderSlide?: (slide: AnySlide) => React.ReactNode | undefined;
 }) {
+  // On the shared layer stack while open: the lightbox listens for Escape on its own element, which a host's window-level
+  // back key never reaches. As a layer it is counted by `escapeWillBeHandled` and closed by that same key.
+  useLayer(open, { onEscape: onClose, lockScroll: true, traps: true });
   return (
     <Lightbox
       open={open}

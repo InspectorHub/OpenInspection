@@ -28,3 +28,6 @@ export const SEVERITY_DOT: Record<Severity, string> = {
 export function isSeverity(v: unknown): v is Severity {
   return typeof v === 'string' && (SEVERITIES as readonly string[]).includes(v);
 }
+
+/** What `getRatingColor` answers for a rating that has no colour of its own: a design token, not data. */
+export const FALLBACK_RATING_COLOR = 'var(--ih-fg-5, #d4d4d8)';

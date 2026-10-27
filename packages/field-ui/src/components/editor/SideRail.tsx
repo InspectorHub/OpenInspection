@@ -9,6 +9,7 @@ import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import type { EditorMode } from "../editor-shared/editor-mode";
 import { useFieldDataSource } from "../../context";
 import { useReadOnly } from "../../read-only";
+import { isFallbackRatingColor, readableTextOn } from "../../lib/readable-text";
 import { m } from "../../i18n";
 
 interface SideRailProps {
@@ -39,6 +40,12 @@ interface SideRailProps {
   categoryColor?: Map<string, string>;
 }
 
+/** The fill is data (a tenant's colour), so the text takes whichever of white and dark ink reads better on it. */
+function ratingPillStyle(bg: string) {
+  const color = readableTextOn(bg);
+  return color ? { backgroundColor: bg, color } : { backgroundColor: bg };
+}
+
 type TabId = "preview" | "library" | "photos";
 
 const TABS: Array<{ id: TabId; label: () => string; icon: string }> = [
@@ -58,6 +65,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
   // library is meaningless for a data-entry item (module E). Either tab is also
   // left out when the host does not provide what it lists (the comment library,
   // the photo pool): a tab that can only say "unavailable" is a dead control.
+  const ratingColor = getRatingColor?.(String(activeResult?.rating ?? "")) || '#6b7280';
   const hideLibrary = mode === "fill" && !!activeItem && activeItem.type !== "rich";
   const visibleTabs = TABS.filter((t) => {
     if (t.id === "photos" && (mode !== "fill" || !resources.mediaPool)) return false;
@@ -124,8 +132,8 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                   {Boolean(activeResult.rating) && (
                     <div>
                       <span
-                        className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-                        style={{ backgroundColor: getRatingColor?.(activeResult.rating as string) || '#6b7280' }}
+                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${isFallbackRatingColor(ratingColor) ? "bg-ih-bg-muted text-ih-fg-1" : "text-white"}`}
+                        style={isFallbackRatingColor(ratingColor) ? undefined : ratingPillStyle(ratingColor)}
                       >
                         {getRatingLabel?.(activeResult.rating as string) || (activeResult.rating as string)}
                       </span>
@@ -268,7 +276,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
             title={tab.label()}
           >
             {tab.id === "photos" && (photoCount ?? 0) > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ih-primary text-ih-fg-inverse text-[9px] font-bold leading-none">
+              <span className="absolute top-0.5 right-1 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ih-primary text-ih-fg-inverse text-[9px] font-bold leading-none">
                 {photoCount}
               </span>
             )}

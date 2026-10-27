@@ -7,8 +7,9 @@ import { m } from "../../i18n";
 type EditorState = ReturnType<typeof useInspectionState>;
 
 /**
- * Filter chips, the statutory progress and the batch toggle above the item list. Fixed-width on desktop: es-419
- * "Sin calificar" broke mid-phrase inside its chip, so the STRIP wraps and labels do not. Tablet reuses it as is.
+ * Filter chips, the statutory progress and the batch toggle above the item list. The chips take their own row and share
+ * it; in a narrow pane (a 255px tablet list, es-419 labels) the LABEL is cut with an ellipsis and the COUNT stays whole,
+ * and each chip's title carries the full "label count". Tablet reuses it as is.
  * The batch toggle starts a write (a rating applied to many items), so a read-only editor does not offer it.
  */
 export function ItemFilterBar({ state, formProgress, isMobile }: { state: EditorState; formProgress: ReturnType<typeof useStatutoryFormProgress>; isMobile: boolean }) {
@@ -17,21 +18,23 @@ export function ItemFilterBar({ state, formProgress, isMobile }: { state: Editor
     <div className="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-ih-border">
       <SegmentedControl
         ariaLabel={m.editor_route_item_filter()}
+        className="w-full min-w-0 [&>button]:min-w-0 [&>button]:px-1.5 [&>button>span:last-child]:min-w-0"
         value={state.itemFilter}
         onChange={(v) => state.setItemFilter(v as ItemFilter)}
-        options={(["all", "unrated", "issues", "flagged"] as const).map((f) => ({
-          value: f,
-          label: (
-            <span className="whitespace-nowrap">
-              {f === "all" ? m.editor_route_filter_all() : f === "unrated" ? m.editor_route_filter_unrated() : f === "issues" ? m.editor_route_filter_issues() : m.editor_route_filter_flagged()}
-              {f !== "all" && (
-                <span className="ml-1 text-[10px]">
-                  {f === "unrated" ? state.filterCounts.unrated : f === "issues" ? state.filterCounts.issues : state.filterCounts.flagged}
-                </span>
-              )}
-            </span>
-          ),
-        }))}
+        options={(["all", "unrated", "issues", "flagged"] as const).map((f) => {
+          const text = f === "all" ? m.editor_route_filter_all() : f === "unrated" ? m.editor_route_filter_unrated() : f === "issues" ? m.editor_route_filter_issues() : m.editor_route_filter_flagged();
+          const count = f === "all" ? null : state.filterCounts[f];
+          return {
+            value: f,
+            title: count === null ? text : `${text} ${count}`,
+            label: (
+              <span className="flex min-w-0 items-baseline gap-1">
+                <span className="min-w-0 truncate">{text}</span>
+                {count !== null && <span className="shrink-0 tabular-nums text-[10px]">{count}</span>}
+              </span>
+            ),
+          };
+        })}
       />
       {formProgress && (
         <span className="ml-auto text-[11px] text-ih-fg-3 whitespace-nowrap">

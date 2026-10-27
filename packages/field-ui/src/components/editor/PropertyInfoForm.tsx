@@ -205,7 +205,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
   }
 
   return (
-    <div className="px-6 py-6 max-w-5xl" data-testid="property-info-form">
+    <div className="px-0 md:px-6 py-6 max-w-5xl" data-testid="property-info-form">
       <header className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">

@@ -34,6 +34,8 @@ export function stubViewport(arg: boolean | number) {
     const limit = Number(/max-width:\s*([\d.]+)px/.exec(query)?.[1] ?? "-1");
     return {
       get matches() {
+        // A mouse is attached unless a test says otherwise (keyboard-hints.test.tsx drives the coarse case itself).
+        if (query.includes("any-pointer: fine")) return true;
         return viewportWidth <= limit;
       },
       media: query,

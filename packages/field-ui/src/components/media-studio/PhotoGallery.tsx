@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PhotoGrid } from "./PhotoGrid";
 import { MediaViewer, ALL_MEDIA_ACTIONS, type MediaAction } from "./MediaViewer";
 import { useReadOnly } from "../../read-only";
-import { useFieldDataSource } from "../../context";
+import { useFieldDataSource, usePhotoUrlVersion } from "../../context";
 import type { MediaPoolListing } from "../../data-source-types";
 import { m } from "../../i18n";
 
@@ -23,6 +23,7 @@ export interface PhotoGalleryProps {
 export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGalleryProps) {
   const mediaPool = useFieldDataSource().resources.mediaPool;
   const readOnly = useReadOnly();
+  const photoUrlVersion = usePhotoUrlVersion();
   // null until the first answer. A reload keeps the previous answer on screen until the next one lands.
   const [listing, setListing] = useState<MediaPoolListing | null>(null);
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -41,7 +42,7 @@ export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGall
     return () => {
       latestRead.current += 1;
     };
-  }, [inspectionId, load]);
+  }, [inspectionId, load, photoUrlVersion]);
 
   // Three states, because this panel had two and one of them was doing the work
   // of three (F57). "No photos in this inspection yet." is a statement about the

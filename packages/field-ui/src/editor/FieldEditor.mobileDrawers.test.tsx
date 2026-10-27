@@ -99,3 +99,14 @@ describe("the Theme drawer", () => {
     expect(wrapper.className).toContain("[&_button]:min-w-11");
   });
 });
+
+describe("the phone Items drawer", () => {
+  it("lists the items across the whole sheet, not in the desktop's 280px column", async () => {
+    mount(null, true);
+    fireEvent.click(await tab(m.editor_mobile_drawer_items()));
+    const sheet = await screen.findByRole("dialog", { name: m.editor_route_drawer_items() });
+    const list = sheet.querySelector("[data-shortcut-scope]") as HTMLElement;
+    expect(list.className).toContain("w-full");
+    expect(Array.from(sheet.querySelectorAll("*")).some((el) => el.classList.contains("w-[280px]"))).toBe(false);
+  });
+});

@@ -20,6 +20,7 @@
 
 import { EmptyState, Button, Icon } from "@core/shared-ui";
 import { m } from "../../i18n";
+import { useHasFinePointer } from "../../hooks/useHasFinePointer";
 
 export interface ItemPaneItem {
   id: string;
@@ -56,6 +57,7 @@ export interface ItemPaneEmptyStateProps {
 
 export function ItemPaneEmptyState({ items, isRated, onOpenItem }: ItemPaneEmptyStateProps) {
   const next = firstItemToOpen(items, isRated);
+  const fine = useHasFinePointer();
 
   if (!next) {
     return (
@@ -93,12 +95,12 @@ export function ItemPaneEmptyState({ items, isRated, onOpenItem }: ItemPaneEmpty
             </Button>
             {/* Demoted, not deleted: useful once you know the pane, useless as a
                 headline. */}
-            <p className="text-[11px] text-ih-fg-3">
+            {fine && <p className="text-[11px] text-ih-fg-3">
               {m.editor_route_navigate_hint_press()}{" "}
               <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">J</kbd> /{" "}
               <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">K</kbd>{" "}
               {m.editor_route_navigate_hint_navigate()}
-            </p>
+            </p>}
           </div>
         }
       />

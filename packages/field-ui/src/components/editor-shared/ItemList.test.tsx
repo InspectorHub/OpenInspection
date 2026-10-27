@@ -81,3 +81,20 @@ test('touch targets: the drag handle and the options button grow to 44px on a co
   expect(options?.className).toContain('pointer-coarse:min-h-11');
   expect(options?.className).toContain('w-6 h-6');
 });
+
+// On a phone the list fills the Items drawer; the desktop's 280px column with a rule left a blank panel beside it.
+test('fullWidth: fills its container, no fixed column, no vertical rule, names can still truncate', () => {
+  const { container } = render(
+    <ItemList mode="fill" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()} results={{}} fullWidth />
+  );
+  const root = container.firstElementChild as HTMLElement;
+  expect(root.className.split(/\s+/)).toEqual(expect.arrayContaining(['w-full', 'min-w-0', 'flex', 'flex-col']));
+  expect(root.className).not.toContain('w-[280px]');
+  expect(root.className).not.toContain('border-r');
+  expect(screen.getByText('Roof Covering').className).toContain('truncate');
+});
+
+test('CONTROL - without fullWidth the desktop column is unchanged', () => {
+  const { container } = render(<ItemList mode="fill" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()} results={{}} />);
+  expect((container.firstElementChild as HTMLElement).className).toContain('w-[280px]');
+});

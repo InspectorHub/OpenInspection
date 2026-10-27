@@ -18,7 +18,7 @@ import {
   setPhotoAnnotation as bindingSetPhotoAnnotation,
   markPhotoPending as bindingMarkPhotoPending,
 } from "../collab/results-binding";
-import { useFieldDataSource } from "../context";
+import { useFieldDataSource, usePhotoUrlVersion } from "../context";
 import { freeVideoMedia, videoEntryIdentity } from "../lib/video-media-delete";
 import { removeMediaBy as bindingRemoveMediaBy } from "../shared/results-doc-media";
 import { m } from "../i18n";
@@ -77,7 +77,7 @@ export function usePhotoOps(ctx: {
     setPhotoStudioOpen,
   } = ctx;
   const dataSource = useFieldDataSource();
-  const { urls } = dataSource;
+  const { urls } = dataSource, photoUrlVersion = usePhotoUrlVersion();
   /* Photo writes in flight, by kind + finding + photo. A crop or annotation save that repeats
    * while the first is still being queued or uploaded is dropped: the first one already applied
    * its optimistic edit, and a second bake of the same photo would race it. Released when the
@@ -273,7 +273,7 @@ export function usePhotoOps(ctx: {
           durationSec: p.durationSec,
         };
       }),
-    [getItemPhotos, state.inspection.id, pendingUrls, urls],
+    [getItemPhotos, state.inspection.id, pendingUrls, urls, photoUrlVersion],
   );
 
   /* Task 8 — open the viewer for an item at index i. */

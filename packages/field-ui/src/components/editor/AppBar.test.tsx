@@ -27,7 +27,7 @@ const more = () => screen.getByRole("button", { name: m.editor_mobile_more() });
 describe("AppBar web", () => {
   it("is today's phone bar, class for class", () => {
     render(<AppBar {...props()} />);
-    expect(bar().className).toBe("sticky top-0 z-30 h-12 bg-ih-bg-card border-b border-ih-border flex items-center px-2 gap-2");
+    expect(bar().className).toBe("sticky top-0 z-30 h-12 bg-ih-bg-card border-b border-ih-border flex items-center pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] gap-2");
     expect(bar().getAttribute("data-platform")).toBe("web");
     expect(back().className).toContain("w-11 h-11 touch-manipulation");
     expect(more().textContent).toBe("⋮");

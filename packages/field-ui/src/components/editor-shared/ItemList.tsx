@@ -85,6 +85,7 @@ interface SharedItemListProps {
   onAddGroupInstance?: (groupId: string) => void;
   /** Tablet pane: fluid width, rows at least 56px high, the selected row marked by a tint, a 3px bar and bold text. */
   pane?: boolean;
+  fullWidth?: boolean; // phone drawer: fills the sheet, not the desktop's 280px column with its rule
 }
 
 /**
@@ -154,7 +155,7 @@ export function ItemList({
   activeUnitId = null,
   groups,
   onAddGroupInstance,
-  pane = false,
+  pane = false, fullWidth = false,
 }: SharedItemListProps) {
   const { heading: slotHeading, closes: groupClosedBy } = slotHeadings(groups, items);
   const grouped = Boolean(groups?.length);
@@ -197,10 +198,8 @@ export function ItemList({
   });
 
   return (
-    <div data-shortcut-scope className={pane ? "w-full min-w-0 flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col" : "w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col"}>
-      {/* Filter chips live in the inspection-edit header row (with per-filter
-          counts + a working Flagged filter); this shared list only renders the
-          items it is handed, already filtered by the parent. */}
+    <div data-shortcut-scope className={pane ? "w-full min-w-0 flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col" : fullWidth ? "w-full min-w-0 overflow-y-auto flex flex-col" : "w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col"}>
+      {/* Filter chips live in the editor's header row; this list only renders the items it is handed, already filtered. */}
 
       {/* Item list */}
       <div ref={containerRef} className="flex-1 overflow-y-auto p-2 space-y-0.5">

@@ -80,6 +80,8 @@ import { m } from "../i18n";
 import { ReadOnlyScope, useReadOnly } from "../read-only";
 import { guardPhotoOps, readOnlyKeyboard } from "../read-only-guards";
 import { ReadOnlyItemView } from "../components/editor/ReadOnlyItemView";
+import { useFinishFieldworkConfirm } from "../components/editor/FinishFieldworkConfirm";
+import { useScrollTopOnDetails } from "../hooks/useScrollTopOnDetails";
 import { ItemFilterBar } from "../components/editor/ItemFilterBar";
 import { UnitControls } from "../components/editor/UnitControls";
 
@@ -551,7 +553,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
   // The editor's inspection copy is frozen at mount (see useInspectionState), so revalidation alone
   // leaves the header badge and the toolbar button stale: patch the status locally as structural edits do.
   onMarkedComplete: () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS_COMPLETED })),
-  onFieldworkFinished: () => state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS_COMPLETED })),
+  onFieldworkFinished: () => { state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS_COMPLETED })); notify(m.editor_finish_fieldwork_done(), "success", { durationMs: 3000 }); },
   onPublished: () => state.setShowPublishModal(false),
  });
 
@@ -579,10 +581,8 @@ function FieldEditorInner({ data }: { data: EditorData }) {
   if (publishFlow.finishError) notify(publishFlow.finishError, "error", { durationMs: 8000 });
  }, [publishFlow.finishError, notify]);
 
- /* Finish fieldwork — advisory order-lifecycle move (never a publish gate). */
- const handleFinishFieldwork = useCallback(() => {
-  void publishFlow.finishFieldwork();
- }, [publishFlow]);
+ useScrollTopOnDetails(state.activeView);
+ const { request: handleFinishFieldwork, dialog: finishDialog } = useFinishFieldworkConfirm(publishFlow.finishFieldwork, publishFlow.finishing); // advisory lifecycle move, never a publish gate
 
  /* Commercial subtype + report tier (CommercialReportControls). */
  const commercialSave = useCommercialReportSave(String(state.inspection.id), (patch) => {
@@ -1385,7 +1385,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  onRenameItem={canEditStructure ? (itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label) : undefined}
  groups={statutoryGroups}
  onAddGroupInstance={readOnly ? undefined : (groupId) => setAddingToGroup(groupId)}
- pane={layout === "tablet"}
+ pane={layout === "tablet"} fullWidth={isPhone}
  />
  );
 
@@ -1970,7 +1970,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  {speedModeEl}
  {!isPhone && state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}
  {isMobile && mobileDrawersEl}
- {finishActionsEl}
+ {finishActionsEl}{finishDialog}
  {unsavedGuardEl}
  </>
  );

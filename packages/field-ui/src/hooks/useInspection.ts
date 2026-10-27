@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { findingKey } from "./findings/shared";
 import { backfillLevelDescriptions } from "./inspection/helpers";
 import type { InspectionContext } from "./inspection/helpers";
-import type { Severity } from "../lib/severity";
+import { FALLBACK_RATING_COLOR, type Severity } from "../lib/severity";
 import { rangeIds } from "../shared/batch-range";
 import { formatDate } from "../shared/format";
 import { useInspectionProgress } from "./inspection/useInspectionProgress";
@@ -348,7 +348,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
 
   const getRatingColor = useCallback(
     (ratingId: string | null | undefined): string => {
-      if (!ratingId) return "var(--ih-fg-5, #d4d4d8)";
+      if (!ratingId) return FALLBACK_RATING_COLOR;
       const lvl = ratingLevels.find((l) => l.id === ratingId);
       if (lvl?.color) return lvl.color;
       const legacy: Record<string, string> = {
@@ -356,7 +356,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
         Monitor: "var(--ih-status-watch, #f59e0b)",
         Defect: "var(--ih-status-bad, #ef4444)",
       };
-      return legacy[ratingId] || "var(--ih-fg-5, #d4d4d8)";
+      return legacy[ratingId] || FALLBACK_RATING_COLOR;
     },
     [ratingLevels],
   );

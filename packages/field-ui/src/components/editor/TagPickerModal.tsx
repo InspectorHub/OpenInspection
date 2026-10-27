@@ -1,5 +1,6 @@
 import { Modal } from "@core/shared-ui";
 import { m } from "../../i18n";
+import { readableTextOn } from "../../lib/readable-text";
 
 export interface TagPickerModalProps {
  open: boolean;
@@ -49,7 +50,7 @@ export function TagPickerModal({ open, activeItemId, tagsByItem, presetTags, onT
     <span
      key={tag.id}
      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-     style={{ backgroundColor: tag.color || '#6b7280' }}
+     style={{ backgroundColor: tag.color || '#6b7280', color: readableTextOn(tag.color || '#6b7280') ?? undefined }}
     >
      {tag.name}
     </span>

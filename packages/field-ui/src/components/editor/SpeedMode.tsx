@@ -252,9 +252,9 @@ export function SpeedMode({
       )}
 
       {/* Footer */}
-      <div className="h-10 flex items-center justify-center text-[11px] text-ih-fg-3 border-t border-ih-border">
+      {!touch && <div className="h-10 flex items-center justify-center text-[11px] text-ih-fg-3 border-t border-ih-border">
         {m.editor_speedmode_footer_press()} <kbd className="mx-1 px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">Z</kbd> {m.editor_speedmode_footer_or()} <kbd className="mx-1 px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">Esc</kbd> {m.editor_speedmode_footer_exit()}
-      </div>
+      </div>}
 
       {/* IA-17 — first-run coach mark: tap anywhere (or press any key) to dismiss */}
       {showCoach && (
