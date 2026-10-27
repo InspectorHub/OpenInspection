@@ -141,6 +141,8 @@ function SignoffRoleCard({
   // must reload the editor's data or the card never leaves its stale state.
   // One reload per accepted write: the answer settles once, so there is no
   // re-render storm to guard against.
+  // The card keeps no copy of a sign-off it has already sent: what was typed is cleared once it is accepted or removed.
+  const clearForm = () => { setPersonId(""); setName(""); setLicense(""); setDualRole(false); };
   const submitSignoff = async () => {
     if (pairIncomplete) { setPairTried(true); return; }
     const answer = await runSign({
@@ -153,7 +155,7 @@ function SignoffRoleCard({
       dualRole,
     });
     if (isIgnored(answer)) return;
-    if (answer.ok) dataSource.reload();
+    if (answer.ok) { clearForm(); dataSource.reload(); }
     else dataSource.notify(answer.error ?? m.editor_compliance_signoff_failed(), "error");
   };
 
@@ -163,7 +165,7 @@ function SignoffRoleCard({
     if (removing) return;
     setConfirmOpen(false);
     const answer = await runRemove({ type: "compliance", op: "remove-signoff", role });
-    if (!isIgnored(answer) && answer.ok) dataSource.reload();
+    if (!isIgnored(answer) && answer.ok) { clearForm(); dataSource.reload(); }
   };
 
   return (
@@ -187,16 +189,12 @@ function SignoffRoleCard({
         </div>
       ) : (
         <div className="space-y-2">
-          {mayNamePerson && ([[m.editor_compliance_person_id(), personId, setPersonId], [m.editor_compliance_name(), name, setName]] as const).map(([placeholder, value, set]) => (
-            <input key={placeholder} placeholder={placeholder} value={value} onChange={(e) => set(e.target.value)} disabled={saving} className="ih-input w-full" />
+          {([...(mayNamePerson ? [[m.editor_compliance_person_id(), personId, setPersonId], [m.editor_compliance_name(), name, setName]] as const : []), [m.editor_compliance_license_optional(), license, setLicense] as const]).map(([label, value, set]) => (
+            <label key={label} className="block">
+              <span className="block text-[11px] text-ih-fg-3">{label}</span>
+              <input placeholder={label} value={value} onChange={(e) => set(e.target.value)} disabled={saving} className="ih-input w-full" />
+            </label>
           ))}
-          <input
-            placeholder={m.editor_compliance_license_optional()}
-            value={license}
-            onChange={(e) => setLicense(e.target.value)}
-            disabled={saving}
-            className="ih-input w-full"
-          />
           {pairTried && pairIncomplete ? <p role="alert" className="text-[11px] text-ih-bad-fg">{m.editor_compliance_signoff_pair_needed()}</p> : null}
           <label className="flex items-center gap-1.5 text-[11px] text-ih-fg-3">
             <input
