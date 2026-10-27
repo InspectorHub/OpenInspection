@@ -1,5 +1,6 @@
 import { Button } from "@core/shared-ui";
 import { MobileBottomDrawer } from "../MobileBottomDrawer";
+import { useReadOnly } from "../../read-only";
 import { m } from "../../i18n";
 
 export interface MobileFinishDrawerProps {
@@ -82,6 +83,7 @@ export function MobileFinishDrawer({
   onUpdateSourceTemplate = null,
   onOpenTheme = null,
 }: MobileFinishDrawerProps) {
+  const readOnly = useReadOnly();
   const run = (fn: () => void) => {
     onClose();
     fn();
@@ -102,12 +104,16 @@ export function MobileFinishDrawer({
   return (
     <MobileBottomDrawer open={open} onClose={onClose} title={m.editor_mobile_more()} heightFraction={0.8}>
       <div className="p-4 space-y-2 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <Button variant="primary" className={row} onClick={() => run(onPublish)}>
-          {m.editor_header_publish()}
-        </Button>
-        <Button variant="secondary" className={row} onClick={() => run(onSign)}>
-          {m.editor_header_sign()}
-        </Button>
+        {!readOnly && (
+          <>
+            <Button variant="primary" className={row} onClick={() => run(onPublish)}>
+              {m.editor_header_publish()}
+            </Button>
+            <Button variant="secondary" className={row} onClick={() => run(onSign)}>
+              {m.editor_header_sign()}
+            </Button>
+          </>
+        )}
         {onFinishFieldwork && (
           <Button
             variant="secondary"

@@ -8,6 +8,7 @@ import { CommentLibraryList } from "./CommentLibraryList";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import type { EditorMode } from "../editor-shared/editor-mode";
 import { useFieldDataSource } from "../../context";
+import { useReadOnly } from "../../read-only";
 import { m } from "../../i18n";
 
 interface SideRailProps {
@@ -48,6 +49,7 @@ const TABS: Array<{ id: TabId; label: () => string; icon: string }> = [
 
 export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, fill = false, categoryColor, locale }: SideRailProps) {
   const { urls, resources } = useFieldDataSource();
+  const readOnly = useReadOnly();
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [openState, setOpen] = useState(initialOpen ?? false);
   // In a bottom drawer the panel is the drawer's content: the drawer's own close dismisses it, nothing collapses it.
@@ -59,7 +61,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
   const hideLibrary = mode === "fill" && !!activeItem && activeItem.type !== "rich";
   const visibleTabs = TABS.filter((t) => {
     if (t.id === "photos" && (mode !== "fill" || !resources.mediaPool)) return false;
-    if (t.id === "library" && (hideLibrary || !resources.commentsLibrary)) return false;
+    if (t.id === "library" && (hideLibrary || readOnly || !resources.commentsLibrary)) return false;
     return true;
   });
   // A result stores a photo as an entry object (a bare key in older data). A video is not an image, and an entry with no
@@ -261,7 +263,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
             className={`relative w-10 flex flex-col items-center gap-0.5 py-2.5 rounded-r-md transition-all ${
               effectiveTab === tab.id && open
                 ? "bg-ih-bg-card text-ih-primary-text shadow-ih-card border-l-2 border-ih-primary -ml-px"
-                : "text-ih-fg-4 hover:text-ih-fg-2"
+                : "text-ih-fg-3 hover:text-ih-fg-2"
             }`}
             title={tab.label()}
           >

@@ -86,3 +86,16 @@ describe("mobile drawers never scroll sideways", () => {
     expect((panel.querySelector("div.overflow-y-auto") as HTMLElement).className).not.toContain("overflow-x-hidden");
   });
 });
+
+describe("the Theme drawer", () => {
+  it("gives the host's theme buttons a 44px touch target", async () => {
+    mount(null, true);
+    fireEvent.click(await screen.findByRole("button", { name: m.editor_mobile_more() }));
+    const more = await screen.findByRole("dialog", { name: m.editor_mobile_more() });
+    fireEvent.click(within(more).getByRole("button", { name: m.nav_theme_label() }));
+    const drawer = await screen.findByRole("dialog", { name: m.nav_theme_label() });
+    const wrapper = within(drawer).getByTestId("theme-control").parentElement as HTMLElement;
+    expect(wrapper.className).toContain("[&_button]:min-h-11");
+    expect(wrapper.className).toContain("[&_button]:min-w-11");
+  });
+});

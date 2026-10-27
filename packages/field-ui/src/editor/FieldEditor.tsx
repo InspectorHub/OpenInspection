@@ -5,7 +5,7 @@ import type { EditorData, FieldDataSource } from "../data-source";
 import { ORIGINAL_QUALITY_KEY } from "../shared/original-quality";
 import { findRatingLevel, ratingAdvanceDecision } from "../shared/rating-levels";
 import { makeCustomDefect } from "../shared/custom-defects";
-import { useInspectionState, type InspectionSchema, type ItemFilter } from "../hooks/useInspection";
+import { useInspectionState, type InspectionSchema } from "../hooks/useInspection";
 import { findingKey } from "../hooks/findings/shared";
 import { usePublishFlow } from "../hooks/usePublishFlow";
 import { useCommercialReportSave } from "../hooks/useCommercialReportSave";
@@ -75,8 +75,13 @@ import { MobileBottomDrawer } from "../components/MobileBottomDrawer";
 import { BreadcrumbDropdown, type UnitScopeRow } from "../components/editor/BreadcrumbDropdown";
 import type { ResultMap } from "../hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "../shared/types";
-import { Button, IconButton, SegmentedControl } from "@core/shared-ui";
+import { Button, IconButton } from "@core/shared-ui";
 import { m } from "../i18n";
+import { ReadOnlyScope, useReadOnly } from "../read-only";
+import { guardPhotoOps, readOnlyKeyboard } from "../read-only-guards";
+import { ReadOnlyItemView } from "../components/editor/ReadOnlyItemView";
+import { ItemFilterBar } from "../components/editor/ItemFilterBar";
+import { UnitControls } from "../components/editor/UnitControls";
 
 /**
  * Device-local opt-out for the upload preprocessing pass. Default OFF means
@@ -97,8 +102,9 @@ function originalQualityEnabled(): boolean {
  * slots, so any host (web route, native shell) mounts it the same way. `data` must follow the host's
  * revalidation: units, publish state and the rest are read from it on every render.
  */
-export function FieldEditor({ data }: { data: EditorData }) {
+function FieldEditorInner({ data }: { data: EditorData }) {
  const dataSource = useFieldDataSource();
+ const readOnly = useReadOnly();
  const slots = useFieldSlots();
  const caps = useEditorCapabilities();
  // The host's own values (tenant, video backend, collab flag, display language), read once per render.
@@ -201,14 +207,17 @@ export function FieldEditor({ data }: { data: EditorData }) {
  // useResultsDoc returns. The ref is filled right after useMediaDrain below.
  const drainRef = useRef<() => void>(() => {});
  const collab = useResultsDoc(String(data.inspection.id), () => drainRef.current());
+ // Read-only: the document is still read, projected and synced, but no write helper is ever handed it. A Yjs map `set`
+ // does not pass through `doc.transact`, so withholding the document is the one guard that cannot be bypassed.
+ const writeDoc = readOnly ? null : collab?.doc ?? null;
 
  // #181 PR-G — build the media drain (uploader + doc swap) over the live doc.
- const { drain: mediaDrain } = useMediaDrain(String(data.inspection.id), collab?.doc ?? null);
+ const { drain: mediaDrain } = useMediaDrain(String(data.inspection.id), writeDoc);
  drainRef.current = mediaDrain;
 
  // Online photo upload, on its own channel so an autosave can never cancel an in-flight upload (and vice
  // versa). `busy` is true while a batch is out; `outcomes` are the finished batches the effect below attaches.
- const photoUpload = usePhotoBatchUpload(String(data.inspection.id), collab?.doc ?? null);
+ const photoUpload = usePhotoBatchUpload(String(data.inspection.id), writeDoc);
 
  // Once the doc is live, project it into the editor's `results`. First paint uses
  // data.results; until the doc has synced its projection is merged, not adopted.
@@ -225,7 +234,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  inspectionId: String(state.inspection.id),
     // #181 — every write routes through the Y.Doc. The doc is briefly null on
     // the SSR / first-paint window before the connection initialises.
-    collab: collab?.doc ? { doc: collab.doc } : undefined,
+    collab: writeDoc ? { doc: writeDoc } : undefined,
     // Phase U (Batch C1) — scope every read/write to the active unit (null = _default).
     activeUnitId,
  });
@@ -309,15 +318,15 @@ export function FieldEditor({ data }: { data: EditorData }) {
  return map;
  }, [activeResult]);
 
- // Whole-inspection photo count for the Photos tab badge (P3). Sums per-item
- // result.photos across the results map.
+ // Photos tab badge (P3): the distinct photo keys in the results map. One item can sit under two keys (composite and
+ // bare), so lengths are not summed; an entry with no key (a video, a pending upload) is not counted.
  const inspectionPhotoCount = useMemo(() => {
- let n = 0;
+ const keys = new Set<string>();
  for (const value of Object.values(state.results)) {
  const photos = (value as Record<string, unknown> | null)?.photos;
- if (Array.isArray(photos)) n += photos.length;
+ if (Array.isArray(photos)) for (const p of photos) { const k = typeof p === "string" ? p : (p as { key?: string } | null)?.key; if (k) keys.add(k); }
  }
- return n;
+ return keys.size;
  }, [state.results]);
 
  const locationSuggestions = useMemo(() => {
@@ -624,7 +633,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
   const statutoryGroups = useStatutoryGroups(data.templateSnapshot);
   // Every structural edit is refused server-side on a statutory inspection, so
   // the controls for them are withheld rather than offered and rejected.
-  const canEditStructure = useStructuralEditingAllowed(data.templateSnapshot);
+  const canEditStructure = useStructuralEditingAllowed(data.templateSnapshot) && !readOnly;
   // Which group is having an instance added, if any. Null closes the drawer.
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   // Guarded rather than a raw write: recording an instance is a user
@@ -694,12 +703,12 @@ export function FieldEditor({ data }: { data: EditorData }) {
   onViewerAction,
   performPhotoCropSave,
   performPhotoAnnotationSave,
- } = usePhotoOps({
+ } = guardPhotoOps(usePhotoOps({
   state,
   findings,
   streamCustomerSubdomain,
   // #181 — photo array ops route through the Y.Doc (the DO persists it to D1).
-  collabDoc: collab?.doc ?? null,
+  collabDoc: writeDoc,
   // Phase U (Batch C2a) — scope photo composite keys to the active unit.
   activeUnitId,
   setPhotoStudioUrl,
@@ -707,7 +716,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
   setPhotoStudioIndex,
   setPhotoStudioTotal,
   setPhotoStudioOpen,
- });
+ }), readOnly);
 
  /* Mobile shell state */
  // The layout band decides the tree. `isMobile` is every touch layout (phone and tablet), which share the
@@ -746,7 +755,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  /* Tag chip row + clone-last handler for ItemEditor */
  /* ---------------------------------------------------------------- */
 
- const tagChipRow = state.activeItemId ? (
+ const tagChipRow = state.activeItemId && !readOnly ? (
   <TagChipRow
    pinnedTags={pinnedTags}
    activeTagIds={activeTagIds}
@@ -892,7 +901,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
 
  // How many items Speed mode would walk: the label of its touch entry points, which are left out at zero. Only the
  // touch layouts show it, so only they count, and only as a number (the queue itself is built when Speed opens).
- const speedUnrated = useMemo(() => (isMobile ? countUnratedItems(state.sections, state.getResult) : 0), [isMobile, state.sections, state.getResult, state.results]);
+ const speedUnrated = useMemo(() => (isMobile && !readOnly ? countUnratedItems(state.sections, state.getResult) : 0), [isMobile, readOnly, state.sections, state.getResult, state.results]);
 
  const toggleSpeedMode = useCallback(() => {
  if (!state.speedMode) {
@@ -911,7 +920,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
 
  // Rating and Undo in Speed mode (every write goes through `commitRating`); see the hook for the queue rules.
  const { speedRate, undoSpeedRating, finishedItem, pendingUndo, setPendingUndo } = useSpeedRating({
- state, commitRating, doc: collab?.doc ?? null, activeUnitId,
+ state, commitRating, doc: writeDoc, activeUnitId,
  onUndoUnavailable: () => dataSource.notify(m.editor_speedmode_undo_unavailable(), "error"),
  });
 
@@ -1002,7 +1011,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  const handlePhotoUpload = useCallback(
  (e: React.ChangeEvent<HTMLInputElement>) => {
  const all = Array.from(e.target.files ?? []);
- if (all.length === 0 || !state.activeItemId) return;
+ if (all.length === 0 || !state.activeItemId || readOnly) return;
  const itemId = state.activeItemId;
  const overflow = all.length > MAX_BATCH_PHOTOS;
  const files = overflow ? all.slice(0, MAX_BATCH_PHOTOS) : all;
@@ -1029,7 +1038,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  // adds fall back to the online fetcher (the pending-doc model covers
  // item photos; defect pending is out of scope) — they simply re-fire
  // when back online.
- const doc = collab?.doc ?? null;
+ const doc = writeDoc;
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
  if (!dataSource.isOnline() && doc && sid && !target) {
   // Phase U (Batch C2a) — key the offline pending-photo doc entry to the active
@@ -1055,12 +1064,12 @@ export function FieldEditor({ data }: { data: EditorData }) {
  if (cameraInputRef.current) cameraInputRef.current.value = "";
  if (libraryInputRef.current) libraryInputRef.current.value = "";
  },
- [state.activeItemId, state.inspection.id, dataSource, photoUpload.submit, notify, collab?.doc, state.sectionIdForItem, state.currentSection, activeUnitId],
+ [state.activeItemId, state.inspection.id, dataSource, photoUpload.submit, notify, writeDoc, readOnly, state.sectionIdForItem, state.currentSection, activeUnitId],
  );
 
  const handleBurstCommit = useCallback(
  (blobs: Blob[]) => {
- if (blobs.length === 0) return;
+ if (blobs.length === 0 || readOnly) return;
  // No target item: say so, never drop the frames silently.
  if (!state.burstCameraItemId) { notify(m.editor_burst_no_item(), "warning", { durationMs: 6000 }); return; }
  const itemId = state.burstCameraItemId;
@@ -1080,7 +1089,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  photoUpload.submit({ itemId, findingKey: findingKey(activeUnitId, sid ?? "", itemId), files, target: null });
  })();
  },
- [state.burstCameraItemId, state.sectionIdForItem, state.currentSection, activeUnitId, photoUpload.submit, notify],
+ [state.burstCameraItemId, state.sectionIdForItem, state.currentSection, activeUnitId, photoUpload.submit, notify, readOnly],
  );
 
  // Attach uploaded photo keys once a batch has finished — to the item, or
@@ -1297,7 +1306,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  ],
  );
 
- useKeyboard(keyboardHandlers, true);
+ useKeyboard(readOnly ? readOnlyKeyboard(keyboardHandlers) : keyboardHandlers, true);
 
  /* ---------------------------------------------------------------- */
  /* Visible items (filtered + searched) */
@@ -1342,12 +1351,12 @@ export function FieldEditor({ data }: { data: EditorData }) {
  // the two sibling entries in this same rail already close it.
  if (isMobile) setMobileDrawer(null);
  }}
- onAddSection={structure.addSection}
- onDuplicateSection={structure.duplicateSection}
- onDeleteSection={structure.deleteSection}
- onMoveSection={structure.moveSection}
- onReorderSection={structure.reorderSection}
- onRenameSection={structure.renameSection}
+ onAddSection={readOnly ? undefined : structure.addSection}
+ onDuplicateSection={readOnly ? undefined : structure.duplicateSection}
+ onDeleteSection={readOnly ? undefined : structure.deleteSection}
+ onMoveSection={readOnly ? undefined : structure.moveSection}
+ onReorderSection={readOnly ? undefined : structure.reorderSection}
+ onRenameSection={readOnly ? undefined : structure.renameSection}
  />
  );
 
@@ -1356,9 +1365,10 @@ export function FieldEditor({ data }: { data: EditorData }) {
  mode="fill"
  items={visibleItems}
  sectionId={state.currentSection?.id || ""}
- activeItemId={state.activeItemId}
+ activeItemId={state.activeView === "property" ? null : state.activeItemId}
  onSelect={(id) => {
  state.setActiveItemId(id);
+ state.setActiveView("items");
  if (isMobile) setMobileDrawer(null);
  }}
  results={state.results}
@@ -1374,12 +1384,13 @@ export function FieldEditor({ data }: { data: EditorData }) {
  onReorderItem={canEditStructure ? (fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem) : undefined}
  onRenameItem={canEditStructure ? (itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label) : undefined}
  groups={statutoryGroups}
- onAddGroupInstance={(groupId) => setAddingToGroup(groupId)}
+ onAddGroupInstance={readOnly ? undefined : (groupId) => setAddingToGroup(groupId)}
  pane={layout === "tablet"}
  />
  );
 
  const itemEditorEl = state.activeItemId ? (
+ readOnly ? <ReadOnlyItemView item={state.activeItem} sectionTitle={state.currentSection?.title} result={findings.getResult(state.activeItemId, state.currentSection?.id)} ratingLevels={state.ratingLevels} inspectionId={String(state.inspection.id)} coverKey={coverKey} onOpenPhoto={onOpenPhoto} videoPosterUrl={videoPosterUrl} pendingPhotoUrl={pendingPhotoUrl} /> :
  <ItemEditor
  uiControl={itemUi(state.activeItemId)}
  notesFlushRef={notesFlushRef}
@@ -1575,7 +1586,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
   <p className="text-[15px] font-semibold text-ih-fg-1">{m.editor_route_empty_template_title()}</p>
   <p className="text-[13px] text-ih-fg-3 max-w-sm">{m.editor_route_empty_template_desc()}</p>
-  {caps.settingsSheet && (
+  {caps.settingsSheet && !readOnly && (
    <Button
    variant="primary"
    onClick={() => state.setSettingsOpen(true)}
@@ -1769,7 +1780,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  comments={comments}
  statutoryInstance={statutoryInstance}
  statutoryGroups={statutoryGroups}
- collabDoc={collab?.doc ?? null}
+ collabDoc={writeDoc}
  inspectionId={String(state.inspection.id)}
  phone={isMobile}
  streamCustomerSubdomain={streamCustomerSubdomain}
@@ -1797,56 +1808,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  />
  );
 
- // Filter chips, the statutory progress and the batch toggle above the item list. Fixed-width on desktop: es-419
- // "Sin calificar" broke mid-phrase inside its chip, so the STRIP wraps and labels do not. Tablet reuses it as is.
- const itemFilterBarEl = (
- <div className="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-ih-border">
- <SegmentedControl
- ariaLabel={m.editor_route_item_filter()}
- value={state.itemFilter}
- onChange={(v) => state.setItemFilter(v as ItemFilter)}
- options={(["all", "unrated", "issues", "flagged"] as const).map((f) => ({
- value: f,
- label: (
- <span className="whitespace-nowrap">
- {f === "all" ? m.editor_route_filter_all() : f === "unrated" ? m.editor_route_filter_unrated() : f === "issues" ? m.editor_route_filter_issues() : m.editor_route_filter_flagged()}
- {f !== "all" && (
- <span className="ml-1 text-[10px]">
- {f === "unrated" ? state.filterCounts.unrated : f === "issues" ? state.filterCounts.issues : state.filterCounts.flagged}
- </span>
- )}
- </span>
- ),
- }))}
- />
- {formProgress && (
- <span className="ml-auto text-[11px] text-ih-fg-3 whitespace-nowrap">
- {m.statutory_form_completeness({ answered: String(formProgress.answered), total: String(formProgress.total) })}
- </span>
- )}
- {/* Batch mode toggle — object-scoped action, lives with the items it selects
-     (moved out of the global header). */}
- <IconButton
- onClick={() => {
-  if (state.batchMode) {
-  state.setBatchMode(false);
-  state.setBatchSelected({});
-  } else {
-  state.setBatchMode(true);
-  }
- }}
- selected={state.batchMode}
- size="sm"
- className={isMobile ? "ml-auto w-11 h-11 touch-manipulation" : "ml-auto"}
- title={state.batchMode ? m.editor_route_exit_batch_mode() : m.editor_route_batch_mode()}
- aria-label={state.batchMode ? m.editor_route_exit_batch_mode() : m.editor_route_batch_select_items()}
- >
- <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
- </svg>
- </IconButton>
- </div>
- );
+ const itemFilterBarEl = <ItemFilterBar state={state} formProgress={formProgress} isMobile={isMobile} />;
 
  // Batch action bar: spans the full editor width and shows while items are selected. Desktop and tablet mount it.
  const batchBarEl = state.batchMode && state.selectedBatchCount > 0 ? (
@@ -1954,8 +1916,8 @@ export function FieldEditor({ data }: { data: EditorData }) {
  onClose={() => setMobileDrawer(null)}
  onPublish={() => void handlePublishClick()}
  onSign={() => setSignModalOpen(true)}
- onOpenSettings={caps.settingsSheet ? () => state.setSettingsOpen(true) : null}
- onFinishFieldwork={(state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
+ onOpenSettings={caps.settingsSheet && !readOnly ? () => state.setSettingsOpen(true) : null}
+ onFinishFieldwork={!readOnly && (state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null}
  finishingFieldwork={publishFlow.finishing}
  onPreviewReport={
   previewReportUrl && openPreview
@@ -1966,26 +1928,34 @@ export function FieldEditor({ data }: { data: EditorData }) {
  pdfLabel={pdf ? pdf.actionLabel(m.editor_header_preview_pdf_short()) : undefined}
  pdfBusy={pdf?.busy ?? false}
  pdfError={pdf?.error ?? null}
- onChangeTemplate={caps.settingsSheet ? () => state.setSettingsOpen(true) : null}
- onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}
- onUpdateSourceTemplate={structure.canSaveBack ? () => structure.openSaveTemplate("back") : null}
+ onChangeTemplate={caps.settingsSheet && !readOnly ? () => state.setSettingsOpen(true) : null}
+ onSaveAsNewTemplate={readOnly ? null : () => structure.openSaveTemplate("new")}
+ onUpdateSourceTemplate={structure.canSaveBack && !readOnly ? () => structure.openSaveTemplate("back") : null}
  onOpenTheme={caps.themeControl ? () => setMobileDrawer('theme') : null}
  onSpeedMode={speedUnrated > 0 ? openSpeedMode : null}
- onBurstCamera={caps.cameraCapture && state.activeItemId ? () => { state.setBurstCameraItemId(state.activeItemId || null); state.setBurstCameraOpen(true); } : null}
- onOpenVersionHistory={fieldSession.collabEditing && caps.versionHistory ? () => setVersionHistoryOpen(true) : null}
- onOpenUnits={showUnitsSurface ? () => setUnitsManagerOpen(true) : null}
- onOpenCostItems={showUnitsSurface && caps.costItems ? () => setCostItemsOpen(true) : null}
+ onBurstCamera={caps.cameraCapture && state.activeItemId && !readOnly ? () => { state.setBurstCameraItemId(state.activeItemId || null); state.setBurstCameraOpen(true); } : null}
+ onOpenVersionHistory={fieldSession.collabEditing && caps.versionHistory && !readOnly ? () => setVersionHistoryOpen(true) : null}
+ onOpenUnits={showUnitsSurface && !readOnly ? () => setUnitsManagerOpen(true) : null}
+ onOpenCostItems={showUnitsSurface && caps.costItems && !readOnly ? () => setCostItemsOpen(true) : null}
  />
  {/* Theme — narrow-screen home for the theme control the xl+ header shows
      inline, so the auto/light/dark/field preference is reachable on tablet
      and phone too. */}
  <MobileBottomDrawer open={mobileDrawer === 'theme'} onClose={() => setMobileDrawer(null)} title={m.nav_theme_label()}>
- <div className="p-4">
+ <div className="p-4 [&_button]:min-h-11 [&_button]:min-w-11 [&_button]:touch-manipulation">
   {slots.renderThemeControl?.({})}
  </div>
  </MobileBottomDrawer>
  </>
  );
+
+ // Read-only starting while a dialog that writes is open (publish, sign, settings, version history, the cameras) closes it.
+ useEffect(() => {
+  if (!readOnly) return;
+  state.setShowPublishModal(false); setShowPublishGate(false); setSignModalOpen(false); state.setSettingsOpen(false);
+  setVersionHistoryOpen(false); state.setBurstCameraOpen(false); setAddMediaChooser(null); setVideoCaptureTarget(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when read-only turns on; the setters are stable
+ }, [readOnly]);
 
  // Everything that is not part of one layout's frame: file inputs, the capture and annotate overlays, every
  // dialog and sheet, Speed mode, the keyboard help and the drawers. It is rendered ONCE, as the first child of
@@ -2112,41 +2082,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  canUpdateSourceTemplate={structure.canSaveBack}
  perUnitControls={
   showUnitsSurface ? (
-   <div className="flex items-center gap-2">
-    {isPerUnit && (
-      <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} />
-    )}
-    <Button
-     variant="secondary"
-     size="sm"
-     onClick={() => setUnitsManagerOpen(true)}
-     className="hidden lg:inline-flex"
-     title={m.editor_route_manage_units()}
-     icon={
-      <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-      </svg>
-     }
-    >
-     {m.editor_route_units()}
-    </Button>
-    {caps.costItems && (
-     <Button
-      variant="secondary"
-      size="sm"
-      onClick={() => setCostItemsOpen(true)}
-      className="hidden lg:inline-flex"
-      title={m.editor_route_cost_items_title()}
-      icon={
-       <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m0-10a4 4 0 100 8 4 4 0 000-8z" />
-       </svg>
-      }
-     >
-      {m.editor_route_cost_items()}
-     </Button>
-    )}
-   </div>
+   <UnitControls isPerUnit={isPerUnit} units={units} activeUnitId={activeUnitId} onSelectScope={requestScope} onOpenUnits={() => setUnitsManagerOpen(true)} onOpenCostItems={() => setCostItemsOpen(true)} />
   ) : undefined
  }
  />
@@ -2235,4 +2171,9 @@ export function FieldEditor({ data }: { data: EditorData }) {
  </div>
  </>
  );
+}
+
+/** The inspection editor page. `readOnly` shows it for reading only: nothing in it can write, and the write controls are not offered. */
+export function FieldEditor({ data, readOnly = false }: { data: EditorData; readOnly?: boolean }) {
+ return <ReadOnlyScope readOnly={readOnly}><FieldEditorInner data={data} /></ReadOnlyScope>;
 }

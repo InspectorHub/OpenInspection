@@ -192,7 +192,7 @@ export function SectionRail({
    }
   }}
   className={`group relative flex items-stretch rounded-md text-[13px] transition-all ${
-   activeSection === section.id
+   activeSection === section.id && !overviewActive
     ? "bg-ih-primary-tint text-ih-primary-text font-bold border-l-2 border-ih-primary"
     : "text-ih-fg-3 hover:bg-ih-bg-muted"
   }`}
@@ -312,7 +312,7 @@ export function SectionRail({
    size="sm"
    onClick={onAddSection}
    data-testid="add-section-btn"
-   className="w-full justify-start h-auto py-2 border border-dashed border-ih-border text-ih-fg-4 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
+   className="w-full justify-start h-auto py-2 border border-dashed border-ih-border text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
   >
    {m.editor_shared_add_section()}
   </Button>

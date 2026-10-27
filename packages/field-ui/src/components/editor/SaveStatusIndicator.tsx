@@ -14,7 +14,7 @@ export function SaveStatusIndicator({ status }: { status: SaveStatus }) {
   data-status={status}
   role="status"
   aria-live="polite"
-  className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${
+  className={`inline-flex shrink-0 whitespace-nowrap items-center gap-1.5 text-[11px] font-bold ${
    status === "saving"
    ? "text-ih-watch-fg"
    : status === "saved"

@@ -38,7 +38,8 @@ export interface ItemPhotoStripProps {
   photos: StripPhoto[];
   coverKey: string | null;
   photoUrl: (key: string) => string;
-  onAddPhoto: () => void;
+  /** Absent: the strip only shows its photos (no add tile). */
+  onAddPhoto?: () => void;
   onOpen: (index: number) => void;
   /**
    * Emit the new photo order. CONTRACT: the array is the ORIGINAL `key` order
@@ -345,7 +346,7 @@ export function ItemPhotoStrip({
             </button>
           );
         })}
-        <button
+        {onAddPhoto && <button
           type="button"
           // aria-disabled while uploading so focus stays on the button.
           {...pendingProps(photoUploading, onAddPhoto)}
@@ -363,7 +364,7 @@ export function ItemPhotoStrip({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           )}
-        </button>
+        </button>}
       </div>
     </div>
   );

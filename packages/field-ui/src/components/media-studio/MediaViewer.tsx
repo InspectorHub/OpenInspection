@@ -8,6 +8,9 @@ import { m } from "../../i18n";
 
 export type MediaAction = "crop" | "annotate" | "rotate" | "cover" | "caption" | "revert" | "delete" | "poster";
 
+/** Every toolbar action. Each one changes the photo or the inspection, so a read-only viewer hides them all. */
+export const ALL_MEDIA_ACTIONS: readonly MediaAction[] = ["crop", "annotate", "rotate", "cover", "caption", "revert", "delete", "poster"];
+
 /** Bottom toolbar — single place all per-media actions live (field-tablet: bottom, 44px). */
 export function MediaViewerToolbar({
   kind,

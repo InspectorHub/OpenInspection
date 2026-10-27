@@ -47,12 +47,17 @@ describe('editor header visibility table', () => {
     }
   });
 
-  it('hides the overflow trigger where every control it holds is inline again', () => {
-    // Sign, version history and theme all return at xl, so at xl the menu is
-    // empty and its trigger must not render.
-    const bps = new Set(Object.values(HEADER_OVERFLOW).map(pivotBreakpoint));
-    expect(bps.has('xl')).toBe(true);
-    expect(OVERFLOW_SRC).toContain('className="xl:hidden"');
+  it('moves each control inline at the width where the bar really has room for it', () => {
+    // Version history (with the search) at xl, Sign at 1400px, Finish at 2xl, the theme control at 2100px: each pivot
+    // is chosen from the width budget in EditorHeader.layout.test.tsx, so the title keeps its room.
+    expect(Object.fromEntries(Object.entries(HEADER_OVERFLOW).map(([k, v]) => [k, pivotBreakpoint(v)]))).toEqual({
+      sign: 'min-[1400px]', finishFieldwork: '2xl', versionHistory: 'xl', theme: 'min-[2100px]',
+    });
+  });
+
+  it('gives the overflow trigger the hide class of the widest row it holds (see HeaderOverflowMenu.trigger.test.tsx)', () => {
+    expect(OVERFLOW_SRC).toContain('overflowTriggerHide');
+    expect(OVERFLOW_SRC).toContain('className={triggerHide}');
   });
 });
 

@@ -81,3 +81,10 @@ test('CONTROL - without fill the second tap closes the library and says so', () 
   fireEvent.click(screen.getByRole('button', { name: /Library/ }));
   expect(calls).toEqual([true, false]);
 });
+
+test('an inactive tab label is the fg-3 text tier, not the decoration tier', () => {
+  render(<SideRail locale="en-US" mode="fill" initialOpen activeItem={ITEM} activeResult={{}} inspectionId="insp" />);
+  const inactive = screen.getByRole('button', { name: /Photos/ });
+  expect(inactive.className).toContain('text-ih-fg-3');
+  expect(inactive.className).not.toContain('text-ih-fg-4');
+});

@@ -7,6 +7,7 @@ import { PcaNarrativePanel } from "../inspection/PcaNarrativePanel";
 import { CompliancePanel } from "../inspection-edit/CompliancePanel";
 import { CommercialReportControls, type ReportTier } from "./CommercialReportControls";
 import { PropertyTypeControl } from "./PropertyTypeControl";
+import { useReadOnly } from "../../read-only";
 
 /**
  * The "Inspection Details" overview — property facts, the statutory form
@@ -60,6 +61,7 @@ export function InspectionOverview({
     onChangeTier,
 }: InspectionOverviewProps) {
     const { urls } = useFieldDataSource();
+    const readOnly = useReadOnly();
     // Read once, so the three gates below cannot disagree about the same house.
     const bag = inspection as Record<string, unknown>;
     const isCommercial = bag.propertyType === "commercial";
@@ -80,6 +82,8 @@ export function InspectionOverview({
                 coverage={statutoryCoverage}
                 previewHref={urls.statutoryPreviewPdf(String(bag.id))}
             />
+            {/* Everything below edits (details forms, reclassification, report tier, narrative, sign-off): a read-only editor shows the facts and the coverage list only. */}
+            {!readOnly && <>
             <StatutoryDetailsHost inspectionId={String(bag.id)} details={statutoryDetails} />
             {/* Reclassification. UNGATED on purpose — every other control in this
                 block appears only once `propertyType === 'commercial'`, so a
@@ -133,6 +137,7 @@ export function InspectionOverview({
                     <CompliancePanel inspectionId={String(bag.id)} data={complianceData} />
                 </div>
             ) : null}
+            </>}
         </>
     );
 }

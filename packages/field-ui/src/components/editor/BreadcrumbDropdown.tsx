@@ -66,7 +66,7 @@ export function BreadcrumbDropdown({ units, activeUnitId, onSelect }: Breadcrumb
         aria-expanded={open}
         aria-label={m.editor_scope_switch_aria({ label: activeLabel })}
         title={m.editor_scope_switch_title()}
-        className="border-none bg-ih-bg-muted hover:bg-ih-border max-w-[200px]"
+        className="border-none bg-ih-bg-muted hover:bg-ih-border max-w-[200px] lg:max-w-[140px] xl:max-w-[200px]"
       >
         <svg className="w-3.5 h-3.5 text-ih-fg-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6l8-3 8 3-8 3-8-3zM4 12l8 3 8-3M4 18l8 3 8-3" />
