@@ -20,7 +20,7 @@ export function isWidgetEmbedPath(path: string, embedQuery: string | null | unde
 }
 
 /** Directives that accept extra hosts through `CspOptions.extraSources`. */
-export type CspExtraDirective = 'script-src' | 'style-src' | 'connect-src' | 'img-src' | 'frame-src';
+type CspExtraDirective = 'script-src' | 'style-src' | 'connect-src' | 'img-src' | 'frame-src';
 
 export interface CspOptions {
     /** Widget embed page: `frame-ancestors *` instead of `'none'`. */

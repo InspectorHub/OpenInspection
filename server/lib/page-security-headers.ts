@@ -63,7 +63,7 @@ export const STRICT_POLICY_EVERY_NTH_PAGE = 20;
  *     the clip played in the page itself comes from the worker's own origin.
  * Google Maps is deliberately not repeated here; it is already in the shared allowlist.
  */
-export const PAGE_EXTRA_SOURCES = {
+const PAGE_EXTRA_SOURCES = {
     'script-src': ['https://js.stripe.com'],
     'frame-src': ['https://js.stripe.com', 'https://hooks.stripe.com', 'https://*.cloudflarestream.com'],
     'connect-src': ['https://api.stripe.com', 'https://m.stripe.network', 'https://r.stripe.com'],

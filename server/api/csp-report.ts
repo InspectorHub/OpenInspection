@@ -58,7 +58,18 @@ app.openapi(cspReportRoute, async (c) => {
             }
             for (const fields of parseCspReports(body, c.req.query('p'))) {
                 if (!admitCspReport(Date.now(), fields)) break;
-                logger.info('csp_report', { ...fields });
+                // Field by field on purpose: only these values are ever logged, so a field added to
+                // CspReportFields later does not reach the log without a decision here.
+                logger.info('csp_report', {
+                    policy: fields.policy,
+                    disposition: fields.disposition,
+                    effective_directive: fields.effective_directive,
+                    blocked: fields.blocked,
+                    document_path: fields.document_path,
+                    source_file_origin: fields.source_file_origin,
+                    line: fields.line,
+                    column: fields.column,
+                });
             }
         }
     }

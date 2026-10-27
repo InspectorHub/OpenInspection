@@ -18,7 +18,7 @@ export const CSP_REPORT_MAX_BYTES = 16 * 1024;
 export const CSP_REPORT_MAX_PER_WINDOW = 30;
 export const CSP_REPORT_WINDOW_MS = 60_000;
 /** A Reporting API request may batch reports; only this many of one request are looked at. */
-export const CSP_REPORT_MAX_PER_REQUEST = 5;
+const CSP_REPORT_MAX_PER_REQUEST = 5;
 
 const MAX_DIRECTIVE = 40;
 const MAX_ORIGIN = 100;
@@ -104,7 +104,7 @@ function reduceNumber(value: number | undefined): number | undefined {
     return Math.min(MAX_LINE, Math.max(0, Math.trunc(value)));
 }
 
-export function reducePolicy(value: string | undefined): CspReportFields['policy'] {
+function reducePolicy(value: string | undefined): CspReportFields['policy'] {
     return value === 'a' || value === 'b' ? value : 'unknown';
 }
 
@@ -162,7 +162,7 @@ function parseRaw(body: unknown): CspReportFields[] {
 }
 
 /** The same violation repeats on every page view; one line per distinct tuple per window is enough. */
-export const CSP_REPORT_DEDUPE_MAX_KEYS = 256;
+const CSP_REPORT_DEDUPE_MAX_KEYS = 256;
 
 let windowStart = 0;
 let loggedInWindow = 0;
