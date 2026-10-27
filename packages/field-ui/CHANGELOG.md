@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.3.0...field-ui-v0.4.0) (2026-10-27)
+
+
+### Features
+
+* **field-ui:** add a read-only mode and fix the desktop header and item navigation ([09f6d5e](https://github.com/InspectorHub/OpenInspection/commit/09f6d5e61e9191e4f37c282b9e26f48f28028c59))
+* **field-ui:** read-only mode, phone drawers, header layout and photo fixes ([6ff50bb](https://github.com/InspectorHub/OpenInspection/commit/6ff50bbc85e334d5a80ec969a3c75505e14e125c))
+
+
+### Bug Fixes
+
+* **field-ui:** escape backslashes in the placeholder test's selector helper ([74ce920](https://github.com/InspectorHub/OpenInspection/commit/74ce92043e8c15e3d0e6bf906b0412e8b048e8f3))
+* **field-ui:** give input placeholders a readable colour ([d698526](https://github.com/InspectorHub/OpenInspection/commit/d69852604ec1f9698bfbff84745482d844e4feb5))
+* **field-ui:** label the compliance sign-off inputs and clear them after a sign-off ([0eacee4](https://github.com/InspectorHub/OpenInspection/commit/0eacee481d541a7cf5907c55bda2284ac4507d45))
+* **field-ui:** make the Sections and Preview drawers usable on a phone ([1db954e](https://github.com/InspectorHub/OpenInspection/commit/1db954ef68ed1b3c94728a0898017168aa9b806e))
+
 ## [0.3.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.2.1...field-ui-v0.3.0) (2026-10-26)
 
 
