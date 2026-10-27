@@ -25,6 +25,8 @@ type CspExtraDirective = 'script-src' | 'style-src' | 'connect-src' | 'img-src' 
 export interface CspOptions {
     /** Widget embed page: `frame-ancestors *` instead of `'none'`. */
     widgetEmbed: boolean;
+    /** Allow same-origin framing: `frame-ancestors 'self'` instead of `'none'` (ignored for embed pages). */
+    sameOriginFraming?: boolean;
     /** Keep `'unsafe-inline'` in script-src and style-src. Defaults to true. */
     allowInline?: boolean;
     /** Appended last as `report-uri`. Omit for no reporting. */
@@ -58,7 +60,7 @@ export function buildCsp(options: CspOptions): string {
         // 'self' required so the Settings → Embed Widget page can iframe
         // its own /book?embed=1 preview. Without it the live preview is blank.
         `frame-src 'self' https://challenges.cloudflare.com${extra('frame-src')}`,
-        options.widgetEmbed ? 'frame-ancestors *' : "frame-ancestors 'none'",
+        options.widgetEmbed ? 'frame-ancestors *' : options.sameOriginFraming ? "frame-ancestors 'self'" : "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
         "object-src 'none'",

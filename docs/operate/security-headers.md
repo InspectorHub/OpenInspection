@@ -15,13 +15,13 @@ Both build their Content-Security-Policy from one allowlist, `server/lib/csp-pol
 
 | Header | Value | Why |
 |---|---|---|
-| `X-Frame-Options` | `DENY` | No page of the app is framed by the app itself. The booking widget pages are the exception (below). |
+| `X-Frame-Options` | `SAMEORIGIN` | A page may be framed by a page of the same origin, and by no other site. The app frames none of its own pages except the booking widget pages (below), so this is looser than it needs to be on purpose: it keeps a same-origin frame usable, for example to preview a page at a narrow width. |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | Keeps paths and query strings (tokens in links) out of the `Referer` header sent to other sites. |
 | `Permissions-Policy` | `geolocation=(), microphone=(), camera=(self)` | The inspection editor opens the camera through `getUserMedia`; nothing uses the microphone or geolocation. |
 
 The widget embed pages, `/book?embed=1` and `/embed/*`, are meant to be placed in an iframe on other sites. They get **no** `X-Frame-Options` and `frame-ancestors *`. Protection for the booking submit comes from the origin allowlist on `POST /api/public/book`, not from framing rules.
 
-This is a behaviour change for pages that were previously unprotected: report, portal and checkout pages now send `X-Frame-Options: DENY`, so a third-party site that puts one of them in an iframe will see it blank. The booking widget routes above stay frameable.
+This is a behaviour change for pages that were previously unprotected: report, portal and checkout pages now send `X-Frame-Options: SAMEORIGIN`, so a third-party site that puts one of them in an iframe will still see it blank (same-origin framing is allowed, cross-site framing is refused). API responses keep `DENY`. The booking widget routes above stay frameable.
 
 Pages that are redirects, empty answers (204/304) or not HTML get none of these.
 

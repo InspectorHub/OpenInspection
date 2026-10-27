@@ -11,21 +11,22 @@
  * what pages load that the allowlist does not know about before switching it on.
  * `docs/operate/security-headers.md` describes the rollout.
  *
- * X-Frame-Options is DENY (and `frame-ancestors 'none'`) because the only pages
- * the app frames are the widget embed pages, which are exempt below:
+ * X-Frame-Options is SAMEORIGIN (and `frame-ancestors 'self'`): a page may be framed
+ * by a page of the same origin, never by another site. The app itself frames no page
+ * of its own except the widget embed pages, which are exempt below, so the policy
+ * could be stricter; SAMEORIGIN is kept so that a same-origin frame still works for
+ * checking a page at a narrow width. Who frames what today:
  *   - app/components/settings/EmbedWidgetPanel.tsx frames `/embed/<company>`
  *   - public/widget.js frames `/book?embed=1`
  *   - the other iframes are third-party (the Cloudflare Stream player in
  *     ReportMediaTile.tsx and VideoPlayer.tsx; Stripe.js, loaded by loadStripe in
  *     PayCard.tsx, BookingDepositPanel.tsx and StripePayPanel.tsx) or a sandboxed
  *     `srcDoc` email preview (EmailPreview.tsx). None frames a page of ours.
- * If a page of this app is ever framed by this app, switch to SAMEORIGIN and
- * `frame-ancestors 'self'`.
  *
  * Behaviour change to know about: report, portal and checkout pages previously
- * carried no framing protection and now send X-Frame-Options DENY, so a
+ * carried no framing protection and now send X-Frame-Options SAMEORIGIN, so a
  * third-party site that iframes one of them sees it blank. The booking embed
- * routes stay exempt.
+ * routes stay exempt. The API middleware keeps DENY: API responses are never framed.
  *
  * Permissions-Policy: the editor opens the camera with `getUserMedia({ video })`
  * (packages/field-ui/src/components/editor/BurstCamera.tsx), so camera is allowed
@@ -89,10 +90,10 @@ export function pageSecurityHeaders(pathname: string, query: URLSearchParams, in
         // script-src and style-src, so the report shows how much inline script
         // and style the pages use.
         'Content-Security-Policy-Report-Only': [
-            buildCsp({ widgetEmbed: embed, reportUri: `${CSP_REPORT_PATH}?p=a`, extraSources: PAGE_EXTRA_SOURCES }),
-            ...(includeStrict ? [buildCsp({ widgetEmbed: embed, allowInline: false, reportUri: `${CSP_REPORT_PATH}?p=b`, extraSources: PAGE_EXTRA_SOURCES })] : []),
+            buildCsp({ widgetEmbed: embed, sameOriginFraming: true, reportUri: `${CSP_REPORT_PATH}?p=a`, extraSources: PAGE_EXTRA_SOURCES }),
+            ...(includeStrict ? [buildCsp({ widgetEmbed: embed, sameOriginFraming: true, allowInline: false, reportUri: `${CSP_REPORT_PATH}?p=b`, extraSources: PAGE_EXTRA_SOURCES })] : []),
         ].join(', '),
     };
-    if (!embed) headers['X-Frame-Options'] = 'DENY';
+    if (!embed) headers['X-Frame-Options'] = 'SAMEORIGIN';
     return headers;
 }

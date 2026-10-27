@@ -14,12 +14,12 @@ const policies = (h: Record<string, string>) => h['Content-Security-Policy-Repor
 const directive = (policy: string, name: string) => policy.split('; ').find((d) => d.startsWith(`${name} `));
 
 describe('pageSecurityHeaders', () => {
-    it('a normal page is not frameable and carries the referrer and feature policies', () => {
+    it('a normal page is frameable only by its own origin and carries the referrer and feature policies', () => {
         const h = headersFor('/login');
-        expect(h['X-Frame-Options']).toBe('DENY');
+        expect(h['X-Frame-Options']).toBe('SAMEORIGIN');
         expect(h['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
         expect(h['Permissions-Policy']).toBe(PAGE_PERMISSIONS_POLICY);
-        for (const p of policies(h)) expect(directive(p, 'frame-ancestors')).toBe("frame-ancestors 'none'");
+        for (const p of policies(h)) expect(directive(p, 'frame-ancestors')).toBe("frame-ancestors 'self'");
     });
 
     it.each([
@@ -33,8 +33,8 @@ describe('pageSecurityHeaders', () => {
     });
 
     it('/book without embed=1 is a normal page (control for the embed exemption)', () => {
-        expect(headersFor('/book')['X-Frame-Options']).toBe('DENY');
-        expect(headersFor('/book', 'embed=0')['X-Frame-Options']).toBe('DENY');
+        expect(headersFor('/book')['X-Frame-Options']).toBe('SAMEORIGIN');
+        expect(headersFor('/book', 'embed=0')['X-Frame-Options']).toBe('SAMEORIGIN');
     });
 
     it('allows the camera for this origin only and keeps microphone and geolocation off', () => {
@@ -55,6 +55,18 @@ describe('pageSecurityHeaders', () => {
         );
         expect(directive(strict!, 'style-src')).toBe("style-src 'self'");
         expect(strict).not.toContain('unsafe-inline');
+    });
+});
+
+describe('pages and the API intentionally differ on framing', () => {
+    it('pages are SAMEORIGIN / frame-ancestors self; the API stays DENY / frame-ancestors none', () => {
+        const page = headersFor('/login');
+        expect(page['X-Frame-Options']).toBe('SAMEORIGIN');
+        for (const p of policies(page)) expect(p).toContain("frame-ancestors 'self'");
+        expect(buildCsp({ widgetEmbed: false })).toContain("frame-ancestors 'none'");
+        expect(buildCsp({ widgetEmbed: false, sameOriginFraming: true })).toContain("frame-ancestors 'self'");
+        // the embed routes are unchanged whatever the option says
+        expect(buildCsp({ widgetEmbed: true, sameOriginFraming: true })).toContain('frame-ancestors *');
     });
 });
 
@@ -132,7 +144,7 @@ describe('securityHeadersForPage (what workers/app.ts stamps)', () => {
     const html = () => new Response('<html></html>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 
     it('stamps an HTML page', () => {
-        expect(securityHeadersForPage(html(), url, () => true)['X-Frame-Options']).toBe('DENY');
+        expect(securityHeadersForPage(html(), url, () => true)['X-Frame-Options']).toBe('SAMEORIGIN');
     });
 
     it('stamps nothing on a redirect, an empty answer, JSON or a non-HTML response', () => {
@@ -147,7 +159,7 @@ describe('securityHeadersForPage (what workers/app.ts stamps)', () => {
         const request = new Request(url);
         const base = { request, startedAt: Date.now(), getRoutes: () => undefined };
         const page = finishPage({ ...base, res: html(), extraHeaders: securityHeadersForPage(html(), url) });
-        expect(page.headers.get('X-Frame-Options')).toBe('DENY');
+        expect(page.headers.get('X-Frame-Options')).toBe('SAMEORIGIN');
         expect(page.headers.get('Permissions-Policy')).toBe(PAGE_PERMISSIONS_POLICY);
         expect(page.headers.get('Content-Security-Policy-Report-Only')).toContain('report-uri /api/public/csp-report');
         expect(page.headers.get('Server-Timing')).toMatch(/^app;dur=\d+$/);
