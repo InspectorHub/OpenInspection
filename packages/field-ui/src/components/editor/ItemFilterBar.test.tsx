@@ -36,9 +36,15 @@ describe("ItemFilterBar", () => {
     expect(label.parentElement?.className.split(/\s+/)).toEqual(expect.arrayContaining(["flex", "min-w-0", "gap-1"]));
   });
 
-  it("names each segment in full for the case where its label is cut", () => {
+  it("names each segment in full, and says the counts are of this section", () => {
     mount();
-    expect(screen.getByRole("radio", { name: /Unrated/ }).getAttribute("title")).toBe("Unrated 3");
-    expect(screen.getByRole("radio", { name: /All/ }).getAttribute("title")).toBe("All");
+    expect(screen.getByRole("radio", { name: /Unrated/ }).getAttribute("title")).toBe("Unrated 3 in this section");
+    expect(screen.getByRole("radio", { name: /Flagged/ }).getAttribute("title")).toBe("Flagged 0 in this section");
+    expect(screen.getByRole("radio", { name: /All/ }).getAttribute("title")).toBe("All items in this section");
+  });
+
+  it("keeps a 44px width for a finger, which wins over the shrink-to-fit rule for coarse pointers", () => {
+    mount();
+    expect(screen.getByRole("radiogroup").className.split(/\s+/)).toEqual(expect.arrayContaining(["[&>button]:min-w-0", "[&>button]:pointer-coarse:min-w-11"]));
   });
 });

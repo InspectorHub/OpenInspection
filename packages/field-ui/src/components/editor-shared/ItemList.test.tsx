@@ -98,3 +98,50 @@ test('CONTROL - without fullWidth the desktop column is unchanged', () => {
   const { container } = render(<ItemList mode="fill" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()} results={{}} />);
   expect((container.firstElementChild as HTMLElement).className).toContain('w-[280px]');
 });
+
+// The row dot shows the rating's own colour, so a rating whose id is not Satisfactory/Monitor/Defect is not grey.
+describe('the rating dot', () => {
+  const dot = (rating: string, getRatingColor?: (id: string) => string) => {
+    const { container } = render(
+      <ItemList mode="fill" items={[items[0]!]} sectionId="s1" activeItemId={null} onSelect={vi.fn()} results={{ '_default:s1:i1': { rating } }} getRatingColor={getRatingColor} />,
+    );
+    return container.querySelector('span.rounded-full.w-2') as HTMLElement;
+  };
+
+  test('takes the colour for a rating id it does not know by name', () => {
+    const d = dot('Repair', () => '#7c3aed');
+    expect(d.style.background).toBe('#7c3aed');
+    expect(d.className).not.toContain('bg-ih-border-strong');
+  });
+
+  test('a tenant colour wins over the literal id mapping', () => {
+    expect(dot('Defect', () => '#123456').style.background).toBe('#123456');
+  });
+
+  test('the fallback token is not painted as a fill: the neutral token class stays', () => {
+    const d = dot('Repair', () => 'var(--ih-fg-5, #d4d4d8)');
+    expect(d.style.background).toBe('');
+    expect(d.className).toContain('bg-ih-border-strong');
+  });
+
+  test('an unsafe colour string is treated as no colour: nothing reaches the style, the id class stays', () => {
+    for (const bad of ['url(https://x)', 'red; background:url(x)', 'expression(1)']) {
+      const d = dot('Repair', () => bad);
+      expect(d.getAttribute('style') ?? '').toBe('');
+      expect(d.className).toContain('bg-ih-border-strong');
+    }
+    expect(dot('Defect', () => 'url(x)').className).toContain('bg-ih-bad');
+  });
+
+  test('CONTROL - without a colour the literal ids keep their classes', () => {
+    expect(dot('Satisfactory').className).toContain('bg-ih-ok');
+    expect(dot('DEF').className).toContain('bg-ih-bad');
+    expect(dot('Repair').className).toContain('bg-ih-border-strong');
+  });
+});
+
+test('asks for the dot of a row once per render', () => {
+  const ask = vi.fn(() => '#7c3aed');
+  render(<ItemList mode="fill" items={[items[0]!]} sectionId="s1" activeItemId={null} onSelect={vi.fn()} results={{ '_default:s1:i1': { rating: 'Repair' } }} getRatingColor={ask} />);
+  expect(ask).toHaveBeenCalledTimes(1);
+});

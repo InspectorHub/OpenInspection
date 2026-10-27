@@ -212,8 +212,7 @@ export function seedResultsDoc(
 /**
  * Apply a single SCALAR-field patch to an item inside a Y.Doc transaction.
  *
- * The item is expected to have been pre-seeded via `seedResultsDoc`. If it is
- * absent (defensive path), it is seeded first.
+ * The item is expected to be pre-seeded via `seedResultsDoc`; if absent (defensive path) it is seeded first.
  *
  * This function only handles scalar fields — last-write-wins per scalar is the
  * correct semantics for them. Nested fields (attributes, tabs, photos,
@@ -235,6 +234,7 @@ export function applyItemPatch(
     value: unknown,
 ): void {
     const results = doc.getMap<unknown>('results');
+    if ((results.get(findingKey) as Y.Map<unknown> | undefined)?.get?.(field) === value) return; // already there: not a write
 
     doc.transact(() => {
         const item = getOrSeedItem(results, findingKey);

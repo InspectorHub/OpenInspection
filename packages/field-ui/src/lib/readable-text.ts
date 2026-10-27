@@ -23,6 +23,40 @@ function parseRgb(v: string): [number, number, number] | null {
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
 }
 
+const HEX = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const COLOR_FN = /^(?:rgba?|hsla?)\(\s*[\d.]+(?:deg|%)?(?:\s*[,/]\s*[\d.]+(?:deg|%)?|\s+[\d.]+(?:deg|%)?)*\s*\)$/i;
+const TOKEN = /^var\(\s*--ih-[\w-]+\s*(?:,\s*([^;{}"'()]+(?:\([^;{}"'()]*\))?))?\s*\)$/;
+
+/**
+ * The colour string when it is a plain CSS colour that is safe to put in a style attribute, else null: a hex colour, a
+ * a colour name from the small table below (not any word: `amber` is a tag colour but not a CSS colour),
+ * rgb()/rgba()/hsl()/hsla() with numeric arguments, or a `var(--ih-...)` token whose fallback (if any) is itself one of those.
+ * A tenant's rating colour is stored as an unvalidated string, so anything else (a url(), an expression, a second
+ * declaration, quotes, braces, a name) is treated as "no colour".
+ */
+export function safeCssColor(color: unknown): string | null {
+  if (typeof color !== 'string') return null;
+  const v = color.trim();
+  if (v === '' || v.length > 120) return null;
+  // A letters-only word (red, transparent, currentColor) carries nothing that can be injected.
+  if (HEX.test(v) || COLOR_FN.test(v) || namedHex(v) !== null) return v;
+  const token = TOKEN.exec(v);
+  if (token) return token[1] === undefined || safeCssColor(token[1]) !== null ? v : null;
+  return null;
+}
+
+/** The CSS names a tag colour can be (the picker's ten, plus the plain extremes), as hex, for the text-contrast decision only. */
+const NAMED: Record<string, string> = {
+  red: '#ff0000', orange: '#ffa500', yellow: '#ffff00', blue: '#0000ff', green: '#008000', teal: '#008080',
+  purple: '#800080', indigo: '#4b0082', pink: '#ffc0cb', brown: '#a52a2a', gray: '#808080', grey: '#808080', white: '#ffffff', black: '#000000',
+};
+
+/** Own keys only: `constructor`, `toString`, `__proto__`... are letters-only words but not colours. */
+function namedHex(name: string): string | null {
+  const key = name.toLowerCase();
+  return Object.hasOwn(NAMED, key) ? NAMED[key] : null;
+}
+
 function luminance([r, g, b]: [number, number, number]): number {
   const lin = (c: number) => {
     const s = c / 255;
@@ -44,11 +78,25 @@ const WHITE_FLOOR = 3;
 export function readableTextOn(background: string | null | undefined): string | null {
   if (!background) return null;
   const v = background.trim();
-  const rgb = parseHex(v) ?? parseRgb(v);
+  const rgb = parseHex(v) ?? parseRgb(v) ?? parseHex(namedHex(v) ?? '');
   if (!rgb) return null;
   const bg = luminance(rgb);
   const onWhite = 1.05 / (bg + 0.05);
   if (onWhite >= WHITE_FLOOR) return WHITE;
   const onInk = (bg + 0.05) / (luminance(parseHex(DARK_INK)!) + 0.05);
   return onWhite >= onInk ? WHITE : DARK_INK;
+}
+
+/**
+ * `color` with the two hex digits `alpha` appended, for a tint of that colour: only a 6-digit hex can take them. Any other
+ * form (a name, rgb(), a 3-digit hex, a token) would become an invalid colour, so there is no tint (null).
+ */
+export function tintOf(color: string | null | undefined, alpha: string): string | null {
+  const safe = safeCssColor(color);
+  return safe !== null && /^#[0-9a-f]{6}$/i.test(safe) ? `${safe}${alpha}` : null;
+}
+
+/** The inline style of a chip that shows a data colour: the text in that colour, on a light tint of it where a tint can be made. */
+export function tintedChipStyle(color: string | null | undefined): { backgroundColor?: string; color?: string } {
+  return { backgroundColor: tintOf(color, '1a') ?? undefined, color: safeCssColor(color) ?? undefined };
 }

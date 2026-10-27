@@ -1,4 +1,5 @@
 import { m } from "../../i18n";
+import { safeCssColor } from "../../lib/readable-text";
 
 export interface ProgressStripTextProps {
     rated:       number;
@@ -11,7 +12,7 @@ export interface ProgressStripTextProps {
 const Dot = ({ color }: { color: string }) => (
     <span
         className="inline-block w-1.5 h-1.5 rounded-full mr-1 align-middle"
-        style={{ backgroundColor: color }}
+        style={{ backgroundColor: safeCssColor(color) ?? undefined }}
     />
 );
 

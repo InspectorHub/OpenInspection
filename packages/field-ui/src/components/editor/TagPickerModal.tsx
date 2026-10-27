@@ -1,6 +1,6 @@
 import { Modal } from "@core/shared-ui";
 import { m } from "../../i18n";
-import { readableTextOn } from "../../lib/readable-text";
+import { readableTextOn, safeCssColor } from "../../lib/readable-text";
 
 export interface TagPickerModalProps {
  open: boolean;
@@ -27,11 +27,11 @@ export function TagPickerModal({ open, activeItemId, tagsByItem, presetTags, onT
      ? "bg-ih-bg-muted ring-1 ring-inset"
      : "hover:bg-ih-bg-muted"
     }`}
-    style={isActive ? { "--tw-ring-color": tag.color } as React.CSSProperties : undefined}
+    style={isActive && safeCssColor(tag.color) ? { "--tw-ring-color": tag.color } as React.CSSProperties : undefined}
     >
     <span
-     className="w-3 h-3 rounded-full flex-shrink-0"
-     style={{ backgroundColor: tag.color }}
+     className="w-3 h-3 rounded-full flex-shrink-0 bg-ih-border-strong"
+     style={safeCssColor(tag.color) ? { backgroundColor: safeCssColor(tag.color) as string } : undefined}
     />
     <span className="flex-1 text-ih-fg-1">{tag.name}</span>
     {isActive && (
@@ -50,7 +50,7 @@ export function TagPickerModal({ open, activeItemId, tagsByItem, presetTags, onT
     <span
      key={tag.id}
      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-     style={{ backgroundColor: tag.color || '#6b7280', color: readableTextOn(tag.color || '#6b7280') ?? undefined }}
+     style={{ backgroundColor: safeCssColor(tag.color) ?? '#6b7280', color: readableTextOn(safeCssColor(tag.color) ?? '#6b7280') ?? undefined }}
     >
      {tag.name}
     </span>

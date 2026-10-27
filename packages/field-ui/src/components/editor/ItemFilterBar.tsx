@@ -18,7 +18,7 @@ export function ItemFilterBar({ state, formProgress, isMobile }: { state: Editor
     <div className="flex flex-wrap items-center gap-1 px-3 py-1.5 border-b border-ih-border">
       <SegmentedControl
         ariaLabel={m.editor_route_item_filter()}
-        className="w-full min-w-0 [&>button]:min-w-0 [&>button]:px-1.5 [&>button>span:last-child]:min-w-0"
+        className="w-full min-w-0 [&>button]:min-w-0 [&>button]:pointer-coarse:min-w-11 [&>button]:px-1.5 [&>button>span:last-child]:min-w-0"
         value={state.itemFilter}
         onChange={(v) => state.setItemFilter(v as ItemFilter)}
         options={(["all", "unrated", "issues", "flagged"] as const).map((f) => {
@@ -26,7 +26,7 @@ export function ItemFilterBar({ state, formProgress, isMobile }: { state: Editor
           const count = f === "all" ? null : state.filterCounts[f];
           return {
             value: f,
-            title: count === null ? text : `${text} ${count}`,
+            title: count === null ? m.editor_route_filter_all_in_section() : m.editor_route_filter_count_in_section({ label: text, count }),
             label: (
               <span className="flex min-w-0 items-baseline gap-1">
                 <span className="min-w-0 truncate">{text}</span>

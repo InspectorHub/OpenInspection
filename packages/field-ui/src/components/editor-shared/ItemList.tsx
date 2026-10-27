@@ -9,6 +9,7 @@ import { m } from "../../i18n";
 import { itemDepths, outlineNumbers, subtreeOf, MAX_ITEM_DEPTH } from "../../shared/template-hierarchy";
 import { useItemRowMenu } from "../../hooks/useItemRowMenu";
 import { ItemRowIndent } from "./ItemRowIndent";
+import { ratingDot } from "./rating-dot";
 import { ItemSubtreeDeleteModal, type PendingSubtreeDelete } from "./ItemSubtreeDeleteModal";
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
@@ -86,6 +87,8 @@ interface SharedItemListProps {
   /** Tablet pane: fluid width, rows at least 56px high, the selected row marked by a tint, a 3px bar and bold text. */
   pane?: boolean;
   fullWidth?: boolean; // phone drawer: fills the sheet, not the desktop's 280px column with its rule
+  /** The colour of a rating id (tenant level colour); the row dot uses it, so any rating id has its colour. */
+  getRatingColor?: (id: string) => string;
 }
 
 /**
@@ -125,14 +128,6 @@ function slotHeadings(
 }
 
 const PANE_SELECTED = "bg-ih-primary-tint border-l-[3px] border-ih-primary font-bold text-ih-primary-text";
-/** Map rating to dot color for the item list */
-function ratingDotClass(rating: string): string {
-  if (rating === "Satisfactory" || rating === "SAT") return "bg-ih-ok";
-  if (rating === "Monitor" || rating === "MON") return "bg-ih-watch";
-  if (rating === "Defect" || rating === "DEF") return "bg-ih-bad";
-  return "bg-ih-border-strong";
-}
-
 export function ItemList({
   mode,
   items,
@@ -155,7 +150,7 @@ export function ItemList({
   activeUnitId = null,
   groups,
   onAddGroupInstance,
-  pane = false, fullWidth = false,
+  pane = false, fullWidth = false, getRatingColor,
 }: SharedItemListProps) {
   const { heading: slotHeading, closes: groupClosedBy } = slotHeadings(groups, items);
   const grouped = Boolean(groups?.length);
@@ -295,11 +290,10 @@ export function ItemList({
                       indent rather than instead of it. */}
                   <ItemRowIndent depth={depths.get(item.id) ?? 0} outline={outlines.get(item.id) ?? ""} />
                   <span className="flex-1 truncate">{item.label}</span>
-                  {mode === "fill" && Boolean(result.rating) && (
-                    <span
-                      className={`w-2 h-2 rounded-full flex-shrink-0 ${ratingDotClass(result.rating as string)}`}
-                    />
-                  )}
+                  {mode === "fill" && Boolean(result.rating) && (() => {
+                    const dot = ratingDot(result.rating as string, getRatingColor);
+                    return <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot.className}`} style={dot.style} />;
+                  })()}
                   {mode === "author" && (
                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-2 flex-shrink-0">
                       {item.type}

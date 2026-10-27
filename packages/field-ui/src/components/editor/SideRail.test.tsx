@@ -133,3 +133,19 @@ test('CONTROL - a tenant colour keeps its inline fill and computed text', () => 
   expect(pill.style.backgroundColor).toBe('#ef4444');
   expect(pill.style.color).toBe('#ffffff');
 });
+
+// On the desktop the editor draws a 24px "Collapse photo rail" button at `left-1` over the panel's top-left corner, so the
+// panel's heading row starts to the right of it (4px + 24px = 28px, and pl-9 is 36px). In a drawer there is no such button.
+test('the heading row clears the collapse button on the desktop rail, and uses plain padding in a drawer', () => {
+  const header = (fill: boolean) => {
+    const { unmount } = render(<SideRail locale="en-US" mode="fill" initialOpen fill={fill} activeItem={ITEM} activeResult={{}} inspectionId="insp" />);
+    const row = screen.getByText('preview', { selector: 'span' }).parentElement as HTMLElement;
+    const cls = row.className.split(/\s+/);
+    unmount();
+    return cls;
+  };
+  expect(header(false)).toEqual(expect.arrayContaining(['pl-9', 'pr-3']));
+  expect(header(false)).not.toContain('px-3');
+  expect(header(true)).toContain('px-3');
+  expect(header(true)).not.toContain('pl-9');
+});

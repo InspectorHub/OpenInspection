@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { FALLBACK_RATING_COLOR, isFallbackRatingColor, readableTextOn } from './readable-text';
+import { FALLBACK_RATING_COLOR, isFallbackRatingColor, readableTextOn, safeCssColor, tintOf, tintedChipStyle } from './readable-text';
 
 /** The WCAG contrast formula, written out again here rather than read from the code under test. */
 function channel(c: number) {
@@ -78,5 +78,56 @@ describe('the fallback rating fill', () => {
     expect(isFallbackRatingColor('#d4d4d8')).toBe(false);
     expect(isFallbackRatingColor('var(--ih-status-ok, #10b981)')).toBe(false);
     expect(isFallbackRatingColor(undefined)).toBe(false);
+  });
+});
+
+// A tenant's rating colour is an unvalidated string that ends up in a style attribute: only plain colours get through.
+describe('readableTextOn for colour names', () => {
+  it.each([['red', '#ffffff'], ['blue', '#ffffff'], ['green', '#ffffff'], ['teal', '#ffffff'], ['purple', '#ffffff'], ['brown', '#ffffff'], ['gray', '#ffffff'], ['black', '#ffffff'],
+    ['indigo', '#ffffff'], ['yellow', '#0f172a'], ['orange', '#0f172a'], ['pink', '#0f172a'], ['white', '#0f172a'], ['Yellow', '#0f172a']])('%s gets %s text', (name, text) => {
+    expect(readableTextOn(name)).toBe(text);
+  });
+
+  it('CONTROL - a name it has no colour for (a Tailwind-only name, transparent) leaves the caller on its own text colour', () => {
+    for (const name of ['amber', 'slate', 'transparent', 'currentColor', 'constructor', 'toString', '__proto__']) expect(readableTextOn(name)).toBeNull();
+  });
+});
+
+describe('tintedChipStyle (the library rating chips)', () => {
+  it('tints a 6-digit hex and colours the text; a name keeps the text colour and gets no tint; an unsafe value gets nothing', () => {
+    expect(tintedChipStyle('#ef4444')).toEqual({ backgroundColor: '#ef44441a', color: '#ef4444' });
+    expect(tintedChipStyle('red')).toEqual({ backgroundColor: undefined, color: 'red' });
+    expect(tintedChipStyle('url(x)')).toEqual({ backgroundColor: undefined, color: undefined });
+  });
+});
+
+describe('tintOf', () => {
+  it('appends the alpha only to a 6-digit hex, and gives nothing for any other form', () => {
+    expect(tintOf('#ef4444', '1a')).toBe('#ef44441a');
+    for (const c of ['#fff', '#ef444480', 'rgb(1,2,3)', 'red', 'var(--ih-fg-5)', null, undefined]) expect(tintOf(c, '1a'), String(c)).toBeNull();
+  });
+});
+
+describe('safeCssColor', () => {
+  it.each([
+    '#fff', '#FFFA', '#1d4ed8', '#1d4ed8cc', 'rgb(29, 78, 216)', 'rgba(29,78,216,0.5)', 'rgb(29 78 216 / 50%)',
+    'hsl(220, 80%, 48%)', 'hsla(220 80% 48% / .5)', 'hsl(220deg 80% 48%)',
+    'red', 'Teal', 'indigo', 'grey',
+    'var(--ih-fg-5)', 'var(--ih-status-ok, #10b981)', 'var(--ih-fg-5, #d4d4d8)', 'var(--ih-a, var(--ih-b, #fff))',
+  ])('accepts %s', (c) => expect(safeCssColor(c)).toBe(c));
+
+  it.each([
+    'url(https://x)', 'red; background:url(x)', 'red;', '#fff; color:red', 'expression(alert(1))', '"red"', "'red'",
+    'rgb(1,2,3){}', 'rgb(1,2,url(x))', 'rgb(1,2,3', 'calc(1px + 2px)', 'var(--x)', 'var(--ih-x, url(x))', 'var(--ih-a, var(--x, #fff))', 'var(--ih-a, var(--ih-b, url(x)))', 'var(--ih-x, red; x:y)',
+    '#ggg', '#12345', 'linear-gradient(red, blue)', 'red;x', 'red url(x)', 're d', 're', 'red!', 'red/*x*/',
+    // words that are not CSS colours: Tailwind names, keywords and anything else
+    'amber', 'slate', 'rose', 'emerald', 'transparent', 'currentColor', 'foo', 'rebeccapurple', 'constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__', '#fff\\', '#f\nff', 'rgb(1,2,3)/*x*/', '', '   ',
+  ])('rejects %j', (c) => expect(safeCssColor(c)).toBeNull());
+
+  it('rejects what is not a string, and trims what is', () => {
+    expect(safeCssColor(undefined)).toBeNull();
+    expect(safeCssColor(null)).toBeNull();
+    expect(safeCssColor(42 as never)).toBeNull();
+    expect(safeCssColor('  #fff  ')).toBe('#fff');
   });
 });

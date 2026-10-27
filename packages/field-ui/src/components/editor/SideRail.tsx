@@ -9,7 +9,7 @@ import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import type { EditorMode } from "../editor-shared/editor-mode";
 import { useFieldDataSource } from "../../context";
 import { useReadOnly } from "../../read-only";
-import { isFallbackRatingColor, readableTextOn } from "../../lib/readable-text";
+import { isFallbackRatingColor, readableTextOn, safeCssColor } from "../../lib/readable-text";
 import { m } from "../../i18n";
 
 interface SideRailProps {
@@ -65,7 +65,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
   // library is meaningless for a data-entry item (module E). Either tab is also
   // left out when the host does not provide what it lists (the comment library,
   // the photo pool): a tab that can only say "unavailable" is a dead control.
-  const ratingColor = getRatingColor?.(String(activeResult?.rating ?? "")) || '#6b7280';
+  const ratingColor = safeCssColor(getRatingColor?.(String(activeResult?.rating ?? ""))) ?? '#6b7280';
   const hideLibrary = mode === "fill" && !!activeItem && activeItem.type !== "rich";
   const visibleTabs = TABS.filter((t) => {
     if (t.id === "photos" && (mode !== "fill" || !resources.mediaPool)) return false;
@@ -115,7 +115,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
       {/* Content panel (256px, left of tab strip) */}
       {open && (
         <div className={`${fill ? "flex-1 min-w-0" : "w-64"} border-l border-ih-border bg-ih-bg-card flex flex-col overflow-hidden`}>
-          <div className="flex items-center justify-between px-3 py-2 border-b border-ih-border">
+          <div className={`flex items-center justify-between ${fill ? "px-3" : "pl-9 pr-3"} py-2 border-b border-ih-border`}>
             <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 capitalize">{effectiveTab}</span>
             {!fill && (
               <IconButton onClick={closePanel} aria-label={m.editor_siderail_close_panel()} size="sm" className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2">

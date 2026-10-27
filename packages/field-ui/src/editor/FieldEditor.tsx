@@ -82,6 +82,7 @@ import { guardPhotoOps, readOnlyKeyboard } from "../read-only-guards";
 import { ReadOnlyItemView } from "../components/editor/ReadOnlyItemView";
 import { useFinishFieldworkConfirm } from "../components/editor/FinishFieldworkConfirm";
 import { useScrollTopOnDetails } from "../hooks/useScrollTopOnDetails";
+import { notesCommitTarget } from "../hooks/notes-commit-target";
 import { ItemFilterBar } from "../components/editor/ItemFilterBar";
 import { UnitControls } from "../components/editor/UnitControls";
 
@@ -1371,7 +1372,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  state.setActiveView("items");
  if (isMobile) setMobileDrawer(null);
  }}
- results={state.results}
+ results={state.results} getRatingColor={state.getRatingColor}
  activeUnitId={activeUnitId}
  batchMode={state.batchMode}
  batchSelected={state.batchSelected}
@@ -1457,14 +1458,9 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  );
  }
  }}
- onNotesBlur={(notes) => {
- if (state.activeItemId && state.currentSection) {
- findings.commitNotes(
- state.currentSection.id,
- state.activeItemId,
- notes,
- );
- }
+ onNotesBlur={(notes, itemId) => {
+ const target = notesCommitTarget({ itemId, activeItemId: state.activeItemId, currentSectionId: state.currentSection?.id, sectionIdForItem: state.sectionIdForItem });
+ if (target) findings.commitNotes(target.sectionId, target.itemId, notes);
  }}
  onValue={(value) => {
  if (state.activeItemId && state.currentSection) {

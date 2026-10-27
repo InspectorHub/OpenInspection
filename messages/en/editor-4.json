@@ -33,6 +33,8 @@
   "editor_route_filter_unrated": "Unrated",
   "editor_route_filter_issues": "Issues",
   "editor_route_filter_flagged": "Flagged",
+  "editor_route_filter_all_in_section": "All items in this section",
+  "editor_route_filter_count_in_section": "{label} {count} in this section",
   "editor_route_exit_batch_mode": "Exit batch mode",
   "editor_route_batch_mode": "Batch mode (B)",
   "editor_route_batch_select_items": "Batch select items",
