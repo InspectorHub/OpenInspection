@@ -275,8 +275,8 @@ html[data-color-scheme="field"] {
   text-transform: uppercase;
   letter-spacing: 0.18em;
   /* fg-3, not fg-4. This is a section LABEL — the sidebar's "Workspace" heading
-     — so it is text, and fg-4 is the decoration tier (chevrons, dividers,
-     placeholders): 2.56:1 on a light card and 3.07:1 on a dark one. fg-3 is
+     — so it is text, and fg-4 is the decoration tier (chevrons, dividers):
+     2.56:1 on a light card and 3.07:1 on a dark one. fg-3 is
      4.76 / 5.71 / 12.02. The rule was invisible to `lint:contrast` because the
      gate read Tailwind class strings only and this colour is set in CSS; that is
      now covered by `cssTextRules`. */
@@ -318,6 +318,16 @@ html[data-color-scheme="field"] {
 }
 .ih-input:disabled + svg {
   opacity: 0.55;
+}
+
+/* An explicit placeholder colour. Without one the placeholder takes whatever the host's base layer or the WebView
+   decides, and on an Android WebView it was not visible at all. A placeholder is text the person has to read, so it
+   is the fg-3 text tier (4.76:1 on a light card), not fg-4: that is the decoration tier (2.56:1). opacity: 1 stops
+   a browser default from dimming the colour a second time. */
+.ih-input::placeholder,
+textarea::placeholder {
+  color: var(--ih-fg-3);
+  opacity: 1;
 }
 
 .ih-kbd {

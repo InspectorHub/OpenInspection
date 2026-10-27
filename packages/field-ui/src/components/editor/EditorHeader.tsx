@@ -11,6 +11,7 @@ import { SaveStatusIndicator } from "./SaveStatusIndicator";
 import { HEADER_OVERFLOW } from "./header-visibility";
 import { runWithPending } from "./publish-pending";
 import { HeaderOverflowMenu } from "./HeaderOverflowMenu";
+import { useReadOnly } from "../../read-only";
 import { m } from "../../i18n";
 
 type EditorState = ReturnType<typeof useInspectionState>;
@@ -84,6 +85,7 @@ export function EditorHeader({
  // supplies none simply gets no such entry point.
  const { pdf, renderThemeControl } = useFieldSlots();
  const caps = useEditorCapabilities();
+ const readOnly = useReadOnly();
  const { urls, exit } = useFieldDataSource();
  const { openPreview } = useHostActions(String(state.inspection.id));
  const listHref = urls.inspectionsList?.() ?? null;
@@ -120,7 +122,7 @@ export function EditorHeader({
  <div className="h-14 bg-ih-bg-card border-b border-ih-border flex items-center px-4 gap-3">
 
  {/* Left zone: navigation + identity + progress + save status + status badge */}
- <div className="flex items-center gap-3 min-w-0 flex-1">
+ <div data-testid="header-identity" className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
  {listHref ? (
   <a href={listHref} onClick={onBackClick} aria-label={m.common_back()} className={BACK_CLASS}>{backIcon}</a>
  ) : (
@@ -140,7 +142,7 @@ export function EditorHeader({
 
  {/* Completion progress [INFORMATION] — the least critical info; drops out
      first on narrow widths so identity + status stay legible. */}
- <div className="hidden 2xl:flex items-center">
+ <div data-testid="header-progress" className="hidden min-[2400px]:flex items-center">
  {(() => {
   const stats = state.overallStats();
   return (
@@ -159,7 +161,7 @@ export function EditorHeader({
  <SaveStatusIndicator status={state.saveStatus} />
 
  {/* Status badge */}
- <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-ih-bg-muted text-ih-fg-2 ring-ih-border inline-flex items-center">
+ <span data-testid="header-status" className="hidden min-[1400px]:inline-flex shrink-0 whitespace-nowrap px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-ih-bg-muted text-ih-fg-2 ring-ih-border items-center">
   {state.inspection.status as string}
  </span>
 
@@ -179,14 +181,15 @@ export function EditorHeader({
      at the same breakpoint; only version history reappears in the More menu.
      Search does not: typing into a popover is worse than not offering it, and
      an inspector on a tablet navigates by section rail, not by search. */}
- <div className={`${HEADER_OVERFLOW.versionHistory.inline} items-center gap-2`}>
+ <div data-testid="header-search" className={`${HEADER_OVERFLOW.versionHistory.inline} items-center gap-2 shrink-0`}>
  {/* Search */}
  <input
   type="text"
   placeholder={m.editor_header_search_placeholder()}
+  aria-label={m.editor_header_search_placeholder()}
   value={state.searchQuery}
   onChange={(e) => state.setSearchQuery(e.target.value)}
-  className="w-44 h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
+  className="w-36 h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
  />
 
  {/* Item fullscreen + batch mode moved OUT of the header — object-scoped
@@ -194,7 +197,7 @@ export function EditorHeader({
      item list column). The header holds global actions only. */}
 
  {/* #181 — Version history (only when collab editing is enabled) */}
- {collabEditing && caps.versionHistory && (
+ {collabEditing && caps.versionHistory && !readOnly && (
   <IconButton
   aria-label={m.editor_header_version_history()}
   onClick={() => onOpenVersionHistory?.()}
@@ -208,7 +211,7 @@ export function EditorHeader({
  </div>
 
  {/* Right zone: theme + settings + preview + preview PDF + sign now + publish */}
- <div className="flex items-center gap-2">
+ <div data-testid="header-actions" className="flex items-center gap-2 shrink-0 whitespace-nowrap">
  {/* Theme — the shared 4-segment control (auto/light/dark/field), same as the
      tenant sidebar. Shown from xl up where the header has room; narrower
      widths reach it through the mobile Theme drawer. */}
@@ -221,7 +224,7 @@ export function EditorHeader({
      least discoverable. The label collapses on narrow widths (where its
      text-button neighbours hide entirely) but the button itself never
      does — nothing else opens this sheet. */}
- {caps.settingsSheet && <Button
+ {caps.settingsSheet && !readOnly && <Button
   variant="secondary"
   size="md"
   aria-label={m.editor_header_settings()}
@@ -249,18 +252,18 @@ export function EditorHeader({
   </svg>
   }
  >
-  <span className="hidden lg:inline">{m.editor_header_settings()}</span>
+  <span className="hidden min-[1920px]:inline">{m.editor_header_settings()}</span>
  </Button>}
 
  {/* Template menu [config] — global template actions consolidated here
      (swap template · save as new · update source), replacing the buttons
      that used to sit at the section-rail bottom. */}
- <TemplateMenu
+ {!readOnly && <TemplateMenu
   onChangeTemplate={caps.settingsSheet ? onChangeTemplate : null}
   onSaveAsNewTemplate={onSaveAsNewTemplate}
   onUpdateSourceTemplate={onUpdateSourceTemplate}
   canUpdateSource={canUpdateSourceTemplate}
- />
+ />}
 
  {/* Preview [CHECK tier] — the report's two fidelities behind one control.
      Never hides: it is the rehearsal for Publish, and Publish never hides.
@@ -283,7 +286,7 @@ export function EditorHeader({
  )}
 
  {/* Sign now button */}
- <Button
+ {!readOnly && <Button
   variant="secondary"
   size="md"
   onClick={() => setSignModalOpen(true)}
@@ -292,12 +295,12 @@ export function EditorHeader({
   icon={<Icon name="edit" className="w-3.5 h-3.5" />}
  >
   {m.editor_header_sign()}
- </Button>
+ </Button>}
 
  {/* Finish fieldwork — advisory order-lifecycle move, shown until the
      on-site work is marked complete. Publishing does not require it. A more
      central action than Sign (xl-only), so it appears from lg up. */}
- {(state.inspection.status as string) !== "completed" && (
+ {!readOnly && (state.inspection.status as string) !== "completed" && (
  <Button
   variant="secondary"
   size="md"
@@ -317,10 +320,10 @@ export function EditorHeader({
  <HeaderOverflowMenu
   onSign={() => setSignModalOpen(true)}
   onFinishFieldwork={
-   (state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null
+   !readOnly && (state.inspection.status as string) !== "completed" ? handleFinishFieldwork : null
   }
   finishingFieldwork={finishingFieldwork}
-  onOpenVersionHistory={collabEditing && caps.versionHistory && onOpenVersionHistory ? onOpenVersionHistory : null}
+  onOpenVersionHistory={collabEditing && caps.versionHistory && onOpenVersionHistory && !readOnly ? onOpenVersionHistory : null}
   /* Full width in the menu: at its intrinsic size the four segments sit in
      a short pill against a much wider panel, reading as a stray chip rather
      than a control. */
@@ -328,7 +331,7 @@ export function EditorHeader({
  />
 
  {/* Publish button */}
- <Button
+ {!readOnly && <Button
   variant="primary"
   onClick={onPublishClick}
   // pending (not disabled) keeps focus on the button; see Button. onPublishClick also refuses re-entry.
@@ -351,7 +354,7 @@ export function EditorHeader({
   }
  >
   {openingPublish ? m.report_publish_checking() : m.editor_header_publish()}
- </Button>
+ </Button>}
  </div>
 
  </div>

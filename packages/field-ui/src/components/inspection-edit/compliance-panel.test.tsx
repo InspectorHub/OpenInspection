@@ -212,6 +212,66 @@ describe("CompliancePanel sign-off", () => {
     ]);
   });
 
+  it("every input has an accessible name, not only a placeholder", () => {
+    renderPanel(base, { role: "owner" });
+    const card = screen.getByTestId("signoff-pcr_reviewer");
+    for (const label of ["Person ID", "Name", /license/i]) expect(within(card).getByLabelText(label)).toBeTruthy();
+  });
+
+  it("each label is a block, so it sits above its input without a baseline gap", () => {
+    renderPanel(base, { role: "owner" });
+    const card = screen.getByTestId("signoff-pcr_reviewer");
+    for (const text of ["Person ID", "Name", /license/i]) expect(within(card).getByText(text, { selector: "span" }).className).toContain("block");
+  });
+
+  it("CONTROL - a non-owner is not offered the person inputs, only the license", () => {
+    renderPanel(base, { role: "inspector" });
+    const card = screen.getByTestId("signoff-pcr_reviewer");
+    expect(within(card).queryByLabelText("Person ID")).toBeNull();
+    expect(within(card).getByLabelText(/license/i)).toBeTruthy();
+  });
+
+  it("clears what was typed after an accepted sign-off", async () => {
+    const { fake } = renderPanel(base, { role: "owner" });
+    const card = screen.getByTestId("signoff-pcr_reviewer");
+    fireEvent.change(within(card).getByLabelText("Person ID"), { target: { value: "P-7" } });
+    fireEvent.change(within(card).getByLabelText("Name"), { target: { value: "Ada" } });
+    fireEvent.change(within(card).getByLabelText(/license/i), { target: { value: "L-1" } });
+    fireEvent.click(within(card).getByRole("checkbox"));
+    fireEvent.click(within(card).getByRole("button", { name: /sign off/i }));
+    await waitFor(() => expect(fake.reloadCount).toBe(1));
+    for (const label of ["Person ID", "Name", /license/i]) expect((within(card).getByLabelText(label) as HTMLInputElement).value).toBe("");
+    expect((within(card).getByRole("checkbox") as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("CONTROL - a refused sign-off keeps what was typed", async () => {
+    const { fake } = renderPanel(base, { role: "owner" });
+    fake.failExecute("compliance", "refused");
+    const card = screen.getByTestId("signoff-pcr_reviewer");
+    fireEvent.change(within(card).getByLabelText("Person ID"), { target: { value: "P-7" } });
+    fireEvent.change(within(card).getByLabelText("Name"), { target: { value: "Ada" } });
+    fireEvent.click(within(card).getByRole("button", { name: /sign off/i }));
+    await waitFor(() => expect(fake.notifications).toHaveLength(1));
+    expect((within(card).getByLabelText("Person ID") as HTMLInputElement).value).toBe("P-7");
+  });
+
+  it("after an accepted removal the license of the removed sign-off is not offered again", async () => {
+    const signed = { ...base, reportSignoffs: [{ role: "pcr_reviewer" as const, personId: "P-2", name: "Ada Lovelace", license: "L9", signedAt: Date.UTC(2026, 0, 15, 23, 30) }] };
+    const fake: FakeDataSource = createFakeDataSource({ data: createEmptyEditorData(), session: { role: "owner" } });
+    const tree = (data: CompliancePanelData) => (
+      <FieldDataSourceProvider dataSource={fake}>
+        <CompliancePanel inspectionId="i1" data={data} />
+      </FieldDataSourceProvider>
+    );
+    const { rerender } = render(tree(signed));
+    const card = screen.getByTestId("signoff-pcr_reviewer");
+    fireEvent.click(within(card).getByRole("button", { name: /remove/i }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: /remove/i }));
+    await waitFor(() => expect(fake.reloadCount).toBe(1));
+    rerender(tree(base));
+    expect((within(screen.getByTestId("signoff-pcr_reviewer")).getByLabelText(/license/i) as HTMLInputElement).value).toBe("");
+  });
+
   describe("naming a person", () => {
     const typeInto = (card: HTMLElement, placeholder: string, value: string) =>
       fireEvent.change(within(card).getByPlaceholderText(placeholder), { target: { value } });

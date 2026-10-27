@@ -8,6 +8,7 @@ import { CommentLibraryList } from "./CommentLibraryList";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import type { EditorMode } from "../editor-shared/editor-mode";
 import { useFieldDataSource } from "../../context";
+import { useReadOnly } from "../../read-only";
 import { m } from "../../i18n";
 
 interface SideRailProps {
@@ -30,6 +31,8 @@ interface SideRailProps {
   onLibraryTabChange?: (open: boolean) => void;
   /** Initial open state — used only in server-rendered tests (defaults false). */
   initialOpen?: boolean;
+  /** In a bottom drawer: starts open, and the panel fills the sheet instead of the desktop's 256px column. */
+  fill?: boolean;
   /** Authoring unification Plan-4 module K — tenant defect_categories color
    *  lookup (keyed by name AND id), forwarded to the preview tab's
    *  CannedCommentRow chip so a configured color renders here too. */
@@ -44,10 +47,13 @@ const TABS: Array<{ id: TabId; label: () => string; icon: string }> = [
   { id: "photos", label: () => m.editor_siderail_tab_photos(), icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
 ];
 
-export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, categoryColor, locale }: SideRailProps) {
+export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, fill = false, categoryColor, locale }: SideRailProps) {
   const { urls, resources } = useFieldDataSource();
+  const readOnly = useReadOnly();
   const [activeTab, setActiveTab] = useState<TabId>("preview");
-  const [open, setOpen] = useState(initialOpen ?? false);
+  const [openState, setOpen] = useState(initialOpen ?? false);
+  // In a bottom drawer the panel is the drawer's content: the drawer's own close dismisses it, nothing collapses it.
+  const open = fill || openState;
   // Photos: fill-only (Plan 1). Library: rich-only in fill mode — the canned
   // library is meaningless for a data-entry item (module E). Either tab is also
   // left out when the host does not provide what it lists (the comment library,
@@ -55,9 +61,14 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
   const hideLibrary = mode === "fill" && !!activeItem && activeItem.type !== "rich";
   const visibleTabs = TABS.filter((t) => {
     if (t.id === "photos" && (mode !== "fill" || !resources.mediaPool)) return false;
-    if (t.id === "library" && (hideLibrary || !resources.commentsLibrary)) return false;
+    if (t.id === "library" && (hideLibrary || readOnly || !resources.commentsLibrary)) return false;
     return true;
   });
+  // A result stores a photo as an entry object (a bare key in older data). A video is not an image, and an entry with no
+  // key (a photo still waiting to upload) has nothing to show or download.
+  const photoKeys = (Array.isArray(activeResult?.photos) ? (activeResult.photos as Array<string | { key?: string; mediaType?: string } | null>) : [])
+    .map((p) => (typeof p === "string" ? p : p?.mediaType === "video" ? "" : p?.key ?? ""))
+    .filter((k) => k !== "");
   const effectiveTab = visibleTabs.some((t) => t.id === activeTab) ? activeTab : "preview";
 
   // If the active item switches to non-rich while the Library tab is selected,
@@ -72,6 +83,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
   }, [hideLibrary, activeTab, onLibraryTabChange]);
 
   const toggle = (tabId: TabId) => {
+    if (fill && activeTab === tabId) return;
     if (activeTab === tabId && open) {
       setOpen(false);
       if (tabId === "library") onLibraryTabChange?.(false);
@@ -94,14 +106,16 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
     <div className="flex h-full">
       {/* Content panel (256px, left of tab strip) */}
       {open && (
-        <div className="w-64 border-l border-ih-border bg-ih-bg-card flex flex-col overflow-hidden">
+        <div className={`${fill ? "flex-1 min-w-0" : "w-64"} border-l border-ih-border bg-ih-bg-card flex flex-col overflow-hidden`}>
           <div className="flex items-center justify-between px-3 py-2 border-b border-ih-border">
             <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 capitalize">{effectiveTab}</span>
-            <IconButton onClick={closePanel} aria-label={m.editor_siderail_close_panel()} size="sm" className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2">
-              <Icon name="x" size={14} />
-            </IconButton>
+            {!fill && (
+              <IconButton onClick={closePanel} aria-label={m.editor_siderail_close_panel()} size="sm" className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2">
+                <Icon name="x" size={14} />
+              </IconButton>
+            )}
           </div>
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className={`flex-1 overflow-y-auto p-3${fill ? " overflow-x-hidden" : ""}`}>
             {effectiveTab === "preview" && (
               activeItem && activeResult ? (
                 <div className="space-y-3">
@@ -177,11 +191,11 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                   })()}
 
                   {/* Photos */}
-                  {Array.isArray(activeResult.photos) && (activeResult.photos as string[]).length > 0 && (
+                  {photoKeys.length > 0 && (
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-3">{m.editor_siderail_tab_photos()}</span>
                       <div className="mt-1 grid grid-cols-3 gap-1">
-                        {(activeResult.photos as string[]).map((key, i) => {
+                        {photoKeys.map((key, i) => {
                           const url = urls.photo(inspectionId ?? "", key);
                           const name = photoDisplayName(key);
                           return (
@@ -195,6 +209,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                               <img
                                 src={url}
                                 alt={name}
+                                loading="lazy"
                                 className="w-full aspect-square object-cover rounded border border-ih-border"
                               />
                             </a>
@@ -248,7 +263,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
             className={`relative w-10 flex flex-col items-center gap-0.5 py-2.5 rounded-r-md transition-all ${
               effectiveTab === tab.id && open
                 ? "bg-ih-bg-card text-ih-primary-text shadow-ih-card border-l-2 border-ih-primary -ml-px"
-                : "text-ih-fg-4 hover:text-ih-fg-2"
+                : "text-ih-fg-3 hover:text-ih-fg-2"
             }`}
             title={tab.label()}
           >

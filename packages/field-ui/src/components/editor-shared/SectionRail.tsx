@@ -35,6 +35,8 @@ interface SharedSectionRailProps {
  activeUnitId?: string | null;
  sectionProgress?: (sectionId: string) => { total: number; rated: number; percent: number; hasDefect: boolean };
  sectionDefectCount?: (sectionId: string) => number;
+ /** In a bottom drawer the rail fills the sheet instead of the desktop's fixed 200px column. */
+ fullWidth?: boolean;
  /** Whether the report-scoped "Inspection Details" overview entry is active. */
  overviewActive?: boolean;
  /** Called when the user selects the "Inspection Details" overview entry. */
@@ -98,6 +100,7 @@ export function SectionRail({
  sectionProgress,
  sectionDefectCount,
  overviewActive = false,
+ fullWidth = false,
  onSelectOverview,
  onAddSection,
  onDuplicateSection,
@@ -128,7 +131,7 @@ export function SectionRail({
  });
 
  return (
- <aside data-shortcut-scope className="w-[200px] flex-shrink-0 border-r border-ih-border overflow-y-auto bg-ih-bg-app/50">
+ <aside data-shortcut-scope className={`${fullWidth ? "w-full" : "w-[200px] flex-shrink-0 border-r"} border-ih-border overflow-y-auto bg-ih-bg-app/50`}>
  <nav className="p-2 space-y-0.5">
   {/* Report-scoped overview entry — sits above section list, no progress donut */}
   {mode === 'fill' && (
@@ -189,7 +192,7 @@ export function SectionRail({
    }
   }}
   className={`group relative flex items-stretch rounded-md text-[13px] transition-all ${
-   activeSection === section.id
+   activeSection === section.id && !overviewActive
     ? "bg-ih-primary-tint text-ih-primary-text font-bold border-l-2 border-ih-primary"
     : "text-ih-fg-3 hover:bg-ih-bg-muted"
   }`}
@@ -309,7 +312,7 @@ export function SectionRail({
    size="sm"
    onClick={onAddSection}
    data-testid="add-section-btn"
-   className="w-full justify-start h-auto py-2 border border-dashed border-ih-border text-ih-fg-4 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
+   className="w-full justify-start h-auto py-2 border border-dashed border-ih-border text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
   >
    {m.editor_shared_add_section()}
   </Button>

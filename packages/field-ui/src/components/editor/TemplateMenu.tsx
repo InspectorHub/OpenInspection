@@ -43,12 +43,13 @@ export function TemplateMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         title={m.template_menu_template()}
+        aria-label={m.template_menu_template()}
         className="border-none bg-transparent text-ih-fg-3 hover:bg-ih-bg-muted"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 0 1 2-2h5l2 2h5a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6Z" />
         </svg>
-        <span className="hidden lg:inline">{m.template_menu_template()}</span>
+        <span className="hidden min-[1920px]:inline">{m.template_menu_template()}</span>
         <svg className="w-3 h-3 text-ih-fg-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>

@@ -24,7 +24,7 @@ The root entry exports:
 
 | Group | Exports |
 |---|---|
-| The editor | `FieldEditor` (props: `{ data: EditorData }`) |
+| The editor | `FieldEditor` (props: `{ data: EditorData; readOnly?: boolean }`) |
 | Host contract | `FieldDataSourceProvider`, `useFieldDataSource`, `useFieldCommand`, `useFieldEnsureHuman`, `useFieldSlots`, `isIgnored`, `setFieldLocale`, `bindFieldLocaleSource`, and the TypeScript types of the contract (`FieldDataSource`, `FieldHostSlots`, `FieldUrls`, `FieldResources`, `EditorData`, `SessionInfo`, and so on) |
 | Finding keys | `findingKey`, `findingsForUnit`, `isMetaKey` (the same functions the server uses to address a result) |
 | Photo decoding | `DecodeImageError`, `isDecodeImageError` (matches by error name, so it works across two copies of the package), and the types `DecodeImage`, `DecodeImageOptions`, `DecodedImage` (see `media` below) |
@@ -45,6 +45,13 @@ setFieldLocale(session.locale); // and keep it in step with the host's own local
   <FieldEditor data={editorData} />
 </FieldDataSourceProvider>
 ```
+
+Pass `readOnly` to show an inspection for reading only. Nothing in a read-only editor can write: the results document is
+never handed to a write helper, every write on the data source (commands, uploads, the media store, the resource writes)
+is refused with "This inspection is read-only.", and the controls that write (rating row, notes input, add-photo tile,
+publish, sign, finish, structure and template editing, settings, units, cost items, batch and Speed mode) are not
+rendered. Navigation, the section and item lists, the rating as an indicator, notes as text, photos and their viewer, the
+preview and updates from other people keep working. Without `readOnly` nothing changes.
 
 What the host has to provide:
 

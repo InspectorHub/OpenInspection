@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, useActionLatch } from "@core/shared-ui";
 import { runWithPending } from "./publish-pending";
+import { useReadOnly } from "../../read-only";
 import { m } from "../../i18n";
 
 export interface TabletActionsProps {
@@ -17,12 +18,13 @@ export interface TabletActionsProps {
 export function TabletActions({ onPreview, onPublish }: TabletActionsProps) {
   const [opening, setOpening] = useState(false);
   const latch = useActionLatch(opening);
+  const readOnly = useReadOnly();
   return (
     <>
       <Button variant="ghost" size="sm" className="min-h-11 touch-manipulation" onClick={onPreview}>
         {m.editor_route_drawer_preview()}
       </Button>
-      <Button
+      {!readOnly && <Button
         variant="primary"
         size="sm"
         className="min-h-11 touch-manipulation"
@@ -31,7 +33,7 @@ export function TabletActions({ onPreview, onPublish }: TabletActionsProps) {
         onClick={() => latch(() => runWithPending(onPublish, setOpening))}
       >
         {opening ? m.report_publish_checking() : m.editor_header_publish()}
-      </Button>
+      </Button>}
     </>
   );
 }

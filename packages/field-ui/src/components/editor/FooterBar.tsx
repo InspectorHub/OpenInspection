@@ -14,6 +14,8 @@ interface FooterBarProps {
 export function FooterBar({ connected = false, status, roster = [] }: FooterBarProps) {
   const effectiveStatus: PresenceStatus = status ?? (connected ? "connected" : "connecting");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // A person with two connections (two tabs) is listed twice by the server; they are one avatar.
+  const people = [...new Map(roster.map((u) => [u.userId, u])).values()];
   const { commentsLibrary } = useEditorCapabilities();
 
   const SHORTCUTS = [
@@ -67,7 +69,7 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
       {/* Presence roster */}
       {roster.length > 0 && (
         <div className="flex items-center gap-1 mr-2">
-          {roster.slice(0, 5).map((user) => (
+          {people.slice(0, 5).map((user) => (
             <div
               key={user.userId}
               className="w-6 h-6 rounded-full bg-ih-primary text-ih-fg-inverse text-[10px] font-bold flex items-center justify-center ring-2 ring-ih-bg-card"
@@ -76,8 +78,8 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
               {user.name.charAt(0).toUpperCase()}
             </div>
           ))}
-          {roster.length > 5 && (
-            <span className="text-[10px] text-ih-fg-3 ml-1">+{roster.length - 5}</span>
+          {people.length > 5 && (
+            <span className="text-[10px] text-ih-fg-3 ml-1">+{people.length - 5}</span>
           )}
         </div>
       )}

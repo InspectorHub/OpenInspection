@@ -2,6 +2,7 @@ import { useMemo, useCallback, useEffect, useRef, useState } from "react";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
 import { isIgnored, useFieldCommand } from "../../context";
 import { isDedicatedFactKey } from "../../shared/property-facts-keys";
+import { useReadOnly } from "../../read-only";
 import { m } from "../../i18n";
 
 interface MetadataField {
@@ -64,6 +65,7 @@ interface PropertyInfoFormProps {
 }
 
 export function PropertyInfoForm({ inspection, templateFields, propertyAddress, onSave, onCommit }: PropertyInfoFormProps) {
+  const readOnly = useReadOnly();
   const defaultFields = inspection.propertyType === "commercial" ? commercialFields() : residentialFields();
   const metaFields = templateFields?.length ? templateFields : defaultFields;
 
@@ -219,7 +221,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
           <h2 className="text-2xl font-bold tracking-tight text-ih-fg-1">
             {(propertyAddress || inspection.propertyAddress as string) || m.editor_property_fallback()}
           </h2>
-          <button
+          {!readOnly && <button
             type="button"
             // Only the in-flight part is aria-disabled (focus stays on the button); too-short stays native.
             {...pendingProps(autofilling, () => void runAutofill())}
@@ -227,7 +229,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
             className={`h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-primary-text hover:bg-ih-primary-tint disabled:opacity-50 disabled:cursor-not-allowed ${PENDING_CLASS}`}
           >
             {autofilling ? m.editor_property_autofill_loading() : m.editor_property_autofill_button()}
-          </button>
+          </button>}
         </div>
         {autofillMsg && <p className="mt-2 text-[12px] text-ih-fg-3">{autofillMsg}</p>}
       </header>
@@ -244,7 +246,12 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
                     <span className="text-[9px] font-semibold text-ih-primary-text normal-case tracking-normal">{m.editor_property_prefilled()}</span>
                   )}
                 </span>
-                {(f.type === "text" || f.type === "number" || f.type === "date") && (
+                {readOnly && (
+                  <p data-testid={`property-value-${f.id}`} className="mt-1 text-[13px] text-ih-fg-1 min-h-9 flex items-center">
+                    {f.type === "boolean" ? (inspection[f.id] ? "✓" : "—") : String(inspection[f.id] ?? "") || "—"}
+                  </p>
+                )}
+                {!readOnly && (f.type === "text" || f.type === "number" || f.type === "date") && (
                   <input
                     type={f.type}
                     value={(inspection[f.id] as string | number) ?? ""}
@@ -254,7 +261,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
                     className="ih-input mt-1 w-full"
                   />
                 )}
-                {f.type === "select" && (
+                {!readOnly && f.type === "select" && (
                   <select
                     value={(inspection[f.id] as string) ?? ""}
                     onChange={(e) => { onSave?.(f.id, e.target.value); commitAll(f, e.target.value); }}
@@ -266,7 +273,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
                     ))}
                   </select>
                 )}
-                {f.type === "boolean" && (
+                {!readOnly && f.type === "boolean" && (
                   <div className="mt-1 flex items-center h-10">
                     <input
                       type="checkbox"

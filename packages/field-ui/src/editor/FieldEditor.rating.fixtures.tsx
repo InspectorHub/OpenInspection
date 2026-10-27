@@ -44,10 +44,11 @@ export interface RatingMountOptions {
   platform?: FieldDataSource["platform"];
   data?: EditorData;
   resources?: Partial<FieldResources>;
+  readOnly?: boolean;
 }
 
 /** Mounts the editor at `width` (390 phone, 834 tablet, 1280 desktop) and captures the results document it connects. */
-export function mountForRatings(width: number, { platform = "web", data = RATING_DATA, resources }: RatingMountOptions = {}): RatingMount {
+export function mountForRatings(width: number, { platform = "web", data = RATING_DATA, resources, readOnly }: RatingMountOptions = {}): RatingMount {
   stubViewport(width);
   stubCamera(true);
   const fake = createFakeDataSource({ data, session: { collabEditing: true, tenantSlug: null }, platform, resources });
@@ -60,7 +61,7 @@ export function mountForRatings(width: number, { platform = "web", data = RATING
   };
   render(
     <FieldDataSourceProvider dataSource={fake} slots={{ humanCheck: "not-required", renderUnsavedGuard: () => <div data-testid="unsaved-guard" /> }}>
-      <FieldEditor data={data} />
+      <FieldEditor data={data} readOnly={readOnly} />
     </FieldDataSourceProvider>,
   );
   return {

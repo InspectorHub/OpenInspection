@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi } from 'vitest';
+import { describe, vi } from 'vitest';
 import { SectionRail } from './SectionRail';
 
 const sections = [
@@ -84,4 +84,40 @@ test('touch targets: the drag handle and the options button grow to 44px on a co
   expect(options?.className).toContain('pointer-coarse:min-w-11');
   expect(options?.className).toContain('pointer-coarse:min-h-11');
   expect(options?.className).toContain('w-6 h-6');
+});
+
+// Exactly one row is the current one: Inspection Details while its view is open, otherwise the open section.
+describe('which row is highlighted', () => {
+  const rows = (overviewActive: boolean) => {
+    render(
+      <SectionRail
+        mode="fill"
+        sections={sections}
+        activeSection="s1"
+        onSelect={() => {}}
+        results={{}}
+        sectionProgress={() => ({ total: 2, rated: 1, percent: 50, hasDefect: false })}
+        onSelectOverview={() => {}}
+        overviewActive={overviewActive}
+      />,
+    );
+    const lit = (el: HTMLElement | null) => !!el?.className.includes('bg-ih-primary-tint');
+    return { details: lit(screen.getByTestId('inspection-details-entry')), roof: lit(screen.getByText('Roof').closest('[class*="group"]') as HTMLElement) };
+  };
+
+  test('with Inspection Details open only that entry is highlighted', () => {
+    expect(rows(true)).toEqual({ details: true, roof: false });
+  });
+
+  test('CONTROL - otherwise only the open section is', () => {
+    expect(rows(false)).toEqual({ details: false, roof: true });
+  });
+});
+
+// Small text on the rail uses the fg-3 text tier (4.5:1 in both themes); fg-4 is the decoration tier (3.4:1 in dark).
+test('the Add section label is the fg-3 text tier', () => {
+  render(<SectionRail mode="author" sections={sections} activeSection="s1" onSelect={() => {}} onAddSection={() => {}} />);
+  const cls = screen.getByTestId('add-section-btn').className;
+  expect(cls).toContain('text-ih-fg-3');
+  expect(cls).not.toContain('text-ih-fg-4');
 });

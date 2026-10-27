@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Button, Icon, MenuItem, Popover } from "@core/shared-ui";
-import { HEADER_OVERFLOW } from "./header-visibility";
+import { HEADER_OVERFLOW, overflowTriggerHide } from "./header-visibility";
+import { useReadOnly } from "../../read-only";
 import { m } from "../../i18n";
 
 export interface HeaderOverflowMenuProps {
@@ -27,8 +28,8 @@ export interface HeaderOverflowMenuProps {
  * "priority+" bar would be the textbook answer, but it renders nothing useful
  * during SSR and costs bundle this Worker does not have.
  *
- * The trigger itself is `xl:hidden`: Sign, version history and the theme
- * control all reappear at `xl`, so at that width the menu would be empty.
+ * The trigger itself is hidden from the widest pivot among the rows it holds (`overflowTriggerHide`): from there every
+ * control it holds is inline again and the menu would be empty; with no row at all it is not rendered.
  */
 export function HeaderOverflowMenu({
   onSign,
@@ -39,12 +40,22 @@ export function HeaderOverflowMenu({
 }: HeaderOverflowMenuProps) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
+  const readOnly = useReadOnly();
 
   const run = (fn: () => void) => {
     setOpen(false);
     fn();
   };
 
+  // Sign, finish and version history all write, so a read-only editor holds only the theme row. The trigger is there only
+  // while a row it holds is hidden inline, and not at all when it holds none.
+  const triggerHide = overflowTriggerHide([
+    ...(readOnly ? [] : (['sign'] as const)),
+    ...(onFinishFieldwork ? (['finishFieldwork'] as const) : []),
+    ...(onOpenVersionHistory ? (['versionHistory'] as const) : []),
+    ...(themeControl ? (['theme'] as const) : []),
+  ]);
+  if (triggerHide === null) return null;
   return (
     <>
       <Button
@@ -56,7 +67,7 @@ export function HeaderOverflowMenu({
         aria-expanded={open}
         aria-label={m.editor_header_more()}
         title={m.editor_header_more()}
-        className="xl:hidden"
+        className={triggerHide}
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01" />
@@ -67,7 +78,7 @@ export function HeaderOverflowMenu({
         {/* Wide enough that the four-segment theme control in the last row
             breathes; the action rows above are far shorter than this. */}
         <ul role="menu" aria-label={m.editor_header_more()} className="py-1 min-w-[260px]">
-          <li role="none">
+          {!readOnly && <li role="none">
             <MenuItem
               data-testid="overflow-sign-btn"
               className={HEADER_OVERFLOW.sign.row}
@@ -76,7 +87,7 @@ export function HeaderOverflowMenu({
             >
               {m.editor_header_sign()}
             </MenuItem>
-          </li>
+          </li>}
           {onFinishFieldwork && (
             <li role="none">
               <MenuItem

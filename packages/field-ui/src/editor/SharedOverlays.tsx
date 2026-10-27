@@ -5,7 +5,8 @@ import { BurstCamera } from "../components/editor/BurstCamera";
 import { PhotoAnnotator } from "../components/media-studio/PhotoAnnotator";
 import { CoverCropper, coverCropFor } from "../components/media-studio/CoverCropper";
 import { PhotoCropper } from "../components/media-studio/PhotoCropper";
-import { MediaViewer } from "../components/media-studio/MediaViewer";
+import { MediaViewer, ALL_MEDIA_ACTIONS } from "../components/media-studio/MediaViewer";
+import { useReadOnly } from "../read-only";
 import { PosterPicker } from "../components/media-studio/PosterPicker";
 import { fullResUrl } from "../components/media-studio/cropImage";
 import { RecropWarningModal } from "../components/editor/RecropWarningModal";
@@ -120,6 +121,7 @@ export function SharedOverlays({
     setPhotoCropTarget, recropWarn, setRecropWarn, galleryCropSource, setGalleryCropSource, sessionCoverCrop,
     setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave,
   } = photoOps;
+  const readOnly = useReadOnly();
   return (
     <>
  {/* Burst camera overlay */}
@@ -176,7 +178,7 @@ export function SharedOverlays({
  index={viewer.index}
  onClose={() => setViewer((v) => ({ ...v, index: null }))}
  onAction={onViewerAction}
- hideActions={caps.video ? undefined : ["poster"]}
+ hideActions={readOnly ? ALL_MEDIA_ACTIONS : caps.video ? undefined : ["poster"]}
  streamCustomerSubdomain={streamCustomerSubdomain}
  inspectionId={inspectionId}
  />

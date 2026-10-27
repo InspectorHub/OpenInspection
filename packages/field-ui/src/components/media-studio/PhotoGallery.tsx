@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PhotoGrid } from "./PhotoGrid";
-import { MediaViewer, type MediaAction } from "./MediaViewer";
+import { MediaViewer, ALL_MEDIA_ACTIONS, type MediaAction } from "./MediaViewer";
+import { useReadOnly } from "../../read-only";
 import { useFieldDataSource } from "../../context";
 import type { MediaPoolListing } from "../../data-source-types";
 import { m } from "../../i18n";
@@ -21,6 +22,7 @@ export interface PhotoGalleryProps {
 }
 export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGalleryProps) {
   const mediaPool = useFieldDataSource().resources.mediaPool;
+  const readOnly = useReadOnly();
   // null until the first answer. A reload keeps the previous answer on screen until the next one lands.
   const [listing, setListing] = useState<MediaPoolListing | null>(null);
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -70,7 +72,7 @@ export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGall
         photos={photos}
         index={lightbox}
         onClose={() => setLightbox(null)}
-        hideActions={GALLERY_UNHANDLED_ACTIONS}
+        hideActions={readOnly ? ALL_MEDIA_ACTIONS : GALLERY_UNHANDLED_ACTIONS}
         onAction={(a, p) => {
           if (a === "cover") onSetCover({ key: p.key, url: p.url });
           else if (a === "annotate") onAnnotate({ key: p.key, url: p.url });

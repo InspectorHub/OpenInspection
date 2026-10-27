@@ -19,13 +19,13 @@
  */
 export const HEADER_OVERFLOW = {
   /** Manual signature — the Sign modal. */
-  sign: { inline: 'hidden xl:inline-flex', row: 'xl:hidden' },
+  sign: { inline: 'hidden min-[1400px]:inline-flex', row: 'min-[1400px]:hidden' },
   /** Advisory order-lifecycle move; the publish modal offers it too. */
-  finishFieldwork: { inline: 'hidden lg:inline-flex', row: 'lg:hidden' },
+  finishFieldwork: { inline: 'hidden 2xl:inline-flex', row: '2xl:hidden' },
   /** #181 — collab-only version history. */
   versionHistory: { inline: 'hidden xl:flex', row: 'xl:hidden' },
   /** auto / light / dark / field theme control. */
-  theme: { inline: 'hidden xl:flex', row: 'xl:hidden' },
+  theme: { inline: 'hidden min-[2100px]:flex', row: 'min-[2100px]:hidden' },
 } as const;
 
 /**
@@ -35,11 +35,33 @@ export const HEADER_OVERFLOW = {
  * ship together.
  */
 export function pivotBreakpoint(pair: { inline: string; row: string }): string | null {
-  const inlineBp = /(?:^|\s)(sm|md|lg|xl|2xl):(?:inline-flex|flex|block|inline)(?:\s|$)/.exec(pair.inline)?.[1];
-  const rowBp = /(?:^|\s)(sm|md|lg|xl|2xl):hidden(?:\s|$)/.exec(pair.row)?.[1];
+  const inlineBp = /(?:^|\s)(sm|md|lg|xl|2xl|min-\[\d+px\]):(?:inline-flex|flex|block|inline)(?:\s|$)/.exec(pair.inline)?.[1];
+  const rowBp = /(?:^|\s)(sm|md|lg|xl|2xl|min-\[\d+px\]):hidden(?:\s|$)/.exec(pair.row)?.[1];
   if (!inlineBp || !rowBp || inlineBp !== rowBp) return null;
   // The header button must also START hidden, or it shows at every width and
   // the overflow row duplicates it below the breakpoint.
   if (!/(?:^|\s)hidden(?:\s|$)/.test(pair.inline)) return null;
   return inlineBp;
+}
+
+const TAILWIND_PX: Record<string, number> = { sm: 640, md: 768, lg: 1024, xl: 1280, '2xl': 1536 };
+
+/** The width, in px, a pivot breakpoint starts at (`xl` or `min-[1400px]`). */
+function pivotPx(bp: string): number {
+  return TAILWIND_PX[bp] ?? Number(/min-\[(\d+)px\]/.exec(bp)?.[1] ?? 0);
+}
+
+/**
+ * The class that hides the More trigger where it would be empty, or null when no row is present at all. A row can be
+ * absent (no theme slot, fieldwork already finished, no collaboration, read-only), and the trigger is needed only
+ * until the widest pivot among the rows that ARE present, because from there every one of them is inline again.
+ */
+export function overflowTriggerHide(present: ReadonlyArray<keyof typeof HEADER_OVERFLOW>): string | null {
+  let widest: { px: number; cls: string } | null = null;
+  for (const key of present) {
+    const pair = HEADER_OVERFLOW[key];
+    const px = pivotPx(pivotBreakpoint(pair) ?? '');
+    if (widest === null || px > widest.px) widest = { px, cls: pair.row };
+  }
+  return widest?.cls ?? null;
 }
