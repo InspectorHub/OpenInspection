@@ -64,8 +64,18 @@ describe("TagSwatch (the library and the inspection settings)", () => {
     expect(document.querySelector(".b")?.getAttribute("style")).toContain("background-color: red");
   });
 
-  it("draws nothing for a colour that is not a plain colour, a word that is not a CSS colour, or none", () => {
-    const { container } = render(<><TagSwatch color={BAD} /><TagSwatch color="red;x" /><TagSwatch color="amber" /><TagSwatch color="slate" /><TagSwatch color={null} /></>);
+  it.each([["amber", "#f59e0b", [245, 158, 11]], ["slate", "#64748b", [100, 116, 139]], ["rose", "#f43f5e", [244, 63, 94]], ["emerald", "#10b981", [16, 185, 129]]] as const)(
+    "paints the seeded palette name %s from its hex, not the word",
+    (word, hex, [r, g, b]) => {
+      render(<TagSwatch color={word} className="p" />);
+      const style = (document.querySelector(".p")?.getAttribute("style") ?? "").replace(/\s+/g, "").toLowerCase();
+      expect(style.includes(hex) || style.includes(`rgb(${r},${g},${b})`)).toBe(true);
+      expect(style).not.toContain(word);
+    },
+  );
+
+  it("draws nothing for a colour that is not a plain colour, a word that is not a colour, or none", () => {
+    const { container } = render(<><TagSwatch color={BAD} /><TagSwatch color="red;x" /><TagSwatch color="rebeccapurple" /><TagSwatch color="foo" /><TagSwatch color={null} /></>);
     expect(container.innerHTML).toBe("");
   });
 });

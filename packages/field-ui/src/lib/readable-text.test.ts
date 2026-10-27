@@ -88,8 +88,13 @@ describe('readableTextOn for colour names', () => {
     expect(readableTextOn(name)).toBe(text);
   });
 
-  it('CONTROL - a name it has no colour for (a Tailwind-only name, transparent) leaves the caller on its own text colour', () => {
-    for (const name of ['amber', 'slate', 'transparent', 'currentColor', 'constructor', 'toString', '__proto__']) expect(readableTextOn(name)).toBeNull();
+  it.each([['amber', '#0f172a'], ['emerald', '#0f172a'], ['slate', '#ffffff'], ['rose', '#ffffff'], ['Amber', '#0f172a']])('the Tailwind palette name %s gets %s text, chosen from its hex', (name, text) => {
+    expect(readableTextOn(name)).toBe(text);
+    expect(readableTextOn(safeCssColor(name))).toBe(text);
+  });
+
+  it('CONTROL - a name it has no colour for (transparent, a keyword, a prototype key) leaves the caller on its own text colour', () => {
+    for (const name of ['transparent', 'currentColor', 'foo', 'constructor', 'toString', '__proto__']) expect(readableTextOn(name)).toBeNull();
   });
 });
 
@@ -120,9 +125,13 @@ describe('safeCssColor', () => {
     'url(https://x)', 'red; background:url(x)', 'red;', '#fff; color:red', 'expression(alert(1))', '"red"', "'red'",
     'rgb(1,2,3){}', 'rgb(1,2,url(x))', 'rgb(1,2,3', 'calc(1px + 2px)', 'var(--x)', 'var(--ih-x, url(x))', 'var(--ih-a, var(--x, #fff))', 'var(--ih-a, var(--ih-b, url(x)))', 'var(--ih-x, red; x:y)',
     '#ggg', '#12345', 'linear-gradient(red, blue)', 'red;x', 'red url(x)', 're d', 're', 'red!', 'red/*x*/',
-    // words that are not CSS colours: Tailwind names, keywords and anything else
-    'amber', 'slate', 'rose', 'emerald', 'transparent', 'currentColor', 'foo', 'rebeccapurple', 'constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__', '#fff\\', '#f\nff', 'rgb(1,2,3)/*x*/', '', '   ',
+    // words that are not colours: keywords and anything else (the four palette names are accepted above)
+    'transparent', 'currentColor', 'foo', 'rebeccapurple', 'constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__', '#fff\\', '#f\nff', 'rgb(1,2,3)/*x*/', '', '   ',
   ])('rejects %j', (c) => expect(safeCssColor(c)).toBeNull());
+
+  it.each([['amber', '#f59e0b'], ['slate', '#64748b'], ['rose', '#f43f5e'], ['emerald', '#10b981'], ['  Emerald ', '#10b981']])('returns the hex for the palette name %j, since the word is not valid CSS', (c, hex) => {
+    expect(safeCssColor(c)).toBe(hex);
+  });
 
   it('rejects what is not a string, and trims what is', () => {
     expect(safeCssColor(undefined)).toBeNull();
