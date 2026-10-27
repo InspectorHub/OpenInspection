@@ -28,6 +28,7 @@ deferred.
 | [`operate/upgrade.md`](operate/upgrade.md) | Move an existing deployment to a newer release (forward-only) — including the one-time reconcile a rebuilt baseline needs |
 | [`operate/sms-compliance.md`](operate/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
 | [`operate/rotate-jwt-keyring.md`](operate/rotate-jwt-keyring.md) | Rotating the ES256 JWT keyring without invalidating live sessions |
+| [`operate/security-headers.md`](operate/security-headers.md) | Response security headers on pages and the API, the report-only CSP, reading `csp_report` log lines, tightening to enforcement |
 
 ## Using the product
 

@@ -1,6 +1,6 @@
 {
   "_comment": "Mutating routes with no principal guard (requireRole, requireCapability, ...). Each entry needs a category from CATEGORIES in scripts/lib/mutating-route-guards.mjs and a reason verified in the handler. The list may only shrink: lower maxEntries when you remove one. needs-owner-decision is temporary.",
-  "maxEntries": 66,
+  "maxEntries": 67,
   "entries": {
     "server/api/agent-signup.ts::POST /": {
       "category": "public-by-design",
@@ -177,6 +177,10 @@
     "server/api/public/deposit-intent.ts::POST /inspections/{id}/deposit-intent": {
       "category": "public-by-design",
       "reason": "/api/public/ prefix: a client paying a booking deposit before any account; rate-limited, refuses once the visit is under way"
+    },
+    "server/api/csp-report.ts::POST /csp-report": {
+      "category": "public-by-design",
+      "reason": "/api/public/csp-report: browser CSP violation reports are sent without credentials; the handler does no database, KV, R2, email or queue work, reads at most 16 KiB, logs a sampled line and always answers 204 (the middleware chain still runs; a non-204 just drops the report)"
     },
     "server/api/public/uploads.ts::POST /uploads/photo": {
       "category": "token-track",
