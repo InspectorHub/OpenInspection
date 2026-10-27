@@ -1,3 +1,4 @@
+import { safeCssColor } from "@core/field-ui/lib/readable-text";
 import { useEffect, useRef, useState } from "react";
 import { Modal, Button, IconButton, Icon } from "@core/shared-ui";
 import type { Severity } from "@core/field-ui/lib/severity";
@@ -242,7 +243,7 @@ export function RatingSystemEditor({
                 {/* Color swatch — the level's identity */}
                 <label
                   className="relative w-9 h-9 rounded-md shrink-0 cursor-pointer ring-1 ring-inset ring-black/10 flex items-center justify-center text-[11px] font-extrabold text-white"
-                  style={{ backgroundColor: lvl.color }}
+                  style={{ backgroundColor: safeCssColor(lvl.color) ?? undefined }}
                   title={m.rating_editor_pick_color()}
                 >
                   {lvl.abbreviation.slice(0, 3) || "·"}

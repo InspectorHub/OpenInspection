@@ -1,3 +1,4 @@
+import { safeCssColor } from "@core/field-ui/lib/readable-text";
 import { useEffect, useRef, useState } from "react";
 import { Modal, Button } from "@core/shared-ui";
 import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
@@ -100,7 +101,7 @@ export function DefectCategoryEditor({
               same inline-style exemption RatingSystemEditor.tsx relies on. */}
           <label
             className="relative w-9 h-9 rounded-md shrink-0 cursor-pointer ring-1 ring-inset ring-black/10"
-            style={{ backgroundColor: color }}
+            style={{ backgroundColor: safeCssColor(color) ?? undefined }}
             title={m.defect_category_editor_pick_color()}
           >
             <input

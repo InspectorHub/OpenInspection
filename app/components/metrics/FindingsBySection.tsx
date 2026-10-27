@@ -18,6 +18,7 @@
  *
  * lint:ds — `ih-*` tokens only.
  */
+import { safeCssColor } from "@core/field-ui/lib/readable-text";
 import { useState } from "react";
 import { Card, Select, Table } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
@@ -86,7 +87,7 @@ export function FindingsBySection({ findings }: { findings: FindingsData | null 
               ...active.columns.map((col) => ({
                 label: (
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: safeCssColor(col.color) ?? undefined }} />
                     {col.label}
                   </span>
                 ),

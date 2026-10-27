@@ -1,3 +1,4 @@
+import { TagSwatch } from "~/components/TagSwatch";
 import { useEffect, useRef, useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/tags";
@@ -147,9 +148,7 @@ export default function TagsPage() {
                 label: m.library_tags_col_name(),
                 cell: (tag) => (
                   <span className="inline-flex items-center gap-2 font-semibold text-ih-fg-1">
-                    {tag.color && (
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
-                    )}
+                    <TagSwatch color={tag.color} />
                     {tag.name}
                   </span>
                 ),

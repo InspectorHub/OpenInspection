@@ -2,6 +2,7 @@
 // like brandTokens injects --ih-primary*. Consumed by report components as
 // var(--report-*). App-side re-declaration of the server StyleTokens shape
 // (app/ must not import server/lib). Colour is NOT here — that's brandTokens.
+import { safeCssColor } from "@core/field-ui/lib/readable-text";
 import type { CSSProperties } from 'react';
 
 export interface PresetTokenMap {
@@ -54,12 +55,15 @@ const TOKEN_MAP: Record<keyof PresetTokenMap, [string, string]> = {
   hair: ['--report-hair', '#e8e1d8'],
 };
 
+// The tokens that hold a colour: a profile's value is used only when it is a plain colour, else the base default applies.
+const COLOUR_KEYS: ReadonlySet<keyof PresetTokenMap> = new Set(['coverInk', 'bandColor', 'sectionFill', 'cardFill', 'paper', 'paper2', 'ink', 'muted', 'hair']);
+
 export function presetTokens(tokens: PresetTokenMap | null | undefined): CSSProperties {
   const out: Record<string, string> = {};
   const t = (tokens ?? {}) as Record<string, string>;
   for (const key of Object.keys(TOKEN_MAP) as (keyof PresetTokenMap)[]) {
     const [cssVar, base] = TOKEN_MAP[key];
-    out[cssVar] = t[key] ?? base;
+    out[cssVar] = (COLOUR_KEYS.has(key) ? safeCssColor(t[key]) : t[key]) ?? base;
   }
   return out as CSSProperties;
 }

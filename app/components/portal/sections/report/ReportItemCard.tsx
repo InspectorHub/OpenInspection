@@ -11,6 +11,7 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
+import { safeCssColor, tintOf } from "@core/field-ui/lib/readable-text";
 import type { ReactNode } from "react";
 import { m } from "~/paraglide/messages";
 import { itemDrivesSummary, itemIsUnrated } from "~/lib/report-helpers";
@@ -48,14 +49,15 @@ export function ReportItemCard({
   onToggleRepairItem,
   nested = false,
 }: ReportItemCardProps) {
+  const ratingColor = safeCssColor(item.ratingColor) ?? undefined; // from the server: only a plain colour reaches a style
   return (
     <div
       data-testid="report-item-card"
       data-nested={nested ? "true" : undefined}
       className={`bg-ih-bg-card overflow-hidden ${nested ? "border-l border-ih-border" : "border border-ih-border"} ${PRINT_CARD_CLASS}`}
       style={nested
-        ? { borderInlineStartWidth: 2, borderInlineStartColor: item.ratingColor }
-        : { borderRadius: "var(--report-radius)", borderLeftWidth: 4, borderLeftColor: item.ratingColor }}
+        ? { borderInlineStartWidth: 2, borderInlineStartColor: ratingColor }
+        : { borderRadius: "var(--report-radius)", borderLeftWidth: 4, borderLeftColor: ratingColor }}
     >
       <div className={nested ? "px-4 py-3" : "p-4"}>
         <div className="flex items-start justify-between mb-2">
@@ -66,8 +68,8 @@ export function ReportItemCard({
             <span
               className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"
               style={{
-                background: `${item.ratingColor}20`,
-                color: item.ratingColor,
+                background: tintOf(item.ratingColor, "20") ?? undefined,
+                color: ratingColor,
               }}
             >
               {item.ratingLabel}

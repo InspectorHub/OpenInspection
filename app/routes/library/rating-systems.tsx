@@ -1,3 +1,4 @@
+import { tintedChipStyle } from "@core/field-ui/lib/readable-text";
 import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
@@ -170,7 +171,7 @@ export default function RatingSystemsPage() {
                       <span
                         key={l.id || l.abbreviation}
                         className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold ring-1 ${SEVERITY_RING[l.severity] ?? "ring-ih-border-strong/30"}`}
-                        style={{ backgroundColor: l.color ? `${l.color}1a` : undefined, color: l.color || undefined }}
+                        style={tintedChipStyle(l.color)}
                         title={`${l.label} · ${SEVERITY_LABEL[l.severity]}`}
                       >
                         {l.abbreviation || l.label}
