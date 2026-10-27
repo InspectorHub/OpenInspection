@@ -98,6 +98,7 @@ function makeHarness(opts: { network?: (req: { url: string }) => Promise<Respons
             for (const n of ['static', 'user', 'meta']) if (n.includes(substr)) failingWrites.add(`openinspection-${n}-${SW_VERSION}`);
         },
         get: (p: string, mode = 'cors') => dispatch('fetch', { request: { method: 'GET', url: ORIGIN + p, mode } }),
+        send: (method: string, p: string) => dispatch('fetch', { request: { method, url: ORIGIN + p, mode: 'cors' } }),
         message: (data: unknown) => dispatch('message', { data }),
         activate: () => dispatch('activate', {}),
         install: () => dispatch('install', {}),
@@ -335,5 +336,123 @@ describe('sw.js: a failed cache write never costs the user a live response', () 
         });
         await h.get('/inspections', 'navigate');
         expect(h.allUserPaths()).toEqual([]);
+    });
+});
+
+describe('sw.js: a deleted inspection is not readable from the cache', () => {
+    const OTHER = '9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+    async function seeded(network: (req: { url: string }) => Promise<Response> = reply('data')) {
+        const h = makeHarness({ network });
+        await h.message({ type: 'set-user', marker: 'user-a' });
+        for (const id of [ID, OTHER]) {
+            await h.get(`/api/inspections/${id}`);
+            await h.get(`/api/inspections/${id}/results`);
+        }
+        return h;
+    }
+
+    it('forgets the detail and the results once the server has deleted it', async () => {
+        const h = await seeded();
+        h.setNetwork(async () => new Response('{}', { status: 200 }));
+        const out = await h.send('DELETE', `/api/inspections/${ID}`);
+        expect(out.responded).toBe(true);
+        expect(out.response?.status).toBe(200);
+        expect(h.allUserPaths().sort()).toEqual([`/api/inspections/${OTHER}`, `/api/inspections/${OTHER}/results`].sort());
+    });
+
+    it('matches the id however it is cased', async () => {
+        const h = await seeded();
+        h.setNetwork(async () => new Response('{}', { status: 200 }));
+        await h.send('DELETE', `/api/inspections/${ID.toUpperCase()}`);
+        expect(h.allUserPaths().every((p) => !p.toLowerCase().includes(ID))).toBe(true);
+    });
+
+    it('also forgets them when the server says the inspection is already gone (404, 410)', async () => {
+        for (const status of [404, 410]) {
+            const h = await seeded();
+            h.setNetwork(async () => new Response('gone', { status }));
+            await h.send('DELETE', `/api/inspections/${ID}`);
+            expect(h.allUserPaths().some((p) => p.includes(ID))).toBe(false);
+        }
+    });
+
+    it('CONTROL - a refused delete (500, 403) keeps what is cached', async () => {
+        for (const status of [500, 403]) {
+            const h = await seeded();
+            h.setNetwork(async () => new Response('no', { status }));
+            const out = await h.send('DELETE', `/api/inspections/${ID}`);
+            expect(out.response?.status).toBe(status);
+            expect(h.allUserPaths()).toHaveLength(4);
+        }
+    });
+
+    it('CONTROL - deleting another inspection keeps these, and other writes are left alone', async () => {
+        const h = await seeded();
+        h.setNetwork(async () => new Response('{}', { status: 200 }));
+        await h.send('DELETE', `/api/inspections/${OTHER}`);
+        expect(h.allUserPaths().filter((p) => p.includes(ID))).toHaveLength(2);
+        expect((await h.send('POST', `/api/inspections/${ID}/results`)).responded).toBe(false);
+        expect((await h.send('DELETE', '/api/inspections/counts')).responded).toBe(false);
+        expect(h.allUserPaths().filter((p) => p.includes(ID))).toHaveLength(2);
+    });
+});
+
+describe('sw.js: forget-inspection message (the page deletes through a route action, so the worker never sees the DELETE)', () => {
+    const OTHER = '9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+    const userCache = () => `openinspection-user-${SW_VERSION}`;
+
+    async function seeded() {
+        const h = makeHarness({ network: reply('data') });
+        await h.message({ type: 'set-user', marker: 'user-a' });
+        // A cached read, plus the page and photo entries a visit leaves behind.
+        for (const id of [ID, OTHER]) {
+            await h.get(`/api/inspections/${id}`);
+            await h.get(`/api/inspections/${id}/results`);
+        }
+        const user = h.store.get(userCache())!;
+        const stamp = () => new Response('x', { headers: { 'x-oi-user': 'user-a' } });
+        for (const p of [
+            `/inspections/${ID}`, `/inspections/${ID}/edit`, `/inspections/${ID}.data`, `/inspections/${ID}/edit.data`,
+            `/inspections/${OTHER}`, `/inspections/${OTHER}/edit`, '/inspections',
+            `/api/inspections/files/tenant1%2F${ID}%2Fitem_aaaa_roof.jpg`, `/api/inspections/files/tenant1/${ID}/item_bbbb_gutter.jpg`,
+            `/api/inspections/files/tenant1%2F${OTHER}%2Fitem_cccc_roof.jpg`,
+            `/api/inspections/files/tenant1%2F${OTHER}%2Fitem_dddd_${ID}.jpg`,
+        ]) user.set(ORIGIN + p, stamp());
+        return h;
+    }
+
+    it('forgets the cached detail, results, pages and photo files of that inspection, and nothing else', async () => {
+        const h = await seeded();
+        await h.message({ type: 'forget-inspection', id: ID });
+        const left = h.allUserPaths().map(decodeURIComponent).sort();
+        expect(left).toEqual([
+            '/inspections',
+            `/inspections/${OTHER}`, `/inspections/${OTHER}/edit`,
+            `/api/inspections/${OTHER}`, `/api/inspections/${OTHER}/results`,
+            `/api/inspections/files/tenant1/${OTHER}/item_cccc_roof.jpg`,
+            `/api/inspections/files/tenant1/${OTHER}/item_dddd_${ID}.jpg`,
+        ].sort());
+    });
+
+    it('matches the id however it is cased', async () => {
+        const h = await seeded();
+        await h.message({ type: 'forget-inspection', id: ID.toUpperCase() });
+        expect(h.allUserPaths().some((p) => decodeURIComponent(p).toLowerCase().includes(`/${ID}`) && !p.includes(OTHER))).toBe(false);
+    });
+
+    it('CONTROL - a malformed id, a missing id and other message types do nothing', async () => {
+        const h = await seeded();
+        const before = h.allUserPaths().length;
+        for (const msg of [
+            { type: 'forget-inspection', id: 'not-a-uuid' },
+            { type: 'forget-inspection', id: `${ID}/../${OTHER}` },
+            { type: 'forget-inspection', id: '*' },
+            { type: 'forget-inspection', id: 'tenant1' }, // would match every photo of that tenant if it were not a whole id
+            { type: 'forget-inspection', id: 'item_aaaa_roof.jpg' },
+            { type: 'forget-inspection' },
+            { type: 'forget-inspection', id: 42 },
+            { type: 'something-else', id: ID },
+        ]) await h.message(msg);
+        expect(h.allUserPaths()).toHaveLength(before);
     });
 });

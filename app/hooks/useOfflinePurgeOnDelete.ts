@@ -31,6 +31,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { purgeInspectionOfflineData } from "@core/field-ui/collab/offline-purge";
 import { webOfflinePurgeHost } from "~/lib/field/web-collab";
+import { forgetInspectionInServiceWorker } from "~/lib/forget-inspection";
 
 /** The shape this hook reads off the page's delete fetcher. */
 export interface DeleteFetcherLike {
@@ -49,6 +50,8 @@ export function useOfflinePurgeOnDelete(fetcher: DeleteFetcherLike): (ids: strin
         // Fire and forget: the purge never rejects, and a cleanup must not be
         // able to block or fail the deletion the user already completed.
         void Promise.all(ids.map((id) => purgeInspectionOfflineData(id, webOfflinePurgeHost)));
+        // The cached reads, pages and photo files go too: the page deletes through a route action, which the worker never sees.
+        for (const id of ids) forgetInspectionInServiceWorker(id);
     }, [fetcher.state, fetcher.data, queue]);
 
     return useCallback((ids: string[]) => {

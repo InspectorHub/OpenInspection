@@ -23,6 +23,7 @@
 //   { type: 'set-user', marker: string | null }  who is signed in now (null: nobody). A change purges USER_CACHE.
 //   { type: 'clear-user-cache' }                 purge USER_CACHE and forget the user (sign-out).
 //   { type: 'queue-changed' }                    register the background sync.
+//   { type: 'forget-inspection', id }            forget that inspection's cached reads, pages and photo files (after a delete).
 
 const SW_VERSION   = 'v4-a1';
 const STATIC_CACHE = `openinspection-static-${SW_VERSION}`;
@@ -46,6 +47,8 @@ const PRECACHE_ASSETS = [
 // None of them is UUID-shaped, so matching the id shape excludes them all without a second copy of the
 // list here; app/lib/sw.test.ts walks the server's list against this file to keep that true.
 const INSPECTION_READ = /^\/api\/inspections\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\/results)?$/i;
+const INSPECTION_ID_ONLY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INSPECTION_ID = /^\/api\/inspections\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 const PHOTO_FILE_PREFIX = '/api/inspections/files/';
 const LOGOUT_PATHS = ['/logout', '/agent-logout'];
 
@@ -99,6 +102,33 @@ async function writeMarker(marker) {
   else await cache.delete(MARKER_URL);
 }
 
+// Remove everything this device cached for one inspection: its detail and results, its pages (the document and the
+// route data of /inspections/<id> and below it), and its photo files. A photo file is identifiable only because its key
+// is `<tenant>/<inspection id>/<name>` and the URL carries the key, so a file whose URL does not show the id as a path
+// segment is left alone (it is replaced or dropped on the next read, and is never listed anywhere else).
+async function forgetInspection(id) {
+  try {
+    const want = id.toLowerCase();
+    const cache = await caches.open(USER_CACHE);
+    for (const key of await cache.keys()) {
+      const path = new URL(key.url).pathname.toLowerCase();
+      const api = `/api/inspections/${want}`;
+      const page = `/inspections/${want}`;
+      const isRead = path === api || path === `${api}/results`;
+      const isPage = path === page || path.startsWith(`${page}/`) || path.startsWith(`${page}.`);
+      let isPhoto = false;
+      if (path.startsWith(PHOTO_FILE_PREFIX)) {
+        let decoded = path;
+        try { decoded = decodeURIComponent(path); } catch { /* keep the raw path */ }
+        isPhoto = decoded.slice(PHOTO_FILE_PREFIX.length - 1).includes(`/${want}/`);
+      }
+      if (isRead || isPage || isPhoto) await cache.delete(key);
+    }
+  } catch {
+    // The cache is unavailable: the delete itself already succeeded, and the entry is replaced on the next read.
+  }
+}
+
 async function clearUserCache() {
   await writeMarker(null);
   await caches.delete(USER_CACHE);
@@ -116,6 +146,19 @@ async function setUser(marker) {
 // -- Fetch --------------------------------------------------------------------------------------
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  if (request.method === 'DELETE') {
+    // Deleting an inspection must not leave it readable from this device's cache: forget its detail and results once the
+    // server has taken it away (or says it is already gone). A refused delete changes nothing.
+    const gone = new URL(request.url);
+    const id = gone.origin === self.location.origin ? INSPECTION_ID.exec(gone.pathname)?.[1] : null;
+    if (id) {
+      event.respondWith(fetch(request).then(async (res) => {
+        if (res.ok || res.status === 404 || res.status === 410) await forgetInspection(id);
+        return res;
+      }));
+    }
+    return;
+  }
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
@@ -289,6 +332,10 @@ self.addEventListener('message', (event) => {
     event.waitUntil(setUser(data.marker));
   } else if (data.type === 'clear-user-cache') {
     event.waitUntil(clearUserCache());
+  } else if (data.type === 'forget-inspection') {
+    // Like every message here it comes from a page this worker controls (same origin, through `controller.postMessage`).
+    // The id is checked to be a whole inspection id, so a crafted one cannot match more than one inspection.
+    if (typeof data.id === 'string' && INSPECTION_ID_ONLY.test(data.id)) event.waitUntil(forgetInspection(data.id));
   }
 });
 
