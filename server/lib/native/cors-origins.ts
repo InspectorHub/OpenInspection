@@ -1,5 +1,6 @@
 import { cors } from 'hono/cors';
 import type { MiddlewareHandler } from 'hono';
+import { CSP_REPORT_PATH } from '../page-security-headers';
 
 /**
  * Page origins of the native app's WebView: iOS serves from capacitor://localhost,
@@ -42,6 +43,9 @@ const nativeCors = cors({
 
 /** CORS for /api/*: the native app origins get the extra headers, every other origin the baseline. */
 export const apiCors: MiddlewareHandler = (c, next) => {
+    // The CSP report receiver is posted to by the browser itself, same origin, and answers
+    // with no CORS headers at all: reflecting an origin back would only invite cross-site callers.
+    if (c.req.path === CSP_REPORT_PATH) return next();
     const origin = c.req.header('Origin') ?? '';
     return (NATIVE_APP_ORIGINS.includes(origin) ? nativeCors : baselineCors)(c, next);
 };

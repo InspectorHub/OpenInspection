@@ -192,6 +192,13 @@ export interface CollabConnector {
 
 export interface FieldUrls {
   photo(inspectionId: string, key: string): string;
+  /**
+   * Optional. `photo()` is synchronous, so a host that can only produce an address later (a photo it fetches and
+   * caches, a signed address it renews) calls the listener whenever any photo address may have changed; the editor then
+   * asks `photo()` again and its thumbnails, viewer and previews show the new address. Calls may be batched. Returns
+   * the unsubscribe function. Absent: addresses are read when the editor renders, as before.
+   */
+  subscribe?(listener: () => void): () => void;
   reportPreview(tenantSlug: string, inspectionId: string): string | null;
   reportPdf(inspectionId: string): string | null;
   /**

@@ -3,6 +3,7 @@ import { Button } from "@core/shared-ui";
 import type { PresenceUser, PresenceStatus } from "../../hooks/usePresence";
 import { useEditorCapabilities } from "../../hooks/useEditorCapabilities";
 import { m } from "../../i18n";
+import { useHasFinePointer } from "../../hooks/useHasFinePointer";
 
 interface FooterBarProps {
   connected?: boolean;
@@ -14,6 +15,7 @@ interface FooterBarProps {
 export function FooterBar({ connected = false, status, roster = [] }: FooterBarProps) {
   const effectiveStatus: PresenceStatus = status ?? (connected ? "connected" : "connecting");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const fine = useHasFinePointer();
   // A person with two connections (two tabs) is listed twice by the server; they are one avatar.
   const people = [...new Map(roster.map((u) => [u.userId, u])).values()];
   const { commentsLibrary } = useEditorCapabilities();
@@ -34,8 +36,8 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
   ];
 
   return (
-    <div className="hidden md:flex fixed bottom-0 inset-x-0 z-30 bg-ih-bg-card border-t border-ih-border px-4 py-1.5 items-center gap-3 text-[11px] text-ih-fg-3">
-      <div className="relative">
+    <div className="hidden md:flex fixed bottom-0 inset-x-0 z-30 bg-ih-bg-card border-t border-ih-border pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] py-1.5 items-center gap-3 text-[11px] text-ih-fg-3">
+      {fine && <div className="relative">
         <Button
           variant="secondary"
           size="sm"
@@ -62,7 +64,7 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       <span className="flex-1" />
 

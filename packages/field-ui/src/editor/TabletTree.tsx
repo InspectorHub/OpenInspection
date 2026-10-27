@@ -41,7 +41,7 @@ export function TabletTree({ appBar, listHeader, sectionTitle, list, main, empty
         <div className="flex flex-1 min-h-0 min-w-0">
           <aside
             data-testid="tablet-list-pane"
-            className="w-[clamp(280px,36vw,360px)] shrink-0 min-w-0 min-h-0 border-r border-ih-border flex flex-col"
+            className="w-[clamp(280px,36vw,360px)] shrink-0 min-w-0 min-h-0 pl-[env(safe-area-inset-left)] border-r border-ih-border flex flex-col"
           >
             {listHeader}
             <div className="sticky top-0 z-10 shrink-0 px-3 py-1.5 bg-ih-bg-card border-b border-ih-border text-[12px] font-bold text-ih-fg-2 truncate">
@@ -51,7 +51,7 @@ export function TabletTree({ appBar, listHeader, sectionTitle, list, main, empty
           </aside>
           <main
             data-testid="tablet-editor-pane"
-            className="flex-1 min-w-0 min-h-0 overflow-y-auto overscroll-contain px-5 py-4 pb-24 [@media(max-height:499px)]:py-2"
+            className="flex-1 min-w-0 min-h-0 overflow-y-auto overscroll-contain pl-5 pr-[max(1.25rem,env(safe-area-inset-right))] py-4 pb-24 [@media(max-height:499px)]:py-2"
           >
             {main}
           </main>

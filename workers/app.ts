@@ -36,6 +36,8 @@ import { withHumanToken } from "./human-token";
 import { sessionMarkerFromCookie } from "../server/lib/session-marker";
 // Imports only react-router (already above) and the logger, which imports nothing.
 import { createServerBuildTracker, finishPage } from "../server/lib/page-timing";
+// Imports page-timing (above) and a leaf that imports nothing: safe at the top level.
+import { securityHeadersForPage } from "../server/lib/page-response-headers";
 
 /** Hono context for this worker, so handlers need no `any`. */
 type Ctx = Context<{ Bindings: WorkerEnv }>;
@@ -115,13 +117,20 @@ const ssr = async (c: Ctx) => {
   // One new Response carries both the session marker and Server-Timing, so the
   // body stream is re-wrapped once, by reference, and never read.
   const marker = await sessionMarkerForPage(rendered, c.req.header("cookie"));
+  // Pages never pass through the API app's securityHeaders middleware, so they get
+  // their own set here, on the same Response: only for what finishPage treats as a
+  // page (not a redirect, 204/304 or an empty HTML answer).
+  const extraHeaders: Record<string, string> = {
+    ...securityHeadersForPage(rendered, new URL(c.req.url)),
+    ...(marker ? { "x-oi-session": marker } : {}),
+  };
   const finished = finishPage({
     request: c.req.raw,
     res: rendered,
     startedAt,
     inprocCalls: () => inprocCalls,
     getRoutes: serverBuild.getRoutes,
-    extraHeaders: marker ? { "x-oi-session": marker } : undefined,
+    extraHeaders,
   });
   // finishPage leaves a redirect or an empty HTML answer untouched (not a page),
   // but the session marker was always stamped on any HTML response: keep that.

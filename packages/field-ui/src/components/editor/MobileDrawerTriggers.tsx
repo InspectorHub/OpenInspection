@@ -21,7 +21,7 @@ export interface MobileDrawerTriggersProps {
  */
 export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerTriggersProps) {
     return (
-        <nav aria-label={m.editor_mobile_nav_label()} className="fixed left-0 right-0 bottom-0 z-30 h-[calc(3.5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-ih-bg-card border-t border-ih-border flex">
+        <nav aria-label={m.editor_mobile_nav_label()} className="fixed left-0 right-0 bottom-0 z-30 h-[calc(3.5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] bg-ih-bg-card border-t border-ih-border flex">
             {([
                 { id: 'sections', label: m.editor_mobile_drawer_sections(), icon: '☰' },
                 { id: 'items',    label: m.editor_mobile_drawer_items(),    icon: '≣' },

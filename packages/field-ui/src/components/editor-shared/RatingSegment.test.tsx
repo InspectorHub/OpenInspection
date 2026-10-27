@@ -181,3 +181,18 @@ describe("RatingSegment", () => {
     expect(tile.className).not.toContain("@container");
   });
 });
+
+describe("RatingSegment fill for a rating with no colour of its own", () => {
+  it("uses the muted surface and its foreground, not the fallback grey with white text", () => {
+    render(<RatingSegment ratings={[{ value: "x", label: "Repair", tone: "neutral" as const, color: "var(--ih-fg-5, #d4d4d8)" }]} value="x" onChange={() => {}} />);
+    const tile = screen.getByRole("radio", { name: "Repair" });
+    expect(tile.className.split(/\s+/)).toEqual(expect.arrayContaining(["bg-ih-bg-muted", "text-ih-fg-1"]));
+    expect(tile.style.background).toBe("");
+    expect(tile.style.color).toBe("");
+  });
+
+  it("CONTROL - a real colour keeps its inline fill", () => {
+    render(<RatingSegment ratings={[{ value: "x", label: "Repair", tone: "neutral" as const, color: "#ef4444" }]} value="x" onChange={() => {}} />);
+    expect(screen.getByRole("radio", { name: "Repair" }).style.color).toBe("#ffffff");
+  });
+});

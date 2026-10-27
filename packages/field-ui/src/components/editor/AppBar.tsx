@@ -82,7 +82,7 @@ export function AppBar({ platform, sectionTitle, itemLabel, onBack, onMore, tabl
     return (
         <header
             data-platform={platform}
-            className={`sticky top-0 z-30 ${height} bg-ih-bg-card border-b border-ih-border flex items-center px-2 gap-2`}
+            className={`sticky top-0 z-30 ${height} bg-ih-bg-card border-b border-ih-border flex items-center pl-[max(0.5rem,env(safe-area-inset-left))] pr-[max(0.5rem,env(safe-area-inset-right))] gap-2`}
         >
             <IconButton onClick={onBack} className={BTN} aria-label={m.common_back()}>
                 <BackGlyph platform={platform} />

@@ -1,3 +1,4 @@
+import { TagSwatch } from "~/components/TagSwatch";
 import { useState } from 'react';
 import { useLoaderData } from 'react-router';
 import { Icon, RadioGroup, Button, Modal, Banner } from "@core/shared-ui";
@@ -272,7 +273,7 @@ function SettingsInspectionPage() {
                                     }}
                                     className="w-4 h-4"
                                 />
-                                <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }} />
+                                <TagSwatch color={tag.color} className="inline-block" />
                                 <span className="text-[13px]">{tag.name}</span>
                             </li>
                         );

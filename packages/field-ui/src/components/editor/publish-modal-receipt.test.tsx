@@ -83,7 +83,7 @@ describe("PublishModal — what the dialog claims publishing does", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("records a new version");
     expect(text).toContain("does not send the report itself");
-    expect(text).toContain("Send report");
+    expect(text).toContain("send it from the inspection");
   });
 });
 

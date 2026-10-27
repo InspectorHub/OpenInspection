@@ -8,6 +8,8 @@ interface Props {
   label?: string;
 }
 
+const PAPER = { backgroundColor: "#ffffff", borderColor: "#cbd5e1" } as const;
+
 export function SignaturePad({ onSubmit, onCancel, label }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
@@ -30,7 +32,10 @@ export function SignaturePad({ onSubmit, onCancel, label }: Props) {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     const point = "touches" in e ? e.touches[0] : (e as React.MouseEvent);
-    return { x: point.clientX - rect.left, y: point.clientY - rect.top };
+    // The canvas may be drawn smaller than its 400x150 bitmap (a phone card): map the finger to bitmap pixels.
+    const sx = rect.width > 0 ? canvas.width / rect.width : 1;
+    const sy = rect.height > 0 ? canvas.height / rect.height : 1;
+    return { x: (point.clientX - rect.left) * sx, y: (point.clientY - rect.top) * sy };
   };
 
   const start = (e: React.MouseEvent | React.TouchEvent) => {
@@ -88,7 +93,9 @@ export function SignaturePad({ onSubmit, onCancel, label }: Props) {
         ref={canvasRef}
         width={400}
         height={150}
-        className="border border-ih-border bg-ih-bg-card rounded cursor-crosshair touch-none"
+        // Paper stays white in every theme: the ink is dark, and the exported PNG carries the ink alone.
+        style={PAPER}
+        className="block w-full max-w-[400px] border rounded cursor-crosshair touch-none"
         onMouseDown={start}
         onMouseMove={move}
         onMouseUp={end}

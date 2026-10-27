@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@core/shared-ui";
+import { isFallbackRatingColor, readableTextOn, safeCssColor } from "../../lib/readable-text";
 
 export type RatingTone = "ok" | "warn" | "bad" | "info" | "neutral";
 
@@ -172,7 +173,10 @@ export function RatingSegment({
         // A per-option `color` override wins over the tone token classes
         // (data-driven, like BatchActionBar's existing pattern) and applies
         // regardless of selection — see the RatingOption.color doc above.
-        const style = r.color ? { background: r.color, color: "#fff" } : undefined;
+        // A rating with no colour of its own gets the fallback token: a muted surface and its foreground, not that grey with white text.
+        const colour = safeCssColor(r.color); // a colour from the server is used only when it is a plain colour
+        const tokenFill = !!colour && isFallbackRatingColor(colour);
+        const style = colour && !tokenFill ? { background: colour, color: readableTextOn(colour) ?? "#fff" } : undefined;
         // At `size="sm"` (compact tiles, e.g. BatchActionBar) always show the
         // short form. At md/lg, swap on the TILE's own width: the abbreviation
         // while the tile is narrow, the full label once there is room for it —
@@ -206,7 +210,7 @@ export function RatingSegment({
             onClick={() => onChange(r.value)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={`transition-colors focus:outline-none focus:shadow-ih-focus ${sizeClass} ${
-              r.color ? "" : toneClass
+              tokenFill ? "bg-ih-bg-muted text-ih-fg-1 border border-ih-border" : colour ? "" : toneClass
             }`}
             style={style}
           >

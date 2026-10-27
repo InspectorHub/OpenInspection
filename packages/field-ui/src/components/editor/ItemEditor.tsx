@@ -79,7 +79,7 @@ interface ItemEditorProps {
  ratingLevels?: EditorRatingLevel[];
  onRating: (rating: string) => void;
  onNotes: (notes: string) => void;
- onNotesBlur: (notes: string) => void;
+ onNotesBlur: (notes: string, itemId?: string) => void;
  /** Module B — capture a non-rich typed value onto result.value (collab doc). */
  onValue?: (value: string | boolean | number) => void;
  onToggleCanned?: (tabName: string, cannedId: string, included: boolean) => void;
@@ -463,7 +463,7 @@ export function ItemEditor({
  />
  <div className="relative">
  <textarea
-  id="notes-textarea"
+  id="notes-textarea" {...notesCommit.composition}
   ref={notesRef}
   value={(result.notes as string) || ""}
   onChange={(e) => {
@@ -473,7 +473,7 @@ export function ItemEditor({
    setTaQuery(frag);
    setTaOpen(frag.trim().length >= 2);
   }}
-  onBlur={(e) => { notesCommit.settle(); onNotesBlur(e.target.value); setTaOpen(false); }}
+  onBlur={(e) => { notesCommit.settle(); onNotesBlur(e.target.value, item.id); setTaOpen(false); }}
   onKeyDown={(e) => {
    if (taOpen && ta.matches.length > 0) {
     if (e.key === "ArrowDown") { e.preventDefault(); ta.move(1); return; }
@@ -521,7 +521,7 @@ export function ItemEditor({
    notes={(result.notes as string) || ""}
    context={`${sectionTitle} — ${item.label}`}
    resultId={resultId}
-   onAccept={(text) => { onNotes(text); notesCommit.settle(); onNotesBlur(text); }}
+   onAccept={(text) => { onNotes(text); notesCommit.settle(); onNotesBlur(text, item.id); }}
   />
  )}
  {tagChipRow}

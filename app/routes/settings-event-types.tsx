@@ -1,3 +1,4 @@
+import { safeCssColor } from "@core/field-ui/lib/readable-text";
 import { useState, useRef, useEffect } from "react";
 import { useLoaderData, useRevalidator } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
@@ -193,7 +194,7 @@ export default function SettingsEventTypes() {
                   <div className="flex items-center gap-2">
                     <span
                       className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: t.color ?? "#4a72ff" }}
+                      style={{ backgroundColor: safeCssColor(t.color) ?? "#4a72ff" }}
                     />
                     <span className="font-bold text-ih-fg-1">
                       {t.name}

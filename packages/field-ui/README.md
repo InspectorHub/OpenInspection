@@ -138,6 +138,10 @@ signatures):
   neutral notice and counts the batch as saved, not failed.
 - `urls`: `FieldUrls`, the address builders for photos, reports, presence and
   in-app paths.
+  `photo()` is synchronous; a host that can only produce an address later (a photo it fetches and caches) provides the
+  optional `subscribe(listener)` and calls the listener whenever any photo address may have changed. The editor then asks
+  `photo()` again and its thumbnails, viewer and previews show the new address. Calls may be batched; `subscribe` returns
+  the unsubscribe function. Absent, nothing changes.
 - `resources`: `FieldResources`, optional capabilities (preferences, canned
   comments, cost items, repair items, media pool, settings sheet, AI assist,
   publish readiness, template search, version history, video). A member the

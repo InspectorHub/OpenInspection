@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Button } from '@core/shared-ui';
 import { m } from "../../i18n";
+import { readableTextOn, safeCssColor } from "../../lib/readable-text";
 
 export interface TagPin {
     id:    string;
@@ -30,16 +31,17 @@ export function TagChipRow({ pinnedTags, activeTagIds, onToggle, onOpenLibrary }
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {sorted.map(tag => {
                 const active = activeTagIds.has(tag.id);
+                const colour = safeCssColor(tag.color);
                 return (
                     <button
                         key={tag.id}
                         onClick={() => onToggle(tag)}
                         className={`px-2 py-0.5 rounded-full text-[11px] font-bold transition-colors border ${
                             active
-                                ? 'text-white border-transparent'
+                                ? `${colour ? 'text-white' : 'bg-ih-bg-muted text-ih-fg-1'} border-transparent`
                                 : 'text-ih-fg-3 border-ih-border bg-transparent hover:bg-ih-bg-muted'
                         }`}
-                        style={active ? { backgroundColor: tag.color } : {}}
+                        style={active && colour ? { backgroundColor: colour, color: readableTextOn(colour) ?? undefined } : {}}
                     >
                         {tag.name}
                     </button>

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import type { CommandData, CommandResult, FieldCommand } from './commands';
 import type { FieldDataSource, FieldHostSlots } from './data-source';
@@ -30,6 +30,41 @@ export function useFieldDataSource(): FieldDataSource {
     throw new Error('useFieldDataSource must be used inside a <FieldDataSourceProvider>.');
   }
   return dataSource;
+}
+
+/**
+ * A number that goes up each time the host says a photo address may have changed (`FieldUrls.subscribe`). Read it where
+ * a result is derived from `urls.photo()` and put it in that derivation's dependencies, so the address is asked for again.
+ * Without `subscribe` it stays 0 and costs nothing.
+ */
+export function usePhotoUrlVersion(): number {
+  const { urls } = useFieldDataSource();
+  const store = useMemo(() => {
+    let version = 0;
+    return {
+      // A host that fires once per fetched photo is coalesced to one render per tick.
+      subscribe: (onChange: () => void) => {
+        let queued = false;
+        let live = true;
+        const off = urls.subscribe?.(() => {
+          if (queued) return;
+          queued = true;
+          queueMicrotask(() => {
+            queued = false;
+            if (!live) return;
+            version += 1;
+            onChange();
+          });
+        });
+        return () => {
+          live = false;
+          off?.();
+        };
+      },
+      read: () => version,
+    };
+  }, [urls]);
+  return useSyncExternalStore(store.subscribe, store.read, store.read);
 }
 
 /** The host-supplied UI slots; an empty object when the provider was given none. */

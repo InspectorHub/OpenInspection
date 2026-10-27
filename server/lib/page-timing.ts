@@ -166,7 +166,7 @@ function resolveRoute(getRoutes: () => ServerRoutes | undefined, pathname: strin
 }
 
 /** An HTML document that is a page, not a redirect or an empty answer. */
-function isPageResponse(res: Response): boolean {
+export function isPageResponse(res: Response): boolean {
     if (res.status === 204 || res.status === 304 || (res.status >= 300 && res.status < 400)) return false;
     return (res.headers.get('Content-Type') ?? '').includes('text/html');
 }

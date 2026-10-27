@@ -16,6 +16,7 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
+import { safeCssColor } from "@core/field-ui/lib/readable-text";
 import { m } from "~/paraglide/messages";
 import { itemIsUnrated } from "~/lib/report-helpers";
 import { PRINT_CARD_CLASS, type ReportSection } from "./types";
@@ -57,7 +58,7 @@ export function ReportSummaryStats({ sections, total }: { sections: ReportSectio
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {summaryCards.map((s) => (
           <div key={s.label} className={`bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center ${PRINT_CARD_CLASS}`}>
-            <div className={`text-2xl font-bold ${s.color ? "" : "text-ih-fg-1"}`} style={s.color ? { color: s.color } : undefined}>{s.value}</div>
+            <div className={`text-2xl font-bold ${safeCssColor(s.color) ? "" : "text-ih-fg-1"}`} style={safeCssColor(s.color) ? { color: safeCssColor(s.color) as string } : undefined}>{s.value}</div>
             <div className="text-[11px] text-ih-fg-3 uppercase tracking-widest mt-1">
               {s.label}
             </div>

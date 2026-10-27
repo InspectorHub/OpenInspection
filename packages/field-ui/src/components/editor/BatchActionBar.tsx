@@ -2,6 +2,7 @@ import React from "react";
 import { Button } from "@core/shared-ui";
 import { RatingSegment, type RatingOption } from "../editor-shared/RatingSegment";
 import { m } from "../../i18n";
+import { safeCssColor } from "../../lib/readable-text";
 
 interface BatchActionBarProps {
   count: number;
@@ -40,7 +41,7 @@ export function BatchActionBar({
     value: level.id,
     label: String(idx + 1),
     tone: "neutral",
-    color: getRatingColor(level.id),
+    color: safeCssColor(getRatingColor(level.id)) ?? undefined,
   }));
 
   return (

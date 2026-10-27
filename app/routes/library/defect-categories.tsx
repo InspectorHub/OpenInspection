@@ -1,3 +1,4 @@
+import { safeCssColor } from "@core/field-ui/lib/readable-text";
 import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
@@ -102,7 +103,7 @@ export default function DefectCategoriesPage() {
                         same inline-style exemption as RatingSystemEditor.tsx. */}
                     <span
                       className="w-3.5 h-3.5 rounded-full shrink-0 ring-1 ring-inset ring-black/10"
-                      style={{ backgroundColor: cat.color }}
+                      style={{ backgroundColor: safeCssColor(cat.color) ?? undefined }}
                     />
                     <p className="text-[13px] font-semibold text-ih-fg-1 truncate">{cat.name}</p>
                     {cat.drivesSummary && (

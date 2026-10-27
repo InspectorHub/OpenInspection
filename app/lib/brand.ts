@@ -1,3 +1,4 @@
+import { safeCssColor } from "@core/field-ui/lib/readable-text";
 import type { CSSProperties } from "react";
 import type { DateFormat, TimeFormat } from "@core/field-ui/shared/display-prefs";
 
@@ -291,8 +292,10 @@ export function brandTextColor(
  *
  * Returns `{}` when no tenant color is set so the platform default applies.
  */
-export function brandTokens(primaryColor: string | null | undefined): CSSProperties {
-  if (!primaryColor) return {};
+export function brandTokens(rawPrimaryColor: string | null | undefined): CSSProperties {
+  // The colour is tenant data and lands in CSS custom properties: only a plain colour is used, anything else means "no tenant colour".
+  const primaryColor = safeCssColor(rawPrimaryColor);
+  if (!primaryColor || !parseColor(primaryColor)) return {};
   const c600 = `color-mix(in srgb, ${primaryColor} 88%, #000)`;
   const c700 = `color-mix(in srgb, ${primaryColor} 76%, #000)`;
   const tint = `color-mix(in srgb, ${primaryColor} 10%, transparent)`;

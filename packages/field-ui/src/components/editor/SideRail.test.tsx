@@ -88,3 +88,64 @@ test('an inactive tab label is the fg-3 text tier, not the decoration tier', () 
   expect(inactive.className).toContain('text-ih-fg-3');
   expect(inactive.className).not.toContain('text-ih-fg-4');
 });
+
+// The rating pill's fill is a tenant colour (or a pale token), so its text is chosen for contrast, not fixed white.
+test('the rating pill has dark text on a pale fill and white text on a dark one', () => {
+  const show = (color: string) => {
+    const { unmount } = render(
+      <SideRail locale="en-US" mode="fill" initialOpen activeItem={ITEM} activeResult={{ rating: 'rep' }} inspectionId="insp" getRatingColor={() => color} getRatingLabel={() => 'Repair'} />,
+    );
+    const pill = screen.getByText('Repair') as HTMLElement;
+    const text = pill.style.color;
+    unmount();
+    return text;
+  };
+  expect(show('#cbd5e1')).toBe('#0f172a');
+  expect(show('#1d4ed8')).toBe('#ffffff');
+});
+
+// The badge sits inside its tab, not flush against the strip edge. The right safe-area inset is the drawer sheet's job
+// (MobileBottomDrawer pads it once); the strip adds none of its own, or a notch would be cleared twice.
+test('the photo count badge is inside the tab, and the strip adds no safe-area padding of its own', () => {
+  render(<SideRail locale="en-US" mode="fill" initialOpen activeItem={ITEM} activeResult={{}} inspectionId="insp" photoCount={3} />);
+  const badge = screen.getByText('3');
+  expect(badge.className).toContain('top-0.5');
+  expect(badge.className).toContain('right-1');
+  expect(badge.className).not.toContain('-right-0.5');
+  const strip = screen.getByRole('button', { name: /Photos/ }).parentElement as HTMLElement;
+  expect(strip.className).not.toContain('safe-area-inset-right');
+  expect(strip.className).not.toContain('box-content');
+});
+
+// A rating with no colour of its own (getRatingColor answers the fallback token) is a muted surface with its foreground,
+// not that pale grey with white text.
+test('the rating pill of an unknown rating uses theme tokens, not white text on the fallback fill', () => {
+  render(<SideRail locale="en-US" mode="fill" initialOpen activeItem={ITEM} activeResult={{ rating: 'rep' }} inspectionId="insp" getRatingColor={() => 'var(--ih-fg-5, #d4d4d8)'} getRatingLabel={() => 'Repair'} />);
+  const pill = screen.getByText('Repair') as HTMLElement;
+  expect(pill.className.split(/\s+/)).toEqual(expect.arrayContaining(['bg-ih-bg-muted', 'text-ih-fg-1']));
+  expect(pill.className).not.toContain('text-white');
+  expect(pill.style.backgroundColor).toBe('');
+});
+
+test('CONTROL - a tenant colour keeps its inline fill and computed text', () => {
+  render(<SideRail locale="en-US" mode="fill" initialOpen activeItem={ITEM} activeResult={{ rating: 'rep' }} inspectionId="insp" getRatingColor={() => '#ef4444'} getRatingLabel={() => 'Repair'} />);
+  const pill = screen.getByText('Repair') as HTMLElement;
+  expect(pill.style.backgroundColor).toBe('#ef4444');
+  expect(pill.style.color).toBe('#ffffff');
+});
+
+// On the desktop the editor draws a 24px "Collapse photo rail" button at `left-1` over the panel's top-left corner, so the
+// panel's heading row starts to the right of it (4px + 24px = 28px, and pl-9 is 36px). In a drawer there is no such button.
+test('the heading row clears the collapse button on the desktop rail, and uses plain padding in a drawer', () => {
+  const header = (fill: boolean) => {
+    const { unmount } = render(<SideRail locale="en-US" mode="fill" initialOpen fill={fill} activeItem={ITEM} activeResult={{}} inspectionId="insp" />);
+    const row = screen.getByText('preview', { selector: 'span' }).parentElement as HTMLElement;
+    const cls = row.className.split(/\s+/);
+    unmount();
+    return cls;
+  };
+  expect(header(false)).toEqual(expect.arrayContaining(['pl-9', 'pr-3']));
+  expect(header(false)).not.toContain('px-3');
+  expect(header(true)).toContain('px-3');
+  expect(header(true)).not.toContain('pl-9');
+});

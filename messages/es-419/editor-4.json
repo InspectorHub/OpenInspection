@@ -33,6 +33,8 @@
   "editor_route_filter_unrated": "Sin calificar",
   "editor_route_filter_issues": "Problemas",
   "editor_route_filter_flagged": "Marcados",
+  "editor_route_filter_all_in_section": "Todos los elementos de esta sección",
+  "editor_route_filter_count_in_section": "{label} {count} en esta sección",
   "editor_route_exit_batch_mode": "Salir del modo por lotes",
   "editor_route_batch_mode": "Modo por lotes (B)",
   "editor_route_batch_select_items": "Seleccionar elementos por lotes",

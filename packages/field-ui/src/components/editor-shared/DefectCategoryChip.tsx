@@ -1,3 +1,5 @@
+import { safeCssColor } from "../../lib/readable-text";
+
 export interface DefectCategoryChipProps {
   /** 'safety' | 'recommendation' | 'maintenance'. Raw strings are tolerated:
    *  the inspection canned-defect `category` is a free-form schema string, and
@@ -35,13 +37,14 @@ export function DefectCategoryChip({ category, className, color }: DefectCategor
   // A configured color replaces the tokened text color (keeps the neutral
   // pill background so a custom hue stays legible) — the tokened fallback
   // below only applies when no data-driven color was resolved.
-  const tokens = color ? "bg-ih-bg-muted" : (CATEGORY_TOKENS[category] ?? DEFAULT_TOKENS);
+  const safe = safeCssColor(color); // from the server: used only when it is a plain colour
+  const tokens = safe ? "bg-ih-bg-muted" : (CATEGORY_TOKENS[category] ?? DEFAULT_TOKENS);
   return (
     <span
       className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${tokens}${
         className ? ` ${className}` : ""
       }`}
-      style={color ? { color } : undefined}
+      style={safe ? { color: safe } : undefined}
     >
       {category}
     </span>

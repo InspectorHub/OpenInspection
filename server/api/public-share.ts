@@ -10,7 +10,8 @@
 
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import type { ApiOf } from '../lib/api-schema';
+import { legacyMounted, type ApiOf } from '../lib/api-schema';
+import cspReportRoutes from './csp-report';
 import { z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema';
@@ -88,9 +89,14 @@ app.openapi(shareTokenRoute, async (c) => {
     return sendSuccess(c, { token: shareToken, url });
 });
 
+// The browser CSP report receiver is the other unauthenticated public POST; it is mounted here
+// rather than in the composition root, which is size-capped.
+app.route('/', cspReportRoutes);
+
 /** Registration order. Drives `PublicShareApi`; a test pins it to what `app` really registered. */
 export const publicShareRouteConfigs = [
     shareTokenRoute,
+    legacyMounted('/', cspReportRoutes),
 ] as const;
 
 export type PublicShareApi = ApiOf<typeof publicShareRouteConfigs>;

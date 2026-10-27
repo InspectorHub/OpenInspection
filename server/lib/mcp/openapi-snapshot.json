@@ -5057,6 +5057,20 @@
     "description": "Saves a company permission template: a name, a base role (manager, inspector or staff) and the capability switches that differ from that role's defaults. Applying it later copies its role and switches onto an invite or a member; changing or archiving it afterwards does not change anyone who already received it. A manager cannot save a template that turns on a switch the manager does not hold themselves, including through the base role; an owner can. The name must be unique among live templates, and a company keeps at most 25. Writes a permission_template.create audit entry. Restricted to owners and managers."
   },
   {
+    "operationId": "createPublicCspReport",
+    "method": "POST",
+    "pathTemplate": "/api/public/csp-report",
+    "scopes": [],
+    "tag": "public",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Receive a browser Content-Security-Policy violation report",
+    "description": "Receiver for the report-uri of the page Content-Security-Policy-Report-Only header. Sent by the browser itself, without credentials. Accepts application/csp-report, application/reports+json or application/json up to 16 KiB; a larger or malformed body is dropped. Each accepted report becomes one structured log line holding only low-cardinality fields (directive, blocked origin, page path with ids removed); nothing is stored. Always answers 204 with an empty body."
+  },
+  {
     "operationId": "createPublicPayIntent",
     "method": "POST",
     "pathTemplate": "/api/public/inspections/{id}/pay-intent",
