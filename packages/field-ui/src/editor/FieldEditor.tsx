@@ -1333,7 +1333,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  activeUnitId={activeUnitId}
  sectionProgress={state.sectionProgress}
  sectionDefectCount={state.sectionDefectCount}
- overviewActive={state.activeView === "property"}
+ overviewActive={state.activeView === "property"} fullWidth={isMobile}
  onSelectOverview={() => {
  state.setActiveView("property");
  // Mobile only, and both lines are load-bearing. The drawer does not
@@ -1543,7 +1543,7 @@ export function FieldEditor({ data }: { data: EditorData }) {
  );
 
  const sideRailEl = (
- <SideRail
+ <SideRail fill={isMobile}
  locale={displayLocale}
  mode="fill"
  activeItem={state.activeItem ? { id: state.activeItem.id, label: (state.activeItem.label || state.activeItem.name || "") as string, type: state.activeItem.type } : null}
@@ -1923,8 +1923,8 @@ export function FieldEditor({ data }: { data: EditorData }) {
  };
  const openSpeedFromDrawer = () => { setMobileDrawer(null); openSpeedMode(); };
  const appBarTitles = {
-  sectionTitle: state.currentSection?.title ?? "",
-  itemLabel: ((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? m.editor_route_select_an_item(),
+  sectionTitle: state.activeView === "property" ? "" : state.currentSection?.title ?? "",
+  itemLabel: state.activeView === "property" ? m.editor_shared_inspection_details() : ((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? m.editor_route_select_an_item(),
  };
 
  // The per-unit scope switcher (commercial, per_unit mode only: the desktop header's `perUnitControls`), for the

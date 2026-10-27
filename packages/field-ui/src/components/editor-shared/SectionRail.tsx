@@ -35,6 +35,8 @@ interface SharedSectionRailProps {
  activeUnitId?: string | null;
  sectionProgress?: (sectionId: string) => { total: number; rated: number; percent: number; hasDefect: boolean };
  sectionDefectCount?: (sectionId: string) => number;
+ /** In a bottom drawer the rail fills the sheet instead of the desktop's fixed 200px column. */
+ fullWidth?: boolean;
  /** Whether the report-scoped "Inspection Details" overview entry is active. */
  overviewActive?: boolean;
  /** Called when the user selects the "Inspection Details" overview entry. */
@@ -98,6 +100,7 @@ export function SectionRail({
  sectionProgress,
  sectionDefectCount,
  overviewActive = false,
+ fullWidth = false,
  onSelectOverview,
  onAddSection,
  onDuplicateSection,
@@ -128,7 +131,7 @@ export function SectionRail({
  });
 
  return (
- <aside data-shortcut-scope className="w-[200px] flex-shrink-0 border-r border-ih-border overflow-y-auto bg-ih-bg-app/50">
+ <aside data-shortcut-scope className={`${fullWidth ? "w-full" : "w-[200px] flex-shrink-0 border-r"} border-ih-border overflow-y-auto bg-ih-bg-app/50`}>
  <nav className="p-2 space-y-0.5">
   {/* Report-scoped overview entry — sits above section list, no progress donut */}
   {mode === 'fill' && (
