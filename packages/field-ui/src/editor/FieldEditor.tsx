@@ -753,11 +753,14 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  /* Tag chip row + clone-last handler for ItemEditor */
  /* ---------------------------------------------------------------- */
 
+ // The row is the only tag control a phone has, so it also opens the full list (elsewhere that is the T key alone).
  const tagChipRow = state.activeItemId && !readOnly ? (
   <TagChipRow
    pinnedTags={pinnedTags}
+   chosenTags={state.tagsByItem?.[state.activeItemId]}
    activeTagIds={activeTagIds}
    onToggle={(tag) => toggleTag(tag)}
+   onOpenLibrary={() => setTagPickerOpen(true)}
   />
  ) : null;
 
