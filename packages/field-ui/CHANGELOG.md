@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.4.0...field-ui-v0.5.0) (2026-10-28)
+
+
+### Features
+
+* **field-ui:** fixes found on a phone and tablet, and an optional photo URL subscription ([d9c37c9](https://github.com/InspectorHub/OpenInspection/commit/d9c37c96e6aa6defa1e7b28d204e00a2f27c6e6e))
+* **field-ui:** keep item tags across a reload, and name the starter rating systems neutrally ([651ef71](https://github.com/InspectorHub/OpenInspection/commit/651ef713910e69f01cc73e3528ab9c042dcfe22f))
+* **field-ui:** phone and tablet fixes, notes kept on switch, safe data colours, offline cleanup after delete, page security headers ([9ec4b3f](https://github.com/InspectorHub/OpenInspection/commit/9ec4b3f8f203e7e98bf9ed7cfc34bac7de9a8176))
+* **web:** keep item tags across a reload, confirm completing fieldwork, draw seeded tag colours, and fix narrow-screen layout ([45a432b](https://github.com/InspectorHub/OpenInspection/commit/45a432b333066ac98cb549dcd581784317c6059f))
+
+
+### Bug Fixes
+
+* **editor:** encode the ids the item-tags relay passes on, and stop offering tags no host can store ([219e997](https://github.com/InspectorHub/OpenInspection/commit/219e997e3bb00cbd9ad9ed4aa5cf4d2e1268aad2))
+* **field-ui:** draw the seeded tag colours amber, slate, rose and emerald ([d318066](https://github.com/InspectorHub/OpenInspection/commit/d3180665cb261aafcf8a56669907d5032a188fe5))
+* **field-ui:** keep typed notes with their item, and draw only colours that are safe ([d06b228](https://github.com/InspectorHub/OpenInspection/commit/d06b22884e94075ff38d9008caf3634ca24ced87))
+* **field-ui:** let a phone reach the tag list, and make the tag chips finger-sized ([6839298](https://github.com/InspectorHub/OpenInspection/commit/683929816322c1fd1a23431beb5459f31315c116))
+* **web:** narrow-screen layout, tag pinning, completion feedback and neutral wording ([9681101](https://github.com/InspectorHub/OpenInspection/commit/9681101a0f10a301b81fec04b139784aa331e641))
+
 ## [0.4.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.3.0...field-ui-v0.4.0) (2026-10-27)
 
 
