@@ -17,6 +17,12 @@ type TagRow = { id: string; name: string; color?: string | null };
 type Relay = { headers: Record<string, string> };
 
 /**
+ * The typed client splices a path parameter into the URL as it is given, so an id that came from the query string or the
+ * form body is encoded first: a value such as `a/../b` or `a?b` is then one path segment, not a different route.
+ */
+const seg = (id: string) => encodeURIComponent(id);
+
+/**
  * The tag routes are mounted on `/api/inspections` but are not part of the typed client's chain, so the three calls
  * are declared here with the shape they have (see `inspector-portal.tsx` for the same step on `complete`).
  */
@@ -42,7 +48,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const api = createApi(context, { token });
   try {
     const res = await (api.inspections[":id"] as unknown as TagApi).tags.$get(
-      { param: { id: inspectionId } },
+      { param: { id: seg(inspectionId) } },
       { headers: { "x-token-relay": "1" } },
     );
     if (!res.ok) return { tags: null };
@@ -71,14 +77,14 @@ export async function action({ request, context }: Route.ActionArgs) {
   try {
     if (intent === "add") {
       const res = await (api.inspections[":id"] as unknown as TagApi).items[":itemId"].tags.$post(
-        { param: { id: inspectionId, itemId }, json: { tagId } },
+        { param: { id: seg(inspectionId), itemId: seg(itemId) }, json: { tagId } },
         hdr,
       );
       return { success: res.ok };
     }
     if (intent === "remove") {
       const res = await (api.inspections[":id"] as unknown as TagApi).items[":itemId"].tags[":tagId"].$delete(
-        { param: { id: inspectionId, itemId, tagId } },
+        { param: { id: seg(inspectionId), itemId: seg(itemId), tagId: seg(tagId) } },
         hdr,
       );
       return { success: res.ok };

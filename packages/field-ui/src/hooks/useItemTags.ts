@@ -66,5 +66,5 @@ export function useItemTags(inspectionId: string, setTagsByItem: Dispatch<SetSta
       });
   }, [store, inspectionId, setTagsByItem, notify]);
 
-  return { toggle };
+  return { toggle, canSave: store !== undefined };
 }

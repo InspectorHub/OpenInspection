@@ -41,6 +41,7 @@
   "editor_tagchiprow_more": "+ more",
   "editor_tagchiprow_open_library_aria": "Open tag library",
   "editor_tagpicker_title": "Tags",
+  "editor_tagpicker_empty": "There are no tags yet. Add tags in the Library, then choose them here.",
   "editor_unitprogress_summary_aria": "{completed} of {total} units complete",
   "editor_unitprogress_count": "{completed}/{total} units",
   "editor_unitprogress_status_complete": "complete",

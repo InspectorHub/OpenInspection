@@ -31,11 +31,14 @@ function harness(itemTags: Store | undefined, initial: ItemTagMap = {}) {
   const ds = createFakeDataSource({ data: createEmptyEditorData(), resources: itemTags ? { itemTags } : {} });
   ds.notify = notify;
   let state: ItemTagMap = initial;
+  let canSave: boolean | undefined;
   let toggle!: ReturnType<typeof useItemTags>['toggle'];
   function Probe() {
     const [tagsByItem, setTagsByItem] = useState<ItemTagMap>(initial);
     state = tagsByItem;
-    toggle = useItemTags('insp-1', setTagsByItem).toggle;
+    const tags = useItemTags('insp-1', setTagsByItem);
+    toggle = tags.toggle;
+    canSave = tags.canSave;
     return null;
   }
   render(
@@ -43,7 +46,7 @@ function harness(itemTags: Store | undefined, initial: ItemTagMap = {}) {
       <Probe />
     </FieldDataSourceProvider>,
   );
-  return { state: () => state, toggle: (item: string, tag: typeof URGENT) => toggle(item, tag, state[item] ?? []), notify };
+  return { state: () => state, canSave: () => canSave, toggle: (item: string, tag: typeof URGENT) => toggle(item, tag, state[item] ?? []), notify };
 }
 
 const flush = () =>
@@ -180,5 +183,16 @@ describe('useItemTags — a host with no store', () => {
     act(() => h.toggle('item-a', URGENT)); // a later press, after the page has rendered the first
     expect(h.state()['item-a'] ?? []).toEqual([]);
     expect(h.notify).not.toHaveBeenCalled();
+  });
+
+  it('says whether the host can save, so the editor offers only tags a host can store', async () => {
+    const none = harness(undefined);
+    await flush();
+    expect(none.canSave()).toBe(false);
+    cleanup();
+    const store: Store = { list: vi.fn(() => Promise.resolve(null)), add: vi.fn(), remove: vi.fn() };
+    const withStore = harness(store);
+    await flush();
+    expect(withStore.canSave()).toBe(true);
   });
 });

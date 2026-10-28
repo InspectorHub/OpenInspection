@@ -41,6 +41,7 @@
   "editor_tagchiprow_more": "+ más",
   "editor_tagchiprow_open_library_aria": "Abrir la biblioteca de etiquetas",
   "editor_tagpicker_title": "Etiquetas",
+  "editor_tagpicker_empty": "Todavía no hay etiquetas. Agrega etiquetas en la Biblioteca y luego elígelas aquí.",
   "editor_unitprogress_summary_aria": "{completed} de {total} unidades completas",
   "editor_unitprogress_count": "{completed}/{total} unidades",
   "editor_unitprogress_status_complete": "completa",

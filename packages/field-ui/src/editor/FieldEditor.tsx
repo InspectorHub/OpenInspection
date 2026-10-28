@@ -732,18 +732,18 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  const notesFlushRef = useRef<(() => void) | null>(null);
  useResetBatchOnPhone(isPhone, state.batchMode, state.setBatchMode, state.setBatchSelected);
 
+ // Reads the saved tags when the editor opens and saves each toggle; see the hook.
+ const { toggle: toggleItemTag, canSave: canSaveTags } = useItemTags(String(state.inspection.id), state.setTagsByItem);
  // The picker lists the company's own tags: only those have ids the host can store. The five names below are what
- // it offered before the library reached the editor, and still serve a company that has no tags yet.
- const PRESET_TAGS = useMemo(() => tagLibrary.length > 0 ? tagLibrary : [
+ // it offered before the library reached the editor; they serve only a host that saves nothing, because a host that
+ // does would refuse them (no tag has those ids) and take every choice back.
+ const PRESET_TAGS = useMemo(() => tagLibrary.length > 0 || canSaveTags ? tagLibrary : [
   { id: "follow-up", name: "Follow Up", color: "#ef4444" },
   { id: "urgent", name: "Urgent", color: "#f97316" },
   { id: "photo-needed", name: "Photo Needed", color: "#eab308" },
   { id: "re-inspect", name: "Re-inspect", color: "#3b82f6" },
   { id: "client-question", name: "Client Question", color: "#a855f7" },
- ], [tagLibrary]);
-
- // Reads the saved tags when the editor opens and saves each toggle; see the hook.
- const { toggle: toggleItemTag } = useItemTags(String(state.inspection.id), state.setTagsByItem);
+ ], [tagLibrary, canSaveTags]);
  const toggleTag = useCallback((tag: { id: string; name: string; color: string }) => {
   if (!state.activeItemId) return;
   toggleItemTag(state.activeItemId, tag, state.tagsByItem[state.activeItemId] || []);
