@@ -36,8 +36,9 @@
       }
     },
     "c2": {
-      "combined": "3d3b937fe838865a9d26e662bcbab0b9ebe4fb227a73ff2d763774e6f95878f8",
+      "combined": "d736356846733f4b58e15e95c8a882b65217ab82373aa4fbda260f3072c298a8",
       "files": {
+        "server/data/rating-system-seeds.ts": "e57db466b078548efb35f8b0ea9be83d4d9971593f4676d932bb0afdfed25cc5",
         "server/data/seed-templates/commercial-hospitality.json": "e3c4bd49a05e0aaa7c3681b1c57cdfedd84b22b3e798969ffb8125ad37b4df72",
         "server/data/seed-templates/commercial-industrial.json": "10107fa6d118e6c33a131808506d6b6b82e38d529862ddd5fb1fc983f6cf3e4e",
         "server/data/seed-templates/commercial-office.json": "f48dd3e01d2cba3599190db96ff22c4da3eecb4f426bcc2d1f1ef011f4e1c414",

@@ -62,6 +62,11 @@ export const NATIVE_CONTRACT: readonly NativeContractEntry[] = [
     { method: 'get', path: '/api/inspections/{id}/statutory-form/coverage' },
     // Reference data the editor reads.
     { method: 'get', path: '/api/tags' },
+    // The tags on a checklist item: the whole inspection's map for the editor's chips, then attach and detach. The
+    // attach is idempotent (a tag already on the item changes nothing), so the app may replay it after a dropped answer.
+    { method: 'get', path: '/api/inspections/{id}/tags' },
+    { method: 'post', path: '/api/inspections/{id}/items/{itemId}/tags' },
+    { method: 'delete', path: '/api/inspections/{id}/items/{itemId}/tags/{tagId}' },
     { method: 'get', path: '/api/admin/defect-categories' },
     { method: 'get', path: '/api/recommendations' },
     { method: 'get', path: '/api/contractor-types' },

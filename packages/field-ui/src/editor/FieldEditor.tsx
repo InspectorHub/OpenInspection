@@ -16,6 +16,7 @@ import { useFindings, type AttachedRepairItem } from "../hooks/useFindings";
 import { usePhotoOps } from "../hooks/usePhotoOps";
 import { useScopeLoader } from "../hooks/useScopeLoader";
 import { useInspectionPrefs } from "../hooks/useInspectionPrefs";
+import { useItemTags } from "../hooks/useItemTags";
 import { useKeyboard } from "../hooks/useKeyboard";
 import { useCannedComments } from "../hooks/useCannedComments";
 import { useEditorCapabilities } from "../hooks/useEditorCapabilities";
@@ -731,26 +732,22 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  const notesFlushRef = useRef<(() => void) | null>(null);
  useResetBatchOnPhone(isPhone, state.batchMode, state.setBatchMode, state.setBatchSelected);
 
- const PRESET_TAGS = useMemo(() => [
+ // The picker lists the company's own tags: only those have ids the host can store. The five names below are what
+ // it offered before the library reached the editor, and still serve a company that has no tags yet.
+ const PRESET_TAGS = useMemo(() => tagLibrary.length > 0 ? tagLibrary : [
   { id: "follow-up", name: "Follow Up", color: "#ef4444" },
   { id: "urgent", name: "Urgent", color: "#f97316" },
   { id: "photo-needed", name: "Photo Needed", color: "#eab308" },
   { id: "re-inspect", name: "Re-inspect", color: "#3b82f6" },
   { id: "client-question", name: "Client Question", color: "#a855f7" },
- ], []);
+ ], [tagLibrary]);
 
+ // Reads the saved tags when the editor opens and saves each toggle; see the hook.
+ const { toggle: toggleItemTag } = useItemTags(String(state.inspection.id), state.setTagsByItem);
  const toggleTag = useCallback((tag: { id: string; name: string; color: string }) => {
   if (!state.activeItemId) return;
-  const current = state.tagsByItem[state.activeItemId] || [];
-  const exists = current.some(t => t.id === tag.id);
-  const updated = exists
-   ? current.filter(t => t.id !== tag.id)
-   : [...current, tag];
-  state.setTagsByItem(prev => ({
-   ...prev,
-   [state.activeItemId!]: updated,
-  }));
- }, [state.activeItemId, state.tagsByItem, state.setTagsByItem]);
+  toggleItemTag(state.activeItemId, tag, state.tagsByItem[state.activeItemId] || []);
+ }, [state.activeItemId, state.tagsByItem, toggleItemTag]);
 
  /* ---------------------------------------------------------------- */
  /* Tag chip row + clone-last handler for ItemEditor */

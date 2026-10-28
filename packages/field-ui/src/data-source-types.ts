@@ -90,6 +90,9 @@ export interface TagLibraryEntry {
   color: string;
 }
 
+/** The tags on each checklist item of one inspection, keyed by the item's id (the editor's chips). */
+export type ItemTagMap = Record<string, Array<{ id: string; name: string; color?: string }>>;
+
 /** The loader returns `{ id, name, color }` rows. */
 export interface DefectCategory {
   id: string;

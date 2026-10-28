@@ -12,6 +12,7 @@
  *   - report-utils + bucket mapping survives the new shape
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { RatingSystemService } from '../../../server/services/rating-system.service';
 import { RECOMMENDATION_CATEGORIES, getRecommendationCategory, getRecommendationPhrase } from '../../../server/lib/recommendation-categories';
 import { createTestDb, setupSchema } from '../db';
@@ -65,6 +66,26 @@ describe('RatingSystemService — seed + tenant scope', () => {
         expect(oi4.levels[0]!.order).toBe(0);
         expect(oi4.isDefault).toBe(true);
         expect(oi4.isSeed).toBe(true);
+    });
+
+    it('never renames a system a workspace already holds, and names a new workspace\'s copy neutrally', async () => {
+        // Seeding skips a slug that is already present, so a seed name changed in a later release reaches only
+        // workspaces created after it. Simulate a workspace seeded under an earlier name, then re-run the seeder.
+        await svc.seedDefaults(TENANT_A);
+        const held = (await svc.list(TENANT_A)).find(s => s.slug === 'itb')!;
+        await testDb.update(schema.ratingSystems)
+            .set({ name: 'Name from an earlier release' })
+            .where(eq(schema.ratingSystems.id, held.id));
+
+        await svc.seedDefaults(TENANT_A);
+        const after = (await svc.list(TENANT_A)).find(s => s.slug === 'itb')!;
+        expect(after.name).toBe('Name from an earlier release');
+
+        // The positive control: a workspace that has none yet gets the current seed name.
+        await svc.seedDefaults(TENANT_B);
+        const fresh = (await svc.list(TENANT_B)).find(s => s.slug === 'itb')!;
+        expect(fresh.name).toBe('Detailed (8-level)');
+        expect((await svc.list(TENANT_B)).find(s => s.slug === 'itb-3')!.name).toBe('Simplified (3-tier)');
     });
 
     it('isolates each tenant\'s systems', async () => {

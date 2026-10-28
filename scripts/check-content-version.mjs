@@ -62,6 +62,10 @@ const CONTENT_SOURCES = [
     { kind: 'dir', path: 'server/services/starter-content/fixtures', ext: '.ts' },
     { kind: 'dir', path: 'server/data/seed-templates', ext: '.json' },
     { kind: 'file', path: 'server/lib/people/default-role-profiles.ts' },
+    // The rating systems themselves. fixtures/rating-systems.ts, listed above through its directory, only
+    // re-exports this file, so without it a new rating system (a new slug) would not move the hash and would
+    // reach new workspaces only.
+    { kind: 'file', path: 'server/data/rating-system-seeds.ts' },
 ];
 
 function collect() {

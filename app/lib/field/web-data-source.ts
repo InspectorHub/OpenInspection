@@ -9,6 +9,7 @@ import { createWebExecute, type WebExecute } from "./web-transport";
 import { createWebAiAssist } from "./web-ai-assist";
 import { createWebCommentsLibrary } from "./web-comments-library";
 import { createWebCostItems } from "./web-cost-items";
+import { createWebItemTags } from "./web-item-tags";
 import { createWebPrefs } from "./web-prefs";
 import { createWebPublishReadiness } from "./web-publish-readiness";
 import { createWebVideo } from "./web-video";
@@ -80,6 +81,7 @@ export function createWebFieldDataSource(parts: WebDataSourceParts): FieldDataSo
             video: createWebVideo(),
             commentsLibrary: createWebCommentsLibrary(),
             costItems: createWebCostItems(),
+            itemTags: createWebItemTags(),
             aiAssist: createWebAiAssist(),
             templateSearch: createWebTemplateSearch(),
             repairItems: createWebRepairItems(),

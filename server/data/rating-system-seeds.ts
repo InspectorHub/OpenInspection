@@ -57,8 +57,8 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
     },
     {
         slug:        'itb',
-        name:        'Inspector Toolbelt (ITB) 8-level',
-        description: 'Inspector Toolbelt full granularity scheme — finer severity tracking for detailed reports.',
+        name:        'Detailed (8-level)',
+        description: 'Full granularity scheme, Functional through Hazard — finer severity tracking for detailed reports.',
         isDefault:   false,
         levels: [
             { abbreviation: 'F',   label: 'Functional',      color: '#10b981', severity: 'good',        isDefect: false, hotkey: '1', pausesAdvance: false },
@@ -73,8 +73,8 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
     },
     {
         slug:        'itb-3',
-        name:        'Inspector Toolbelt (ITB) 3-tier',
-        description: 'Inspector Toolbelt simplified scheme — Functional / Marginal / Deficient. Fast for screening visits.',
+        name:        'Simplified (3-tier)',
+        description: 'Simplified scheme — Functional / Marginal / Deficient. Fast for screening visits.',
         isDefault:   false,
         levels: [
             { abbreviation: 'F',   label: 'Functional', color: '#10b981', severity: 'good',        isDefect: false, hotkey: '1', pausesAdvance: false },
