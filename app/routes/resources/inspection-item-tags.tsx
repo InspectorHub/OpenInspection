@@ -58,9 +58,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  const token = await requireToken(context, request);
+  // The session check and the body read do not depend on each other.
+  const [token, fd] = await Promise.all([requireToken(context, request), request.formData()]);
   const api = createApi(context, { token });
-  const fd = await request.formData();
   const intent = String(fd.get("intent") ?? "");
   const inspectionId = String(fd.get("inspectionId") ?? "");
   const itemId = String(fd.get("itemId") ?? "");
