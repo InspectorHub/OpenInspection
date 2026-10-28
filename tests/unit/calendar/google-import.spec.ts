@@ -23,7 +23,7 @@ const run = (blocks: BusyBlock[], ownIds: string[] = []) =>
         connectedAtMs: CONNECTED_AT,
     });
 
-describe('filterImportableBlocks — Spectora one-off import semantics', () => {
+describe('filterImportableBlocks — one-off import semantics', () => {
     it('keeps an ordinary one-off event created after connect', () => {
         const out = run([block()]);
         expect(out.keep).toHaveLength(1);

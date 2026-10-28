@@ -1,5 +1,5 @@
 /**
- * Which provider events become OI busy time — the Spectora one-off semantics.
+ * Which provider events become OI busy time: one-off appointments only.
  *
  * Pure decision logic on purpose. The orchestration (credentials, read set,
  * persistence) lives in `sync-engine.ts`; everything that is a RULE lives here,
@@ -13,7 +13,7 @@
  *     is what makes an event recognisable as ours.
  *  3. Skip instances of a recurring series. `singleEvents=true` expands series
  *     into instances, so a weekly standup arrives as fifty separate busy
- *     blocks. Spectora imports one-off appointments only, and so do we in v1.
+ *     blocks. Only one-off appointments are imported in v1.
  *  6. Skip events that predate the connection. Connecting a calendar should not
  *     retroactively block months of already-accepted work. An event is "new
  *     enough" if EITHER its creation or its last modification is at/after

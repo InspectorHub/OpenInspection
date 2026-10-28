@@ -3,7 +3,7 @@ import { REPAIR_ACTION_TAGS } from '../../repair-action-tag';
 import { REPAIR_CREATOR_KINDS } from '../../people/role-kinds';
 
 /** A buyer/agent/inspector-built repair-request list for a published report.
- * Multiple lists may exist per inspection (one+ per creator) — Spectora parity. */
+ * Multiple lists may exist per inspection (one+ per creator). */
 export const repairRequests = sqliteTable('repair_requests', {
   id: text('id').primaryKey(),
   tenantId: text('tenant_id').notNull(),
@@ -100,21 +100,10 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   //      and a requested remedy are different statements about a defect, so the
   //      two do not line up and neither can be derived from the other.
   //
-  // ⚠️ THE FOUR VALUES ARE A PRODUCT CHOICE, NOT AN INDUSTRY DERIVATION, AND
-  // THE ONE VENDOR WITH A PUBLISHED ANSWER PUTS THEM ON THE OTHER SIDE.
-  // The plan that introduced this column cited "the union of HIP and ISN" for
-  // the vocabulary. Checking that afterwards: ISN's help centre describes the
-  // same four as something the reviewing AGENT selects — verbatim, "as a
-  // response to the request item" — and Home Inspector Pro's page carries no
-  // role label at all, so it settles nothing. Nobody was found putting these
-  // four on the requester.
-  //
-  // The column stays on the REQUEST axis anyway, deliberately: "I want it
-  // repaired / replaced / funded" is a coherent and useful thing for a buyer
-  // to say, and HIP revealing a money field only under `fund` supports hanging
-  // the amount off it. Both facts are recorded here because one of them is
-  // evidence and the other is a decision, and a later reader must not mistake
-  // the second for the first.
+  // ⚠️ THE FOUR VALUES ARE A PRODUCT CHOICE, AND THEY SIT ON THE REQUEST AXIS.
+  // "I want it repaired / replaced / funded" is a coherent and useful thing for
+  // a buyer to say, and it lets the amount hang off `fund`. A reviewer's
+  // reply to a request item is a different statement about the same defect.
   //
   // ⚠️ A RESPONSE AXIS, IF IT IS EVER BUILT, MUST NOT REUSE THIS COLUMN OR ITS
   // VOCABULARY. Same four words on the same row for two different actors is

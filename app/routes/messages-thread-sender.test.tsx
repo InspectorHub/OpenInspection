@@ -8,12 +8,10 @@
  * contact's name, the time and the preview, so a thread whose last line was
  * yours looked exactly like one waiting on your reply.
  *
- * WHY A PREFIX ON THE PREVIEW RATHER THAN A BADGE. Surveyed 2026-09-08:
- * Spectora's Conversations documentation says the subtext of a message "will
- * always show when the message was sent, and who sent it" — sender identity
- * belongs beside the preview, not as a separate ornament. It is also the
- * universal inbox convention, and the row already carries the counterparty's
- * name, so only the OTHER case needs saying.
+ * WHY A PREFIX ON THE PREVIEW RATHER THAN A BADGE. Sender identity belongs
+ * beside the preview, not as a separate ornament. It is also the usual inbox
+ * convention, and the row already carries the counterparty's name, so only the
+ * OTHER case needs saying.
  *
  * `inspector` is us: the schema's own comment reads "Staff author when fromRole
  * === 'inspector'; null when the counterparty sent it". Everything else —

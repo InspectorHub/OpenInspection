@@ -14,10 +14,9 @@
 import { ROLE_KIND, type RepairCreatorKind } from './people/role-kinds';
 
 /**
- * The buyer's requested remedy. Four values, because that is what the market
- * offers a buyer: Home Inspector Pro's request form and ISN's agent response
- * are both Repair / Replace / Fund / Other. Two values would leave the most
- * common ask — "just give me the money" — with nowhere to go.
+ * The buyer's requested remedy. Four values (Repair / Replace / Fund / Other),
+ * because two would leave the most common ask — "just give me the money" —
+ * with nowhere to go.
  *
  * ⚠️ Deliberately NOT unified with either neighbouring enum; see the column
  * comment in `db/schema/repair-request.ts` for why each one stays separate.

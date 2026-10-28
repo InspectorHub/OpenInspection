@@ -1,6 +1,5 @@
 /**
- * Report section numbering + edit-permission helpers — Competitor parity
- * App.F.4 (Spectora).
+ * Report section numbering + edit-permission helpers.
  *
  * In the published report viewer (`/report/:id`), section headings render
  * as `"3 - Roof"` (1-based, in visible-section order). On hover, an
@@ -27,7 +26,7 @@ export function canEditSection(role: string | null | undefined): boolean {
 }
 
 /**
- * Build a Spectora-style numbered section title:
+ * Build a numbered section title:
  *   formatSectionHeading('Roof', 2)  ->  "3 - Roof"
  *
  * `index` is 0-based (matches the array index in the rendered list).

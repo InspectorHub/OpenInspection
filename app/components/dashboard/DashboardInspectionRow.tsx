@@ -1,4 +1,6 @@
+import { useRef, useState } from "react";
 import { Link } from "react-router";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { STAFF_ORDER_STATUSES } from "../../../server/lib/inspection/order-fields";
 import { INSPECTION_STATUS, isReportPublished, statusTone } from "~/lib/status";
@@ -75,6 +77,20 @@ export function DashboardInspectionRow({
   const cancelled = insp.status === INSPECTION_STATUS.CANCELLED;
   const showReportLink =
     reportView && tenantSlug && isReportPublished(insp.reportStatus);
+  // Completing is the one status change that asks first: the select sits under a thumb on a phone, and a mis-tap
+  // would otherwise mark the on-site work finished with no way to tell. The select is controlled by `insp.status`,
+  // so cancelling leaves it showing the stored value; nothing is sent until the dialog is confirmed.
+  const [confirmingComplete, setConfirmingComplete] = useState(false);
+  // Decided synchronously: two clicks on the confirm button can land before the dialog has re-rendered closed.
+  const completeAsked = useRef(false);
+  const chooseStatus = (status: string) => {
+    if (status === INSPECTION_STATUS.COMPLETED && insp.status !== INSPECTION_STATUS.COMPLETED) {
+      completeAsked.current = true;
+      setConfirmingComplete(true);
+      return;
+    }
+    transitionStatus(insp.id, status);
+  };
   return (
     <div className="flex items-center gap-2 px-4 py-3 hover:bg-ih-bg-muted transition-colors group">
       <input
@@ -85,11 +101,11 @@ export function DashboardInspectionRow({
       />
       <Link
         to={`/inspections/${insp.id}`}
-        className="flex items-center justify-between flex-1 min-w-0"
+        className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-0 flex-1 min-w-0"
       >
         <div className="min-w-0">
           {isColumnVisible("propertyAddress") && (
-            <p className="text-[13px] font-medium text-ih-fg-1 truncate">
+            <p className="text-[13px] font-medium text-ih-fg-1 line-clamp-2 sm:line-clamp-none sm:truncate">
               {insp.address || insp.propertyAddress || m.dashboard_row_no_address()}
             </p>
           )}
@@ -111,7 +127,7 @@ export function DashboardInspectionRow({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0 ml-4">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap sm:shrink-0 sm:ml-4">
           {isColumnVisible("statusIcons") && (
             <Pill tone={statusTone(insp.status)}>
               {insp.status.replace(/_/g, " ")}
@@ -195,7 +211,7 @@ export function DashboardInspectionRow({
         {!cancelled && canChangeStatus && !(orderStatusesOnly && insp.status === INSPECTION_STATUS.COMPLETED) && (
           <select
             value={insp.status}
-            onChange={(e) => transitionStatus(insp.id, e.target.value)}
+            onChange={(e) => chooseStatus(e.target.value)}
             onClick={(e) => e.stopPropagation()}
             className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-2 border-0 outline-none cursor-pointer"
           >
@@ -205,6 +221,26 @@ export function DashboardInspectionRow({
           </select>
         )}
       </div>
+      {/* Outside the hover group for the same reason as the restore control below: the Modal renders inline. */}
+      {confirmingComplete && (
+        <ConfirmDialog
+          open
+          title={m.editor_finish_fieldwork_confirm_title()}
+          message={m.editor_finish_fieldwork_confirm_body()}
+          confirmLabel={m.inspections_hub_lifecycle_mark_complete()}
+          tone="default"
+          onConfirm={() => {
+            if (!completeAsked.current) return;
+            completeAsked.current = false;
+            setConfirmingComplete(false);
+            transitionStatus(insp.id, INSPECTION_STATUS.COMPLETED);
+          }}
+          onCancel={() => {
+            completeAsked.current = false;
+            setConfirmingComplete(false);
+          }}
+        />
+      )}
       {/* OUTSIDE the hover group, and that is load-bearing twice over. The
           restore control carries a confirmation Modal, which renders INLINE
           rather than through a portal — an ancestor at `opacity-0` would both

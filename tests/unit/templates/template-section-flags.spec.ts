@@ -1,5 +1,5 @@
 /**
- * Track E2 (Spectora App.A) — per-section disclaimer + always_page_break.
+ * Track E2 — per-section disclaimer + always_page_break.
  *
  * Schema-level tests verify that the v2 template Zod validator accepts the
  * new optional fields and rejects malformed ones. The renderer side is

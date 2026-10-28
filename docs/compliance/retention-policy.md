@@ -297,8 +297,8 @@ tenant, is applied above it and deliberately not folded in: one function
 silently responsible for a legal determination it has no facts for is how a
 wrong answer gets an authoritative shape.
 
-**Why the disclosure sits next to the control.** The dominant competitor stores
-reports indefinitely, including after cancellation. A customer who never opens a
+**Why the disclosure sits next to the control.** Reports may be expected to be
+kept indefinitely, including after cancellation. A customer who never opens a
 disclosure would reasonably assume our number is required of them, so the
 disclosure wording renders plainly beside the field rather than behind a control
 or on a policy page.

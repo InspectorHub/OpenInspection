@@ -1,5 +1,5 @@
 /**
- * Track E2 (Spectora App.A) — getReportData surfaces per-section
+ * Track E2 — getReportData surfaces per-section
  * disclaimerText + alwaysPageBreak so the published report viewer can
  * render the disclaimer block + apply the data-page-break attribute.
  */

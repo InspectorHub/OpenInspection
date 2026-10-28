@@ -1,5 +1,5 @@
 /**
- * Round-2 backlog #2 — Inspection dashboard column registry (Spectora §5.1 / §E.7).
+ * Round-2 backlog #2 — Inspection dashboard column registry.
  *
  * Master list of every column the inspector can show / hide on the dashboard
  * inspection list. The registry is the single source of truth — used by:

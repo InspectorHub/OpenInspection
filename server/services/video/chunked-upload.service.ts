@@ -65,11 +65,20 @@ function notOpen(row: VideoUpload): UploadFailure | null {
     return row.state === 'completed' ? DONE : GONE;
 }
 
-/** What storage's multipart errors look like; the codes are R2's documented ones, the names are what the binding throws. */
+/**
+ * What storage's multipart errors look like. The binding's message carries R2's numeric code and no S3-style name,
+ * e.g. "completeMultipartUpload: One or more of the specified parts could not be found. (10025)", so the codes are
+ * what is matched: 10025 (a part is missing or its ETag is stale) and 10048 (part sizes differ) mean the ledger and
+ * storage disagree; 10024 means the upload id is gone.
+ *
+ * 10011 ("Your proposed upload is smaller than the minimum allowed object size") stays `other` on purpose: the ledger
+ * has already checked every part's size against the declared total, so storage refusing one for being too small is not
+ * something the client can repair by sending the parts again. It is logged as a failure and the row is reopened.
+ */
 function classify(err: unknown): 'invalid-part' | 'no-such-upload' | 'other' {
     const text = err instanceof Error ? err.message : String(err);
-    if (/InvalidPart|\b10025\b|\b10048\b/i.test(text)) return 'invalid-part';
-    if (/NoSuchUpload|\b10024\b/i.test(text)) return 'no-such-upload';
+    if (/\b(?:10025|10048)\b/.test(text)) return 'invalid-part';
+    if (/\b10024\b/.test(text)) return 'no-such-upload';
     return 'other';
 }
 

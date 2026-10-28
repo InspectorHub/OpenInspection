@@ -15069,7 +15069,7 @@
                       },
                       "templateImport": {
                         "type": "boolean",
-                        "description": "May bring a template in from a Spectora export or the content marketplace."
+                        "description": "May bring a template in from an export of another inspection product or the content marketplace."
                       },
                       "deleteInspection": {
                         "type": "boolean",

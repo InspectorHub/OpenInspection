@@ -384,8 +384,8 @@ the session on the agent sign-in page rather than the staff one.
 > and so on). Before assuming a role means what its name suggests, find the enum
 > it comes from.
 
-Template permission is four verbs rather than the single "Add/Edit Template"
-switch Spectora ships, because the four are not equally recoverable. `templateEdit`
+Template permission is four verbs rather than a single "Add/Edit Template"
+switch, because the four are not equally recoverable. `templateEdit`
 is the irreversible one — there is no template version history, and the audit
 trail records *that* a change happened, not the content to roll back to — yet it
 stays on for inspectors so fixing a typo does not need an owner. `templateDelete`

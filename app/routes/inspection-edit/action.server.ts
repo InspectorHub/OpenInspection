@@ -244,7 +244,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  }
 
  if (intent === "upload-cover") {
- // DB-16 — direct cover upload (Spectora parity): upload an image to the
+ // DB-16 — direct cover upload: upload an image to the
  // loose media pool, then set it as the report cover in one step. Rides the
  // BFF relay like every other mutation (no raw client fetch).
  const file = formData.get("file");

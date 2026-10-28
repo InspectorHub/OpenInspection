@@ -10,7 +10,7 @@
  * F65: three of the four quick actions navigated to a query parameter that
  * nothing in the repository read (`?new=1`, `?import=1` — 0 hits). Two of them
  * now address a page that opens its own dialog; the third pointed at a flow that
- * was deleted (a paste-a-JSON Spectora importer) and is repointed at the wizard
+ * was deleted (a paste-a-JSON importer for one vendor) and is repointed at the wizard
  * that replaced it, with the vendor name dropped — the wizard's first question
  * is which vendor, so naming one in the palette promised a shortcut that is not
  * there.

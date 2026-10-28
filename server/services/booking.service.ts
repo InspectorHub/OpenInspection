@@ -312,7 +312,7 @@ export class BookingService {
     /**
      * Deterministic auto-assignment — "first available": stable sort by
      * (name, id) over the free set so repeated submissions pick the same
-     * person (Spectora's seniority-order analogue without a rank field).
+     * person.
      */
     async pickInspector(tenantId: string, freeIds: string[]): Promise<string | null> {
         if (freeIds.length === 0) return null;

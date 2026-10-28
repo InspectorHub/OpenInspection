@@ -98,7 +98,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  inspBodyP,
  optionalP,
  ]);
- void inspRes;
+ // 404/403 means no editor (an empty 200 shell got kept by the service worker); other failures stay tolerant.
+ if ([403, 404].includes(inspRes.status)) throw new Response("Inspection not found", { status: inspRes.status });
  const resultsBody = resultsRes.ok ? await resultsRes.json() : {};
  const reportBody = reportRes.ok ? await reportRes.json() : {};
 

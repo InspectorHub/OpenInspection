@@ -4,8 +4,8 @@
  *
  * Three things can only be proven here, at the HTTP boundary:
  *
- * 1. THE PUBLISH GATE FAILS CLOSED. The industry surface withholds the log
- *    until the report is published. The assertion is not "the response says
+ * 1. THE PUBLISH GATE FAILS CLOSED. The log is withheld until the report
+ *    is published. The assertion is not "the response says
  *    published: false" — it is that the lists were NEVER QUERIED, because a
  *    gate that computes the answer and then declines to print it is one
  *    refactor away from printing it.

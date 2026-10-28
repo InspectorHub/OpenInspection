@@ -100,7 +100,7 @@ export async function populateSplits(db: Db, tenantId: string, inspectionId: str
             if (onLine.some(s => s.userId === userId && s.correctsSplitId === null)) continue;
             const rule = pickRule(rules, line.serviceId, userId);
             if (!rule) continue;
-            // The divisor is the competitor's mandatory, non-disableable rule:
+            // The divisor is a mandatory, non-disableable rule:
             // a 60% rule on a $500 service with two inspectors pays 30% each.
             // Without it, a second inspector pays out 120% of the service.
             const amountCents = Math.floor(computeGross(rule, line.priceCents) / eligible.length);

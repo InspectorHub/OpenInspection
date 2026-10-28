@@ -3,7 +3,7 @@
  * #69 — the Repair Request Log, pinned at the two places it can silently go
  * wrong.
  *
- * 1. THE PUBLISH GATE. The industry surface this copies withholds the log until
+ * 1. THE PUBLISH GATE. The log is withheld until
  *    the report is published, and the server refuses to query the lists on that
  *    branch. The view model repeats the rule, so this asserts on the OUTPUT a
  *    reader gets rather than on which branch ran: a payload that carries lists
@@ -164,7 +164,7 @@ describe("repair request log — read only", () => {
 
 describe("repair request log — the log is many lists", () => {
   it("renders one entry per list, each attributed to who built it", async () => {
-    // Spectora calls it a Log because an order collects several: the buyer's,
+    // It is a Log because an order collects several lists: the buyer's,
     // their agent's, sometimes a second buyer's. A page that rendered only the
     // newest would look correct on every single-list order.
     const { findByTestId } = renderLog({

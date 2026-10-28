@@ -9,11 +9,10 @@
  * WHY THE FIX IS "DO NOT OFFER IT" AND NOT "BLOCK $0":
  *
  *   A $0 INVOICE IS LEGITIMATE, and blocking that would have been the wrong
- *   lesson to draw. Surveyed 2026-09-07: Stripe finalizes a zero-total invoice
- *   straight to `paid` without attempting collection; ISN documents stamping
- *   PAID on an order "or has a total cost amounting to $0.00"; Canopy ships a
- *   zero-balance invoice specifically to "document work performed without
- *   charging the client" for courtesy work. Comped inspections are real.
+ *   lesson to draw. Stripe finalizes a zero-total invoice
+ *   straight to `paid` without attempting collection, and a zero-balance
+ *   invoice is a normal way to document courtesy work done without charging
+ *   the client. Comped inspections are real.
  *
  *   What is not legitimate is ASKING SOMEONE TO PAY ZERO. So the card stops
  *   offering that action and says what to do instead, rather than presenting a

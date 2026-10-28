@@ -91,7 +91,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // (see #181 provider plan).
     smsMode: text('sms_mode', { enum: ['platform', 'own', 'managed_shared', 'managed_dedicated'] }).notNull().default('platform'),
     senderDisplayName: text('sender_display_name'),
-    // 2026-06-14 — Point of Contact (Spectora parity). Single tenant-level
+    // 2026-06-14 — Point of Contact. Single tenant-level
     // switch for who client-facing emails come from. Drives From display name
     // + reply-to (NOT the From address — that is emailMode).
     pointOfContact: text('point_of_contact', { enum: ['inspector', 'company'] }).notNull().default('company'),
@@ -162,23 +162,23 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Round-2 backlog #10 — when true, every NEW inspection inherits
     // agreementRequired = true at creation time.
     blockUnsignedAgreement: integer('is_unsigned_agreement_blocked', { mode: 'boolean' }).notNull().default(false),
-    // Round-2 backlog G3 (Spectora §4.1, ITB UC-ITB-10) — tenant-defined
+    // Round-2 backlog G3 — tenant-defined
     // referral sources that extend the seven seeds (Realtor / Past Client /
     // Google Search / Facebook / Yelp / Walk-in / Other). NULL = no extras.
     customReferralSources: text('custom_referral_sources', { mode: 'json' }).$type<string[]>(),
-    // Round-2 backlog #2 (Spectora §5.1 / §E.7) — per-tenant default for the
+    // Round-2 backlog #2 — per-tenant default for the
     // inspection dashboard column visibility set. JSON array of column ids
     // (see server/lib/dashboard-columns.ts for the registry). NULL means
     // "use the registry default-on set".
     dashboardColumnPrefs: text('dashboard_column_prefs', { mode: 'json' }).$type<string[]>(),
     // Agent Accounts A3 — concierge booking review mode toggle.
-    // Default 0 (false) = HomeGauge-style auto-confirm: agent submits ->
-    // magic-link goes to client immediately. 1 (true) = Spectora reviewer
+    // Default 0 (false) = auto-confirm: agent submits ->
+    // magic-link goes to client immediately. 1 (true) = reviewer
     // mode: inspector must approve the draft before the client gets the link.
     conciergeReviewRequired: integer('is_concierge_review_required', { mode: 'boolean' }).notNull().default(false),
     // IA-26 — company-level booking page: when true the public /book/:tenant
-    // wizard shows an inspector dropdown ("Allow choice of inspectors",
-    // Spectora-style). Default OFF = pure auto-assign (first available).
+    // wizard shows an inspector dropdown ("Allow choice of inspectors").
+    // Default OFF = pure auto-assign (first available).
     allowInspectorChoice: integer('is_inspector_choice_allowed', { mode: 'boolean' }).notNull().default(false),
     // Workers Paid PDF pipeline opt-in.
     // Default 0 (OFF) — keeps the Free-plan path cost-free (window.print()
@@ -413,7 +413,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     legalName: text('legal_name'),
     /**
      * The last invoice number handed out for this tenant. Default 1000, so the
-     * first invoice is **1001** — Jobber's convention, and the category's;
+     * first invoice is **1001**;
      * starting at 1 tells a homebuyer they are this company's first customer.
      *
      * A COUNTER, not a `MAX(invoice_number) + 1` scan. D1 has no interactive

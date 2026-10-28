@@ -14,7 +14,7 @@ const TENANT = '00000000-0000-0000-0000-000000000099';
 const INSPECTION_ID = '11111111-1111-1111-1111-111111111111';
 
 /**
- * Round-2 backlog #9 (Spectora §E.3) — Media Center service-level tests.
+ * Round-2 backlog #9 — Media Center service-level tests.
  *
  * Coverage:
  *   - getMediaCenter aggregates attached photos with section/item labels

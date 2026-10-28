@@ -584,7 +584,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/inspection/role-profiles.ts · 13 columns · primary key `id`</sub>
 
-> Tenant-configurable people roles (Spectora "Additional Inspection People" parity). `kind` is the ONLY semantic switch — capabilities derive from it in server/lib/people/capabilities.ts.
+> Tenant-configurable people roles ("additional inspection people"). `kind` is the ONLY semantic switch — capabilities derive from it in server/lib/people/capabilities.ts.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -1057,7 +1057,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/inspection/media.ts · 15 columns · primary key `id`</sub>
 
-> Round-2 backlog #9 (Spectora §E.3) — Media Center pool. Photos uploaded ahead of item placement live here until the inspector drags one onto an item textarea, at which point InspectionService.attachPoolPhoto moves it into inspection_results.data[itemId].photos[] and deletes the pool row.
+> Round-2 backlog #9 — Media Center pool. Photos uploaded ahead of item placement live here until the inspector drags one onto an item textarea, at which point InspectionService.attachPoolPhoto moves it into inspection_results.data[itemId].photos[] and deletes the pool row.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -1342,7 +1342,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `foundation_type` | text |  |  |  | Plain text rather than an enum: getPropertyFacts coerces anything outside basement/slab/crawlspace/other to 'other' on read, so an Estated autofill value can land here without the write path having to reject it. |
 | `bedrooms` | integer |  |  |  | *An integer value.* |
 | `bathrooms` | real |  |  |  | `real` because half-baths are normal (2.5). One of the six Property Facts columns patched together by updatePropertyFacts; Estated autofill fills it from `structure.baths`. |
-| `lot_size` | text |  |  |  | Round-2 backlog G1 (Spectora §E.2) — free-text lot size so inspectors can enter "0.25 acres", "10,000 sqft", etc. |
+| `lot_size` | text |  |  |  | Round-2 backlog G1 — free-text lot size so inspectors can enter "0.25 acres", "10,000 sqft", etc. |
 | `property_facts` | text |  |  |  | Round-2 backlog G1 — JSON envelope for future property facts that don't warrant their own column. |
 | `cover_photo_id` | text |  |  |  | Design System 0520 subsystem E P1 — id of the inspection_media_pool row used as the report cover image. |
 | `cover_crop` | text |  |  |  | Media Studio (cover crop) — the crop transform applied to the SOURCE image (cover_photo_id), in source-pixel coords. **[more]** |
@@ -1358,12 +1358,12 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `profile_override` | text |  |  |  | Report Style Presets — per-inspection appearance profile override. NULL = inherit template default, then tenant default, then 'signature'. |
 | `require_defect_fields_override` | text |  |  | `none, location, trade, both` | Track H (IA-7) — per-inspection override of the tenant's require_defect_fields default; NULL = inherit. |
 | `request_id` | text | IX FK→`inspection_requests.id` |  |  | Sprint 2 S2-2 — Multi-inspection per request. NULL on legacy rows pre-backfill; application requires a non-null value on all newly created inspections. |
-| `concierge_status` | text |  |  |  | Agent Accounts A3 — concierge booking state machine. NULL = not a concierge booking (or already settled into status='confirmed' / 'cancelled') 'awaiting_inspector' = agent submitted; inspector must approve (Spectora reviewer mode) 'awaiting_client' = magic-link sent to client; waiting on … |
+| `concierge_status` | text |  |  |  | Agent Accounts A3 — concierge booking state machine. NULL = not a concierge booking (or already settled into status='confirmed' / 'cancelled') 'awaiting_inspector' = agent submitted; inspector must approve (reviewer mode) 'awaiting_client' = magic-link sent to client; waiting on confirmation (auto … |
 | `is_team_mode` | integer | NN | `false` |  | Design System 0520 M3 — TeamMode flag enabling the team UI (TeamBanner / RosterPopover). WHO is on the team lives in `inspection_inspectors`, one row per person with their role — the only place any reader may learn it. |
 | `source_inspection_id` | text |  |  |  | #119 — re-inspection linkage (app-layer refs, no DB FK per Schema Rules). source = the baseline this re-inspection carried from (original OR a prior re-inspection). |
 | `root_inspection_id` | text | IX |  |  | *App-layer reference to another row — no database foreign key.* |
 | `reinspection_round` | integer |  |  |  | A re-inspection is its own ORDER, not a second report on the original. It is created as a new `inspections` row carrying this round number, and that is correct: it is a separate fee-bearing visit with its own agreement and its own invoice. |
-| `unit_inspection_mode` | text | NN | `'tagged'` | `tagged, per_unit` | Commercial PCA Phase F — multi-unit inspection mode. 'tagged' (default, Spectora-parity): the section/item checklist stays fixed and each defect is optionally tagged with a location drawn from locationOptions — this reuses DefectState.location + the finding key, so there is no location_tag column. **[more]** |
+| `unit_inspection_mode` | text | NN | `'tagged'` | `tagged, per_unit` | Commercial PCA Phase F — multi-unit inspection mode. 'tagged' (default): the section/item checklist stays fixed and each defect is optionally tagged with a location drawn from locationOptions — this reuses DefectState.location + the finding key, so there is no location_tag column. **[more]** |
 | `location_options` | text |  |  |  | Structured location picklist for the 'tagged' mode (floors / zones / units). The inspector defines or bulk-generates it; DefectState.location selects from it (free text still allowed). |
 | `sampling_declaration` | text |  |  |  | Representative-sampling declaration (ASTM E2018 §4.3.4): what was sampled and what was not. |
 | `pca_narrative` | text |  |  |  | Commercial PCA Phase S — editable report narrative blocks (8-key prose shape; see server/lib/pca-narrative.ts). |
@@ -1624,7 +1624,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `created_by` | text | NN |  |  | users.id of the operator who staged it. Soft reference. |
 | `intent` | text | NN |  | `templates.create, templates.overwrite, contacts.import, members.invite…` |  |
 | `target_id` | text |  |  |  | The row this run overwrites. Set ONLY for `templates.overwrite`, where the operator was standing on the template when they started; NULL for every other intent, because nothing else has a single named target. |
-| `vendor` | text | NN |  |  | Provenance for display ("imported from Spectora on ...") — never matched on. |
+| `vendor` | text | NN |  |  | Provenance for display ("imported from the source product on ...") — never matched on. |
 | `adapter_name` | text | NN |  |  | *A name.* |
 | `adapter_version` | text | NN |  |  |  |
 | `manifest` | text | NN |  |  | The bundle manifest, stringified ONCE at stage time and JSON.parsed straight back — never re-serialized from a re-read row, so what a report shows is the bytes the producing run made. |
@@ -2040,7 +2040,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/repair-request.ts · 11 columns · primary key `id`</sub>
 
-> A buyer/agent/inspector-built repair-request list for a published report. Multiple lists may exist per inspection (one+ per creator) — Spectora parity.
+> A buyer/agent/inspector-built repair-request list for a published report. Multiple lists may exist per inspection (one+ per creator).
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2255,7 +2255,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 
 <sub>server/lib/db/schema/inspection/assignment.ts · 4 columns · primary key `service_id, user_id`</sub>
 
-> IA-26 — inspector x service qualification (Spectora "Service Limitations" equivalent). ZERO rows for a service = every staff member is qualified (the MVP default); adding rows restricts that service to the listed users.
+> IA-26 — inspector x service qualification (service limitations). ZERO rows for a service = every staff member is qualified (the MVP default); adding rows restricts that service to the listed users.
 
 | Column | Type | Flags | Default | Values | Description |
 |---|---|---|---|---|---|
@@ -2673,7 +2673,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `video_mode` | text | NN | `'r2'` | `r2, stream` | Self-host video backend selection (mirrors emailMode). Default 'r2' (free). |
 | `sms_mode` | text | NN | `'platform'` | `platform, own, managed_shared, managed_dedicated` | Track L (D3) — SMS sender mode, mirrors email_mode. 'platform' uses the platform Twilio env; 'own' uses the tenant's three TWILIO_* secrets (only when all three are present, else platform fallback — see resolve-twilio.ts). **[more]** |
 | `sender_display_name` | text |  |  |  | *A name.* |
-| `point_of_contact` | text | NN | `'company'` | `inspector, company` | 2026-06-14 — Point of Contact (Spectora parity). Single tenant-level switch for who client-facing emails come from. |
+| `point_of_contact` | text | NN | `'company'` | `inspector, company` | 2026-06-14 — Point of Contact. Single tenant-level switch for who client-facing emails come from. |
 | `billing_url` | text |  |  |  | *A URL.* |
 | `review_url` | text |  |  |  | Track J (#122) — per-company Google/Yelp/Facebook review link. The "Review request" automation stays inert until this is set (fail-closed). |
 | `company_phone` | text |  |  |  | Track L — company contact phone shown in client SMS ({{company_phone}}). |
@@ -2689,10 +2689,10 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `is_customer_repair_export_enabled` | integer | NN | `false` |  | Sprint 3 S3-2 — when true, the public report viewer surfaces a "Generate repair request" link that takes the customer to a print- friendly export they can hand off to a contractor (or email back to themselves). |
 | `is_unpaid_blocked` | integer | NN | `false` |  | Round-2 backlog #10 — when true, every NEW inspection inherits paymentRequired = true at creation time. |
 | `is_unsigned_agreement_blocked` | integer | NN | `false` |  | Round-2 backlog #10 — when true, every NEW inspection inherits agreementRequired = true at creation time. |
-| `custom_referral_sources` | text |  |  |  | Round-2 backlog G3 (Spectora §4.1, ITB UC-ITB-10) — tenant-defined referral sources that extend the seven seeds (Realtor / Past Client / Google Search / Facebook / Yelp / Walk-in / Other). |
-| `dashboard_column_prefs` | text |  |  |  | Round-2 backlog #2 (Spectora §5.1 / §E.7) — per-tenant default for the inspection dashboard column visibility set. |
-| `is_concierge_review_required` | integer | NN | `false` |  | Agent Accounts A3 — concierge booking review mode toggle. Default 0 (false) = HomeGauge-style auto-confirm: agent submits -> magic-link goes to client immediately. |
-| `is_inspector_choice_allowed` | integer | NN | `false` |  | IA-26 — company-level booking page: when true the public /book/:tenant wizard shows an inspector dropdown ("Allow choice of inspectors", Spectora-style). |
+| `custom_referral_sources` | text |  |  |  | Round-2 backlog G3 — tenant-defined referral sources that extend the seven seeds (Realtor / Past Client / Google Search / Facebook / Yelp / Walk-in / Other). |
+| `dashboard_column_prefs` | text |  |  |  | Round-2 backlog #2 — per-tenant default for the inspection dashboard column visibility set. |
+| `is_concierge_review_required` | integer | NN | `false` |  | Agent Accounts A3 — concierge booking review mode toggle. Default 0 (false) = auto-confirm: agent submits -> magic-link goes to client immediately. |
+| `is_inspector_choice_allowed` | integer | NN | `false` |  | IA-26 — company-level booking page: when true the public /book/:tenant wizard shows an inspector dropdown ("Allow choice of inspectors"). |
 | `is_pdf_pipeline_enabled` | integer | NN | `false` |  | Workers Paid PDF pipeline opt-in. Default 0 (OFF) — keeps the Free-plan path cost-free (window.print() fallback in the viewer is unaffected). |
 | `is_team_mode_default` | integer | NN | `false` |  | Design System 0520 subsystem C P10 — /team Defaults section toggles. |
 | `require_defect_fields` | text | NN | `'none'` | `none, location, trade, both` | Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES. Tenant default; per-inspection override on inspections.require_defect_ fields_override (the blockUnpaid → paymentRequired inheritance pattern). |
@@ -2737,7 +2737,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `company_geocoded_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `repair_quick_phrases` | text |  |  |  | #275 — quick-insert phrases for repair-request notes, maintained by the tenant. Same shape and storage idiom as `custom_referral_sources` above. **[more]** |
 | `legal_name` | text |  |  |  | The registered legal entity, as it appears on the licence — distinct from `companyName`, which is the trading brand / DBA. **[more]** |
-| `invoice_seq` | integer | NN | `1000` |  | The last invoice number handed out for this tenant. Default 1000, so the first invoice is **1001** — Jobber's convention, and the category's; starting at 1 tells a homebuyer they are this company's first customer. **[more]** |
+| `invoice_seq` | integer | NN | `1000` |  | The last invoice number handed out for this tenant. Default 1000, so the first invoice is **1001**; starting at 1 tells a homebuyer they are this company's first customer. **[more]** |
 | `report_pdf_retention_years` | integer | NN | `7` |  | Years a rendered report PDF is kept. `0` = indefinite, which is an explicit controller instruction the platform executes rather than an absence of a setting. **[more]** |
 | `is_report_view_counting_enabled` | integer | NN | `false` |  | Whether this workspace counts report opens. Default FALSE. **[more]** |
 | `offline_max_days` | integer | NN | `30` |  | Native clients lock their local data after this many days without a successful refresh. Enforced on the device; the server only publishes it. |

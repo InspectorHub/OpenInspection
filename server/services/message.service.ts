@@ -79,9 +79,8 @@ export class MessageService {
     }
 
     /**
-     * Company-wide inbox: one row per contact thread (design §3.9 — the
-     * Conversations shape both competitors ship). `WHERE contact_id` is the
-     * whole query once threads are contact-keyed; this summarises it per
+     * Company-wide inbox: one row per contact thread (design §3.9). `WHERE contact_id` is
+     * the whole query once threads are contact-keyed; this summarises it per
      * contact: who, their newest message, and how many counterparty rows are
      * unread. Ordered newest-activity first.
      */

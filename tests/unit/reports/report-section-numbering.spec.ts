@@ -6,8 +6,7 @@ import {
 } from '../../../server/lib/report-section-numbering';
 
 /**
- * Competitor parity App.F.4 (Spectora) — auto-numbered section headings
- * + EDIT SECTION hover affordance in the published report viewer.
+ * Auto-numbered section headings + EDIT SECTION hover affordance in the published report viewer.
  */
 describe('report-section-numbering', () => {
     describe('canEditSection', () => {

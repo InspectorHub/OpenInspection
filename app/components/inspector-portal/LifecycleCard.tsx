@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Button } from "@core/shared-ui";
+import { Card, Button, Banner } from "@core/shared-ui";
 import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { BlockHeading } from "./BlockHeading";
 import { CancelInspectionModal } from "./CancelInspectionModal";
@@ -58,7 +58,12 @@ export function LifecycleCard({
 }) {
     const state = lifecycleState(status);
     // The card owns the complete-fieldwork submit: the guard refuses a second press in the same frame.
-    const { submit, busy: marking } = useGuardedSubmit();
+    const { submit, fetcher, busy: marking } = useGuardedSubmit<{ ok?: boolean; error?: string }>();
+    // Shown while the settled answer is a failure. A new attempt leaves `idle`, which clears it until that
+    // attempt settles, so an old message never sits beside a request that is already in flight.
+    const completeError = fetcher.state === "idle" && fetcher.data?.ok === false
+        ? (fetcher.data.error || m.inspections_hub_lifecycle_error())
+        : null;
     const [cancelOpen, setCancelOpen] = useState(false);
     const [completeOpen, setCompleteOpen] = useState(false);
 
@@ -71,6 +76,7 @@ export function LifecycleCard({
             {state === "actionable" ? (canComplete || canCancel) && (
                 <>
                     {canComplete && <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_lifecycle_hint()}</p>}
+                    {completeError && <Banner tone="danger" className="mb-3">{completeError}</Banner>}
                     {/* Secondary, and the shared Button rather than a hand-rolled
                         one. As a solid primary it was the loudest control on the
                         page while being, by its own contract above, advisory and
@@ -83,7 +89,7 @@ export function LifecycleCard({
                                 advisory but a mis-tap on a phone would otherwise send it. The
                                 guarded submit decides before the command goes out, so two
                                 presses in one frame send one request. */}
-                            <Button type="button" variant="secondary" size="sm" disabled={marking} onClick={() => setCompleteOpen(true)}>
+                            <Button type="button" variant="secondary" size="sm" pending={marking} onClick={() => setCompleteOpen(true)}>
                                 {marking ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
                             </Button>
                             <ConfirmDialog

@@ -65,7 +65,7 @@ export const UpdateBrandingSchema = z.object({
     // agreement gate. When true, every newly created inspection inherits
     // agreementRequired=true.
     blockUnsignedAgreement: z.boolean().optional().openapi({ example: false }).describe('Company default for new inspections: when true, each newly created inspection is marked agreement-required. A per-inspection setting still overrides it, and existing inspections are not changed'),
-    // Round-2 backlog G3 (Spectora §4.1) — extra referral-source labels the
+    // Round-2 backlog G3 — extra referral-source labels the
     // tenant wants on the inspection settings dropdown. The seed list of
     // seven values (Realtor / Past Client / …) is hardcoded; this array
     // appends to it. Trimmed entries; max 32 to keep the dropdown usable.
@@ -285,7 +285,7 @@ export const ATTENTION_THRESHOLDS_DEFAULTS = {
     report_unpublished_h: 72,
 } as const;
 
-// Round-2 backlog #2 (Spectora §5.1 / §E.7) — per-tenant default for the
+// Round-2 backlog #2 — per-tenant default for the
 // inspection dashboard column visibility set. The actual id whitelist lives
 // in server/lib/dashboard-columns.ts; we constrain length here so a malicious
 // payload can't blow up the JSON envelope, but accept any string id and

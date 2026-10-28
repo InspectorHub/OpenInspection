@@ -1,5 +1,5 @@
 /**
- * Round-2 backlog #2 — Dashboard preferences service (Spectora §5.1 / §E.7).
+ * Round-2 backlog #2 — Dashboard preferences service.
  *
  * Owns the per-tenant dashboard column visibility default. Stored as a JSON
  * array of column ids on `tenant_configs.dashboard_column_prefs`.

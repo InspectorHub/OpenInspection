@@ -2,8 +2,7 @@ import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqli
 import { sql } from 'drizzle-orm';
 import { ROLE_KINDS } from '../../../people/role-kinds';
 
-// Tenant-configurable people roles (Spectora "Additional Inspection People"
-// parity). `kind` is the ONLY semantic switch — capabilities derive from it in
+// Tenant-configurable people roles ("additional inspection people"). `kind` is the ONLY semantic switch — capabilities derive from it in
 // server/lib/people/capabilities.ts. New table: app-layer tenant filtering, no
 // .references() per Schema Rules. See spec 2026-07-16-oi-people-role-profiles.
 export const contactRoleProfiles = sqliteTable('contact_role_profiles', {

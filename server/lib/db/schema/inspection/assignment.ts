@@ -29,8 +29,7 @@ export const inspectionInspectors = sqliteTable('inspection_inspectors', {
     index('idx_insp_inspectors_user').on(t.userId),
 ]);
 
-// IA-26 — inspector x service qualification (Spectora "Service Limitations"
-// equivalent). ZERO rows for a service = every staff member is qualified
+// IA-26 — inspector x service qualification (service limitations). ZERO rows for a service = every staff member is qualified
 // (the MVP default); adding rows restricts that service to the listed users.
 export const serviceInspectors = sqliteTable('service_inspectors', {
     serviceId: text('service_id').notNull(),

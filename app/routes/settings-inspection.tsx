@@ -266,10 +266,14 @@ function SettingsInspectionPage() {
                                     checked={pinned}
                                     disabled={!pinned && prefs.pinnedTagIds.length >= 5}
                                     onChange={() => {
-                                        const next = pinned
-                                            ? prefs.pinnedTagIds.filter(id => id !== tag.id)
-                                            : [...prefs.pinnedTagIds, tag.id];
-                                        patch({ pinnedTagIds: next });
+                                        // Computed from the latest pins, not from this render's: quick clicks
+                                        // land before the next render, and each must build on the one before.
+                                        patch(current => {
+                                            const has = current.pinnedTagIds.includes(tag.id);
+                                            if (has) return { pinnedTagIds: current.pinnedTagIds.filter(id => id !== tag.id) };
+                                            if (current.pinnedTagIds.length >= 5) return {};
+                                            return { pinnedTagIds: [...current.pinnedTagIds, tag.id] };
+                                        });
                                     }}
                                     className="w-4 h-4"
                                 />

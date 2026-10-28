@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 
 /**
- * Round-2 backlog #9 (Spectora §E.3) — Media Center.
+ * Round-2 backlog #9 — Media Center.
  *
  * Two-list payload: photos already attached to an item plus the loose pool
  * of bulk-uploaded shots awaiting placement. The drawer renders both groups

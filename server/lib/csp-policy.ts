@@ -33,7 +33,7 @@ export interface CspOptions {
     reportUri?: string;
     /**
      * Hosts added to a directive on top of the shared allowlist. Absent means the enforced API
-     * policy, byte for byte; the page policies use it for hosts only pages load.
+     * policy (the shared allowlist, nothing more); the page policies use it for hosts only pages load.
      */
     extraSources?: Partial<Record<CspExtraDirective, readonly string[]>>;
 }
@@ -54,12 +54,14 @@ export function buildCsp(options: CspOptions): string {
         `style-src 'self'${inline ? " 'unsafe-inline'" : ''}${extra('style-src')}`,
         "font-src 'self' data:",
         // maps.gstatic.com / maps.googleapis.com: map tiles + marker sprites.
-        `img-src 'self' data: blob: https://maps.gstatic.com https://maps.googleapis.com${extra('img-src')}`,
+        // *.cloudflarestream.com: the Stream player's thumbnails.
+        `img-src 'self' data: blob: https://maps.gstatic.com https://maps.googleapis.com https://*.cloudflarestream.com${extra('img-src')}`,
         // maps.googleapis.com: the Maps SDK's own XHR/fetch for tile metadata.
         `connect-src 'self' https://challenges.cloudflare.com https://maps.googleapis.com${extra('connect-src')}`,
         // 'self' required so the Settings → Embed Widget page can iframe
         // its own /book?embed=1 preview. Without it the live preview is blank.
-        `frame-src 'self' https://challenges.cloudflare.com${extra('frame-src')}`,
+        // *.cloudflarestream.com: the Stream video player iframe.
+        `frame-src 'self' https://challenges.cloudflare.com https://*.cloudflarestream.com${extra('frame-src')}`,
         options.widgetEmbed ? 'frame-ancestors *' : options.sameOriginFraming ? "frame-ancestors 'self'" : "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",

@@ -1,13 +1,12 @@
 // /api/inspections/:id/pay-splits — the read and write face for what each
 // inspector earns on one job (#278).
 //
-// THE VISIBILITY RULE IS QUERY SCOPING, NOT A CAPABILITY. Spectora's shipped
-// behaviour is "an inspector sees their own pay split on every inspection and
-// cannot see or edit anyone else's"; that is a THIRD state — `companyFinance: false`
-// AND `subject = self` — and no boolean permission flag can express it. Housecall
-// Pro and Jobber both fail to offer it for exactly that reason: their pay
-// permissions are binary, so "see your own" has nowhere to live. Ours would be
-// binary too if this were a capability, so the GET is gated on ROLE and the ROWS
+// THE VISIBILITY RULE IS QUERY SCOPING, NOT A CAPABILITY. The rule is "an
+// inspector sees their own pay split on every inspection and cannot see or edit
+// anyone else's"; that is a THIRD state — `companyFinance: false` AND
+// `subject = self` — and no boolean permission flag can express it, because a
+// binary pay permission has nowhere for "see your own" to live. This would be
+// binary too if it were a capability, so the GET is gated on ROLE and the ROWS
 // are filtered:
 //
 //   companyFinance: true  (owner/manager) → every split on the inspection, editable
@@ -24,9 +23,8 @@
 // appears here. Never "cost": the inspector reads this payload.
 //
 // Every write is `requireCapability('companyFinance')` on top of the role gate. An
-// inspector's own row is read-only to them, which is the competitor's rule and
-// also the only defensible one — a wage nobody but its recipient can change is
-// not an agreement.
+// inspector's own row is read-only to them, which is the only defensible rule —
+// a wage nobody but its recipient can change is not an agreement.
 //
 // The route definitions are NAMED CONSTS rather than inlined into the chain,
 // which is not a style preference: `scripts/check-idempotency-coverage.mjs`

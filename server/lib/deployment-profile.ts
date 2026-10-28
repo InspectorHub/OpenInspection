@@ -125,7 +125,7 @@ export interface DeploymentProfile {
     /** Whether the PLATFORM supplies the Intuit app a tenant connects through.
      *  True in saas: one published app serves every tenant, and asking an
      *  inspection company to register their own on developer.intuit.com would
-     *  be handing them a question none of our competitors ask. False in
+     *  be handing them a question they should not have to answer. False in
      *  standalone — not as a downgrade, but because Intuit matches a redirect
      *  URI byte for byte and a self-hosted deploy answers on its own domain, so
      *  the platform's app CANNOT work there whatever we prefer.

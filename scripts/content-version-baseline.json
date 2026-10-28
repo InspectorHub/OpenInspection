@@ -36,7 +36,7 @@
       }
     },
     "c2": {
-      "combined": "eee78c837f2580ff93b34041de5c9088fed5d687dd55e8cc0a2d5ded85d1ceea",
+      "combined": "3d3b937fe838865a9d26e662bcbab0b9ebe4fb227a73ff2d763774e6f95878f8",
       "files": {
         "server/data/seed-templates/commercial-hospitality.json": "e3c4bd49a05e0aaa7c3681b1c57cdfedd84b22b3e798969ffb8125ad37b4df72",
         "server/data/seed-templates/commercial-industrial.json": "10107fa6d118e6c33a131808506d6b6b82e38d529862ddd5fb1fc983f6cf3e4e",
@@ -58,7 +58,7 @@
         "server/data/seed-templates/sewer-scope.json": "9da534d9926baf2136e04b02fced3120d4023e498b4812e591887d51f9463a02",
         "server/data/seed-templates/trec-rei-7-6.json": "d3280f74e9e27184ac6d606206eec156881f821799433f632c815b1f5ee32d6e",
         "server/data/seed-templates/wind-mitigation.json": "cd6c78f4cbd0c94d841963e9cba7ab725a87523c43ff0c132877b32555c8962c",
-        "server/lib/people/default-role-profiles.ts": "7a0984542a32c3d5315ce1d8bb8d7f165e3511a6f23ed0dbd27a953f1ac41de4",
+        "server/lib/people/default-role-profiles.ts": "8146ee5b5068d3e96ab23998db5b34abe72e455d25b9896ce6e064515c1ff55e",
         "server/services/starter-content/fixtures/agreement-template.ts": "cb50e1a56238612e8c98f05f725e6e06cd58b4b534e5061c05427921ab0a36c1",
         "server/services/starter-content/fixtures/canned-comments.ts": "0fe2055871fe14a0ce1d56085992a09d2710e2e29c344d48bbb564abac6e038a",
         "server/services/starter-content/fixtures/contractor-types.ts": "b9b31ab9f9d29a41fe175ff5768b869fb3d718acf8dec5d95786ebf841cd05c0",

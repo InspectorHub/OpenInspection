@@ -523,7 +523,7 @@ export class InspectionService {
     }
 
     /**
-     * Track E1 (ITB §11, UC-ITB-07) — Repair List aggregation.
+     * Track E1 — Repair List aggregation.
      *
      * Walks every section of the published report (via getReportData so we
      * stay aligned with the rating-system snapshot resolution + photo
@@ -582,7 +582,7 @@ export class InspectionService {
     }
 
     /**
-     * Round-2 F3 — People card payload (Spectora §E.2 / §4.1).
+     * Round-2 F3 — People card payload.
      *
      * Groups every party connected to an inspection by role so the inspection
      * Settings page can render a contact card with role chips:

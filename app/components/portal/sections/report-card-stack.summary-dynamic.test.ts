@@ -1,5 +1,5 @@
 // Verifies the report summary cards are derived DYNAMICALLY from the
-// inspection's own rating system (Spectora-style), not the previous hardcoded
+// inspection's own rating system, not the previous hardcoded
 // "Satisfactory / Monitor / Defects" buckets. Raw-source assertions mirror the
 // existing report-card-stack web tests.
 //

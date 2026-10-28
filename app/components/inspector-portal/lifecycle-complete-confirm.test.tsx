@@ -77,9 +77,81 @@ describe("LifecycleCard - mark fieldwork complete confirmation", () => {
         // In flight: the dialog is gone and the page button shows the marking state, disabled.
         await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
         const marking = await screen.findByRole("button", { name: m.inspections_hub_lifecycle_marking() });
-        expect((marking as HTMLButtonElement).disabled).toBe(true);
+        // aria-disabled, never native `disabled`: a natively disabled button drops keyboard focus to the page body.
+        expect((marking as HTMLButtonElement).disabled).toBe(false);
+        expect(marking.getAttribute("aria-disabled")).toBe("true");
         await act(async () => { release(); });
         await waitFor(() => expect(screen.queryByRole("button", { name: m.inspections_hub_lifecycle_marking() })).toBeNull());
         expect(screen.queryByRole("dialog")).toBeNull();
+    });
+});
+
+describe("LifecycleCard - focus stays on the page button while marking", () => {
+    it("the dialog hands focus back to the button, and the busy button keeps it and ignores a press", async () => {
+        let release: () => void = () => undefined;
+        const submitted = renderCard(new Promise<void>((resolve) => { release = resolve; }));
+        const pageButton = await screen.findByRole("button", { name: m.inspections_hub_lifecycle_mark_complete() });
+        pageButton.focus();
+        fireEvent.click(pageButton);
+        const dialog = await screen.findByRole("dialog", { name: dialogName() });
+        fireEvent.click(within(dialog).getByRole("button", { name: m.inspections_hub_lifecycle_mark_complete() }));
+        await waitFor(() => expect(submitted).toHaveLength(1));
+        const marking = await screen.findByRole("button", { name: m.inspections_hub_lifecycle_marking() });
+        await waitFor(() => expect(document.activeElement).toBe(marking));
+        // A press on the busy button opens nothing.
+        fireEvent.click(marking);
+        expect(screen.queryByRole("dialog")).toBeNull();
+        await act(async () => { release(); });
+    });
+});
+
+describe("LifecycleCard - a failed complete is shown", () => {
+    function renderFailing(answers: Array<{ ok: boolean; error?: string }>) {
+        let n = 0;
+        const Stub = createRoutesStub([
+            {
+                path: "/hub",
+                Component: () => <LifecycleCard status={INSPECTION_STATUS.SCHEDULED} inspectionId="insp-1" />,
+                action: async () => {
+                    const answer = answers[Math.min(n, answers.length - 1)];
+                    n += 1;
+                    return { ...answer, intent: "complete" };
+                },
+            },
+        ]);
+        render(<Stub initialEntries={["/hub"]} />);
+    }
+
+    async function completeOnce() {
+        fireEvent.click(await screen.findByRole("button", { name: m.inspections_hub_lifecycle_mark_complete() }));
+        const dialog = await screen.findByRole("dialog", { name: dialogName() });
+        fireEvent.click(within(dialog).getByRole("button", { name: m.inspections_hub_lifecycle_mark_complete() }));
+    }
+
+    it("shows the action's error in an alert", async () => {
+        renderFailing([{ ok: false, error: "Only scheduled inspections can be completed." }]);
+        await completeOnce();
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).toContain("Only scheduled inspections can be completed.");
+    });
+
+    it("falls back to the standard sentence when the action gives none", async () => {
+        renderFailing([{ ok: false }]);
+        await completeOnce();
+        expect((await screen.findByRole("alert")).textContent).toContain(m.inspections_hub_lifecycle_error());
+    });
+
+    it("clears the message when the next attempt starts, and shows nothing after it succeeds", async () => {
+        renderFailing([{ ok: false, error: "First attempt failed." }, { ok: true }]);
+        await completeOnce();
+        await screen.findByRole("alert");
+        await completeOnce();
+        await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    });
+
+    it("CONTROL - no message before anything was attempted", async () => {
+        renderFailing([{ ok: false, error: "never asked" }]);
+        await screen.findByRole("button", { name: m.inspections_hub_lifecycle_mark_complete() });
+        expect(screen.queryByRole("alert")).toBeNull();
     });
 });

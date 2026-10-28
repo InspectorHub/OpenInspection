@@ -59,16 +59,15 @@ export const STRICT_POLICY_EVERY_NTH_PAGE = 20;
  *     StripePayPanel.tsx:58 loads the script from js.stripe.com and mounts Elements
  *     frames from the same host; hooks.stripe.com is the 3-D Secure frame. The
  *     api / m / r hosts are Stripe.js's own XHR and telemetry endpoints.
- *   - Cloudflare Stream: the player iframe (VideoPlayer.tsx:35, report-video.ts:115)
- *     and its thumbnails (PosterPicker.tsx:26, report-video.ts:80). No media-src:
- *     the clip played in the page itself comes from the worker's own origin.
- * Google Maps is deliberately not repeated here; it is already in the shared allowlist.
+ * Google Maps and the Cloudflare Stream player (its iframe and thumbnails) are deliberately not repeated
+ * here; they are in the shared allowlist. There is no media-src: the clip played in the page itself comes
+ * from the worker's own origin.
  */
 const PAGE_EXTRA_SOURCES = {
     'script-src': ['https://js.stripe.com'],
-    'frame-src': ['https://js.stripe.com', 'https://hooks.stripe.com', 'https://*.cloudflarestream.com'],
+    'frame-src': ['https://js.stripe.com', 'https://hooks.stripe.com'],
     'connect-src': ['https://api.stripe.com', 'https://m.stripe.network', 'https://r.stripe.com'],
-    'img-src': ['https://*.stripe.com', 'https://*.cloudflarestream.com'],
+    'img-src': ['https://*.stripe.com'],
 } as const;
 
 export const PAGE_PERMISSIONS_POLICY = 'geolocation=(), microphone=(), camera=(self)';

@@ -74,12 +74,9 @@ const deleteButtonFor = (title: string) =>
  * `siteKey` and is how the field-level census found it.
  *
  * WHY IT IS SHOWN AS A GAP RATHER THAN A TICK, and only before publication.
- * Surveyed 2026-09-08: Spectora's field app marks sections and items with
- * checkmarks as they are completed, so a completeness indicator on the
- * inspector's working surface is ordinary for the category. What the inspector
- * needs from a list of deliverables is what is still outstanding, so the row
- * speaks only when the narrative is missing — a badge on every finished row is
- * noise, and after publication an unwritten narrative is no longer a to-do.
+ * What the inspector needs from a list of deliverables is what is still
+ * outstanding, so the row speaks only when the narrative is missing — a badge
+ * on every finished row is noise, and after publication an unwritten narrative is no longer a to-do.
  */
 describe("report-level narrative indicator", () => {
     it("says so when an unpublished report has no narrative", () => {

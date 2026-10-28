@@ -80,4 +80,15 @@ describe("InspectionsStatCards", () => {
         expect(container.querySelectorAll("a[href]")).toHaveLength(0);
         expect(container.querySelectorAll(".cursor-pointer")).toHaveLength(0);
     });
+
+    it("stacks the label over the number on a phone and lets the label wrap", () => {
+        const { getByText } = renderCards();
+        const label = getByText("Needs Attention");
+        // The label may shrink and break; the number sits beside it only from `sm`.
+        expect(label.className).toContain("min-w-0");
+        expect(label.className).toContain("break-words");
+        const group = label.parentElement!;
+        expect(group.className).toContain("flex-col");
+        expect(group.className).toContain("sm:flex-row");
+    });
 });

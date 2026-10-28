@@ -74,6 +74,13 @@ describe("TagSwatch (the library and the inspection settings)", () => {
     },
   );
 
+  it("carries a hairline ring on the border token so a dark colour stays visible in dark theme", () => {
+    render(<TagSwatch color="#4f46e5" className="r" />);
+    const cls = document.querySelector(".r")?.className ?? "";
+    expect(cls).toContain("ring-1");
+    expect(cls).toContain("ring-ih-border");
+  });
+
   it("draws nothing for a colour that is not a plain colour, a word that is not a colour, or none", () => {
     const { container } = render(<><TagSwatch color={BAD} /><TagSwatch color="red;x" /><TagSwatch color="rebeccapurple" /><TagSwatch color="foo" /><TagSwatch color={null} /></>);
     expect(container.innerHTML).toBe("");

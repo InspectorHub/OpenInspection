@@ -45,7 +45,7 @@ export interface SchemaItem {
 }
 
 /**
- * Track E2 (Spectora App.A) — per-section disclaimer + force-page-break are
+ * Track E2 — per-section disclaimer + force-page-break are
  * stored on the schema's section node so the editor can author them and the
  * published report can honor them. Both optional; legacy templates without
  * these fields render unchanged.

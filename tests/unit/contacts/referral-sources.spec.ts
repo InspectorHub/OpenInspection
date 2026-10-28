@@ -1,5 +1,5 @@
 /**
- * Round-2 backlog G3 (Spectora §4.1, ITB UC-ITB-10) — referral source list
+ * Round-2 backlog G3 — referral source list
  * resolver. Asserts:
  *   - Seed list is always returned.
  *   - Custom labels are appended in order.

@@ -5,9 +5,8 @@ import { m } from "~/paraglide/messages";
 /**
  * "Your browser timezone is X · Use this" affordance under a timezone picker.
  *
- * Mainstream field-service tools (Housecall Pro, Jobber, ServiceTitan) pre-
- * detect the viewer's zone instead of defaulting silently to UTC; this offers
- * the detected zone as a one-click choice without ever changing what the picker
+ * Defaulting silently to UTC is a poor answer, so this offers the viewer's
+ * detected zone as a one-click choice without ever changing what the picker
  * resolves to on its own.
  *
  * SSR-safe: the browser zone is read AFTER mount (initial render is null on both

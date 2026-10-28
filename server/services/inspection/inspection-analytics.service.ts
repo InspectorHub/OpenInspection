@@ -40,7 +40,7 @@ function countCustomDefects(
 }
 
 /**
- * Track E1 (ITB §11) — one contractor punch-list row returned by
+ * Track E1 — one contractor punch-list row returned by
  * `getRepairList`. Moved here from inside that method (shape unchanged).
  *
  * @declarationEmit Exported so the emitted `.d.ts` can NAME it: it is the
@@ -125,7 +125,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
     }
 
     /**
-     * Track E1 (ITB §11, UC-ITB-07) — Repair List aggregation.
+     * Track E1 — Repair List aggregation.
      *
      * Walks every section of the published report (via getReportData so we
      * stay aligned with the rating-system snapshot resolution + photo

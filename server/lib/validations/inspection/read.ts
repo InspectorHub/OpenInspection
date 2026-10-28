@@ -2,7 +2,7 @@ import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
 
 /**
- * Round-2 backlog G1 (Spectora §E.2) — Property Facts strip payload.
+ * Round-2 backlog G1 — Property Facts strip payload.
  * Six structured fields. All optional so inspectors can fill them in over
  * time. `null` clears a field; omitted = leave existing value untouched.
  *
@@ -80,7 +80,7 @@ export const InspectionRecipientsResponseSchema = createApiResponseSchema(
   z.array(InspectionRecipientSchema)
 ).openapi('InspectionRecipientsResponse');
 
-// Round-2 F3 — People card payload (Spectora §E.2).
+// Round-2 F3 — People card payload.
 const PeopleAgentSchema = z.object({
   id:     z.string(),
   name:   z.string(),
@@ -254,7 +254,7 @@ export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHub
  */
 export const SendAgreementRequestSchema = z.object({
   // Canonical UUID: agreements.id is always crypto.randomUUID() in production
-  // (the Spectora import preserves external ids only for template-internal items,
+  // (an import preserves external ids only for template-internal items,
   // never as the agreements PK). Pre-launch we enforce the canonical format rather
   // than tolerate non-UUID ids — only test seeds were ever non-UUID.
   agreementId: z.string().trim().min(1).optional().describe('Agreement template id; defaults to the tenant first agreement'),

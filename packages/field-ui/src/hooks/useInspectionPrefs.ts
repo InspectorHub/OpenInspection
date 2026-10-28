@@ -30,6 +30,12 @@ export function useInspectionPrefs() {
     const requested = useRef(false);
     /** The last state the host acknowledged (the load, or a saved echo): the baseline a failed save falls back to. */
     const committed = useRef<InspectionPrefs>(DEFAULT_INSPECTION_PREFS);
+    /**
+     * What the page shows right now, kept in step with `prefs` SYNCHRONOUSLY. A change computed from the
+     * rendered `prefs` is stale when two land before the next render (a list edited by several quick clicks
+     * would lose all but the last); `patch` can be given a function of this value instead.
+     */
+    const latest = useRef<InspectionPrefs>(DEFAULT_INSPECTION_PREFS);
     const mounted = useRef(true);
     useEffect(() => {
         mounted.current = true;
@@ -48,6 +54,7 @@ export function useInspectionPrefs() {
             (loadedPrefs) => {
                 committed.current = loadedPrefs;
                 if (!mounted.current) return;
+                latest.current = loadedPrefs;
                 setPrefs(loadedPrefs);
                 setLoaded(true);
             },
@@ -85,7 +92,8 @@ export function useInspectionPrefs() {
                     if (mounted.current) {
                         const later = queued.current;
                         const base = committed.current;
-                        setPrefs({ ...base, ...later });
+                        latest.current = { ...base, ...later };
+                        setPrefs(latest.current);
                     }
                 } else {
                     // The optimistic values of THIS request would otherwise stand, nothing would say anything,
@@ -97,7 +105,8 @@ export function useInspectionPrefs() {
                         if (!(key in queued.current)) back[key] = committed.current[key];
                     }
                     if (mounted.current) {
-                        setPrefs((prev) => ({ ...prev, ...(back as Partial<InspectionPrefs>) }));
+                        latest.current = { ...latest.current, ...(back as Partial<InspectionPrefs>) };
+                        setPrefs(latest.current);
                         setSaveFailed(true);
                     }
                 }
@@ -108,9 +117,14 @@ export function useInspectionPrefs() {
         }
     }, []);
 
-    const patch = useCallback((delta: Partial<InspectionPrefs>) => {
+    const patch = useCallback((change: Partial<InspectionPrefs> | ((current: InspectionPrefs) => Partial<InspectionPrefs>)) => {
+        // A function sees the value of every change already made, rendered or not, so toggling one entry of a list
+        // several times in a row applies each toggle to the result of the last.
+        const delta = typeof change === 'function' ? change(latest.current) : change;
+        if (Object.keys(delta).length === 0) return;
         // Optimistic update; the answer adopts the server echo.
-        setPrefs(prev => ({ ...prev, ...delta }));
+        latest.current = { ...latest.current, ...delta };
+        setPrefs(latest.current);
         setSaveFailed(false);
         if (!prefsStore) return;
         queued.current = { ...queued.current, ...delta };

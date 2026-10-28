@@ -3,9 +3,10 @@
  * GET returns merged defaults; PATCH validates + persists.
  */
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
+import { and, eq, inArray } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema/tenant';
+import { tags } from '../lib/db/schema';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -106,6 +107,19 @@ const liveLinkCountRoute = createRoute(withMcpMetadata({
     description: 'Counts the report links across the tenant that would be affected by applying an expiry to the existing backlog. Rendered into the confirm control so the operator sees the blast radius before acting, not after. Available to owner and manager roles.',
 }, { scopes: ['read'], tier: 'extended' }));
 
+/**
+ * The pinned ids that still name one of the company's tags. A tag deleted before its pin was removed (or a
+ * prefs blob written by an older build) must not reach the editor, so every read and every merge drops them.
+ */
+async function livePinnedTagIds(db: DrizzleD1Database, tenantId: string, pinned: readonly string[]): Promise<string[]> {
+    if (pinned.length === 0) return [];
+    const rows = await db.select({ id: tags.id }).from(tags)
+        .where(and(eq(tags.tenantId, tenantId), inArray(tags.id, [...pinned])))
+        .all();
+    const live = new Set(rows.map((r) => r.id as string));
+    return pinned.filter((id) => live.has(id));
+}
+
 const app = createApiRouter();
 app.openapi(liveLinkCountRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
@@ -131,8 +145,10 @@ app.openapi(getRoute, async (c) => {
         .get();
     // requireDefectFields rides this endpoint but lives in its own column
     // (the publish-readiness service reads it without JSON parsing).
+    const withPrefs = withDefaults(row?.prefs ?? null);
     const merged = {
-        ...withDefaults(row?.prefs ?? null),
+        ...withPrefs,
+        pinnedTagIds: await livePinnedTagIds(db, tenantId, withPrefs.pinnedTagIds),
         requireDefectFields: row?.requireDefectFields ?? 'none',
     };
     return c.json(merged, 200);
@@ -153,8 +169,10 @@ app.openapi(patchRoute, async (c) => {
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
         .get();
+    const current = withDefaults(existing?.prefs ?? null);
     const merged = {
-        ...withDefaults(existing?.prefs ?? null),
+        ...current,
+        pinnedTagIds: await livePinnedTagIds(db, tenantId, current.pinnedTagIds),
         requireDefectFields: existing?.requireDefectFields ?? 'none',
         ...patch,
     };

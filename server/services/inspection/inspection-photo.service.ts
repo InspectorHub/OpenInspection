@@ -99,7 +99,7 @@ export class InspectionPhotoService extends InspectionSubService {
     }
 
     /**
-     * Round-2 backlog #9 (Spectora §E.3) — Media Center.
+     * Round-2 backlog #9 — Media Center.
      *
      * Aggregates every photo associated with an inspection in two groups:
      *   - `attached` — photos already pinned to a specific item, sourced

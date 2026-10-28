@@ -153,7 +153,11 @@ export default function TagsPage() {
                   </span>
                 ),
               },
-              { label: m.library_tags_col_color(), cell: (tag) => <span className="text-ih-fg-3">{tag.color || "--"}</span> },
+              // The colour's name repeats what the swatch beside the tag name
+              // already shows, so it is the column that goes when the table is
+              // narrower than a phone card (container query, as in Contacts):
+              // Actions must stay on screen, not behind a sideways scroll.
+              { label: m.library_tags_col_color(), className: "hidden @md:table-cell", cell: (tag) => <span className="text-ih-fg-3">{tag.color || "--"}</span> },
               { label: m.library_tags_col_used(), cell: (tag) => <span className="text-ih-fg-3">{tag.count ?? 0}</span> },
               {
                 label: m.library_tags_col_actions(),

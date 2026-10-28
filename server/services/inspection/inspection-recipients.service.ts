@@ -116,7 +116,7 @@ export class InspectionRecipientsService extends InspectionSubService {
     }
 
     /**
-     * Round-2 F3 — People card payload (Spectora §E.2 / §4.1).
+     * Round-2 F3 — People card payload.
      *
      * Groups every party connected to an inspection by role so the inspection
      * Settings page can render a contact card with role chips:

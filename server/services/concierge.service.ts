@@ -25,8 +25,8 @@ import type { PlanQuotaGuard } from '../features/plan-quota/guard';
  * Agent Accounts A3 — Concierge state machine service.
  *
  * Per-tenant concierge_review_required toggles between:
- *   - HomeGauge auto mode (default, OFF): agent submits -> client gets magic link immediately
- *   - Spectora reviewer mode (ON):        agent submits -> inspector approves -> client gets magic link
+ *   - Auto mode (default, OFF):  agent submits -> client gets magic link immediately
+ *   - Reviewer mode (ON):        agent submits -> inspector approves -> client gets magic link
  *
  * State machine:
  *   agent submits  ─┬─> 'awaiting_inspector' ── approveByInspector ──> 'awaiting_client'

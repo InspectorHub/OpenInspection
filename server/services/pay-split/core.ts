@@ -79,8 +79,8 @@ export async function rosterIds(db: Db, tenantId: string, inspectionId: string):
 /**
  * Who may be paid on this line. ZERO qualification rows for a service means
  * every staff member is qualified (the `service_inspectors` MVP default);
- * rows restrict it. Mirrors the competitor's auto-assign, which pays every
- * inspector on the job for the services they are not excluded from.
+ * rows restrict it. Every inspector on the job is paid for the services they
+ * are not excluded from.
  */
 export function eligibleFor(serviceId: string, roster: string[], quals: Map<string, Set<string>>): string[] {
     const restricted = quals.get(serviceId);

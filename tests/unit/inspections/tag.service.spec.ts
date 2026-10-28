@@ -15,6 +15,7 @@ import { logger } from '../../../server/lib/logger';
 import { TagService } from '../../../server/services/tag.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -162,6 +163,33 @@ describe('TagService', () => {
 
         const links = await svc.getItemTags(TENANT_A, INSPECTION_X, ITEM_1);
         expect(links.length).toBe(0);
+    });
+
+    describe('delete also unpins the tag', () => {
+        const prefs = (pinnedTagIds: string[]) => ({ cloneDefault: 'rating_notes' as const, autoAdvanceDelayMs: 200, pinnedTagIds });
+        const readPins = async (tenantId: string) =>
+            (await testDb.select({ p: schema.tenantConfigs.inspectionPrefs }).from(schema.tenantConfigs)
+                .where(eq(schema.tenantConfigs.tenantId, tenantId)).get())?.p?.pinnedTagIds;
+
+        it('removes the deleted id from the company pins and keeps the others', async () => {
+            const keep = await svc.create(TENANT_A, { name: 'Keep' });
+            const gone = await svc.create(TENANT_A, { name: 'Gone' });
+            await testDb.insert(schema.tenantConfigs).values({ tenantId: TENANT_A, updatedAt: new Date(), inspectionPrefs: prefs([keep.id, gone.id]) });
+            await svc.delete(gone.id, TENANT_A);
+            expect(await readPins(TENANT_A)).toEqual([keep.id]);
+        });
+
+        it('leaves the pins of a different company alone', async () => {
+            const gone = await svc.create(TENANT_A, { name: 'Gone' });
+            await testDb.insert(schema.tenantConfigs).values({ tenantId: TENANT_B, updatedAt: new Date(), inspectionPrefs: prefs([gone.id]) });
+            await svc.delete(gone.id, TENANT_A);
+            expect(await readPins(TENANT_B)).toEqual([gone.id]);
+        });
+
+        it('still deletes when the company has no prefs at all', async () => {
+            const gone = await svc.create(TENANT_A, { name: 'Gone' });
+            await expect(svc.delete(gone.id, TENANT_A)).resolves.toEqual({ deleted: true });
+        });
     });
 
     it('listInspectionsByTag returns only matching inspection ids', async () => {

@@ -50,8 +50,8 @@ const seqFor = async (tenantId: string) =>
 describe('allocateInvoiceNumber', () => {
     it('starts at 1001, not at 1', async () => {
         // Starting at 1 tells a homebuyer they are this company's first-ever
-        // customer. Jobber's `#1001` is the category convention and the reason
-        // the counter's default is 1000 rather than 0.
+        // customer. `#1001` is the usual first number and the reason the
+        // counter's default is 1000 rather than 0.
         expect(await allocateInvoiceNumber(db as never, TENANT)).toBe(1001);
     });
 

@@ -104,7 +104,7 @@ export const inspections = sqliteTable('inspections', {
     // from `structure.baths`. NULL = the inspector has not entered it, and the
     // strip renders its "—" placeholder.
     bathrooms:           real('bathrooms'),
-    // Round-2 backlog G1 (Spectora §E.2) — free-text lot size so inspectors
+    // Round-2 backlog G1 — free-text lot size so inspectors
     // can enter "0.25 acres", "10,000 sqft", etc. without a parser.
     lotSize:             text('lot_size'),
     // Round-2 backlog G1 — JSON envelope for future property facts that
@@ -177,8 +177,8 @@ export const inspections = sqliteTable('inspections', {
     requestId:           text('request_id').references(() => inspectionRequests.id),
     // Agent Accounts A3 — concierge booking state machine.
     //   NULL                 = not a concierge booking (or already settled into status='confirmed' / 'cancelled')
-    //   'awaiting_inspector' = agent submitted; inspector must approve (Spectora reviewer mode)
-    //   'awaiting_client'    = magic-link sent to client; waiting on confirmation (HomeGauge auto mode or post-inspector-approve)
+    //   'awaiting_inspector' = agent submitted; inspector must approve (reviewer mode)
+    //   'awaiting_client'    = magic-link sent to client; waiting on confirmation (auto mode or post-inspector-approve)
     conciergeStatus:     text('concierge_status'),
     // Design System 0520 M3 — TeamMode flag enabling the team UI (TeamBanner /
     // RosterPopover). WHO is on the team lives in `inspection_inspectors`, one
@@ -196,8 +196,8 @@ export const inspections = sqliteTable('inspections', {
     // agreement and its own invoice. Folding it into the original order as an
     // ancillary report would put two of each behind one order id.
     reinspectionRound:  integer('reinspection_round'),
-    // Commercial PCA Phase F — multi-unit inspection mode. 'tagged' (default,
-    // Spectora-parity): the section/item checklist stays fixed and each defect
+    // Commercial PCA Phase F — multi-unit inspection mode. 'tagged' (default):
+    // the section/item checklist stays fixed and each defect
     // is optionally tagged with a location drawn from locationOptions — this
     // reuses DefectState.location + the finding key, so there is no location_tag
     // column. 'per_unit' (Phase U): every unit is a first-class inspection_units

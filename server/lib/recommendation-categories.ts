@@ -3,7 +3,7 @@
  *
  * Each defect can carry a `recommendation_id` slug pointing to one of these
  * categories. The published report card renders the matching `defaultPhrase`
- * after the inspector's defect notes so reports read like Spectora's
+ * after the inspector's defect notes so reports read as
  * polished output ("Recommend a qualified electrician to evaluate.")
  * instead of a generic "contact a contractor."
  *

@@ -228,14 +228,14 @@ const TemplateSectionSchema = z.object({
     icon:       z.string().optional().describe('Optional icon key stored with the section.'),
     identifier: z.string().optional().describe('Optional short code or numeral identifying the section, kept with the section when the template is saved.'),
     items:      z.array(TemplateItemSchema).describe('Ordered checklist items of the section; an item with a parentId nests under another item of the same section, and array order is the display order.'),
-    // Track E2 (Spectora App.A) — per-section legal disclaimer rendered at
+    // Track E2 — per-section legal disclaimer rendered at
     // the bottom of the section in the published report. Null/empty when
     // unset. Free-form text (≤ 4 KB) so tenants can paste boilerplate.
     disclaimerText:  z.string().max(4000).nullable().optional().describe('Legal or explanatory disclaimer printed at the bottom of the section in the published report; null or empty prints nothing.'),
     // Track E2 — when true, the published report forces a page break BEFORE
     // this section in PDF output.
     alwaysPageBreak: z.boolean().optional().describe('When true the published report starts this section on a new page in print and PDF output.'),
-    // Provenance from upstream platform imports (e.g. Spectora). The editor
+    // Provenance from imports from another product. The editor
     // surfaces this as a small colored dot next to the section title so
     // imported sections are visually distinguishable.
     source:          ItemSourceSchema.nullable().optional().describe('Where the section was imported from; the editor marks imported sections with a coloured dot.'),

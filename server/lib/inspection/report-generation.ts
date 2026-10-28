@@ -23,9 +23,8 @@ import { REPORT_STATUS } from '../status/report-status';
 /**
  * The number of reports on one order past which things get unpleasant.
  *
- * A soft ceiling, deliberately: the competitor's own guidance is "no strict
- * limit, keep below 15", and ours carry Yjs documents so the same pressure
- * applies — every extra report is another collaborative document to open, sync
+ * A soft ceiling, deliberately: reports carry Yjs documents, so the
+ * pressure grows with the count — every extra report is another collaborative document to open, sync
  * and render. Nothing is refused. An inspector who genuinely needs sixteen
  * deliverables knows something the software does not.
  */

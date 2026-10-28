@@ -1,9 +1,8 @@
 /**
  * <ReportSummaryStats> — the at-a-glance card row at the top of the report.
  *
- * The cards are derived from THIS inspection's own rating system
- * (Spectora-style), not from fixed Satisfactory/Monitor/Defects buckets: items
- * are tallied by their rating level and one card is rendered per level that
+ * The cards are derived from THIS inspection's own rating system, not from
+ * fixed Satisfactory/Monitor/Defects buckets: items are tallied by their rating level and one card is rendered per level that
  * actually occurs, using that level's own label and colour, ordered good→bad by
  * severity bucket and then by first appearance. The derivation lives with the
  * render because the ordering rule is only meaningful as the reading order of

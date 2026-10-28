@@ -3,8 +3,7 @@ import { coerceOverrides as coerceWith, type BitDecl } from './capability-overri
 
 export const TOGGLEABLE = [
   'publish', 'scheduleOthers', 'inspectionFees', 'companyFinance', 'manageContacts', 'viewCommunication',
-  // Four verbs, not one "Add/Edit Template" toggle (which is what Spectora
-  // ships). The split exists because the four are not equally recoverable:
+  // Four verbs, not one "Add/Edit Template" toggle. The split exists because the four are not equally recoverable:
   // EDIT is the irreversible one -- there is no template_versions table, and the
   // "History" affordance is EntityAuditTrail, which records THAT a change
   // happened and not the content to roll back to -- yet it stays ON for

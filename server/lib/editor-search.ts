@@ -1,5 +1,5 @@
 /**
- * Editor full-text search helpers — Competitor parity App.E.3 (Spectora).
+ * Editor full-text search helpers.
  *
  * Pure utility functions used by the inspection editor (`inspection-edit.tsx`
  * + `public/js/inspection-edit.js`) to filter the rendered section/item tree
