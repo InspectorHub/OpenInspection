@@ -1,22 +1,22 @@
 /**
- * The API middleware's output, pinned byte for byte. The policy builder moved to
- * lib/csp-policy.ts (shared with the page headers); this proves the move changed
- * nothing on API responses.
+ * The API middleware's output, pinned byte for byte. The policy builder lives in
+ * lib/csp-policy.ts (shared with the page headers); the pinned string is the
+ * original allowlist plus the Cloudflare Stream player hosts the pages also use.
  */
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { securityHeaders } from '../../../server/lib/middleware/security-headers';
 import { buildCsp } from '../../../server/lib/csp-policy';
 
-// Verbatim from the middleware before the policy builder was extracted.
+// The policy the middleware enforces: the original allowlist plus the Cloudflare Stream player (frame-src) and its thumbnails (img-src).
 const NORMAL_CSP =
     "default-src 'self'; " +
     "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://maps.googleapis.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "font-src 'self' data:; " +
-    "img-src 'self' data: blob: https://maps.gstatic.com https://maps.googleapis.com; " +
+    "img-src 'self' data: blob: https://maps.gstatic.com https://maps.googleapis.com https://*.cloudflarestream.com; " +
     "connect-src 'self' https://challenges.cloudflare.com https://maps.googleapis.com; " +
-    "frame-src 'self' https://challenges.cloudflare.com; " +
+    "frame-src 'self' https://challenges.cloudflare.com https://*.cloudflarestream.com; " +
     "frame-ancestors 'none'; " +
     "base-uri 'self'; " +
     "form-action 'self'; " +
@@ -25,7 +25,7 @@ const EMBED_CSP = NORMAL_CSP.replace("frame-ancestors 'none'", 'frame-ancestors 
 
 const app = new Hono().use('*', securityHeaders as never).get('*', (c) => c.text('ok'));
 
-describe('API securityHeaders middleware (byte-identical)', () => {
+describe('API securityHeaders middleware (the exact API policy, including the Cloudflare Stream player hosts)', () => {
     it('a normal path', async () => {
         const res = await app.request('/api/anything');
         expect(res.headers.get('Content-Security-Policy')).toBe(NORMAL_CSP);

@@ -1,5 +1,5 @@
 /**
- * Track E1 (ITB §11, UC-ITB-07) — Repair List aggregation.
+ * Track E1 — Repair List aggregation.
  *
  * Covers:
  *   - getRepairList aggregates ONLY included canned defects from the

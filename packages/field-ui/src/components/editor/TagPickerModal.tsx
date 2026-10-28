@@ -16,6 +16,7 @@ export function TagPickerModal({ open, activeItemId, tagsByItem, presetTags, onT
  return (
  <Modal open={open} onClose={onClose} title={m.editor_tagpicker_title()} size="sm">
   <div className="space-y-1.5">
+   {presetTags.length === 0 && <p className="text-[13px] text-ih-fg-3">{m.editor_tagpicker_empty()}</p>}
    {presetTags.map((tag) => {
    const isActive = selected.some(t => t.id === tag.id);
    return (
@@ -27,7 +28,7 @@ export function TagPickerModal({ open, activeItemId, tagsByItem, presetTags, onT
      ? "bg-ih-bg-muted ring-1 ring-inset"
      : "hover:bg-ih-bg-muted"
     }`}
-    style={isActive && safeCssColor(tag.color) ? { "--tw-ring-color": tag.color } as React.CSSProperties : undefined}
+    style={isActive && safeCssColor(tag.color) ? { "--tw-ring-color": safeCssColor(tag.color) } as React.CSSProperties : undefined}
     >
     <span
      className="w-3 h-3 rounded-full flex-shrink-0 bg-ih-border-strong"

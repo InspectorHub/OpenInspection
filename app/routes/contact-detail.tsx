@@ -145,8 +145,7 @@ export default function ContactDetailPage() {
   const archived = !!contact.archivedAt;
 
   return (
-    /* ds-allow: page bottom gutter (60px), bespoke page-shell spacing with no token */
-    <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-ih-list">
+    <div className="space-y-ih-list">
       {/* Breadcrumb — Contacts > this contact */}
       <Breadcrumb
         items={[

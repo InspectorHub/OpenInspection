@@ -1,5 +1,5 @@
 /**
- * Round-2 backlog G3 (Spectora §4.1, ITB UC-ITB-10) — referral source list.
+ * Round-2 backlog G3 — referral source list.
  *
  * Seven seed values that ship with every workspace. Tenants can append
  * additional labels via Settings → Workspace → Referral Sources, persisted

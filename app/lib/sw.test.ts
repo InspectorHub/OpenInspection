@@ -298,6 +298,30 @@ describe('sw.js: pages (HTML) are per user too', () => {
         expect(await body(out.response)).toBe('<html>page</html>');
     });
 
+    it('does not store a 404 page, and drops the copy it kept of a page the server now says is gone', async () => {
+        const h = makeHarness({ network: html('user-a') });
+        await h.get(`/inspections/${ID}/edit`, 'navigate');
+        expect(h.allUserPaths()).toEqual([`/inspections/${ID}/edit`]);
+        h.setNetwork(async () => new Response('<html>gone</html>', {
+            status: 404,
+            headers: { 'content-type': 'text/html; charset=utf-8', 'x-oi-session': 'user-a' },
+        }));
+        const out = await h.get(`/inspections/${ID}/edit`, 'navigate');
+        expect(out.response?.status).toBe(404);
+        expect(h.allUserPaths()).toEqual([]);
+    });
+
+    it('CONTROL - a 500 page leaves the cached copy for the offline case', async () => {
+        const h = makeHarness({ network: html('user-a') });
+        await h.get(`/inspections/${ID}/edit`, 'navigate');
+        h.setNetwork(async () => new Response('<html>oops</html>', {
+            status: 500,
+            headers: { 'content-type': 'text/html; charset=utf-8', 'x-oi-session': 'user-a' },
+        }));
+        await h.get(`/inspections/${ID}/edit`, 'navigate');
+        expect(h.allUserPaths()).toEqual([`/inspections/${ID}/edit`]);
+    });
+
     it('purges on a logout navigation before the request goes out', async () => {
         const h = makeHarness({ network: reply('x') });
         await h.message({ type: 'set-user', marker: 'user-a' });
@@ -417,6 +441,13 @@ describe('sw.js: forget-inspection message (the page deletes through a route act
             `/api/inspections/files/tenant1%2F${ID}%2Fitem_aaaa_roof.jpg`, `/api/inspections/files/tenant1/${ID}/item_bbbb_gutter.jpg`,
             `/api/inspections/files/tenant1%2F${OTHER}%2Fitem_cccc_roof.jpg`,
             `/api/inspections/files/tenant1%2F${OTHER}%2Fitem_dddd_${ID}.jpg`,
+            // Multi-route data requests and pages that carry an inspection id in the query or deeper in the path.
+            `/inspections/${ID}.data?_routes=routes%2Finspector-portal`,
+            `/inspections.data?_routes=routes%2Finspections&focus=${ID}`,
+            `/report-view/acme/${ID}`,
+            `/inspections.data?_routes=routes%2Finspections&focus=${OTHER}`,
+            `/report-view/acme/${OTHER}`,
+            `/inspections?ref=${ID}abc`,
         ]) user.set(ORIGIN + p, stamp());
         return h;
     }
@@ -424,13 +455,19 @@ describe('sw.js: forget-inspection message (the page deletes through a route act
     it('forgets the cached detail, results, pages and photo files of that inspection, and nothing else', async () => {
         const h = await seeded();
         await h.message({ type: 'forget-inspection', id: ID });
-        const left = h.allUserPaths().map(decodeURIComponent).sort();
+        // Compared as path + query, because the multi-route entries differ only in their query.
+        const left = [...h.store.get(userCache())!.keys()]
+            .map((u) => decodeURIComponent(new URL(u).pathname + new URL(u).search)).sort();
         expect(left).toEqual([
             '/inspections',
             `/inspections/${OTHER}`, `/inspections/${OTHER}/edit`,
             `/api/inspections/${OTHER}`, `/api/inspections/${OTHER}/results`,
             `/api/inspections/files/tenant1/${OTHER}/item_cccc_roof.jpg`,
             `/api/inspections/files/tenant1/${OTHER}/item_dddd_${ID}.jpg`,
+            // Another inspection's multi-route entry and page stay, and so does a query that only STARTS with this id.
+            `/inspections.data?_routes=routes/inspections&focus=${OTHER}`,
+            `/report-view/acme/${OTHER}`,
+            `/inspections?ref=${ID}abc`,
         ].sort());
     });
 

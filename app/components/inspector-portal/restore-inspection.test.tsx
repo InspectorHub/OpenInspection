@@ -25,7 +25,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { createRoutesStub, useFetcher, useLoaderData } from "react-router";
+import { createRoutesStub, useLoaderData } from "react-router";
 
 import { IDEMPOTENCY_FIELD } from "~/hooks/useGuardedSubmit";
 
@@ -64,7 +64,7 @@ function renderCard(status: string, restoreResult: unknown = { ok: true }): Harn
 
 function CardHost({ status }: { status: string }) {
     useLoaderData();
-    return <LifecycleCard status={status} inspectionId="insp-1" fetcher={useFetcher()} />;
+    return <LifecycleCard status={status} inspectionId="insp-1" />;
 }
 
 const restoreButton = () => screen.findByRole("button", { name: "Restore to scheduled" });

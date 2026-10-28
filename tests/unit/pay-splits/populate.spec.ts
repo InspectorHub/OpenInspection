@@ -94,8 +94,8 @@ describe('pay-split population', () => {
     const splits = (lineId = LINE) => getSplitsForLine(db, T, lineId);
 
     it('assigns only inspectors qualified for that service', async () => {
-        // Mirrors the competitor: auto-assign every inspector on the inspection
-        // to the services they are not excluded from in Service Limitations.
+        // Auto-assign every inspector on the inspection to the services they
+        // are not excluded from in Service Limitations.
         await qualify(RADON, ['u2']);                 // u1 is NOT qualified for radon
         await setRule({ serviceId: RADON, type: 'percent', value: 6000 });
         await assign('u1', ['u2']);
@@ -115,7 +115,7 @@ describe('pay-split population', () => {
     });
 
     it('DIVIDES the computed split by the number of inspectors on that line', async () => {
-        // Mandatory and non-disableable at the competitor, for a reason: without
+        // Mandatory and non-disableable, for a reason: without
         // it, attaching a second inspector pays out 120% of the service.
         await setRule({ type: 'percent', value: 6000 });
         await assign('u1', ['u2']);

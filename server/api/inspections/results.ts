@@ -31,7 +31,7 @@ import { refuseStatutorySnapshotEdit } from '../../lib/middleware/refuse-statuto
 import { getDrizzle } from '../../lib/route-helpers';
 
 /**
- * Round-2 backlog G1 (Spectora §E.2) — GET /api/inspections/:id/property-facts
+ * Round-2 backlog G1 — GET /api/inspections/:id/property-facts
  * Returns the six Property Facts columns for the strip + report banner.
  */
 const getPropertyFactsRoute = createRoute(withMcpMetadata({
@@ -54,7 +54,7 @@ const getPropertyFactsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
- * Round-2 backlog G1 (Spectora §E.2) — PATCH /api/inspections/:id/property-facts
+ * Round-2 backlog G1 — PATCH /api/inspections/:id/property-facts
  * Inline-edit handler for the Property Facts card. Accepts a partial payload
  * so a single-field save round-trips without touching the other columns.
  */

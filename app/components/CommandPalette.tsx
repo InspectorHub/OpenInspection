@@ -35,13 +35,13 @@ function getQuickActions(): PaletteItem[] {
     // and nothing to say why.
     { id: "qa-new-template", label: m.command_palette_action_new_template(), group: m.command_palette_group_quick_actions(), icon: "plus", hint: m.command_palette_action_hint_create(), to: "/library/templates?new=1" },
     { id: "qa-new-contact", label: m.command_palette_action_new_contact(), group: m.command_palette_group_quick_actions(), icon: "plus", hint: m.command_palette_action_hint_create(), to: "/contacts?new=1" },
-    // F65 — this was `Import Spectora` pointing at `/library/templates?import=1`.
+    // F65 — this was a vendor-named import shortcut pointing at `/library/templates?import=1`.
     // Both halves of that were stale. The paste-a-JSON-document importer and its
     // endpoint are gone; importing now runs through the staged wizard, whose
     // address `importEntryHref` owns so this entry cannot drift from the two
     // others that open it. The VENDOR NAME goes with it: the wizard's first
-    // question is which product the file came from — Spectora is one of several
-    // — so naming one here promised a shortcut that does not exist.
+    // question is which product the file came from, so naming one here
+    // promised a shortcut that does not exist.
     { id: "qa-import", label: m.command_palette_action_import(), group: m.command_palette_group_quick_actions(), icon: "plus", to: importEntryHref("templates.create") },
   ];
 }

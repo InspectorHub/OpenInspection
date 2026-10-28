@@ -76,7 +76,7 @@ const updateAttentionThresholdsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-// --- Dashboard Column Prefs (Round-2 backlog #2 — Spectora §5.1 / §E.7) ---
+// --- Dashboard Column Prefs (Round-2 backlog #2) ---
 //
 // Per-tenant default for the inspection dashboard column visibility set.
 // Stored as a JSON array of column ids on `tenant_configs.dashboard_column_prefs`.

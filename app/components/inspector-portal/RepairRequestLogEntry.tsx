@@ -5,8 +5,7 @@
  * READ ONLY, deliberately and structurally: this component takes no callbacks,
  * so there is nothing a future edit can wire a control to without changing its
  * signature. The list is the buyer's negotiating document; the company is a
- * reader of it, and the industry surface this is modelled on (Spectora's RRB
- * Log) offers no reply either.
+ * reader of it, so the surface offers no reply.
  *
  * ⚠️ It renders <RepairDefectRowView>, the inner presentational row — NOT
  * <RepairDefectRow>. The outer one carries the builder's checkbox, credit

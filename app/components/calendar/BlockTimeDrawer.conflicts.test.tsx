@@ -42,8 +42,17 @@ function mount(opts: { conflicts?: Conflict[]; previewFails?: boolean; block?: b
 
 /** The drawer's submit button lives outside its form (form="block-time-form"), so submit the form itself. */
 const submitForm = () => (document.getElementById("block-time-form") as HTMLFormElement).requestSubmit();
+/**
+ * The drawer seeds its fields in an effect that runs AFTER the first paint (title and date start empty). Anything
+ * done before that effect has run is overwritten, which leaves the required title empty and a form that silently
+ * refuses to submit. The date is a field only the seed fills, so wait for it.
+ */
+const seeded = () =>
+    waitFor(() => expect(document.querySelector<HTMLInputElement>('#block-time-form input[type="date"]')?.value).toBe("2027-03-10"));
 const fillAndSubmit = async () => {
-    fireEvent.change(await screen.findByLabelText(/^title$/i), { target: { value: "Dentist" } });
+    const titleInput = await screen.findByLabelText(/^title$/i);
+    await seeded();
+    fireEvent.change(titleInput, { target: { value: "Dentist" } });
     const times = [...document.querySelectorAll<HTMLInputElement>('#block-time-form input[type="time"]')];
     fireEvent.change(times[0]!, { target: { value: "10:00" } });
     fireEvent.change(times[1]!, { target: { value: "11:00" } });
@@ -97,6 +106,7 @@ describe("BlockTimeDrawer conflicts", () => {
     it("editing a block checks too", async () => {
         const { asked } = mount({ conflicts: [], block: true });
         await screen.findByRole("button", { name: /save changes/i });
+        await seeded();
         const times = [...document.querySelectorAll<HTMLInputElement>('#block-time-form input[type="time"]')];
         fireEvent.change(times[0]!, { target: { value: "10:00" } });
         fireEvent.change(times[1]!, { target: { value: "11:00" } });

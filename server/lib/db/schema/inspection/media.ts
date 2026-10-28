@@ -33,7 +33,7 @@ export const inspectionItemTagLinks = sqliteTable('inspection_item_tag_links', {
     index('idx_tag_links_inspection_item').on(t.inspectionId, t.itemId),
 ]);
 
-// Round-2 backlog #9 (Spectora §E.3) — Media Center pool. Photos uploaded
+// Round-2 backlog #9 — Media Center pool. Photos uploaded
 // ahead of item placement live here until the inspector drags one onto an
 // item textarea, at which point InspectionService.attachPoolPhoto moves it
 // into inspection_results.data[itemId].photos[] and deletes the pool row.

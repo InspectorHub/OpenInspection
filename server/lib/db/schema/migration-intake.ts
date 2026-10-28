@@ -52,7 +52,7 @@ export const migrationBatches = sqliteTable('migration_batches', {
      * every other intent, because nothing else has a single named target.
      */
     targetId: text('target_id'),
-    /** Provenance for display ("imported from Spectora on ...") — never matched on. */
+    /** Provenance for display ("imported from the source product on ...") — never matched on. */
     vendor: text('vendor').notNull(),
     adapterName: text('adapter_name').notNull(),
     adapterVersion: text('adapter_version').notNull(),

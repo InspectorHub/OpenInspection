@@ -56,11 +56,9 @@ export function PublishReportModal({
    * them — so the last screen before an outward-facing act was the one screen
    * with the least information, while publishing from the editor showed a list.
    *
-   * It does not disable the submit. Of five established products surveyed
-   * 2026-09-07, four never block publishing on report completeness and the one
-   * that does ships it off by default; Horizon's tutorial states outright that
-   * its equivalent check "will not force you to make an entry. It is simply a
-   * gentle reminder."
+   * It does not disable the submit. A completeness check is a reminder, not a
+   * precondition: an inspector may have good reason to publish with an item
+   * left open, so the count informs and the decision stays theirs.
    *
    * A count and not a list because a count is all the hub has: its payload
    * carries `{ ready, blockingCount }`. The defects themselves come from a

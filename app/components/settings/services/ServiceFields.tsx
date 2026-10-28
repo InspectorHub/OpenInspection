@@ -80,7 +80,7 @@ export function ServiceFields({
   const [templateId, setTemplateId] = useState(initialTemplateId || onlyTemplate);
 
   // Two services sharing a default template is the single most common way to
-  // end up with duplicate reports — the competitor keeps an FAQ entry for it.
+  // end up with duplicate reports.
   // Nothing downstream is invalid, so this warns and does not block: there are
   // legitimate reasons to want it, and the failure mode is surprise.
   const sharing = templateId ? otherServices.filter((s) => s.templateId === templateId) : [];

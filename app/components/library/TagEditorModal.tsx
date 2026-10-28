@@ -18,10 +18,10 @@ export const TAG_COLORS = [
 /**
  * The list plus whatever this tag already carries.
  *
- * Existing data holds tokens this list does not: `rose`, `emerald` and `amber`
- * are Tailwind palette names, not CSS colour keywords, so they pass the
- * server's `/^[a-z]{3,20}$/` and paint NOTHING in the list — visible on
- * `/library/tags`, where three of nine starter tags show no swatch.
+ * Existing data holds tokens this list does not: `rose`, `emerald`, `amber` and
+ * `slate` are Tailwind palette names, not CSS colour keywords, so they pass the
+ * server's `/^[a-z]{3,20}$/` but are not valid CSS. The stored value stays the
+ * word; the display (`safeCssColor`) maps those four names to hex.
  *
  * They are kept as options anyway. A select that cannot represent the current
  * value shows "No color" for a tag that has one, and saving then changes the

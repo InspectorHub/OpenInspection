@@ -60,28 +60,52 @@ describe("colours from the server reach a style attribute only when they are pla
     return Array.from(document.body.querySelectorAll("[style]")).map((e) => inline(e));
   };
 
-  // `amber`, `slate`, `rose`... are tag colours the server allows but not CSS colours: the browser would drop the fill and the
-  // label would be white on the page. They take the fallback classes, with no white text and no fill.
-  it.each(["amber", "slate"])("a tag chip in the non-CSS word %s falls back to the muted token classes", (word) => {
+  // The four seeded palette names (`amber`, `slate`, `rose`, `emerald`) are tag colours the server allows but not CSS colours. They
+  // are painted from their hex, and the ink is chosen from that hex: dark on the light fills, white on the dark ones.
+  const PALETTE_INK = [["amber", "#f59e0b", "#0f172a"], ["emerald", "#10b981", "#0f172a"], ["slate", "#64748b", "#ffffff"], ["rose", "#f43f5e", "#ffffff"]] as const;
+  const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
+  const hasRgb = (st: string, hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    return norm(st).includes(hex) || norm(st).includes(`rgb(${r},${g},${b})`);
+  };
+
+  it.each(PALETTE_INK)("an active tag chip in the palette name %s is filled with %s and carries the ink %s", (word, fill, ink) => {
     render(<TagChipRow pinnedTags={[{ id: "t", name: "Urgent", color: word }]} activeTagIds={new Set(["t"])} onToggle={vi.fn()} />);
+    const chip = screen.getByRole("button", { name: "Urgent" });
+    const st = inline(chip);
+    expect(hasRgb(st.split("background-color")[1] ?? "", fill)).toBe(true);
+    expect(hasRgb(st.split(/;\s*color/)[1] ?? "", ink)).toBe(true);
+    expect(st).not.toContain(word);
+  });
+
+  it.each(PALETTE_INK)("the tag picker's selected chip, dot and ring for %s use %s, never the word", (word, fill, ink) => {
+    const styles = picker(word);
+    expect(styles.filter((st) => hasRgb(st.split("background-color")[1] ?? "", fill)).length).toBeGreaterThanOrEqual(2); // dot + selected chip
+    expect(styles.some((st) => hasRgb(st.split("--tw-ring-color")[1] ?? "", fill))).toBe(true);
+    expect(styles.some((st) => hasRgb(st.split(/;\s*color/)[1] ?? "", ink))).toBe(true);
+    expect(styles.every((st) => !st.includes(word))).toBe(true);
+  });
+
+  it("a tag chip in a word that is not a colour still falls back to the muted token classes", () => {
+    render(<TagChipRow pinnedTags={[{ id: "t", name: "Urgent", color: "rebeccapurple" }]} activeTagIds={new Set(["t"])} onToggle={vi.fn()} />);
     const chip = screen.getByRole("button", { name: "Urgent" });
     expect(chip.className).toContain("bg-ih-bg-muted");
     expect(chip.className).toContain("text-ih-fg-1");
     expect(chip.className).not.toContain("text-white");
-    expect(inline(chip)).not.toContain(word);
+    expect(inline(chip)).not.toContain("rebeccapurple");
   });
 
-  it.each(["amber", "slate"])("the tag picker's selected chip for %s has the grey fallback fill with legible text, and no dot fill of that word", (word) => {
-    const styles = picker(word);
+  it("the tag picker's selected chip for a word that is not a colour has the grey fallback fill and no ring", () => {
+    const styles = picker("rebeccapurple");
     expect(styles.some((st) => st.includes("#6b7280") || st.includes("rgb(107, 114, 128)"))).toBe(true);
-    expect(styles.every((st) => !st.includes(word))).toBe(true);
+    expect(styles.every((st) => !st.includes("rebeccapurple"))).toBe(true);
     expect(styles.some((st) => st.includes("--tw-ring-color"))).toBe(false);
   });
 
   it("a rating tile with a non-CSS word falls back to its token tone", () => {
-    render(<RatingSegment ratings={[{ value: "x", label: "Repair", tone: "neutral" as const, color: "amber" }]} value="x" onChange={() => {}} />);
+    render(<RatingSegment ratings={[{ value: "x", label: "Repair", tone: "neutral" as const, color: "rebeccapurple" }]} value="x" onChange={() => {}} />);
     const tile = screen.getByRole("radio", { name: "Repair" });
-    expect(inline(tile)).not.toContain("amber");
+    expect(inline(tile)).not.toContain("rebeccapurple");
     expect(inline(tile)).not.toContain("color: #fff");
     expect(tile.className).toContain("bg-ih-bg-inverse");
   });

@@ -10,7 +10,7 @@ import {
 } from '../../../server/lib/editor-search';
 
 /**
- * Competitor parity App.E.3 (Spectora) — editor full-text search.
+ * Editor full-text search.
  * Pure-function tests for the filter helpers used by inspection-edit.tsx.
  */
 describe('editor-search', () => {

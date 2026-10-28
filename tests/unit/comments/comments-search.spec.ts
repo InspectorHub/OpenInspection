@@ -90,7 +90,7 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
     it('marketplace-imported rows (libraryId set) participate in search', async () => {
         await db.insert(schema.comments).values({
             id: 'imp', tenantId: TENANT, text: 'Imported: flue cap missing at water heater vent.',
-            libraryId: 'lib-spectora-1',
+            libraryId: 'lib-imported-1',
             severity: 'significant', section: null, category: null, createdAt: new Date(),
         });
         const { texts } = await search('flue cap');

@@ -141,6 +141,36 @@ beforeEach(() => {
     sessionContextBody = null;
 });
 
+describe('editor loader — a deleted or missing inspection has no editor', () => {
+    async function thrownStatus() {
+        try {
+            await loadAll();
+        } catch (e) {
+            return e instanceof Response ? e.status : 'other';
+        }
+        return 'returned';
+    }
+
+    it('answers 404 when the inspection read says it is gone', async () => {
+        inspectionGet.mockResolvedValue(new Response(JSON.stringify({ success: false }), { status: 404 }));
+        expect(await thrownStatus()).toBe(404);
+    });
+
+    it('answers 403 when the caller may not see it', async () => {
+        inspectionGet.mockResolvedValue(new Response(JSON.stringify({ success: false }), { status: 403 }));
+        expect(await thrownStatus()).toBe(403);
+    });
+
+    it('CONTROL - a transient server error still opens the editor instead of pretending the inspection is gone', async () => {
+        inspectionGet.mockResolvedValue(new Response('boom', { status: 500 }));
+        expect(await thrownStatus()).toBe('returned');
+    });
+
+    it('CONTROL - an existing inspection loads', async () => {
+        expect(await thrownStatus()).toBe('returned');
+    });
+});
+
 describe('editor loader — item attributes survive the report-data overlay', () => {
     it('carries the snapshot attributes onto the projected item', async () => {
         // The whole defect in one assertion: before the merge this was

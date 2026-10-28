@@ -9320,7 +9320,7 @@
       "body": null
     },
     "summary": "Public token-gated inspection report data",
-    "description": "Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing or names nothing; 410 when a real link has expired or been revoked, so the page can explain what happened instead of showing a not-found."
+    "description": "Public, no-login report data resolved via a persistent portal token (a tokenized link). 404 when the token is missing or names nothing; 410 when a real link has expired or been revoked, so the page can explain what happened instead of showing a not-found."
   },
   {
     "operationId": "getPublicReportGate",

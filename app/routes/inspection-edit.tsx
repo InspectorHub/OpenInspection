@@ -1,8 +1,9 @@
 import { useMemo } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useRouteError } from "react-router";
 import { FieldEditor } from "@core/field-ui/editor/FieldEditor";
 import { EditorHumanCheck } from "~/components/editor/EditorHumanCheck";
 import { InspectionFieldHost } from "~/components/field/WebFieldHost";
+import { RouteErrorNotice } from "~/components/RouteErrorNotice";
 import { m as appMessages } from "~/paraglide/messages";
 import { editorDataFromLoader } from "~/lib/field/web-editor-data";
 import type { loader } from "./inspection-edit/loader.server";
@@ -60,5 +61,20 @@ export default function InspectionEditRoute() {
  <EditorHumanCheck coolingWindow={data.outboundCoolingWindow}>
  <InspectionFieldHost><FieldEditor data={data} /></InspectionFieldHost>
  </EditorHumanCheck>
+ );
+}
+
+/**
+ * A deleted or missing inspection answers 404 from the loader. The editor sits outside the workspace layout, so the
+ * notice fills the screen and offers the way back to the list.
+ */
+export function ErrorBoundary() {
+ return (
+  <RouteErrorNotice
+   error={useRouteError()}
+   fullScreen
+   messages={{ notFound: appMessages.inspections_hub_eb_not_found(), forbidden: appMessages.inspections_hub_eb_forbidden(), generic: appMessages.inspections_hub_eb_generic() }}
+   back={{ to: "/inspections", label: appMessages.inspections_hub_eb_back() }}
+  />
  );
 }

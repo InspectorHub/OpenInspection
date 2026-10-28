@@ -187,10 +187,10 @@ export const UpdateInspectionSchema = z.object({
     lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('Free-text lot size, for example 0.25 acres; null clears it.'),
     unit:           z.string().max(50).nullable().optional().describe('Unit or suite identifier within the property; null clears it.'),
     county:         z.string().max(100).nullable().optional().describe('County of the property; null clears it.'),
-    // Round-2 backlog G2 (Spectora §7.10) — when does the buyer close on
+    // Round-2 backlog G2 — when does the buyer close on
     // the property. Used for follow-up CRM signals. ISO YYYY-MM-DD.
     closingDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date (YYYY-MM-DD)').nullable().optional().openapi({ example: '2026-07-15' }).describe('Closing date of the property sale (YYYY-MM-DD); null clears it.'),
-    // Round-2 backlog G3 (Spectora §4.1) — free-text Order ID for ISN-style
+    // Round-2 backlog G3 — free-text Order ID for external order
     // integrations. Surfaced in PMS exports.
     referenceNumber:        z.string().max(64).nullable().optional().openapi({ example: 'REF-2026-0142' }).describe('External order or reference number for the job; null clears it.'),
     // Round-2 backlog G3 — referral source label. Free-text so the seed

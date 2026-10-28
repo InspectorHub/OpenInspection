@@ -562,7 +562,7 @@ export class InspectionReportService extends InspectionSubService {
             { defaultProfileId: tenantDefaultProfileId },
         );
 
-        // Round-2 backlog G1 (Spectora §E.2) — Property Facts banner rendered
+        // Round-2 backlog G1 — Property Facts banner rendered
         // at the top of the published report. Surface the six dedicated
         // columns; the report layer decides whether to render the strip
         // when at least one field is populated.

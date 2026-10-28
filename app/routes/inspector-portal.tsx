@@ -749,7 +749,6 @@ export default function InspectionHubPage() {
   const submitReport = useFetcher<typeof action>();
   const returnReport = useFetcher<typeof action>();
   const unpublishReport = useFetcher<typeof action>();
-  const completeInspection = useFetcher<typeof action>();
   const submittingReport = submitReport.state !== "idle";
   const returningReport = returnReport.state !== "idle";
   const unpublishingReport = unpublishReport.state !== "idle";
@@ -997,7 +996,7 @@ export default function InspectionHubPage() {
 
         {/* 5. Inspection status — the visit itself. Independent of report
             publishing. */}
-        <LifecycleCard status={inspection.status} inspectionId={inspection.id} fetcher={completeInspection} canComplete={access.canEditInspection} canCancel={access.canCancel} canRestore={access.canRestore} />
+        <LifecycleCard status={inspection.status} inspectionId={inspection.id} canComplete={access.canEditInspection} canCancel={access.canCancel} canRestore={access.canRestore} />
 
         {/* 5b. Communication — what has been said, and what we sent. The
             client already had a Messages tab; this is the inspector's first

@@ -231,6 +231,37 @@ describe('useInspectionPrefs: IA-129, a failed save must not stand', () => {
     expect(m.patches[1].delta).toEqual({ autoAdvanceDelayMs: 500, pinnedTagIds: ['t1'] });
   });
 
+  it('several list toggles in ONE act all apply: each builds on the result of the one before', async () => {
+    const { m, h } = await loaded();
+    const toggle = (id: string) => (current: InspectionPrefs) => ({
+      pinnedTagIds: current.pinnedTagIds.includes(id) ? current.pinnedTagIds.filter((x) => x !== id) : [...current.pinnedTagIds, id],
+    });
+    act(() => {
+      const { patch } = h.latest();
+      patch(toggle('a'));
+      patch(toggle('b'));
+      patch(toggle('c'));
+      patch(toggle('d'));
+    });
+    expect(h.latest().prefs.pinnedTagIds).toEqual(['a', 'b', 'c', 'd']);
+    expect(m.patches).toHaveLength(1);
+    m.patches[0].resolve({ ok: true, data: { ...DEFAULT_INSPECTION_PREFS, pinnedTagIds: ['a'] } });
+    await flush();
+    expect(m.patches).toHaveLength(2);
+    expect(m.patches[1].delta).toEqual({ pinnedTagIds: ['a', 'b', 'c', 'd'] });
+    m.patches[1].resolve({ ok: true, data: { ...DEFAULT_INSPECTION_PREFS, pinnedTagIds: ['a', 'b', 'c', 'd'] } });
+    await flush();
+    expect(h.latest().prefs.pinnedTagIds).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('a toggle that changes nothing sends nothing', async () => {
+    const { m, h } = await loaded();
+    act(() => {
+      h.latest().patch(() => ({}));
+    });
+    expect(m.patches).toHaveLength(0);
+  });
+
   it('a failure rolls back only what THAT request changed: an earlier saved value stays', async () => {
     const { m, h } = await loaded();
     act(() => {

@@ -100,11 +100,8 @@ export function withInvoiceSync<
                 // already in the product. Editing each contact to trigger a push
                 // was the only cure, and nothing said so.
                 //
-                // Creating on demand is also what the field does: Jobber and
-                // Housecall Pro create the QuickBooks customer lazily on first
-                // use; ISN is the outlier that makes you map every client up
-                // front. Following the majority here costs nothing and matches
-                // what an inspector coming from another product expects.
+                // Creating on demand costs nothing and spares the company from
+                // mapping every client up front.
                 //
                 // A failure inside `upsertCustomer` is already logged and filed
                 // as its own `qbo_sync_errors` row against the CONTACT, so the

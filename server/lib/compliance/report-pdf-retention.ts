@@ -22,10 +22,10 @@
  * ── Zero means indefinite ───────────────────────────────────────────────────
  * That is an explicit controller instruction, which the
  * platform executes. It is not the default and it is not us declining to have
- * one. The dominant competitor stores reports indefinitely including after
- * cancellation, so our having a default at all runs against what an inspection
- * company expects — which is exactly why it is disclosed at the point of
- * setting rather than on a policy page.
+ * one. An inspection company may expect reports to be kept indefinitely,
+ * including after cancellation, so having a default at all runs against that
+ * expectation — which is exactly why it is disclosed at the point of setting
+ * rather than on a policy page.
  *
  * ── What this module does NOT decide ────────────────────────────────────────
  * Tenant override is not absolute: the effective period is

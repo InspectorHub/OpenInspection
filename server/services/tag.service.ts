@@ -14,6 +14,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { tags, inspectionItemTagLinks } from '../lib/db/schema';
+import { tenantConfigs } from '../lib/db/schema/tenant';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { CreateTagInput, UpdateTagInput, TagRecord } from '../lib/validations/tag.schema';
@@ -169,7 +170,25 @@ export class TagService {
             .where(and(eq(inspectionItemTagLinks.tagId, id), eq(inspectionItemTagLinks.tenantId, tenantId)));
         await db.delete(tags)
             .where(and(eq(tags.id, id), eq(tags.tenantId, tenantId)));
+        await this.unpin(id, tenantId);
         return { deleted: true as const };
+    }
+
+    /**
+     * Removes a deleted tag from the company's pinned tags (`inspection_prefs.pinnedTagIds`), so the editor's
+     * quick-pick row never holds an id that points at nothing. A company with no prefs, or without this id
+     * pinned, is left untouched (no write).
+     */
+    private async unpin(id: string, tenantId: string): Promise<void> {
+        const db = this.getDrizzle();
+        const row = await db.select({ prefs: tenantConfigs.inspectionPrefs }).from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        const pinned = row?.prefs?.pinnedTagIds;
+        if (!row?.prefs || !Array.isArray(pinned) || !pinned.includes(id)) return;
+        await db.update(tenantConfigs)
+            .set({ inspectionPrefs: { ...row.prefs, pinnedTagIds: pinned.filter((pin) => pin !== id) } })
+            .where(eq(tenantConfigs.tenantId, tenantId));
     }
 
     /** Idempotent first-run seeder. Returns counts of inserted vs. skipped. */

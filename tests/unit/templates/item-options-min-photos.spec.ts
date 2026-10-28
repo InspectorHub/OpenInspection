@@ -9,11 +9,9 @@
  * the worse half of the dead-control taxonomy: not a button wired to nothing,
  * but a LABEL PROMISING A CAPABILITY THAT DOES NOT EXIST.
  *
- * WHY IT IS REMOVED RATHER THAN IMPLEMENTED. Surveyed 2026-09-08: Spectora's
- * own documentation says a template is "output exactly as entered" and that it
- * enforces nothing in code; what it and HomeGauge offer instead are DEFAULT
- * photos, which guarantee a photo is present without ever blocking anyone.
- * Neither ships a minimum-count rule. Building one would put a novel blocking
+ * WHY IT IS REMOVED RATHER THAN IMPLEMENTED. A template is output exactly as
+ * entered, and DEFAULT photos already guarantee a photo is present without ever
+ * blocking anyone. Building a minimum-count rule would put a new blocking
  * constraint in front of an inspector standing in a crawlspace who genuinely
  * cannot take the third picture — the field tool's job is to record what was
  * found, not to refuse the finding.

@@ -103,26 +103,24 @@ async function writeMarker(marker) {
 }
 
 // Remove everything this device cached for one inspection: its detail and results, its pages (the document and the
-// route data of /inspections/<id> and below it), and its photo files. A photo file is identifiable only because its key
-// is `<tenant>/<inspection id>/<name>` and the URL carries the key, so a file whose URL does not show the id as a path
-// segment is left alone (it is replaced or dropped on the next read, and is never listed anywhere else).
+// route data of /inspections/<id> and below it), and its photo files: every cached request whose path or query names the
+// id as a whole token. A photo file is identifiable only because its key is `<tenant>/<inspection id>/<name>` and the URL
+// carries the key, so a file whose URL does not show the id on its own is left alone (it is replaced or dropped on the
+// next read, and is never listed anywhere else).
 async function forgetInspection(id) {
   try {
+    // The id counts only as a WHOLE token: the decoded path and query are split on every character outside
+    // [a-z0-9_-], so `.`, `/`, `?`, `&` and `=` are boundaries while `_` and `-` are not (`item_x_<id>.jpg` and
+    // `<id>-abc` are other tokens). It is looked for in the query too, so a route-data request that lists routes under
+    // the inspection (`/inspections.data?_routes=...&id=<id>`) goes with the rest. No regex lookbehind: older Safari
+    // throws on constructing one, and the catch below would then forget nothing.
     const want = id.toLowerCase();
     const cache = await caches.open(USER_CACHE);
     for (const key of await cache.keys()) {
-      const path = new URL(key.url).pathname.toLowerCase();
-      const api = `/api/inspections/${want}`;
-      const page = `/inspections/${want}`;
-      const isRead = path === api || path === `${api}/results`;
-      const isPage = path === page || path.startsWith(`${page}/`) || path.startsWith(`${page}.`);
-      let isPhoto = false;
-      if (path.startsWith(PHOTO_FILE_PREFIX)) {
-        let decoded = path;
-        try { decoded = decodeURIComponent(path); } catch { /* keep the raw path */ }
-        isPhoto = decoded.slice(PHOTO_FILE_PREFIX.length - 1).includes(`/${want}/`);
-      }
-      if (isRead || isPage || isPhoto) await cache.delete(key);
+      const url = new URL(key.url);
+      let text = `${url.pathname}${url.search}`.toLowerCase();
+      try { text = decodeURIComponent(text); } catch { /* keep the raw text */ }
+      if (text.split(/[^a-z0-9_-]+/).includes(want)) await cache.delete(key);
     }
   } catch {
     // The cache is unavailable: the delete itself already succeeded, and the entry is replaced on the next read.
@@ -302,6 +300,16 @@ async function navigate(request, url) {
         // The marker could not be saved: nothing is stored below either, since the check reads it back.
       }
       await storeIfStillCurrent(request, response.clone(), marker);
+    }
+    // The server says this page is gone (a deleted inspection's editor): the copy this device kept of it
+    // must not be served as if it still existed. Only a 200 is ever stored above, so a 404 is never cached.
+    if (response.status === 404 || response.status === 410) {
+      try {
+        const cache = await caches.open(USER_CACHE);
+        await cache.delete(request);
+      } catch {
+        // The cache is unavailable: the live answer is still returned.
+      }
     }
     return response;
   } catch {

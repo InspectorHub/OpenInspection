@@ -44,7 +44,7 @@ export interface GoogleEvent {
      * Present on every INSTANCE of a recurring series (singleEvents=true
      * expands series into instances), naming the series it came from. Its
      * presence is how the import tells a one-off appointment from a weekly
-     * standup — Spectora imports only the former.
+     * standup — only the former is imported.
      */
     recurringEventId?: string;
     /** RFC-3339 creation time; drives the do-not-backfill-before-connect rule. */

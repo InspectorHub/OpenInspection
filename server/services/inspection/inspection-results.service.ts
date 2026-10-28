@@ -13,7 +13,7 @@ import { appendDeviation as appendDeviationPure, type DeviationInput } from '../
  */
 export class InspectionResultsService extends InspectionSubService {
     /**
-     * Round-2 backlog G1 (Spectora §E.2) — return the Property Facts strip
+     * Round-2 backlog G1 — return the Property Facts strip
      * payload for a single inspection. Each field is null when the inspector
      * hasn't filled it in yet so the UI can show its "—" placeholder.
      */

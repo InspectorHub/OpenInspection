@@ -85,8 +85,8 @@ export function resolveDeposit(input: {
 /**
  * The deposit for a whole ORDER — one number, pinned to the primary inspection,
  * never mapped per service. A multi-service booking is one order with ancillary
- * services beneath it (the competitor model, and the reason the N-inspections
- * shape we chose internally must not leak into the money).
+ * services beneath it (the reason the N-inspections shape we chose internally
+ * must not leak into the money).
  *
  * The workspace default is applied ONCE, to the part of the order no service
  * has spoken for; services that carry their own policy are resolved

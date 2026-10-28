@@ -97,6 +97,45 @@ describe('chunked video upload: settling an unfinished completion (real app)', (
         expect((await finish('e1')).status).toBe(200);
     });
 
+    describe('how a storage refusal is classified (by R2 code; the binding sends no S3-style name)', () => {
+        afterEach(() => { u.r2.failComplete = null; });
+
+        it('treats the real message of a stale or missing part (10025) as a ledger mismatch and starts the parts over', async () => {
+            await sendAll('c1', TWO);
+            u.r2.failComplete = 'completeMultipartUpload: One or more of the specified parts could not be found. (10025)';
+            const res = await finish('c1');
+            expect(res.status).toBe(409);
+            expect(await code(res)).toBe('VIDEO_PARTS_MISMATCH');
+            expect(await partRows('c1')).toHaveLength(0);
+            expect((await ledger('c1'))?.state).toBe('open');
+        });
+
+        it('does not take a bare S3-style name for a classification: without its code the message is an unknown failure', async () => {
+            await sendAll('c2', TWO);
+            u.r2.failComplete = 'InvalidPart';
+            const logged = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+            const res = await finish('c2');
+            logged.mockRestore();
+            expect(res.status).toBe(500);
+            expect(await partRows('c2')).not.toHaveLength(0);
+        });
+
+        it('leaves 10011 (smaller than the minimum object size) an unknown failure: logged, the parts kept, the upload retryable', async () => {
+            await sendAll('c3', TWO);
+            u.r2.failComplete = 'completeMultipartUpload: Your proposed upload is smaller than the minimum allowed object size. (10011)';
+            const logged = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+            const res = await finish('c3');
+            const call = logged.mock.calls.find((c) => c[0] === 'video-chunked: completing failed');
+            logged.mockRestore();
+            expect(res.status).toBe(500);
+            expect(call?.[1]).toMatchObject({ mediaId: 'c3', error: expect.stringContaining('10011') });
+            expect((await ledger('c3'))?.state).toBe('open');
+            expect(await partRows('c3')).not.toHaveLength(0);
+            u.r2.failComplete = null;
+            expect((await finish('c3')).status).toBe(200);
+        });
+    });
+
     it('fails the upload, and leaves the object alone, when the object found while settling has another size', async () => {
         await sendAll('w1', TWO);
         putObject('w1', TWO + 5);

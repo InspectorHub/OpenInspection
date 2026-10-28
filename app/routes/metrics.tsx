@@ -30,8 +30,8 @@ interface MetricsData {
   // Two money columns with two labels. `payCents` is what the inspector earns;
   // `attributedRevenueCents` is what the business billed for the lines they
   // worked. Never merged into one column called "revenue" — they differ by
-  // margin and the difference is the business. Never called "cost": unlike the
-  // competitor's equivalent report, an inspector reads this page.
+  // margin and the difference is the business. Never called "cost": an
+  // inspector reads this page.
   byInspector: {
     inspectorId: string;
     inspectorName: string;

@@ -1,9 +1,8 @@
 /**
  * `/inspections/:id/repair-requests` — the Repair Request Log (#69).
  *
- * WHERE THIS LIVES IS THE DESIGN. The industry surface this is modelled on
- * (Spectora's RRB Log) hangs off the inspection detail page, not the report
- * editor, and neither it nor ISN's equivalent notifies anybody when a list is
+ * WHERE THIS LIVES IS THE DESIGN. The log hangs off the inspection detail page,
+ * not the report editor, and nothing notifies anybody when a list is
  * submitted: the inspector goes and looks. So the entry point is a link in the
  * hub's Report card, this page owns the reading, and nothing anywhere sends a
  * "a repair request arrived" notice. That absence is a decision, not a gap.

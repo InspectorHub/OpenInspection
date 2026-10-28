@@ -10,8 +10,7 @@ export const PRIMARY_CLIENT_KEY = 'client';
 export const SECONDARY_CLIENT_KEY = 'co_client';
 
 /**
- * Seeded per tenant. Aligned with Spectora's default people set so migrated
- * users keep their mental model. `kind` sets the baseline; capabilityOverrides
+ * Seeded per tenant. `kind` sets the baseline; capabilityOverrides
  * states every bit explicitly.
  *
  * Explicit rather than inherited, deliberately: every row then reads the same

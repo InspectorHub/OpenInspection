@@ -9,7 +9,7 @@ Two code paths produce responses, and each sets its own headers:
 | API (`/api/*`, webhooks, status) | `server/lib/middleware/security-headers.ts` |
 | HTML pages (everything the React Router renderer answers) | `server/lib/page-security-headers.ts`, applied in `workers/app.ts` |
 
-Both build their Content-Security-Policy from one allowlist, `server/lib/csp-policy.ts`, so the two cannot drift apart.
+Both build their Content-Security-Policy from one allowlist, `server/lib/csp-policy.ts`, so the two cannot drift apart. That allowlist includes the Cloudflare Stream player (`frame-src`) and its thumbnails (`img-src`), so the enforced API policy allows them as well as the pages.
 
 ## Enforced on HTML pages
 
@@ -29,7 +29,7 @@ Pages that are redirects, empty answers (204/304) or not HTML get none of these.
 
 Pages carry a `Content-Security-Policy-Report-Only` header. Nothing is blocked; the browser posts a report for each violation to `/api/public/csp-report`. The header holds up to two policies, separated by a comma, and each reports with its own tag:
 
-1. **Policy `a`, the allowlist policy** (`report-uri ...?p=a`). The allowlist the API enforces, plus the hosts only pages load (Stripe.js and its frames, the Cloudflare Stream player and thumbnails; `PAGE_EXTRA_SOURCES` in `server/lib/page-security-headers.ts`), sent on every page. A report against it means a page loads something the allowlist does not know about (a font host, an analytics script, a payment frame).
+1. **Policy `a`, the allowlist policy** (`report-uri ...?p=a`). The allowlist the API enforces, plus the hosts only pages load (Stripe.js and its frames; `PAGE_EXTRA_SOURCES` in `server/lib/page-security-headers.ts`), sent on every page. A report against it means a page loads something the allowlist does not know about (a font host, an analytics script, a payment frame).
 2. **Policy `b`, the strict policy** (`report-uri ...?p=b`). Policy `a` with `'unsafe-inline'` removed from `script-src` and `style-src`. Reports against it count how much inline script and style the pages use, which is why most of them have `blocked: inline`.
 
 Policy `b` is sent on **one page in 20** per isolate (`STRICT_POLICY_EVERY_NTH_PAGE` in `server/lib/page-security-headers.ts`). The reason is request volume: the legacy `report-uri` mechanism sends one request per violation, and every inline script or style attribute on a page is a violation, so a page sent with the strict policy can cause dozens of requests to the receiver. Sending it on every page would multiply the traffic of the whole deployment. Consequences for reading the logs: counts of `policy: b` lines are a sample, so **multiply them by the sampling number** to estimate the real figure, and compare `b` counts only with other `b` counts.

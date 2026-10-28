@@ -13,7 +13,7 @@ body:
     attributes:
       label: Problem
       description: What user pain are you trying to solve? Concrete scenarios beat abstract wishes.
-      placeholder: "When I import a Spectora report, the section ordering is alphabetical instead of matching the original."
+      placeholder: "When I import a report from another product, the section ordering is alphabetical instead of matching the original."
     validations:
       required: true
   - type: textarea

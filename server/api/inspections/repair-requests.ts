@@ -10,10 +10,9 @@
  * global JWT gate and `requireRole`, and reads the tenant from the verified
  * claims — the URL's `:id` names the inspection, never the tenant.
  *
- * READ ONLY, and there is no sibling write. The industry answer is a log the
- * inspector goes and looks at: Spectora's RRB Log is view-only, and the
- * respondable flow the other vendor ships belongs to the buyer's agent, not to
- * the inspection company. A reply from the company on the buyer's own
+ * READ ONLY, and there is no sibling write. The design is a log the inspector
+ * goes and looks at; a respondable flow would belong to the buyer's agent, not
+ * to the inspection company. A reply from the company on the buyer's own
  * negotiating document is a different product decision, not this endpoint's
  * missing half.
  */

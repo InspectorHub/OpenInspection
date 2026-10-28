@@ -69,7 +69,12 @@ export function InspectionsStatCards({
                             The rule keeps the encoding and returns 44px of
                             width to the words. */}
                         <div className={`w-[3px] self-stretch shrink-0 rounded-full ${stat.rule}`} aria-hidden="true" />
-                        <div className="min-w-0 flex-1 text-[12px] font-bold text-ih-fg-3 uppercase tracking-[0.12em]">
+                        {/* Label above the number on a phone, side by side from
+                            `sm`: two cards per row leave about 120px of text
+                            width at 390px, which a tracked-out uppercase label
+                            and a 34px digit cannot share. */}
+                        <div className="min-w-0 flex-1 flex flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-3">
+                        <div className="min-w-0 sm:flex-1 text-[12px] font-bold text-ih-fg-3 uppercase tracking-[0.12em] break-words">
                             {stat.label}
                         </div>
                         {/* A zero is quieter than a non-zero, deliberately.
@@ -85,6 +90,7 @@ export function InspectionsStatCards({
                             }`}
                         >
                             {stat.value}
+                        </div>
                         </div>
                     </div>
                 );

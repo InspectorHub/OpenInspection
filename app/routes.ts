@@ -123,6 +123,7 @@ export default [
   route("resources/contacts-template", "routes/resources/starter-template.ts"),
   route("resources/members-template", "routes/resources/members-template.ts"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
+  route("resources/inspection-item-tags", "routes/resources/inspection-item-tags.tsx"),
   route("resources/marketplace-install", "routes/resources/marketplace-install.tsx"),
   route("resources/marketplace-uninstall", "routes/resources/marketplace-uninstall.tsx"),
   route("resources/statutory-update", "routes/resources/statutory-update.tsx"),

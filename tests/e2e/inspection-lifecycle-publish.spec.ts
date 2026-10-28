@@ -112,7 +112,13 @@ test.describe.serial('Publish is decoupled from order completion (IA-29 / IA-30)
     // disappears once the work is complete — a single-element signal for the
     // transition (the status label itself renders in both the header and the
     // card, so it is not a strict-mode-safe locator).
+    // The button asks first: it opens a confirmation dialog whose confirm button
+    // carries the same label, so confirm inside the dialog and wait for it to
+    // close before the page button is the only match again.
     await completeBtn.click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: /mark fieldwork complete/i }).click();
+    await expect(dialog).toBeHidden({ timeout: NAV_TIMEOUT });
     await expect(completeBtn).toBeHidden({ timeout: NAV_TIMEOUT });
 
     // The invariant: completing the order changed nothing about publishing.

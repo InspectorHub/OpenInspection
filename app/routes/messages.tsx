@@ -2,8 +2,7 @@
  * /messages — the company-wide Messages inbox (Track D, design §3.9).
  *
  * Threads are contact-keyed, so this page is `WHERE contact_id` over the same
- * table the inspector portal's Communication card reads — the Conversations
- * shape both Spectora and ISN ship. It is also the only surface that shows
+ * table the inspector portal's Communication card reads. It is also the only surface that shows
  * messages with NO inspection attached (pre-booking outreach); the
  * per-inspection view filters those out by construction.
  *
@@ -45,9 +44,8 @@ export function meta() {
  * the staff author (the message schema's own comment says so) and every other
  * role — client, agent, other — is them.
  *
- * A prefix on the preview rather than a badge: surveyed 2026-09-08, Spectora's
- * Conversations documentation says a message's subtext "will always show when
- * the message was sent, and who sent it", which is where every inbox puts it.
+ * A prefix on the preview rather than a badge: sender identity belongs beside
+ * the preview, which is where inboxes put it.
  */
 export function ThreadPreview({ body, fromRole }: { body: string; fromRole: string }) {
   return (

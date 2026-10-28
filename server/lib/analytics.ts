@@ -190,8 +190,7 @@ function isNonCondition(level: HeatmapLevel): boolean {
  * Satisfactory/Monitor/Defect, the commercial one adds Marginal, Low
  * Maintenance and Hazard. Folding those onto a fixed 3- or 4-column scale would
  * silently merge distinct levels (Monitor and Marginal both carry severity
- * `marginal`, so a severity-keyed fold loses one of them outright). Competitors
- * publish 4–5 levels for the same reason. Levels that describe the absence of a
+ * `marginal`, so a severity-keyed fold loses one of them outright). Levels that describe the absence of a
  * condition — Not Inspected / Not Present — are excluded: they are not findings.
  *
  * **Why one matrix per system rather than one merged table.** See

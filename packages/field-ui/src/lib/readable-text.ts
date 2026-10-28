@@ -29,10 +29,11 @@ const TOKEN = /^var\(\s*--ih-[\w-]+\s*(?:,\s*([^;{}"'()]+(?:\([^;{}"'()]*\))?))?
 
 /**
  * The colour string when it is a plain CSS colour that is safe to put in a style attribute, else null: a hex colour, a
- * a colour name from the small table below (not any word: `amber` is a tag colour but not a CSS colour),
- * rgb()/rgba()/hsl()/hsla() with numeric arguments, or a `var(--ih-...)` token whose fallback (if any) is itself one of those.
- * A tenant's rating colour is stored as an unvalidated string, so anything else (a url(), an expression, a second
- * declaration, quotes, braces, a name) is treated as "no colour".
+ * colour name from the small table below (not any word: `foo` is not a colour), rgb()/rgba()/hsl()/hsla() with numeric
+ * arguments, or a `var(--ih-...)` token whose fallback (if any) is itself one of those. The four seeded tag colours that
+ * are palette names and not CSS names (`amber`, `slate`, `rose`, `emerald`) come back as their hex, because the word
+ * itself is not valid CSS; the stored value stays the word. A tenant's rating colour is stored as an unvalidated string,
+ * so anything else (a url(), an expression, a second declaration, quotes, braces, an unknown name) is treated as "no colour".
  */
 export function safeCssColor(color: unknown): string | null {
   if (typeof color !== 'string') return null;
@@ -40,6 +41,8 @@ export function safeCssColor(color: unknown): string | null {
   if (v === '' || v.length > 120) return null;
   // A letters-only word (red, transparent, currentColor) carries nothing that can be injected.
   if (HEX.test(v) || COLOR_FN.test(v) || namedHex(v) !== null) return v;
+  const palette = paletteHex(v);
+  if (palette !== null) return palette;
   const token = TOKEN.exec(v);
   if (token) return token[1] === undefined || safeCssColor(token[1]) !== null ? v : null;
   return null;
@@ -55,6 +58,14 @@ const NAMED: Record<string, string> = {
 function namedHex(name: string): string | null {
   const key = name.toLowerCase();
   return Object.hasOwn(NAMED, key) ? NAMED[key] : null;
+}
+
+/** Tailwind palette names (the 500 shade) that the seeded tags use but CSS does not know, as hex, for display only. */
+const PALETTE: Record<string, string> = { amber: '#f59e0b', slate: '#64748b', rose: '#f43f5e', emerald: '#10b981' };
+
+function paletteHex(name: string): string | null {
+  const key = name.toLowerCase();
+  return Object.hasOwn(PALETTE, key) ? PALETTE[key] : null;
 }
 
 function luminance([r, g, b]: [number, number, number]): number {
@@ -78,7 +89,7 @@ const WHITE_FLOOR = 3;
 export function readableTextOn(background: string | null | undefined): string | null {
   if (!background) return null;
   const v = background.trim();
-  const rgb = parseHex(v) ?? parseRgb(v) ?? parseHex(namedHex(v) ?? '');
+  const rgb = parseHex(v) ?? parseRgb(v) ?? parseHex(namedHex(v) ?? paletteHex(v) ?? '');
   if (!rgb) return null;
   const bg = luminance(rgb);
   const onWhite = 1.05 / (bg + 0.05);

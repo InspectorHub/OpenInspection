@@ -8793,6 +8793,129 @@
         }
       }
     },
+    "/api/inspections/{id}/items/{itemId}/tags": {
+      "post": {
+        "tags": [
+          "tags"
+        ],
+        "summary": "Link a tag to an inspection item",
+        "operationId": "createTagItemsTags",
+        "description": "Attach one of the company's tags to a checklist item of an inspection. Attaching a tag that is already on the item changes nothing.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Checklist item id within the inspection."
+            },
+            "required": true,
+            "description": "Checklist item id within the inspection.",
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tagId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Unique id of the tag."
+                  }
+                },
+                "required": [
+                  "tagId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Linked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagLinkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/items/{itemId}/tags/{tagId}": {
+      "delete": {
+        "tags": [
+          "tags"
+        ],
+        "summary": "Unlink a tag from an inspection item",
+        "operationId": "deleteTagItemsTag",
+        "description": "Detach a tag from a checklist item of an inspection. The tag itself stays available to the company.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Checklist item id within the inspection."
+            },
+            "required": true,
+            "description": "Checklist item id within the inspection.",
+            "name": "itemId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Unique id of the tag."
+            },
+            "required": true,
+            "description": "Unique id of the tag.",
+            "name": "tagId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unlinked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagUnlinkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/inspections/{id}/media": {
       "get": {
         "tags": [
@@ -10284,6 +10407,93 @@
           },
           "404": {
             "description": "No such inspection, or it produces no statutory form"
+          }
+        }
+      }
+    },
+    "/api/inspections/{id}/tags": {
+      "get": {
+        "tags": [
+          "tags"
+        ],
+        "summary": "Map of itemId → tags for an inspection",
+        "operationId": "listTagTags",
+        "description": "Return, for one inspection, a map from each checklist item id to the tags attached to that item.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Inspection id."
+            },
+            "required": true,
+            "description": "Inspection id.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item tag map",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ],
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "Unique id of the tag."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "Tag name."
+                            },
+                            "color": {
+                              "type": "string",
+                              "nullable": true,
+                              "description": "Colour token for the tag, or null."
+                            },
+                            "isSeed": {
+                              "type": "boolean",
+                              "description": "True for built-in tags that ship with the company."
+                            },
+                            "createdAt": {
+                              "type": "number",
+                              "description": "When the tag was created (epoch milliseconds)."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "isSeed",
+                            "createdAt"
+                          ]
+                        }
+                      },
+                      "description": "Response payload."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -15069,7 +15279,7 @@
                       },
                       "templateImport": {
                         "type": "boolean",
-                        "description": "May bring a template in from a Spectora export or the content marketplace."
+                        "description": "May bring a template in from an export of another inspection product or the content marketplace."
                       },
                       "deleteInspection": {
                         "type": "boolean",
@@ -15364,6 +15574,38 @@
           "createdAt"
         ]
       },
+      "TagLinkResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "True when the request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "linked": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ],
+                "description": "True when the tag was attached to the item."
+              }
+            },
+            "required": [
+              "linked"
+            ],
+            "description": "Response payload."
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
       "TagListResponse": {
         "type": "object",
         "properties": {
@@ -15406,6 +15648,38 @@
           "meta": {
             "nullable": true,
             "description": "Optional response metadata, such as pagination information."
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "TagUnlinkResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "True when the request succeeded."
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "unlinked": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ],
+                "description": "True when the tag was detached from the item."
+              }
+            },
+            "required": [
+              "unlinked"
+            ],
+            "description": "Response payload."
           }
         },
         "required": [

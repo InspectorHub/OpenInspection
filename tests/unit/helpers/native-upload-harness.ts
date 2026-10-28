@@ -42,6 +42,8 @@ export interface R2Stub {
     reportCompleteSize: number | null;
     /** When set, `complete` joins the object and THEN throws this message: the call succeeded but its answer was lost. */
     throwAfterComplete: string | null;
+    /** When set, `complete` throws this message before joining anything (a refusal from storage). */
+    failComplete: string | null;
 }
 
 /** The part-size rule storage enforces on `complete`, approximated: all but the last part equal in size and 5 MiB or more. */
@@ -50,12 +52,12 @@ const MIN_PART_BYTES = 5 * 1024 * 1024;
 export function makeR2(): R2Stub {
     const store = new Map<string, { bytes: Uint8Array; contentType: string }>();
     const uploads = new Map<string, StubMultipart>();
-    const stubState = { reportCompleteSize: null as number | null, throwAfterComplete: null as string | null };
+    const stubState = { reportCompleteSize: null as number | null, throwAfterComplete: null as string | null, failComplete: null as string | null };
     let counter = 0;
     const handle = (key: string, uploadId: string) => {
         const live = () => {
             const u = uploads.get(uploadId);
-            if (!u || u.key !== key || u.state !== 'open') throw new Error('The specified multipart upload does not exist. (NoSuchUpload; 10024)');
+            if (!u || u.key !== key || u.state !== 'open') throw new Error('The specified multipart upload does not exist. (10024)');
             return u;
         };
         return {
@@ -68,9 +70,10 @@ export function makeR2(): R2Stub {
             abort: async () => { live().state = 'aborted'; },
             complete: async (given: { partNumber: number; etag: string }[]) => {
                 const u = live();
+                if (stubState.failComplete) throw new Error(stubState.failComplete);
                 const chosen = given.map((g) => {
                     const part = u.parts.get(g.partNumber);
-                    if (!part || part.etag !== g.etag) throw new Error('One or more of the specified parts could not be found. (InvalidPart; 10025)');
+                    if (!part || part.etag !== g.etag) throw new Error('One or more of the specified parts could not be found. (10025)');
                     return part.bytes;
                 });
                 chosen.slice(0, -1).forEach((b) => {
@@ -108,6 +111,8 @@ export function makeR2(): R2Stub {
         set reportCompleteSize(v: number | null) { stubState.reportCompleteSize = v; },
         get throwAfterComplete() { return stubState.throwAfterComplete; },
         set throwAfterComplete(v: string | null) { stubState.throwAfterComplete = v; },
+        get failComplete() { return stubState.failComplete; },
+        set failComplete(v: string | null) { stubState.failComplete = v; },
     };
 }
 

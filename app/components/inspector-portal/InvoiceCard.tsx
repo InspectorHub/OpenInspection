@@ -103,8 +103,8 @@ export function InvoiceCard({
                 <div className="flex items-center gap-2 flex-wrap">
                     {/* Asking a client to pay zero is not an action, so it is not
                         offered. A $0 INVOICE is legitimate — Stripe finalizes a
-                        zero total straight to `paid` without collecting, ISN
-                        stamps PAID on one, and comped work is real — but a
+                        zero total straight to `paid` without collecting,
+                        and comped work is real — but a
                         REQUEST to pay nothing is a dead end, and the modal
                         behind this button gated only on the recipient's email,
                         never on the amount. Say what to do instead rather than

@@ -94,7 +94,7 @@ const getReportDataRoute = createRoute(withMcpMetadata({
 /**
  * GET /api/inspections/:id/repair-list
  *
- * Track E1 (ITB §11, UC-ITB-07) — flat punch-list of every defect-rated
+ * Track E1 — flat punch-list of every defect-rated
  * item across the inspection, suitable for handing to a contractor or
  * realtor. Authenticated route; the public viewer page hits the same
  * service via a server-side render at /inspections/:id/repair-list.

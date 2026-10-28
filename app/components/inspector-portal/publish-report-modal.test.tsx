@@ -10,13 +10,10 @@
  *      about them, so the last screen before the irreversible act was the one
  *      screen with the least information. Publishing from the editor showed a
  *      list; publishing from the hub showed nothing. Same act, two answers.
- *   2. IT DOES NOT BLOCK. Surveyed 2026-09-07: of five established products,
- *      four never block publishing on report completeness (HomeGauge warns with
- *      a one-click override, ISN and Horizon only count, Palmtech checks the
- *      agreement and never the content), and the one that does — Spectora —
- *      ships it off by default. Horizon's own tutorial is explicit: "Required
- *      Items will not force you to make an entry. It is simply a gentle
- *      reminder." A disabled publish button here would be the outlier.
+ *   2. IT DOES NOT BLOCK. A completeness check is a reminder, not a
+ *      precondition: an inspector may have good reason to publish with an item
+ *      left open, so the count informs and the decision stays theirs. A
+ *      disabled publish button here would take that decision away.
  *
  * The count is all the hub has: its payload carries `{ ready, blockingCount }`
  * and not the defects themselves — those come from a separate endpoint the

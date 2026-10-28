@@ -202,7 +202,7 @@ describe('summariseFindings (IA-82)', () => {
  * Multiple rating systems in one tenant.
  *
  * Systems are NOT commensurable and are never merged into one table. `Defect`
- * (OI default), `Deficient` (TREC) and `Deficiency` (ITB) name one severity
+ * (OI default), `Deficient` (TREC) and `Deficiency` (a seeded 3-tier scheme) name one severity
  * band in three vocabularies; unioning them produces three sparse columns whose
  * order is meaningless, because a level's `order` is an index within its own
  * system. A row total spanning two systems counts real findings but describes a

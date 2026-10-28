@@ -8,10 +8,9 @@
  * complained; it was silently unprofessional. Observed in a live sandbox on
  * 2026-08-16.
  *
- * Sequential per tenant, starting at 1001 — Jobber's `#1001` is the named
- * example and the category convention. (Spectora is the outlier that generates
- * none at all and displays QuickBooks' own DocNumber instead, which is not open
- * to us: we are the system that CREATES the invoice.)
+ * Sequential per tenant, starting at 1001, the usual first number for an
+ * invoice. Leaving numbering to QuickBooks' own DocNumber is not open to us:
+ * we are the system that CREATES the invoice.
  */
 import { eq, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';

@@ -77,7 +77,7 @@ async function resolveClientTenant(
 
 /**
  * Public, no-login portal endpoints (`/api/public/*`). Access is gated by the
- * persistent per-(recipient, order) portal token (Spectora/ISN tokenized-link
+ * persistent per-(recipient, order) portal token (a tokenized-link
  * model). The token is the credential; tenantId is resolved from it, NEVER from
  * the URL `:tenant` segment. See plan 2026-06-01-core-public-endpoints-c10-residual.
  */
@@ -103,7 +103,7 @@ const reportRoute = createRoute(withMcpMetadata({
         410: { description: 'The link was valid but has expired or been revoked (IA-36 ⑨) — code REPORT_LINK_EXPIRED / REPORT_LINK_REVOKED' },
     },
     operationId: 'getPublicReport',
-    description: 'Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing or names nothing; 410 when a real link has expired or been revoked, so the page can explain what happened instead of showing a not-found.',
+    description: 'Public, no-login report data resolved via a persistent portal token (a tokenized link). 404 when the token is missing or names nothing; 410 when a real link has expired or been revoked, so the page can explain what happened instead of showing a not-found.',
 }, { scopes: [], tier: 'extended' }));
 
 // A-9 — Public token-scoped photo serve for the no-login report viewer. Mirrors

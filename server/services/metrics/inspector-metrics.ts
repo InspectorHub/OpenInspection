@@ -19,8 +19,8 @@
  * 2. PAY IS NOT ATTRIBUTED REVENUE. `payCents` is the sum of that person's
  *    recorded split rows — money owed to them. `attributedRevenueCents` is what
  *    the business billed for the lines they worked. They differ by margin and
- *    the difference is the business. Housecall Pro calls the first one
- *    `Commission Cost`; we do not, because our inspector can see this figure.
+ *    the difference is the business. The first is never called a "cost",
+ *    because the inspector can see this figure.
  *
  * 3. MEDIAN, NOT MEAN. One delayed report on a complex property drags a mean
  *    and misrepresents the person it is attached to.

@@ -93,9 +93,19 @@ describe('hosts only pages load', () => {
         expect(directive(allowlist!, 'media-src')).toBeUndefined();
     });
 
-    it('the API policy does not get them', () => {
+    it('the API policy gets none of the Stripe hosts, only the Stream player it shares with pages', () => {
         const api = buildCsp({ widgetEmbed: false });
-        for (const host of ['stripe', 'cloudflarestream']) expect(api).not.toContain(host);
+        expect(api).not.toContain('stripe');
+        expect(directive(api, 'frame-src')).toContain('https://*.cloudflarestream.com');
+        expect(directive(api, 'img-src')).toContain('https://*.cloudflarestream.com');
+    });
+
+    it('lists the Stream host once per directive, not once from the shared allowlist and again from the page extras', () => {
+        for (const policy of [allowlist!, strict!]) {
+            for (const name of ['frame-src', 'img-src']) {
+                expect(directive(policy, name)!.split('https://*.cloudflarestream.com')).toHaveLength(2);
+            }
+        }
     });
 
     it('through pageSecurityHeaders, the strict policy is the allowlist policy minus unsafe-inline in script-src and style-src, and nothing else', () => {

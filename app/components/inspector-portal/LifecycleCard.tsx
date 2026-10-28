@@ -1,9 +1,10 @@
 import { useState } from "react";
-import type { useFetcher } from "react-router";
-import { Card, Button } from "@core/shared-ui";
+import { Card, Button, Banner } from "@core/shared-ui";
+import { ConfirmDialog } from "@core/field-ui/components/ConfirmDialog";
 import { BlockHeading } from "./BlockHeading";
 import { CancelInspectionModal } from "./CancelInspectionModal";
 import { RestoreInspectionAction } from "~/components/RestoreInspectionAction";
+import { useGuardedSubmit } from "~/hooks/useGuardedSubmit";
 import { lifecycleState } from "~/lib/hub-blocks";
 import { humanizeStatus, statusTone } from "~/lib/status";
 import { m } from "~/paraglide/messages";
@@ -41,7 +42,6 @@ import { m } from "~/paraglide/messages";
 export function LifecycleCard({
     status,
     inspectionId,
-    fetcher,
     canComplete = true,
     canCancel = true,
     canRestore = true,
@@ -49,8 +49,6 @@ export function LifecycleCard({
     status: string;
     /** The order being cancelled — the quote and the cancel are both keyed on it. */
     inspectionId: string;
-    /** The hub's complete-fieldwork fetcher, so the button reflects its state. */
-    fetcher: ReturnType<typeof useFetcher>;
     /** False for a viewer the API refuses to mark the visit complete (office staff). */
     canComplete?: boolean;
     /** False when the API would refuse the cancel (office staff on a paid or started inspection). */
@@ -59,8 +57,15 @@ export function LifecycleCard({
     canRestore?: boolean;
 }) {
     const state = lifecycleState(status);
-    const marking = fetcher.state !== "idle";
+    // The card owns the complete-fieldwork submit: the guard refuses a second press in the same frame.
+    const { submit, fetcher, busy: marking } = useGuardedSubmit<{ ok?: boolean; error?: string }>();
+    // Shown while the settled answer is a failure. A new attempt leaves `idle`, which clears it until that
+    // attempt settles, so an old message never sits beside a request that is already in flight.
+    const completeError = fetcher.state === "idle" && fetcher.data?.ok === false
+        ? (fetcher.data.error || m.inspections_hub_lifecycle_error())
+        : null;
     const [cancelOpen, setCancelOpen] = useState(false);
+    const [completeOpen, setCompleteOpen] = useState(false);
 
     return (
         <Card className="p-5">
@@ -71,6 +76,7 @@ export function LifecycleCard({
             {state === "actionable" ? (canComplete || canCancel) && (
                 <>
                     {canComplete && <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_lifecycle_hint()}</p>}
+                    {completeError && <Banner tone="danger" className="mb-3">{completeError}</Banner>}
                     {/* Secondary, and the shared Button rather than a hand-rolled
                         one. As a solid primary it was the loudest control on the
                         page while being, by its own contract above, advisory and
@@ -79,13 +85,26 @@ export function LifecycleCard({
                     <div className="flex flex-wrap items-center gap-2">
                         {canComplete && (
                             <>
-                            {/* busy-controls-allow: POST /:id/complete is idempotent server-side (an already completed inspection short-circuits before any write or automation), so a same-frame double click is harmless */}
-                            <fetcher.Form method="post">
-                                <input type="hidden" name="intent" value="complete" />
-                                <Button type="submit" variant="secondary" size="sm" disabled={marking}>
-                                    {marking ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
-                                </Button>
-                            </fetcher.Form>
+                            {/* Asks first, like the editor's "Finish fieldwork": the move is
+                                advisory but a mis-tap on a phone would otherwise send it. The
+                                guarded submit decides before the command goes out, so two
+                                presses in one frame send one request. */}
+                            <Button type="button" variant="secondary" size="sm" pending={marking} onClick={() => setCompleteOpen(true)}>
+                                {marking ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
+                            </Button>
+                            <ConfirmDialog
+                                open={completeOpen}
+                                title={m.editor_finish_fieldwork_confirm_title()}
+                                message={m.editor_finish_fieldwork_confirm_body()}
+                                confirmLabel={m.inspections_hub_lifecycle_mark_complete()}
+                                tone="default"
+                                busy={marking}
+                                onConfirm={() => {
+                                    submit({ intent: "complete" }, { method: "post" });
+                                    setCompleteOpen(false);
+                                }}
+                                onCancel={() => setCompleteOpen(false)}
+                            />
                             </>
                         )}
                         {/* A link-weight danger control: cancelling is rare and

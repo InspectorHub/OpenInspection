@@ -26,6 +26,7 @@ import type {
   CommentsLibraryEntry,
   CommentsLibraryQuery,
   CommentsLibraryRow,
+  ItemTagMap,
   TagLibraryEntry,
   TemplateSchema,
   TemplateSearchResult,
@@ -264,6 +265,20 @@ export interface FieldResources {
   costItems?: {
     list(inspectionId: string): Promise<CostItemsListing>;
     save(inspectionId: string, write: CostItemWrite): Promise<CommandResult<{ id?: string }>>;
+  };
+  /**
+   * The tags on each checklist item of one inspection (the web host serves it from
+   * `/resources/inspection-item-tags`). `list` never rejects: `null` means the host could not read it, and the
+   * editor then shows what it already has. `add` and `remove` never reject either: a not-ok answer means the host
+   * did not store the change, and the editor takes it back. Both are idempotent (adding a tag that is attached, or
+   * removing one that is not, changes nothing), and the tag must be one of the company's own (`EditorData.tagLibrary`).
+   * Absent means the host cannot keep item tags: the editor holds them in memory for the session only, as it did
+   * before this member existed.
+   */
+  itemTags?: {
+    list(inspectionId: string): Promise<ItemTagMap | null>;
+    add(inspectionId: string, itemId: string, tagId: string): Promise<CommandResult>;
+    remove(inspectionId: string, itemId: string, tagId: string): Promise<CommandResult>;
   };
   /** The tenant's repair-item catalogue (it is not per inspection). `list` never rejects: a failed read answers none. */
   repairItems?: { list(): Promise<RepairItemOption[]> };

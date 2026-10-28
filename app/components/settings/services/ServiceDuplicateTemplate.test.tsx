@@ -1,10 +1,8 @@
 // @vitest-environment happy-dom
 /**
  * Two services defaulting to the same template is the single most common way a
- * tenant ends up with duplicate reports — the competitor keeps an FAQ entry
- * answering exactly this: "If you're seeing multiple reports generating on your
- * inspections, you may have the same template defaulted for both your primary
- * service and your add-on services."
+ * tenant ends up with duplicate reports: a template defaulted for both a
+ * primary service and an add-on service generates one report per service.
  *
  * Naming the other service is the whole value. "This template is already in
  * use" is not actionable; "Standard Home Inspection already uses this template"

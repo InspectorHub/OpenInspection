@@ -11,8 +11,8 @@
  *
  * So this asserts the scale, not merely that something renders.
  */
-import { describe, it, expect, vi } from "vitest";
-import { render } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, act, fireEvent, cleanup } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
@@ -233,5 +233,86 @@ describe("DashboardInspectionRow - controls an office user is not offered", () =
     it("POSITIVE CONTROL - a cancelled row still offers Restore to everyone else", () => {
       expect(restoreButton(renderRow(0, "cancelled").container)).toBeDefined();
     });
+  });
+});
+
+describe("DashboardInspectionRow - narrow layout", () => {
+  it("stacks the text column over the badges on a phone so the address keeps the full width", () => {
+    const { container } = renderRow(0);
+    const link = container.querySelector('a[href="/inspections/i-1"]')!;
+    expect(link.className).toContain("flex-col");
+    expect(link.className).toContain("sm:flex-row");
+    const badges = link.lastElementChild!;
+    expect(badges.className).toContain("flex-wrap");
+    expect(badges.className).toContain("sm:flex-nowrap");
+    // Desktop keeps its fixed-width badge cluster.
+    expect(badges.className).toContain("sm:shrink-0");
+    expect(badges.className).not.toMatch(/(^|\s)shrink-0(\s|$)/);
+  });
+});
+
+describe("DashboardInspectionRow - completing asks first", () => {
+  afterEach(cleanup);
+
+  function renderWith(transitionStatus: (id: string, status: string) => void, status = "scheduled") {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <DashboardInspectionRow
+            insp={{ ...INSPECTION, price: 0, status } as Inspection}
+            tenantSlug={null}
+            selectedIds={new Set<string>()}
+            isColumnVisible={() => true}
+            toggleSelect={() => {}}
+            transitionStatus={transitionStatus}
+            timeZone="UTC"
+          />
+        ),
+      },
+    ]);
+    const view = render(<Stub initialEntries={["/"]} />);
+    return view;
+  }
+
+  const choose = (container: HTMLElement, value: string) =>
+    fireEvent.change(container.querySelector("select")!, { target: { value } });
+
+  it("choosing completed opens the confirmation and sends nothing", async () => {
+    const send = vi.fn();
+    const { container, findByText } = renderWith(send);
+    choose(container, "completed");
+    expect(await findByText("Finish fieldwork?")).toBeTruthy();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("cancelling sends nothing and the select still shows the stored status", async () => {
+    const send = vi.fn();
+    const { container, findByText } = renderWith(send);
+    choose(container, "completed");
+    await findByText("Finish fieldwork?");
+    fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
+    expect(screen.queryByText("Finish fieldwork?")).toBeNull();
+    expect(send).not.toHaveBeenCalled();
+    expect(container.querySelector("select")?.value).toBe("scheduled");
+  });
+
+  it("confirming sends exactly one request, even when the confirm button is hit twice in one frame", async () => {
+    const send = vi.fn();
+    const { container, findByText } = renderWith(send);
+    choose(container, "completed");
+    await findByText("Finish fieldwork?");
+    const confirm = screen.getByRole("button", { name: "Mark fieldwork complete" });
+    act(() => { confirm.click(); confirm.click(); });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send).toHaveBeenCalledWith("i-1", "completed");
+  });
+
+  it("CONTROL - any other status goes out at once, with no dialog", () => {
+    const send = vi.fn();
+    const { container } = renderWith(send);
+    choose(container, "confirmed");
+    expect(send).toHaveBeenCalledWith("i-1", "confirmed");
+    expect(screen.queryByText("Finish fieldwork?")).toBeNull();
   });
 });

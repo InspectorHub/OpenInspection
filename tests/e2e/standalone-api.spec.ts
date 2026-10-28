@@ -341,7 +341,7 @@ test.describe.serial('Standalone API Tests', () => {
     test('API-22: /report/:tenant/:id is a 302 permalink shim to /report-view', async ({ request }) => {
         // The public /report/:tenant/:id page (app/routes/public/report.tsx) is now
         // an unconditional 302 permalink shim to /report-view/:tenant/:id (the old
-        // Spectora-style bookmark still works). The actual report RENDER lives at
+        // bookmarked-link form still works). The actual report RENDER lives at
         // /report-view and is covered by the report-viewer project; the existence
         // check moved into the data layer (see API-23).
         const tenantSlug = TENANT_SLUG;

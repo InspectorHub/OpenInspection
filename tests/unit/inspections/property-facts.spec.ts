@@ -1,5 +1,5 @@
 /**
- * Round-2 backlog G1 (Spectora §E.2) — InspectionService.updatePropertyFacts
+ * Round-2 backlog G1 — InspectionService.updatePropertyFacts
  * + getPropertyFacts unit coverage.
  *
  * Asserts:

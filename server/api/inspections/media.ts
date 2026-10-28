@@ -100,7 +100,7 @@ const servePhotoRoute = createRoute(withMcpMetadata({
     description: "Streams an inspection item/pool photo from R2, scoped to the caller's tenant + inspection via the key prefix. Sets Content-Disposition from the stored original filename; ?download=1 forces an attachment.",
 }, { scopes: ['read'], tier: 'extended' }));
 
-/* ── Round-2 backlog #9 (Spectora §E.3) — Media Center ─────────────────────
+/* ── Round-2 backlog #9 — Media Center ─────────────────────
  *
  * Three endpoints powering the editor's centralized photo library drawer:
  *   GET  /api/inspections/:id/media          — aggregate {attached, pool}

@@ -7,9 +7,8 @@ import { createApiResponseSchema } from './shared.schema';
  * The naming here is load-bearing and is NOT interchangeable. `amountCents` is
  * the WORKER'S PAY. The company-side figure — what the business billed for the
  * work — is "attributed revenue" and lives in the metrics payload, never in
- * this one. Housecall Pro calls the worker's money `Commission Cost`, which is
- * safe there because only an owner ever opens that report; an inspector opens
- * THIS one, so "cost" is not a word this surface may use.
+ * this one. An inspector opens THIS payload, so "cost" is not a word this
+ * surface may use for the worker's money.
  */
 const PaySplitSchema = z.object({
     id:                  z.string().describe('Pay split row id.'),

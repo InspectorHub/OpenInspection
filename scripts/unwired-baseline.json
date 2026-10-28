@@ -33,7 +33,7 @@
   },
   "server/lib/editor-search.ts": {
     "kind": "deferred",
-    "reason": "Editor full-text search helpers, built for competitor parity. The editor route does not import them, so the search they implement is not offered anywhere."
+    "reason": "Editor full-text search helpers. The editor route does not import them, so the search they implement is not offered anywhere."
   },
   "server/lib/icons.tsx": {
     "kind": "deferred",
@@ -73,7 +73,7 @@
   },
   "server/lib/report-section-numbering.ts": {
     "kind": "deferred",
-    "reason": "Report section numbering plus edit-permission helpers, built for competitor parity. No renderer imports them."
+    "reason": "Report section numbering plus edit-permission helpers. No renderer imports them."
   },
   "server/lib/report-style/infer-profile.ts": {
     "kind": "deferred",
