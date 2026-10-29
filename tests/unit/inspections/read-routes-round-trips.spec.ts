@@ -19,7 +19,7 @@ import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { createHarness, TENANT_ID, OWNER_ID, type Harness } from '../helpers/tenant-email-harness';
 import { measureWall, recordRoundTrips, wallWithinBudget } from '../helpers/round-trip-recorder';
 
-const LATENCY_MS = 40;
+const LATENCY_MS = 100;
 
 async function get(h: Harness, path: string, options: { warm?: boolean } = {}) {
     const rec = recordRoundTrips(h.env.DB as D1Database, LATENCY_MS);

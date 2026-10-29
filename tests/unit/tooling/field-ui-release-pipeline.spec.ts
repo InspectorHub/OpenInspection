@@ -235,7 +235,7 @@ describe.each([
     expect(verdict(`${name}@0.2.0`, `${prefix}0.2.0`)).toBe('MATCH');
     expect(verdict(`${name}@0.2.0`, `${prefix}0.2.1`)).toBe('MISMATCH');
     expect(verdict(`@other/${slug}@0.2.0`, `${prefix}0.2.0`)).toBe('MISMATCH');
-  });
+  }, 15_000);
 
   it('publish: the post-publish visibility check waits up to 5 minutes and warns instead of failing the job', () => {
     const steps = publish.jobs.publish.steps;

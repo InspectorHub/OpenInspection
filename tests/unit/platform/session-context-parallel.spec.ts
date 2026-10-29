@@ -16,6 +16,14 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const SLOW_MS = 150;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let startedReads = 0;
+let startedAtFirstCompletion = 0;
+const slowRead = async <T>(value: T): Promise<T> => {
+    startedReads += 1;
+    await sleep(SLOW_MS);
+    if (startedAtFirstCompletion === 0) startedAtFirstCompletion = startedReads;
+    return value;
+};
 const hooks = vi.hoisted(() => ({
     seat: vi.fn(),
     video: vi.fn(),
@@ -33,6 +41,8 @@ let testDb: BetterSQLite3Database<typeof schema>;
 const unread = vi.fn();
 
 beforeEach(async () => {
+    startedReads = 0;
+    startedAtFirstCompletion = 0;
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
@@ -41,9 +51,9 @@ beforeEach(async () => {
     await testDb.insert(schema.users).values({
         id: 'u-1', tenantId: TENANT_ID, email: 'u@example.com', passwordHash: 'x', role: 'inspector', createdAt: new Date(),
     } as never);
-    hooks.seat.mockReset().mockImplementation(async () => { await sleep(SLOW_MS); return { used: 2, max: 5 }; });
-    hooks.video.mockReset().mockImplementation(async () => { await sleep(SLOW_MS); return { provider: 'stream' }; });
-    unread.mockReset().mockImplementation(async () => { await sleep(SLOW_MS); return 7; });
+    hooks.seat.mockReset().mockImplementation(() => slowRead({ used: 2, max: 5 }));
+    hooks.video.mockReset().mockImplementation(() => slowRead({ provider: 'stream' }));
+    unread.mockReset().mockImplementation(() => slowRead(7));
 });
 
 function buildApp() {
@@ -66,16 +76,15 @@ type Body = { data: { seatUsage: unknown; videoProvider: string; unreadMessages:
 
 describe('session context secondary reads', () => {
     it('finish in about the time of the slowest read, not the sum of all of them', async () => {
-        const t0 = performance.now();
         const res = await buildApp().request('/api/session/context');
-        const elapsed = performance.now() - t0;
         expect(res.status).toBe(200);
         const body = await res.json() as Body;
         expect(body.data.seatUsage).toEqual({ used: 2, limit: 5 });
         expect(body.data.videoProvider).toBe('stream');
         expect(body.data.unreadMessages).toBe(7);
-        // Sequential would be at least 3 * SLOW_MS (450). One wave is about 150.
-        expect(elapsed).toBeLessThan(SLOW_MS * 2.2);
+        // A serial implementation would finish its first read before starting the other two.
+        // Concurrent reads all start before any of the delayed reads can finish.
+        expect(startedAtFirstCompletion).toBe(3);
     });
 
     it('a video provider failure still falls back to r2 and leaves the other answers intact', async () => {
