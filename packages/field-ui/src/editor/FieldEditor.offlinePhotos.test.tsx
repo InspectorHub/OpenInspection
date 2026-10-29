@@ -64,6 +64,7 @@ interface Options {
   /** `store.delete` throws. */
   deleteThrows?: boolean;
   online?: boolean;
+  rejectCode?: string;
 }
 
 /** A phone editor on one item whose host store can be made to fail; returns what the editor did. */
@@ -89,7 +90,8 @@ async function mountEditor(opts: Options = {}) {
       store: {
         ...fake.media.store,
         put: async (rec) => {
-          if (nameOf(rec).startsWith("bad")) throw new Error("TOO_LARGE");
+          if (nameOf(rec).startsWith("bad")) throw Object.assign(new Error("private path must not be shown"), { code: opts.rejectCode ?? "TOO_LARGE" });
+          if (nameOf(rec).startsWith("unsupported")) throw Object.assign(new Error("private path must not be shown"), { code: "UNSUPPORTED_TYPE" });
           await fake.media.store.put(rec);
         },
         delete: async (id) => {
@@ -141,7 +143,8 @@ describe("offline photo batch with a rejecting store", () => {
     expect(out.photos).toHaveLength(2);
     expect(out.photos.every((p) => p.pendingUpload === true)).toBe(true);
     expect(out.photos.map((p) => p.pendingId).sort()).toEqual(out.stored.map((r) => r.pendingId).sort());
-    expect(out.sent).toEqual([expect.objectContaining({ message: m.editor_route_photos_rejected({ count: 1, s: "" }), variant: "error" })]);
+    expect(out.sent).toEqual([expect.objectContaining({ message: m.editor_route_photo_too_large({ count: 1, s: "" }), variant: "error" })]);
+    expect(out.messages.join(" ")).not.toContain("private path");
     expect(out.messages).not.toContain(m.editor_route_save_failed());
   });
 
@@ -150,7 +153,7 @@ describe("offline photo batch with a rejecting store", () => {
     expect(out.unhandled).toEqual([]);
     expect(out.stored).toHaveLength(0);
     expect(out.photos).toHaveLength(0);
-    expect(out.messages).toEqual([m.editor_route_photos_rejected({ count: 3, s: "s" })]);
+    expect(out.messages).toEqual([m.editor_route_photo_too_large({ count: 3, s: "s" })]);
   });
 
   it("CONTROL - a batch where every file succeeds stores and appends all of them and shows no notice", async () => {
@@ -169,7 +172,7 @@ describe("offline photo batch with a rejecting store", () => {
     expect(out.stored).toHaveLength(19);
     expect(out.photos).toHaveLength(19);
     expect(out.messages).toHaveLength(2);
-    expect(out.messages).toContain(m.editor_route_photos_rejected({ count: 1, s: "" }));
+    expect(out.messages).toContain(m.editor_route_photo_too_large({ count: 1, s: "" }));
     expect(out.messages).toContain(m.editor_route_photos_batch_capped());
   });
 });
@@ -193,6 +196,30 @@ describe("offline photo batch when the doc append throws after the store", () =>
     expect(out.deleted).toHaveLength(1);
     expect(out.photos).toHaveLength(2);
     expect(out.messages).toEqual([m.editor_route_photos_rejected({ count: 1, s: "" })]);
+  });
+
+  it("shows a fixed unsupported-type reason for a coded offline store rejection", async () => {
+    const out = await pick(["unsupported.tiff", "ok.jpg"]);
+    expect(out.stored).toHaveLength(1);
+    expect(out.photos).toHaveLength(1);
+    expect(out.messages).toEqual([m.editor_route_photo_unsupported_type({ count: 1, s: "" })]);
+    expect(out.messages.join(" ")).not.toContain("private path");
+  });
+
+  it("reports each known reason once while keeping valid files from the same batch", async () => {
+    const out = await pick(["bad.jpg", "unsupported.tiff", "ok.jpg"]);
+    expect(out.stored).toHaveLength(1);
+    expect(out.photos).toHaveLength(1);
+    expect(out.messages).toEqual([
+      m.editor_route_photo_unsupported_type({ count: 1, s: "" }),
+      m.editor_route_photo_too_large({ count: 1, s: "" }),
+    ]);
+  });
+
+  it("keeps the generic count for an unknown rejection without exposing its message", async () => {
+    const out = await pick(["bad.jpg", "ok.jpg"], { rejectCode: "UNRECOGNIZED" });
+    expect(out.messages).toEqual([m.editor_route_photos_rejected({ count: 1, s: "" })]);
+    expect(out.messages.join(" ")).not.toContain("private path");
   });
 });
 

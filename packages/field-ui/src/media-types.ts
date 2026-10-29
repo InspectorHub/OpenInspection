@@ -64,7 +64,11 @@ export type PendingMediaRecord =
   | (PendingMediaBase & { kind: 'annotate'; meta: PhotoAnnotateMeta });
 
 export interface PendingMediaStore {
-  /** Must reject on failure. */
+  /**
+   * Must reject on failure. A host may attach a stable `code` to the error;
+   * the editor recognizes `UNSUPPORTED_TYPE` and `TOO_LARGE` for safe offline
+   * photo guidance. Unknown errors keep the generic rejection notice.
+   */
   put(rec: PendingMediaRecord): Promise<void>;
   get(pendingId: string): Promise<PendingMediaRecord | null>;
   list(inspectionId?: string): Promise<PendingMediaRecord[]>;

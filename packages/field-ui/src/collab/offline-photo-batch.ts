@@ -20,8 +20,29 @@ export interface OfflinePhotoTarget {
     itemId:       string;
 }
 
+export type OfflinePhotoRejectionReason = 'unsupportedType' | 'tooLarge';
+
+export interface OfflinePhotoBatchResult {
+    rejected: number;
+    /** Counts for known, safe storage error codes. Unknown errors remain in `rejected` only. */
+    reasons: Partial<Record<OfflinePhotoRejectionReason, number>>;
+}
+
+function safeRejectionReason(error: unknown): OfflinePhotoRejectionReason | undefined {
+    if (!error || typeof error !== 'object') return undefined;
+    try {
+        switch (Reflect.get(error, 'code')) {
+            case 'UNSUPPORTED_TYPE': return 'unsupportedType';
+            case 'TOO_LARGE': return 'tooLarge';
+            default: return undefined;
+        }
+    } catch {
+        return undefined;
+    }
+}
+
 /**
- * Store and append every file in order; resolves to how many were rejected. Never rejects. A file counts as rejected
+ * Store and append every file in order; resolves to the rejection count and safe coded reasons. Never rejects. A file counts as rejected
  * when the store refuses it OR when the doc entry cannot be appended after the bytes were stored; in the second case
  * the stored row is removed again on a best-effort basis, so no bytes are left without an entry.
  */
@@ -30,8 +51,9 @@ export async function addOfflinePhotos(
     doc: Y.Doc,
     target: OfflinePhotoTarget,
     files: readonly Blob[],
-): Promise<number> {
+): Promise<OfflinePhotoBatchResult> {
     let rejected = 0;
+    const reasons: OfflinePhotoBatchResult['reasons'] = {};
     for (const blob of files) {
         const pendingId = crypto.randomUUID();
         let stored = false;
@@ -46,10 +68,12 @@ export async function addOfflinePhotos(
             });
             stored = true;
             appendPendingPhoto(doc, target.findingKey, pendingId);
-        } catch {
+        } catch (error) {
             rejected += 1;
+            const reason = safeRejectionReason(error);
+            if (reason) reasons[reason] = (reasons[reason] ?? 0) + 1;
             if (stored) await Promise.resolve().then(() => store.delete(pendingId)).catch(() => undefined);
         }
     }
-    return rejected;
+    return { rejected, reasons };
 }

@@ -28,6 +28,7 @@ import { usePresence } from "../hooks/usePresence";
 import { useResultsDoc } from "../collab/use-results-doc";
 import { useMediaDrain } from "../hooks/useMediaDrain";
 import { addOfflinePhotos } from "../collab/offline-photo-batch";
+import { offlinePhotoRejectionMessages } from "./offline-photo-rejection-messages";
 import { useResultsProjection } from "../hooks/useResultsProjection";
 import { useSpeedRating } from "../hooks/useSpeedRating";
 import { SectionRail } from "../components/editor-shared/SectionRail";
@@ -1047,8 +1048,8 @@ function FieldEditorInner({ data }: { data: EditorData }) {
   const fk = findingKey(activeUnitId, sid, itemId);
   // The host's store may reject a file; the rest of the batch still goes through and the user hears once, with the
   // count. It is a photo that was not added, not a save failure, so the save state is left alone.
-  const rejected = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId }, bakedFiles);
-  if (rejected > 0) notify(m.editor_route_photos_rejected({ count: rejected, s: rejected === 1 ? "" : "s" }), "error", { durationMs: 8000 });
+  const batch = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId }, bakedFiles);
+  for (const message of offlinePhotoRejectionMessages(batch)) notify(message, "error", { durationMs: 8000 });
  } else {
   // A file input's change event fires once per file-chooser selection (the chooser is modal) and the input
   // is reset after it is read, so there is no double click to repeat. A batch queues behind one in flight.
