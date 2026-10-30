@@ -1,43 +1,67 @@
 import { m } from '../i18n';
-import type { OfflinePhotoBatchResult, OfflinePhotoRejectionReason } from '../collab/offline-photo-batch';
+import type { OfflinePhotoBatchResult } from '../collab/offline-photo-batch';
 import type { MediaFileResult } from '../media-types';
 
-/** Localized, fixed user-facing reasons; never render arbitrary host error text. */
-export function offlinePhotoRejectionMessages(batch: OfflinePhotoBatchResult): string[] {
+interface PhotoBatchTally {
+    /** Files that made it (uploaded, or stored on the device). */
+    added: number;
+    tooLarge: number;
+    unsupportedType: number;
+    /** Rejected for any other reason; the reason is never shown. */
+    other: number;
+}
+
+const plural = (count: number) => ({ count, s: count === 1 ? '' : 's' });
+
+/**
+ * One place for the count-to-message branching. Known reasons get a fixed sentence each; when part of the batch did
+ * get through, the user also hears how many (a rejection must not hide the photos that were added). Nothing here
+ * renders host error text.
+ */
+function photoBatchMessages(tally: PhotoBatchTally, wording: 'upload' | 'offline'): string[] {
+    const { added, tooLarge, unsupportedType, other } = tally;
+    const rejected = tooLarge + unsupportedType + other;
+    if (rejected === 0) return [];
     const messages: string[] = [];
-    const known = Object.values(batch.reasons).reduce((sum, count) => sum + (count ?? 0), 0);
-    const append = (reason: OfflinePhotoRejectionReason, count: number) => {
-        if (count === 0) return;
-        const args = { count, s: count === 1 ? '' : 's' };
-        messages.push(reason === 'unsupportedType'
-            ? m.editor_route_photo_unsupported_type(args)
-            : count === 1
-                ? m.editor_route_photo_too_large_single()
-                : m.editor_route_photo_too_large(args));
-    };
-    append('unsupportedType', batch.reasons.unsupportedType ?? 0);
-    append('tooLarge', batch.reasons.tooLarge ?? 0);
-    const unknown = batch.rejected - known;
-    if (unknown > 0) messages.push(m.editor_route_photos_rejected({ count: unknown, s: unknown === 1 ? '' : 's' }));
+    if (added > 0) {
+        const args = { success: added, total: added + rejected, failed: rejected };
+        messages.push(wording === 'upload' ? m.editor_route_photos_partial_upload(args) : m.editor_route_photos_partial_added(args));
+    }
+    if (unsupportedType > 0) messages.push(m.editor_route_photo_unsupported_type(plural(unsupportedType)));
+    if (tooLarge === 1) messages.push(m.editor_route_photo_too_large_single());
+    else if (tooLarge > 1) messages.push(m.editor_route_photo_too_large(plural(tooLarge)));
+    // With photos added, the summary above already counts the unknown failures.
+    if (other > 0 && added === 0) {
+        const known = tooLarge + unsupportedType > 0;
+        messages.push(wording === 'upload' && !known
+            ? m.editor_route_photos_partial_upload({ success: 0, total: other, failed: other })
+            : m.editor_route_photos_rejected(plural(other)));
+    }
     return messages;
+}
+
+/** Localized, fixed user-facing reasons; never render arbitrary host error text. `total` is the batch size. */
+export function offlinePhotoRejectionMessages(batch: OfflinePhotoBatchResult, total: number): string[] {
+    const tooLarge = batch.reasons.tooLarge ?? 0;
+    const unsupportedType = batch.reasons.unsupportedType ?? 0;
+    return photoBatchMessages({
+        added: total - batch.rejected,
+        tooLarge,
+        unsupportedType,
+        other: batch.rejected - tooLarge - unsupportedType,
+    }, 'offline');
 }
 
 /** Map only known host codes to localized copy; unknown failures stay summarized. */
 export function onlinePhotoRejectionMessages(results: readonly MediaFileResult[]): string[] {
     const failures = results.filter((result) => !result.ok && result.kept !== true);
-    const tooLargeCount = failures.filter((result) => result.error === 'TOO_LARGE').length;
-    const otherFailureCount = failures.length - tooLargeCount;
-    const messages: string[] = [];
-    if (tooLargeCount === 1) messages.push(m.editor_route_photo_too_large_single());
-    else if (tooLargeCount > 1) messages.push(m.editor_route_photo_too_large({ count: tooLargeCount, s: 's' }));
-    if (otherFailureCount > 0) {
-        const keptCount = results.filter((result) => !result.ok && result.kept === true).length;
-        const successCount = results.filter((result) => result.ok).length;
-        messages.push(m.editor_route_photos_partial_upload({
-            success: successCount,
-            total: results.length - keptCount - tooLargeCount,
-            failed: otherFailureCount,
-        }));
-    }
-    return messages;
+    const count = (code: string) => failures.filter((result) => result.error === code).length;
+    const tooLarge = count('TOO_LARGE');
+    const unsupportedType = count('UNSUPPORTED_TYPE');
+    return photoBatchMessages({
+        added: results.filter((result) => result.ok).length,
+        tooLarge,
+        unsupportedType,
+        other: failures.length - tooLarge - unsupportedType,
+    }, 'upload');
 }

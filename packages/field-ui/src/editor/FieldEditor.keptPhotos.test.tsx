@@ -99,6 +99,12 @@ describe("photos kept on the device", () => {
     expect(out.variantOf(tooLarge)).toBe("error");
   });
 
+  it("a mixed batch with a known reason still reports how many photos uploaded", async () => {
+    const out = await commitBurst([{ ok: true, key: "k1" }, { ok: false, error: "TOO_LARGE" }]);
+    expect(out.messages).toContain(m.editor_route_photos_partial_upload({ success: 1, total: 2, failed: 1 }));
+    expect(out.messages).toContain(m.editor_route_photo_too_large_single());
+  });
+
   it("CONTROL - a clean batch shows only the success notice", async () => {
     const out = await commitBurst([{ ok: true, key: "k1" }, { ok: true, key: "k2" }]);
     expect(out.variantOf(m.editor_route_photos_added({ count: 2, s: "s", toDefect: "" }))).toBe("success");

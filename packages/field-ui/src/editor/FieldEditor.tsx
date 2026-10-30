@@ -1049,7 +1049,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
   // The host's store may reject a file; the rest of the batch still goes through and the user hears once, with the
   // count. It is a photo that was not added, not a save failure, so the save state is left alone.
   const batch = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId }, bakedFiles);
-  for (const message of offlinePhotoRejectionMessages(batch)) notify(message, "error", { durationMs: 8000 });
+  for (const message of offlinePhotoRejectionMessages(batch, bakedFiles.length)) notify(message, "error", { durationMs: 8000 });
  } else {
   // A file input's change event fires once per file-chooser selection (the chooser is modal) and the input
   // is reset after it is read, so there is no double click to repeat. A batch queues behind one in flight.

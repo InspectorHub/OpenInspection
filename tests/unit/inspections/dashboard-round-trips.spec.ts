@@ -37,7 +37,7 @@ import { createHarness, TENANT_ID, OWNER_ID, INSPECTOR_ID, type Harness } from '
 import { FIXED_NOW, MANAGER_ID, seedDashboard } from '../helpers/dashboard-fixture';
 import { measureWall, recordRoundTrips, wallWithinBudget, type RoundTripLog } from '../helpers/round-trip-recorder';
 
-const LATENCY_MS = 100;
+const LATENCY_MS = 40;
 
 async function measure(h: Harness, sub: string, role: string): Promise<RoundTripLog & { ms: number; base: number }> {
     const rec = recordRoundTrips(h.env.DB as D1Database, LATENCY_MS);

@@ -70,7 +70,8 @@ export async function addOfflinePhotos(
             appendPendingPhoto(doc, target.findingKey, pendingId);
         } catch (error) {
             rejected += 1;
-            const reason = safeRejectionReason(error);
+            // Only the store's own refusal carries a code the editor may explain; a failure while appending is unknown.
+            const reason = stored ? undefined : safeRejectionReason(error);
             if (reason) reasons[reason] = (reasons[reason] ?? 0) + 1;
             if (stored) await Promise.resolve().then(() => store.delete(pendingId)).catch(() => undefined);
         }

@@ -63,12 +63,12 @@ describe('round-trip recorder', () => {
         expect(rec.log.waves).toBe(1);
     });
 
-    describe('the wall-time bound (budget of 3 round trips at 100 ms)', () => {
+    describe('the wall-time bound (budget of 3 round trips at 40 ms)', () => {
         const serial = async (n: number) => {
-            const rec = recordRoundTrips(fakeD1(), 100);
+            const rec = recordRoundTrips(fakeD1(), 40);
             const q = () => rec.binding.prepare('select 1').bind().all();
-            const m = await measureWall(rec, 100, async () => { for (let i = 0; i < n; i++) await q(); });
-            return { m, ok: wallWithinBudget(m, 3, 100) };
+            const m = await measureWall(rec, 40, async () => { for (let i = 0; i < n; i++) await q(); });
+            return { m, ok: wallWithinBudget(m, 3, 40) };
         };
 
         it('a request inside its budget passes', async () => {
@@ -82,8 +82,8 @@ describe('round-trip recorder', () => {
 
         it('the base is the request without any delay, so it does not loosen the bound', async () => {
             const { m } = await serial(3);
-            expect(m.base).toBeLessThan(100);
-            expect(m.ms).toBeGreaterThanOrEqual(3 * 100 - 5);
+            expect(m.base).toBeLessThan(40);
+            expect(m.ms).toBeGreaterThanOrEqual(3 * 40 - 5);
         });
     });
 });

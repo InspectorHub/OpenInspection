@@ -55,6 +55,13 @@ async function post(fd: FormData): Promise<{ ok: boolean; status: number; body: 
     return { ok: res.ok, status: res.status, body };
 }
 
+/**
+ * Stable reason code for an oversized photo. The media route relays the API's status unchanged and its body carries no
+ * code of its own, so the status is the only signal: 413 is the one that means "too large". Other statuses (a 400 included)
+ * stay generic on purpose; nothing distinguishes an unsupported type from any other bad request.
+ */
+const TOO_LARGE = "TOO_LARGE";
+
 /** `doc` is null when the host has no results document yet; a crop or annotation then fails, a photo does not need one. */
 export function createWebUploader(inspectionId: string, doc: Y.Doc | null): MediaUploader {
     return {
@@ -67,6 +74,7 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
             if (rec.kind === "photo") {
                 fd.append("file", new File([rec.blob], "photo.jpg", { type: rec.blob.type || "image/jpeg" }));
                 const res = await post(fd);
+                if (res.status === 413) throw new Error(TOO_LARGE);
                 if (!res.ok) throw new Error(`upload failed: ${res.status}`);
                 const key = res.body?.data?.key;
                 if (!key) throw new Error("upload returned no key");

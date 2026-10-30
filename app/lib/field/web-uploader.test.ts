@@ -14,6 +14,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as Y from "yjs";
 import { seedResultsDoc, appendPhoto } from "@core/field-ui/shared/results-doc";
 import type { PendingMediaRecord } from "@core/field-ui/media-types";
+import { onlinePhotoRejectionMessages } from "@core/field-ui/editor/photo-rejection-messages";
+import { m } from "@core/field-ui/i18n";
+import type { MediaFileResult } from "@core/field-ui/media-types";
 import { createWebMediaUploader, createWebUploader } from "./web-uploader";
 
 const FK = "_default:s1:i1";
@@ -215,6 +218,22 @@ describe("createWebMediaUploader: the package contract (answers, never throws)",
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it("answers the stable TOO_LARGE code for an HTTP 413 from the media route", async () => {
+        const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+        fetchMock.mockResolvedValue(jsonResponse({ error: "Upstream answered 413" }, 413));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "TOO_LARGE" });
+    });
+
+    it("CONTROL - 400, 500 and 503 keep the 'upload failed: <status>' text, and a 200 still succeeds", async () => {
+        const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+        for (const status of [400, 500, 503]) {
+            fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, status));
+            expect(await up.upload(photoRec())).toEqual({ ok: false, error: `upload failed: ${status}` });
+        }
+        fetchMock.mockResolvedValue(jsonResponse({ data: { key: "k1" } }));
+        expect(await up.upload(photoRec())).toEqual({ ok: true, key: "k1" });
+    });
+
     it("without a results document a photo still uploads, a crop and an annotation fail without sending", async () => {
         fetchMock.mockResolvedValue(jsonResponse({ data: { key: "k1" } }));
         const up = createWebMediaUploader("insp-1", null);
@@ -223,5 +242,36 @@ describe("createWebMediaUploader: the package contract (answers, never throws)",
         expect(await up.upload(cropRec())).toEqual({ ok: false, error: "no results document to resolve the photo in" });
         expect(await up.upload(annotRec())).toEqual({ ok: false, error: "no results document to resolve the photo in" });
         expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
+
+describe("a mixed batch through the real web uploader result shape", () => {
+    it("turns a 413 into the fixed too-large sentence next to the uploaded count", async () => {
+        const statuses = [200, 200, 200, 413];
+        let call = 0;
+        fetchMock.mockImplementation(async () => {
+            const status = statuses[call++] ?? 500;
+            return jsonResponse(status === 200 ? { data: { key: `k${call}` } } : { error: "Upstream answered 413" }, status);
+        });
+        const up = createWebMediaUploader("insp-1", null);
+        const results: MediaFileResult[] = [];
+        for (let i = 0; i < 4; i++) {
+            const r = await up.upload(photoRec());
+            results.push(r.ok ? { index: i, ok: true, key: r.key } : { index: i, ok: false, error: r.error });
+        }
+        expect(results[3]).toEqual({ index: 3, ok: false, error: "TOO_LARGE" });
+        expect(onlinePhotoRejectionMessages(results)).toEqual([
+            m.editor_route_photos_partial_upload({ success: 3, total: 4, failed: 1 }),
+            m.editor_route_photo_too_large_single(),
+        ]);
+    });
+
+    it("CONTROL - a 500 stays an unknown failure with no reason sentence", async () => {
+        fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, 500));
+        const r = await createWebMediaUploader("insp-1", null).upload(photoRec());
+        expect(r).toEqual({ ok: false, error: "upload failed: 500" });
+        expect(onlinePhotoRejectionMessages([{ index: 0, ok: false, error: r.ok ? "" : r.error }])).toEqual([
+            m.editor_route_photos_partial_upload({ success: 0, total: 1, failed: 1 }),
+        ]);
     });
 });

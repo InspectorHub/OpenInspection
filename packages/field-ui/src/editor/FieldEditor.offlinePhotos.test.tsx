@@ -17,7 +17,7 @@ import { createFakeDataSource } from "../testing/fake-data-source";
 import { DATA, fullResources, fullSlots, stubCamera, stubViewport } from "./FieldEditor.capabilities.fixtures";
 import { FieldEditor } from "./FieldEditor";
 
-const hooks = vi.hoisted(() => ({ appendCalls: 0, appendFailsOn: new Set<number>(), bakeFails: new Set<string>(), baked: [] as string[], frames: 2 }));
+const hooks = vi.hoisted(() => ({ appendCalls: 0, appendFailsOn: new Set<number>(), appendCode: "", bakeFails: new Set<string>(), baked: [] as string[], frames: 2 }));
 
 vi.mock("../collab/results-binding", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../collab/results-binding")>();
@@ -25,7 +25,7 @@ vi.mock("../collab/results-binding", async (importOriginal) => {
     ...actual,
     appendPendingPhoto: (...args: Parameters<typeof actual.appendPendingPhoto>) => {
       hooks.appendCalls += 1;
-      if (hooks.appendFailsOn.has(hooks.appendCalls)) throw new Error("DOC_DESTROYED");
+      if (hooks.appendFailsOn.has(hooks.appendCalls)) throw Object.assign(new Error("DOC_DESTROYED"), hooks.appendCode ? { code: hooks.appendCode } : {});
       actual.appendPendingPhoto(...args);
     },
   };
@@ -50,6 +50,7 @@ afterEach(() => {
   localStorage.removeItem(ORIGINAL_QUALITY_KEY);
   hooks.appendCalls = 0;
   hooks.appendFailsOn.clear();
+  hooks.appendCode = "";
   hooks.bakeFails.clear();
   hooks.baked.length = 0;
 });
@@ -143,7 +144,10 @@ describe("offline photo batch with a rejecting store", () => {
     expect(out.photos).toHaveLength(2);
     expect(out.photos.every((p) => p.pendingUpload === true)).toBe(true);
     expect(out.photos.map((p) => p.pendingId).sort()).toEqual(out.stored.map((r) => r.pendingId).sort());
-    expect(out.sent).toEqual([expect.objectContaining({ message: m.editor_route_photo_too_large_single(), variant: "error" })]);
+    expect(out.sent).toEqual([
+      expect.objectContaining({ message: m.editor_route_photos_partial_added({ success: 2, total: 3, failed: 1 }), variant: "error" }),
+      expect.objectContaining({ message: m.editor_route_photo_too_large_single(), variant: "error" }),
+    ]);
     expect(out.messages.join(" ")).not.toContain("private path");
     expect(out.messages).not.toContain(m.editor_route_save_failed());
   });
@@ -171,7 +175,8 @@ describe("offline photo batch with a rejecting store", () => {
     expect(out.unhandled).toEqual([]);
     expect(out.stored).toHaveLength(19);
     expect(out.photos).toHaveLength(19);
-    expect(out.messages).toHaveLength(2);
+    expect(out.messages).toHaveLength(3);
+    expect(out.messages).toContain(m.editor_route_photos_partial_added({ success: 19, total: 20, failed: 1 }));
     expect(out.messages).toContain(m.editor_route_photo_too_large_single());
     expect(out.messages).toContain(m.editor_route_photos_batch_capped());
   });
@@ -186,7 +191,7 @@ describe("offline photo batch when the doc append throws after the store", () =>
     expect(out.photos).toHaveLength(2);
     expect(out.photos.map((p) => p.pendingId).sort()).toEqual(out.stored.map((r) => r.pendingId).sort());
     expect(out.deleted).toHaveLength(1);
-    expect(out.messages).toEqual([m.editor_route_photos_rejected({ count: 1, s: "" })]);
+    expect(out.messages).toEqual([m.editor_route_photos_partial_added({ success: 2, total: 3, failed: 1 })]);
   });
 
   it("the cleanup delete throws too: nothing is thrown, the count is still right and the rest is kept", async () => {
@@ -195,14 +200,17 @@ describe("offline photo batch when the doc append throws after the store", () =>
     expect(out.unhandled).toEqual([]);
     expect(out.deleted).toHaveLength(1);
     expect(out.photos).toHaveLength(2);
-    expect(out.messages).toEqual([m.editor_route_photos_rejected({ count: 1, s: "" })]);
+    expect(out.messages).toEqual([m.editor_route_photos_partial_added({ success: 2, total: 3, failed: 1 })]);
   });
 
   it("shows a fixed unsupported-type reason for a coded offline store rejection", async () => {
     const out = await pick(["unsupported.tiff", "ok.jpg"]);
     expect(out.stored).toHaveLength(1);
     expect(out.photos).toHaveLength(1);
-    expect(out.messages).toEqual([m.editor_route_photo_unsupported_type({ count: 1, s: "" })]);
+    expect(out.messages).toEqual([
+      m.editor_route_photos_partial_added({ success: 1, total: 2, failed: 1 }),
+      m.editor_route_photo_unsupported_type({ count: 1, s: "" }),
+    ]);
     expect(out.messages.join(" ")).not.toContain("private path");
   });
 
@@ -211,14 +219,29 @@ describe("offline photo batch when the doc append throws after the store", () =>
     expect(out.stored).toHaveLength(1);
     expect(out.photos).toHaveLength(1);
     expect(out.messages).toEqual([
+      m.editor_route_photos_partial_added({ success: 1, total: 3, failed: 2 }),
       m.editor_route_photo_unsupported_type({ count: 1, s: "" }),
       m.editor_route_photo_too_large_single(),
     ]);
   });
 
+  it("a coded error from the doc append is an unknown rejection, not a store reason", async () => {
+    hooks.appendFailsOn.add(1);
+    hooks.appendCode = "TOO_LARGE";
+    const out = await pick(["a.jpg", "b.jpg"]);
+    expect(out.messages).toEqual([m.editor_route_photos_partial_added({ success: 1, total: 2, failed: 1 })]);
+    expect(out.messages).not.toContain(m.editor_route_photo_too_large_single());
+    expect(out.deleted).toHaveLength(1);
+  });
+
+  it("CONTROL - the same code from the store itself is explained", async () => {
+    const out = await pick(["bad.jpg", "b.jpg"]);
+    expect(out.messages).toContain(m.editor_route_photo_too_large_single());
+  });
+
   it("keeps the generic count for an unknown rejection without exposing its message", async () => {
     const out = await pick(["bad.jpg", "ok.jpg"], { rejectCode: "UNRECOGNIZED" });
-    expect(out.messages).toEqual([m.editor_route_photos_rejected({ count: 1, s: "" })]);
+    expect(out.messages).toEqual([m.editor_route_photos_partial_added({ success: 1, total: 2, failed: 1 })]);
     expect(out.messages.join(" ")).not.toContain("private path");
   });
 });

@@ -365,7 +365,7 @@ describe('offline package archive listing', () => {
             const read = timed(() => readPackageEntry(bomb, 'yjs/insp-1.bin', 200 * 1024));
             expect(read.value).toBeNull();
             expect(read.ms, 'abandoned as soon as it passes its declaration').toBeLessThan(inflateAll / FASTER_BY);
-        }, 15_000);
+        });
 
         it('still reads a legitimate entry that compresses about 1000:1 (declared size equals actual size)', () => {
             const zeros = new Uint8Array(MIB);
