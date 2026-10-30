@@ -91,6 +91,14 @@ describe("photos kept on the device", () => {
     expect(out.sent.filter((x) => x.variant === "info")).toEqual([]);
   });
 
+  it("a known oversized upload shows its fixed reason instead of a generic count", async () => {
+    const out = await commitBurst([{ ok: false, error: "TOO_LARGE" }]);
+    const tooLarge = m.editor_route_photo_too_large_single();
+    expect(out.messages).toContain(tooLarge);
+    expect(out.messages).not.toContain(m.editor_route_photos_partial_upload({ success: 0, total: 1, failed: 1 }));
+    expect(out.variantOf(tooLarge)).toBe("error");
+  });
+
   it("CONTROL - a clean batch shows only the success notice", async () => {
     const out = await commitBurst([{ ok: true, key: "k1" }, { ok: true, key: "k2" }]);
     expect(out.variantOf(m.editor_route_photos_added({ count: 2, s: "s", toDefect: "" }))).toBe("success");

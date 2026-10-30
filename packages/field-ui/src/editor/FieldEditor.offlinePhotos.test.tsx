@@ -143,7 +143,7 @@ describe("offline photo batch with a rejecting store", () => {
     expect(out.photos).toHaveLength(2);
     expect(out.photos.every((p) => p.pendingUpload === true)).toBe(true);
     expect(out.photos.map((p) => p.pendingId).sort()).toEqual(out.stored.map((r) => r.pendingId).sort());
-    expect(out.sent).toEqual([expect.objectContaining({ message: m.editor_route_photo_too_large({ count: 1, s: "" }), variant: "error" })]);
+    expect(out.sent).toEqual([expect.objectContaining({ message: m.editor_route_photo_too_large_single(), variant: "error" })]);
     expect(out.messages.join(" ")).not.toContain("private path");
     expect(out.messages).not.toContain(m.editor_route_save_failed());
   });
@@ -172,7 +172,7 @@ describe("offline photo batch with a rejecting store", () => {
     expect(out.stored).toHaveLength(19);
     expect(out.photos).toHaveLength(19);
     expect(out.messages).toHaveLength(2);
-    expect(out.messages).toContain(m.editor_route_photo_too_large({ count: 1, s: "" }));
+    expect(out.messages).toContain(m.editor_route_photo_too_large_single());
     expect(out.messages).toContain(m.editor_route_photos_batch_capped());
   });
 });
@@ -212,7 +212,7 @@ describe("offline photo batch when the doc append throws after the store", () =>
     expect(out.photos).toHaveLength(1);
     expect(out.messages).toEqual([
       m.editor_route_photo_unsupported_type({ count: 1, s: "" }),
-      m.editor_route_photo_too_large({ count: 1, s: "" }),
+      m.editor_route_photo_too_large_single(),
     ]);
   });
 

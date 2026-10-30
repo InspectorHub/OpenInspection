@@ -85,7 +85,7 @@ export interface MediaFileResult {
   index: number;
   ok: boolean;
   key?: string;
-  /** `NO_KEY`, `HTTP_<status>` or `EXCEPTION`. */
+  /** A fixed host code such as `TOO_LARGE`, `NO_KEY`, `HTTP_<status>` or `EXCEPTION`; never render arbitrary values. */
   error?: string;
   /** The upload failed but the host kept the bytes on the device (see `MediaUploader`): not a lost photo. */
   kept?: boolean;

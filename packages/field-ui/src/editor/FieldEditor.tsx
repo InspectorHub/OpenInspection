@@ -28,7 +28,7 @@ import { usePresence } from "../hooks/usePresence";
 import { useResultsDoc } from "../collab/use-results-doc";
 import { useMediaDrain } from "../hooks/useMediaDrain";
 import { addOfflinePhotos } from "../collab/offline-photo-batch";
-import { offlinePhotoRejectionMessages } from "./offline-photo-rejection-messages";
+import { offlinePhotoRejectionMessages, onlinePhotoRejectionMessages } from "./photo-rejection-messages";
 import { useResultsProjection } from "../hooks/useResultsProjection";
 import { useSpeedRating } from "../hooks/useSpeedRating";
 import { SectionRail } from "../components/editor-shared/SectionRail";
@@ -1132,7 +1132,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  }
  if (keptCount > 0) notify(m.editor_route_photos_kept({ count: keptCount, s: keptCount === 1 ? "" : "s" }), "info", { durationMs: 6000 });
  if (failCount > 0) {
- notify(m.editor_route_photos_partial_upload({ success: successCount, total: total - keptCount, failed: failCount }), "error", { durationMs: 8000 });
+ for (const message of onlinePhotoRejectionMessages(d.results)) notify(message, "error", { durationMs: 8000 });
  } else if (successCount > 0) {
  notify(
  m.editor_route_photos_added({ count: successCount, s: successCount === 1 ? "" : "s", toDefect: d.targetType === "defect" ? " to defect" : "" }),

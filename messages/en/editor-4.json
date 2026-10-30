@@ -10,6 +10,7 @@
   "editor_route_photos_rejected": "{count} photo{s} could not be added.",
   "editor_route_photo_unsupported_type": "{count} photo{s} could not be added because only JPEG, PNG and HEIC photos are supported.",
   "editor_route_photo_too_large": "{count} photo{s} could not be added because each exceeds the 10 MB limit.",
+  "editor_route_photo_too_large_single": "This photo is larger than 10 MB and cannot be uploaded.",
   "editor_route_photo_not_converted": "A photo could not be converted and was skipped. {reason}",
   "editor_read_only": "This inspection is read-only.",
   "editor_route_photo_upload_failed": "Photo upload failed — your photo did NOT reach the server.",
