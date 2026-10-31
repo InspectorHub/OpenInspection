@@ -15,6 +15,7 @@
 
 import type * as Y from 'yjs';
 import { findingKey } from '../shared/finding-key';
+import { orderPhotoBatch as docOrderPhotoBatch, type BatchPhotoName } from '../shared/photo-batch-order';
 import { cloneByScope } from '../shared/findings-shared';
 import type {
     AttachedRepairItem,
@@ -123,6 +124,8 @@ export interface CollabFindingsApi {
         target: { kind: 'canned' | 'custom'; id: string },
         photoKey: string,
     ) => void;
+    /** Put an upload batch's photos on the item back in selection order; see `orderPhotoBatch` in shared/photo-batch-order. */
+    orderPhotoBatch: (itemId: string, selection: ReadonlyArray<BatchPhotoName>) => void;
     getPhotoCount: (itemId: string) => number;
     addCustomDefect: (sectionId: string, itemId: string, defect: CustomCommentEntry) => void;
     toggleCustomDefect: (sectionId: string, itemId: string, customId: string, included: boolean) => void;
@@ -294,6 +297,12 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         setDirty(true);
     };
 
+    const orderPhotoBatch = (itemId: string, selection: ReadonlyArray<BatchPhotoName>): void => {
+        const sid = sectionIdForItem(itemId);
+        if (!sid) return;
+        docOrderPhotoBatch(doc, findingKey(unit, sid, itemId), selection);
+    };
+
     // Mirrors the legacy read: count `photos` on the resolved entry.
     const getPhotoCount = (itemId: string): number => {
         const r = getResult(itemId);
@@ -356,6 +365,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         batchSetRating,
         addPhotoToItem,
         addPhotoToDefect,
+        orderPhotoBatch,
         getPhotoCount,
         addCustomDefect,
         toggleCustomDefect,

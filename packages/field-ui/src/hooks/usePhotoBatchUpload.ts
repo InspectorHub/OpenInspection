@@ -29,6 +29,8 @@ interface PhotoBatchOutcome {
   ok: boolean;
   keys: string[];
   results: MediaFileResult[];
+  /** The pending id each file was handed to the uploader with, by selection index (the id of the entry a host writes when it keeps the file). */
+  pendingIds: string[];
   /**
    * A file failed for a reason that may pass (connection, server error) and was not kept: the change is not saved. A file the host
    * permanently refused does NOT count, because there is nothing left to save; it is announced with its own reason instead.
@@ -116,6 +118,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
     const uploader = dataSourceRef.current.media.uploader(inspectionRef.current, docRef.current);
     const meta = metaOf(batch);
     const results: MediaFileResult[] = new Array<MediaFileResult>(batch.files.length);
+    const pendingIds: string[] = new Array<string>(batch.files.length).fill('');
     let next = 0;
     const worker = async (): Promise<void> => {
       for (;;) {
@@ -130,6 +133,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
           createdAt: Date.now(),
           meta,
         };
+        pendingIds[index] = rec.pendingId;
         try {
           // The same check the server and the pending store apply: a file it would refuse never leaves the device, and
           // is answered with the same fixed code a server refusal carries (so the existing wording announces it once).
@@ -153,6 +157,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
       ok: batch.files.length > 0 && batch.itemId !== '' && results.every((r) => r.ok || r.kept === true),
       keys,
       results,
+      pendingIds,
       unsaved: batch.files.length === 0 || batch.itemId === '' || results.some((r) => !r.ok && r.kept !== true && r.permanent !== true),
       itemId: batch.itemId,
       targetType: batch.target === null ? 'item' : 'defect',
@@ -176,6 +181,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
             ok: false,
             keys: [],
             results: batch.files.map((_, index) => ({ index, ok: false, error: 'EXCEPTION' })),
+            pendingIds: batch.files.map(() => ''),
             unsaved: true,
             itemId: batch.itemId,
             targetType: batch.target === null ? 'item' : 'defect',
