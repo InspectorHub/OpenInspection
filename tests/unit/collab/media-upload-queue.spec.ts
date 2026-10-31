@@ -13,6 +13,7 @@ import type { PendingMediaRecord, PendingMediaStore } from '@core/field-ui/media
 import {
     enqueueMedia,
     drainMediaQueue,
+    PermanentUploadError,
     type MediaUploader,
     type UploadResult,
 } from '@core/field-ui/collab/media-upload-queue';
@@ -270,5 +271,49 @@ describe('media-upload-queue', () => {
         await enqueueMedia(store, makeRecord());
         const third = await drainMediaQueue({ ...deps, uploader: okUploader().uploader });
         expect(third.uploaded).toBe(1);
+    });
+    describe('a permanent rejection', () => {
+        it('is reported once, dropped from the queue and never uploaded again; transient failures and the rest of the queue are unaffected', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'REFUSED' }));
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 2, pendingId: 'FLAKY' }));
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 3, pendingId: 'OK' }));
+            const calls: string[] = [];
+            const uploader: MediaUploader = {
+                upload: async (rec) => {
+                    calls.push(rec.pendingId);
+                    if (rec.pendingId === 'REFUSED') throw new PermanentUploadError('UNSUPPORTED_TYPE');
+                    if (rec.pendingId === 'FLAKY') throw new Error('upload failed: 503');
+                    return { key: `r2/${rec.pendingId}` };
+                },
+            };
+            const rejected: Array<{ id: string; reason: string }> = [];
+            const deps = {
+                inspectionId: 'insp-1', store, uploader,
+                onUploaded: () => { /* noop */ },
+                onRejected: (rec: PendingMediaRecord, reason: string) => { rejected.push({ id: rec.pendingId, reason }); },
+            };
+            expect(await drainMediaQueue(deps)).toEqual({ uploaded: 1, failed: 1 });
+            expect(rejected).toEqual([{ id: 'REFUSED', reason: 'UNSUPPORTED_TYPE' }]);
+            expect([...store.rows.keys()]).toEqual(['FLAKY']);
+            // The next drain retries only the transient one.
+            calls.length = 0;
+            expect(await drainMediaQueue(deps)).toEqual({ uploaded: 0, failed: 1 });
+            expect(calls).toEqual(['FLAKY']);
+            expect(rejected).toHaveLength(1);
+        });
+
+        it('stays out of the retry loop even when its local copy cannot be deleted', async () => {
+            const rec = makeRecord({ inspectionId: 'insp-1', pendingId: 'STUCK' });
+            await enqueueMedia(store, rec);
+            const stubborn: PendingMediaStore = { ...store, delete: async () => { throw new Error('idb locked'); } };
+            const calls: string[] = [];
+            const uploader: MediaUploader = { upload: async (r) => { calls.push(r.pendingId); throw new PermanentUploadError('TOO_LARGE'); } };
+            const rejected: string[] = [];
+            const deps = { inspectionId: 'insp-1', store: stubborn, uploader, onUploaded: () => { /* noop */ }, onRejected: (r: PendingMediaRecord) => { rejected.push(r.pendingId); } };
+            await drainMediaQueue(deps);
+            await drainMediaQueue(deps);
+            expect(calls).toEqual(['STUCK']);
+            expect(rejected).toEqual(['STUCK']);
+        });
     });
 });

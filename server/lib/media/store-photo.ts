@@ -1,8 +1,9 @@
 import { Errors } from '../errors';
 import { stripExifOnIngest, type ImagesBinding } from './strip-exif';
 import { headBytes, sniffPhotoType } from './sniff';
+import { MAX_PHOTO_BYTES } from '@core/field-ui/shared/photo-limits';
 
-export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+export { MAX_PHOTO_BYTES };
 
 /** Content types a signed photo upload may declare, and the key extension each one is stored under. */
 export const SIGNED_PHOTO_EXT = {
@@ -48,7 +49,7 @@ export function isSignedPhotoExt(ext: string | undefined): ext is string {
 async function sniffedPhotoType(file: Blob): Promise<keyof typeof SIGNED_PHOTO_EXT> {
     assertPhotoSize(file.size); // an oversized body is a 413 whatever it contains
     const type = sniffPhotoType(await headBytes(file));
-    if (type === null) throw Errors.BadRequest('Photo is not a jpeg, png or heic image');
+    if (type === null) throw Errors.UnsupportedPhotoType('Photo is not a jpeg, png or heic image');
     return type;
 }
 

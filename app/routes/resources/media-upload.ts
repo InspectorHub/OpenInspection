@@ -13,7 +13,7 @@
  *
  * The answer keeps the API's `{ data: { key | croppedKey | annotatedKey } }`
  * shape, which is what the web uploader reads. An upstream failure comes back
- * with the upstream status so the drain leaves the record queued. Nothing is
+ * with the upstream status (and the API's stable error code, when it sent one). Nothing is
  * forwarded without a session or without the ids the endpoint addresses by.
  */
 import type { Route } from "./+types/media-upload";
@@ -21,8 +21,8 @@ import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { isPathSegment } from "~/lib/path-segment";
 
-function fail(status: number, error: string): Response {
-    return Response.json({ error }, { status });
+function fail(status: number, error: string, code?: string): Response {
+    return Response.json(code ? { error, code } : { error }, { status });
 }
 
 function text(fd: FormData, name: string): string {
@@ -92,9 +92,19 @@ export async function action({ request, context }: Route.ActionArgs): Promise<Re
     }
 }
 
-/** Hand the API's answer back: its status, and its `data` object when it succeeded. */
+/** The stable machine-readable code of the API's error envelope (`{ error: { code } }`), when it has one. */
+async function upstreamCode(res: { json: () => Promise<unknown> }): Promise<string | undefined> {
+    const body = (await res.json().catch(() => null)) as { error?: { code?: unknown } } | null;
+    const code = body?.error?.code;
+    return typeof code === "string" && code !== "" ? code : undefined;
+}
+
+/**
+ * Hand the API's answer back: its status, and its `data` object when it succeeded. A failure keeps the API's status and
+ * its stable error code (never its message), so the browser can tell an unsupported file type from any other 400.
+ */
 async function relay(res: { ok: boolean; status: number; json: () => Promise<unknown> }): Promise<Response> {
-    if (!res.ok) return fail(res.status, `Upstream answered ${res.status}`);
+    if (!res.ok) return fail(res.status, `Upstream answered ${res.status}`, await upstreamCode(res));
     const body = (await res.json().catch(() => null)) as { data?: unknown } | null;
     return Response.json({ data: body?.data ?? null }, { status: 200 });
 }

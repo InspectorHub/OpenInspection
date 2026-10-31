@@ -89,6 +89,8 @@ export interface MediaFileResult {
   error?: string;
   /** The upload failed but the host kept the bytes on the device (see `MediaUploader`): not a lost photo. */
   kept?: boolean;
+  /** The host refused the file itself (see `MediaUploader`): nothing is waiting to be saved, so it is not a failed save. */
+  permanent?: boolean;
 }
 
 /**
@@ -107,10 +109,11 @@ export interface MediaFileResult {
  * - `kind: 'crop'`: `key` is the derived `croppedKey`.
  * - `kind: 'annotate'`: `key` is the derived `annotatedKey`.
  *
- * Failure is `{ ok: false, error }` and never a throw. A host that stored the bytes on the device and wrote the
+ * Failure is `{ ok: false, error }` and never a throw. `permanent: true` says the host will refuse these very bytes every time
+ * (the server rejected the file itself, not the connection): the offline drain then stops retrying the queued record. A host that stored the bytes on the device and wrote the
  * pending entry itself (see `appendPendingPhoto`) adds `kept: true`: the photo is not lost and uploads later, so the
  * editor counts it as saved on the device instead of as a failure.
  */
 export interface MediaUploader {
-  upload(rec: PendingMediaRecord): Promise<{ ok: true; key: string; result?: MediaFileResult } | { ok: false; error: string; kept?: true }>;
+  upload(rec: PendingMediaRecord): Promise<{ ok: true; key: string; result?: MediaFileResult } | { ok: false; error: string; kept?: true; permanent?: true }>;
 }

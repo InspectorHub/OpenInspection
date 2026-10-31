@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { m } from "../../i18n";
 
 /**
@@ -20,8 +21,16 @@ export interface MobileDrawerTriggersProps {
  * mobile.
  */
 export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerTriggersProps) {
+    // While this nav is on screen the document carries `data-mobile-nav`; theme.css lifts the floating notices
+    // (`--ih-toast-bottom`) above the nav so they never cover its labels.
+    useEffect(() => {
+        document.documentElement.setAttribute('data-mobile-nav', '');
+        return () => {
+            document.documentElement.removeAttribute('data-mobile-nav');
+        };
+    }, []);
     return (
-        <nav aria-label={m.editor_mobile_nav_label()} className="fixed left-0 right-0 bottom-0 z-30 h-[calc(3.5rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] bg-ih-bg-card border-t border-ih-border flex">
+        <nav aria-label={m.editor_mobile_nav_label()} className="fixed left-0 right-0 bottom-0 z-30 h-[var(--ih-mobile-nav-h)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] bg-ih-bg-card border-t border-ih-border flex">
             {([
                 { id: 'sections', label: m.editor_mobile_drawer_sections(), icon: '☰' },
                 { id: 'items',    label: m.editor_mobile_drawer_items(),    icon: '≣' },

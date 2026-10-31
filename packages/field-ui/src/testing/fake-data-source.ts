@@ -81,7 +81,7 @@ export interface FakeDataSource extends FieldDataSource {
   /** Every `media.uploader(...).upload` call, in call order. `hadDoc` is whether a results document was passed. */
   readonly uploads: readonly { inspectionId: string; rec: PendingMediaRecord; hadDoc: boolean }[];
   /** Make every later upload answer `{ ok: false, error }`. */
-  failUpload(error: string): void;
+  failUpload(error: string, opts?: { permanent?: boolean }): void;
   /**
    * Make every later command of this type answer `{ ok: false, error }`. A response
    * registered with `respondWith` for the same command still rides along as `data`,
@@ -230,7 +230,7 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
   const purged: string[] = [];
   const notifications: { message: string; variant: NotifyVariant | undefined; durationMs?: number; action?: { label: string; run: () => void } }[] = [];
   const uploads: { inspectionId: string; rec: PendingMediaRecord; hadDoc: boolean }[] = [];
-  let uploadFailure: string | null = null;
+  let uploadFailure: { error: string; permanent: boolean } | null = null;
   const failures = new Map<FieldCommand['type'], string>();
   const responses = new Map<string, unknown>();
   const records = new Map<string, PendingMediaRecord>();
@@ -255,8 +255,8 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
     get uploads() {
       return uploads;
     },
-    failUpload(error) {
-      uploadFailure = error;
+    failUpload(error, opts) {
+      uploadFailure = { error, permanent: opts?.permanent === true };
     },
     get reloadCount() {
       return reloadCount;
@@ -378,7 +378,7 @@ export function createFakeDataSource(seed: FakeSeed): FakeDataSource {
       uploader: (inspectionId, doc) => ({
         upload: async (rec) => {
           uploads.push({ inspectionId, rec, hadDoc: doc !== null });
-          return uploadFailure === null ? { ok: true, key: `uploaded/${rec.pendingId}` } : { ok: false, error: uploadFailure };
+          return uploadFailure === null ? { ok: true, key: `uploaded/${rec.pendingId}` } : { ok: false, error: uploadFailure.error, ...(uploadFailure.permanent ? { permanent: true as const } : {}) };
         },
       }),
     },

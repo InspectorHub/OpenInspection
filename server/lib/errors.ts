@@ -111,6 +111,9 @@ export enum ErrorCode {
     ROLE_CEILING = 'ROLE_CEILING',
     // A manager tried to change their own permission overrides.
     SELF_PERMISSION_CHANGE = 'SELF_PERMISSION_CHANGE',
+    // A photo upload whose bytes are not a jpeg, png or heic image (400). A code of its own so a client can
+    // tell this refusal from every other 400 without reading the message.
+    UNSUPPORTED_PHOTO_TYPE = 'UNSUPPORTED_PHOTO_TYPE',
 }
 
 /**
@@ -134,6 +137,7 @@ export class AppError extends Error {
  */
 export const Errors = {
     BadRequest: (msg: string, details?: unknown) => new AppError(400, ErrorCode.BAD_REQUEST, msg, details),
+    UnsupportedPhotoType: (msg: string) => new AppError(400, ErrorCode.UNSUPPORTED_PHOTO_TYPE, msg),
     Unauthorized: (msg: string = 'Unauthorized access') => new AppError(401, ErrorCode.UNAUTHORIZED, msg),
     Forbidden: (msg: string = 'Action forbidden', details?: unknown) => new AppError(403, ErrorCode.FORBIDDEN, msg, details),
     FinancialRequired: (field: string, capability: MoneyBucket) =>

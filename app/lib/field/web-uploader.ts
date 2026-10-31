@@ -46,21 +46,50 @@ function uploadSignal(): AbortSignal | undefined {
     return controller.signal;
 }
 
-async function post(fd: FormData): Promise<{ ok: boolean; status: number; body: { data?: Record<string, string | undefined> } | null }> {
+interface MediaAnswer {
+    ok: boolean;
+    status: number;
+    body: { data?: Record<string, string | undefined> } | null;
+    /** The stable error code the route relays from the API; undefined on success or when there is none. */
+    code: string | undefined;
+}
+
+async function post(fd: FormData): Promise<MediaAnswer> {
     const signal = uploadSignal();
     const res = await fetch(MEDIA_UPLOAD_ENDPOINT, { method: "POST", credentials: "include", body: fd, ...(signal ? { signal } : {}) });
-    const body = res.ok
-        ? ((await res.json().catch(() => null)) as { data?: Record<string, string | undefined> } | null)
-        : null;
-    return { ok: res.ok, status: res.status, body };
+    if (res.ok) {
+        return { ok: true, status: res.status, body: (await res.json().catch(() => null)) as { data?: Record<string, string | undefined> } | null, code: undefined };
+    }
+    const failure = (await res.json().catch(() => null)) as { code?: unknown } | null;
+    return { ok: false, status: res.status, body: null, code: typeof failure?.code === "string" ? failure.code : undefined };
 }
 
 /**
- * Stable reason code for an oversized photo. The media route relays the API's status unchanged and its body carries no
- * code of its own, so the status is the only signal: 413 is the one that means "too large". Other statuses (a 400 included)
- * stay generic on purpose; nothing distinguishes an unsupported type from any other bad request.
+ * An answer the server gave about the BYTES themselves: it will give the same answer every time, so a queued copy must
+ * not be retried and is dropped. Deleting a photo taken in the field is irreversible, so the set is deliberately small:
+ * 413 and the coded unsupported type are handled by name below, and 415 is the only other status that judges the file.
+ * A plain 400 is NOT here: the same status also carries 'Storage not available' and 'itemId is required', which are about
+ * the moment or the request, so the photo stays queued and is retried. 422, auth (401/403), rate limit (429), timeouts
+ * and 5xx are not about the bytes either.
+ */
+const PERMANENT_STATUSES: ReadonlySet<number> = new Set([415]);
+
+/** A failed upload; `permanent` is set when retrying the same bytes cannot succeed. */
+class UploadRefused extends Error {
+    constructor(message: string, readonly permanent: boolean) {
+        super(message);
+        this.name = "UploadRefused";
+    }
+}
+
+/**
+ * Stable reason codes for a refused photo. 413 is the status that means "too large". An unsupported file type is a 400
+ * like several others, so it is told apart ONLY by the stable code the media route relays from the API
+ * (`UNSUPPORTED_PHOTO_TYPE`), never by message text. Every other status or code stays generic.
  */
 const TOO_LARGE = "TOO_LARGE";
+const UNSUPPORTED_TYPE = "UNSUPPORTED_TYPE";
+const API_UNSUPPORTED_PHOTO_TYPE = "UNSUPPORTED_PHOTO_TYPE";
 
 /** `doc` is null when the host has no results document yet; a crop or annotation then fails, a photo does not need one. */
 export function createWebUploader(inspectionId: string, doc: Y.Doc | null): MediaUploader {
@@ -74,8 +103,9 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
             if (rec.kind === "photo") {
                 fd.append("file", new File([rec.blob], "photo.jpg", { type: rec.blob.type || "image/jpeg" }));
                 const res = await post(fd);
-                if (res.status === 413) throw new Error(TOO_LARGE);
-                if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+                if (res.status === 413) throw new UploadRefused(TOO_LARGE, true);
+                if (res.status === 400 && res.code === API_UNSUPPORTED_PHOTO_TYPE) throw new UploadRefused(UNSUPPORTED_TYPE, true);
+                if (!res.ok) throw new UploadRefused(`upload failed: ${res.status}`, PERMANENT_STATUSES.has(res.status));
                 const key = res.body?.data?.key;
                 if (!key) throw new Error("upload returned no key");
                 return { key };
@@ -123,7 +153,10 @@ export function createWebMediaUploader(inspectionId: string, doc: Y.Doc | null):
                 const key = rec.kind === "photo" ? result.key : rec.kind === "crop" ? result.croppedKey : result.annotatedKey;
                 return key ? { ok: true as const, key } : { ok: false as const, error: "upload returned no key" };
             } catch (err) {
-                return { ok: false as const, error: err instanceof Error && err.message ? err.message : "upload failed" };
+                const error = err instanceof Error && err.message ? err.message : "upload failed";
+                return err instanceof UploadRefused && err.permanent && rec.kind === "photo"
+                    ? { ok: false as const, error, permanent: true as const }
+                    : { ok: false as const, error };
             }
         },
     };

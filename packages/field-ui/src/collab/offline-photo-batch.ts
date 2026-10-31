@@ -20,7 +20,7 @@ export interface OfflinePhotoTarget {
     itemId:       string;
 }
 
-export type OfflinePhotoRejectionReason = 'unsupportedType' | 'tooLarge';
+type OfflinePhotoRejectionReason = 'unsupportedType' | 'tooLarge';
 
 export interface OfflinePhotoBatchResult {
     rejected: number;

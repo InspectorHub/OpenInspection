@@ -23,7 +23,7 @@ function batch(over: Partial<PhotoBatch> = {}): PhotoBatch {
 function parkedSource() {
   const fake = createFakeDataSource({ data: createEmptyEditorData() });
   const started: PendingMediaRecord[] = [];
-  const settle: Array<(r: { ok: true; key: string } | { ok: false; error: string; kept?: true }) => void> = [];
+  const settle: Array<(r: { ok: true; key: string } | { ok: false; error: string; kept?: true; permanent?: true }) => void> = [];
   const uploader: MediaUploader = {
     upload: (rec) =>
       new Promise((resolve) => {
@@ -259,6 +259,36 @@ describe('usePhotoBatchUpload', () => {
     const [out] = latest.outcomes;
     expect(out.results[0]).not.toHaveProperty('kept');
     expect(out.ok).toBe(false);
+    expect(latest.failedSinceIdle).toBe(true);
+  });
+
+  it('a permanent rejection (unsupported type, too large) is carried into the result but is not a failed save of the period', async () => {
+    const { ds, settle } = parkedSource();
+    mount(ds);
+    act(() => latest.submit(batch({ files: [file('a'), file('b'), file('c')] })));
+    await flush();
+    await act(async () => {
+      settle[0]({ ok: true, key: 'k1' });
+      settle[1]({ ok: false, error: 'UNSUPPORTED_TYPE', permanent: true });
+      settle[2]({ ok: false, error: 'TOO_LARGE', permanent: true });
+    });
+    await flush();
+    const [out] = latest.outcomes;
+    expect(out.results[1]).toMatchObject({ ok: false, error: 'UNSUPPORTED_TYPE', permanent: true });
+    expect(out.keys).toEqual(['k1']);
+    expect(latest.failedSinceIdle).toBe(false);
+  });
+
+  it('CONTROL - a permanent rejection next to a transient failure still fails the period, and a transient one alone does', async () => {
+    const { ds, settle } = parkedSource();
+    mount(ds);
+    act(() => latest.submit(batch({ files: [file('a'), file('b')] })));
+    await flush();
+    await act(async () => {
+      settle[0]({ ok: false, error: 'TOO_LARGE', permanent: true });
+      settle[1]({ ok: false, error: 'upload failed: 503' });
+    });
+    await flush();
     expect(latest.failedSinceIdle).toBe(true);
   });
 

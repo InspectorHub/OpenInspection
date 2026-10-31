@@ -13,6 +13,12 @@
 import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach } from "vitest";
 import type { PendingMediaRecord } from "@core/field-ui/media-types";
+import { addOfflinePhotos } from "@core/field-ui/collab/offline-photo-batch";
+import { offlinePhotoRejectionMessages } from "@core/field-ui/editor/photo-rejection-messages";
+import { projectResults, seedResultsDoc } from "@core/field-ui/shared/results-doc";
+import * as Y from "yjs";
+import { MAX_PHOTO_BYTES } from "../../../server/lib/media/store-photo";
+import { sniffPhotoType } from "../../../server/lib/media/sniff";
 import {
     webMediaStore,
     toStored,
@@ -65,12 +71,23 @@ async function rawGet(pendingId: string): Promise<Record<string, unknown> | unde
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const FK = "_default:s1:i1";
+/** The first bytes of a real jpeg: the store decides by these, never by the declared type. */
+const JPEG_HEAD = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+const PNG_HEAD = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+const ascii = (t: string): number[] => [...t].map((c) => c.charCodeAt(0));
+const HEIC_HEAD = new Uint8Array([0, 0, 0, 24, ...ascii("ftyp"), ...ascii("heic"), 0, 0, 0, 0, ...ascii("mif1")]);
+const AVIF_HEAD = new Uint8Array([0, 0, 0, 24, ...ascii("ftyp"), ...ascii("avif"), 0, 0, 0, 0, ...ascii("mif1")]);
+const TEXT_BYTES = new TextEncoder().encode("this is plain text, not a picture");
+
+function photoOf(pendingId: string, blob: Blob): PendingMediaRecord {
+    return { kind: "photo", pendingId, inspectionId: "insp-v", createdAt: 1, blob, meta: { targetType: "item", findingKey: FK, itemId: "i1" } };
+}
 const crop = { aspect: "3:2", orientation: "landscape" as const, x: 1, y: 2, width: 30, height: 20 };
 
 function photo(pendingId: string, inspectionId = "insp-1", createdAt = 1): PendingMediaRecord {
     return {
         kind: "photo", pendingId, inspectionId, createdAt,
-        blob: new Blob([pendingId], { type: "image/jpeg" }),
+        blob: new Blob([JPEG_HEAD, pendingId], { type: "image/jpeg" }),
         meta: { targetType: "item", findingKey: FK, itemId: "i1" },
     };
 }
@@ -196,7 +213,7 @@ describe("web media store: PendingMediaStore behaviour", () => {
 
     it("put rejects for a defect photo, which the stored shape cannot address", async () => {
         const rec: PendingMediaRecord = {
-            kind: "photo", pendingId: "defect-1", inspectionId: "i", createdAt: 1, blob: new Blob(["d"]),
+            kind: "photo", pendingId: "defect-1", inspectionId: "i", createdAt: 1, blob: new Blob([JPEG_HEAD]),
             meta: { targetType: "defect", findingKey: FK, itemId: "i1", customId: "c1", defectKind: "custom" },
         };
         await expect(webMediaStore.put(rec)).rejects.toThrow("defect");
@@ -205,5 +222,75 @@ describe("web media store: PendingMediaStore behaviour", () => {
 
     it("objectUrl is null for an absent record", async () => {
         expect(await webMediaStore.objectUrl("nope")).toBeNull();
+    });
+});
+
+describe("web media store: put refuses a photo the server would permanently refuse", () => {
+    const rejection = async (rec: PendingMediaRecord) => {
+        try {
+            await webMediaStore.put(rec);
+        } catch (error) {
+            return error as { code?: string };
+        }
+        return null;
+    };
+
+    it("a text file named photo.jpg and declared image/jpeg is refused with UNSUPPORTED_TYPE and stores nothing", async () => {
+        const file = new File([TEXT_BYTES], "photo.jpg", { type: "image/jpeg" });
+        expect((await rejection(photoOf("txt-1", file)))?.code).toBe("UNSUPPORTED_TYPE");
+        expect(await webMediaStore.get("txt-1")).toBeNull();
+        expect(await webMediaStore.list("insp-v")).toEqual([]);
+    });
+
+    it.each([["jpeg", JPEG_HEAD], ["png", PNG_HEAD], ["heic", HEIC_HEAD]] as const)("CONTROL - real %s bytes are stored, whatever they are declared as", async (name, head) => {
+        for (const type of ["", "application/octet-stream", "text/plain"]) {
+            const id = `ok-${name}-${type.length}`;
+            await webMediaStore.put(photoOf(id, new File([head], "x.bin", { type })));
+            expect(await webMediaStore.get(id), id).not.toBeNull();
+        }
+    });
+
+    it("AVIF and an empty body are refused: the server stores neither", async () => {
+        expect((await rejection(photoOf("avif-1", new Blob([AVIF_HEAD], { type: "image/jpeg" }))))?.code).toBe("UNSUPPORTED_TYPE");
+        expect((await rejection(photoOf("empty-1", new Blob([], { type: "image/jpeg" }))))?.code).toBe("UNSUPPORTED_TYPE");
+        expect(await webMediaStore.list("insp-v")).toEqual([]);
+    });
+
+    it("one byte over the server's photo ceiling is refused with TOO_LARGE; exactly the ceiling is stored", async () => {
+        const over = new Blob([JPEG_HEAD, new Uint8Array(MAX_PHOTO_BYTES + 1 - JPEG_HEAD.length)]);
+        expect(over.size).toBe(MAX_PHOTO_BYTES + 1);
+        expect((await rejection(photoOf("big-1", over)))?.code).toBe("TOO_LARGE");
+        expect(await webMediaStore.get("big-1")).toBeNull();
+        const exact = new Blob([JPEG_HEAD, new Uint8Array(MAX_PHOTO_BYTES - JPEG_HEAD.length)]);
+        expect(exact.size).toBe(MAX_PHOTO_BYTES);
+        await webMediaStore.put(photoOf("big-2", exact));
+        expect(await webMediaStore.get("big-2")).not.toBeNull();
+    });
+
+    it("the web store applies the SERVER's rules: the same ceiling and the same sniffer (executable coupling)", async () => {
+        expect(MAX_PHOTO_BYTES).toBe(10 * 1024 * 1024);
+        // The sniffer the store reads is the server's: what it accepts, the server stores.
+        for (const head of [JPEG_HEAD, PNG_HEAD, HEIC_HEAD]) expect(sniffPhotoType(head)).not.toBeNull();
+        for (const head of [AVIF_HEAD, TEXT_BYTES]) expect(sniffPhotoType(head)).toBeNull();
+        const bigServerLimit = new Blob([JPEG_HEAD, new Uint8Array(MAX_PHOTO_BYTES - JPEG_HEAD.length + 1)]);
+        expect((await rejection(photoOf("couple-1", bigServerLimit)))?.code).toBe("TOO_LARGE");
+    });
+
+    it("an offline batch through the real batch path: rejected files get the fixed reasons and the stored count is kept", async () => {
+        const doc = new Y.Doc();
+        seedResultsDoc(doc, [{ findingKey: FK }]);
+        const big = new Blob([JPEG_HEAD, new Uint8Array(MAX_PHOTO_BYTES)], { type: "image/jpeg" });
+        const files = [
+            new File([JPEG_HEAD, "a"], "ok.jpg", { type: "image/jpeg" }),
+            new File([TEXT_BYTES], "fake.jpg", { type: "image/jpeg" }),
+            big,
+            new File([HEIC_HEAD], "phone.heic", { type: "" }),
+        ];
+        const result = await addOfflinePhotos(webMediaStore, doc, { inspectionId: "insp-b", findingKey: FK, itemId: "i1" }, files);
+        expect(result).toEqual({ rejected: 2, reasons: { unsupportedType: 1, tooLarge: 1 } });
+        const entries = (projectResults(doc)[FK]?.photos ?? []) as unknown[];
+        expect(entries).toHaveLength(2);
+        expect(await webMediaStore.list("insp-b")).toHaveLength(2);
+        expect(offlinePhotoRejectionMessages(result, files.length).length).toBe(3); // summary + one sentence per reason
     });
 });

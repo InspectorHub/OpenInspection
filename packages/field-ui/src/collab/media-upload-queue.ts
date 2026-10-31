@@ -44,6 +44,19 @@ export interface MediaUploader {
     upload(rec: PendingMediaRecord): Promise<UploadResult>;
 }
 
+/**
+ * Thrown by an uploader when the host refused these very bytes and will refuse them every time (an unsupported file,
+ * an oversized one). The drain then stops retrying the record: it reports it through `onRejected` and removes it. The
+ * message is the host's fixed reason code (for example `TOO_LARGE`). A network failure or a 5xx is NOT this: it stays an
+ * ordinary rejection and the record is retried on the next drain.
+ */
+export class PermanentUploadError extends Error {
+    constructor(reason: string) {
+        super(reason);
+        this.name = 'PermanentUploadError';
+    }
+}
+
 export interface DrainDeps {
     inspectionId: string;
     /** Where the pending records live. */
@@ -62,6 +75,12 @@ export interface DrainDeps {
      * record again). Optional: the host decides whether to log it.
      */
     onCleanupFailed?: (rec: PendingMediaRecord, error: unknown) => void;
+    /**
+     * Called once for a record whose upload failed with a `PermanentUploadError` (`reason` is its message), after
+     * which the record is deleted and never uploaded again. The caller removes the matching pending doc entry and
+     * tells the person. Such a record is not counted in `failed`.
+     */
+    onRejected?: (rec: PendingMediaRecord, reason: string) => void;
 }
 
 export interface DrainSummary {
@@ -86,6 +105,9 @@ const draining = new Set<string>();
  * longer says "pending", and the swap that resolves it is a no-op on an already resolved entry.
  */
 const swapped = new Set<string>();
+
+/** Records the host permanently refused whose local delete failed: reported already, never uploaded again. */
+const refused = new Set<string>();
 
 // ─── Public API ─────────────────────────────────────────────────────────────────
 
@@ -125,24 +147,33 @@ export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
         // Oldest first, whatever order the store happens to list in.
         const pending = [...(await store.list(inspectionId))].sort((a, b) => a.createdAt - b.createdAt);
         for (const rec of pending) {
-            if (!swapped.has(rec.pendingId)) {
-                let result: UploadResult;
+            if (!swapped.has(rec.pendingId) && !refused.has(rec.pendingId)) {
+                let result: UploadResult | undefined;
                 try {
                     result = await uploader.upload(rec);
-                } catch {
-                    // Upload failed — leave the record queued for the next drain.
-                    failed += 1;
-                    continue;
+                } catch (error) {
+                    if (error instanceof PermanentUploadError) {
+                        // The host will never accept these bytes: report once, then stop carrying them.
+                        refused.add(rec.pendingId);
+                        deps.onRejected?.(rec, error.message);
+                    } else {
+                        // Upload failed — leave the record queued for the next drain.
+                        failed += 1;
+                        continue;
+                    }
                 }
-                // Upload succeeded — swap the doc entry, then drop the local blob.
-                onUploaded(rec, result);
-                swapped.add(rec.pendingId);
-                uploaded += 1;
+                if (result) {
+                    // Upload succeeded — swap the doc entry, then drop the local blob.
+                    onUploaded(rec, result);
+                    swapped.add(rec.pendingId);
+                    uploaded += 1;
+                }
             }
             // A failed cleanup must not wedge the drain: the next drain re-attempts the delete only.
             try {
                 await store.delete(rec.pendingId);
                 swapped.delete(rec.pendingId);
+                refused.delete(rec.pendingId);
             } catch (error) {
                 deps.onCleanupFailed?.(rec, error);
             }

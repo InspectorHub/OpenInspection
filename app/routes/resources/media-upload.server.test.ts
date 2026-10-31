@@ -227,6 +227,21 @@ describe("media-upload relay: upstream failures", () => {
         expect(res.status).toBe(403);
     });
 
+    it("passes the API's stable error code through, and a different 400 carries its own code", async () => {
+        uploadPost.mockResolvedValue(json({ success: false, error: { message: "Photo is not a jpeg, png or heic image", code: "UNSUPPORTED_PHOTO_TYPE" } }, 400));
+        const refused = await post({ kind: "photo", inspectionId: "insp-1", itemId: "i1", file: jpeg });
+        expect(refused.status).toBe(400);
+        expect(await refused.json()).toEqual({ error: "Upstream answered 400", code: "UNSUPPORTED_PHOTO_TYPE" });
+        // CONTROL: another 400 relays its own code, never the photo-type one.
+        uploadPost.mockResolvedValue(json({ success: false, error: { message: "Validation failed", code: "validation_error" } }, 400));
+        const other = await post({ kind: "photo", inspectionId: "insp-1", itemId: "i1", file: jpeg });
+        expect(await other.json()).toEqual({ error: "Upstream answered 400", code: "validation_error" });
+        // CONTROL: an answer with no readable envelope has no code at all.
+        uploadPost.mockResolvedValue(new Response("<html>nope</html>", { status: 400 }));
+        const bare = await post({ kind: "photo", inspectionId: "insp-1", itemId: "i1", file: jpeg });
+        expect(await bare.json()).toEqual({ error: "Upstream answered 400" });
+    });
+
     it("a thrown upstream call answers 502, never 200", async () => {
         cropPost.mockRejectedValue(new Error("network"));
         const res = await post({ kind: "crop", inspectionId: "insp-1", itemId: "i1", photoIndex: "0", crop: "{}", image: jpeg });

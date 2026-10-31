@@ -201,7 +201,7 @@ describe("phone ergonomics", () => {
     const root = header.parentElement as HTMLElement;
     expect(root.className).toContain("min-h-dvh");
     expect(root.className).not.toContain("min-h-screen");
-    expect(root.className).toContain("pb-[calc(3.5rem+env(safe-area-inset-bottom))]");
+    expect(root.className).toContain("pb-[var(--ih-mobile-nav-h)]");
     const nav = (await itemsTab()).closest("nav") as HTMLElement;
     expect(nav.className).toContain("pb-[env(safe-area-inset-bottom)]");
   });

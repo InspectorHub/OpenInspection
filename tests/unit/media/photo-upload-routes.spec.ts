@@ -40,6 +40,24 @@ describe('photo upload routes decide the type from the bytes (real app)', () => 
         expect(u.r2.store.size).toBe(1);
     });
 
+    it.each(Object.keys(ROUTES) as (keyof typeof ROUTES)[])('%s: a refused file type answers the stable code UNSUPPORTED_PHOTO_TYPE, and another 400 does not', async (name) => {
+        u = await createUploadHarness();
+        const { path, field, extra } = ROUTES[name];
+        const refused = await u.call(path, { method: 'POST', body: form(field, 'image/jpeg', HTML_BYTES, extra) });
+        expect(refused.status).toBe(400);
+        const refusedBody = (await refused.json()) as { success: boolean; error: { code: string } };
+        expect(refusedBody.success).toBe(false);
+        expect(refusedBody.error.code).toBe('UNSUPPORTED_PHOTO_TYPE');
+        // Control: a different 400 (the form has no file at all) carries some other code.
+        const noFile = await u.call(path, { method: 'POST', body: form('other', 'image/jpeg', JPEG_BYTES, extra) });
+        expect(noFile.status).toBe(400);
+        const noFileBody = (await noFile.json()) as { error: { code: string } };
+        expect(noFileBody.error.code).not.toBe('UNSUPPORTED_PHOTO_TYPE');
+        // Control: the same route still stores a real photo.
+        const ok = await u.call(path, { method: 'POST', body: form(field, 'image/jpeg', JPEG_BYTES, extra) });
+        expect(ok.status).toBe(200);
+    });
+
     it.each(Object.keys(ROUTES) as (keyof typeof ROUTES)[])('%s: a png declared as jpeg is stored as png, an untyped heic as heic', async (name) => {
         u = await createUploadHarness();
         const { path, field, extra } = ROUTES[name];

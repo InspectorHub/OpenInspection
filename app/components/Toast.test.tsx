@@ -26,4 +26,15 @@ describe('ToastPortal', () => {
     const card = getByText('Save failed').parentElement as HTMLElement;
     expect(card.className).toContain('border-l-ih-bad');
   });
+
+  it('sits at the shared notice offset: 1rem by default (desktop), lifted above the bottom nav only when the stylesheet sets the variable', () => {
+    const { getByText } = render(<ToastPortal />);
+    act(() => {
+      pushToast({ message: 'Where am I', variant: 'error', durationMs: 10_000 });
+    });
+    const stack = getByText('Where am I').parentElement?.parentElement as HTMLElement;
+    expect(stack.className).toContain('bottom-[var(--ih-toast-bottom,1rem)]');
+    // CONTROL: the old fixed offset is gone, so nothing pins the stack at 1rem under a phone nav.
+    expect(stack.className).not.toMatch(/(^|\s)bottom-4(\s|$)/);
+  });
 });

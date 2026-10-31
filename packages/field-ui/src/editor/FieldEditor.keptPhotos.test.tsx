@@ -30,7 +30,7 @@ afterEach(() => {
   localStorage.removeItem(ORIGINAL_QUALITY_KEY);
 });
 
-type Answer = { ok: true; key: string } | { ok: false; error: string; kept?: true };
+type Answer = { ok: true; key: string } | { ok: false; error: string; kept?: true; permanent?: true };
 
 /** A phone editor whose uploader answers the files of one burst in order; returns what the editor announced. */
 async function commitBurst(answers: Answer[]) {
@@ -97,6 +97,22 @@ describe("photos kept on the device", () => {
     expect(out.messages).toContain(tooLarge);
     expect(out.messages).not.toContain(m.editor_route_photos_partial_upload({ success: 0, total: 1, failed: 1 }));
     expect(out.variantOf(tooLarge)).toBe("error");
+  });
+
+  it("a permanently refused photo is explained with its fixed reason and is never reported as a failed document save", async () => {
+    const out = await commitBurst([{ ok: true, key: "k1" }, { ok: false, error: "UNSUPPORTED_TYPE", permanent: true }, { ok: false, error: "TOO_LARGE", permanent: true }]);
+    expect(out.messages).toContain(m.editor_route_photos_partial_upload({ success: 1, total: 3, failed: 2 }));
+    expect(out.messages).toContain(m.editor_route_photo_unsupported_type({ count: 1, s: "" }));
+    expect(out.messages).toContain(m.editor_route_photo_too_large_single());
+    expect(out.messages).not.toContain(m.editor_route_save_failed());
+    // The header is not left in the red Error state either.
+    expect(document.querySelector('[data-testid="save-status"][data-status="error"]')).toBeNull();
+  });
+
+  it("CONTROL - the same refusal next to a transient failure still raises the save-failed message", async () => {
+    const out = await commitBurst([{ ok: false, error: "TOO_LARGE", permanent: true }, { ok: false, error: "upload failed: 503" }]);
+    expect(out.messages).toContain(m.editor_route_save_failed());
+    expect(document.querySelector('[data-testid="save-status"][data-status="error"]')).not.toBeNull();
   });
 
   it("a mixed batch with a known reason still reports how many photos uploaded", async () => {

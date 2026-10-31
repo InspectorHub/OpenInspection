@@ -18,6 +18,7 @@ import { FieldDataSourceProvider } from '../context';
 import type { MediaUploader } from '../media-types';
 import { appendPhoto, projectResults, seedResultsDoc } from '../shared/results-doc';
 import { createEmptyEditorData, createFakeDataSource, type FakeDataSource } from '../testing/fake-data-source';
+import { m } from '../i18n';
 import { useMediaDrain } from './useMediaDrain';
 
 afterEach(cleanup);
@@ -79,6 +80,52 @@ describe('useMediaDrain', () => {
     await settle();
     expect(await ds.media.store.list(inspectionId)).toEqual([]);
     expect(keysOf(doc!)).toEqual(['retry/p1']);
+  });
+
+  it('a permanent rejection is reported with the fixed reason, dropped from the doc and the queue, and never retried', async () => {
+    const { ds, doc, hook, inspectionId, revoked } = setup();
+    await queue(ds, inspectionId, doc!, 'bad', 1);
+    await queue(ds, inspectionId, doc!, 'good', 2);
+    ds.media.uploader = () => ({
+      upload: async (rec) => (rec.pendingId === 'bad'
+        ? { ok: false, error: 'UNSUPPORTED_TYPE', permanent: true as const }
+        : { ok: true, key: `uploaded/${rec.pendingId}` }),
+    });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(await ds.media.store.list(inspectionId)).toEqual([]);
+    // Only the accepted photo is left in the doc; the refused one has no pending tile any more.
+    expect(keysOf(doc!)).toEqual(['uploaded/good']);
+    expect(revoked.sort()).toEqual(['bad', 'good']);
+    expect(ds.notifications.map((n) => [n.message, n.variant])).toEqual([
+      [m.editor_route_photos_partial_upload({ success: 1, total: 2, failed: 1 }), 'error'],
+      [m.editor_route_photo_unsupported_type({ count: 1, s: '' }), 'error'],
+    ]);
+    const attempts = ds.uploads.length;
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.uploads.length).toBe(attempts);
+  });
+
+  it('a refusal never raises the document save-failed message', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    await queue(ds, inspectionId, doc!, 'big', 1);
+    ds.failUpload('TOO_LARGE', { permanent: true });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.notifications.some((n) => n.message === m.editor_route_save_failed())).toBe(false);
+    expect(ds.notifications.map((n) => n.message)).toContain(m.editor_route_photo_too_large_single());
+  });
+
+  it('CONTROL - a transient failure (no permanent flag) stays queued, keeps its pending tile and says nothing', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    await queue(ds, inspectionId, doc!, 'p1', 1);
+    ds.failUpload('upload failed: 503');
+    act(() => hook.result.current.drain());
+    await settle();
+    expect((await ds.media.store.list(inspectionId)).map((r) => r.pendingId)).toEqual(['p1']);
+    expect(keysOf(doc!)).toEqual(['']);
+    expect(ds.notifications).toEqual([]);
   });
 
   it('maps the uploaded key onto the field of the record kind (crop -> croppedKey)', async () => {

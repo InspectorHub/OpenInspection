@@ -221,12 +221,49 @@ describe("createWebMediaUploader: the package contract (answers, never throws)",
     it("answers the stable TOO_LARGE code for an HTTP 413 from the media route", async () => {
         const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
         fetchMock.mockResolvedValue(jsonResponse({ error: "Upstream answered 413" }, 413));
-        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "TOO_LARGE" });
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "TOO_LARGE", permanent: true });
     });
 
-    it("CONTROL - 400, 500 and 503 keep the 'upload failed: <status>' text, and a 200 still succeeds", async () => {
+    it("a 413 is a permanent rejection, a 5xx or 429 is not", async () => {
         const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
-        for (const status of [400, 500, 503]) {
+        fetchMock.mockResolvedValue(jsonResponse({ error: "Upstream answered 413" }, 413));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "TOO_LARGE", permanent: true });
+        for (const status of [429, 500, 502, 503, 401]) {
+            fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, status));
+            expect(await up.upload(photoRec()), String(status)).toEqual({ ok: false, error: `upload failed: ${status}` });
+        }
+    });
+
+    it("answers the stable UNSUPPORTED_TYPE code for the route's UNSUPPORTED_PHOTO_TYPE answer", async () => {
+        const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+        fetchMock.mockResolvedValue(jsonResponse({ error: "Upstream answered 400", code: "UNSUPPORTED_PHOTO_TYPE" }, 400));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "UNSUPPORTED_TYPE", permanent: true });
+    });
+
+    it("an unrecognised 400 is NOT a permanent rejection: the queued photo must be kept and retried", async () => {
+        // The same status carries 'Storage not available' and 'itemId is required' as well as a refused file, and the first
+        // is about the moment. Deleting a photo taken in the field for that would be silent data loss.
+        const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+        for (const body of [{ error: "Upstream answered 400" }, { error: "Upstream answered 400", code: "validation_error" }]) {
+            fetchMock.mockResolvedValue(jsonResponse(body, 400));
+            expect(await up.upload(photoRec())).toEqual({ ok: false, error: "upload failed: 400" });
+        }
+        fetchMock.mockResolvedValue(new Response("<html>", { status: 400 }));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "upload failed: 400" });
+        // 422 judges the request, not the bytes, so it is not a reason to delete the photo either.
+        fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, 422));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "upload failed: 422" });
+    });
+
+    it("CONTROL - only a refusal of the bytes is permanent: 413, 415 and the coded unsupported type; 500 and 503 keep their text, a 200 still succeeds", async () => {
+        const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+        fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, 415));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "upload failed: 415", permanent: true });
+        fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, 413));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "TOO_LARGE", permanent: true });
+        fetchMock.mockResolvedValue(jsonResponse({ error: "Upstream answered 400", code: "UNSUPPORTED_PHOTO_TYPE" }, 400));
+        expect(await up.upload(photoRec())).toEqual({ ok: false, error: "UNSUPPORTED_TYPE", permanent: true });
+        for (const status of [500, 503, 429, 401]) {
             fetchMock.mockResolvedValue(jsonResponse({ error: "no" }, status));
             expect(await up.upload(photoRec())).toEqual({ ok: false, error: `upload failed: ${status}` });
         }
@@ -246,6 +283,32 @@ describe("createWebMediaUploader: the package contract (answers, never throws)",
 });
 
 describe("a mixed batch through the real web uploader result shape", () => {
+    it("turns an unsupported type into the fixed sentence next to the uploaded count, and a 413 into the too-large one", async () => {
+        const answers: Array<[number, unknown]> = [
+            [200, { data: { key: "k1" } }],
+            [400, { error: "Upstream answered 400", code: "UNSUPPORTED_PHOTO_TYPE" }],
+            [413, { error: "Upstream answered 413" }],
+            [400, { error: "Upstream answered 400", code: "validation_error" }],
+        ];
+        let call = 0;
+        fetchMock.mockImplementation(async () => {
+            const [status, body] = answers[call++] ?? [500, {}];
+            return jsonResponse(body, status);
+        });
+        const up = createWebMediaUploader("insp-1", null);
+        const results: MediaFileResult[] = [];
+        for (let i = 0; i < 4; i++) {
+            const r = await up.upload(photoRec());
+            results.push(r.ok ? { index: i, ok: true, key: r.key } : { index: i, ok: false, error: r.error });
+        }
+        expect(results.map((r) => r.error)).toEqual([undefined, "UNSUPPORTED_TYPE", "TOO_LARGE", "upload failed: 400"]);
+        expect(onlinePhotoRejectionMessages(results)).toEqual([
+            m.editor_route_photos_partial_upload({ success: 1, total: 4, failed: 3 }),
+            m.editor_route_photo_unsupported_type({ count: 1, s: "" }),
+            m.editor_route_photo_too_large_single(),
+        ]);
+    });
+
     it("turns a 413 into the fixed too-large sentence next to the uploaded count", async () => {
         const statuses = [200, 200, 200, 413];
         let call = 0;

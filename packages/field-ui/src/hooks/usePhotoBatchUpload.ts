@@ -28,6 +28,11 @@ interface PhotoBatchOutcome {
   ok: boolean;
   keys: string[];
   results: MediaFileResult[];
+  /**
+   * A file failed for a reason that may pass (connection, server error) and was not kept: the change is not saved. A file the host
+   * permanently refused does NOT count, because there is nothing left to save; it is announced with its own reason instead.
+   */
+  unsaved: boolean;
   itemId: string;
   targetType: 'item' | 'defect';
   customId: string;
@@ -43,7 +48,7 @@ export interface PhotoBatchUploader {
    */
   outcomes: readonly PhotoBatchOutcome[];
   /**
-   * True when any batch of the current busy period failed (some file was neither stored nor kept on the device), however many batches
+   * True when any batch of the current busy period failed (some file was neither stored, kept on the device nor permanently refused), however many batches
    * followed it and whether or not their outcomes were already consumed. A new period starts when a batch is
    * submitted while none is out. Read it when `busy` falls to false to decide between "saved" and "error".
    */
@@ -128,7 +133,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
           const out = await uploader.upload(rec);
           results[index] = out.ok
             ? { index, ok: true, key: out.key }
-            : { index, ok: false, error: out.error, ...(out.kept === true ? { kept: true } : {}) };
+            : { index, ok: false, error: out.error, ...(out.kept === true ? { kept: true } : {}), ...(out.permanent === true ? { permanent: true } : {}) };
         } catch {
           results[index] = { index, ok: false, error: 'EXCEPTION' };
         }
@@ -140,6 +145,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
       ok: batch.files.length > 0 && batch.itemId !== '' && results.every((r) => r.ok || r.kept === true),
       keys,
       results,
+      unsaved: batch.files.length === 0 || batch.itemId === '' || results.some((r) => !r.ok && r.kept !== true && r.permanent !== true),
       itemId: batch.itemId,
       targetType: batch.target === null ? 'item' : 'defect',
       customId: batch.target?.id ?? '',
@@ -162,6 +168,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
             ok: false,
             keys: [],
             results: batch.files.map((_, index) => ({ index, ok: false, error: 'EXCEPTION' })),
+            unsaved: true,
             itemId: batch.itemId,
             targetType: batch.target === null ? 'item' : 'defect',
             customId: batch.target?.id ?? '',
@@ -171,7 +178,7 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
         pendingRef.current -= 1;
         // After unmount nothing is rendered, so there is nothing to attach the keys to; the files stay stored.
         if (!mounted.current) return;
-        if (!outcome.ok) setFailedSinceIdle(true);
+        if (outcome.unsaved) setFailedSinceIdle(true);
         setOutcomes((prev) => [...prev, outcome]);
         setPending((n) => n - 1);
       });

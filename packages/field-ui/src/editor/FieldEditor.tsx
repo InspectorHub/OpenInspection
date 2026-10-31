@@ -1976,7 +1976,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  return (
  <>
  {overlaysEl}
- <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+ <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[var(--ih-mobile-nav-h)]">
  <AppBar
  platform={dataSource.platform}
  {...appBarTitles}
