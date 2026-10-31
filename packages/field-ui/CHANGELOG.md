@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.2](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.6.1...field-ui-v0.6.2) (2026-10-31)
+
+
+### Bug Fixes
+
+* **field-ui:** order the pending photos of a batch where every file was kept ([1b8d8cb](https://github.com/InspectorHub/OpenInspection/commit/1b8d8cbdbedc60647ea947aaf58af48bd0dbc90c))
+* **field-ui:** order the pending photos of a batch where every file was kept ([b406061](https://github.com/InspectorHub/OpenInspection/commit/b406061cf08e367a25a65255292f083878c4867c))
+
 ## [0.6.1](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.6.0...field-ui-v0.6.1) (2026-10-31)
 
 
