@@ -23,6 +23,7 @@ import { useEditorCapabilities } from "../hooks/useEditorCapabilities";
 import { useHostActions } from "../hooks/useHostActions";
 import { unsavedChangesAtRisk } from "../hooks/unsaved-changes-risk";
 import { usePhotoBatchUpload } from "../hooks/usePhotoBatchUpload";
+import { attachPhotoBatch } from "../hooks/attachPhotoBatch";
 import { useReportCoverWrites } from "../hooks/useReportCoverWrites";
 import { usePresence } from "../hooks/usePresence";
 import { useResultsDoc } from "../collab/use-results-doc";
@@ -1107,19 +1108,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  for (const d of settled) {
  // Attach every successful key exactly as before — unchanged regardless of
  // whether the submission was a single file or a batch.
- if (d.keys.length && d.itemId) {
- for (const k of d.keys) {
- if (d.targetType === "defect" && d.customId) {
- findings.addPhotoToDefect(
- d.itemId,
- { kind: d.defectKind, id: d.customId },
- k,
- );
- } else {
- findings.addPhotoToItem(d.itemId, k);
- }
- }
- }
+ attachPhotoBatch(findings, d);
  // results[] reports how many files of a large selection made it. Success and failure toasts are mutually
  // exclusive; a file the host kept on the device (kept) is neither: it gets a neutral toast of its own.
  const total = d.results.length;

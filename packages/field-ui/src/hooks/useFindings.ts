@@ -86,6 +86,7 @@ export function useFindings(
     batchSetRating: () => 0,
     addPhotoToItem: noop,
     addPhotoToDefect: noop,
+    orderPhotoBatch: noop,
     getPhotoCount: (itemId: string) => {
       const photos = getResult(itemId).photos as unknown[] | undefined;
       return Array.isArray(photos) ? photos.length : 0;

@@ -348,3 +348,20 @@ describe('usePhotoBatchUpload', () => {
     });
   });
 });
+
+describe('usePhotoBatchUpload pendingIds', () => {
+  it('hands each file its pending id and reports it by selection index, with a gap for a refused file', async () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    mount(fake);
+    const refused = new Blob([new Uint8Array([0x00, 0x01, 0x02, 0x03])], { type: 'text/plain' });
+    act(() => latest.submit(batch({ files: [file('a'), refused, file('c')] })));
+    await flush();
+    const [out] = latest.outcomes;
+    expect(out.results[1]).toMatchObject({ ok: false, permanent: true });
+    expect(out.pendingIds).toHaveLength(3);
+    expect(out.pendingIds[0]).toBe(fake.uploads[0].rec.pendingId);
+    expect(out.pendingIds[2]).toBe(fake.uploads[1].rec.pendingId);
+    expect(fake.uploads).toHaveLength(2);
+    expect(new Set(out.pendingIds).size).toBe(3);
+  });
+});
