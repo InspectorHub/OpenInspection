@@ -97,6 +97,8 @@
   "editor_photo_save_no_photo": "No se encuentra esta foto en la inspección, así que la edición no se guardó. Recargue la página e inténtelo de nuevo.",
   "editor_photo_save_no_document": "La inspección aún no está conectada, así que la edición no se guardó. Compruebe su conexión e inténtelo de nuevo.",
   "editor_photo_save_failed": "No se pudo guardar la edición de la foto. Inténtelo de nuevo.",
+  "editor_photo_save_too_large": "Esta edición supera el tamaño máximo de foto, así que no se guardó. La foto original no cambió.",
+  "editor_photo_save_unsupported_type": "Esta edición no es una imagen compatible, así que no se guardó. La foto original no cambió.",
   "editor_mobile_nav_label": "Navegación del editor",
   "editor_speedmode_undo_unavailable": "No se pudo deshacer la calificación porque la inspección no está conectada. Vuelva a establecerla desde el elemento.",
   "editor_collab_selected_version": "Versión seleccionada",

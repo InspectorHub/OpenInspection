@@ -97,6 +97,8 @@
   "editor_photo_save_no_photo": "This photo cannot be found in the inspection, so the edit was not saved. Reload the page and try again.",
   "editor_photo_save_no_document": "The inspection is not connected yet, so the edit was not saved. Check your connection and try again.",
   "editor_photo_save_failed": "The photo edit could not be saved. Try again.",
+  "editor_photo_save_too_large": "This edit is larger than the maximum photo size, so it was not saved. The original photo is unchanged.",
+  "editor_photo_save_unsupported_type": "This edit is not a supported image, so it was not saved. The original photo is unchanged.",
   "editor_mobile_nav_label": "Editor navigation",
   "editor_speedmode_undo_unavailable": "The rating could not be undone because the inspection is not connected. Set it again from the item.",
   "editor_collab_selected_version": "Selected version",

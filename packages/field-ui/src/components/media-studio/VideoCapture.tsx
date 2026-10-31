@@ -3,6 +3,7 @@ import { PENDING_CLASS, pendingProps, useActionLatch, useLayer } from "@core/sha
 import { useFieldDataSource } from "../../context";
 import type { VideoFinalizeInput } from "../../data-source-types";
 import { m } from "../../i18n";
+import { posterKeyIfAdmissible } from "./video-poster";
 
 /**
  * Plan 7 — video walk-through capture (pluggable backend: Stream or R2).
@@ -61,7 +62,8 @@ export function validateVideoFile(file: File): string | null {
 }
 
 export function VideoCapture({ inspectionId, provider, itemId, onClose, onUploaded }: VideoCaptureProps) {
-  const video = useFieldDataSource().resources.video;
+  const dataSource = useFieldDataSource();
+  const video = dataSource.resources.video;
   const inputRef = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>("pick");
   const [error, setError] = useState<string | null>(null);
@@ -115,8 +117,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
         try {
           const posterBlob = await grabFirstFrame(file);
           if (posterBlob) {
-            const poster = await video.uploadPoster(inspectionId, ticket, posterBlob);
-            if (poster.ok) posterKey = poster.data?.posterKey;
+            posterKey = await posterKeyIfAdmissible(posterBlob, () => video.uploadPoster(inspectionId, ticket, posterBlob), (message, variant) => dataSource.notify(message, variant));
           }
         } catch {
           // Non-fatal: poster grab failed (canvas blocked, browser quirk, etc.)

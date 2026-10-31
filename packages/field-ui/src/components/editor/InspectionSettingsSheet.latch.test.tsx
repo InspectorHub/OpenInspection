@@ -15,7 +15,7 @@ import { InspectionSettingsSheet } from "./InspectionSettingsSheet";
 vi.mock("../media-studio/CoverCropper", () => ({
   coverCropFor: () => null,
   CoverCropper: ({ onSave }: { onSave: (b: Blob, c: unknown) => void }) => (
-    <button type="button" data-testid="crop-save" onClick={() => onSave(new Blob(["x"]), { aspect: "1:1", orientation: "landscape", pixels: { x: 0, y: 0, width: 1, height: 1 } })}>save crop</button>
+    <button type="button" data-testid="crop-save" onClick={() => onSave(new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])]), { aspect: "1:1", orientation: "landscape", pixels: { x: 0, y: 0, width: 1, height: 1 } })}>save crop</button>
   ),
 }));
 
@@ -50,7 +50,7 @@ describe("InspectionSettingsSheet cover upload latch", () => {
 
     // Raw dispatch: fireEvent wraps each call in its own act(), which would flush between the two.
     const pick = (name: string) => {
-      Object.defineProperty(input, "files", { value: [new File(["x"], name, { type: "image/png" })], configurable: true });
+      Object.defineProperty(input, "files", { value: [new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], name, { type: "image/png" })], configurable: true });
       input.dispatchEvent(new Event("change", { bubbles: true }));
     };
     act(() => { pick("a.png"); pick("b.png"); });
@@ -132,7 +132,7 @@ describe("InspectionSettingsSheet save guard", () => {
     const fake = mount();
     await waitFor(() => expect(document.getElementById("inspection-settings-form")).not.toBeNull());
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    Object.defineProperty(input, "files", { value: [new File(["x"], "a.png", { type: "image/png" })], configurable: true });
+    Object.defineProperty(input, "files", { value: [new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], "a.png", { type: "image/png" })], configurable: true });
     act(() => {
       input.dispatchEvent(new Event("change", { bubbles: true }));
       submit();

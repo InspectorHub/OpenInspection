@@ -4,6 +4,8 @@ import { act, cleanup, render, screen } from '@testing-library/react';
 import { FieldDataSourceProvider } from '../context';
 import type { FieldDataSource, MediaUploader, PendingMediaRecord } from '../data-source';
 import { createEmptyEditorData, createFakeDataSource } from '../testing/fake-data-source';
+import { MAX_PHOTO_BYTES } from '../shared/photo-limits';
+import { onlinePhotoRejectionMessages } from '../editor/photo-rejection-messages';
 import { usePhotoBatchUpload } from './usePhotoBatchUpload';
 import type { PhotoBatch, PhotoBatchUploader } from './usePhotoBatchUpload';
 
@@ -11,8 +13,9 @@ afterEach(cleanup);
 
 const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
+/** A body the admission check accepts: a jpeg signature, then the name so the files differ. */
 function file(name: string): Blob {
-  return new Blob([name], { type: 'image/jpeg' });
+  return new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0]), name], { type: 'image/jpeg' });
 }
 
 function batch(over: Partial<PhotoBatch> = {}): PhotoBatch {
@@ -301,5 +304,47 @@ describe('usePhotoBatchUpload', () => {
     await flush();
     expect(latest.outcomes[0].ok).toBe(false);
     expect(latest.failedSinceIdle).toBe(true);
+  });
+
+  describe('admission before the file leaves the device', () => {
+    const tooLarge = () => new Blob([new Uint8Array(MAX_PHOTO_BYTES + 1)], { type: 'image/jpeg' });
+    const notAnImage = () => new Blob(['%PDF-1.7'], { type: 'image/jpeg' });
+
+    it('a file over the ceiling or not an image never reaches the uploader; its siblings still upload; the answer carries the existing codes', async () => {
+      const fake = createFakeDataSource({ data: createEmptyEditorData() });
+      mount(fake);
+      act(() => latest.submit(batch({ files: [file('a'), tooLarge(), notAnImage(), file('b')] })));
+      await flush();
+      expect(fake.uploads).toHaveLength(2);
+      const [out] = latest.outcomes;
+      expect(out.results.map((r) => [r.index, r.ok, r.ok ? undefined : r.error])).toEqual([
+        [0, true, undefined], [1, false, 'TOO_LARGE'], [2, false, 'UNSUPPORTED_TYPE'], [3, true, undefined],
+      ]);
+      expect(out.keys).toHaveLength(2);
+      // A refusal is permanent (nothing to retry) so the editor does not flag the batch as unsaved, exactly as for a server refusal.
+      expect(out.unsaved).toBe(false);
+      // The wording is the existing one: the codes map through onlinePhotoRejectionMessages and nothing is added.
+      expect(onlinePhotoRejectionMessages(out.results)).toHaveLength(3);
+    });
+
+    it('applies to a defect-targeted batch and to a single file (burst frames take the same path)', async () => {
+      const fake = createFakeDataSource({ data: createEmptyEditorData() });
+      mount(fake);
+      act(() => latest.submit(batch({ files: [notAnImage()], target: { kind: 'canned', id: 'd-1' } })));
+      await flush();
+      expect(fake.uploads).toEqual([]);
+      expect(latest.outcomes[0]).toMatchObject({ ok: false, targetType: 'defect', keys: [] });
+    });
+
+    it('CONTROL - a body exactly at the ceiling is uploaded', async () => {
+      const fake = createFakeDataSource({ data: createEmptyEditorData() });
+      mount(fake);
+      const atLimit = new Uint8Array(MAX_PHOTO_BYTES);
+      atLimit.set([0xff, 0xd8, 0xff, 0xe0]);
+      act(() => latest.submit(batch({ files: [new Blob([atLimit])] })));
+      await flush();
+      expect(fake.uploads).toHaveLength(1);
+      expect(latest.outcomes[0].ok).toBe(true);
+    });
   });
 });

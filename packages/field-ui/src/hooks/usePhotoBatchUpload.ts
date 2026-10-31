@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { useFieldDataSource } from '../context';
 import type { MediaFileResult, PendingMediaRecord, PhotoUploadMeta } from '../media-types';
+import { photoRefusal } from '../shared/photo-admission';
 
 /** The defect row an uploaded photo is pinned to instead of the item. */
 interface PhotoBatchTarget {
@@ -130,6 +131,13 @@ export function usePhotoBatchUpload(inspectionId: string, doc: Y.Doc | null): Ph
           meta,
         };
         try {
+          // The same check the server and the pending store apply: a file it would refuse never leaves the device, and
+          // is answered with the same fixed code a server refusal carries (so the existing wording announces it once).
+          const refusal = await photoRefusal(rec.blob);
+          if (refusal !== null) {
+            results[index] = { index, ok: false, error: refusal, permanent: true };
+            continue;
+          }
           const out = await uploader.upload(rec);
           results[index] = out.ok
             ? { index, ok: true, key: out.key }

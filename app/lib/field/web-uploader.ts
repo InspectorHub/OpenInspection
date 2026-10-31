@@ -84,6 +84,12 @@ const UNSUPPORTED_TYPE = "UNSUPPORTED_TYPE";
 const API_PHOTO_TOO_LARGE = "PHOTO_TOO_LARGE";
 const API_UNSUPPORTED_PHOTO_TYPE = "UNSUPPORTED_PHOTO_TYPE";
 
+/** Throws the permanent refusal when the answer is one of the two coded ones; any other answer returns and is handled by the caller. */
+function throwIfRefused(res: MediaAnswer): void {
+    if (res.status === 413 && res.code === API_PHOTO_TOO_LARGE) throw new UploadRefused(TOO_LARGE);
+    if (res.status === 400 && res.code === API_UNSUPPORTED_PHOTO_TYPE) throw new UploadRefused(UNSUPPORTED_TYPE);
+}
+
 /** `doc` is null when the host has no results document yet; a crop or annotation then fails, a photo does not need one. */
 export function createWebUploader(inspectionId: string, doc: Y.Doc | null): MediaUploader {
     return {
@@ -96,8 +102,7 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
             if (rec.kind === "photo") {
                 fd.append("file", new File([rec.blob], "photo.jpg", { type: rec.blob.type || "image/jpeg" }));
                 const res = await post(fd);
-                if (res.status === 413 && res.code === API_PHOTO_TOO_LARGE) throw new UploadRefused(TOO_LARGE);
-                if (res.status === 400 && res.code === API_UNSUPPORTED_PHOTO_TYPE) throw new UploadRefused(UNSUPPORTED_TYPE);
+                throwIfRefused(res);
                 if (!res.ok) throw new Error(`upload failed: ${res.status}`);
                 const key = res.body?.data?.key;
                 if (!key) throw new Error("upload returned no key");
@@ -115,6 +120,7 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
                 fd.append("image", new File([rec.blob], "cropped.jpg", { type: "image/jpeg" }));
                 fd.append("crop", JSON.stringify(rec.meta.crop));
                 const res = await post(fd);
+                throwIfRefused(res);
                 if (!res.ok) throw new Error(`crop failed: ${res.status}`);
                 const croppedKey = res.body?.data?.croppedKey;
                 if (!croppedKey) throw new Error("crop returned no croppedKey");
@@ -124,6 +130,7 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
             fd.append("image", new File([rec.blob], "annotated.png", { type: "image/png" }));
             fd.append("nodes", rec.meta.nodesJson);
             const res = await post(fd);
+            throwIfRefused(res);
             if (!res.ok) throw new Error(`annotation failed: ${res.status}`);
             const annotatedKey = res.body?.data?.annotatedKey;
             if (!annotatedKey) throw new Error("annotation returned no annotatedKey");
@@ -147,7 +154,7 @@ export function createWebMediaUploader(inspectionId: string, doc: Y.Doc | null):
                 return key ? { ok: true as const, key } : { ok: false as const, error: "upload returned no key" };
             } catch (err) {
                 const error = err instanceof Error && err.message ? err.message : "upload failed";
-                return err instanceof UploadRefused && rec.kind === "photo"
+                return err instanceof UploadRefused
                     ? { ok: false as const, error, permanent: true as const }
                     : { ok: false as const, error };
             }

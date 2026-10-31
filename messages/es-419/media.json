@@ -76,6 +76,7 @@
   "media_video_err_too_large": "El video es demasiado grande (máx. 200 MB).",
   "media_video_err_unexpected": "El servicio de video devolvió una respuesta inesperada. Inténtelo de nuevo.",
   "media_video_err_upload": "Falló la subida. Revise su conexión e inténtelo de nuevo.",
+  "media_video_poster_skipped": "El video se subió sin imagen de vista previa porque no se pudo usar la imagen.",
   "media_video_err_upload_status": "Falló la subida ({status}). Inténtelo de nuevo.",
   "media_video_privacy_before": "Este clip se almacena tal como se grabó. Los datos de ubicación incrustados en el archivo",
   "media_video_privacy_not": "no",

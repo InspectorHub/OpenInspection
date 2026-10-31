@@ -34,12 +34,12 @@ vi.mock("../components/media-studio/preprocessImage", () => ({
   preprocessImage: async (file: File) => {
     if (hooks.bakeFails.has(file.name)) throw new Error("CANVAS");
     hooks.baked.push(file.name);
-    return new File(["baked"], `baked-${file.name}`, { type: "image/jpeg" });
+    return new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], `baked-${file.name}`, { type: "image/jpeg" });
   },
 }));
 vi.mock("../components/editor/BurstCamera", () => ({
   BurstCamera: ({ onCommit }: { onCommit: (blobs: Blob[]) => void }) => (
-    <button data-testid="burst-commit" onClick={() => onCommit(Array.from({ length: hooks.frames }, () => new Blob(["frame"], { type: "image/jpeg" })))} />
+    <button data-testid="burst-commit" onClick={() => onCommit(Array.from({ length: hooks.frames }, () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], { type: "image/jpeg" })))} />
   ),
 }));
 
@@ -128,7 +128,7 @@ async function pick(names: string[], opts: Options = {}) {
   try {
     const { snapshot } = await mountEditor(opts);
     const input = document.querySelector('input[type="file"][multiple]') as HTMLInputElement;
-    fireEvent.change(input, { target: { files: names.map((n) => new File(["x"], n, { type: "image/jpeg" })) } });
+    fireEvent.change(input, { target: { files: names.map((n) => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], n, { type: "image/jpeg" })) } });
     await new Promise((r) => setTimeout(r, 150));
     return await snapshot(unhandled);
   } finally {
@@ -261,7 +261,7 @@ describe("a baking step that rejects falls back to the original file", () => {
     hooks.bakeFails.add("b.jpg");
     const { fake } = await mountEditor({ original: false, online: true });
     fireEvent.change(document.querySelector('input[type="file"][multiple]') as HTMLInputElement, {
-      target: { files: ["a.jpg", "b.jpg", "c.jpg"].map((n) => new File(["x"], n, { type: "image/jpeg" })) },
+      target: { files: ["a.jpg", "b.jpg", "c.jpg"].map((n) => new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], n, { type: "image/jpeg" })) },
     });
     await waitFor(() => expect(fake.uploads).toHaveLength(3));
     expect(fake.uploads.map((u) => nameOf(u.rec)).sort()).toEqual(["b.jpg", "baked-a.jpg", "baked-c.jpg"]);

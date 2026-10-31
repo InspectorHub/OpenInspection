@@ -15,7 +15,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type * as Y from 'yjs';
 import { drainMediaQueue, PermanentUploadError } from '../collab/media-upload-queue';
 import type { MediaUploader as DrainUploader, UploadResult } from '../collab/media-upload-queue';
-import { dropPendingPhoto } from '../collab/pending-photo-drop';
+import { clearPendingDerivative, dropPendingPhoto } from '../collab/pending-photo-drop';
 import { resolvePendingPhoto } from '../collab/results-binding';
 import { useFieldDataSource } from '../context';
 import { onlinePhotoRejectionMessages } from '../editor/photo-rejection-messages';
@@ -80,10 +80,14 @@ export function useMediaDrain(
             onRejected: (rec, reason) => {
                 // The host will never take these bytes: the tile goes, the local copy goes, and the person is told why.
                 // Only a brand-new photo has a tile of its own; a crop or annotation sits on a photo that stays, and its
-                // refusal is not a photo count. The outcome is recorded first so a throwing step below cannot hide it.
+                // refusal is not a photo count and is not announced (the editor checks the image before it queues one, so
+                // this is a fallback): only its pending marker goes. The outcome is recorded first so a throwing step
+                // below cannot hide it.
                 if (rec.kind === 'photo') {
                     outcomes.push({ index: outcomes.length, ok: false, error: reason });
                     dropPendingPhoto(liveDoc, rec.meta.findingKey, rec.pendingId);
+                } else {
+                    clearPendingDerivative(liveDoc, rec.meta.findingKey, rec.meta.photoKey, rec.pendingId);
                 }
                 revokeRef.current?.(rec.pendingId);
             },

@@ -11,13 +11,17 @@
  *  - a failed online bake changes nothing and says nothing;
  *  - a repeat while the first save is still in flight sends nothing (same frame included) and says so;
  *  - a save that cannot be addressed or has no live document sends nothing, shows nothing as saved and says so;
- *  - the viewer / studio urls come from `urls.photo`.
+ *  - the viewer / studio urls come from `urls.photo`;
+ *  - an image the server would refuse (over the ceiling, or not an image by its bytes) is refused BEFORE anything is
+ *    queued, sent or shown as saved, with a fixed sentence, online and offline; an admissible one still goes through.
  */
 import { createElement, type ReactNode } from 'react';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { FieldDataSourceProvider } from '../context';
+import { m } from '../i18n';
+import { MAX_PHOTO_BYTES } from '../shared/photo-limits';
 import type { MediaUploader, PendingMediaRecord } from '../media-types';
 import { appendPhoto, projectResults, seedResultsDoc } from '../shared/results-doc';
 import { createEmptyEditorData, createFakeDataSource, type FakeDataSource } from '../testing/fake-data-source';
@@ -70,7 +74,13 @@ function setup(opts: { withDoc?: boolean } = {}) {
 
 const photoOf = (doc: Y.Doc) => (projectResults(doc)[FK]?.photos ?? [])[0] as unknown as Record<string, unknown>;
 const target = { itemId: 'i1', photoIndex: 0, sectionId: 's1' };
-const blob = () => new Blob(['x'], { type: 'image/jpeg' });
+/** Bytes the admission check accepts: a jpeg signature. `size` pads the body (a few bytes by default). */
+const JPEG_HEAD = [0xff, 0xd8, 0xff, 0xe0];
+const blob = (size = JPEG_HEAD.length) => {
+  const bytes = new Uint8Array(size);
+  bytes.set(JPEG_HEAD);
+  return new Blob([bytes], { type: 'image/jpeg' });
+};
 const flush = () => act(async () => { await new Promise((r) => setTimeout(r, 10)); });
 
 /** An uploader whose answers the test settles by hand. */
@@ -104,12 +114,12 @@ describe('online crop', () => {
     expect(await ds.media.store.list()).toEqual([]);
   });
 
-  it('applies the optimistic edit at once, and a failed bake leaves the doc and the user alone', async () => {
+  it('applies the optimistic edit once the image is admitted, and a failed bake leaves the doc and the user alone', async () => {
     const { ds, doc, hook, ctx } = setup();
     ds.failUpload('HTTP_500');
     act(() => hook.result.current.performPhotoCropSave(target, blob(), CROP));
-    expect(ctx.state.setResults).toHaveBeenCalledTimes(1);
     await flush();
+    expect(ctx.state.setResults).toHaveBeenCalledTimes(1);
     expect(photoOf(doc!)).toEqual({ key: 'base.jpg', mediaType: 'photo' });
     expect(ds.notifications).toEqual([]);
   });
@@ -130,6 +140,7 @@ describe('online crop', () => {
       hook.result.current.performPhotoCropSave(target, blob(), CROP);
       hook.result.current.performPhotoCropSave(target, blob(), CROP);
     });
+    await flush();
     expect(held.calls).toHaveLength(1);
     // The dropped repeat did not apply a second optimistic edit either, and the user was told.
     expect(ctx.state.setResults).toHaveBeenCalledTimes(1);
@@ -140,10 +151,12 @@ describe('online crop', () => {
     ctx.findings.getResult = () => ({ photos: [{ key: 'base.jpg' }, { key: 'other.jpg' }] });
     hook.rerender();
     act(() => hook.result.current.performPhotoCropSave({ ...target, photoIndex: 1 }, blob(), CROP));
+    await flush();
     expect(held.calls).toHaveLength(2);
     await act(async () => { held.releases[0]!({ ok: false, error: 'x' }); held.releases[1]!({ ok: false, error: 'x' }); });
     await flush();
     act(() => hook.result.current.performPhotoCropSave(target, blob(), CROP));
+    await flush();
     expect(held.calls).toHaveLength(3);
   });
 
@@ -280,11 +293,13 @@ describe('annotation', () => {
       handled.push(hook.result.current.performPhotoAnnotationSave(target, blob(), '[]'));
     });
     expect(handled).toEqual([true, true]);
+    await flush();
     expect(held.calls).toHaveLength(1);
     expect(ds.notifications.map((n) => n.variant)).toEqual(['info']);
     await act(async () => { held.releases[0]!({ ok: true, key: 'a.png' }); });
     await flush();
     act(() => { hook.result.current.performPhotoAnnotationSave(target, blob(), '[]'); });
+    await flush();
     expect(held.calls).toHaveLength(2);
   });
 });
@@ -315,5 +330,65 @@ describe('urls and pending blobs', () => {
     hook.rerender();
     await flush();
     expect(hook.result.current.pendingPhotoUrl('p-1')).toBe('blob:fake/p-1');
+  });
+});
+
+describe('admission before enqueue or send', () => {
+  const tooLarge = () => blob(MAX_PHOTO_BYTES + 1);
+  const notAnImage = () => new Blob(['%PDF-1.7 not an image'], { type: 'image/jpeg' });
+  const refusals = [
+    ['over the size limit', tooLarge, () => m.editor_photo_save_too_large()],
+    ['not an image by its bytes', notAnImage, () => m.editor_photo_save_unsupported_type()],
+  ] as const;
+  const saves = [
+    ['crop', (h: ReturnType<typeof setup>['hook'], b: Blob) => { h.result.current.performPhotoCropSave(target, b, CROP); }],
+    ['annotation', (h: ReturnType<typeof setup>['hook'], b: Blob) => { h.result.current.performPhotoAnnotationSave(target, b, '[{"t":"rect"}]'); }],
+  ] as const;
+
+  for (const [saveName, save] of saves) {
+    for (const online of [true, false]) {
+      for (const [why, makeBlob, sentence] of refusals) {
+        it(`${saveName} ${online ? 'online' : 'offline'}: an image ${why} is refused with the fixed sentence and writes nothing`, async () => {
+          const { ds, doc, hook, ctx } = setup();
+          ds.setOnline(online);
+          const before = Y.encodeStateAsUpdate(doc!);
+          act(() => save(hook, makeBlob()));
+          await flush();
+          expect(ds.notifications.map((n) => [n.message, n.variant])).toEqual([[sentence(), 'error']]);
+          expect(ds.uploads).toEqual([]);
+          expect(await ds.media.store.list()).toEqual([]);
+          expect(ctx.state.setResults).not.toHaveBeenCalled();
+          expect(photoOf(doc!)).toEqual({ key: 'base.jpg', mediaType: 'photo' });
+          expect(Y.encodeStateAsUpdate(doc!)).toEqual(before);
+          // The refusal released the photo: the next, admissible save is not held back by it.
+          const told = ds.notifications.length;
+          act(() => save(hook, blob()));
+          await flush();
+          expect(ds.notifications.slice(told)).toEqual([]);
+          expect(online ? ds.uploads : await ds.media.store.list()).toHaveLength(1);
+        });
+      }
+    }
+  }
+
+  it('CONTROL - an admissible png is accepted for an annotation, online and offline', async () => {
+    const png = () => new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], { type: 'image/png' });
+    const online = setup();
+    act(() => { online.hook.result.current.performPhotoAnnotationSave(target, png(), '[]'); });
+    await flush();
+    expect(online.ds.uploads).toHaveLength(1);
+    const offline = setup();
+    offline.ds.setOnline(false);
+    act(() => { offline.hook.result.current.performPhotoAnnotationSave(target, png(), '[]'); });
+    await flush();
+    expect(await offline.ds.media.store.list()).toHaveLength(1);
+  });
+
+  it('CONTROL - a body exactly at the ceiling is admitted', async () => {
+    const { ds, hook } = setup();
+    act(() => hook.result.current.performPhotoCropSave(target, blob(MAX_PHOTO_BYTES), CROP));
+    await flush();
+    expect(ds.notifications).toEqual([]);
+    expect(ds.uploads).toHaveLength(1);
   });
 });

@@ -18,7 +18,7 @@ vi.mock("../components/editor/BurstCamera", () => ({
   BurstCamera: ({ onCommit }: { onCommit: (blobs: Blob[]) => void }) => (
     <button
       data-testid="burst-commit"
-      onClick={() => onCommit(Array.from({ length: frames.count }, () => new Blob(["frame"], { type: "image/jpeg" })))}
+      onClick={() => onCommit(Array.from({ length: frames.count }, () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], { type: "image/jpeg" })))}
     />
   ),
 }));

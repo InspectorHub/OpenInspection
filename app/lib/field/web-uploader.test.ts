@@ -362,3 +362,24 @@ describe("a mixed batch through the real web uploader result shape", () => {
         ]);
     });
 });
+
+describe("a crop or annotation the server refuses by size is permanent too", () => {
+    const records = [["crop", cropRec], ["annotation", annotRec]] as const;
+
+    for (const [name, make] of records) {
+        it(`${name}: a 413 carrying PHOTO_TOO_LARGE is the permanent TOO_LARGE refusal`, async () => {
+            const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+            fetchMock.mockResolvedValue(jsonResponse({ error: "Upstream answered 413", code: "PHOTO_TOO_LARGE" }, 413));
+            expect(await up.upload(make())).toEqual({ ok: false, error: "TOO_LARGE", permanent: true });
+        });
+
+        it(`${name}: CONTROL - a plain 413, a 400 without the type code and a 5xx stay retryable`, async () => {
+            const up = createWebMediaUploader("insp-1", docWithPhotos("r2/base.jpg"));
+            const failed = name === "crop" ? "crop failed" : "annotation failed";
+            for (const [status, body] of [[413, { error: "x" }], [400, { error: "x" }], [500, { error: "x" }]] as const) {
+                fetchMock.mockResolvedValue(jsonResponse(body, status));
+                expect(await up.upload(make()), String(status)).toEqual({ ok: false, error: `${failed}: ${status}` });
+            }
+        });
+    }
+});

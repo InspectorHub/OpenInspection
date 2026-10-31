@@ -7,6 +7,9 @@ import { ORIGINAL_QUALITY_KEY } from "../../shared/original-quality";
 import { isIgnored, useFieldCommand, useFieldDataSource } from "../../context";
 import type { CoverPhotoOption, ReportProfileOption, SettingsSheetData, TemplateSummary } from "../../data-source-types";
 import { m } from "../../i18n";
+import { photoRefusal } from "../../shared/photo-admission";
+import { refuseInadmissibleImage } from "../../hooks/photo-save-guard";
+import { onlinePhotoRejectionMessages } from "../../editor/photo-rejection-messages";
 
 /**
  * REPORT settings — everything here changes how this inspection's report is
@@ -40,7 +43,8 @@ interface InspectionSettingsSheetProps {
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplateApplied }: InspectionSettingsSheetProps) {
-  const sheet = useFieldDataSource().resources.settingsSheet;
+  const dataSource = useFieldDataSource();
+  const sheet = dataSource.resources.settingsSheet;
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -177,17 +181,26 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
   function uploadCover(file: File) {
     coverLatch(() => {
       setUploadingCover(true);
-      void runCover({ type: "upload-cover", file }).then((result) => {
-        if (mounted.current) setUploadingCover(false);
-        if (isIgnored(result) || !mounted.current || !result.ok || !result.data?.coverKey) return;
-        // Append the new photo to the grid and open it for cropping — all in LOCAL state. We deliberately
-        // do NOT reload the sheet (that would flicker the entire settings sheet).
-        const key = result.data.coverKey;
-        const url = result.data.coverUrl;
-        if (url) {
-          setPhotos((prev) => (prev.some((p) => p.key === key) ? prev : [{ key, url, label: m.editor_settings_cover_uploaded_label() }, ...prev]));
-          setCropSource({ key, url });
+      // The photo check first (size ceiling, type by bytes): a file the server would refuse is announced with the
+      // photo wording and never sent.
+      void photoRefusal(file).then((refusal) => {
+        if (refusal !== null) {
+          for (const message of onlinePhotoRejectionMessages([{ index: 0, ok: false, error: refusal }])) dataSource.notify(message, "error", { durationMs: 8000 });
+          if (mounted.current) setUploadingCover(false);
+          return;
         }
+        void runCover({ type: "upload-cover", file }).then((result) => {
+          if (mounted.current) setUploadingCover(false);
+          if (isIgnored(result) || !mounted.current || !result.ok || !result.data?.coverKey) return;
+          // Append the new photo to the grid and open it for cropping — all in LOCAL state. We deliberately
+          // do NOT reload the sheet (that would flicker the entire settings sheet).
+          const key = result.data.coverKey;
+          const url = result.data.coverUrl;
+          if (url) {
+            setPhotos((prev) => (prev.some((p) => p.key === key) ? prev : [{ key, url, label: m.editor_settings_cover_uploaded_label() }, ...prev]));
+            setCropSource({ key, url });
+          }
+        });
       });
     });
   }
@@ -400,21 +413,21 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
           onSave={(blob, c) => coverLatch(() => {
             const source = cropSource;
             const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
-            setCropSource(null);
-            void runCover({
-              type: "crop-cover",
-              sourceKey: source.key,
-              crop: JSON.stringify(crop),
-              image: new File([blob], "cover.jpg", { type: "image/jpeg" }),
-            }).then((result) => {
-              if (!mounted.current) return;
-              // Dropped because another cover write is out: the crop was not sent, so the editor goes back to it.
-              if (isIgnored(result)) {
-                setCropSource(source);
-                return;
-              }
-              setSessionCrop({ key: source.key, crop });
-              if (result.ok && result.data?.coverKey) setCoverKey(result.data.coverKey);
+            const image = new File([blob], "cover.jpg", { type: "image/jpeg" });
+            // Checked first: an image the server would refuse is announced, nothing is sent and the cropper stays open.
+            void refuseInadmissibleImage(dataSource, image).then((refused) => {
+              if (refused || !mounted.current) return;
+              setCropSource(null);
+              void runCover({ type: "crop-cover", sourceKey: source.key, crop: JSON.stringify(crop), image }).then((result) => {
+                if (!mounted.current) return;
+                // Dropped because another cover write is out: the crop was not sent, so the editor goes back to it.
+                if (isIgnored(result)) {
+                  setCropSource(source);
+                  return;
+                }
+                setSessionCrop({ key: source.key, crop });
+                if (result.ok && result.data?.coverKey) setCoverKey(result.data.coverKey);
+              });
             });
           })}
         />

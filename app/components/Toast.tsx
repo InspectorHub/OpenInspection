@@ -4,12 +4,15 @@ import { useToastQueue } from '../hooks/useToast';
  * The stack sits at `--ih-toast-bottom`, which defaults to 1rem. A page with a fixed bottom bar (the phone editor's nav)
  * marks the document and the stylesheet raises the variable above that bar and the safe-area inset, so notices never
  * cover its labels. Desktop has no such bar and keeps the default.
+ *
+ * z-[110] puts a notice above the full-screen studio overlays (the cropper at z-70, the annotator and speed mode at
+ * z-100): at z-50 a refusal raised while one of them stays open was in the DOM but hidden under it.
  */
 export function ToastPortal() {
     const queue = useToastQueue();
     if (queue.length === 0) return null;
     return (
-        <div className="fixed bottom-[var(--ih-toast-bottom,1rem)] left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2">
+        <div className="fixed bottom-[var(--ih-toast-bottom,1rem)] left-1/2 -translate-x-1/2 z-[110] flex flex-col gap-2">
             {queue.map(t => (
                 <div key={t.id} role={t.variant === 'error' ? 'alert' : 'status'} aria-atomic="true" className={`bg-ih-bg-card text-ih-fg-1 border border-ih-border rounded-lg shadow-ih-popover px-4 py-2 text-[13px] flex items-center gap-3 min-w-[260px]${
                     t.variant === 'error' ? ' border-l-4 border-l-ih-bad'

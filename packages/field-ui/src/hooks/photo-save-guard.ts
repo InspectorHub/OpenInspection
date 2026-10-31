@@ -1,5 +1,6 @@
 import type { FieldDataSource } from '../data-source';
 import { m } from '../i18n';
+import { photoRefusal } from '../shared/photo-admission';
 
 /**
  * Decides whether a photo edit (crop or annotation) can be sent, and when it cannot, tells the user why and
@@ -49,4 +50,17 @@ export function guardedSave(
     .finally(() => {
       inFlight.delete(key);
     });
+}
+
+/**
+ * Refuses an edited image the server would permanently refuse (over the photo ceiling, or not an image by its bytes)
+ * BEFORE it is queued, sent or shown as saved, and says why with a fixed sentence. Answers `true` when it refused.
+ * The same check, from the same source, as the pending store applies to a picked photo, so the problem is never
+ * left for the drain to find later.
+ */
+export async function refuseInadmissibleImage(dataSource: Pick<FieldDataSource, 'notify'>, blob: Blob): Promise<boolean> {
+  const refusal = await photoRefusal(blob);
+  if (refusal === null) return false;
+  dataSource.notify(refusal === 'TOO_LARGE' ? m.editor_photo_save_too_large() : m.editor_photo_save_unsupported_type(), 'error');
+  return true;
 }

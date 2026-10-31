@@ -256,6 +256,58 @@ describe('useMediaDrain', () => {
     expect(keysOf(doc!)).toEqual(['base1.jpg']);
   });
 
+  const pendingOf = (doc: Y.Doc, photoKey: string) =>
+    ((projectResults(doc)[FK]?.photos ?? []) as Array<{ key: string; pendingId?: string; pendingKind?: string }>).find((p) => p.key === photoKey);
+
+  it('a refused crop clears its pending marker, keeps the original photo, and says nothing', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    appendPhoto(doc!, FK, { key: 'base1.jpg', mediaType: 'photo' });
+    appendPhoto(doc!, FK, { key: 'base2.jpg', mediaType: 'photo' });
+    await queueCrop(ds, doc!, inspectionId, 'c1', 'base1.jpg', 1);
+    await queueCrop(ds, doc!, inspectionId, 'c2', 'base2.jpg', 2);
+    expect(pendingOf(doc!, 'base1.jpg')).toMatchObject({ pendingId: 'c1', pendingKind: 'crop' });
+    ds.media.uploader = () => ({
+      upload: async (rec) => (rec.pendingId === 'c1'
+        ? { ok: false, error: 'TOO_LARGE', permanent: true as const }
+        : { ok: false, error: 'HTTP_500' }),
+    });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.notifications).toEqual([]);
+    expect(keysOf(doc!)).toEqual(['base1.jpg', 'base2.jpg']);
+    expect(pendingOf(doc!, 'base1.jpg')).not.toHaveProperty('pendingId');
+    expect(pendingOf(doc!, 'base1.jpg')).not.toHaveProperty('pendingKind');
+    // CONTROL - the crop that failed transiently keeps its marker and its queued record for the next drain.
+    expect(pendingOf(doc!, 'base2.jpg')).toMatchObject({ pendingId: 'c2', pendingKind: 'crop' });
+    expect((await ds.media.store.list(inspectionId)).map((r) => r.pendingId)).toEqual(['c2']);
+  });
+
+  it('a refused annotation clears its pending marker too, and a throwing revoke callback does not stop it', async () => {
+    const inspectionId = `drain-${(nextInspection += 1)}`;
+    const ds = createFakeDataSource({ data: createEmptyEditorData() });
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'base1.jpg', mediaType: 'photo' });
+    markPhotoPending(doc, FK, 'base1.jpg', 'a1', 'annotate', { annotationsJson: '[]' });
+    await ds.media.store.put({
+      pendingId: 'a1', inspectionId, kind: 'annotate', blob: new Blob(['a']), createdAt: 1,
+      meta: { findingKey: FK, itemId: 'i1', photoIndex: 0, photoKey: 'base1.jpg', nodesJson: '[]' },
+    });
+    ds.failUpload('TOO_LARGE', { permanent: true });
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(FieldDataSourceProvider, { dataSource: ds }, children);
+    const hook = renderHook(() => useMediaDrain(inspectionId, doc, () => { throw new Error('revoke blew up'); }), { wrapper });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+    try {
+      act(() => hook.result.current.drain());
+      await settle();
+      expect(pendingOf(doc, 'base1.jpg')).not.toHaveProperty('pendingId');
+      expect(await ds.media.store.list(inspectionId)).toEqual([]);
+      expect(ds.notifications).toEqual([]);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
   it('a throwing host callback does not wedge the drain: the refusal is still announced and the next photo uploads', async () => {
     const inspectionId = `drain-${(nextInspection += 1)}`;
     const ds = createFakeDataSource({ data: createEmptyEditorData() });

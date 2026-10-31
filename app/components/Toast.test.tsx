@@ -37,4 +37,15 @@ describe('ToastPortal', () => {
     // CONTROL: the old fixed offset is gone, so nothing pins the stack at 1rem under a phone nav.
     expect(stack.className).not.toMatch(/(^|\s)bottom-4(\s|$)/);
   });
+
+  it('stacks above the full-screen studio overlays (cropper z-70, annotator and speed mode z-100) and below the transient shortcuts HUD', () => {
+    const { getByText } = render(<ToastPortal />);
+    act(() => {
+      pushToast({ message: 'Visible over a cropper', variant: 'error', durationMs: 10_000 });
+    });
+    const stack = getByText('Visible over a cropper').parentElement?.parentElement as HTMLElement;
+    const z = Number(/(?:^|\s)z-\[(\d+)\]/.exec(stack.className)?.[1] ?? /(?:^|\s)z-(\d+)/.exec(stack.className)?.[1]);
+    expect(z).toBeGreaterThan(100);
+    expect(z).toBeLessThan(200); // the route progress bar (z-200) and the shortcuts HUD stay above a notice
+  });
 });
