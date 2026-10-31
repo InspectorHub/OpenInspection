@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.6.0...field-ui-v0.6.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* **field-ui:** keep a photo batch in selection order when the host keeps some files as pending ([10f5ac5](https://github.com/InspectorHub/OpenInspection/commit/10f5ac5b8520fefca7519278c22496325e14386d))
+* **field-ui:** keep a photo batch in selection order; neutral wording for the mobile begin hint ([d001c8d](https://github.com/InspectorHub/OpenInspection/commit/d001c8d845a370b6415fcc67c9dca86134e42cc2))
+
 ## [0.6.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.5.0...field-ui-v0.6.0) (2026-10-31)
 
 
