@@ -191,8 +191,15 @@ export interface CollabConnector {
   purge(inspectionId: string): Promise<void>;
 }
 
+/** How much picture a caller needs: `thumb` (a tile), `view` (a full-screen viewer) or `original` (a download, or a crop or annotation source). */
+export type PhotoSize = 'thumb' | 'view' | 'original';
+
 export interface FieldUrls {
-  photo(inspectionId: string, key: string): string;
+  /**
+   * The address of a photo. `size` is an optional hint: a host with smaller copies may return one for `thumb` or
+   * `view`; a host without them ignores it and answers as before. `original` is always the exact stored bytes.
+   */
+  photo(inspectionId: string, key: string, size?: PhotoSize): string;
   /**
    * Optional. `photo()` is synchronous, so a host that can only produce an address later (a photo it fetches and
    * caches, a signed address it renews) calls the listener whenever any photo address may have changed; the editor then

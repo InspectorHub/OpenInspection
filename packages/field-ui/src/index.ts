@@ -14,6 +14,7 @@ export type {
   FieldHostSlots,
   FieldResources,
   FieldUrls,
+  PhotoSize,
   MediaFileResult,
   MediaUploader,
   NotifyOptions,

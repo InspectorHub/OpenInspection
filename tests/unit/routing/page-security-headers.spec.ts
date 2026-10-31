@@ -88,9 +88,15 @@ describe('hosts only pages load', () => {
         expect(directive(strict!, name)).toContain(host);
     });
 
-    it('keeps the Maps hosts that were already there and adds no media-src', () => {
+    it('keeps the Maps hosts that were already there', () => {
         expect(directive(allowlist!, 'script-src')).toContain('https://maps.googleapis.com');
-        expect(directive(allowlist!, 'media-src')).toBeUndefined();
+    });
+
+    it('media-src is own origin plus blob: only, for every policy (the first-frame grab of an uploaded clip)', () => {
+        for (const policy of [allowlist!, strict!, buildCsp({ widgetEmbed: false })]) {
+            expect(directive(policy, 'media-src')).toBe("media-src 'self' blob:");
+        }
+        expect(directive(allowlist!, 'media-src')).not.toMatch(/data:|\*|https?:/);
     });
 
     it('the API policy gets none of the Stripe hosts, only the Stream player it shares with pages', () => {

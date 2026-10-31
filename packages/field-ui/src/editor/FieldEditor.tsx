@@ -69,6 +69,7 @@ import { useItemEditorUiStore } from "../components/editor/item-editor-ui";
 import { useResetBatchOnPhone } from "../hooks/useResetBatchOnPhone";
 import { countUnratedItems } from "./speed-queue";
 import { SaveStatusIndicator } from "../components/editor/SaveStatusIndicator";
+import { WithHostStatus } from "../components/editor/HostStatus";
 import { InspectionIdentity } from "../components/editor/InspectionIdentity";
 import { MobileDrawerTriggers, type MobileDrawerId } from "../components/editor/MobileDrawerTriggers";
 import { MobileFinishDrawer } from "../components/editor/MobileFinishDrawer";
@@ -1854,7 +1855,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  const photos = (result?.photos as string[]) || [];
  if (photos.length > 0) {
   openPhotoStudio({
-   url: dataSource.urls.photo(String(state.inspection.id), photos[0]),
+   url: dataSource.urls.photo(String(state.inspection.id), photos[0], "original"),
    key: photos[0],
    index: 1,
    total: photos.length,
@@ -1889,7 +1890,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  // The per-unit scope switcher (commercial, per_unit mode only: the desktop header's `perUnitControls`), for the
  // phone's Items drawer and the tablet's list pane, and the save indicator both app bars carry.
  const scopeSwitcherEl = showUnitsSurface && isPerUnit ? <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} /> : null;
- const saveStatusEl = <SaveStatusIndicator status={state.saveStatus} />;
+ const saveStatusEl = <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} />} renderStatus={slots.renderStatus} />;
  const { pdf } = slots;
 
  // The bottom drawers of the touch layouts. The phone also has the Items drawer (the tablet shows the list in a pane).

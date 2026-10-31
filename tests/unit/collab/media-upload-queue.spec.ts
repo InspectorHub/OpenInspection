@@ -364,4 +364,49 @@ describe('media-upload-queue', () => {
             }
         });
     });
+
+    describe('a throwing onUploaded', () => {
+        it('cannot wedge the drain or lose the photo: the record is kept, later records still upload, it is not uploaded again this session, nothing leaks the host text', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'SWAPFAIL' }));
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 2, pendingId: 'AFTER' }));
+            const { uploader, calls } = okUploader();
+            const swaps: string[] = [];
+            const deps = {
+                inspectionId: 'insp-1', store, uploader,
+                onUploaded: (rec: PendingMediaRecord) => {
+                    swaps.push(rec.pendingId);
+                    if (rec.pendingId === 'SWAPFAIL') throw new Error('doc swap exploded: secret detail');
+                },
+            };
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+            try {
+                const first = await drainMediaQueue(deps);
+                expect(first).toEqual({ uploaded: 1, failed: 1 });
+                // Kept (a later session retries the swap); the record that swapped fine is gone.
+                expect([...store.rows.keys()]).toEqual(['SWAPFAIL']);
+                expect((await drainMediaQueue(deps))).toEqual({ uploaded: 0, failed: 0 });
+                expect([...store.rows.keys()]).toEqual(['SWAPFAIL']);
+                expect(calls.map((c) => c.pendingId)).toEqual(['SWAPFAIL', 'AFTER']);
+                expect(swaps).toEqual(['SWAPFAIL', 'AFTER']);
+                expect(logged).toHaveBeenCalled();
+                expect(JSON.stringify(logged.mock.calls)).not.toContain('secret detail');
+            } finally {
+                logged.mockRestore();
+            }
+        });
+
+        it('CONTROL - a well-behaved onUploaded runs once per record and nothing is logged', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'FINE' }));
+            const { uploader } = okUploader();
+            const swaps: string[] = [];
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+            try {
+                expect(await drainMediaQueue({ inspectionId: 'insp-1', store, uploader, onUploaded: (r) => { swaps.push(r.pendingId); } })).toEqual({ uploaded: 1, failed: 0 });
+                expect(swaps).toEqual(['FINE']);
+                expect(logged).not.toHaveBeenCalled();
+            } finally {
+                logged.mockRestore();
+            }
+        });
+    });
 });

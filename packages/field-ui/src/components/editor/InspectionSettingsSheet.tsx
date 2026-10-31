@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Drawer, Button, useActionLatch } from "@core/shared-ui";
+import { Drawer, Button } from "@core/shared-ui";
 import { TemplateCombobox } from "../TemplateCombobox";
 import { CoverCropper, coverCropFor, type StoredCoverCrop } from "../media-studio/CoverCropper";
 import { fullResUrl } from "../media-studio/cropImage";
@@ -9,6 +9,7 @@ import type { CoverPhotoOption, ReportProfileOption, SettingsSheetData, Template
 import { m } from "../../i18n";
 import { photoRefusal } from "../../shared/photo-admission";
 import { refuseInadmissibleImage } from "../../hooks/photo-save-guard";
+import { useHeldLatch } from "../../hooks/useHeldLatch";
 import { onlinePhotoRejectionMessages } from "../../editor/photo-rejection-messages";
 
 /**
@@ -175,15 +176,14 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
     if (photo) setCropSource({ key, url: photo.url });
   }
 
-  // DB-16 — direct cover upload (`upload-cover`: pool upload + set cover). The latch drops a same-frame repeat
-  // before anything is touched; `runCover` drops one that lands while an earlier cover write is still out.
-  const coverLatch = useActionLatch(coverBusy);
+  // DB-16 — direct cover upload. The latch drops a repeat (same frame, or while a check is pending); `runCover` drops one during a write.
+  const coverLatch = useHeldLatch(coverBusy, () => { dataSource.notify(m.editor_photo_save_failed(), "error"); setUploadingCover(false); });
   function uploadCover(file: File) {
     coverLatch(() => {
       setUploadingCover(true);
       // The photo check first (size ceiling, type by bytes): a file the server would refuse is announced with the
       // photo wording and never sent.
-      void photoRefusal(file).then((refusal) => {
+      return photoRefusal(file).then((refusal) => {
         if (refusal !== null) {
           for (const message of onlinePhotoRejectionMessages([{ index: 0, ok: false, error: refusal }])) dataSource.notify(message, "error", { durationMs: 8000 });
           if (mounted.current) setUploadingCover(false);
@@ -415,7 +415,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, onTemplat
             const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
             const image = new File([blob], "cover.jpg", { type: "image/jpeg" });
             // Checked first: an image the server would refuse is announced, nothing is sent and the cropper stays open.
-            void refuseInadmissibleImage(dataSource, image).then((refused) => {
+            return refuseInadmissibleImage(dataSource, image).then((refused) => {
               if (refused || !mounted.current) return;
               setCropSource(null);
               void runCover({ type: "crop-cover", sourceKey: source.key, crop: JSON.stringify(crop), image }).then((result) => {

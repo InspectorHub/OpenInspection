@@ -15,6 +15,8 @@ const urls = createWebUrls();
 describe("createWebUrls golden strings", () => {
     it("photo encodes the key", () => {
         expect(urls.photo("i1", "a/b c.jpg")).toBe("/api/inspections/i1/photo?key=a%2Fb%20c.jpg");
+        // the web host does not map the size hint (the photo route's ?w= could back it later), so it changes nothing
+        for (const size of ["thumb", "view", "original"] as const) expect(urls.photo("i1", "a/b c.jpg", size)).toBe(urls.photo("i1", "a/b c.jpg"));
     });
     it("reportPreview needs a slug", () => {
         expect(urls.reportPreview("acme", "i1")).toBe("/report-view/acme/i1");
@@ -84,9 +86,9 @@ describe("presenceSocket", () => {
 describe("call sites still build the same fragments", () => {
     const read = (rel: string) => readFileSync(path.resolve(__dirname, "../../..", rel), "utf8");
     const sites: Array<[string, string[]]> = [
-        ["packages/field-ui/src/components/editor/ItemEditor.tsx", ["urls.photo(inspectionId ?? \"\", k)"]],
-        ["packages/field-ui/src/components/editor/SideRail.tsx", ["urls.photo(inspectionId ?? \"\", key)"]],
-        ["packages/field-ui/src/hooks/usePhotoOps.ts", ["urls.photo(state.inspection.id, baseKey)", "urls.photo(state.inspection.id, dk)", "urls.photo(state.inspection.id, annotateBaseKey)", "urls.photo(state.inspection.id, originalKey)"]],
+        ["packages/field-ui/src/components/editor/ItemEditor.tsx", ["urls.photo(inspectionId ?? \"\", k, \"thumb\")"]],
+        ["packages/field-ui/src/components/editor/SideRail.tsx", ["urls.photo(inspectionId ?? \"\", key, \"thumb\")", "urls.photo(inspectionId ?? \"\", key, \"original\")"]],
+        ["packages/field-ui/src/hooks/usePhotoOps.ts", ["urls.photo(state.inspection.id, baseKey)", "urls.photo(state.inspection.id, dk)", "urls.photo(state.inspection.id, annotateBaseKey, \"original\")", "urls.photo(state.inspection.id, originalKey, \"original\")"]],
         ["packages/field-ui/src/components/editor/EditorHeader.tsx", ["urls.reportPreview(tenantSlug, String(state.inspection.id))"]],
         ["packages/field-ui/src/components/media-studio/VideoPlayer.tsx", ["urls.videoObject(inspectionId, mediaId)"]],
         [
@@ -95,7 +97,7 @@ describe("call sites still build the same fragments", () => {
         ],
         ["packages/field-ui/src/components/editor/InspectionOverview.tsx", ["urls.statutoryPreviewPdf(String(bag.id))"]],
         ["packages/field-ui/src/hooks/useHostActions.ts", ["dataSource.urls.reportPreview(tenantSlug, inspectionId)"]],
-        ["packages/field-ui/src/editor/FieldEditor.tsx", ["dataSource.urls.photo(String(state.inspection.id), photos[0])"]],
+        ["packages/field-ui/src/editor/FieldEditor.tsx", ["dataSource.urls.photo(String(state.inspection.id), photos[0], \"original\")"]],
         ["packages/field-ui/src/components/editor/PublishModal.tsx", ["urls.editorPath(inspectionId)"]],
     ];
     for (const [file, fragments] of sites) {

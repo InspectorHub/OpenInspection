@@ -142,6 +142,9 @@ export function usePhotoOps(ctx: {
     },
     [findings, state.sectionIdForItem],
   );
+  // The latest reader, for a save that awaits: photos may be removed or reordered while it waits.
+  const photosNow = useRef(getItemPhotos);
+  photosNow.current = getItemPhotos;
 
   /* #181 PR-G — local objectURL map for pending (offline) media. A pending photo
    * entry has no servable R2 key, so the strip/viewer renders the LOCAL blob from
@@ -443,7 +446,7 @@ export function usePhotoOps(ctx: {
         // base is croppedKey || originalKey — NEVER annotatedKey (that would
         // double-bake the existing annotation).
         const annotateBaseKey = photo.croppedKey || photo.originalKey || photo.key;
-        setPhotoStudioUrl(urls.photo(state.inspection.id, annotateBaseKey));
+        setPhotoStudioUrl(urls.photo(state.inspection.id, annotateBaseKey, "original"));
         setPhotoStudioKey(photo.key);
         setPhotoStudioIndex(idx);
         setPhotoStudioTotal(0);
@@ -459,7 +462,7 @@ export function usePhotoOps(ctx: {
         setPhotoCropTarget({
           itemId,
           photoIndex: idx,
-          sourceUrl: urls.photo(state.inspection.id, originalKey),
+          sourceUrl: urls.photo(state.inspection.id, originalKey, "original"),
           hasAnnotation: !!photo.annotated,
           sectionId,
         });
@@ -498,10 +501,8 @@ export function usePhotoOps(ctx: {
       const { itemId, photoIndex, sectionId } = target;
       const cropTransform = { aspect: crop.aspect, orientation: crop.orientation, ...crop.pixels };
 
-      // Snapshot the photo's CURRENT entry + original key BEFORE any mutation so
-      // both the online doc write and the offline enqueue address by key.
-      const current = getItemPhotos(itemId)[photoIndex];
-      const originalKey = current?.key;
+      // The original key, read BEFORE any mutation: the doc write and the offline enqueue address by key.
+      const originalKey = getItemPhotos(itemId)[photoIndex]?.key;
       const fk = docFindingKey(itemId, sectionId);
 
       // A repeat in flight, an unaddressable photo or no live document: dropped before anything, with a message.
@@ -523,13 +524,13 @@ export function usePhotoOps(ctx: {
       // drives the real UI once the bake returns / drains + we write it back).
       guardedSave(dataSource, mediaSavesInFlight.current, saveKey, async () => {
         if (await refuseInadmissibleImage(dataSource, blob)) return;
-        patchItemPhotos(itemId, (photos) =>
-          photos.map((p, i) =>
-            i === photoIndex
-              ? clearAnnotationOnRecrop(p, p.croppedKey ?? p.key, cropTransform)
-              : p,
-          ),
-        );
+        // The check read the whole blob; find the photo again BY KEY. Gone (removed meanwhile): nothing is written.
+        const current = photosNow.current(itemId).find((p) => p?.key === originalKey);
+        if (!current) return;
+        patchItemPhotos(itemId, (photos) => {
+          const at = photos.findIndex((p) => p?.key === originalKey);
+          return photos.map((p, i) => (i === at ? clearAnnotationOnRecrop(p, p.croppedKey ?? p.key, cropTransform) : p));
+        });
 
         // #181 PR-G — offline: persist the baked crop locally + mark the doc photo
         // pending-crop (KEEP the base key so the report still serves the original).
@@ -584,6 +585,7 @@ export function usePhotoOps(ctx: {
       // neither queued nor sent, and the person is told. The editor already tried a smaller export; see PhotoAnnotator.
       guardedSave(dataSource, mediaSavesInFlight.current, saveKey, async () => {
         if (await refuseInadmissibleImage(dataSource, blob)) return;
+        if (!photosNow.current(itemId).some((p) => p?.key === originalKey)) return;
 
         // #181 PR-G — offline: persist the baked annotation PNG locally + mark the
         // doc photo pending-annotate (KEEP base/cropped key — annotation layers on

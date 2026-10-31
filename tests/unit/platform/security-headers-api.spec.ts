@@ -8,13 +8,14 @@ import { Hono } from 'hono';
 import { securityHeaders } from '../../../server/lib/middleware/security-headers';
 import { buildCsp } from '../../../server/lib/csp-policy';
 
-// The policy the middleware enforces: the original allowlist plus the Cloudflare Stream player (frame-src) and its thumbnails (img-src).
+// The policy the middleware enforces: the original allowlist plus the Cloudflare Stream player (frame-src) and its thumbnails (img-src), plus media-src for the blob: first-frame grab of an uploaded clip.
 const NORMAL_CSP =
     "default-src 'self'; " +
     "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://maps.googleapis.com; " +
     "style-src 'self' 'unsafe-inline'; " +
     "font-src 'self' data:; " +
     "img-src 'self' data: blob: https://maps.gstatic.com https://maps.googleapis.com https://*.cloudflarestream.com; " +
+    "media-src 'self' blob:; " +
     "connect-src 'self' https://challenges.cloudflare.com https://maps.googleapis.com; " +
     "frame-src 'self' https://challenges.cloudflare.com https://*.cloudflarestream.com; " +
     "frame-ancestors 'none'; " +

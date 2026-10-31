@@ -65,6 +65,10 @@ What the host has to provide:
   down explicitly; leaving the slot out does not turn the gate off.
 - `slots.renderUnsavedGuard`, if leaving the editor with unsaved work should be
   intercepted. Absent means leaving is never intercepted.
+- `slots.renderStatus`, an optional status element of the host's own (an offline indicator, say). The editor shows it
+  beside the save state in the desktop header and in the phone and tablet app bars, and never in place of it. Absent,
+  nothing is added. The host owns its semantics. It must be pure and may be called more than once per render. It cannot
+  shrink or truncate, so keep it small: the phone app bar shares one row with the title.
 - The theme (see Theme) and the peer dependencies (see below).
 
 A member of `urls`, `resources` or `slots` that the host leaves out hides the
@@ -142,6 +146,11 @@ signatures):
   optional `subscribe(listener)` and calls the listener whenever any photo address may have changed. The editor then asks
   `photo()` again and its thumbnails, viewer and previews show the new address. Calls may be batched; `subscribe` returns
   the unsubscribe function. Absent, nothing changes.
+  `photo()` also takes an optional third argument, `size`: a `PhotoSize` (`'thumb'`, `'view'` or `'original'`). It is a
+  hint. The editor asks for `thumb` in photo strips and the side-rail preview, and for `original` where the exact bytes
+  matter (the side-rail download, the source a crop or an annotation is made from, the photo studio). `view` is part
+  of the contract but nothing in the editor requests it yet. A host with smaller copies may return one for `thumb`
+  or `view`; a host without them ignores the argument and nothing changes.
 - `resources`: `FieldResources`, optional capabilities (preferences, canned
   comments, cost items, repair items, media pool, settings sheet, AI assist,
   publish readiness, template search, version history, video). A member the

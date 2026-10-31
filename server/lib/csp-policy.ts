@@ -56,6 +56,8 @@ export function buildCsp(options: CspOptions): string {
         // maps.gstatic.com / maps.googleapis.com: map tiles + marker sprites.
         // *.cloudflarestream.com: the Stream player's thumbnails.
         `img-src 'self' data: blob: https://maps.gstatic.com https://maps.googleapis.com https://*.cloudflarestream.com${extra('img-src')}`,
+        // blob: the first-frame grab of an uploaded clip loads it into a hidden <video>; no remote media host.
+        "media-src 'self' blob:",
         // maps.googleapis.com: the Maps SDK's own XHR/fetch for tile metadata.
         `connect-src 'self' https://challenges.cloudflare.com https://maps.googleapis.com${extra('connect-src')}`,
         // 'self' required so the Settings → Embed Widget page can iframe

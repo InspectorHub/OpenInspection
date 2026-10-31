@@ -106,6 +106,9 @@ const draining = new Set<string>();
  */
 const swapped = new Set<string>();
 
+/** Records uploaded whose doc swap threw: kept in the store, not uploaded again this session (a later session retries). */
+const swapFailed = new Set<string>();
+
 /** Records the host permanently refused whose local delete failed: reported already, never uploaded again. */
 const refused = new Set<string>();
 
@@ -128,7 +131,8 @@ export async function enqueueMedia(store: PendingMediaStore, rec: PendingMediaRe
  *
  * For each record: `await uploader.upload(rec)`; on success call
  * `onUploaded(rec, result)` then `store.delete(rec.pendingId)`; on a
- * failed upload, leave the record queued and continue. Returns counts of
+ * failed upload, leave the record queued and continue. If `onUploaded` throws the
+ * record is also kept (counted failed, not uploaded again this session) and the drain continues. Returns counts of
  * uploaded vs failed. Concurrent drains for the same inspection are coalesced
  * (the second returns `{ uploaded: 0, failed: 0 }`).
  */
@@ -147,6 +151,7 @@ export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
         // Oldest first, whatever order the store happens to list in.
         const pending = [...(await store.list(inspectionId))].sort((a, b) => a.createdAt - b.createdAt);
         for (const rec of pending) {
+            if (swapFailed.has(rec.pendingId)) continue;
             if (!swapped.has(rec.pendingId) && !refused.has(rec.pendingId)) {
                 let result: UploadResult | undefined;
                 try {
@@ -171,7 +176,19 @@ export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
                 }
                 if (result) {
                     // Upload succeeded — swap the doc entry, then drop the local blob.
-                    onUploaded(rec, result);
+                    try {
+                        onUploaded(rec, result);
+                    } catch {
+                        // The bytes ARE on the server but the doc entry was not swapped, so it still says "pending". The
+                        // record is KEPT: deleting it would strand a placeholder with nothing to re-link it, and a photo
+                        // must never be lost. Held for this session so it is not uploaded again here; a later session
+                        // uploads and swaps it again, at the cost of a possible duplicate server copy. Counted failed;
+                        // the drain goes on. Fixed wording only; the host's error text is not echoed.
+                        swapFailed.add(rec.pendingId);
+                        failed += 1;
+                        console.error('An uploaded-photo handler failed; the photo stays in the local queue:', rec.pendingId);
+                        continue;
+                    }
                     swapped.add(rec.pendingId);
                     uploaded += 1;
                 }
