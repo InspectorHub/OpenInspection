@@ -124,7 +124,7 @@ export function ReadOnlyItemView({ item, sectionTitle, result, ratingLevels, ins
         itemId={item.id}
         photos={((result.photos as StripPhoto[]) ?? []).filter(Boolean)}
         coverKey={coverKey}
-        photoUrl={(k) => urls.photo(inspectionId, k)}
+        photoUrl={(k) => urls.photo(inspectionId, k, "thumb")}
         onOpen={(i) => onOpenPhoto?.(item.id, i)}
         videoPosterUrl={videoPosterUrl}
         pendingPhotoUrl={pendingPhotoUrl}

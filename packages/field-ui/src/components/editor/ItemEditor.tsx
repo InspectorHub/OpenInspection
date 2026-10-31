@@ -609,7 +609,7 @@ export function ItemEditor({
  itemId={item.id}
  photos={((result.photos as StripPhoto[]) ?? [])}
  coverKey={coverKey ?? null}
- photoUrl={(k) => urls.photo(inspectionId ?? "", k)}
+ photoUrl={(k) => urls.photo(inspectionId ?? "", k, "thumb")}
  onAddPhoto={() => onAddPhoto?.()}
  onOpen={(i) => onOpenPhoto?.(item.id, i)}
  onReorder={onReorderPhotos ? (order) => onReorderPhotos(item.id, order) : undefined}

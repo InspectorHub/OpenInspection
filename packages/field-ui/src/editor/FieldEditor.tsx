@@ -28,6 +28,7 @@ import { usePresence } from "../hooks/usePresence";
 import { useResultsDoc } from "../collab/use-results-doc";
 import { useMediaDrain } from "../hooks/useMediaDrain";
 import { addOfflinePhotos } from "../collab/offline-photo-batch";
+import { offlinePhotoRejectionMessages, onlinePhotoRejectionMessages } from "./photo-rejection-messages";
 import { useResultsProjection } from "../hooks/useResultsProjection";
 import { useSpeedRating } from "../hooks/useSpeedRating";
 import { SectionRail } from "../components/editor-shared/SectionRail";
@@ -68,6 +69,7 @@ import { useItemEditorUiStore } from "../components/editor/item-editor-ui";
 import { useResetBatchOnPhone } from "../hooks/useResetBatchOnPhone";
 import { countUnratedItems } from "./speed-queue";
 import { SaveStatusIndicator } from "../components/editor/SaveStatusIndicator";
+import { WithHostStatus } from "../components/editor/HostStatus";
 import { InspectionIdentity } from "../components/editor/InspectionIdentity";
 import { MobileDrawerTriggers, type MobileDrawerId } from "../components/editor/MobileDrawerTriggers";
 import { MobileFinishDrawer } from "../components/editor/MobileFinishDrawer";
@@ -1047,8 +1049,8 @@ function FieldEditorInner({ data }: { data: EditorData }) {
   const fk = findingKey(activeUnitId, sid, itemId);
   // The host's store may reject a file; the rest of the batch still goes through and the user hears once, with the
   // count. It is a photo that was not added, not a save failure, so the save state is left alone.
-  const rejected = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId }, bakedFiles);
-  if (rejected > 0) notify(m.editor_route_photos_rejected({ count: rejected, s: rejected === 1 ? "" : "s" }), "error", { durationMs: 8000 });
+  const batch = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId }, bakedFiles);
+  for (const message of offlinePhotoRejectionMessages(batch, bakedFiles.length)) notify(message, "error", { durationMs: 8000 });
  } else {
   // A file input's change event fires once per file-chooser selection (the chooser is modal) and the input
   // is reset after it is read, so there is no double click to repeat. A batch queues behind one in flight.
@@ -1131,7 +1133,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  }
  if (keptCount > 0) notify(m.editor_route_photos_kept({ count: keptCount, s: keptCount === 1 ? "" : "s" }), "info", { durationMs: 6000 });
  if (failCount > 0) {
- notify(m.editor_route_photos_partial_upload({ success: successCount, total: total - keptCount, failed: failCount }), "error", { durationMs: 8000 });
+ for (const message of onlinePhotoRejectionMessages(d.results)) notify(message, "error", { durationMs: 8000 });
  } else if (successCount > 0) {
  notify(
  m.editor_route_photos_added({ count: successCount, s: successCount === 1 ? "" : "s", toDefect: d.targetType === "defect" ? " to defect" : "" }),
@@ -1853,7 +1855,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  const photos = (result?.photos as string[]) || [];
  if (photos.length > 0) {
   openPhotoStudio({
-   url: dataSource.urls.photo(String(state.inspection.id), photos[0]),
+   url: dataSource.urls.photo(String(state.inspection.id), photos[0], "original"),
    key: photos[0],
    index: 1,
    total: photos.length,
@@ -1888,7 +1890,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  // The per-unit scope switcher (commercial, per_unit mode only: the desktop header's `perUnitControls`), for the
  // phone's Items drawer and the tablet's list pane, and the save indicator both app bars carry.
  const scopeSwitcherEl = showUnitsSurface && isPerUnit ? <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} /> : null;
- const saveStatusEl = <SaveStatusIndicator status={state.saveStatus} />;
+ const saveStatusEl = <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} />} renderStatus={slots.renderStatus} />;
  const { pdf } = slots;
 
  // The bottom drawers of the touch layouts. The phone also has the Items drawer (the tablet shows the list in a pane).
@@ -1975,7 +1977,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  return (
  <>
  {overlaysEl}
- <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
+ <div key="phone" data-layout="phone" data-collab-synced={collabSynced ? "true" : "false"} className="min-h-dvh pb-[var(--ih-mobile-nav-h)]">
  <AppBar
  platform={dataSource.platform}
  {...appBarTitles}

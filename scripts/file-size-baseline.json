@@ -65,7 +65,7 @@
   "server/api/inspections/media.ts": 437,
   "server/lib/compliance/erasure-manifest.ts": 427,
   "server/services/template.service.ts": 427,
-  "packages/field-ui/src/components/editor/InspectionSettingsSheet.tsx": 425,
+  "packages/field-ui/src/components/editor/InspectionSettingsSheet.tsx": 438,
   "packages/field-ui/src/hooks/useStructureEdit.ts": 424,
   "server/services/inspection/inspection-core.service.ts": 424,
   "server/data/automation-seeds.ts": 423,

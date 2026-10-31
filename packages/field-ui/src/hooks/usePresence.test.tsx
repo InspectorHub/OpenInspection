@@ -32,6 +32,11 @@ class FakeSocket {
     this.readyState = FakeSocket.OPEN;
     for (const cb of this.listeners.get('open') ?? []) cb({});
   }
+  /** The socket going away, as the server or the browser does it. */
+  drop() {
+    this.readyState = 3;
+    for (const cb of this.listeners.get('close') ?? []) cb({});
+  }
 }
 
 beforeEach(() => {
@@ -81,4 +86,121 @@ describe('usePresence', () => {
     expect(FakeSocket.instances).toEqual([]);
     expect(seen.status).toBe('unavailable');
   });
+
+  it('a socket that drops on its own shows reconnecting (control)', () => {
+    const handle = mountWithHandle();
+    act(() => FakeSocket.instances[0].open());
+    expect(handle.status).toBe('connected');
+    act(() => FakeSocket.instances[0].drop());
+    expect(handle.status).toBe('reconnecting');
+  });
+
+  it('a close the hook asked for leaves the state alone when the socket reports it later', () => {
+    // The late close event of a socket the hook itself closed has nothing to report and nothing to reconnect; it must not
+    // flip the status to 'reconnecting', and it must not touch state at all (it can arrive after the page is gone).
+    const handle = mountWithHandle();
+    act(() => FakeSocket.instances[0].open());
+    act(() => handle.close());
+    act(() => FakeSocket.instances[0].drop());
+    expect(handle.status).not.toBe('reconnecting');
+    expect(FakeSocket.instances).toHaveLength(1);
+  });
 });
+
+describe('usePresence: close() and switching inspections', () => {
+  afterEach(() => vi.useRealTimers());
+
+  function mountSwitchable() {
+    const handle: { status?: string; connected?: boolean; close: () => void } = { close: () => undefined };
+    const ds = createFakeDataSource({
+      data: createEmptyEditorData(),
+      urls: { presenceSocket: (id: string) => `wss://host.example/api/inspections/${id}/presence/ws` },
+      session: { userId: 'user-7' },
+    });
+    function Probe({ id }: { id: string }) {
+      const p = usePresence({ inspectionId: id, userName: 'Inspector' });
+      handle.status = p.status;
+      handle.connected = p.connected;
+      handle.close = p.close;
+      return null;
+    }
+    const ui = (id: string) => (
+      <FieldDataSourceProvider dataSource={ds}>
+        <Probe id={id} />
+      </FieldDataSourceProvider>
+    );
+    const view = render(ui('insp-1'));
+    return { handle, switchTo: (id: string) => view.rerender(ui(id)) };
+  }
+
+  it('an explicit close() while mounted leaves status and connected telling the same story', () => {
+    const { handle } = mountSwitchable();
+    act(() => FakeSocket.instances[0].open());
+    expect(handle.connected).toBe(true);
+    expect(handle.status).toBe('connected');
+    act(() => handle.close());
+    expect(handle.connected).toBe(false);
+    expect(handle.status).toBe('unavailable');
+  });
+
+  it('the late close of the OLD inspection socket changes nothing and opens no second socket', () => {
+    vi.useFakeTimers();
+    const { handle, switchTo } = mountSwitchable();
+    act(() => FakeSocket.instances[0].open());
+    switchTo('insp-2');
+    expect(FakeSocket.instances.map((s) => s.url.includes('insp-2'))).toEqual([false, true]);
+    act(() => FakeSocket.instances[1].open());
+    expect(handle.connected).toBe(true);
+    // The first socket's close event arrives only now, after the effect re-ran for the new inspection.
+    act(() => FakeSocket.instances[0].drop());
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(handle.connected).toBe(true);
+    expect(handle.status).toBe('connected');
+    expect(FakeSocket.instances).toHaveLength(2);
+  });
+
+  it('a reconnect already scheduled for the old inspection never fires after the switch', () => {
+    vi.useFakeTimers();
+    const { switchTo } = mountSwitchable();
+    act(() => FakeSocket.instances[0].open());
+    act(() => FakeSocket.instances[0].drop()); // schedules a reconnect for insp-1
+    switchTo('insp-2');
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(FakeSocket.instances.filter((s) => s.url.includes('insp-1'))).toHaveLength(1);
+    expect(FakeSocket.instances.filter((s) => s.url.includes('insp-2'))).toHaveLength(1);
+  });
+
+  it('CONTROL - the CURRENT socket dropping still shows reconnecting and reconnects', () => {
+    vi.useFakeTimers();
+    const { handle, switchTo } = mountSwitchable();
+    switchTo('insp-2');
+    act(() => FakeSocket.instances[1].open());
+    act(() => FakeSocket.instances[1].drop());
+    expect(handle.status).toBe('reconnecting');
+    expect(handle.connected).toBe(false);
+    act(() => { vi.advanceTimersByTime(1_000); });
+    expect(FakeSocket.instances).toHaveLength(3);
+    expect(FakeSocket.instances[2].url).toContain('insp-2');
+  });
+});
+
+function mountWithHandle() {
+  const handle: { status?: string; close: () => void } = { close: () => undefined };
+  const ds = createFakeDataSource({
+    data: createEmptyEditorData(),
+    urls: { presenceSocket: (id: string) => `wss://host.example/api/inspections/${id}/presence/ws` },
+    session: { userId: 'user-7' },
+  });
+  function Probe() {
+    const p = usePresence({ inspectionId: 'insp-1', userName: 'Inspector' });
+    handle.status = p.status;
+    handle.close = p.close;
+    return null;
+  }
+  render(
+    <FieldDataSourceProvider dataSource={ds}>
+      <Probe />
+    </FieldDataSourceProvider>,
+  );
+  return handle;
+}

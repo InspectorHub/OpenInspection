@@ -60,8 +60,8 @@ export const STRICT_POLICY_EVERY_NTH_PAGE = 20;
  *     frames from the same host; hooks.stripe.com is the 3-D Secure frame. The
  *     api / m / r hosts are Stripe.js's own XHR and telemetry endpoints.
  * Google Maps and the Cloudflare Stream player (its iframe and thumbnails) are deliberately not repeated
- * here; they are in the shared allowlist. There is no media-src: the clip played in the page itself comes
- * from the worker's own origin.
+ * here; they are in the shared allowlist. media-src is the same for pages and the API
+ * (own origin plus blob:, for the first-frame grab of an uploaded clip), so it is in the shared policy too.
  */
 const PAGE_EXTRA_SOURCES = {
     'script-src': ['https://js.stripe.com'],

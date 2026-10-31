@@ -23,6 +23,7 @@
  */
 import type { PendingMediaRecord, PendingMediaStore } from "@core/field-ui/media-types";
 import type { PhotoCropTransform } from "@core/field-ui/data-source-types";
+import { photoRefusal } from "@core/field-ui/shared/photo-admission";
 
 // ─── On-disk layout (frozen) ──────────────────────────────────────────────────
 
@@ -213,11 +214,39 @@ function isStoredPendingMedia(v: unknown): v is StoredPendingMedia {
     );
 }
 
+// ─── Admission ────────────────────────────────────────────────────────────────
+
+/** A refusal the editor can explain: `code` is one of the fixed reasons it classifies, the message is never shown. */
+function rejection(code: "UNSUPPORTED_TYPE" | "TOO_LARGE", message: string): Error & { code: string } {
+    return Object.assign(new Error(message), { code });
+}
+
+/**
+ * Refuse a photo the server would permanently refuse, before it is queued: over the server's photo ceiling, or bytes
+ * that are not a jpeg, png or heic image. The type is decided by the leading bytes with the server's own sniffer,
+ * never by the declared type or the file name. HEIC is accepted as a type: whether this browser can decode it is
+ * a separate step. Only a user-chosen photo is checked here; the editor checks a crop or an annotation with the same function before it queues one.
+ */
+async function assertAdmissible(rec: PendingMediaRecord): Promise<void> {
+    if (rec.kind !== "photo") return;
+    const refusal = await photoRefusal(rec.blob);
+    if (refusal === "TOO_LARGE") throw rejection(refusal, "photo is over the size limit");
+    if (refusal === "UNSUPPORTED_TYPE") throw rejection(refusal, "photo is not a jpeg, png or heic image");
+}
+
 // ─── The store ────────────────────────────────────────────────────────────────
 
 export const webMediaStore: PendingMediaStore = {
-    /** Rejects on a write failure (see the module note). */
-    put: (rec) => withStore<IDBValidKey>("readwrite", (store) => store.put(toStored(rec))).then(() => undefined),
+    /**
+     * Rejects on a write failure (see the module note), and with a coded error (`UNSUPPORTED_TYPE`, `TOO_LARGE`) for a
+     * photo the server would permanently refuse.
+     */
+    put: async (rec) => {
+        // Admission first: a photo about to be refused is not converted, so its specific reason is never masked.
+        await assertAdmissible(rec);
+        const row = toStored(rec);
+        await withStore<IDBValidKey>("readwrite", (store) => store.put(row));
+    },
 
     /** Resolves null when absent OR on any transient IndexedDB failure. */
     get: (pendingId) =>

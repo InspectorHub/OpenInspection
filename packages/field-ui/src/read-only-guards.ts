@@ -28,7 +28,7 @@ export function guardPhotoOps(ops: PhotoOps, readOnly: boolean): PhotoOps {
   if (!readOnly) return ops;
   return {
     ...ops,
-    onReorderPhotos: none, onBulkDetachPhotos: none, onBulkMovePhotos: none, onViewerAction: none, performPhotoCropSave: none,
-    performPhotoAnnotationSave: () => true,
+    onReorderPhotos: none, onBulkDetachPhotos: none, onBulkMovePhotos: none, onViewerAction: none, performPhotoCropSave: (_t, _b, _c, onChecked) => onChecked?.(true),
+    performPhotoAnnotationSave: (_t, _b, _n, onChecked) => { onChecked?.(true); return true; },
   };
 }

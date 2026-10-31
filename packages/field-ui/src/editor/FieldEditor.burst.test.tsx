@@ -12,7 +12,7 @@ import { mount } from "./FieldEditor.capabilities.fixtures";
 // The camera itself is not under test: a stand-in that is always mounted and can "finish" with one frame.
 vi.mock("../components/editor/BurstCamera", () => ({
   BurstCamera: ({ onCommit }: { onCommit: (blobs: Blob[]) => void }) => (
-    <button data-testid="burst-commit" onClick={() => onCommit([new Blob(["frame"], { type: "image/jpeg" })])} />
+    <button data-testid="burst-commit" onClick={() => onCommit([new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], { type: "image/jpeg" })])} />
   ),
 }));
 

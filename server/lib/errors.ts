@@ -111,6 +111,12 @@ export enum ErrorCode {
     ROLE_CEILING = 'ROLE_CEILING',
     // A manager tried to change their own permission overrides.
     SELF_PERMISSION_CHANGE = 'SELF_PERMISSION_CHANGE',
+    // A photo upload whose bytes are not a jpeg, png or heic image (400). A code of its own so a client can
+    // tell this refusal from every other 400 without reading the message.
+    UNSUPPORTED_PHOTO_TYPE = 'UNSUPPORTED_PHOTO_TYPE',
+    // A photo upload over the photo size ceiling (413). A code of its own so a client can tell the server's own
+    // size refusal from a 413 raised by a proxy or edge limit in front of it.
+    PHOTO_TOO_LARGE = 'PHOTO_TOO_LARGE',
 }
 
 /**
@@ -134,6 +140,8 @@ export class AppError extends Error {
  */
 export const Errors = {
     BadRequest: (msg: string, details?: unknown) => new AppError(400, ErrorCode.BAD_REQUEST, msg, details),
+    UnsupportedPhotoType: (msg: string) => new AppError(400, ErrorCode.UNSUPPORTED_PHOTO_TYPE, msg),
+    PhotoTooLarge: (msg: string) => new AppError(413, ErrorCode.PHOTO_TOO_LARGE, msg),
     Unauthorized: (msg: string = 'Unauthorized access') => new AppError(401, ErrorCode.UNAUTHORIZED, msg),
     Forbidden: (msg: string = 'Action forbidden', details?: unknown) => new AppError(403, ErrorCode.FORBIDDEN, msg, details),
     FinancialRequired: (field: string, capability: MoneyBucket) =>

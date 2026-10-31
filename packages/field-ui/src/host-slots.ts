@@ -42,6 +42,13 @@ export interface FieldHostSlots {
    * browser's close prompt) and renders its own confirmation. Absent means leaving is never intercepted.
    */
   renderUnsavedGuard?: (props: { atRisk: boolean }) => ReactNode;
+  /**
+   * A status element of the host's own (an offline indicator, say), shown beside the save state in the editor's header
+   * (desktop) and app bar (phone and tablet). It adds to the save state and never replaces it. Absent, or returning
+   * nothing, leaves the header as it was. It must be pure: it may be called more than once per render. The host owns the element's semantics (role, live region) and should keep it
+   * small: the phone app bar shares one row with the title and the More button.
+   */
+  renderStatus?: () => ReactNode;
   /** Told which layout band the browser really shows (after mount, and on change); a host that remembers it returns it as `EditorData.initialLayout`. */
   onLayoutObserved?: (layout: 'phone' | 'tablet' | 'desktop') => void;
 }

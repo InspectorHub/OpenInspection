@@ -11,13 +11,14 @@
  */
 import { createElement, type ReactNode } from 'react';
 import { act, cleanup, renderHook } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 import { appendPendingPhoto, markPhotoPending } from '../collab/results-binding';
 import { FieldDataSourceProvider } from '../context';
 import type { MediaUploader } from '../media-types';
 import { appendPhoto, projectResults, seedResultsDoc } from '../shared/results-doc';
 import { createEmptyEditorData, createFakeDataSource, type FakeDataSource } from '../testing/fake-data-source';
+import { m } from '../i18n';
 import { useMediaDrain } from './useMediaDrain';
 
 afterEach(cleanup);
@@ -79,6 +80,52 @@ describe('useMediaDrain', () => {
     await settle();
     expect(await ds.media.store.list(inspectionId)).toEqual([]);
     expect(keysOf(doc!)).toEqual(['retry/p1']);
+  });
+
+  it('a permanent rejection is reported with the fixed reason, dropped from the doc and the queue, and never retried', async () => {
+    const { ds, doc, hook, inspectionId, revoked } = setup();
+    await queue(ds, inspectionId, doc!, 'bad', 1);
+    await queue(ds, inspectionId, doc!, 'good', 2);
+    ds.media.uploader = () => ({
+      upload: async (rec) => (rec.pendingId === 'bad'
+        ? { ok: false, error: 'UNSUPPORTED_TYPE', permanent: true as const }
+        : { ok: true, key: `uploaded/${rec.pendingId}` }),
+    });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(await ds.media.store.list(inspectionId)).toEqual([]);
+    // Only the accepted photo is left in the doc; the refused one has no pending tile any more.
+    expect(keysOf(doc!)).toEqual(['uploaded/good']);
+    expect(revoked.sort()).toEqual(['bad', 'good']);
+    expect(ds.notifications.map((n) => [n.message, n.variant])).toEqual([
+      [m.editor_route_photos_partial_upload({ success: 1, total: 2, failed: 1 }), 'error'],
+      [m.editor_route_photo_unsupported_type({ count: 1, s: '' }), 'error'],
+    ]);
+    const attempts = ds.uploads.length;
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.uploads.length).toBe(attempts);
+  });
+
+  it('a refusal never raises the document save-failed message', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    await queue(ds, inspectionId, doc!, 'big', 1);
+    ds.failUpload('TOO_LARGE', { permanent: true });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.notifications.some((n) => n.message === m.editor_route_save_failed())).toBe(false);
+    expect(ds.notifications.map((n) => n.message)).toContain(m.editor_route_photo_too_large_single());
+  });
+
+  it('CONTROL - a transient failure (no permanent flag) stays queued, keeps its pending tile and says nothing', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    await queue(ds, inspectionId, doc!, 'p1', 1);
+    ds.failUpload('upload failed: 503');
+    act(() => hook.result.current.drain());
+    await settle();
+    expect((await ds.media.store.list(inspectionId)).map((r) => r.pendingId)).toEqual(['p1']);
+    expect(keysOf(doc!)).toEqual(['']);
+    expect(ds.notifications).toEqual([]);
   });
 
   it('maps the uploaded key onto the field of the record kind (crop -> croppedKey)', async () => {
@@ -152,5 +199,158 @@ describe('useMediaDrain', () => {
     const first = hook.result.current.drain;
     hook.rerender();
     expect(hook.result.current.drain).toBe(first);
+  });
+
+  async function queueCrop(ds: FakeDataSource, doc: Y.Doc, inspectionId: string, pendingId: string, photoKey: string, createdAt: number) {
+    markPhotoPending(doc, FK, photoKey, pendingId, 'crop', {});
+    await ds.media.store.put({
+      pendingId, inspectionId, kind: 'crop', blob: new Blob(['c']), createdAt,
+      meta: { findingKey: FK, itemId: 'i1', photoIndex: 1, photoKey, crop: { aspect: 'free', orientation: 'landscape', x: 0, y: 0, width: 1, height: 1 } },
+    });
+  }
+
+  it('crop uploads do not count as photos: one refused photo plus two good crops announces only the refusal', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    appendPhoto(doc!, FK, { key: 'base1.jpg', mediaType: 'photo' });
+    appendPhoto(doc!, FK, { key: 'base2.jpg', mediaType: 'photo' });
+    await queue(ds, inspectionId, doc!, 'big', 1);
+    await queueCrop(ds, doc!, inspectionId, 'c1', 'base1.jpg', 2);
+    await queueCrop(ds, doc!, inspectionId, 'c2', 'base2.jpg', 3);
+    ds.media.uploader = () => ({
+      upload: async (rec) => (rec.pendingId === 'big'
+        ? { ok: false, error: 'TOO_LARGE', permanent: true as const }
+        : { ok: true, key: `uploaded/${rec.pendingId}` }),
+    });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.notifications.map((n) => n.message)).toEqual([m.editor_route_photo_too_large_single()]);
+  });
+
+  it('CONTROL - two good photos plus one refused photo still read "2 of 3 photos uploaded"', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    await queue(ds, inspectionId, doc!, 'big', 1);
+    await queue(ds, inspectionId, doc!, 'g1', 2);
+    await queue(ds, inspectionId, doc!, 'g2', 3);
+    ds.media.uploader = () => ({
+      upload: async (rec) => (rec.pendingId === 'big'
+        ? { ok: false, error: 'TOO_LARGE', permanent: true as const }
+        : { ok: true, key: `uploaded/${rec.pendingId}` }),
+    });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.notifications.map((n) => n.message)).toEqual([
+      m.editor_route_photos_partial_upload({ success: 2, total: 3, failed: 1 }),
+      m.editor_route_photo_too_large_single(),
+    ]);
+  });
+
+  it('a refused crop never says a photo is too large and never touches the photo tile', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    appendPhoto(doc!, FK, { key: 'base1.jpg', mediaType: 'photo' });
+    await queueCrop(ds, doc!, inspectionId, 'c1', 'base1.jpg', 1);
+    ds.failUpload('TOO_LARGE', { permanent: true });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.notifications).toEqual([]);
+    expect(await ds.media.store.list(inspectionId)).toEqual([]);
+    expect(keysOf(doc!)).toEqual(['base1.jpg']);
+  });
+
+  const pendingOf = (doc: Y.Doc, photoKey: string) =>
+    ((projectResults(doc)[FK]?.photos ?? []) as Array<{ key: string; pendingId?: string; pendingKind?: string }>).find((p) => p.key === photoKey);
+
+  it('a refused crop clears its pending marker, keeps the original photo, and says nothing', async () => {
+    const { ds, doc, hook, inspectionId } = setup();
+    appendPhoto(doc!, FK, { key: 'base1.jpg', mediaType: 'photo' });
+    appendPhoto(doc!, FK, { key: 'base2.jpg', mediaType: 'photo' });
+    await queueCrop(ds, doc!, inspectionId, 'c1', 'base1.jpg', 1);
+    await queueCrop(ds, doc!, inspectionId, 'c2', 'base2.jpg', 2);
+    expect(pendingOf(doc!, 'base1.jpg')).toMatchObject({ pendingId: 'c1', pendingKind: 'crop' });
+    ds.media.uploader = () => ({
+      upload: async (rec) => (rec.pendingId === 'c1'
+        ? { ok: false, error: 'TOO_LARGE', permanent: true as const }
+        : { ok: false, error: 'HTTP_500' }),
+    });
+    act(() => hook.result.current.drain());
+    await settle();
+    expect(ds.notifications).toEqual([]);
+    expect(keysOf(doc!)).toEqual(['base1.jpg', 'base2.jpg']);
+    expect(pendingOf(doc!, 'base1.jpg')).not.toHaveProperty('pendingId');
+    expect(pendingOf(doc!, 'base1.jpg')).not.toHaveProperty('pendingKind');
+    // CONTROL - the crop that failed transiently keeps its marker and its queued record for the next drain.
+    expect(pendingOf(doc!, 'base2.jpg')).toMatchObject({ pendingId: 'c2', pendingKind: 'crop' });
+    expect((await ds.media.store.list(inspectionId)).map((r) => r.pendingId)).toEqual(['c2']);
+  });
+
+  it('a refused annotation clears its pending marker too, and a throwing revoke callback does not stop it', async () => {
+    const inspectionId = `drain-${(nextInspection += 1)}`;
+    const ds = createFakeDataSource({ data: createEmptyEditorData() });
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'base1.jpg', mediaType: 'photo' });
+    markPhotoPending(doc, FK, 'base1.jpg', 'a1', 'annotate', { annotationsJson: '[]' });
+    await ds.media.store.put({
+      pendingId: 'a1', inspectionId, kind: 'annotate', blob: new Blob(['a']), createdAt: 1,
+      meta: { findingKey: FK, itemId: 'i1', photoIndex: 0, photoKey: 'base1.jpg', nodesJson: '[]' },
+    });
+    ds.failUpload('TOO_LARGE', { permanent: true });
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(FieldDataSourceProvider, { dataSource: ds }, children);
+    const hook = renderHook(() => useMediaDrain(inspectionId, doc, () => { throw new Error('revoke blew up'); }), { wrapper });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+    try {
+      act(() => hook.result.current.drain());
+      await settle();
+      expect(pendingOf(doc, 'base1.jpg')).not.toHaveProperty('pendingId');
+      expect(await ds.media.store.list(inspectionId)).toEqual([]);
+      expect(ds.notifications).toEqual([]);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('a throwing host callback does not wedge the drain: the refusal is still announced and the next photo uploads', async () => {
+    const inspectionId = `drain-${(nextInspection += 1)}`;
+    const ds = createFakeDataSource({ data: createEmptyEditorData() });
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(FieldDataSourceProvider, { dataSource: ds }, children);
+    const hook = renderHook(() => useMediaDrain(inspectionId, doc, (id) => { if (id === 'bad') throw new Error('revoke blew up'); }), { wrapper });
+    await queue(ds, inspectionId, doc, 'bad', 1);
+    await queue(ds, inspectionId, doc, 'good', 2);
+    ds.media.uploader = () => ({
+      upload: async (rec) => (rec.pendingId === 'bad'
+        ? { ok: false, error: 'TOO_LARGE', permanent: true as const }
+        : { ok: true, key: `uploaded/${rec.pendingId}` }),
+    });
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+    try {
+      act(() => hook.result.current.drain());
+      await settle();
+      expect(keysOf(doc)).toEqual(['uploaded/good']);
+      expect(await ds.media.store.list(inspectionId)).toEqual([]);
+      expect(ds.notifications.map((n) => n.message)).toContain(m.editor_route_photo_too_large_single());
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  it('a drain that cannot even list the queue is swallowed and logged, not left as an unhandled rejection', async () => {
+    const { ds, doc, hook } = setup();
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+    process.on('unhandledRejection', onUnhandled);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+    try {
+      ds.media.store.list = async () => { throw new Error('idb closed'); };
+      expect(doc).not.toBeNull();
+      act(() => hook.result.current.drain());
+      await settle();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(logged).toHaveBeenCalled();
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+      logged.mockRestore();
+    }
   });
 });

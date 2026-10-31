@@ -204,12 +204,13 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                       <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-3">{m.editor_siderail_tab_photos()}</span>
                       <div className="mt-1 grid grid-cols-3 gap-1">
                         {photoKeys.map((key, i) => {
-                          const url = urls.photo(inspectionId ?? "", key);
+                          const url = urls.photo(inspectionId ?? "", key, "thumb");
+                          const originalUrl = urls.photo(inspectionId ?? "", key, "original");
                           const name = photoDisplayName(key);
                           return (
                             <a
                               key={i}
-                              href={withDownload(url)}
+                              href={withDownload(originalUrl)}
                               download={name}
                               title={m.editor_siderail_download_title({ name })}
                               className="block"

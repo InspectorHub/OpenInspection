@@ -36,7 +36,7 @@ async function pickBatch(withDecoder: boolean, files: File[], expectUploads = tr
         ? {
             decodeImage: async (file: Blob) => {
               if ((file as File).name === "bad.heic") throw new DecodeImageError("UNSUPPORTED", "Install the HEIF codec.");
-              return { blob: new Blob(["converted"], { type: "image/jpeg" }) };
+              return { blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], { type: "image/jpeg" }) };
             },
           }
         : {}),

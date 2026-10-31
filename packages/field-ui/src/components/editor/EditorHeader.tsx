@@ -8,6 +8,7 @@ import { ProgressStripText } from "./ProgressStripText";
 import { TemplateMenu } from "./TemplateMenu";
 import { PreviewMenu } from "./PreviewMenu";
 import { SaveStatusIndicator } from "./SaveStatusIndicator";
+import { WithHostStatus } from "./HostStatus";
 import { HEADER_OVERFLOW } from "./header-visibility";
 import { runWithPending } from "./publish-pending";
 import { HeaderOverflowMenu } from "./HeaderOverflowMenu";
@@ -83,7 +84,7 @@ export function EditorHeader({
 }: EditorHeaderProps) {
  // The PDF preview and the theme switch are host UI (see `FieldHostSlots`); a host that
  // supplies none simply gets no such entry point.
- const { pdf, renderThemeControl } = useFieldSlots();
+ const { pdf, renderThemeControl, renderStatus } = useFieldSlots();
  const caps = useEditorCapabilities();
  const readOnly = useReadOnly();
  const { urls, exit } = useFieldDataSource();
@@ -158,7 +159,7 @@ export function EditorHeader({
  </div>
 
  {/* Save status indicator */}
- <SaveStatusIndicator status={state.saveStatus} />
+ <WithHostStatus indicator={<SaveStatusIndicator status={state.saveStatus} />} renderStatus={renderStatus} />
 
  {/* Status badge */}
  <span data-testid="header-status" className="hidden min-[1400px]:inline-flex shrink-0 whitespace-nowrap px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-ih-bg-muted text-ih-fg-2 ring-ih-border items-center">

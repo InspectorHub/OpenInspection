@@ -54,6 +54,16 @@ describe('guardPhotoOps', () => {
     expect(calls).toHaveBeenCalledTimes(1);
   });
 
+  it('read-only: a crop or annotation save tells its dialog it may close (once), so the dialog is not left open', () => {
+    calls.mockClear();
+    const g = guardPhotoOps(ops, true);
+    const told: boolean[] = [];
+    g.performPhotoCropSave({ itemId: 'i', photoIndex: 0 }, new Blob(), {} as never, (ok) => { told.push(ok); });
+    g.performPhotoAnnotationSave({ itemId: 'i', photoIndex: 0 }, new Blob(), '', (ok) => { told.push(ok); });
+    expect(told).toEqual([true, true]);
+    expect(calls).not.toHaveBeenCalled();
+  });
+
   it('CONTROL - not read-only it is the very same object', () => {
     expect(guardPhotoOps(ops, false)).toBe(ops);
   });

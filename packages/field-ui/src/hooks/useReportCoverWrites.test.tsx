@@ -5,6 +5,7 @@ import type { CommandResult, FieldCommand } from '../commands';
 import { FieldDataSourceProvider } from '../context';
 import type { FieldDataSource } from '../data-source';
 import { m } from '../i18n';
+import { MAX_PHOTO_BYTES } from '../shared/photo-limits';
 import { createEmptyEditorData, createFakeDataSource } from '../testing/fake-data-source';
 import type { FakeDataSource } from '../testing/fake-data-source';
 import { useReportCoverWrites } from './useReportCoverWrites';
@@ -160,5 +161,69 @@ describe('useReportCoverWrites', () => {
       writes.annotate({ itemId: 'i1', photoIndex: 0, nodes: '[]', image: image() });
     });
     expect(sent).toHaveLength(1);
+  });
+});
+
+describe('useReportCoverWrites: the image is checked before the command is created', () => {
+  const jpeg = () => new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], { type: 'image/jpeg' });
+  const tooLarge = () => new Blob([new Uint8Array(MAX_PHOTO_BYTES + 1)], { type: 'image/jpeg' });
+  const notAnImage = () => new Blob(['%PDF-1.7'], { type: 'image/jpeg' });
+  const calls = [
+    ['cover crop', 'crop-cover', (img: Blob) => writes.cropCoverChecked({ sourceKey: 'k1', crop: '{}', image: img })],
+    ['annotation fallback', 'annotate', (img: Blob) => writes.annotateChecked({ itemId: 'i1', photoIndex: 0, nodes: '[]', image: img })],
+  ] as const;
+
+  for (const [name, type, call] of calls) {
+    it(`${name}: an image over the ceiling or not an image sends no command, says why once and resolves false`, async () => {
+      const { fake, sent } = parked();
+      mount(fake);
+      let outcomes: boolean[] = [];
+      await act(async () => { outcomes = [await call(tooLarge()), await call(notAnImage())]; });
+      expect(outcomes).toEqual([false, false]);
+      expect(sent).toEqual([]);
+      expect(fake.notifications.map((n) => [n.message, n.variant])).toEqual([
+        [m.editor_photo_save_too_large(), 'error'],
+        [m.editor_photo_save_unsupported_type(), 'error'],
+      ]);
+    });
+
+    it(`${name}: CONTROL - an admissible image sends exactly one command, silently, and resolves true`, async () => {
+      const { fake, sent } = parked();
+      mount(fake);
+      let ok = false;
+      await act(async () => { ok = await call(jpeg()); });
+      expect(ok).toBe(true);
+      expect(sent.map((c) => c.type)).toEqual([type]);
+      expect(fake.notifications).toEqual([]);
+    });
+  }
+
+  it('the synchronous cropCover / annotate contract is unchanged: they send in the same frame without a check', () => {
+    const { fake, sent } = parked();
+    mount(fake);
+    act(() => writes.cropCover({ sourceKey: 'k1', crop: '{}', image: new Blob(['x']) }));
+    expect(sent.map((c) => c.type)).toEqual(['crop-cover']);
+  });
+});
+
+describe('useReportCoverWrites.annotateChecked: an attempt that was cancelled while the image was checked', () => {
+  const tooLarge = () => new Blob([new Uint8Array(MAX_PHOTO_BYTES + 1)], { type: 'image/jpeg' });
+  const input = (image: Blob) => ({ itemId: 'i1', photoIndex: 0, nodes: '[]', image });
+
+  it('is silent and sends nothing when the listener calls it off', async () => {
+    const { fake, sent } = parked();
+    mount(fake);
+    let ok = true;
+    await act(async () => { ok = await writes.annotateChecked(input(tooLarge()), () => false); });
+    expect(ok).toBe(false);
+    expect(sent).toEqual([]);
+    expect(fake.notifications).toEqual([]);
+  });
+
+  it('CONTROL - a genuine refusal with a listener that does not call it off is announced once', async () => {
+    const { fake } = parked();
+    mount(fake);
+    await act(async () => { await writes.annotateChecked(input(tooLarge()), () => undefined); });
+    expect(fake.notifications.map((n) => n.message)).toEqual([m.editor_photo_save_too_large()]);
   });
 });

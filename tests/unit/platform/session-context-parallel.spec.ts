@@ -14,8 +14,18 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
-const SLOW_MS = 150;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/**
+ * Each read waits on a gate the test opens by hand, so the property under test is read off the order of events and
+ * not off a clock: a read that starts only after another one finished can never have all three in flight at once.
+ */
+const events: string[] = [];
+const gates: Array<() => void> = [];
+const gatedRead = <T>(name: string, value: T): Promise<T> => {
+    events.push(`start:${name}`);
+    return new Promise<T>((resolve) => {
+        gates.push(() => { events.push(`finish:${name}`); resolve(value); });
+    });
+};
 const hooks = vi.hoisted(() => ({
     seat: vi.fn(),
     video: vi.fn(),
@@ -33,6 +43,8 @@ let testDb: BetterSQLite3Database<typeof schema>;
 const unread = vi.fn();
 
 beforeEach(async () => {
+    events.length = 0;
+    gates.length = 0;
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
@@ -41,9 +53,9 @@ beforeEach(async () => {
     await testDb.insert(schema.users).values({
         id: 'u-1', tenantId: TENANT_ID, email: 'u@example.com', passwordHash: 'x', role: 'inspector', createdAt: new Date(),
     } as never);
-    hooks.seat.mockReset().mockImplementation(async () => { await sleep(SLOW_MS); return { used: 2, max: 5 }; });
-    hooks.video.mockReset().mockImplementation(async () => { await sleep(SLOW_MS); return { provider: 'stream' }; });
-    unread.mockReset().mockImplementation(async () => { await sleep(SLOW_MS); return 7; });
+    hooks.seat.mockReset().mockResolvedValue({ used: 2, max: 5 });
+    hooks.video.mockReset().mockResolvedValue({ provider: 'stream' });
+    unread.mockReset().mockResolvedValue(7);
 });
 
 function buildApp() {
@@ -66,16 +78,23 @@ type Body = { data: { seatUsage: unknown; videoProvider: string; unreadMessages:
 
 describe('session context secondary reads', () => {
     it('finish in about the time of the slowest read, not the sum of all of them', async () => {
-        const t0 = performance.now();
-        const res = await buildApp().request('/api/session/context');
-        const elapsed = performance.now() - t0;
+        hooks.seat.mockReset().mockImplementation(() => gatedRead('seat', { used: 2, max: 5 }));
+        hooks.video.mockReset().mockImplementation(() => gatedRead('video', { provider: 'stream' }));
+        unread.mockReset().mockImplementation(() => gatedRead('unread', 7));
+        const pending = Promise.resolve(buildApp().request('/api/session/context'));
+        // All three reads are in flight before any of them is allowed to finish. A serial route would stall on the
+        // first gate and never start the second read, so this wait would time out.
+        await vi.waitFor(() => expect(events.filter((e) => e.startsWith('start:')).sort()).toEqual(['start:seat', 'start:unread', 'start:video']));
+        expect(events.some((e) => e.startsWith('finish:'))).toBe(false);
+        for (const open of gates) open();
+        const res = await pending;
         expect(res.status).toBe(200);
         const body = await res.json() as Body;
         expect(body.data.seatUsage).toEqual({ used: 2, limit: 5 });
         expect(body.data.videoProvider).toBe('stream');
         expect(body.data.unreadMessages).toBe(7);
-        // Sequential would be at least 3 * SLOW_MS (450). One wave is about 150.
-        expect(elapsed).toBeLessThan(SLOW_MS * 2.2);
+        // No read started after another had finished: every start precedes every finish.
+        expect(events.slice(0, 3).every((e) => e.startsWith('start:'))).toBe(true);
     });
 
     it('a video provider failure still falls back to r2 and leaves the other answers intact', async () => {

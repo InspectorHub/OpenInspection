@@ -101,8 +101,16 @@
   --font-ih-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/* Notices sit 1rem from the bottom edge (Toast's fallback); while the phone nav is mounted they sit above it. */
+:root[data-mobile-nav] {
+  --ih-toast-bottom: calc(var(--ih-mobile-nav-h) + 1rem);
+}
+
 /* ── CSS custom properties: light mode (default) ── */
 :root {
+  /* The phone editor's fixed bottom nav: one row plus the device's bottom inset. The nav, the page padding that clears
+     it and the floating notices all read this, so they cannot disagree. */
+  --ih-mobile-nav-h: calc(3.5rem + env(safe-area-inset-bottom));
   /* #6366f1 (indigo-500) measured 4.47:1 on the white card — 0.03 short, and
      symmetric, so the same 4.47 governed an indigo link AND white label text
      on a filled indigo button. #6265f0 is one step of 1/255 per channel and

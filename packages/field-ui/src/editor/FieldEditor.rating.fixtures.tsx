@@ -5,7 +5,7 @@
 import { render } from "@testing-library/react";
 import type * as Y from "yjs";
 import { FieldDataSourceProvider } from "../context";
-import type { EditorData, FieldDataSource, FieldResources } from "../data-source";
+import type { EditorData, FieldDataSource, FieldHostSlots, FieldResources } from "../data-source";
 import { createEmptyEditorData, createFakeDataSource } from "../testing/fake-data-source";
 import { FieldEditor } from "./FieldEditor";
 import { stubCamera, stubViewport } from "./FieldEditor.capabilities.fixtures";
@@ -45,10 +45,12 @@ export interface RatingMountOptions {
   data?: EditorData;
   resources?: Partial<FieldResources>;
   readOnly?: boolean;
+  /** Host slots added to the defaults of this mount. */
+  slots?: FieldHostSlots;
 }
 
 /** Mounts the editor at `width` (390 phone, 834 tablet, 1280 desktop) and captures the results document it connects. */
-export function mountForRatings(width: number, { platform = "web", data = RATING_DATA, resources, readOnly }: RatingMountOptions = {}): RatingMount {
+export function mountForRatings(width: number, { platform = "web", data = RATING_DATA, resources, readOnly, slots }: RatingMountOptions = {}): RatingMount {
   stubViewport(width);
   stubCamera(true);
   const fake = createFakeDataSource({ data, session: { collabEditing: true, tenantSlug: null }, platform, resources });
@@ -60,7 +62,7 @@ export function mountForRatings(width: number, { platform = "web", data = RATING
     return c;
   };
   render(
-    <FieldDataSourceProvider dataSource={fake} slots={{ humanCheck: "not-required", renderUnsavedGuard: () => <div data-testid="unsaved-guard" /> }}>
+    <FieldDataSourceProvider dataSource={fake} slots={{ humanCheck: "not-required", renderUnsavedGuard: () => <div data-testid="unsaved-guard" />, ...slots }}>
       <FieldEditor data={data} readOnly={readOnly} />
     </FieldDataSourceProvider>,
   );

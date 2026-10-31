@@ -44,6 +44,19 @@ export interface MediaUploader {
     upload(rec: PendingMediaRecord): Promise<UploadResult>;
 }
 
+/**
+ * Thrown by an uploader when the host refused these very bytes and will refuse them every time (an unsupported file,
+ * an oversized one). The drain then stops retrying the record: it reports it through `onRejected` and removes it. The
+ * message is the host's fixed reason code (for example `TOO_LARGE`). A network failure or a 5xx is NOT this: it stays an
+ * ordinary rejection and the record is retried on the next drain.
+ */
+export class PermanentUploadError extends Error {
+    constructor(reason: string) {
+        super(reason);
+        this.name = 'PermanentUploadError';
+    }
+}
+
 export interface DrainDeps {
     inspectionId: string;
     /** Where the pending records live. */
@@ -62,6 +75,12 @@ export interface DrainDeps {
      * record again). Optional: the host decides whether to log it.
      */
     onCleanupFailed?: (rec: PendingMediaRecord, error: unknown) => void;
+    /**
+     * Called once for a record whose upload failed with a `PermanentUploadError` (`reason` is its message), after
+     * which the record is deleted and never uploaded again. The caller removes the matching pending doc entry and
+     * tells the person. Such a record is not counted in `failed`.
+     */
+    onRejected?: (rec: PendingMediaRecord, reason: string) => void;
 }
 
 export interface DrainSummary {
@@ -87,6 +106,12 @@ const draining = new Set<string>();
  */
 const swapped = new Set<string>();
 
+/** Records uploaded whose doc swap threw: kept in the store, not uploaded again this session (a later session retries). */
+const swapFailed = new Set<string>();
+
+/** Records the host permanently refused whose local delete failed: reported already, never uploaded again. */
+const refused = new Set<string>();
+
 // ─── Public API ─────────────────────────────────────────────────────────────────
 
 /**
@@ -106,7 +131,8 @@ export async function enqueueMedia(store: PendingMediaStore, rec: PendingMediaRe
  *
  * For each record: `await uploader.upload(rec)`; on success call
  * `onUploaded(rec, result)` then `store.delete(rec.pendingId)`; on a
- * failed upload, leave the record queued and continue. Returns counts of
+ * failed upload, leave the record queued and continue. If `onUploaded` throws the
+ * record is also kept (counted failed, not uploaded again this session) and the drain continues. Returns counts of
  * uploaded vs failed. Concurrent drains for the same inspection are coalesced
  * (the second returns `{ uploaded: 0, failed: 0 }`).
  */
@@ -125,24 +151,53 @@ export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
         // Oldest first, whatever order the store happens to list in.
         const pending = [...(await store.list(inspectionId))].sort((a, b) => a.createdAt - b.createdAt);
         for (const rec of pending) {
-            if (!swapped.has(rec.pendingId)) {
-                let result: UploadResult;
+            if (swapFailed.has(rec.pendingId)) continue;
+            if (!swapped.has(rec.pendingId) && !refused.has(rec.pendingId)) {
+                let result: UploadResult | undefined;
                 try {
                     result = await uploader.upload(rec);
-                } catch {
-                    // Upload failed — leave the record queued for the next drain.
-                    failed += 1;
-                    continue;
+                } catch (error) {
+                    if (error instanceof PermanentUploadError) {
+                        // The host will never accept these bytes: report once, then stop carrying them.
+                        refused.add(rec.pendingId);
+                        try {
+                            deps.onRejected?.(rec, error.message);
+                        } catch {
+                            // A throwing host callback must not wedge the queue: the record is already refused, so it is
+                            // still deleted below and the drain moves on. Fixed wording only; the host's error text is
+                            // not echoed.
+                            console.error('A rejected-photo handler failed; the refused photo was still removed from the local queue:', rec.pendingId);
+                        }
+                    } else {
+                        // Upload failed — leave the record queued for the next drain.
+                        failed += 1;
+                        continue;
+                    }
                 }
-                // Upload succeeded — swap the doc entry, then drop the local blob.
-                onUploaded(rec, result);
-                swapped.add(rec.pendingId);
-                uploaded += 1;
+                if (result) {
+                    // Upload succeeded — swap the doc entry, then drop the local blob.
+                    try {
+                        onUploaded(rec, result);
+                    } catch {
+                        // The bytes ARE on the server but the doc entry was not swapped, so it still says "pending". The
+                        // record is KEPT: deleting it would strand a placeholder with nothing to re-link it, and a photo
+                        // must never be lost. Held for this session so it is not uploaded again here; a later session
+                        // uploads and swaps it again, at the cost of a possible duplicate server copy. Counted failed;
+                        // the drain goes on. Fixed wording only; the host's error text is not echoed.
+                        swapFailed.add(rec.pendingId);
+                        failed += 1;
+                        console.error('An uploaded-photo handler failed; the photo stays in the local queue:', rec.pendingId);
+                        continue;
+                    }
+                    swapped.add(rec.pendingId);
+                    uploaded += 1;
+                }
             }
             // A failed cleanup must not wedge the drain: the next drain re-attempts the delete only.
             try {
                 await store.delete(rec.pendingId);
                 swapped.delete(rec.pendingId);
+                refused.delete(rec.pendingId);
             } catch (error) {
                 deps.onCleanupFailed?.(rec, error);
             }

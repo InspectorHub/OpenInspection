@@ -9,16 +9,22 @@ import { FieldDataSourceProvider } from "../../context";
 import type { SettingsSheetData } from "../../data-source-types";
 import { createEmptyEditorData, createFakeDataSource, createFakeSettingsSheet } from "../../testing/fake-data-source";
 import type { FakeDataSource, FakeSettingsSheet } from "../../testing/fake-data-source";
+import { m } from "../../i18n";
+import { MAX_PHOTO_BYTES } from "../../shared/photo-limits";
 import { InspectionSettingsSheet } from "./InspectionSettingsSheet";
+
+/** The image the mocked cropper hands over; a test sets it to try a refused one. */
+const crop = vi.hoisted(() => ({ blob: null as Blob | null }));
+const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
 
 vi.mock("../media-studio/CoverCropper", () => ({
   coverCropFor: () => null,
   CoverCropper: ({ onSave }: { onSave: (b: Blob, c: unknown) => void }) => (
-    <button type="button" data-testid="crop-save" onClick={() => onSave(new Blob(["x"]), { aspect: "3:2", orientation: "landscape", pixels: { x: 1, y: 2, width: 30, height: 20 } })}>save crop</button>
+    <button type="button" data-testid="crop-save" onClick={() => onSave(crop.blob ?? new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])]), { aspect: "3:2", orientation: "landscape", pixels: { x: 1, y: 2, width: 30, height: 20 } })}>save crop</button>
   ),
 }));
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); crop.blob = null; });
 const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 30)); });
 
 const DATA: SettingsSheetData = {
@@ -149,9 +155,67 @@ describe("InspectionSettingsSheet", () => {
     fake.respondWith("upload-cover", { coverKey: "k9", coverUrl: "/p/k9.jpg" });
     await waitFor(() => expect(form()).not.toBeNull());
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    Object.defineProperty(input, "files", { value: [new File(["x"], "a.png", { type: "image/png" })], configurable: true });
+    Object.defineProperty(input, "files", { value: [new File([JPEG_BYTES], "a.png", { type: "image/png" })], configurable: true });
     fireEvent.change(input);
     expect(await screen.findByTestId("crop-save")).toBeTruthy();
     expect(document.querySelector('img[src="/p/k9.jpg"]')).not.toBeNull();
+  });
+
+  describe("the image is checked before any cover write is sent", () => {
+    const tooLarge = () => new Blob([new Uint8Array(MAX_PHOTO_BYTES + 1)], { type: "image/jpeg" });
+    const notAnImage = () => new Blob(["%PDF-1.7"], { type: "image/jpeg" });
+    const pick = (file: File) => {
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      fireEvent.change(input);
+    };
+
+    it("a picked cover over the ceiling is refused with the photo wording and nothing is sent", async () => {
+      const fake = mount(createFakeSettingsSheet(DATA));
+      await waitFor(() => expect(form()).not.toBeNull());
+      pick(new File([tooLarge()], "big.jpg", { type: "image/jpeg" }));
+      await settle();
+      expect(fake.commands).toEqual([]);
+      expect(fake.notifications.map((n) => [n.message, n.variant])).toEqual([[m.editor_route_photo_too_large_single(), "error"]]);
+    });
+
+    it("a picked cover that is not an image is refused with the photo wording and nothing is sent", async () => {
+      const fake = mount(createFakeSettingsSheet(DATA));
+      await waitFor(() => expect(form()).not.toBeNull());
+      pick(new File([notAnImage()], "x.jpg", { type: "image/jpeg" }));
+      await settle();
+      expect(fake.commands).toEqual([]);
+      expect(fake.notifications.map((n) => n.message)).toEqual([m.editor_route_photo_unsupported_type({ count: 1, s: "" })]);
+    });
+
+    it("CONTROL - after a refusal the next admissible pick is uploaded", async () => {
+      const fake = mount(createFakeSettingsSheet(DATA));
+      fake.respondWith("upload-cover", { coverKey: "k9", coverUrl: "/p/k9.jpg" });
+      await waitFor(() => expect(form()).not.toBeNull());
+      pick(new File([notAnImage()], "x.jpg", { type: "image/jpeg" }));
+      await settle();
+      pick(new File([JPEG_BYTES], "a.jpg", { type: "image/jpeg" }));
+      await settle();
+      expect(fake.commands.map((c) => c.cmd.type)).toEqual(["upload-cover"]);
+    });
+
+    it("a cropped cover that is too large or not an image is refused with the fixed sentence, nothing is sent and the cropper stays open", async () => {
+      const fake = mount(createFakeSettingsSheet(DATA));
+      await waitFor(() => expect(form()).not.toBeNull());
+      fireEvent.click(document.querySelector('img[alt="back"]')!.closest("button")!);
+      for (const [blob, sentence] of [[tooLarge(), m.editor_photo_save_too_large()], [notAnImage(), m.editor_photo_save_unsupported_type()]] as const) {
+        crop.blob = blob;
+        fireEvent.click(await screen.findByTestId("crop-save"));
+        await settle();
+        expect(fake.notifications.at(-1)).toMatchObject({ message: sentence, variant: "error" });
+      }
+      expect(fake.commands).toEqual([]);
+      expect(screen.queryByTestId("crop-save")).not.toBeNull();
+      // CONTROL - an admissible crop is sent and the cropper closes.
+      crop.blob = null;
+      fireEvent.click(screen.getByTestId("crop-save"));
+      await settle();
+      expect(fake.commands.map((c) => c.cmd.type)).toEqual(["crop-cover"]);
+    });
   });
 });

@@ -76,6 +76,7 @@
   "media_video_err_too_large": "Video is too large (max 200 MB).",
   "media_video_err_unexpected": "The video service returned an unexpected response. Please try again.",
   "media_video_err_upload": "Upload failed. Check your connection and try again.",
+  "media_video_poster_skipped": "The video was uploaded without a preview image because the image could not be used.",
   "media_video_err_upload_status": "Upload failed ({status}). Please try again.",
   "media_video_privacy_before": "This clip is stored as recorded. Location data embedded in the file is",
   "media_video_privacy_not": "not",

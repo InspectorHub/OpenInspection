@@ -11,6 +11,8 @@ import {
 } from "./annotations";
 import { AnnotationToolbar, type ToolId } from "./AnnotationToolbar";
 import { AnnotatorPlaceholder } from "./AnnotatorPlaceholder";
+import { exportFittingAnnotation } from "./annotation-fit";
+import { MAX_PHOTO_BYTES } from "../../shared/photo-limits";
 import { MeasureCalibration } from "./MeasureCalibration";
 import { usePhotoSource } from "./usePhotoSource";
 import { m } from "../../i18n";
@@ -271,30 +273,28 @@ export function PhotoAnnotator({
   /* -------------------------------------------------------------- */
   /* Save — export stage to PNG at NATURAL resolution                */
   /* -------------------------------------------------------------- */
-  const handleSave = useCallback(async () => {
+  const exportAndSave = useCallback(async () => {
     const stage = stageRef.current;
     if (!stage) return;
-    // pixelRatio 1/scale maps the scaled-down display stage back to natural px.
-    // konva@10 toBlob returns a Promise (callback optional).
-    let blob: Blob | null;
-    try {
-      blob = (await stage.toBlob({ pixelRatio: 1 / scale, mimeType: "image/png" })) as Blob | null;
-    } catch {
-      // Fallback for environments where toBlob is unavailable on the Stage.
-      const canvas = stage.toCanvas({ pixelRatio: 1 / scale });
-      blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob((b) => resolve(b), "image/png"),
-      );
-    }
+    // pixelRatio ratio/scale maps the display stage to natural px (ratio < 1: smaller when over the photo ceiling); konva@10 toBlob returns a Promise.
+    const render = async (ratio: number): Promise<Blob | null> => {
+      try {
+        return (await stage.toBlob({ pixelRatio: ratio / scale, mimeType: "image/png" })) as Blob | null;
+      } catch {
+        return new Promise<Blob | null>((resolve) => stage.toCanvas({ pixelRatio: ratio / scale }).toBlob((b) => resolve(b), "image/png"));
+      }
+    };
+    const blob = await exportFittingAnnotation(render, { width: natural.w, height: natural.h, limit: MAX_PHOTO_BYTES });
     if (!blob) return;
-    // P6 — derive `measure` annotations from the committed measure lines and
-    // serialize them together with the calibration so measurements persist.
+    // P6 — derive `measure` annotations from the committed lines and serialize them with the calibration.
     const measureAnns: Annotation[] = measures.map((seg) => ({
       kind: "measure", x: seg.a.x, y: seg.a.y, x2: seg.b.x, y2: seg.b.y, unit: calibUnit,
     }));
     const calibration = pxPerUnit != null ? { pxPerUnit, calibUnit } : null;
     onSave({ blob, nodesJson: serializeMeasureDoc([...annotations, ...measureAnns], calibration), caption });
-  }, [annotations, measures, calibUnit, pxPerUnit, caption, scale, onSave]);
+  }, [annotations, measures, calibUnit, pxPerUnit, caption, scale, natural.w, natural.h, onSave]);
+  const exporting = useRef(false); // one export at a time: a second press would bake the same strokes twice
+  const handleSave = useCallback(() => { if (!exporting.current) { exporting.current = true; void exportAndSave().finally(() => { exporting.current = false; }); } }, [exportAndSave]);
 
   /* -------------------------------------------------------------- */
   /* Render                                                          */

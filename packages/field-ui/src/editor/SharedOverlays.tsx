@@ -30,6 +30,7 @@ import type { usePhotoOps } from "../hooks/usePhotoOps";
 import type { EditorCapabilities } from "../hooks/useEditorCapabilities";
 import type { ResultsProjection } from "../shared/results-doc.types";
 import { m } from "../i18n";
+import { usePhotoDialogSaves } from "../hooks/usePhotoDialogSaves";
 
 type PhotoOps = ReturnType<typeof usePhotoOps>;
 
@@ -122,6 +123,9 @@ export function SharedOverlays({
     setSessionCoverCrop, performPhotoCropSave, performPhotoAnnotationSave,
   } = photoOps;
   const readOnly = useReadOnly();
+  const { saveCrop, cancelCrop, saveAnnotation, closeStudio } = usePhotoDialogSaves({
+    performPhotoCropSave, performPhotoAnnotationSave, setPhotoCropTarget, setRecropWarn, setStudioOpen: studio.setOpen, annotateChecked: coverWrites.annotateChecked, photoCropTarget, studioOpen: studio.open,
+  });
   return (
     <>
  {/* Burst camera overlay */}
@@ -149,25 +153,12 @@ export function SharedOverlays({
  } : undefined}
  onSave={({ blob, nodesJson }) => {
   const itemId = state.activeItemId;
-  if (itemId && studio.index != null) {
-   const sectionId = state.currentSection?.id;
-   // #181 — the Y.Doc owns results.data: bake the annotation PNG to R2 + mirror
-   // the returned annotatedKey into the doc (offline refuses with a toast).
-   // performPhotoAnnotationSave returns false only in the brief pre-connect
-   // window before the doc is live; fall back to the online annotate relay then.
-   if (!performPhotoAnnotationSave({ itemId, photoIndex: studio.index, sectionId }, blob, nodesJson)) {
-    coverWrites.annotate({
-     itemId,
-     photoIndex: studio.index,
-     nodes: nodesJson,
-     image: new File([blob], "annotated.png", { type: "image/png" }),
-     ...(sectionId ? { sectionId } : {}),
-    });
-   }
-  }
-  studio.setOpen(false);
+  if (!itemId || studio.index == null) { closeStudio(); return; }
+  // #181 — the Y.Doc owns results.data: the annotation PNG is baked to R2 and its annotatedKey mirrored into the doc.
+  // The studio closes once the image is admitted; a refused image leaves it open with the strokes in it.
+  saveAnnotation({ itemId, photoIndex: studio.index, sectionId: state.currentSection?.id }, blob, nodesJson);
  }}
- onClose={() => studio.setOpen(false)}
+ onClose={closeStudio}
  />
 
  {/* Task 8 — unified MediaViewer for an item's photo strip (tap a thumbnail
@@ -205,14 +196,8 @@ export function SharedOverlays({
   allowFree
   title={m.editor_route_crop_photo()}
   saveLabel={m.editor_route_save_crop()}
-  onCancel={() => setPhotoCropTarget(null)}
-  onSave={(blob, crop) => {
-   const target = photoCropTarget;
-   setPhotoCropTarget(null);
-   const run = () => performPhotoCropSave(target, blob, crop);
-   if (target.hasAnnotation) setRecropWarn({ run });
-   else run();
-  }}
+  onCancel={cancelCrop}
+  onSave={(blob, crop) => saveCrop(photoCropTarget, blob, crop)}
  />
  )}
 
@@ -282,15 +267,20 @@ export function SharedOverlays({
   onCancel={() => setGalleryCropSource(null)}
   onSave={(blob, c) => {
    const crop = { aspect: c.aspect, orientation: c.orientation, ...c.pixels };
-   setSessionCoverCrop({ key: galleryCropSource.key, crop });
+   const source = galleryCropSource;
    // A repeat bakes a second derivative under a fresh random R2 key and orphans the first
    // (setCroppedCover), so a repeat of the same Save joins the one in flight; a different crop waits its turn.
-   coverWrites.cropCover({
-    sourceKey: galleryCropSource.key,
+   // The image is checked before the command is created (an image the server would refuse is announced, nothing
+   // is sent and the cropper stays open); the dialog closes once the crop is on its way.
+   void coverWrites.cropCoverChecked({
+    sourceKey: source.key,
     crop: JSON.stringify(crop),
     image: new File([blob], "cover.jpg", { type: "image/jpeg" }),
+   }).then((sent) => {
+    if (!sent) return;
+    setSessionCoverCrop({ key: source.key, crop });
+    setGalleryCropSource(null);
    });
-   setGalleryCropSource(null);
   }}
  />
  )}

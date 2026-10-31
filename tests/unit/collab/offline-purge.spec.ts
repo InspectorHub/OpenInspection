@@ -57,7 +57,7 @@ function pendingPhoto(inspectionId: string, pendingId: string): PendingMediaReco
         pendingId,
         inspectionId,
         kind: "photo",
-        blob: new Blob([new Uint8Array([1, 2, 3, 4])], { type: "image/jpeg" }),
+        blob: new Blob([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], { type: "image/jpeg" }),
         createdAt: Date.now(),
         meta: { targetType: "item", findingKey: "roof/shingles", itemId: "shingles" },
     };

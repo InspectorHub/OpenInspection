@@ -46,13 +46,48 @@ function uploadSignal(): AbortSignal | undefined {
     return controller.signal;
 }
 
-async function post(fd: FormData): Promise<{ ok: boolean; status: number; body: { data?: Record<string, string | undefined> } | null }> {
+interface MediaAnswer {
+    ok: boolean;
+    status: number;
+    body: { data?: Record<string, string | undefined> } | null;
+    /** The stable error code the route relays from the API; undefined on success or when there is none. */
+    code: string | undefined;
+}
+
+async function post(fd: FormData): Promise<MediaAnswer> {
     const signal = uploadSignal();
     const res = await fetch(MEDIA_UPLOAD_ENDPOINT, { method: "POST", credentials: "include", body: fd, ...(signal ? { signal } : {}) });
-    const body = res.ok
-        ? ((await res.json().catch(() => null)) as { data?: Record<string, string | undefined> } | null)
-        : null;
-    return { ok: res.ok, status: res.status, body };
+    if (res.ok) {
+        return { ok: true, status: res.status, body: (await res.json().catch(() => null)) as { data?: Record<string, string | undefined> } | null, code: undefined };
+    }
+    const failure = (await res.json().catch(() => null)) as { code?: unknown } | null;
+    return { ok: false, status: res.status, body: null, code: typeof failure?.code === "string" ? failure.code : undefined };
+}
+
+/** The server refused these very bytes with a stable code (see below): retrying cannot succeed. Every other failure is a plain Error. */
+class UploadRefused extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "UploadRefused";
+    }
+}
+
+/**
+ * Stable reason codes for a refused photo. Deleting a queued photo is irreversible, so a refusal is permanent ONLY when
+ * the server says so with a stable code the media route relays from the API, never by status alone and never by message
+ * text: `PHOTO_TOO_LARGE` (with 413) and `UNSUPPORTED_PHOTO_TYPE` (with 400). A bare 413 can come from a proxy or edge
+ * limit in front of the server, and a bare 400 also carries 'Storage not available' and 'itemId is required'; both, like
+ * 415, 422, 401/403, 429 and 5xx, stay generic: the photo stays queued and is retried.
+ */
+const TOO_LARGE = "TOO_LARGE";
+const UNSUPPORTED_TYPE = "UNSUPPORTED_TYPE";
+const API_PHOTO_TOO_LARGE = "PHOTO_TOO_LARGE";
+const API_UNSUPPORTED_PHOTO_TYPE = "UNSUPPORTED_PHOTO_TYPE";
+
+/** Throws the permanent refusal when the answer is one of the two coded ones; any other answer returns and is handled by the caller. */
+function throwIfRefused(res: MediaAnswer): void {
+    if (res.status === 413 && res.code === API_PHOTO_TOO_LARGE) throw new UploadRefused(TOO_LARGE);
+    if (res.status === 400 && res.code === API_UNSUPPORTED_PHOTO_TYPE) throw new UploadRefused(UNSUPPORTED_TYPE);
 }
 
 /** `doc` is null when the host has no results document yet; a crop or annotation then fails, a photo does not need one. */
@@ -67,6 +102,7 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
             if (rec.kind === "photo") {
                 fd.append("file", new File([rec.blob], "photo.jpg", { type: rec.blob.type || "image/jpeg" }));
                 const res = await post(fd);
+                throwIfRefused(res);
                 if (!res.ok) throw new Error(`upload failed: ${res.status}`);
                 const key = res.body?.data?.key;
                 if (!key) throw new Error("upload returned no key");
@@ -84,6 +120,7 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
                 fd.append("image", new File([rec.blob], "cropped.jpg", { type: "image/jpeg" }));
                 fd.append("crop", JSON.stringify(rec.meta.crop));
                 const res = await post(fd);
+                throwIfRefused(res);
                 if (!res.ok) throw new Error(`crop failed: ${res.status}`);
                 const croppedKey = res.body?.data?.croppedKey;
                 if (!croppedKey) throw new Error("crop returned no croppedKey");
@@ -93,6 +130,7 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
             fd.append("image", new File([rec.blob], "annotated.png", { type: "image/png" }));
             fd.append("nodes", rec.meta.nodesJson);
             const res = await post(fd);
+            throwIfRefused(res);
             if (!res.ok) throw new Error(`annotation failed: ${res.status}`);
             const annotatedKey = res.body?.data?.annotatedKey;
             if (!annotatedKey) throw new Error("annotation returned no annotatedKey");
@@ -115,7 +153,10 @@ export function createWebMediaUploader(inspectionId: string, doc: Y.Doc | null):
                 const key = rec.kind === "photo" ? result.key : rec.kind === "crop" ? result.croppedKey : result.annotatedKey;
                 return key ? { ok: true as const, key } : { ok: false as const, error: "upload returned no key" };
             } catch (err) {
-                return { ok: false as const, error: err instanceof Error && err.message ? err.message : "upload failed" };
+                const error = err instanceof Error && err.message ? err.message : "upload failed";
+                return err instanceof UploadRefused
+                    ? { ok: false as const, error, permanent: true as const }
+                    : { ok: false as const, error };
             }
         },
     };

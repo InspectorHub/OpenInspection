@@ -53,6 +53,9 @@ export function usePresence(options: {
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const backoffRef = useRef(400);
   const closedRef = useRef(false);
+  // The one pending reconnect, so a close (or a switch to another inspection) can cancel it instead of letting a stale
+  // closure open a socket for the old inspection.
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const send = useCallback((msg: Record<string, unknown>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -76,7 +79,12 @@ export function usePresence(options: {
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
+      // Only the CURRENT socket may act: after a close() or a switch to another inspection, an older socket's late events
+      // belong to a connection nobody is waiting for.
+      const isCurrent = () => wsRef.current === ws && !closedRef.current;
+
       ws.addEventListener("open", () => {
+        if (!isCurrent()) return;
         backoffRef.current = 400;
         everConnectedRef.current = true;
         setStatus("connected");
@@ -104,18 +112,18 @@ export function usePresence(options: {
       });
 
       ws.addEventListener("close", () => {
+        // A close the hook asked for (unmount or close()) has nothing left to report and nothing to reconnect, and
+        // neither has a socket that has since been replaced. Updating state here would also be wrong when the event
+        // arrives late, after the component and its environment are gone. The heartbeat belongs to the current socket,
+        // so a stale socket leaves it alone.
+        if (!isCurrent()) return;
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
         setConnected(false);
         setStatus(everConnectedRef.current ? "reconnecting" : "connecting");
         // Schedule reconnect
-        if (!closedRef.current) {
-          setTimeout(() => connect(), backoffRef.current);
-          backoffRef.current = Math.min(
-            backoffRef.current * 2,
-            MAX_BACKOFF,
-          );
-        }
+        reconnectTimerRef.current = setTimeout(() => connect(), backoffRef.current);
+        backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF);
       });
 
       ws.addEventListener("error", () => {
@@ -128,7 +136,7 @@ export function usePresence(options: {
     } catch {
       // URL malformed or network blocked
       if (!closedRef.current) {
-        setTimeout(() => connect(), backoffRef.current);
+        reconnectTimerRef.current = setTimeout(() => connect(), backoffRef.current);
         backoffRef.current = Math.min(
           backoffRef.current * 2,
           MAX_BACKOFF,
@@ -158,13 +166,21 @@ export function usePresence(options: {
     }
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     heartbeatRef.current = null;
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+    reconnectTimerRef.current = null;
     setConnected(false);
+    // No socket and none coming: the same word the footer already shows for "presence is not available", rather than
+    // a stale "connected" next to connected=false.
+    setStatus("unavailable");
   }, [send]);
 
   // Auto-connect on mount, disconnect on unmount
   useEffect(() => {
     if (!enabled) return;
     closedRef.current = false;
+    // A previous run's close() left "unavailable" and its connection history behind; this run starts fresh.
+    everConnectedRef.current = false;
+    setStatus("connecting");
     connect();
     return () => {
       close();

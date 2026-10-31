@@ -9,7 +9,7 @@ Two code paths produce responses, and each sets its own headers:
 | API (`/api/*`, webhooks, status) | `server/lib/middleware/security-headers.ts` |
 | HTML pages (everything the React Router renderer answers) | `server/lib/page-security-headers.ts`, applied in `workers/app.ts` |
 
-Both build their Content-Security-Policy from one allowlist, `server/lib/csp-policy.ts`, so the two cannot drift apart. That allowlist includes the Cloudflare Stream player (`frame-src`) and its thumbnails (`img-src`), so the enforced API policy allows them as well as the pages.
+Both build their Content-Security-Policy from one allowlist, `server/lib/csp-policy.ts`, so the two cannot drift apart. That allowlist includes the Cloudflare Stream player (`frame-src`) and its thumbnails (`img-src`), and `media-src 'self' blob:` (the first frame of an uploaded video is read from a `blob:` URL), so the enforced API policy allows them as well as the pages.
 
 ## Enforced on HTML pages
 

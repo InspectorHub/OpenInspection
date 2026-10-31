@@ -54,6 +54,36 @@ const PDF_SLOT: FieldHostSlots = {
 };
 const previewButton = () => screen.queryByRole('button', { name: /preview/i });
 
+describe('EditorHeader status slot', () => {
+  it('renders the host status next to the save state without replacing it', () => {
+    state.saveStatus = 'saved';
+    mount({ renderStatus: () => <span data-testid="host-status">Offline</span> });
+    const save = screen.getByTestId('save-status');
+    const host = screen.getByTestId('host-status');
+    expect(save.textContent).toBeTruthy();
+    const identity = screen.getByTestId('header-identity');
+    expect(identity.contains(save) && identity.contains(host)).toBe(true);
+    expect(save.compareDocumentPosition(host) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    state.saveStatus = 'idle';
+  });
+
+  it('shows the host status while the save state is idle', () => {
+    mount({ renderStatus: () => <span data-testid="host-status" /> });
+    expect(screen.queryByTestId('save-status')).toBeNull();
+    expect(screen.getAllByTestId('host-status')).toHaveLength(1);
+  });
+
+  it('CONTROL - without the slot the header is the same markup as with a slot that renders nothing', () => {
+    state.saveStatus = 'saved';
+    mount();
+    const without = screen.getByTestId('header-identity').innerHTML;
+    cleanup();
+    mount({ renderStatus: () => null });
+    expect(screen.getByTestId('header-identity').innerHTML).toBe(without);
+    state.saveStatus = 'idle';
+  });
+});
+
 describe('EditorHeader host slots', () => {
   it('renders without a theme control when the host supplies none', () => {
     mount();

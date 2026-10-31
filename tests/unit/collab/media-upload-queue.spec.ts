@@ -8,11 +8,12 @@
  * on-disk layout are covered by app/lib/field/web-media-store.test.ts.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { PendingMediaRecord, PendingMediaStore } from '@core/field-ui/media-types';
 import {
     enqueueMedia,
     drainMediaQueue,
+    PermanentUploadError,
     type MediaUploader,
     type UploadResult,
 } from '@core/field-ui/collab/media-upload-queue';
@@ -270,5 +271,142 @@ describe('media-upload-queue', () => {
         await enqueueMedia(store, makeRecord());
         const third = await drainMediaQueue({ ...deps, uploader: okUploader().uploader });
         expect(third.uploaded).toBe(1);
+    });
+    describe('a permanent rejection', () => {
+        it('is reported once, dropped from the queue and never uploaded again; transient failures and the rest of the queue are unaffected', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'REFUSED' }));
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 2, pendingId: 'FLAKY' }));
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 3, pendingId: 'OK' }));
+            const calls: string[] = [];
+            const uploader: MediaUploader = {
+                upload: async (rec) => {
+                    calls.push(rec.pendingId);
+                    if (rec.pendingId === 'REFUSED') throw new PermanentUploadError('UNSUPPORTED_TYPE');
+                    if (rec.pendingId === 'FLAKY') throw new Error('upload failed: 503');
+                    return { key: `r2/${rec.pendingId}` };
+                },
+            };
+            const rejected: Array<{ id: string; reason: string }> = [];
+            const deps = {
+                inspectionId: 'insp-1', store, uploader,
+                onUploaded: () => { /* noop */ },
+                onRejected: (rec: PendingMediaRecord, reason: string) => { rejected.push({ id: rec.pendingId, reason }); },
+            };
+            expect(await drainMediaQueue(deps)).toEqual({ uploaded: 1, failed: 1 });
+            expect(rejected).toEqual([{ id: 'REFUSED', reason: 'UNSUPPORTED_TYPE' }]);
+            expect([...store.rows.keys()]).toEqual(['FLAKY']);
+            // The next drain retries only the transient one.
+            calls.length = 0;
+            expect(await drainMediaQueue(deps)).toEqual({ uploaded: 0, failed: 1 });
+            expect(calls).toEqual(['FLAKY']);
+            expect(rejected).toHaveLength(1);
+        });
+
+        it('stays out of the retry loop even when its local copy cannot be deleted', async () => {
+            const rec = makeRecord({ inspectionId: 'insp-1', pendingId: 'STUCK' });
+            await enqueueMedia(store, rec);
+            const stubborn: PendingMediaStore = { ...store, delete: async () => { throw new Error('idb locked'); } };
+            const calls: string[] = [];
+            const uploader: MediaUploader = { upload: async (r) => { calls.push(r.pendingId); throw new PermanentUploadError('TOO_LARGE'); } };
+            const rejected: string[] = [];
+            const deps = { inspectionId: 'insp-1', store: stubborn, uploader, onUploaded: () => { /* noop */ }, onRejected: (r: PendingMediaRecord) => { rejected.push(r.pendingId); } };
+            await drainMediaQueue(deps);
+            await drainMediaQueue(deps);
+            expect(calls).toEqual(['STUCK']);
+            expect(rejected).toEqual(['STUCK']);
+        });
+
+        it('a throwing onRejected cannot wedge the drain: the record is deleted, never re-reported, later records still upload', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'BAD' }));
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 2, pendingId: 'NEXT' }));
+            const calls: string[] = [];
+            const uploader: MediaUploader = {
+                upload: async (rec) => {
+                    calls.push(rec.pendingId);
+                    if (rec.pendingId === 'BAD') throw new PermanentUploadError('TOO_LARGE');
+                    return { key: `r2/${rec.pendingId}` };
+                },
+            };
+            let reports = 0;
+            const deps = {
+                inspectionId: 'insp-1', store, uploader,
+                onUploaded: () => { /* noop */ },
+                onRejected: () => { reports += 1; throw new Error('host callback exploded: secret detail'); },
+            };
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+            try {
+                expect(await drainMediaQueue(deps)).toEqual({ uploaded: 1, failed: 0 });
+                expect([...store.rows.keys()]).toEqual([]);
+                expect(await drainMediaQueue(deps)).toEqual({ uploaded: 0, failed: 0 });
+                expect(calls).toEqual(['BAD', 'NEXT']);
+                expect(reports).toBe(1);
+                expect(logged).toHaveBeenCalled();
+                expect(JSON.stringify(logged.mock.calls)).not.toContain('secret detail');
+            } finally {
+                logged.mockRestore();
+            }
+        });
+
+        it('CONTROL - a well-behaved onRejected still runs exactly once and nothing is logged', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'BAD2' }));
+            const uploader: MediaUploader = { upload: async () => { throw new PermanentUploadError('TOO_LARGE'); } };
+            const rejected: string[] = [];
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+            try {
+                await drainMediaQueue({
+                    inspectionId: 'insp-1', store, uploader, onUploaded: () => { /* noop */ },
+                    onRejected: (r) => { rejected.push(r.pendingId); },
+                });
+                expect(rejected).toEqual(['BAD2']);
+                expect(logged).not.toHaveBeenCalled();
+            } finally {
+                logged.mockRestore();
+            }
+        });
+    });
+
+    describe('a throwing onUploaded', () => {
+        it('cannot wedge the drain or lose the photo: the record is kept, later records still upload, it is not uploaded again this session, nothing leaks the host text', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'SWAPFAIL' }));
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 2, pendingId: 'AFTER' }));
+            const { uploader, calls } = okUploader();
+            const swaps: string[] = [];
+            const deps = {
+                inspectionId: 'insp-1', store, uploader,
+                onUploaded: (rec: PendingMediaRecord) => {
+                    swaps.push(rec.pendingId);
+                    if (rec.pendingId === 'SWAPFAIL') throw new Error('doc swap exploded: secret detail');
+                },
+            };
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+            try {
+                const first = await drainMediaQueue(deps);
+                expect(first).toEqual({ uploaded: 1, failed: 1 });
+                // Kept (a later session retries the swap); the record that swapped fine is gone.
+                expect([...store.rows.keys()]).toEqual(['SWAPFAIL']);
+                expect((await drainMediaQueue(deps))).toEqual({ uploaded: 0, failed: 0 });
+                expect([...store.rows.keys()]).toEqual(['SWAPFAIL']);
+                expect(calls.map((c) => c.pendingId)).toEqual(['SWAPFAIL', 'AFTER']);
+                expect(swaps).toEqual(['SWAPFAIL', 'AFTER']);
+                expect(logged).toHaveBeenCalled();
+                expect(JSON.stringify(logged.mock.calls)).not.toContain('secret detail');
+            } finally {
+                logged.mockRestore();
+            }
+        });
+
+        it('CONTROL - a well-behaved onUploaded runs once per record and nothing is logged', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'FINE' }));
+            const { uploader } = okUploader();
+            const swaps: string[] = [];
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+            try {
+                expect(await drainMediaQueue({ inspectionId: 'insp-1', store, uploader, onUploaded: (r) => { swaps.push(r.pendingId); } })).toEqual({ uploaded: 1, failed: 0 });
+                expect(swaps).toEqual(['FINE']);
+                expect(logged).not.toHaveBeenCalled();
+            } finally {
+                logged.mockRestore();
+            }
+        });
     });
 });
