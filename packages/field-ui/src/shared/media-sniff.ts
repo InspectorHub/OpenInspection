@@ -2,7 +2,8 @@
  * Decide an upload's real type from its first bytes. The declared Content-Type is client controlled, so a
  * client could store anything under an image or video key by labelling it; these functions look at the file
  * itself. Pure and bounded: callers pass at most `HEAD_BYTES` bytes (see `headBytes`), never the whole body.
- * The HEIF rule mirrors `looksLikeHeif` in packages/field-ui (browser side, async on a Blob).
+ * The HEIF brand list is a second copy of the one in `components/media-studio/sniffHeif.ts` (`looksLikeHeif`, which the
+ * browser uses to decide whether a photo needs decoding); `sniffHeif.test.ts` pins the two together on well-formed headers.
  * Shared source: the server (`server/lib/media/sniff.ts` re-exports it) and the web pending store read the SAME rules,
  * so what the browser queues is exactly what the server will store.
  */

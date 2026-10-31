@@ -8,7 +8,7 @@
  * on-disk layout are covered by app/lib/field/web-media-store.test.ts.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { PendingMediaRecord, PendingMediaStore } from '@core/field-ui/media-types';
 import {
     enqueueMedia,
@@ -314,6 +314,54 @@ describe('media-upload-queue', () => {
             await drainMediaQueue(deps);
             expect(calls).toEqual(['STUCK']);
             expect(rejected).toEqual(['STUCK']);
+        });
+
+        it('a throwing onRejected cannot wedge the drain: the record is deleted, never re-reported, later records still upload', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'BAD' }));
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 2, pendingId: 'NEXT' }));
+            const calls: string[] = [];
+            const uploader: MediaUploader = {
+                upload: async (rec) => {
+                    calls.push(rec.pendingId);
+                    if (rec.pendingId === 'BAD') throw new PermanentUploadError('TOO_LARGE');
+                    return { key: `r2/${rec.pendingId}` };
+                },
+            };
+            let reports = 0;
+            const deps = {
+                inspectionId: 'insp-1', store, uploader,
+                onUploaded: () => { /* noop */ },
+                onRejected: () => { reports += 1; throw new Error('host callback exploded: secret detail'); },
+            };
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+            try {
+                expect(await drainMediaQueue(deps)).toEqual({ uploaded: 1, failed: 0 });
+                expect([...store.rows.keys()]).toEqual([]);
+                expect(await drainMediaQueue(deps)).toEqual({ uploaded: 0, failed: 0 });
+                expect(calls).toEqual(['BAD', 'NEXT']);
+                expect(reports).toBe(1);
+                expect(logged).toHaveBeenCalled();
+                expect(JSON.stringify(logged.mock.calls)).not.toContain('secret detail');
+            } finally {
+                logged.mockRestore();
+            }
+        });
+
+        it('CONTROL - a well-behaved onRejected still runs exactly once and nothing is logged', async () => {
+            await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'BAD2' }));
+            const uploader: MediaUploader = { upload: async () => { throw new PermanentUploadError('TOO_LARGE'); } };
+            const rejected: string[] = [];
+            const logged = vi.spyOn(console, 'error').mockImplementation(() => { /* silenced */ });
+            try {
+                await drainMediaQueue({
+                    inspectionId: 'insp-1', store, uploader, onUploaded: () => { /* noop */ },
+                    onRejected: (r) => { rejected.push(r.pendingId); },
+                });
+                expect(rejected).toEqual(['BAD2']);
+                expect(logged).not.toHaveBeenCalled();
+            } finally {
+                logged.mockRestore();
+            }
         });
     });
 });

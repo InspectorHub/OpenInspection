@@ -64,31 +64,24 @@ async function post(fd: FormData): Promise<MediaAnswer> {
     return { ok: false, status: res.status, body: null, code: typeof failure?.code === "string" ? failure.code : undefined };
 }
 
-/**
- * An answer the server gave about the BYTES themselves: it will give the same answer every time, so a queued copy must
- * not be retried and is dropped. Deleting a photo taken in the field is irreversible, so the set is deliberately small:
- * 413 and the coded unsupported type are handled by name below, and 415 is the only other status that judges the file.
- * A plain 400 is NOT here: the same status also carries 'Storage not available' and 'itemId is required', which are about
- * the moment or the request, so the photo stays queued and is retried. 422, auth (401/403), rate limit (429), timeouts
- * and 5xx are not about the bytes either.
- */
-const PERMANENT_STATUSES: ReadonlySet<number> = new Set([415]);
-
-/** A failed upload; `permanent` is set when retrying the same bytes cannot succeed. */
+/** The server refused these very bytes with a stable code (see below): retrying cannot succeed. Every other failure is a plain Error. */
 class UploadRefused extends Error {
-    constructor(message: string, readonly permanent: boolean) {
+    constructor(message: string) {
         super(message);
         this.name = "UploadRefused";
     }
 }
 
 /**
- * Stable reason codes for a refused photo. 413 is the status that means "too large". An unsupported file type is a 400
- * like several others, so it is told apart ONLY by the stable code the media route relays from the API
- * (`UNSUPPORTED_PHOTO_TYPE`), never by message text. Every other status or code stays generic.
+ * Stable reason codes for a refused photo. Deleting a queued photo is irreversible, so a refusal is permanent ONLY when
+ * the server says so with a stable code the media route relays from the API, never by status alone and never by message
+ * text: `PHOTO_TOO_LARGE` (with 413) and `UNSUPPORTED_PHOTO_TYPE` (with 400). A bare 413 can come from a proxy or edge
+ * limit in front of the server, and a bare 400 also carries 'Storage not available' and 'itemId is required'; both, like
+ * 415, 422, 401/403, 429 and 5xx, stay generic: the photo stays queued and is retried.
  */
 const TOO_LARGE = "TOO_LARGE";
 const UNSUPPORTED_TYPE = "UNSUPPORTED_TYPE";
+const API_PHOTO_TOO_LARGE = "PHOTO_TOO_LARGE";
 const API_UNSUPPORTED_PHOTO_TYPE = "UNSUPPORTED_PHOTO_TYPE";
 
 /** `doc` is null when the host has no results document yet; a crop or annotation then fails, a photo does not need one. */
@@ -103,9 +96,9 @@ export function createWebUploader(inspectionId: string, doc: Y.Doc | null): Medi
             if (rec.kind === "photo") {
                 fd.append("file", new File([rec.blob], "photo.jpg", { type: rec.blob.type || "image/jpeg" }));
                 const res = await post(fd);
-                if (res.status === 413) throw new UploadRefused(TOO_LARGE, true);
-                if (res.status === 400 && res.code === API_UNSUPPORTED_PHOTO_TYPE) throw new UploadRefused(UNSUPPORTED_TYPE, true);
-                if (!res.ok) throw new UploadRefused(`upload failed: ${res.status}`, PERMANENT_STATUSES.has(res.status));
+                if (res.status === 413 && res.code === API_PHOTO_TOO_LARGE) throw new UploadRefused(TOO_LARGE);
+                if (res.status === 400 && res.code === API_UNSUPPORTED_PHOTO_TYPE) throw new UploadRefused(UNSUPPORTED_TYPE);
+                if (!res.ok) throw new Error(`upload failed: ${res.status}`);
                 const key = res.body?.data?.key;
                 if (!key) throw new Error("upload returned no key");
                 return { key };
@@ -154,7 +147,7 @@ export function createWebMediaUploader(inspectionId: string, doc: Y.Doc | null):
                 return key ? { ok: true as const, key } : { ok: false as const, error: "upload returned no key" };
             } catch (err) {
                 const error = err instanceof Error && err.message ? err.message : "upload failed";
-                return err instanceof UploadRefused && err.permanent && rec.kind === "photo"
+                return err instanceof UploadRefused && rec.kind === "photo"
                     ? { ok: false as const, error, permanent: true as const }
                     : { ok: false as const, error };
             }

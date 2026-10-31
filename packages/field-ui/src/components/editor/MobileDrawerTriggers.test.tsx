@@ -33,6 +33,22 @@ describe('MobileDrawerTriggers', () => {
     expect(document.documentElement.hasAttribute('data-mobile-nav')).toBe(false);
   });
 
+  it('two overlapping instances share one mark: unmounting one keeps it, unmounting the last removes it', () => {
+    const marked = () => document.documentElement.hasAttribute('data-mobile-nav');
+    const first = render(<MobileDrawerTriggers onOpen={() => {}} />);
+    const second = render(<MobileDrawerTriggers onOpen={() => {}} />);
+    expect(marked()).toBe(true);
+    first.unmount();
+    expect(marked()).toBe(true);
+    second.unmount();
+    expect(marked()).toBe(false);
+    // CONTROL: the count did not go negative, so a later single instance marks and unmarks normally.
+    const third = render(<MobileDrawerTriggers onOpen={() => {}} />);
+    expect(marked()).toBe(true);
+    third.unmount();
+    expect(marked()).toBe(false);
+  });
+
   it('takes its height from the shared layout variable, and the stylesheet lifts the notice offset only while the nav is marked', () => {
     render(<MobileDrawerTriggers onOpen={() => {}} />);
     const nav = screen.getByRole('navigation', { name: m.editor_mobile_nav_label() });

@@ -242,6 +242,18 @@ describe("media-upload relay: upstream failures", () => {
         expect(await bare.json()).toEqual({ error: "Upstream answered 400" });
     });
 
+    it("relays the API's PHOTO_TOO_LARGE code with its 413, and a 413 without a code carries none", async () => {
+        uploadPost.mockResolvedValue(json({ success: false, error: { message: "Photo exceeds 10485760 bytes", code: "PHOTO_TOO_LARGE" } }, 413));
+        const refused = await post({ kind: "photo", inspectionId: "insp-1", itemId: "i1", file: jpeg });
+        expect(refused.status).toBe(413);
+        expect(await refused.json()).toEqual({ error: "Upstream answered 413", code: "PHOTO_TOO_LARGE" });
+        // CONTROL: a 413 from something in front of the API has no envelope and so no code.
+        uploadPost.mockResolvedValue(new Response("<html>too big</html>", { status: 413 }));
+        const bare = await post({ kind: "photo", inspectionId: "insp-1", itemId: "i1", file: jpeg });
+        expect(bare.status).toBe(413);
+        expect(await bare.json()).toEqual({ error: "Upstream answered 413" });
+    });
+
     it("a thrown upstream call answers 502, never 200", async () => {
         cropPost.mockRejectedValue(new Error("network"));
         const res = await post({ kind: "crop", inspectionId: "insp-1", itemId: "i1", photoIndex: "0", crop: "{}", image: jpeg });

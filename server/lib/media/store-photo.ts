@@ -60,7 +60,7 @@ export async function sniffedPhotoExt(file: Blob): Promise<string> {
 
 /** Refuses a photo body over the ceiling with 413, whichever route received it. */
 export function assertPhotoSize(size: number): void {
-    if (size > MAX_PHOTO_BYTES) throw Errors.PayloadTooLarge(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${size})`);
+    if (size > MAX_PHOTO_BYTES) throw Errors.PhotoTooLarge(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${size})`);
 }
 
 /**

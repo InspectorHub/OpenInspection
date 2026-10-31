@@ -57,7 +57,8 @@ export function useMediaDrain(
     const drain = useCallback(() => {
         const liveDoc = docRef.current;
         if (!liveDoc) return;
-        // Rejections of this drain, announced once afterwards with the fixed wording (never host text).
+        // Photo outcomes of this drain, announced once afterwards with the fixed wording (never host text). Crops and
+        // annotations are not photos: they never enter the tally, so they cannot change a photo count.
         const outcomes: MediaFileResult[] = [];
         void drainMediaQueue({
             inspectionId,
@@ -74,14 +75,17 @@ export function useMediaDrain(
                     result,
                 );
                 revokeRef.current?.(rec.pendingId);
-                outcomes.push({ index: outcomes.length, ok: true });
+                if (rec.kind === 'photo') outcomes.push({ index: outcomes.length, ok: true });
             },
             onRejected: (rec, reason) => {
                 // The host will never take these bytes: the tile goes, the local copy goes, and the person is told why.
-                // Only a brand-new photo has a tile of its own; a crop or annotation sits on a photo that stays.
-                if (rec.kind === 'photo') dropPendingPhoto(liveDoc, rec.meta.findingKey, rec.pendingId);
+                // Only a brand-new photo has a tile of its own; a crop or annotation sits on a photo that stays, and its
+                // refusal is not a photo count. The outcome is recorded first so a throwing step below cannot hide it.
+                if (rec.kind === 'photo') {
+                    outcomes.push({ index: outcomes.length, ok: false, error: reason });
+                    dropPendingPhoto(liveDoc, rec.meta.findingKey, rec.pendingId);
+                }
                 revokeRef.current?.(rec.pendingId);
-                outcomes.push({ index: outcomes.length, ok: false, error: reason });
             },
             onCleanupFailed: (rec, error) => {
                 // The photo is uploaded and swapped in; only the local copy stays until the next drain deletes it.
@@ -89,6 +93,9 @@ export function useMediaDrain(
             },
         }).then(() => {
             for (const message of onlinePhotoRejectionMessages(outcomes)) dataSource.notify(message, 'error', { durationMs: 8000 });
+        }).catch((error: unknown) => {
+            // The queue could not even be read. Nothing was dropped; the next trigger drains again.
+            console.error('The offline photo queue could not be drained:', error);
         });
     }, [dataSource, inspectionId]);
 

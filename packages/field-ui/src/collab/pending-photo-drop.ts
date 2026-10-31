@@ -8,13 +8,22 @@
  * Kept beside the drain rather than in `results-binding.ts` / `results-doc.ts`: both are at their size cap.
  */
 
-import type * as Y from 'yjs';
-import { getOrCreateArray, getOrSeedItem, removeElement } from '../shared/results-doc';
+import * as Y from 'yjs';
 
+/**
+ * Looked up READ-ONLY: dropping a photo of a finding that is not in the document must not create an empty item there,
+ * because that write would sync to every peer and to the server.
+ */
 export function dropPendingPhoto(doc: Y.Doc, findingKey: string, pendingId: string): void {
-    const results = doc.getMap<unknown>('results');
-    doc.transact(() => {
-        const item = getOrSeedItem(results, findingKey);
-        removeElement(getOrCreateArray(item, 'photos'), 'pendingId', pendingId);
-    });
+    const item = doc.getMap<unknown>('results').get(findingKey);
+    if (!(item instanceof Y.Map)) return;
+    const photos = item.get('photos');
+    if (!(photos instanceof Y.Array)) return;
+    for (let i = 0; i < photos.length; i++) {
+        const el = photos.get(i);
+        if (el instanceof Y.Map && el.get('pendingId') === pendingId) {
+            doc.transact(() => photos.delete(i, 1));
+            return;
+        }
+    }
 }

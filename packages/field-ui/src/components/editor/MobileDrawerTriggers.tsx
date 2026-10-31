@@ -15,6 +15,9 @@ export interface MobileDrawerTriggersProps {
     showTheme?: boolean;
 }
 
+/** Mounted instances. The page mark is set by the first and removed by the last, so overlapping instances cannot clear each other's. */
+let mountedNavs = 0;
+
 /**
  * Mobile (<768px) bottom-fixed nav of three icon + label buttons that open
  * the corresponding bottom drawer. Replaces the InspectorToolsDock on
@@ -22,11 +25,14 @@ export interface MobileDrawerTriggersProps {
  */
 export function MobileDrawerTriggers({ onOpen, showTheme = true }: MobileDrawerTriggersProps) {
     // While this nav is on screen the document carries `data-mobile-nav`; theme.css lifts the floating notices
-    // (`--ih-toast-bottom`) above the nav so they never cover its labels.
+    // (`--ih-toast-bottom`) above the nav so they never cover its labels. The mark is set in an effect, so it is absent
+    // until the first client commit; no floating notice exists before the person does something, so none is mispositioned.
     useEffect(() => {
+        mountedNavs += 1;
         document.documentElement.setAttribute('data-mobile-nav', '');
         return () => {
-            document.documentElement.removeAttribute('data-mobile-nav');
+            mountedNavs -= 1;
+            if (mountedNavs === 0) document.documentElement.removeAttribute('data-mobile-nav');
         };
     }, []);
     return (

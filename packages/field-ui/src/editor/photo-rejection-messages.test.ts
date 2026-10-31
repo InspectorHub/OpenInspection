@@ -42,8 +42,26 @@ describe('online photo rejection messages', () => {
         ]);
     });
 
-    it('mixes a known reason with an unknown one: the reason once, the unknown counted', () => {
-        expect(onlinePhotoRejectionMessages([fail(0, 'TOO_LARGE'), fail(1, 'HTTP_500')])).toEqual([
+    it('mixes a known reason with a transient failure: the reason once, the transient one worded as a failed upload, never as "could not be added"', () => {
+        const messages = onlinePhotoRejectionMessages([fail(0, 'TOO_LARGE'), fail(1, 'HTTP_500')]);
+        expect(messages).toEqual([
+            m.editor_route_photo_too_large_single(),
+            m.editor_route_photos_partial_upload({ success: 0, total: 1, failed: 1 }),
+        ]);
+        expect(messages).not.toContain(m.editor_route_photos_rejected({ count: 1, s: '' }));
+    });
+
+    it('with an upload, a known reason and a transient failure: one retry-style summary plus the fixed sentence', () => {
+        const messages = onlinePhotoRejectionMessages([ok(0), fail(1, 'TOO_LARGE'), fail(2, 'HTTP_500')]);
+        expect(messages).toEqual([
+            m.editor_route_photos_partial_upload({ success: 1, total: 3, failed: 2 }),
+            m.editor_route_photo_too_large_single(),
+        ]);
+        expect(messages.join(' ')).not.toContain(m.editor_route_photos_rejected({ count: 1, s: '' }));
+    });
+
+    it('CONTROL - the offline path keeps "could not be added" for its unknown failures next to a known reason', () => {
+        expect(offlinePhotoRejectionMessages({ rejected: 2, reasons: { tooLarge: 1 } }, 2)).toEqual([
             m.editor_route_photo_too_large_single(),
             m.editor_route_photos_rejected({ count: 1, s: '' }),
         ]);

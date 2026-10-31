@@ -267,6 +267,21 @@ describe("web media store: put refuses a photo the server would permanently refu
         expect(await webMediaStore.get("big-2")).not.toBeNull();
     });
 
+    it("the admission check runs before the record is converted: a refused defect photo is reported by its specific reason, and a valid one still hits the conversion error", async () => {
+        const defectRec = (id: string, blob: Blob): PendingMediaRecord => ({
+            kind: "photo", pendingId: id, inspectionId: "insp-v", createdAt: 1, blob,
+            meta: { targetType: "defect", findingKey: FK, itemId: "i1", customId: "c1", defectKind: "custom" },
+        });
+        // Conversion would throw a non-coded error for any defect photo; the over-limit and non-image ones must win with their code.
+        expect((await rejection(defectRec("d-big", new Blob([JPEG_HEAD, new Uint8Array(MAX_PHOTO_BYTES)]))))?.code).toBe("TOO_LARGE");
+        expect((await rejection(defectRec("d-txt", new Blob([TEXT_BYTES]))))?.code).toBe("UNSUPPORTED_TYPE");
+        // CONTROL: an admissible defect photo reaches the conversion and fails there without a reason code.
+        const converted = await rejection(defectRec("d-ok", new Blob([JPEG_HEAD])));
+        expect(converted).toBeInstanceOf(Error);
+        expect(converted?.code).toBeUndefined();
+        expect(await webMediaStore.list("insp-v")).toEqual([]);
+    });
+
     it("the web store applies the SERVER's rules: the same ceiling and the same sniffer (executable coupling)", async () => {
         expect(MAX_PHOTO_BYTES).toBe(10 * 1024 * 1024);
         // The sniffer the store reads is the server's: what it accepts, the server stores.

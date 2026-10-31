@@ -329,7 +329,9 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
 
         it.each(Object.keys(upload) as (keyof typeof upload)[])('%s: a file over the ceiling is a 413 and stores nothing', async (name) => {
             const big = new File([new Uint8Array(MAX_PHOTO_BYTES + 1)], 'big.jpg', { type: 'image/jpeg' });
-            await expect(upload[name](big)).rejects.toMatchObject({ status: 413 });
+            await expect(upload[name](big)).rejects.toMatchObject({ status: 413, code: 'PHOTO_TOO_LARGE' });
+            // Control: the unsupported-type refusal keeps its own code, so the two stay distinguishable.
+            await expect(upload[name](new File([HTML_BYTES], 'a.jpg', { type: 'image/jpeg' }))).rejects.toMatchObject({ status: 400, code: 'UNSUPPORTED_PHOTO_TYPE' });
             expect(r2Mock.put).not.toHaveBeenCalled();
         });
     });

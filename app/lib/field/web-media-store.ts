@@ -242,8 +242,9 @@ export const webMediaStore: PendingMediaStore = {
      * photo the server would permanently refuse.
      */
     put: async (rec) => {
-        const row = toStored(rec);
+        // Admission first: a photo about to be refused is not converted, so its specific reason is never masked.
         await assertAdmissible(rec);
+        const row = toStored(rec);
         await withStore<IDBValidKey>("readwrite", (store) => store.put(row));
     },
 

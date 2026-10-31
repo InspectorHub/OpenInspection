@@ -32,8 +32,9 @@ function photoBatchMessages(tally: PhotoBatchTally, wording: 'upload' | 'offline
     else if (tooLarge > 1) messages.push(m.editor_route_photo_too_large(plural(tooLarge)));
     // With photos added, the summary above already counts the unknown failures.
     if (other > 0 && added === 0) {
-        const known = tooLarge + unsupportedType > 0;
-        messages.push(wording === 'upload' && !known
+        // Online, an unknown failure is a transient one (a 5xx, a dropped connection) and says nothing about the file
+        // itself, so it is worded as a failed upload even next to a permanent reason, never as "could not be added".
+        messages.push(wording === 'upload'
             ? m.editor_route_photos_partial_upload({ success: 0, total: other, failed: other })
             : m.editor_route_photos_rejected(plural(other)));
     }

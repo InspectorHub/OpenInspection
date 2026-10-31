@@ -155,7 +155,14 @@ export async function drainMediaQueue(deps: DrainDeps): Promise<DrainSummary> {
                     if (error instanceof PermanentUploadError) {
                         // The host will never accept these bytes: report once, then stop carrying them.
                         refused.add(rec.pendingId);
-                        deps.onRejected?.(rec, error.message);
+                        try {
+                            deps.onRejected?.(rec, error.message);
+                        } catch {
+                            // A throwing host callback must not wedge the queue: the record is already refused, so it is
+                            // still deleted below and the drain moves on. Fixed wording only; the host's error text is
+                            // not echoed.
+                            console.error('A rejected-photo handler failed; the refused photo was still removed from the local queue:', rec.pendingId);
+                        }
                     } else {
                         // Upload failed — leave the record queued for the next drain.
                         failed += 1;

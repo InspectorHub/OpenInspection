@@ -69,7 +69,7 @@ function buildItemMap(): Y.Map<unknown> {
 }
 
 /** Get the item Y.Map for `findingKey`, seeding it first if absent. */
-export function getOrSeedItem(
+function getOrSeedItem(
     results: Y.Map<unknown>,
     findingKey: FindingKey,
 ): Y.Map<unknown> {
@@ -83,7 +83,7 @@ export function getOrSeedItem(
  * Get a nested Y.Array on the item, tolerating items that were seeded by an
  * older buildItemMap (defensive — the field is created if absent).
  */
-export function getOrCreateArray(parent: Y.Map<unknown>, key: string): Y.Array<unknown> {
+function getOrCreateArray(parent: Y.Map<unknown>, key: string): Y.Array<unknown> {
     const existing = parent.get(key);
     if (existing instanceof Y.Array) return existing;
     const arr = new Y.Array<unknown>();
@@ -166,7 +166,7 @@ function upsertElement(
 }
 
 /** Remove the first Y.Map element keyed by `identityField` === `identityValue`. */
-export function removeElement(
+function removeElement(
     arr: Y.Array<unknown>,
     identityField: string,
     identityValue: unknown,
