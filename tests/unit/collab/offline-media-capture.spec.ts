@@ -32,6 +32,9 @@ import { webMediaStore } from '~/lib/field/web-media-store';
 import type { PendingMediaRecord } from '@core/field-ui/media-types';
 
 const FK = '_default:s1:i1';
+// The web pending store refuses a photo whose leading bytes are not jpeg, png or heic, so a fixture photo starts with
+// a jpeg signature (the rest of the bytes do not matter to these specs).
+const JPEG_HEADER = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
 
 async function clearStore(): Promise<void> {
     const all = await webMediaStore.list();
@@ -61,7 +64,7 @@ describe('offline photo ADD → pending entry → drain swaps to real key', () =
     it('appends a pending entry, enqueues the blob, then drain resolves it', async () => {
         const doc = freshDoc();
         const pendingId = 'pid-photo-1';
-        const blob = new Blob(['photo-bytes'], { type: 'image/jpeg' });
+        const blob = new Blob([JPEG_HEADER, 'photo-bytes'], { type: 'image/jpeg' });
 
         // Offline capture: enqueue + write the pending doc entry.
         await enqueueMedia(webMediaStore, {
@@ -112,8 +115,8 @@ describe('offline photo ADD → pending entry → drain swaps to real key', () =
 
     it('two concurrent offline adds resolve independently (matched by pendingId)', async () => {
         const doc = freshDoc();
-        await enqueueMedia(webMediaStore, { pendingId: 'A', inspectionId: 'insp-1', kind: 'photo', blob: new Blob(['a']), meta: { targetType: 'item', findingKey: FK, itemId: 'i1' }, createdAt: 1 });
-        await enqueueMedia(webMediaStore, { pendingId: 'B', inspectionId: 'insp-1', kind: 'photo', blob: new Blob(['b']), meta: { targetType: 'item', findingKey: FK, itemId: 'i1' }, createdAt: 2 });
+        await enqueueMedia(webMediaStore, { pendingId: 'A', inspectionId: 'insp-1', kind: 'photo', blob: new Blob([JPEG_HEADER, 'a']), meta: { targetType: 'item', findingKey: FK, itemId: 'i1' }, createdAt: 1 });
+        await enqueueMedia(webMediaStore, { pendingId: 'B', inspectionId: 'insp-1', kind: 'photo', blob: new Blob([JPEG_HEADER, 'b']), meta: { targetType: 'item', findingKey: FK, itemId: 'i1' }, createdAt: 2 });
         appendPendingPhoto(doc, FK, 'A');
         appendPendingPhoto(doc, FK, 'B');
 

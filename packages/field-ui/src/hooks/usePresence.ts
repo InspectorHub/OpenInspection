@@ -106,16 +106,14 @@ export function usePresence(options: {
       ws.addEventListener("close", () => {
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
+        // A close the hook asked for (unmount or close()) has nothing left to report and nothing to reconnect. Updating
+        // state here would also be wrong when the event arrives late, after the component and its environment are gone.
+        if (closedRef.current) return;
         setConnected(false);
         setStatus(everConnectedRef.current ? "reconnecting" : "connecting");
         // Schedule reconnect
-        if (!closedRef.current) {
-          setTimeout(() => connect(), backoffRef.current);
-          backoffRef.current = Math.min(
-            backoffRef.current * 2,
-            MAX_BACKOFF,
-          );
-        }
+        setTimeout(() => connect(), backoffRef.current);
+        backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF);
       });
 
       ws.addEventListener("error", () => {

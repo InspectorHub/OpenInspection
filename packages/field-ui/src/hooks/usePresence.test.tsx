@@ -32,6 +32,11 @@ class FakeSocket {
     this.readyState = FakeSocket.OPEN;
     for (const cb of this.listeners.get('open') ?? []) cb({});
   }
+  /** The socket going away, as the server or the browser does it. */
+  drop() {
+    this.readyState = 3;
+    for (const cb of this.listeners.get('close') ?? []) cb({});
+  }
 }
 
 beforeEach(() => {
@@ -81,4 +86,44 @@ describe('usePresence', () => {
     expect(FakeSocket.instances).toEqual([]);
     expect(seen.status).toBe('unavailable');
   });
+
+  it('a socket that drops on its own shows reconnecting (control)', () => {
+    const handle = mountWithHandle();
+    act(() => FakeSocket.instances[0].open());
+    expect(handle.status).toBe('connected');
+    act(() => FakeSocket.instances[0].drop());
+    expect(handle.status).toBe('reconnecting');
+  });
+
+  it('a close the hook asked for leaves the state alone when the socket reports it later', () => {
+    // The late close event of a socket the hook itself closed has nothing to report and nothing to reconnect; it must not
+    // flip the status to 'reconnecting', and it must not touch state at all (it can arrive after the page is gone).
+    const handle = mountWithHandle();
+    act(() => FakeSocket.instances[0].open());
+    act(() => handle.close());
+    act(() => FakeSocket.instances[0].drop());
+    expect(handle.status).not.toBe('reconnecting');
+    expect(FakeSocket.instances).toHaveLength(1);
+  });
 });
+
+function mountWithHandle() {
+  const handle: { status?: string; close: () => void } = { close: () => undefined };
+  const ds = createFakeDataSource({
+    data: createEmptyEditorData(),
+    urls: { presenceSocket: (id: string) => `wss://host.example/api/inspections/${id}/presence/ws` },
+    session: { userId: 'user-7' },
+  });
+  function Probe() {
+    const p = usePresence({ inspectionId: 'insp-1', userName: 'Inspector' });
+    handle.status = p.status;
+    handle.close = p.close;
+    return null;
+  }
+  render(
+    <FieldDataSourceProvider dataSource={ds}>
+      <Probe />
+    </FieldDataSourceProvider>,
+  );
+  return handle;
+}
