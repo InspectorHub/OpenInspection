@@ -21,7 +21,7 @@ export interface AttachableBatch {
  * first selected photo (the default cover) included. Photos of the item that are not part of the batch keep their places.
  */
 export function attachPhotoBatch(findings: Pick<CollabFindingsApi, 'addPhotoToItem' | 'addPhotoToDefect' | 'orderPhotoBatch'>, d: AttachableBatch): void {
-  if (!d.keys.length || !d.itemId) return;
+  if (!d.itemId) return;
   for (const k of d.keys) {
     if (d.targetType === 'defect' && d.customId) {
       findings.addPhotoToDefect(d.itemId, { kind: d.defectKind, id: d.customId }, k);
@@ -30,8 +30,10 @@ export function attachPhotoBatch(findings: Pick<CollabFindingsApi, 'addPhotoToIt
     }
   }
   if (d.targetType === 'defect' && d.customId) return;
-  findings.orderPhotoBatch(
-    d.itemId,
-    d.results.flatMap<{ key?: string; pendingId?: string }>((r) => (r.ok && r.key ? [{ key: r.key }] : r.kept === true && d.pendingIds[r.index] ? [{ pendingId: d.pendingIds[r.index] }] : [])),
+  // A batch where every file was kept has no keys to attach, but the host wrote its pending entries in completion order,
+  // so the ordering step must still run. It names only the batch's own photos; nothing is ordered (or created) otherwise.
+  const selection = d.results.flatMap<{ key?: string; pendingId?: string }>((r) =>
+    r.ok && r.key ? [{ key: r.key }] : r.kept === true && d.pendingIds[r.index] ? [{ pendingId: d.pendingIds[r.index] }] : [],
   );
+  if (selection.length > 0) findings.orderPhotoBatch(d.itemId, selection);
 }

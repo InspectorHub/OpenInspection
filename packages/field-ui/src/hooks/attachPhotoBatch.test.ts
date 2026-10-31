@@ -118,3 +118,44 @@ describe('orderPhotoBatch moves only what has to move', () => {
     expect(labels()).toEqual(['resolved-2', 'k1', 'k3']);
   });
 });
+
+describe('attachPhotoBatch when no file was stored', () => {
+  it('a batch where every file was kept: scrambled host writes read in selection order', () => {
+    const { doc, findings, labels } = setup();
+    for (const id of ['p3', 'p1', 'p5', 'p2', 'p4']) appendPendingPhoto(doc, FK, id);
+    attachPhotoBatch(findings, batchOf([0, 1, 2, 3, 4]));
+    expect(labels()).toEqual(['pending:p1', 'pending:p2', 'pending:p3', 'pending:p4', 'pending:p5']);
+  });
+
+  it('an all-failed batch (neither stored nor kept) changes nothing and writes nothing', () => {
+    const { doc, findings, labels } = setup();
+    appendPendingPhoto(doc, FK, 'other');
+    const b = batchOf([]);
+    b.results = b.results.map((r) => ({ index: r.index, ok: false, error: 'HTTP_503' }));
+    b.keys = [];
+    let updates = 0;
+    doc.on('update', () => { updates += 1; });
+    attachPhotoBatch(findings, b);
+    expect(updates).toBe(0);
+    expect(labels()).toEqual(['pending:other']);
+  });
+
+  it('no item id, or an empty batch, returns early', () => {
+    const { doc, findings } = setup();
+    let updates = 0;
+    doc.on('update', () => { updates += 1; });
+    attachPhotoBatch(findings, { ...batchOf([0, 1], 2), itemId: '' });
+    attachPhotoBatch(findings, { ...batchOf([], 0), keys: [], results: [], pendingIds: [] });
+    expect(updates).toBe(0);
+  });
+
+  it('an all-kept batch on a defect row is left to the host', () => {
+    const { findings } = setup();
+    const calls: string[] = [];
+    attachPhotoBatch(
+      { ...findings, orderPhotoBatch: () => calls.push('order'), addPhotoToDefect: () => calls.push('defect') },
+      { ...batchOf([0, 1], 2), targetType: 'defect', customId: 'c1' },
+    );
+    expect(calls).toEqual([]);
+  });
+});
