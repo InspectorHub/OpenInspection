@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.5.0...field-ui-v0.6.0) (2026-10-31)
+
+
+### Features
+
+* **field-ui:** add a photo size hint and a header status slot, allow blob: media in the CSP, and close three gaps found in review ([738c995](https://github.com/InspectorHub/OpenInspection/commit/738c9954a43d9d6e2f5fb4a884227512d1cde723))
+* **field-ui:** check every image before it is sent or queued, and keep a refused edit from hanging around ([34d1d67](https://github.com/InspectorHub/OpenInspection/commit/34d1d670edd8312d7e49b0b670823a63dd12eb6c))
+* **field-ui:** check every image before it is sent, keep refused edits open, and add a photo size hint and a header status slot ([5db8237](https://github.com/InspectorHub/OpenInspection/commit/5db8237662b0a23357d494b8c2d1a4b828c97df0))
+
+
+### Bug Fixes
+
+* **field-ui:** explain oversized photo upload failures ([e96b9ca](https://github.com/InspectorHub/OpenInspection/commit/e96b9caab44989ada8ab9827473bd89eabcef385))
+* **field-ui:** handle permanent photo rejections end to end on the web ([77dc8c0](https://github.com/InspectorHub/OpenInspection/commit/77dc8c022280b5dcf1a2aec546519d5759ea6c56))
+* **field-ui:** keep the crop and studio dialogs open when a save is refused, and make a save one cancellable attempt ([075110d](https://github.com/InspectorHub/OpenInspection/commit/075110d6e17805521580d164bb5c683032b251ec))
+* **field-ui:** only a coded refusal drops a queued photo, and a throwing host callback no longer wedges the drain ([f6ec706](https://github.com/InspectorHub/OpenInspection/commit/f6ec706ab8d49aa56656c416abb39e68bc3110f7))
+* **field-ui:** report rejected photos accurately and keep the added count ([e0ac7d0](https://github.com/InspectorHub/OpenInspection/commit/e0ac7d0a4388291cb43ed8ef7bf6ba6502995863))
+* **field-ui:** update fixtures for the new pending-store check, and stop a late presence close from touching state ([7879ab4](https://github.com/InspectorHub/OpenInspection/commit/7879ab43e6c6fc58054e2a1eeffdb0e9d60ad535))
+
 ## [0.5.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.4.0...field-ui-v0.5.0) (2026-10-28)
 
 
