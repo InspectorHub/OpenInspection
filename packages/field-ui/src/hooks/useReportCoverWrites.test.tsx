@@ -205,3 +205,25 @@ describe('useReportCoverWrites: the image is checked before the command is creat
     expect(sent.map((c) => c.type)).toEqual(['crop-cover']);
   });
 });
+
+describe('useReportCoverWrites.annotateChecked: an attempt that was cancelled while the image was checked', () => {
+  const tooLarge = () => new Blob([new Uint8Array(MAX_PHOTO_BYTES + 1)], { type: 'image/jpeg' });
+  const input = (image: Blob) => ({ itemId: 'i1', photoIndex: 0, nodes: '[]', image });
+
+  it('is silent and sends nothing when the listener calls it off', async () => {
+    const { fake, sent } = parked();
+    mount(fake);
+    let ok = true;
+    await act(async () => { ok = await writes.annotateChecked(input(tooLarge()), () => false); });
+    expect(ok).toBe(false);
+    expect(sent).toEqual([]);
+    expect(fake.notifications).toEqual([]);
+  });
+
+  it('CONTROL - a genuine refusal with a listener that does not call it off is announced once', async () => {
+    const { fake } = parked();
+    mount(fake);
+    await act(async () => { await writes.annotateChecked(input(tooLarge()), () => undefined); });
+    expect(fake.notifications.map((n) => n.message)).toEqual([m.editor_photo_save_too_large()]);
+  });
+});

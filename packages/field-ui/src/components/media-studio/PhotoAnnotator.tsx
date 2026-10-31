@@ -273,11 +273,10 @@ export function PhotoAnnotator({
   /* -------------------------------------------------------------- */
   /* Save — export stage to PNG at NATURAL resolution                */
   /* -------------------------------------------------------------- */
-  const handleSave = useCallback(async () => {
+  const exportAndSave = useCallback(async () => {
     const stage = stageRef.current;
     if (!stage) return;
-    // pixelRatio ratio/scale maps the display stage to natural px (ratio < 1: a smaller export when the PNG is over the
-    // photo ceiling). konva@10 toBlob returns a Promise; the canvas path is for Stages without it.
+    // pixelRatio ratio/scale maps the display stage to natural px (ratio < 1: smaller when over the photo ceiling); konva@10 toBlob returns a Promise.
     const render = async (ratio: number): Promise<Blob | null> => {
       try {
         return (await stage.toBlob({ pixelRatio: ratio / scale, mimeType: "image/png" })) as Blob | null;
@@ -287,14 +286,15 @@ export function PhotoAnnotator({
     };
     const blob = await exportFittingAnnotation(render, { width: natural.w, height: natural.h, limit: MAX_PHOTO_BYTES });
     if (!blob) return;
-    // P6 — derive `measure` annotations from the committed measure lines and
-    // serialize them together with the calibration so measurements persist.
+    // P6 — derive `measure` annotations from the committed lines and serialize them with the calibration.
     const measureAnns: Annotation[] = measures.map((seg) => ({
       kind: "measure", x: seg.a.x, y: seg.a.y, x2: seg.b.x, y2: seg.b.y, unit: calibUnit,
     }));
     const calibration = pxPerUnit != null ? { pxPerUnit, calibUnit } : null;
     onSave({ blob, nodesJson: serializeMeasureDoc([...annotations, ...measureAnns], calibration), caption });
   }, [annotations, measures, calibUnit, pxPerUnit, caption, scale, natural.w, natural.h, onSave]);
+  const exporting = useRef(false); // one export at a time: a second press would bake the same strokes twice
+  const handleSave = useCallback(() => { if (!exporting.current) { exporting.current = true; void exportAndSave().finally(() => { exporting.current = false; }); } }, [exportAndSave]);
 
   /* -------------------------------------------------------------- */
   /* Render                                                          */

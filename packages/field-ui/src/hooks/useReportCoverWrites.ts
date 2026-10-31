@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import { isIgnored, useFieldDataSource } from '../context';
 import type { FieldRunResult } from '../context';
 import { m } from '../i18n';
-import { refuseInadmissibleImage } from './photo-save-guard';
+import { refuseInadmissibleImage, type OnChecked } from './photo-save-guard';
 import { useLatestWinsCommand } from './useLatestWinsCommand';
 
 /** How long the "save failed" message stays up, as every other failed save of the editor. */
@@ -24,7 +24,8 @@ export interface ReportCoverWrites {
    * created, so the commands themselves keep their synchronous, latest-wins contract.
    */
   cropCoverChecked(input: { sourceKey: string; crop: string; image: Blob }): Promise<boolean>;
-  annotateChecked(input: { itemId: string; photoIndex: number; nodes: string; image: Blob; sectionId?: string }): Promise<boolean>;
+  /** `onChecked` is told the verdict before a refusal is announced; answering `false` calls the attempt off silently. */
+  annotateChecked(input: { itemId: string; photoIndex: number; nodes: string; image: Blob; sectionId?: string }, onChecked?: OnChecked): Promise<boolean>;
 }
 
 /**
@@ -84,8 +85,8 @@ export function useReportCoverWrites(inspectionId: string): ReportCoverWrites {
   );
 
   const annotateChecked = useCallback(
-    async (input: { itemId: string; photoIndex: number; nodes: string; image: Blob; sectionId?: string }) => {
-      if (await refuseInadmissibleImage(dataSourceRef.current, input.image)) return false;
+    async (input: { itemId: string; photoIndex: number; nodes: string; image: Blob; sectionId?: string }, onChecked?: OnChecked) => {
+      if (await refuseInadmissibleImage(dataSourceRef.current, input.image, onChecked)) return false;
       annotate(input);
       return true;
     },

@@ -48,4 +48,25 @@ describe('ToastPortal', () => {
     expect(z).toBeGreaterThan(100);
     expect(z).toBeLessThan(200); // the route progress bar (z-200) and the shortcuts HUD stay above a notice
   });
+
+  it('lets taps through to the controls under it: only the action button of a notice takes pointer events', () => {
+    const { getByText } = render(<ToastPortal />);
+    act(() => {
+      pushToast({ message: 'Covering the chips', variant: 'error', durationMs: 10_000, actionLabel: 'Undo', onAction: () => {} });
+    });
+    const card = getByText('Covering the chips').parentElement as HTMLElement;
+    const stack = card.parentElement as HTMLElement;
+    expect(stack.className).toContain('pointer-events-none');
+    expect(card.className).toContain('pointer-events-none');
+    expect(getByText('Undo').className).toContain('pointer-events-auto');
+  });
+
+  it('CONTROL - a notice without an action has no element that takes pointer events', () => {
+    const { getByText } = render(<ToastPortal />);
+    act(() => {
+      pushToast({ message: 'Nothing to press', variant: 'error', durationMs: 10_000 });
+    });
+    const stack = getByText('Nothing to press').parentElement?.parentElement as HTMLElement;
+    expect(stack.querySelectorAll('.pointer-events-auto')).toHaveLength(0);
+  });
 });

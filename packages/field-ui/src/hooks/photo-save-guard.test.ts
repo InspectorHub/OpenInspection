@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { m } from '../i18n';
-import { guardedSave } from './photo-save-guard';
+import { guardedSave, refuseInadmissibleImage } from './photo-save-guard';
+import { MAX_PHOTO_BYTES } from '../shared/photo-limits';
 
 const flush = async () => {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
@@ -43,5 +44,29 @@ describe('guardedSave', () => {
     await flush();
     expect(notify).toHaveBeenCalledTimes(1);
     expect(inFlight.has('k')).toBe(false);
+  });
+});
+
+describe('refuseInadmissibleImage and a cancelled attempt', () => {
+  const huge = () => new Blob([new Uint8Array(MAX_PHOTO_BYTES + 1)]);
+
+  it('a genuine refusal says why exactly once and stops the caller', async () => {
+    const notify = vi.fn();
+    const stop = await refuseInadmissibleImage({ notify }, huge(), () => undefined);
+    expect(stop).toBe(true);
+    expect(notify.mock.calls).toEqual([[m.editor_photo_save_too_large(), 'error']]);
+  });
+
+  it('an attempt cancelled before the check ended is called off with no notice', async () => {
+    const notify = vi.fn();
+    const stop = await refuseInadmissibleImage({ notify }, huge(), () => false);
+    expect(stop).toBe(true);
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('CONTROL - with no listener a refusal is still announced', async () => {
+    const notify = vi.fn();
+    expect(await refuseInadmissibleImage({ notify }, huge())).toBe(true);
+    expect(notify).toHaveBeenCalledTimes(1);
   });
 });

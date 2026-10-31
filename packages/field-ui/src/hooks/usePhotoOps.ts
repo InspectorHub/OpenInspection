@@ -25,7 +25,7 @@ import { m } from "../i18n";
 import { enqueueMedia } from "../collab/media-upload-queue";
 import type { PendingMediaRecord } from "../media-types";
 import type { PhotoEntry } from "../shared/results-doc.types";
-import { dropMediaSave, guardedSave, refuseInadmissibleImage } from "./photo-save-guard";
+import { dropMediaSave, guardedSave, refuseInadmissibleImage, type OnChecked } from "./photo-save-guard";
 
 /**
  * The photo / media-operations cluster of the inspection editor. Behavior-
@@ -495,9 +495,10 @@ export function usePhotoOps(ctx: {
   /* Plan 4 (Task 8/9) — persist a baked crop for the targeted photo. When online,
    * POST multipart to the new crop endpoint; when offline, enqueue for replay
    * (Task 9). Either way, optimistically apply clearAnnotationOnRecrop locally so
-   * the strip immediately reflects the new crop with any annotation cleared. */
+   * the strip immediately reflects the new crop with any annotation cleared.
+   * `onChecked` runs once the image has been checked: the caller closes its dialog only when told it may. */
   const performPhotoCropSave = useCallback(
-    (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, crop: PhotoCrop) => {
+    (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, crop: PhotoCrop, onChecked?: OnChecked) => {
       const { itemId, photoIndex, sectionId } = target;
       const cropTransform = { aspect: crop.aspect, orientation: crop.orientation, ...crop.pixels };
 
@@ -507,7 +508,7 @@ export function usePhotoOps(ctx: {
 
       // A repeat in flight, an unaddressable photo or no live document: dropped before anything, with a message.
       const saveKey = `crop|${fk ?? itemId}|${originalKey ?? photoIndex}`;
-      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc })) return;
+      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc }, onChecked)) return;
       if (!fk || !originalKey || !collabDoc) return; // narrowing only: the guard above already said why
 
       const rec: PendingMediaRecord = {
@@ -523,7 +524,8 @@ export function usePhotoOps(ctx: {
       // queued, sent nor shown, and the person is told. Then the optimistic local apply for instant feedback (the doc
       // drives the real UI once the bake returns / drains + we write it back).
       guardedSave(dataSource, mediaSavesInFlight.current, saveKey, async () => {
-        if (await refuseInadmissibleImage(dataSource, blob)) return;
+        // Refused: the dialog stays open with the person's crop, so they can adjust it or cancel.
+        if (await refuseInadmissibleImage(dataSource, blob, onChecked)) return;
         // The check read the whole blob; find the photo again BY KEY. Gone (removed meanwhile): nothing is written.
         const current = photosNow.current(itemId).find((p) => p?.key === originalKey);
         if (!current) return;
@@ -550,17 +552,12 @@ export function usePhotoOps(ctx: {
     [patchItemPhotos, state.inspection.id, collabDoc, docFindingKey, getItemPhotos, dataSource],
   );
 
-  /* #181 — collab-aware annotation save. Returns true when it HANDLED the save
-   * (collab is ON); the caller then skips its legacy fetcher/offline path. When
-   * collab is OFF returns false so the caller keeps byte-identical behavior.
-   *
-   * Annotation baking ALWAYS needs the network (the server derives + stores the
-   * annotated PNG); offline under collab refuses with a toast rather than using
-   * the legacy offline queue (which replays via REST with no doc → loss). On
-   * success, POST the bake, read the annotatedKey, and mirror it into the doc
-   * (additive merge — annotation never clears the crop). No revalidate. */
+  /* #181 — collab-aware annotation save. Returns true when it HANDLED the save (collab is ON); the caller then skips
+   * its legacy fetcher path, and false otherwise. The server derives the annotated PNG; the returned annotatedKey is
+   * mirrored into the doc (additive merge, annotation never clears the crop). Offline it is queued, as for a crop.
+   * `onChecked` runs once the image has been checked: the caller closes its studio only when told it may. */
   const performPhotoAnnotationSave = useCallback(
-    (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, nodesJson: string): boolean => {
+    (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, nodesJson: string, onChecked?: OnChecked): boolean => {
       if (!collabDoc) return false;
       const { itemId, photoIndex, sectionId } = target;
 
@@ -570,7 +567,7 @@ export function usePhotoOps(ctx: {
 
       // A repeat of a save still in flight, or a photo that cannot be addressed, is dropped with a message (and counts as handled).
       const saveKey = `annotate|${fk ?? itemId}|${originalKey ?? photoIndex}`;
-      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc })) return true;
+      if (dropMediaSave(dataSource, mediaSavesInFlight.current, saveKey, { fk, originalKey, doc: collabDoc }, onChecked)) return true;
       if (!fk || !originalKey) return true; // narrowing only: the guard above already said why
       const rec: PendingMediaRecord = {
         pendingId: crypto.randomUUID(),
@@ -584,7 +581,8 @@ export function usePhotoOps(ctx: {
       // The image is checked first (guardedSave holds the photo meanwhile): an annotation the server would refuse is
       // neither queued nor sent, and the person is told. The editor already tried a smaller export; see PhotoAnnotator.
       guardedSave(dataSource, mediaSavesInFlight.current, saveKey, async () => {
-        if (await refuseInadmissibleImage(dataSource, blob)) return;
+        // Refused: the dialog stays open with the person's strokes, so they can adjust them or cancel.
+        if (await refuseInadmissibleImage(dataSource, blob, onChecked)) return;
         if (!photosNow.current(itemId).some((p) => p?.key === originalKey)) return;
 
         // #181 PR-G — offline: persist the baked annotation PNG locally + mark the
