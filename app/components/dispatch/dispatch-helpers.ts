@@ -36,8 +36,10 @@ export interface DispatchPayload {
   conflictPolicy: "advisory" | "block";
   /** Tenant booking_slot_interval_min — the lattice a vertical drag snaps to. */
   slotIntervalMin: number;
-  /** Epoch ms of 00:00 on `date` in the TENANT timezone. */
+  /** Epoch ms of 00:00 on `date` in the TENANT timezone. Midnight only: never count minutes from it (see `noonMs`). */
   dayStartMs: number;
+  /** Epoch ms of 12:00 on `date` in the TENANT timezone: the anchor every wall-clock minute is counted from. */
+  noonMs: number;
   inspectors: DispatchInspector[];
   items: DispatchItem[];
   unassigned: DispatchItem[];
@@ -279,9 +281,18 @@ export function offsetYFromMinute(minute: number): number {
   return pxFromAxis(clamp(minute, AXIS_START_MIN, AXIS_END_MIN));
 }
 
-/** Minute-of-day → instant, anchored on the tenant's own midnight. */
-export function minuteToEpochMs(dayStartMs: number, minute: number): number {
-  return dayStartMs + minute * 60_000;
+const NOON_MIN = 12 * 60;
+
+/**
+ * Wall-clock minute-of-day → instant, anchored on the tenant's own NOON.
+ *
+ * Not on midnight: on the two days a year the clock changes the day is 25 or 23 hours long, so `midnight + minutes` lands
+ * every time an hour off (a drop at 09:00 was saved as 08:00 on the autumn day and as 10:00 on the spring day). The change
+ * happens in the small hours, so noon, and the whole working axis after it, is on one side of it and counting elapsed
+ * minutes from noon is exact. A minute before the change (the wall-clock fallback of `currentStartMs` can name one) is not.
+ */
+export function minuteToEpochMs(anchors: Pick<DispatchPayload, "noonMs">, minute: number): number {
+  return anchors.noonMs + (minute - NOON_MIN) * 60_000;
 }
 
 /**
@@ -290,11 +301,11 @@ export function minuteToEpochMs(dayStartMs: number, minute: number): number {
  * fallback exists for rows whose instant was never stored, so dropping such a
  * card into the unassigned lane still has something to send.
  */
-export function currentStartMs(item: DispatchItem, dayStartMs: number): number | null {
+export function currentStartMs(item: DispatchItem, anchors: Pick<DispatchPayload, "noonMs">): number | null {
   const stored = item.meta?.scheduledStartMs;
   if (typeof stored === "number" && Number.isFinite(stored)) return stored;
   const minute = minutesOfDay(item.startTime);
-  return minute == null ? null : minuteToEpochMs(dayStartMs, minute);
+  return minute == null ? null : minuteToEpochMs(anchors, minute);
 }
 
 /** `HH:MM` for a minute-of-day — assembled, never formatted (see `lint:i18n`). */
