@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.3.1](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.3.0...openinspection-v2.3.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **dispatch:** do not guess an early wall-clock time on a day the clock changes ([f35110c](https://github.com/InspectorHub/OpenInspection/commit/f35110cde58d202c2aec9070c02317a0c201d327))
+* **dispatch:** read and save times correctly on the days the clock changes ([991e02c](https://github.com/InspectorHub/OpenInspection/commit/991e02c514a0b36503f026a2afa3ccc34ec44361))
+* **dispatch:** save a dropped time correctly on the days the clock changes ([7c769ef](https://github.com/InspectorHub/OpenInspection/commit/7c769ef3c423737b04c3e52871078948ffff9609))
+* **field-ui:** keep a photo batch in selection order; neutral wording for the mobile begin hint ([d001c8d](https://github.com/InspectorHub/OpenInspection/commit/d001c8d845a370b6415fcc67c9dca86134e42cc2))
+* **field-ui:** use neutral wording for the mobile "begin" hint so it reads right with a mouse ([51783db](https://github.com/InspectorHub/OpenInspection/commit/51783db089f2f931f9c3b145ae56b164d73d3985))
+* **tz:** cache the zone formatters and cover east-of-Greenwich change days ([309a40d](https://github.com/InspectorHub/OpenInspection/commit/309a40deb6269d29f5226bcd60839000d8f73d19))
+* **tz:** read a wall-clock time correctly just after a clock change west of Greenwich ([9fc138e](https://github.com/InspectorHub/OpenInspection/commit/9fc138e213ee8919affc04ffe9162a7099d984f0))
+
 ## [2.3.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.2.0...openinspection-v2.3.0) (2026-10-31)
 
 
