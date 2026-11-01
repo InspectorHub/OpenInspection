@@ -471,7 +471,8 @@ jobs:
   # shards would multiply the setup that is already most of the second leg.
   e2e:
     name: e2e (${{ matrix.suite.label }})
-    runs-on: ubuntu-latest
+    # Pinned: `ubuntu-latest` now resolves to 26.04, which Playwright 1.60 cannot install Chromium on; unpin when Playwright supports it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
