@@ -38,6 +38,7 @@ interface BoardPayload {
     conflictPolicy: string;
     slotIntervalMin: number;
     dayStartMs: number;
+    noonMs: number;
     inspectors: Array<{ id: string; name: string | null }>;
     items: Array<{ id: string; kind: string; allDay: boolean; startTime?: string; userId?: string; meta?: Record<string, unknown> }>;
     unassigned: Array<{ id: string }>;
@@ -148,6 +149,29 @@ describe('GET /api/calendar/dispatch', () => {
         // booking engine would never have offered.
         expect(body.data.slotIntervalMin).toBe(30);
         expect(body.data.dayStartMs).toBe(Date.UTC(2026, 5, 1, 0, 0, 0));
+    });
+
+    it('ships noon of the day in the tenant zone: on an ordinary day it is dayStartMs + 12 hours', async () => {
+        const res = await get(buildApp(db, 'owner'));
+        const body = await res.json() as { data: BoardPayload };
+        expect(body.data.noonMs).toBe(Date.UTC(2026, 5, 1, 12, 0, 0));
+        expect(body.data.noonMs - body.data.dayStartMs).toBe(12 * 60 * 60_000);
+    });
+
+    // On the days the clock changes, midnight and noon are not 12 hours apart, and `dayStartMs + minutes * 60000`
+    // lands the drop an hour off. Noon is after the change (it happens in the small hours), so the board anchors on it.
+    it.each([
+        ['the autumn day the clock goes back (25 hours)', '2026-11-01', Date.UTC(2026, 10, 1, 4, 0, 0), Date.UTC(2026, 10, 1, 17, 0, 0), 13],
+        ['the spring day the clock goes forward (23 hours)', '2027-03-14', Date.UTC(2027, 2, 14, 5, 0, 0), Date.UTC(2027, 2, 14, 16, 0, 0), 11],
+    ])('on %s, noon is the real 12:00 and not midnight plus 12 hours', async (_name, date, dayStart, noon, hoursBetween) => {
+        await db.update(schema.tenantConfigs)
+            .set({ defaultTimezone: 'America/New_York' })
+            .where(eq(schema.tenantConfigs.tenantId, TENANT));
+        const res = await get(buildApp(db, 'owner'), date);
+        const body = await res.json() as { data: BoardPayload };
+        expect(body.data.dayStartMs).toBe(dayStart);
+        expect(body.data.noonMs).toBe(noon);
+        expect((body.data.noonMs - body.data.dayStartMs) / 3_600_000).toBe(hoursBetween);
     });
 
     it('echoes a non-default booking_slot_interval_min rather than assuming 30', async () => {

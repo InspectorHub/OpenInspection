@@ -228,12 +228,17 @@ app.openapi(dispatchRoute, async (c) => {
     // would be a second place for it to be applied differently.
     const unassigned = boardItems.filter((i) => i.kind === 'inspection' && !i.userId);
 
-    // The snap grid and the day's zero point travel WITH the board, so a
-    // drag never has to guess a timezone in the browser: a dropped pixel is
-    // `dayStartMs + minutes * 60000`, and the reschedule endpoint derives
-    // the civil date back from that instant in this same zone.
+    // The snap grid and the day's anchors travel WITH the board, so a drag
+    // never has to guess a timezone in the browser. A dropped pixel is a
+    // wall-clock minute, and it becomes an instant as `noonMs + (minute - 720)
+    // * 60000`: noon, not midnight, because on the two days a year the clock
+    // changes the day is 25 or 23 hours long and counting from midnight lands
+    // every drop an hour off. The change happens in the small hours, so noon
+    // is on the same side of it as the whole working axis. The reschedule
+    // endpoint derives the civil date back from that instant in this same zone.
     const slotIntervalMin = cfg?.bookingSlotIntervalMin ?? 30;
     const dayStartMs = wallClockToEpochMs(date, '00:00', tenantTz);
+    const noonMs = wallClockToEpochMs(date, '12:00', tenantTz);
 
     return c.json({
         success: true as const,
@@ -242,6 +247,7 @@ app.openapi(dispatchRoute, async (c) => {
             conflictPolicy,
             slotIntervalMin,
             dayStartMs,
+            noonMs,
             inspectors: roster,
             items: boardItems,
             unassigned,

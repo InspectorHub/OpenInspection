@@ -47,12 +47,14 @@ const ROSTER = [
 ];
 
 const DAY_START_MS = Date.UTC(2027, 2, 15, 4, 0, 0);
+const NOON_MS = Date.UTC(2027, 2, 15, 16, 0, 0);
 
 const BOARD: DispatchPayload = {
   date: "2027-03-15",
   conflictPolicy: "block",
   slotIntervalMin: 30,
   dayStartMs: DAY_START_MS,
+  noonMs: NOON_MS,
   inspectors: ROSTER,
   items: [
     item({ id: "i-1", title: "Maple St", startTime: "09:00", endTime: "11:00", inspectionId: "insp-1", userId: "u-ada" }),
@@ -167,6 +169,20 @@ describe("DispatchBoard drag-drop", () => {
       leadInspectorId: "u-ada",
       scheduledStartMs: String(DAY_START_MS + 9 * 60 * 60_000),
     });
+  });
+
+  it("on the day the clock goes back, a drop at 09:00 writes 09:00 and not 08:00", async () => {
+    // New York, 2026-11-01: midnight is still summer time and noon is winter time, so the day is 25 hours long.
+    const board: DispatchPayload = { ...BOARD, date: "2026-11-01", dayStartMs: Date.UTC(2026, 10, 1, 4, 0, 0), noonMs: Date.UTC(2026, 10, 1, 17, 0, 0) };
+    const posted: Record<string, string>[] = [];
+    renderBoard(board, async ({ request }) => {
+      posted.push(Object.fromEntries(await request.formData()) as Record<string, string>);
+      return { ok: true, conflicts: [] };
+    });
+    const ada = screen.getAllByTestId("dispatch-column")[0];
+    dragCardTo("Pine Rd", ada.querySelector("[data-dispatch-dropzone]")!, 112);
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0].scheduledStartMs).toBe(String(Date.UTC(2026, 10, 1, 14, 0, 0)));
   });
 
   it("snaps a between-slots drop onto the tenant's booking lattice", async () => {
