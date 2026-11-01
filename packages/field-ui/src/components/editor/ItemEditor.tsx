@@ -319,7 +319,7 @@ export function ItemEditor({
  return Array.isArray(row?.photos) ? row.photos.length : 0;
  };
 
- // Shared per-defect photo chip (canned + custom rows).
+ // Shared per-defect photo chip (canned + custom rows). Stays tappable during an upload (queue takes more batches); aria-busy.
  const addPhotoIcon = (
  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -327,7 +327,7 @@ export function ItemEditor({
  );
  const defectPhotoChip = (target: { kind: "canned" | "custom"; id: string }, count: number) =>
  onAddDefectPhoto ? (
- <Button variant="ghost" size="sm" pending={photoUploading} aria-label={m.editor_item_add_defect_photo_aria()} icon={addPhotoIcon}
+ <Button variant="ghost" size="sm" aria-busy={photoUploading ? true : undefined} aria-label={m.editor_item_add_defect_photo_aria()} icon={addPhotoIcon}
  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddDefectPhoto(target); }}
  className="mt-1.5 h-auto px-2 py-1 border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary-text"
  >

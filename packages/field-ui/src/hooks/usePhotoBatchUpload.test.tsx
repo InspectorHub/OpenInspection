@@ -19,7 +19,7 @@ function file(name: string): Blob {
 }
 
 function batch(over: Partial<PhotoBatch> = {}): PhotoBatch {
-  return { itemId: 'item-1', findingKey: '_default:sec-1:item-1', files: [file('a'), file('b')], target: null, ...over };
+  return { itemId: 'item-1', findingKey: '_default:sec-1:item-1', files: [file('a'), file('b')], target: null, source: 'library', ...over };
 }
 
 /** A data source whose uploader parks every upload until the test settles it, and records the order they began. */
@@ -81,6 +81,25 @@ describe('usePhotoBatchUpload', () => {
     await flush();
     expect(fake.uploads[0].rec.meta).toMatchObject({ targetType: 'defect', customId: 'c-9', defectKind: 'custom' });
     expect(latest.outcomes[0]).toMatchObject({ targetType: 'defect', customId: 'c-9', defectKind: 'custom', ok: true });
+  });
+
+  it('hands the origin of the photos to the uploader in meta.source, for an item and for a defect row', async () => {
+    const fake = createFakeDataSource({ data: createEmptyEditorData() });
+    mount(fake);
+    act(() => latest.submit(batch({ files: [file('a')], source: 'camera' })));
+    await flush();
+    act(() => latest.submit(batch({ files: [file('b')], source: 'burst' })));
+    await flush();
+    act(() => latest.submit(batch({ files: [file('c')], source: 'camera', target: { kind: 'canned', id: 'd-1' } })));
+    await flush();
+    act(() => latest.submit(batch({ files: [file('d')], source: 'library', target: { kind: 'custom', id: 'c-2' } })));
+    await flush();
+    expect(fake.uploads.map((u) => u.rec.meta)).toEqual([
+      expect.objectContaining({ targetType: 'item', source: 'camera' }),
+      expect.objectContaining({ targetType: 'item', source: 'burst' }),
+      expect.objectContaining({ targetType: 'defect', customId: 'd-1', source: 'camera' }),
+      expect.objectContaining({ targetType: 'defect', customId: 'c-2', source: 'library' }),
+    ]);
   });
 
   it('reports a partly failed batch per file, keeps the keys that did upload, and is not ok', async () => {

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { INSPECTION_STATUS_COMPLETED } from "../shared/inspection-status";
 import { useFieldDataSource, useFieldEnsureHuman, useFieldSlots } from "../context";
-import type { EditorData, FieldDataSource } from "../data-source";
+import type { EditorData, FieldDataSource, PhotoSource } from "../data-source";
 import { ORIGINAL_QUALITY_KEY } from "../shared/original-quality";
 import { findRatingLevel, ratingAdvanceDecision } from "../shared/rating-levels";
 import { makeCustomDefect } from "../shared/custom-defects";
@@ -1015,6 +1015,8 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  const handlePhotoUpload = useCallback(
  (e: React.ChangeEvent<HTMLInputElement>) => {
  const all = Array.from(e.target.files ?? []);
+ // Read before any await: the camera input is the one with `capture`; the other is the library picker.
+ const source: PhotoSource = e.target === cameraInputRef.current ? "camera" : "library";
  if (all.length === 0 || !state.activeItemId || readOnly) return;
  const itemId = state.activeItemId;
  const overflow = all.length > MAX_BATCH_PHOTOS;
@@ -1050,7 +1052,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
   const fk = findingKey(activeUnitId, sid, itemId);
   // The host's store may reject a file; the rest of the batch still goes through and the user hears once, with the
   // count. It is a photo that was not added, not a save failure, so the save state is left alone.
-  const batch = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId }, bakedFiles);
+  const batch = await addOfflinePhotos(dataSource.media.store, doc, { inspectionId: String(state.inspection.id), findingKey: fk, itemId, source }, bakedFiles);
   for (const message of offlinePhotoRejectionMessages(batch, bakedFiles.length)) notify(message, "error", { durationMs: 8000 });
  } else {
   // A file input's change event fires once per file-chooser selection (the chooser is modal) and the input
@@ -1060,6 +1062,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
   findingKey: findingKey(activeUnitId, sid ?? "", itemId),
   files: bakedFiles,
   target,
+  source,
   });
  }
 
@@ -1090,7 +1093,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  }
  // The burst's "Done" guards its own repeat (BurstCamera), so each commit reaches here once.
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
- photoUpload.submit({ itemId, findingKey: findingKey(activeUnitId, sid ?? "", itemId), files, target: null });
+ photoUpload.submit({ itemId, findingKey: findingKey(activeUnitId, sid ?? "", itemId), files, target: null, source: "burst" });
  })();
  },
  [state.burstCameraItemId, state.sectionIdForItem, state.currentSection, activeUnitId, photoUpload.submit, notify, readOnly],
@@ -1245,7 +1248,9 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  },
  onLibraryClose: () => state.setShowCommentLibrary(false),
  onPhoto: () => {
- if (!state.activeItemId || photoUpload.busy) return;
+ if (!state.activeItemId) return;
+ // An item-level add starts with no defect target: a defect picker that was cancelled leaves its target behind.
+ pendingPhotoTargetRef.current = null;
  // Task 16 — desktop file pickers already offer camera-vs-library choice
  // natively, so go straight to the multi-select library input; mobile
  // still needs the explicit chooser (camera capture has no multi-select).
@@ -1293,7 +1298,6 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  comments,
  commentLibraryItems,
  serverComments,
- photoUpload.busy,
  isMobile,
  ],
  );
@@ -1400,13 +1404,15 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  }
  ratingLevels={state.ratingLevels}
  onRating={handleRating}
- onAddPhoto={() =>
-  state.activeItemId
+ onAddPhoto={() => {
+  pendingPhotoTargetRef.current = null;
+  return state.activeItemId
    ? setAddMediaChooser({ itemId: state.activeItemId })
-   : libraryInputRef.current?.click()
- }
+   : libraryInputRef.current?.click();
+ }}
  onAddDefectPhoto={(target) => {
- if (photoUpload.busy) return;
+ // Not gated on an upload in flight: the batch queue is serial and takes further batches. The target is read
+ // (and cleared) synchronously by handlePhotoUpload, so a batch already out cannot take this one.
  pendingPhotoTargetRef.current = target;
  // Task 16 — same camera/library split as onPhoto above, scoped to a
  // specific defect row instead of the item.

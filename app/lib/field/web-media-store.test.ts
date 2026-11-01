@@ -301,7 +301,7 @@ describe("web media store: put refuses a photo the server would permanently refu
             big,
             new File([HEIC_HEAD], "phone.heic", { type: "" }),
         ];
-        const result = await addOfflinePhotos(webMediaStore, doc, { inspectionId: "insp-b", findingKey: FK, itemId: "i1" }, files);
+        const result = await addOfflinePhotos(webMediaStore, doc, { inspectionId: "insp-b", findingKey: FK, itemId: "i1", source: "library" }, files);
         expect(result).toEqual({ rejected: 2, reasons: { unsupportedType: 1, tooLarge: 1 } });
         const entries = (projectResults(doc)[FK]?.photos ?? []) as unknown[];
         expect(entries).toHaveLength(2);

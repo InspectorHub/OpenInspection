@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import * as Y from "yjs";
 import * as api from "./index";
 import { findingKey as hookFindingKey } from "./hooks/findings/shared";
 
@@ -17,6 +18,7 @@ const VALUE_EXPORTS = [
   "METADATA_PRESETS",
   "RELIANCE_TEMPLATES",
   "appendPendingPhoto",
+  "appendPhoto",
   "bindFieldLocaleSource",
   "escapeWillBeHandled",
   "findingKey",
@@ -25,6 +27,7 @@ const VALUE_EXPORTS = [
   "isIgnored",
   "isDecodeImageError",
   "isMetaKey",
+  "pushPendingPhoto",
   "resolvePcaNarrative",
   "resolvePendingPhoto",
   "setFieldLocale",
@@ -35,7 +38,7 @@ const VALUE_EXPORTS = [
 ];
 
 /** The type names added for 0.3.0; the older ones are covered by the compiler (a host that imports them). */
-const NEW_TYPE_EXPORTS = ["CoverPhotoOption", "GalleryPhoto", "PublishBlockingDefect", "PublishReadiness", "ReportProfileOption", "VideoUploadRef"];
+const NEW_TYPE_EXPORTS = ["CoverPhotoOption", "FindingKey", "GalleryPhoto", "PhotoEntry", "PhotoSource", "PublishBlockingDefect", "PublishReadiness", "ReportProfileOption", "VideoUploadRef"];
 
 /** Names from `export type { ... }` statements in the index source. */
 function typeNamesInIndex(): string[] {
@@ -50,7 +53,7 @@ function typeNamesInIndex(): string[] {
 describe("@inspectorhub/field-ui root entry", () => {
   it("exports exactly the listed values, and both counts are pinned", () => {
     const actual = Object.keys(api).sort();
-    expect([actual.length, VALUE_EXPORTS.length]).toEqual([22, 22]);
+    expect([actual.length, VALUE_EXPORTS.length]).toEqual([24, 24]);
     expect(actual).toEqual([...VALUE_EXPORTS].sort());
   });
 
@@ -75,6 +78,27 @@ describe("@inspectorhub/field-ui root entry", () => {
   it("FieldEditor is the editor component and takes the data prop", () => {
     expect(typeof api.FieldEditor).toBe("function");
     expect(api.FieldEditor.length).toBe(1);
+  });
+});
+
+describe("the exported photo mutators are the real ones", () => {
+  const photos = (doc: Y.Doc) => ((doc.getMap("results").get("_default:s:i") as Y.Map<unknown>).get("photos") as Y.Array<Y.Map<unknown>>).toJSON() as Array<Record<string, unknown>>;
+
+  it("appendPhoto merges by key: the same key twice is one entry, a new key is a second", () => {
+    const doc = new Y.Doc();
+    api.appendPhoto(doc, "_default:s:i", { key: "k1", croppedKey: "first" });
+    api.appendPhoto(doc, "_default:s:i", { key: "k1", croppedKey: "second" });
+    expect(photos(doc)).toEqual([expect.objectContaining({ key: "k1", croppedKey: "second" })]);
+    api.appendPhoto(doc, "_default:s:i", { key: "k2" });
+    expect(photos(doc).map((p) => p.key)).toEqual(["k1", "k2"]);
+  });
+
+  it("pushPendingPhoto dedupes by pendingId, so two offline adds with empty keys are two entries", () => {
+    const doc = new Y.Doc();
+    api.pushPendingPhoto(doc, "_default:s:i", { key: "", pendingId: "p1", pendingUpload: true });
+    api.pushPendingPhoto(doc, "_default:s:i", { key: "", pendingId: "p2", pendingUpload: true });
+    api.pushPendingPhoto(doc, "_default:s:i", { key: "", pendingId: "p1", pendingUpload: true });
+    expect(photos(doc).map((p) => p.pendingId)).toEqual(["p1", "p2"]);
   });
 });
 
