@@ -75,20 +75,34 @@ export function resolveTenantTimeZone(raw: string | null | undefined): string {
   return raw && isValidTimeZone(raw) ? raw : UNDECLARED_TENANT_TIMEZONE;
 }
 
+/**
+ * One formatter per zone for the life of the isolate. Constructing an `Intl.DateTimeFormat` costs about seven times what
+ * formatting with it does, and a booking page converts dozens of slots, each needing two or three offsets.
+ */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+function formatterFor(ianaTz: string): Intl.DateTimeFormat {
+  let dtf = formatters.get(ianaTz);
+  if (dtf === undefined) {
+    dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: ianaTz,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    formatters.set(ianaTz, dtf);
+  }
+  return dtf;
+}
+
 /** The signed numeric UTC offset (minutes) that `ianaTz` has at instant `ms`. */
 function offsetMinutes(ms: number, ianaTz: string): number {
   // Format the instant as wall-clock parts in the target zone, treat those
   // parts as if they were UTC, and diff against the real instant.
-  const dtf = new Intl.DateTimeFormat('en-US', {
-    timeZone: ianaTz,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  const dtf = formatterFor(ianaTz);
   const p = Object.fromEntries(dtf.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
   const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
   return Math.round((asUtc - ms) / 60000);
@@ -134,5 +148,15 @@ export function wallClockToEpochMs(dateYmd: string, timeHm: string, ianaTz: stri
   // Guess: treat the wall-clock as UTC, then correct by the offset at that guess.
   const guess = Date.UTC(y, mo - 1, d, h, mi, 0);
   const off = offsetMinutes(guess, ianaTz);
-  return guess - off * 60000;
+  const first = guess - off * 60000;
+  // The guess can sit on the other side of a clock change from the instant it stands for (west of Greenwich the guess is
+  // EARLIER than the real instant: 07:00 in Los Angeles on the day the clock goes back is 15:00Z, but the guess 07:00Z is
+  // still summer time). So take the offset at the corrected instant too; when it differs and agrees with itself, use it.
+  const offAtFirst = offsetMinutes(first, ianaTz);
+  if (offAtFirst === off) return first;
+  const second = guess - offAtFirst * 60000;
+  // A wall-clock time that does not exist (spring gap) or exists twice (autumn overlap) has no self-consistent second
+  // answer, so the result is the first one. Which of the two hours that picks depends on the side of Greenwich (west:
+  // the earlier occurrence or the later hour of a gap; east: the later occurrence); unchanged from before this fix.
+  return offsetMinutes(second, ianaTz) === offAtFirst ? second : first;
 }

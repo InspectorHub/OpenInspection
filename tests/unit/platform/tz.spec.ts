@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   isValidTimeZone,
   resolveTenantTimeZone,
@@ -35,6 +35,49 @@ describe('tz helper', () => {
     // 2026-07-15T13:00:00Z -> 09:00 EDT (-04:00)
     expect(epochMsToRfc3339(Date.parse('2026-07-15T13:00:00Z'), 'America/New_York'))
       .toBe('2026-07-15T09:00:00-04:00');
+  });
+
+  // West of Greenwich the wall-clock read as UTC is EARLIER than the instant it stands for, so on a day the clock changes
+  // the offset at that first guess can still be the old one. Los Angeles changes at 09:00Z (fall back) and 10:00Z (spring).
+  it('wallClockToEpochMs is right at 07:00 and 08:00 on the day the clock goes back in Los Angeles (after the change, PST)', () => {
+    expect(wallClockToEpochMs('2026-11-01', '07:00', 'America/Los_Angeles')).toBe(Date.UTC(2026, 10, 1, 15, 0));
+    expect(wallClockToEpochMs('2026-11-01', '08:00', 'America/Los_Angeles')).toBe(Date.UTC(2026, 10, 1, 16, 0));
+  });
+
+  it('wallClockToEpochMs is right at 07:00 on the day the clock goes forward in Los Angeles (after the change, PDT)', () => {
+    expect(wallClockToEpochMs('2027-03-14', '07:00', 'America/Los_Angeles')).toBe(Date.UTC(2027, 2, 14, 14, 0));
+  });
+
+  // East of Greenwich the guess is LATER than the real instant, and the old single-guess answer was wrong there too.
+  it.each([
+    ['Europe/Berlin', '2026-10-25', '01:00', Date.UTC(2026, 9, 24, 23, 0)], // CEST, the hour before the clock goes back
+    ['Europe/Berlin', '2027-03-28', '01:00', Date.UTC(2027, 2, 28, 0, 0)], // CET, the hour before the clock goes forward
+    ['Australia/Sydney', '2026-10-04', '00:00', Date.UTC(2026, 9, 3, 14, 0)], // AEST
+    ['Australia/Sydney', '2026-10-04', '01:00', Date.UTC(2026, 9, 3, 15, 0)], // AEST
+    ['Australia/Sydney', '2027-04-04', '00:00', Date.UTC(2027, 3, 3, 13, 0)], // AEDT
+    ['Australia/Sydney', '2027-04-04', '01:00', Date.UTC(2027, 3, 3, 14, 0)], // AEDT
+  ])('wallClockToEpochMs is right east of Greenwich too: %s %s %s', (zone, date, hm, expected) => {
+    expect(wallClockToEpochMs(date, hm, zone)).toBe(expected);
+  });
+
+  it('wallClockToEpochMs does not build a formatter per call (one per zone is enough)', () => {
+    const Real = Intl.DateTimeFormat;
+    // Count constructions but still build a real formatter (a bare spy on a constructor returns nothing usable).
+    const spy = vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (...args: ConstructorParameters<typeof Intl.DateTimeFormat>) {
+      return new Real(...args);
+    } as unknown as typeof Intl.DateTimeFormat);
+    try {
+      for (let i = 0; i < 6; i++) wallClockToEpochMs('2026-11-01', '09:00', 'Asia/Ulaanbaatar');
+      // Each call needs 2-3 offsets; without a cache that is a new formatter every time.
+      expect(spy.mock.calls.length).toBeLessThanOrEqual(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('wallClockToEpochMs control: times well before and after the change are unchanged', () => {
+    expect(wallClockToEpochMs('2026-11-01', '00:30', 'America/Los_Angeles')).toBe(Date.UTC(2026, 10, 1, 7, 30)); // PDT
+    expect(wallClockToEpochMs('2026-11-01', '12:00', 'America/Los_Angeles')).toBe(Date.UTC(2026, 10, 1, 20, 0)); // PST
   });
 
   it('wallClockToEpochMs interprets local wall-clock in the tenant zone', () => {
