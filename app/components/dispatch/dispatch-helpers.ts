@@ -301,11 +301,17 @@ export function minuteToEpochMs(anchors: Pick<DispatchPayload, "noonMs">, minute
  * fallback exists for rows whose instant was never stored, so dropping such a
  * card into the unassigned lane still has something to send.
  */
-export function currentStartMs(item: DispatchItem, anchors: Pick<DispatchPayload, "noonMs">): number | null {
+export function currentStartMs(item: DispatchItem, anchors: Pick<DispatchPayload, "noonMs" | "dayStartMs">): number | null {
   const stored = item.meta?.scheduledStartMs;
   if (typeof stored === "number" && Number.isFinite(stored)) return stored;
   const minute = minutesOfDay(item.startTime);
-  return minute == null ? null : minuteToEpochMs(anchors, minute);
+  if (minute == null) return null;
+  // Counting from noon is exact on the working axis. A wall-clock time before the axis may sit on the other side of the
+  // change on a day the clock changes (midnight and noon are then not 12 hours apart), so there it is refused rather
+  // than guessed an hour off; the caller says so to the user. An ordinary day has no such side and stays exact.
+  const clockChangesToday = anchors.noonMs - anchors.dayStartMs !== NOON_MIN * 60_000;
+  if (clockChangesToday && minute < AXIS_START_MIN) return null;
+  return minuteToEpochMs(anchors, minute);
 }
 
 /** `HH:MM` for a minute-of-day — assembled, never formatted (see `lint:i18n`). */

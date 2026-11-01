@@ -35,6 +35,18 @@ describe("minuteToEpochMs", () => {
 describe("currentStartMs", () => {
   const untimed = (startTime: string): DispatchItem => ({ id: "i", kind: "inspection", title: "x", allDay: false, startTime } as DispatchItem);
 
+  // A wall-clock time before the working axis (a row whose instant was never stored) may sit on the other side of the change,
+  // where counting from noon is an hour off. On a change day it is refused, not guessed; an ordinary day is still exact.
+  it("a wall-clock time before the working axis is refused on a change day (the spring-day 01:30 does not exist as counted from noon)", () => {
+    expect(currentStartMs(untimed("01:30"), SPRING_FORWARD)).toBeNull();
+    expect(currentStartMs(untimed("06:59"), FALL_BACK)).toBeNull();
+  });
+
+  it("control: the same early time on an ordinary day is exact, and 07:00 on a change day is still accepted", () => {
+    expect(currentStartMs(untimed("06:00"), ORDINARY)).toBe(Date.UTC(2026, 5, 1, 10, 0));
+    expect(currentStartMs(untimed("07:00"), FALL_BACK)).toBe(Date.UTC(2026, 10, 1, 12, 0));
+  });
+
   it("a card with a stored instant carries it unchanged", () => {
     const stored = { ...untimed("09:00"), meta: { scheduledStartMs: 123_456 } } as DispatchItem;
     expect(currentStartMs(stored, FALL_BACK)).toBe(123_456);
