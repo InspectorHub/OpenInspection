@@ -65,7 +65,7 @@ const FRI_BEFORE_SPRING_FWD = '2027-03-12'; // EST, -05:00
 const FRI_AFTER_SPRING_FWD = '2027-03-19';  // EDT, -04:00
 
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
-const FAKE_EXEC_CTX = makeExecutionContext().ctx;
+const { ctx: FAKE_EXEC_CTX, settle: settleBackgroundWork } = makeExecutionContext();
 
 describe('public booking refuses a workspace with no declared timezone', () => {
     let db: BetterSQLite3Database<typeof schema>;
@@ -103,8 +103,11 @@ describe('public booking refuses a workspace with no declared timezone', () => {
         });
     });
 
-    afterEach(() => {
+    afterEach(async () => {
         vi.useRealTimers();
+        // A booking hands background work (seeding the default automations) to waitUntil. The helper settles it in its own
+        // afterEach, but that runs after this one, i.e. after the database is closed; so wait for it here, before closing.
+        await settleBackgroundWork();
         sqlite.close();
     });
 

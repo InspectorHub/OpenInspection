@@ -134,5 +134,13 @@ export function wallClockToEpochMs(dateYmd: string, timeHm: string, ianaTz: stri
   // Guess: treat the wall-clock as UTC, then correct by the offset at that guess.
   const guess = Date.UTC(y, mo - 1, d, h, mi, 0);
   const off = offsetMinutes(guess, ianaTz);
-  return guess - off * 60000;
+  const first = guess - off * 60000;
+  // The guess can sit on the other side of a clock change from the instant it stands for (west of Greenwich the guess is
+  // EARLIER than the real instant: 07:00 in Los Angeles on the day the clock goes back is 15:00Z, but the guess 07:00Z is
+  // still summer time). So take the offset at the corrected instant too; when it differs and agrees with itself, use it.
+  const offAtFirst = offsetMinutes(first, ianaTz);
+  if (offAtFirst === off) return first;
+  const second = guess - offAtFirst * 60000;
+  // A wall-clock time that does not exist (spring gap) or exists twice (autumn overlap) keeps the first answer.
+  return offsetMinutes(second, ianaTz) === offAtFirst ? second : first;
 }

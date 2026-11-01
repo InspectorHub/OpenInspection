@@ -37,6 +37,22 @@ describe('tz helper', () => {
       .toBe('2026-07-15T09:00:00-04:00');
   });
 
+  // West of Greenwich the wall-clock read as UTC is EARLIER than the instant it stands for, so on a day the clock changes
+  // the offset at that first guess can still be the old one. Los Angeles changes at 09:00Z (fall back) and 10:00Z (spring).
+  it('wallClockToEpochMs is right at 07:00 and 08:00 on the day the clock goes back in Los Angeles (after the change, PST)', () => {
+    expect(wallClockToEpochMs('2026-11-01', '07:00', 'America/Los_Angeles')).toBe(Date.UTC(2026, 10, 1, 15, 0));
+    expect(wallClockToEpochMs('2026-11-01', '08:00', 'America/Los_Angeles')).toBe(Date.UTC(2026, 10, 1, 16, 0));
+  });
+
+  it('wallClockToEpochMs is right at 07:00 on the day the clock goes forward in Los Angeles (after the change, PDT)', () => {
+    expect(wallClockToEpochMs('2027-03-14', '07:00', 'America/Los_Angeles')).toBe(Date.UTC(2027, 2, 14, 14, 0));
+  });
+
+  it('wallClockToEpochMs control: times well before and after the change are unchanged', () => {
+    expect(wallClockToEpochMs('2026-11-01', '00:30', 'America/Los_Angeles')).toBe(Date.UTC(2026, 10, 1, 7, 30)); // PDT
+    expect(wallClockToEpochMs('2026-11-01', '12:00', 'America/Los_Angeles')).toBe(Date.UTC(2026, 10, 1, 20, 0)); // PST
+  });
+
   it('wallClockToEpochMs interprets local wall-clock in the tenant zone', () => {
     // 09:00 local on 2026-07-15 in New York (EDT -04:00) == 13:00Z
     expect(wallClockToEpochMs('2026-07-15', '09:00', 'America/New_York'))
