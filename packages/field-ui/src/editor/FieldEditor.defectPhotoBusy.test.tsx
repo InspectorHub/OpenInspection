@@ -131,3 +131,31 @@ describe("defect add-photo while a batch is uploading", () => {
     await act(async () => settle[0]("k"));
   });
 });
+
+describe("defect add-photo chip shows a busy cue while a batch uploads", () => {
+  it("a spinner replaces the camera icon while a batch is out, the chip still opens the picker, and the icon returns after", async () => {
+    const { started, settle } = await openItem();
+    const click = pickerOpens();
+    const spinners = () => chips().map((c) => c.querySelector('[data-testid="defect-photo-uploading"]'));
+    expect(spinners()).toEqual([null, null]);
+    fireEvent.click(chips()[0]);
+    fireEvent.change(libraryInput(), { target: { files: [jpeg("one")] } });
+    await waitFor(() => expect(started).toHaveLength(1));
+    // Every defect chip of the item shows the cue (one queue serves the whole editor), each keeps its name and busy flag.
+    await waitFor(() => expect(spinners().every((x) => x !== null)).toBe(true));
+    for (const chip of chips()) {
+      expect(chip.getAttribute("aria-busy")).toBe("true");
+      expect(chip.getAttribute("aria-label")).toBe(m.editor_item_add_defect_photo_aria());
+      expect(chip.querySelector('[data-testid="defect-photo-uploading"]')?.getAttribute("aria-hidden")).toBe("true");
+      expect(chip.querySelectorAll("svg")).toHaveLength(1);
+    }
+    fireEvent.click(chips()[1]);
+    expect(click.calls).toBe(2);
+    await act(async () => settle[0]("k-one"));
+    await waitFor(() => expect(spinners()).toEqual([null, null]));
+    for (const chip of chips()) {
+      expect(chip.hasAttribute("aria-busy")).toBe(false);
+      expect(chip.querySelectorAll("svg")).toHaveLength(1);
+    }
+  });
+});
