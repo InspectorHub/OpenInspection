@@ -10,6 +10,9 @@
  */
 import { z } from '@hono/zod-openapi';
 
+/** The item types a template item can have (the template schema's item types; tests/unit/reports/report-item-types-match-template.spec.ts fails when the two differ). */
+export const REPORT_ITEM_TYPES = ['rich', 'boolean', 'text', 'textarea', 'number', 'select', 'multi_select', 'date', 'photo_only'] as const;
+
 const ReportItemSchema = z.object({
   id: z.string().describe('Item id.'),
   label: z.string().describe('Item label as shown in the report.'),
@@ -20,6 +23,14 @@ const ReportItemSchema = z.object({
   notes: z.string().nullable().describe('Inspector notes for the item, or null.'),
   photos: z.array(z.object({ key: z.string().describe('Storage key of the photo.'), url: z.string().describe('Download URL of the photo.') })).describe('Photos attached to the item.'),
   recommendation: z.string().nullable().optional().describe('Recommendation text attached to the item, if any.'),
+  // The next five are returned by the report-data service for every item (inspection-report.service.ts) and were missing from this document.
+  // Optional here: a server that predates one leaves it out, and a client must cope with that. NOT documented yet, though returned: value (it needs a JSON value type: `z.unknown()` makes the typed client resolve it to `never`, which tests/unit/api-schema/public-report-client.spec-d.ts rejects), ratingOptions,
+  // tabs, resolvedTabs, original, followupStatus, followupNotes (shapes still to be written down).
+  type: z.string().optional().describe(`How the item is filled in: one of ${REPORT_ITEM_TYPES.join(', ')}. rich is a rating with canned-comment tabs, the others capture a value. A template item that names no type is rich. A client must treat a type it does not know as a plain captured value.`),
+  parentId: z.string().nullable().optional().describe('Id of the item this one hangs under, or null for a top-level item.'),
+  naKind: z.enum(['not_inspected', 'not_present']).nullable().optional().describe('Which kind of not-applicable rating the item carries, or null when it carries none.'),
+  notInspectedReason: z.string().nullable().optional().describe('Why the item was not inspected, as the inspector wrote it, or null.'),
+  unit: z.string().nullable().optional().describe('Unit of the captured value for a number item (from the template item options), or null.'),
   // No item-level estimateMin / estimateMax: the "Estimated cost" badge they
   // fed is gone. The `repairItems[]` pair below is a LEGACY READ — findings
   // written before repair pricing was withdrawn still hold the snapshot, and it

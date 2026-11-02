@@ -5853,6 +5853,20 @@
                                     "type": "string"
                                   },
                                   "description": "The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders."
+                                },
+                                "propertyType": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "description": "What kind of property is being inspected, or null when it was never classified. Usually single_family, multi_unit or commercial; the booking wizard can also store condo, townhouse or multi_family, so a client must tolerate other values."
+                                },
+                                "reportStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "in_progress",
+                                    "submitted",
+                                    "published"
+                                  ],
+                                  "description": "Where the report is in its life: in_progress, submitted or published."
                                 }
                               }
                             }
@@ -15006,6 +15020,35 @@
             "type": "string",
             "nullable": true,
             "description": "Recommendation text attached to the item, if any."
+          },
+          "type": {
+            "type": "string",
+            "description": "How the item is filled in: one of rich, boolean, text, textarea, number, select, multi_select, date, photo_only. rich is a rating with canned-comment tabs, the others capture a value. A template item that names no type is rich. A client must treat a type it does not know as a plain captured value."
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Id of the item this one hangs under, or null for a top-level item."
+          },
+          "naKind": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "not_inspected",
+              "not_present",
+              null
+            ],
+            "description": "Which kind of not-applicable rating the item carries, or null when it carries none."
+          },
+          "notInspectedReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Why the item was not inspected, as the inspector wrote it, or null."
+          },
+          "unit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Unit of the captured value for a number item (from the template item options), or null."
           },
           "repairItems": {
             "type": "array",
