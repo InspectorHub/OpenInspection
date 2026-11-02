@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/InspectorHub/OpenInspection/compare/offline-package-v0.2.0...offline-package-v0.2.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* **offline-package:** keep extra per-entry keys when a package is split ([192e425](https://github.com/InspectorHub/OpenInspection/commit/192e425676c8df8450984c2b05c4fadb47e035e5))
+* **offline-package:** keep extra per-entry keys when a package is split ([6bc3ed0](https://github.com/InspectorHub/OpenInspection/commit/6bc3ed08b2ff16283f00e287969151495fbd0f76))
+
 ## [0.2.0](https://github.com/InspectorHub/OpenInspection/compare/offline-package-v0.1.0...offline-package-v0.2.0) (2026-10-27)
 
 
