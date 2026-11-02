@@ -10,7 +10,7 @@
  */
 
 import type * as Y from 'yjs';
-import type { PendingMediaStore } from '../media-types';
+import type { PendingMediaStore, PhotoSource } from '../media-types';
 import { enqueueMedia } from './media-upload-queue';
 import { appendPendingPhoto } from './results-binding';
 
@@ -18,6 +18,7 @@ export interface OfflinePhotoTarget {
     inspectionId: string;
     findingKey:   string;
     itemId:       string;
+    source:       PhotoSource;
 }
 
 type OfflinePhotoRejectionReason = 'unsupportedType' | 'tooLarge';
@@ -63,7 +64,7 @@ export async function addOfflinePhotos(
                 inspectionId: target.inspectionId,
                 kind: 'photo',
                 blob,
-                meta: { targetType: 'item', findingKey: target.findingKey, itemId: target.itemId },
+                meta: { targetType: 'item', findingKey: target.findingKey, itemId: target.itemId, source: target.source },
                 createdAt: Date.now(),
             });
             stored = true;

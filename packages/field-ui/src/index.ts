@@ -23,6 +23,7 @@ export type {
   PendingMediaStore,
   PhotoAnnotateMeta,
   PhotoCropMeta,
+  PhotoSource,
   PhotoUploadMeta,
   ResultsDocHandle,
   SaveStructureTemplateCommand,
@@ -89,6 +90,9 @@ export { FieldEditor } from './editor/FieldEditor';
 // too), not the narrower copy under hooks/findings.
 export { findingKey, findingsForUnit, isMetaKey } from './shared/finding-key';
 export { appendPendingPhoto, resolvePendingPhoto } from './collab/results-binding';
+// The by-key upsert and the by-pendingId push into a results document, so a host's contract test calls the real ones.
+export { appendPhoto, pushPendingPhoto } from './shared/results-doc';
+export type { FindingKey, PhotoEntry } from './shared/results-doc.types';
 export { resolvePcaNarrative } from './shared/pca-narrative';
 export { RELIANCE_TEMPLATES } from './shared/pca-reliance-text';
 export { METADATA_PRESETS } from './shared/commercial-subtypes';

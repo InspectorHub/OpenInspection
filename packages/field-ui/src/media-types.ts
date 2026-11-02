@@ -17,8 +17,19 @@ interface PendingMediaTarget {
  * `customId` and `defectKind` only with `targetType: 'defect'`.
  */
 export type PhotoUploadMeta =
-  | (PendingMediaTarget & { targetType: 'item' })
-  | (PendingMediaTarget & { targetType: 'defect'; customId: string; defectKind: 'canned' | 'custom' });
+  | (PendingMediaTarget & PhotoSourceField & { targetType: 'item' })
+  | (PendingMediaTarget & PhotoSourceField & { targetType: 'defect'; customId: string; defectKind: 'canned' | 'custom' });
+
+/**
+ * Where a photo came from: the camera input ('camera'), the in-editor burst camera ('burst'), or the device's photo
+ * library ('library'). A host that copies new photos to the device gallery skips 'library', which is already there.
+ */
+export type PhotoSource = 'camera' | 'library' | 'burst';
+
+/** The editor always sets `source`; it is optional in the type so a host's own fixtures and older records still fit. */
+interface PhotoSourceField {
+  source?: PhotoSource;
+}
 
 /**
  * A baked crop of an existing photo. Cropping always re-derives from the ORIGINAL `photoKey`.

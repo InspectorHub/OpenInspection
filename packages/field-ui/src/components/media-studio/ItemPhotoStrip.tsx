@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Sortable from "sortablejs";
-import { Button, pendingProps, PENDING_CLASS } from "@core/shared-ui";
+import { Button } from "@core/shared-ui";
 import { resolvePhotoDisplayKey } from "./photo-display-key";
 import { m } from "../../i18n";
 
@@ -348,20 +348,21 @@ export function ItemPhotoStrip({
         })}
         {onAddPhoto && <button
           type="button"
-          // aria-disabled while uploading so focus stays on the button.
-          {...pendingProps(photoUploading, onAddPhoto)}
+          // Never disabled while an upload runs: the upload queue takes further batches, and an inspector working through a
+          // room has to be able to carry on shooting. The running upload is shown as a small badge instead.
+          onClick={onAddPhoto}
+          aria-busy={photoUploading ? true : undefined}
           aria-label={m.media_strip_add_photo_aria()}
           data-testid="photo-add"
-          className={`strip-add w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary-text transition-colors ${PENDING_CLASS}`}
+          className="strip-add relative w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary-text transition-colors"
         >
-          {photoUploading ? (
-            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          {photoUploading && (
+            <svg data-testid="photo-add-uploading" className="absolute right-1 top-1 w-3.5 h-3.5 animate-spin text-ih-primary-text" fill="none" viewBox="0 0 24 24" aria-hidden="true">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-            </svg>
-          ) : (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           )}
         </button>}
