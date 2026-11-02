@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.6.2...field-ui-v0.7.0) (2026-11-02)
+
+
+### Features
+
+* **field-ui:** show a small spinner on the defect add-photo chip while photos upload ([cac4177](https://github.com/InspectorHub/OpenInspection/commit/cac41772624b4c3a0ea3b1b9132ae34907c247ad))
+* **field-ui:** tell the host where a photo came from, and keep add-photo tappable while uploading ([a8f8edb](https://github.com/InspectorHub/OpenInspection/commit/a8f8edb0f4722f570e291297ea4a1fd090c15a13))
+
+
+### Bug Fixes
+
+* **field-ui:** draw the phone navigation icons as one set of line icons ([9339631](https://github.com/InspectorHub/OpenInspection/commit/93396316b59b9977c3edb5bb06fcdea9a541b908))
+* **field-ui:** fix the problems found testing the editor on phones ([bc474e5](https://github.com/InspectorHub/OpenInspection/commit/bc474e5dc1a994128507701761450cba22c4c631))
+* **field-ui:** keep the add-photo tile usable while photos are uploading ([7c78339](https://github.com/InspectorHub/OpenInspection/commit/7c78339a599f7752c273821da83a535aa1e0f1ed))
+* **field-ui:** keep the photo viewer toolbar clear of the notch and status bar ([24a75b2](https://github.com/InspectorHub/OpenInspection/commit/24a75b2386d289c8f5c40264cf400bbe5de3536f))
+
 ## [0.6.2](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.6.1...field-ui-v0.6.2) (2026-10-31)
 
 
