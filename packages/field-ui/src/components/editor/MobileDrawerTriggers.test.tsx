@@ -25,6 +25,25 @@ describe('MobileDrawerTriggers', () => {
     expect(screen.getByRole('button', { name: m.editor_mobile_drawer_sections() })).toBeTruthy();
   });
 
+  it('draws every tab icon as the same kind of line icon, never as a text glyph or an emoji (an emoji is coloured and drawn by the phone\'s own font, so it looked unlike its neighbours)', () => {
+    render(<MobileDrawerTriggers onOpen={() => {}} />);
+    for (const button of screen.getAllByRole('button')) {
+      const icon = button.querySelector('span')!;
+      const svg = icon.querySelector('svg');
+      expect(svg, button.textContent ?? '').not.toBeNull();
+      expect(svg!.getAttribute('fill')).toBe('none');
+      expect(svg!.getAttribute('stroke')).toBe('currentColor');
+      expect(icon.textContent).toBe('');
+    }
+  });
+
+  it('control: the labels are still the only text, so the accessible names did not change', () => {
+    render(<MobileDrawerTriggers onOpen={() => {}} />);
+    expect(screen.getByRole('button', { name: m.editor_route_drawer_preview() })).toBeTruthy();
+    expect(screen.getByRole('button', { name: m.editor_mobile_drawer_items() })).toBeTruthy();
+    expect(screen.getByRole('button', { name: m.nav_theme_label() })).toBeTruthy();
+  });
+
   it('marks the page while it is mounted (so floating notices clear it) and unmarks on unmount', () => {
     expect(document.documentElement.hasAttribute('data-mobile-nav')).toBe(false);
     const { unmount } = render(<MobileDrawerTriggers onOpen={() => {}} />);

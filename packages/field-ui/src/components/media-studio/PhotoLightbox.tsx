@@ -9,6 +9,15 @@ interface LightboxSlide { src?: string; alt?: string }
  * the caller (renderSlide). Image slides keep `{ src, alt }`.
  */
 export type AnySlide = LightboxSlide | { type: string; [k: string]: unknown };
+/**
+ * The library pins its toolbar to `top: 0` with a flat 8px padding. In a phone app with `viewport-fit=cover` that puts the
+ * first row of buttons under the notch or the status bar. The library reads this variable for the toolbar padding
+ * (top, right, bottom, left), so the insets are added there; where there is no inset `env()` is 0 and nothing changes.
+ */
+const SAFE_AREA_TOOLBAR_PADDING = {
+  "--yarl__toolbar_padding": "calc(8px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left))",
+} as React.CSSProperties;
+
 /** Isolation wrapper around yet-another-react-lightbox (single-maintainer dep). */
 export function PhotoLightbox({ slides, index, open, onClose, toolbarButtons, toolbarWrap, renderSlide }: {
   slides: AnySlide[]; index: number; open: boolean; onClose: () => void;
@@ -33,8 +42,7 @@ export function PhotoLightbox({ slides, index, open, onClose, toolbarButtons, to
       plugins={[Zoom]}
       zoom={{ maxZoomPixelRatio: 3, doubleTapDelay: 300, pinchZoomDistanceFactor: 100 }}
       toolbar={{ buttons: [...(toolbarButtons ?? []), "close"] }}
-      // Spread, not `styles={undefined}`: the lightbox reads `styles.root` and an explicit undefined replaces its default.
-      {...(toolbarWrap ? { styles: { toolbar: { flexWrap: "wrap", left: 0 } } } : {})}
+      styles={{ toolbar: { ...(toolbarWrap ? { flexWrap: "wrap", left: 0 } : {}), ...SAFE_AREA_TOOLBAR_PADDING } }}
       render={renderSlide ? { slide: ({ slide }) => renderSlide(slide as unknown as AnySlide) || undefined } : undefined}
     />
   );

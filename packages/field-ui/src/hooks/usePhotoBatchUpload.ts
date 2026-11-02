@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
 import { useFieldDataSource } from '../context';
-import type { MediaFileResult, PendingMediaRecord, PhotoUploadMeta } from '../media-types';
+import type { MediaFileResult, PendingMediaRecord, PhotoSource, PhotoUploadMeta } from '../media-types';
 import { photoRefusal } from '../shared/photo-admission';
 
 /** The defect row an uploaded photo is pinned to instead of the item. */
@@ -17,6 +17,8 @@ export interface PhotoBatch {
   findingKey: string;
   files: Blob[];
   target: PhotoBatchTarget | null;
+  /** Where the files came from; handed to the uploader in `meta.source`. */
+  source: PhotoSource;
 }
 
 /**
@@ -74,7 +76,7 @@ function newPendingId(): string {
 }
 
 function metaOf(batch: PhotoBatch): PhotoUploadMeta {
-  const base = { findingKey: batch.findingKey, itemId: batch.itemId };
+  const base = { findingKey: batch.findingKey, itemId: batch.itemId, source: batch.source };
   return batch.target === null
     ? { ...base, targetType: 'item' }
     : { ...base, targetType: 'defect', customId: batch.target.id, defectKind: batch.target.kind };

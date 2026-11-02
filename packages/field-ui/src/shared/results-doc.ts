@@ -259,6 +259,8 @@ export function setItemAttribute(
 }
 
 /**
+ * Public API for hosts (re-exported from the package root), not only a test helper:
+ * a by-`key` upsert, so the same key twice is one entry.
  * Append (or merge) a photo into the item's `photos` Y.Array.
  * If a photo Y.Map with the same `key` exists, its fields are replaced/merged;
  * otherwise a new photo Y.Map is pushed.
@@ -278,6 +280,9 @@ export function appendPhoto(
 /**
  * #181 PR-G — push a brand-new PENDING photo entry, deduped by `pendingId`
  * (NOT by `key`).
+ *
+ * Public API for hosts (re-exported from the package root), not only a test helper:
+ * a by-`pendingId` upsert.
  *
  * A brand-new offline photo has an EMPTY `key`, so `appendPhoto`'s upsert-by-key
  * would merge two concurrent offline adds into one element. This mutator instead
