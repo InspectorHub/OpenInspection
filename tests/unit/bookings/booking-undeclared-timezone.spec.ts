@@ -65,7 +65,7 @@ const FRI_BEFORE_SPRING_FWD = '2027-03-12'; // EST, -05:00
 const FRI_AFTER_SPRING_FWD = '2027-03-19';  // EDT, -04:00
 
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
-const FAKE_EXEC_CTX = makeExecutionContext().ctx;
+const { ctx: FAKE_EXEC_CTX, settle: settleBackgroundWork } = makeExecutionContext();
 
 describe('public booking refuses a workspace with no declared timezone', () => {
     let db: BetterSQLite3Database<typeof schema>;
@@ -73,6 +73,10 @@ describe('public booking refuses a workspace with no declared timezone', () => {
     let svc: BookingService;
 
     beforeEach(async () => {
+        // The dates below are fixed, so "now" is fixed too: a booking is refused when its day is already past, and
+        // with the real clock this spec stopped passing on 2026-11-01. Only `Date` is frozen; timers stay real.
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-01T12:00:00Z'));
         const setup = createTestDb();
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
@@ -99,7 +103,13 @@ describe('public booking refuses a workspace with no declared timezone', () => {
         });
     });
 
-    afterEach(() => sqlite.close());
+    afterEach(async () => {
+        vi.useRealTimers();
+        // A booking hands background work (seeding the default automations) to waitUntil. The helper settles it in its own
+        // afterEach, but that runs after this one, i.e. after the database is closed; so wait for it here, before closing.
+        await settleBackgroundWork();
+        sqlite.close();
+    });
 
     /** The tenant's stored zone. `undefined` leaves the column at its NOT NULL
      *  default, which is exactly the never-configured state in production. */

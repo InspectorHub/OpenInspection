@@ -56,6 +56,7 @@ interface DispatchBoard {
     conflictPolicy: 'advisory' | 'block';
     slotIntervalMin: number;
     dayStartMs: number;
+    noonMs: number;
     inspectors: { id: string; email: string; role: string }[];
     items: DispatchItem[];
     unassigned: DispatchItem[];
@@ -142,7 +143,7 @@ async function seedUnassigned(
     const id = (await created.json()).data.inspection.id as string;
 
     const scheduled = await request.patch(`${BASE_URL}/api/inspections/${id}/schedule`, {
-        data: { scheduledStartMs: board.dayStartMs + 8 * 60 * 60 * 1000, leadInspectorId: null },
+        data: { scheduledStartMs: board.noonMs - 4 * 60 * 60 * 1000, leadInspectorId: null },
         headers: jsonHeaders(token),
     });
     expect(scheduled.status(), `park inspection (${address}) unassigned`).toBe(200);

@@ -129,7 +129,7 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
     // A drop with no usable pointer position is not a time. Sending it anyway
     // would post NaN milliseconds and move the job to the epoch.
     if (!Number.isFinite(minute)) return;
-    move(dragged, minuteToEpochMs(board.dayStartMs, minute), inspectorId);
+    move(dragged, minuteToEpochMs(board, minute), inspectorId);
   }
 
   // Dropping into the lane is an UNASSIGN, not a reschedule: the time the job
@@ -141,7 +141,7 @@ export function DispatchBoard({ board }: { board: DispatchPayload }) {
     setHover(null);
     setDraggingId(null);
     if (!dragged || !isDraggableItem(dragged)) return;
-    const startMs = currentStartMs(dragged, board.dayStartMs);
+    const startMs = currentStartMs(dragged, board);
     // An untimed job has no instant to carry, and the schedule write needs one.
     // Say so: this used to return silently, so dropping an all-day card on the
     // lane looked like a move that worked and left the card where it was.
