@@ -175,6 +175,7 @@ export type {
   PendingMediaStore,
   PhotoAnnotateMeta,
   PhotoCropMeta,
+  PhotoSource,
   PhotoUploadMeta,
 } from './media-types';
 

@@ -26,3 +26,25 @@ describe("PhotoLightbox toolbarWrap", () => {
     expect(toolbar()?.style.flexWrap ?? "").toBe("");
   });
 });
+
+describe("PhotoLightbox safe area", () => {
+  const padding = () => toolbar()?.style.getPropertyValue("--yarl__toolbar_padding") ?? "";
+
+  it("keeps the toolbar out from under a notch or the status bar: the top padding adds the top safe-area inset (the library pins the toolbar to top:0 with a flat 8px)", () => {
+    render(<PhotoLightbox slides={slides} index={0} open onClose={() => {}} toolbarButtons={buttons} />);
+    expect(padding()).toContain("env(safe-area-inset-top)");
+  });
+
+  it("also keeps both side insets, so a phone held sideways does not cut the first and last button", () => {
+    render(<PhotoLightbox slides={slides} index={0} open onClose={() => {}} toolbarButtons={buttons} />);
+    expect(padding()).toContain("env(safe-area-inset-left)");
+    expect(padding()).toContain("env(safe-area-inset-right)");
+  });
+
+  it("holds when the toolbar wraps too, and the wrap options survive next to it", () => {
+    render(<PhotoLightbox slides={slides} index={0} open onClose={() => {}} toolbarButtons={buttons} toolbarWrap />);
+    expect(padding()).toContain("env(safe-area-inset-top)");
+    expect(toolbar()?.style.flexWrap).toBe("wrap");
+    expect(toolbar()?.style.left).toBe("0px");
+  });
+});

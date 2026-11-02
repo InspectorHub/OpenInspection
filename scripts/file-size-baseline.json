@@ -5,7 +5,7 @@
   "server/durable-objects/inspection-doc.ts": 996,
   "app/routes/inspections.tsx": 937,
   "server/services/inspection/inspection-report.service.ts": 921,
-  "packages/field-ui/src/shared/results-doc.ts": 876,
+  "packages/field-ui/src/shared/results-doc.ts": 881,
   "scripts/check-submit-guard.mjs": 816,
   "scripts/check-chrome-record.mjs": 806,
   "scripts/check-idempotency-coverage.mjs": 797,
