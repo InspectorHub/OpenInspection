@@ -44,6 +44,11 @@ export interface ParsedPackage {
     /** The manifest as written, so keys a later writer added survive a split. */
     manifestRaw: Readonly<Record<string, unknown>>;
     manifest: OfflinePackageManifest;
+    /**
+     * Each `manifest.inspections` entry as written, by inspection id, so keys a later writer added to an
+     * entry survive a split. Absent on a hand-built value, in which case entries are written from `manifest`.
+     */
+    inspectionsRaw?: ReadonlyMap<string, Readonly<Record<string, unknown>>>;
     outbox: readonly OutboxEntry[];
     media: MediaIndex;
     /** Yjs state by inspection id. */
@@ -104,7 +109,7 @@ function parseJson(bytes: Uint8Array | undefined, name: string, fallback: unknow
     }
 }
 
-function parseIndexes(files: Record<string, Uint8Array>): { manifestRaw: Record<string, unknown>; manifest: OfflinePackageManifest; outbox: OutboxEntry[]; media: MediaIndex } {
+function parseIndexes(files: Record<string, Uint8Array>): { manifestRaw: Record<string, unknown>; inspectionsRaw: ReadonlyMap<string, Readonly<Record<string, unknown>>>; manifest: OfflinePackageManifest; outbox: OutboxEntry[]; media: MediaIndex } {
     const raw = parseJson(files[MANIFEST_ENTRY], MANIFEST_ENTRY, undefined);
     const manifest = OfflinePackageManifestSchema.safeParse(raw);
     if (!manifest.success) throw new PackageFormatError('manifest.json is missing or invalid');
@@ -112,7 +117,10 @@ function parseIndexes(files: Record<string, Uint8Array>): { manifestRaw: Record<
     if (!outbox.success) throw new PackageFormatError('outbox.json is invalid');
     const media = MediaIndexSchema.safeParse(parseJson(files[MEDIA_INDEX_ENTRY], MEDIA_INDEX_ENTRY, []));
     if (!media.success) throw new PackageFormatError('media/index.json is invalid');
-    return { manifestRaw: raw as Record<string, unknown>, manifest: manifest.data, outbox: outbox.data, media: media.data };
+    // The schema accepted `raw`, so `inspections` is an array of objects, in the order `manifest.data` has them.
+    const rawEntries = (raw as { inspections: Record<string, unknown>[] }).inspections;
+    const inspectionsRaw = new Map(manifest.data.inspections.map((row, i) => [row.id, rawEntries[i]!] as const));
+    return { manifestRaw: raw as Record<string, unknown>, inspectionsRaw, manifest: manifest.data, outbox: outbox.data, media: media.data };
 }
 
 /**
@@ -138,7 +146,7 @@ export function readPackageSummary(zip: Uint8Array, options: ParseOptions = {}):
 export function parsePackage(zip: Uint8Array, options: ParseOptions = {}): ParsedPackage {
     const names = listEntryNames(zip, options);
     const files = inflateEntries(zip, new Set(names));
-    const { manifestRaw, manifest, outbox, media } = parseIndexes(files);
+    const { manifestRaw, inspectionsRaw, manifest, outbox, media } = parseIndexes(files);
 
     const declared = new Set(manifest.inspections.map((i) => i.id));
     for (const entry of outbox) if (!declared.has(entry.payload.id)) throw new PackageFormatError('outbox names an inspection outside the manifest');
@@ -166,7 +174,7 @@ export function parsePackage(zip: Uint8Array, options: ParseOptions = {}): Parse
     }
     if (unindexed.size > 0) throw new PackageFormatError('a photo has no media index entry');
 
-    return { manifestRaw, manifest, outbox, media, yjs, photos };
+    return { manifestRaw, inspectionsRaw, manifest, outbox, media, yjs, photos };
 }
 
 const encodeJson = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
@@ -179,7 +187,8 @@ const encodeJson = (value: unknown): Uint8Array => new TextEncoder().encode(JSON
 export function writePackageFor(parsed: ParsedPackage, ids: ReadonlySet<string>): Uint8Array {
     const rows = parsed.manifest.inspections.filter((i) => ids.has(i.id));
     const files: Zippable = {
-        [MANIFEST_ENTRY]: encodeJson({ ...parsed.manifestRaw, inspections: rows }),
+        // An entry keeps the keys it was written with, in their order; `id` and `reportId` are always the parsed values.
+        [MANIFEST_ENTRY]: encodeJson({ ...parsed.manifestRaw, inspections: rows.map((row) => ({ ...parsed.inspectionsRaw?.get(row.id), ...row })) }),
         [OUTBOX_ENTRY]: encodeJson(parsed.outbox.filter((e) => ids.has(e.payload.id))),
     };
     const media = parsed.media.filter((m) => ids.has(m.inspectionId));
