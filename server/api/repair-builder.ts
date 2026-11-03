@@ -20,6 +20,8 @@
  * before they could ask for anything.
  */
 
+import { projectRepairBuilderLine, projectRepairRequest, projectRepairRequestWithLines, projectRepairShareLine } from '../lib/repair-request-view';
+import { RepairRequestWithLinesSchema } from '../lib/validations/repair-request-view.schema';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
@@ -68,7 +70,7 @@ const SourceResponseSchema = z.object({
             // the report's cost figures here just puts a number the inspection
             // company appears to stand behind next to that field.
         })).describe('Flattened repair-rated defects from the published report. Carries no cost estimate: the repair builder is pure-credit.'),
-        mine: z.array(z.any()).describe('Caller\'s existing repair requests for this inspection.'),
+        mine: z.array(RepairRequestWithLinesSchema).describe('Caller\'s existing repair requests for this inspection.'),
         // #275 — the ONLY tenant-config value this public, token-authenticated
         // route exposes. Whitelisted field by field on purpose: the rest of the
         // config row is not the client's business.
@@ -137,7 +139,7 @@ app.openapi(sourceRoute, async (c) => {
         loadQuickPhrases(c, tenantId),
     ]);
 
-    return c.json({ success: true as const, data: { defects, mine, quickPhrases } }, 200);
+    return c.json({ success: true as const, data: { defects, mine: mine.map(projectRepairRequestWithLines), quickPhrases } }, 200);
 });
 
 // POST /repair-builder/:tenant/:id — create list
@@ -156,7 +158,7 @@ app.openapi(createListRoute, async (c) => {
     if (gateResult) return gateResult;
 
     const rr = await c.var.services.repairRequest.create(tenantId, id, creator);
-    return c.json({ success: true as const, data: rr }, 200);
+    return c.json({ success: true as const, data: projectRepairRequest(rr) }, 200);
 });
 
 // GET /repair-builder/:tenant/:id/lists/:rrId — get list + items + creditTotal
@@ -177,7 +179,7 @@ app.openapi(getListRoute, async (c) => {
         return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Repair request not found.' } }, 404);
     }
     const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, id, rrId);
-    return c.json({ success: true as const, data: { request: result.request, items: result.items, creditTotal } }, 200);
+    return c.json({ success: true as const, data: { request: projectRepairRequest(result.request), items: result.items.map(projectRepairBuilderLine), creditTotal } }, 200); // projection-allow: the nested value is the credit total, a number
 });
 
 // POST /repair-builder/:tenant/:id/lists/:rrId/items — add item
@@ -216,7 +218,7 @@ app.openapi(addItemRoute, async (c) => {
         note:                 body.note ?? null,
         repairActionTag:      body.repairActionTag ?? null,
     });
-    return c.json({ success: true as const, data: item }, 200);
+    return c.json({ success: true as const, data: projectRepairBuilderLine(item) }, 200);
 });
 
 // PATCH /repair-builder/:tenant/:id/lists/:rrId/items/:itemId — update item
@@ -307,12 +309,12 @@ app.openapi(shareViewRoute, async (c) => {
     // Share routes use the RR's own inspectionId (already validated by runShareGate).
     const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.inspectionId, request.id);
 
-    return c.json({
+    return c.json({ // projection-allow: the nested value is the credit total, a number
         success: true as const,
         data: {
             propertyAddress,
             customIntro: request.customIntro,
-            items,
+            items: items.map(projectRepairShareLine),
             creditTotal,
         },
     }, 200);

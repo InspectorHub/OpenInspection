@@ -373,7 +373,7 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
         }, keyring);
         // Intentionally NOT a Set-Cookie — challenge tokens travel JSON-only so a stolen
         // session cookie alone never permits 2FA bypass.
-        return c.json({
+        return c.json({ // projection-allow: the nested value is the second-factor challenge token minted for this caller
             success: true,
             data: { requires2fa: true, challengeToken }
         }, 200);
@@ -602,11 +602,11 @@ coreAuthRoutes.openapi(inviteInfoRoute, async (c) => {
     const { token } = c.req.valid('query');
     const info = await c.var.services.auth.getInviteInfo(token);
     if (!info) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
-    return c.json({ success: true as const, data: info }, 200);
+    return c.json({ success: true as const, data: info }, 200); // projection-allow: getInviteInfo returns the two fields the invite page states (email, workspace name)
 });
 coreAuthRoutes.openapi(setupStatusRoute, async (c) => {
     const isSetUp = await c.var.services.auth.isSetUp();
-    return c.json({ success: true as const, data: { isSetUp } }, 200);
+    return c.json({ success: true as const, data: { isSetUp } }, 200); // projection-allow: the nested value is a boolean: whether first-run setup is complete
 });
 
 export const coreAuthRouteParts = [loginRoute, changePasswordRoute, joinTeamRoute, mounted('/', ssoRootRoutes, [ssoConsumeRoute] as const), forgotPasswordRoute, resetPasswordRoute, setupRoute, mounted('/', profileRoutes, profileRouteConfigs), mounted('/', totpRoutes, totpRouteConfigs), inviteInfoRoute, setupStatusRoute] as const;

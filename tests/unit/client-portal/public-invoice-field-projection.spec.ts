@@ -71,7 +71,7 @@ describe('IA-86 — public invoice response carries only declared fields', () =>
             c.set('services', {
                 portalAccess,
                 invoice: { findByInspectionId: vi.fn().mockResolvedValue(FULL_ROW) },
-                branding: { getBrand: vi.fn().mockResolvedValue({ companyName: 'Acme', logoUrl: null, primaryColor: null, defaultTimezone: 'UTC' }) },
+                branding: { getBrand: vi.fn().mockResolvedValue({ companyName: 'Acme', legalName: 'Acme Inspections LLC', logoUrl: null, primaryColor: null, defaultTimezone: 'UTC', defaultLocale: 'de-DE', dateFormat: 'eu', timeFormat: '24h' }) },
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
@@ -126,6 +126,12 @@ describe('IA-86 — public invoice response carries only declared fields', () =>
     it('ships the amount already received, which the schema used to strip', async () => {
         const { data } = await fetchInvoice();
         expect(data.amountPaidCents).toBe(2000);
+    });
+
+    it('carries exactly the declared keys, and the brand states the legal entity and the display format of the company', async () => {
+        const { data } = await fetchInvoice();
+        expect(Object.keys(data).sort()).toEqual([...KEPT].sort());
+        expect(data.brand).toMatchObject({ companyName: 'Acme', legalName: 'Acme Inspections LLC', defaultLocale: 'de-DE', dateFormat: 'eu', timeFormat: '24h' });
     });
 
     it('the raw text of the response contains no private note', async () => {

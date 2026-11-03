@@ -49,7 +49,7 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
                 },
             ],
         });
-        const listMine = vi.fn().mockResolvedValue([{ id: 'rr1' }]);
+        const listMine = vi.fn().mockResolvedValue([{ id: 'rr1', items: [] }]);
         const resolveToken = vi.fn().mockResolvedValue(VALID_TOKEN_ROW);
 
         const { app } = buildApp({

@@ -12,6 +12,7 @@
  * handlers and the service, not here; these are shapes only.
  */
 
+import { RepairBuilderLineSchema, RepairRequestViewSchema } from '../../lib/validations/repair-request-view.schema';
 import { createRoute, z } from '@hono/zod-openapi';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 // The two item-body shapes live in lib/validations (house rule); they were
@@ -57,7 +58,7 @@ export const createListRoute = createRoute(withMcpMetadata({
         query:  BuilderQuerySchema,
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.any() }) } }, description: 'Created repair request' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: RepairRequestViewSchema }) } }, description: 'Created repair request' },
         401: { description: 'No valid access credential' },
         403: { description: 'Report not published or tenant feature disabled' },
     },
@@ -75,7 +76,7 @@ export const getListRoute = createRoute(withMcpMetadata({
         query:  BuilderQuerySchema,
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.any() }) } }, description: 'Repair request + items + creditTotal' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ request: RepairRequestViewSchema, items: z.array(RepairBuilderLineSchema), creditTotal: z.number() }) }) } }, description: 'Repair request + items + creditTotal' },
         401: { description: 'No valid access credential' },
         403: { description: 'Report not published or tenant feature disabled' },
         404: { description: 'Repair request not found' },
@@ -95,7 +96,7 @@ export const addItemRoute = createRoute(withMcpMetadata({
         body:   { content: { 'application/json': { schema: ItemBodySchema } }, required: true },
     },
     responses: {
-        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.any() }) } }, description: 'Added item' },
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: RepairBuilderLineSchema }) } }, description: 'Added item' },
         400: { description: 'Validation error' },
         401: { description: 'No valid access credential' },
         403: { description: 'Not the creator, report not published, or an inspector-authored action tag' },

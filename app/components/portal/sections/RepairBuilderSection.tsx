@@ -77,7 +77,7 @@ export interface RepairRequestItem {
 export interface RepairRequest {
   id: string;
   inspectionId: string;
-  tenantId: string;
+  tenantId?: string;
   customIntro: string | null;
   shareToken: string | null;
   items?: RepairRequestItem[];

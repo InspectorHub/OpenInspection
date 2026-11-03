@@ -22,10 +22,11 @@ import { getBookingHost, getBaseUrl } from '../lib/url';
 import { publicReportAccessAllowed, shouldPinLatestPublished } from '../lib/report-access';
 import publicVerifyRoutes, { publicVerifyRouteConfigs } from './public/verify';
 import publicInspectorProfileRoutes, { publicInspectorProfileRouteConfigs } from './public/inspector-profile';
-import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
+import { PublicInvoiceBodySchema, PUBLIC_INVOICE_FIELDS } from '../lib/validations/invoice.schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { readCourtesyTranslationForReport } from '../lib/translation/read-for-report';
 import { projectReportForLink } from '../lib/report-link-response';
+import { projectFields } from '../lib/response-projection';
 import { finishReportLink } from '../lib/report-link-keys';
 import { serveReportPhoto } from '../lib/report-link-photo';
 import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/validations/courtesy-translation.schema';
@@ -421,7 +422,7 @@ app.openapi(reportRoute, async (c) => {
     );
     // The translation reader above got the report as built; the response carries only the report link's fields,
     // with storage keys stated relative to the company (the photo route puts the company back).
-    return c.json({ success: true as const, data: finishReportLink(projectReportForLink(data), tenantId, makePhotoUrl), courtesyTranslation }, 200);
+    return c.json({ success: true as const, data: finishReportLink(projectReportForLink(data), tenantId, makePhotoUrl), courtesyTranslation }, 200); // projection-allow: courtesyTranslation is the stored translation payload declared by CourtesyTranslationPayloadSchema, or null
 });
 app.openapi(reportPhotoRoute, async (c) => {
     const { id } = c.req.valid('param');
@@ -561,12 +562,13 @@ app.openapi(invoiceRoute, async (c) => {
         primaryColor: brand?.primaryColor ?? null,
         logoUrl: brand?.logoUrl ?? null,
         defaultTimezone: brand?.defaultTimezone ?? 'UTC',
+        legalName: brand?.legalName ?? '', defaultLocale: brand?.defaultLocale ?? 'en-US', dateFormat: brand?.dateFormat ?? 'us', timeFormat: brand?.timeFormat ?? '12h',
         supportEmail: brand?.supportEmail ?? null,
         companyPhone: brand?.companyPhone ?? null,
         privacyUrl: brand?.privacyUrl ?? null,
         termsUrl: brand?.termsUrl ?? null,
     };
-    const view = PublicInvoiceBodySchema.parse({ ...inv, lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
+    const view = PublicInvoiceBodySchema.parse({ ...projectFields(inv, PUBLIC_INVOICE_FIELDS), lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
     return c.json({ success: true as const, data: view }, 200);
 });
 app.openapi(payIntentRoute, async (c) => {
@@ -619,7 +621,7 @@ app.openapi(reportGateRoute, async (c) => {
     const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
     if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
     const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant, c.var.services.agreement);
-    return c.json({ success: true as const, data: gate }, 200);
+    return c.json({ success: true as const, data: gate }, 200); // projection-allow: getReportGate builds the typed gate the report page states (reason, labels, links)
 });
 
 /** Registration order, mounts included. Drives `PublicReportApi`; a test pins it to what `app` really registered. */

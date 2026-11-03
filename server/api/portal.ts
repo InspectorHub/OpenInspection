@@ -423,7 +423,7 @@ const portalRoutes = portalRouter
         const email = c.get('portalEmail') as string;
 
         const inspections = await c.var.services.portal.listRecipientInspections(tenantId, email);
-        return c.json({ data: { email, inspections } }, 200);
+        return c.json({ data: { email, inspections } }, 200); // projection-allow: listRecipientInspections returns the typed RecipientInspection list the portal picker states
     })
     .openapi(overviewRoute, async (c) => {
         const tenantId = resolveTenantId(c);
@@ -461,7 +461,7 @@ const portalRoutes = portalRouter
 
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: { ...overview, token, signerToken } }, 200);
+        return c.json({ data: { ...overview, token, signerToken } }, 200); // projection-allow: hubOverview builds the typed HubOverview the portal page states; token and signerToken are the reader own
     })
     .openapi(observeRoute, async (c) => {
         const tenantId = resolveTenantId(c);
@@ -479,7 +479,7 @@ const portalRoutes = portalRouter
         // Tenant + inspection scoped server-side; the portal session is the only gate.
         const observe = await c.var.services.portal.observeProgress(tenantId, inspectionId);
         if (!observe) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: observe }, 200);
+        return c.json({ data: observe }, 200); // projection-allow: observeProgress builds the typed progress view the portal page states
     });
 
 export type PortalApi = typeof portalRoutes;

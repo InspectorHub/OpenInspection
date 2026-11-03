@@ -48,14 +48,12 @@ export class BookingService {
      */
     async listInspectors(tenantId: string) {
         const db = this.getDrizzle();
-        const rows = await db.select({ id: users.id, name: users.name, email: users.email })
+        const rows = await db.select({ id: users.id, name: users.name })
             .from(users)
             .where(and(eq(users.tenantId, tenantId), eq(users.role, 'inspector')))
             .all();
 
-        // This used to select only `email` and return its local part as `name` —
-        // so an inspector WITH a name still came back as their mailbox prefix.
-        // Not a fallback: the real name was never read.
+        // Id and name only: this list answers the public booking page, which needs nothing else about an inspector.
         return rows.map(r => ({
             id: r.id,
             name: r.name ?? null,

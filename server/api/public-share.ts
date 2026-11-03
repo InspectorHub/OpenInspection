@@ -86,7 +86,7 @@ app.openapi(shareTokenRoute, async (c) => {
     const tenantSlug = c.get('requestedTenantSlug') ?? '';
     const url = `${baseUrl}/report/${tenantSlug}/${id}?view=agent&token=${shareToken}`;
     logger.info('Public share-token minted', { inspectionId: id, tenantId });
-    return sendSuccess(c, { token: shareToken, url });
+    return sendSuccess(c, { token: shareToken, url }); // projection-allow: the share token this request just minted for the caller
 });
 
 // The browser CSP report receiver is the other unauthenticated public POST; it is mounted here

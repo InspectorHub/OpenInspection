@@ -188,7 +188,7 @@ bookingsRoutes.openapi(listInspectorsRoute, async (c) => {
 
     const service = c.var.services.booking;
     const inspectors = await service.listInspectors(tenantId);
-    return c.json({ success: true, data: inspectors }, 200);
+    return c.json({ success: true, data: inspectors }, 200); // projection-allow: listInspectors selects id and name only
 });
 bookingsRoutes.openapi(listPublicServicesRoute, async (c) => {
     const tenantId = c.get('tenantId') || c.get('requestedTenantSlug');
@@ -242,7 +242,7 @@ bookingsRoutes.openapi(getAvailabilityRoute, async (c) => {
 
     const service = c.var.services.booking;
     const result = await service.getAvailability(tenantId, inspectorId, startDate, endDate);
-    return c.json({ success: true, data: result }, 200);
+    return c.json({ success: true, data: result }, 200); // projection-allow: getAvailability names the columns of the schedule rows it returns (anonymous read)
 });
 bookingsRoutes.route('/', createBookingRoutes);
 bookingsRoutes.route('/', agreementRoutes);

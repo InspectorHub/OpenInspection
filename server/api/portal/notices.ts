@@ -14,6 +14,7 @@
  * Dismissing a notice archives the header and stops there; `automation_logs`
  * is untouched, so the inspector's Outbox keeps the delivery forever (§3.15).
  */
+import { projectPortalNotice } from '../../lib/notice-portal-view';
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { createApiRouter } from '../../lib/openapi-router';
@@ -149,7 +150,7 @@ const portalNoticeRoutes = router
             listNoticesForContacts(db, { contactIds }),
             unreadNoticeCountForContacts(db, contactIds),
         ]);
-        return c.json({ success: true as const, data: { notices, unread } }, 200);
+        return c.json({ success: true as const, data: { notices: notices.map(projectPortalNotice), unread } }, 200);
     })
     .openapi(markReadRoute, async (c) => {
         const tenantId = resolveTenantId(c);

@@ -223,6 +223,10 @@ export const SCRIPT_GATES = [
     // the API once per item -- rather than one keystroke. Existing violations are frozen in
     // scripts/loader-budget-baseline.json and may only shrink.
     { key: 'loaderbudget', label: 'lint:loader-budget', script: 'check-loader-budget.mjs', fix: 'npm run lint:loader-budget', rung: PUSH },
+    // A route reachable without signing in answers with a response built from a field list, not a row or a service result.
+    // PUSH for the same reason as `loaderbudget`: it parses a few dozen route modules, and the findings that matter are the sum over a
+    // branch. Existing findings are frozen in scripts/public-projection-baseline.json and may only shrink.
+    { key: 'publicprojection', label: 'lint:public-projection', script: 'check-public-projection.mjs', fix: 'npm run lint:public-projection', rung: PUSH },
     { key: 'unwired', label: 'lint:unwired', script: 'check-unwired.mjs', fix: 'npm run lint:unwired', rung: PUSH },
     // `unwired` one level down: a field, not a module. See that script's header.
     { key: 'unreadfields', label: 'lint:unread-fields', script: 'check-unread-fields.mjs', fix: 'npm run lint:unread-fields', rung: PUSH },

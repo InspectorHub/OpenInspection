@@ -57,7 +57,7 @@ export interface MessageRow {
   fromRole: string;
   fromName: string | null;
   body: string;
-  attachments: Array<{ id: string; key: string; name: string }>;
+  attachments: Array<{ id: string; key?: string; name: string }>;
   createdAt: number;
 }
 

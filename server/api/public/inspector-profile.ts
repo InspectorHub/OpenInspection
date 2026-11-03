@@ -98,7 +98,7 @@ app.openapi(brandRoute, async (c) => {
         slug: tenant,
         baseUrl: getBaseUrl(c),
     });
-    return c.json({ success: true as const, data: brand }, 200);
+    return c.json({ success: true as const, data: PublicBrandSchema.parse(brand) }, 200);
 });
 app.openapi(legalDocRoute, async (c) => {
     const { tenant, doc } = c.req.valid('param');

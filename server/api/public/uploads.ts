@@ -68,7 +68,7 @@ function checkDeclaredLength(c: Context<HonoConfig>, maxBytes: number, tooLarge:
     if (header === undefined || !/^\d+$/.test(header.trim())) {
         return c.json({ error: 'Content-Length is required.' }, 411);
     }
-    return Number(header) > maxBytes + MULTIPART_OVERHEAD_BYTES ? c.json(tooLarge, 413) : null;
+    return Number(header) > maxBytes + MULTIPART_OVERHEAD_BYTES ? c.json(tooLarge, 413) : null; // projection-allow: a refusal body the caller built from literals (error code and limits)
 }
 
 /** The token's issuer is still an active member and its inspection still exists, both in the token's tenant. */
@@ -117,7 +117,7 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         logger.info('public-upload: stored photo', {
             tenantId: claims.tenantId, inspectionId: claims.inspectionId, mediaId: claims.mediaId, key,
         });
-        return c.json({ success: true, data: { key } }, 200);
+        return c.json({ success: true, data: { key } }, 200); // projection-allow: the key of the object the holder of this signed upload URL just stored; the native client records it
     })
     .post('/uploads/video', async (c) => {
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'video');

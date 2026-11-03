@@ -10,7 +10,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { inspections, tenantConfigs } from './db/schema';
+import { inspections, tenantConfigs, type repairRequestItems } from './db/schema';
 import { isReportPublished } from './status/report-status';
 import { mayAuthorRepairActionTag } from './repair-action-tag';
 import type { HonoConfig } from '../types/hono';
@@ -173,7 +173,7 @@ export async function runShareGate(
 ): Promise<
     | {
           request: { id: string; tenantId: string; inspectionId: string; customIntro: string | null };
-          items: unknown[];
+          items: (typeof repairRequestItems.$inferSelect)[];
           tenantId: string;
           propertyAddress: string | null;
       }

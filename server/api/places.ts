@@ -111,7 +111,7 @@ if (c.env.TENANT_CACHE) {
         results: Array<{ placeId: string; description: string; mainText: string; secondaryText: string }>
     } | null;
     if (cached) {
-        return c.json({ success: true, data: cached.results, meta: { cached: true } }, 200);
+        return c.json({ success: true, data: cached.results, meta: { cached: true } }, 200); // projection-allow: address suggestions mapped to placeId and display text by lib/places/geocode.ts
     }
 }
 
@@ -164,7 +164,7 @@ const cacheKey = placeDetailsCacheKey(placeId);
 if (c.env.TENANT_CACHE) {
     const cached = await c.env.TENANT_CACHE.get(cacheKey, 'json') as ResolvedPlace | null;
     if (cached) {
-        return c.json({ success: true, data: cached, meta: { cached: true } }, 200);
+        return c.json({ success: true, data: cached, meta: { cached: true } }, 200); // projection-allow: resolved place mapped to address components by lib/places/geocode.ts
     }
 }
 
@@ -178,7 +178,7 @@ if (c.env.TENANT_CACHE) {
     await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(payload), { expirationTtl: 60 * 24 * 60 * 60 });
 }
 
-return c.json({ success: true, data: payload, meta: { cached: false } }, 200);
+return c.json({ success: true, data: payload, meta: { cached: false } }, 200); // projection-allow: resolved place mapped to address components by lib/places/geocode.ts
 });
 
 /** Registration order. Drives `PlacesApi`; a test pins it to what `app` really registered. */

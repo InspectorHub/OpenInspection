@@ -211,12 +211,12 @@ const createServiceDiscountCodesRoute = createRoute(withMcpMetadata({
 const validateServiceRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/discount/validate',
     tags: ["services"], summary: "Validate service for current tenant",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('inspectionFees')] as const,
     request: { body: { content: { 'application/json': { schema: ValidateDiscountSchema.describe('The code to check and the subtotal to price it against.') } } } },
     responses: { 200: { content: { 'application/json': { schema: createApiResponseSchema(ValidateDiscountResponseSchema) } }, description: 'Validation result' } },
     operationId: "validateService",
-    description: "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors."
-}, { scopes: ['write'], tier: 'extended' }));
+    description: "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors who hold the inspection-fees capability."
+}, { scopes: ['write'], tier: 'extended', capability: 'inspectionFees' }));
 
 const listServicesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',

@@ -25,7 +25,7 @@ wellKnownRoutes.get('/openinspection/tenant-keys/:slug', async (c) => {
     const signing = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
     const pub = await signing.getPublicKey(tenant.id);
     if (!pub) return c.json({ error: 'no signing key for tenant' }, 404);
-    return c.json(
+    return c.json( // projection-allow: the tenant public signing key: slug, algorithm, PEM and fingerprint, public by design
         {
             tenantSlug: slug,
             algorithm: 'Ed25519',

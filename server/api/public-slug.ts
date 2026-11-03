@@ -77,7 +77,7 @@ app.openapi(checkSlugRoute, async (c) => {
         return c.json({ success: true as const, data: { available: false, reason: 'invalid' as const } }, 200);
     }
     const result = await c.var.services.user.checkSlug(tenantId, value);
-    return c.json({ success: true as const, data: result }, 200);
+    return c.json({ success: true as const, data: result }, 200); // projection-allow: checkSlug returns { available, reason }
 });
 
 /** Registration order. Drives `PublicSlugApi`; a test pins it to what `app` really registered. */

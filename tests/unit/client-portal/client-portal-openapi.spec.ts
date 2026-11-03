@@ -207,19 +207,20 @@ describe('client messages (OpenAPI list and send)', () => {
         };
         const res = await call(buildApp({ message }), `${msgs}?token=${TOKEN}`);
         expect(res.status).toBe(200);
-        expect(await res.json()).toEqual({ success: true, data: [{ id: 'm1', contactId: 'c1' }] });
+        // The portal receives the listed fields only: the contact id the thread is filtered by is not among them.
+        expect(await res.json()).toEqual({ success: true, data: [{ id: 'm1', attachments: [] }] });
         expect(message.resolveThreadContact).toHaveBeenCalledWith(TENANT, INSPECTION, 'client@x.com');
         expect(message.markThreadReadForContact).toHaveBeenCalledWith(TENANT, 'c1', INSPECTION);
     });
 
-    it('GET without a seat returns the whole list and marks nothing', async () => {
+    it('GET without a seat returns nothing, not the other threads, and marks nothing', async () => {
         const message = {
             resolveThreadContact: vi.fn().mockResolvedValue(null),
             listForInspection: vi.fn().mockResolvedValue([{ id: 'm1', contactId: 'c1' }, { id: 'm2', contactId: 'c2' }]),
             markThreadReadForContact: vi.fn(),
         };
         const res = await call(buildApp({ message }), `${msgs}?token=${TOKEN}`);
-        expect((await res.json() as { data: unknown[] }).data).toHaveLength(2);
+        expect((await res.json() as { data: unknown[] }).data).toEqual([]);
         expect(message.markThreadReadForContact).not.toHaveBeenCalled();
     });
 
@@ -258,7 +259,7 @@ describe('client messages (OpenAPI list and send)', () => {
         });
         const res = await call(app, `${msgs}?token=${TOKEN}`, post(JSON.stringify({ body: 'hello' })));
         expect(res.status).toBe(201);
-        expect(await res.json()).toEqual({ success: true, data: stored });
+        expect(await res.json()).toEqual({ success: true, data: { id: 'm1', fromRole: 'client', body: 'hello', attachments: [] } });
         expect(createMessage).toHaveBeenCalledWith({
             tenantId: TENANT, inspectionId: INSPECTION, contactId: 'c1', fromRole: 'client', fromName: 'Pat Client', body: 'hello', attachments: [],
         });

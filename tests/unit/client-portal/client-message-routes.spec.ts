@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
@@ -19,6 +20,7 @@ import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profil
 import { signPortalSession } from '../../../server/lib/portal-session';
 import { createApiRouter } from '../../../server/lib/openapi-router';
 import { clientMessageRoutes, inspectorMessageRoutes } from '../../../server/api/messages';
+import { CLIENT_MESSAGE_FIELD_LISTS } from '../../../server/lib/client-message-view';
 
 const TENANT = '00000000-0000-0000-0000-0000000000a1';
 const SECRET = 'test-jwt-secret';
@@ -52,14 +54,36 @@ describe('client message routes (resolveClientActor-gated)', () => {
             c.set('user', { sub: INSPECTOR_USER, role: 'inspector', tenantId: TENANT } as never);
             await next();
         });
+        // The production app maps an AppError to its status; this one does the same so a refusal reads as 400, not 500.
+        app.onError((err, c) => c.json({ error: err.message }, ((err as { status?: number }).status ?? 500) as 400));
         app.route('/api/public', clientMessageRoutes);
         app.route('/api/inspections', inspectorMessageRoutes);
         return app;
     }
 
+    /** An in-memory bucket: what an upload puts is what a download gets. */
+    interface Held { bytes: Uint8Array; type: string; name?: string }
+    const stored = new Map<string, Held>();
+    const PHOTOS = {
+        put: async (key: string, value: Uint8Array, opts?: { httpMetadata?: { contentType?: string }; customMetadata?: { originalName?: string } }) => {
+            stored.set(key, { bytes: value, type: opts?.httpMetadata?.contentType ?? 'application/octet-stream', ...(opts?.customMetadata?.originalName ? { name: opts.customMetadata.originalName } : {}) });
+        },
+        head: async (key: string) => {
+            const held = stored.get(key);
+            return held ? { size: held.bytes.byteLength, httpMetadata: { contentType: held.type }, customMetadata: held.name ? { originalName: held.name } : {}, uploaded: new Date(5) } : null;
+        },
+        get: async (key: string) => {
+            const held = stored.get(key);
+            return held ? { body: new Blob([new Uint8Array(held.bytes)]).stream(), httpMetadata: { contentType: held.type }, httpEtag: '"e"' } : null;
+        },
+    } as unknown as R2Bucket;
+
     function reqEnv() {
-        return { JWT_SECRET: SECRET, DB: {} as D1Database } as unknown as HonoConfig['Bindings'];
+        return { JWT_SECRET: SECRET, DB: {} as D1Database, PHOTOS } as unknown as HonoConfig['Bindings'];
     }
+
+    const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    const uploadForm = (name = 'quote.png') => { const fd = new FormData(); fd.append('file', new File([PNG], name, { type: 'image/png' })); fd.append('itemId', 'x'); return fd; };
 
     async function seed() {
         const inspectionId = 'insp1';
@@ -174,5 +198,174 @@ describe('client message routes (resolveClientActor-gated)', () => {
         const body = await inspRes.json<{ data: { body: string }[] }>();
         expect(body.data.length).toBe(1);
         expect(body.data[0].body).toBe('ping');
+    });
+
+    describe('what the portal receives of a message', () => {
+        const MESSAGE_KEYS = [...CLIENT_MESSAGE_FIELD_LISTS.message, 'attachments'].sort();
+
+        it('POST and GET carry the listed fields, and an attachment carries no storage key', async () => {
+            const { app, inspectionId, clientToken } = await seed();
+            const up = await app.request(`/api/public/inspections/${inspectionId}/messages/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv());
+            expect(up.status).toBe(200);
+            const ATTACHMENT = (await up.json<{ data: { id: string; key: string } }>()).data;
+            const sent = await app.request(`/api/public/inspections/${inspectionId}/messages?token=${clientToken}`, {
+                method: 'POST', headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ body: 'With a file', attachments: [ATTACHMENT] }),
+            }, reqEnv());
+            expect(sent.status).toBe(201);
+            const created = (await sent.json<{ data: Record<string, unknown> }>()).data;
+            expect(Object.keys(created).sort()).toEqual(MESSAGE_KEYS);
+            const listed = await app.request(`/api/public/inspections/${inspectionId}/messages?token=${clientToken}`, {}, reqEnv());
+            const [row] = (await listed.json<{ data: Array<{ attachments: Array<Record<string, unknown>> } & Record<string, unknown>> }>()).data;
+            expect(Object.keys(row ?? {}).sort()).toEqual(MESSAGE_KEYS);
+            expect(Object.keys(row?.attachments[0] ?? {}).sort()).toEqual([...CLIENT_MESSAGE_FIELD_LISTS.attachment].sort());
+            expect(JSON.stringify([created, row])).not.toContain(TENANT);
+            for (const key of ['tenantId', 'contactId', 'fromUserId', 'inspectionId']) expect(row).not.toHaveProperty(key);
+        });
+
+        it('a caller with no client seat to resolve is listed nothing, while another participant thread exists', async () => {
+            const { app, portalAccess, message } = await seed();
+            // An inspection with no people on it: no seat matches and there is no primary client to fall back to.
+            await testDb.insert(schema.inspections).values({
+                id: 'insp2', tenantId: TENANT, propertyAddress: '2 Main St', date: '2026-06-02',
+                status: 'requested', reportStatus: 'in_progress', paymentStatus: 'unpaid', createdAt: new Date(), price: 0,
+            });
+            await message.createMessage({ tenantId: TENANT, inspectionId: 'insp2', contactId: 'someone-else', fromRole: 'inspector', fromName: 'Ivan', body: 'for another participant', attachments: [] });
+            expect(await message.listForInspection('insp2', TENANT)).toHaveLength(1);
+            const token = await portalAccess.issueToken({ tenantId: TENANT, inspectionId: 'insp2', recipientEmail: 'nobody@x.com', role: 'client' });
+            const res = await app.request(`/api/public/inspections/insp2/messages?token=${token}`, {}, reqEnv());
+            expect(res.status).toBe(200);
+            const { data } = await res.json<{ data: unknown[] }>();
+            expect(data).toEqual([]);
+        });
+    });
+
+    describe('an attachment sent with a message must be one this company uploaded for this inspection', () => {
+        const send = (app: Awaited<ReturnType<typeof seed>>['app'], path: string, attachments: unknown[], headers: Record<string, string> = {}) =>
+            app.request(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ body: 'files', attachments }) }, reqEnv());
+        const descriptor = (key: string, id = 'att-9') => ({ id, key, name: 'x.png', size: 1, type: 'image/png', uploadedAt: 1 });
+
+        it('client path: an upload followed by a send is accepted and the file downloads; foreign and look-alike keys are refused', async () => {
+            const { app, inspectionId, clientToken } = await seed();
+            const base = `/api/public/inspections/${inspectionId}/messages`;
+            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv());
+            const real = (await up.json<{ data: { id: string; key: string } & Record<string, unknown> }>()).data;
+            expect(real.key).toBe(`${TENANT}/messages/${inspectionId}/${real.id}.png`);
+            const ok = await send(app, `${base}?token=${clientToken}`, [real]);
+            expect(ok.status).toBe(201);
+            const download = await app.request(`${base}/attachments/${real.id}?token=${clientToken}`, {}, reqEnv());
+            expect(download.status).toBe(200);
+            expect(new Uint8Array(await download.arrayBuffer())).toEqual(PNG);
+            const refused = [
+                descriptor('99999999-0000-4000-8000-000000000099/messages/insp1/att-9.png'),
+                descriptor(`${TENANT}/messages/insp2/att-9.png`),
+                descriptor(`${TENANT}/inspections/${inspectionId}/photos/p1.jpg`),
+                descriptor(`${TENANT}/messages/${inspectionId}/other-id.png`),
+                descriptor(`${TENANT}/messages/${inspectionId}/att-9`),
+                descriptor(`${TENANT}/messages/${inspectionId}/../insp2/att-9.png`),
+                descriptor(`${TENANT}/messages/${inspectionId}/att-9.png`, 'att-9/../x'),
+            ];
+            for (const attachment of refused) {
+                const res = await send(app, `${base}?token=${clientToken}`, [attachment]);
+                expect(res.status, attachment.key).toBe(400);
+            }
+            // An old-shape key (the attachment id as the folder) cannot be attached again, even when the object exists.
+            stored.set(`${TENANT}/messages/att-9/att-9.png`, { bytes: PNG, type: 'image/png' });
+            expect((await send(app, `${base}?token=${clientToken}`, [descriptor(`${TENANT}/messages/att-9/att-9.png`)])).status).toBe(400);
+            // A key in the exact upload shape whose object was never stored is refused too.
+            expect((await send(app, `${base}?token=${clientToken}`, [descriptor(`${TENANT}/messages/${inspectionId}/att-9.png`)])).status).toBe(400);
+            // Control: once the object exists, the same descriptor is accepted, so the refusals above are about the key and the object.
+            stored.set(`${TENANT}/messages/${inspectionId}/att-9.png`, { bytes: PNG, type: 'image/png' });
+            expect((await send(app, `${base}?token=${clientToken}`, [descriptor(`${TENANT}/messages/${inspectionId}/att-9.png`)])).status).toBe(201);
+        });
+
+        it('inspector path: the same rules apply to a staff send', async () => {
+            const { app, inspectionId } = await seed();
+            // The signed-in inspector leads the inspection, so sending is theirs to do.
+            await testDb.insert(schema.users).values({ id: INSPECTOR_USER, tenantId: TENANT, email: 'ivan@x.com', passwordHash: 'h', role: 'inspector', name: 'Ivan', createdAt: new Date() });
+            await testDb.update(schema.inspections).set({ inspectorId: INSPECTOR_USER }).where(eq(schema.inspections.id, inspectionId));
+            const base = `/api/inspections/${inspectionId}/messages`;
+            const up = await app.request(`${base}/upload`, { method: 'POST', body: uploadForm() }, reqEnv());
+            expect(up.status).toBe(200);
+            const real = (await up.json<{ data: { id: string; key: string } }>()).data;
+            expect(real.key).toBe(`${TENANT}/messages/${inspectionId}/${real.id}.png`);
+            const ok = await send(app, base, [real]);
+            expect(ok.status).toBe(201);
+            const refused = [
+                descriptor('99999999-0000-4000-8000-000000000099/messages/insp1/att-9.png'),
+                descriptor(`${TENANT}/messages/insp2/att-9.png`),
+                descriptor(`${TENANT}/inspections/${inspectionId}/photos/p1.jpg`),
+            ];
+            for (const attachment of refused) {
+                const res = await send(app, base, [attachment]);
+                expect(res.status, attachment.key).toBe(400);
+            }
+        });
+
+        it('rebuilds name, size and type from the stored object, whatever the send claims, and bounds the claimed fields', async () => {
+            const { app, inspectionId, clientToken, message } = await seed();
+            const base = `/api/public/inspections/${inspectionId}/messages`;
+            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm('quote.png') }, reqEnv());
+            const real = (await up.json<{ data: { id: string; key: string } }>()).data;
+            const claimed = { ...real, name: 'evil.html', size: 99999, type: 'text/html', uploadedAt: 1 };
+            const ok = await send(app, `${base}?token=${clientToken}`, [claimed]);
+            expect(ok.status).toBe(201);
+            const [row] = await message.listForInspection(inspectionId, TENANT);
+            expect(row?.attachments?.[0]).toMatchObject({ id: real.id, name: 'quote.png', size: PNG.byteLength, type: 'image/png' });
+            const download = await app.request(`${base}/attachments/${real.id}?token=${clientToken}`, {}, reqEnv());
+            expect(download.headers.get('content-type')).toBe('image/png');
+            expect(download.headers.get('x-content-type-options')).toBe('nosniff');
+            for (const over of [{ name: 'n'.repeat(300) }, { type: 't'.repeat(200) }, { id: 'i'.repeat(100) }, { key: `${real.key}${'k'.repeat(400)}` }]) {
+                expect((await send(app, `${base}?token=${clientToken}`, [{ ...real, ...over }])).status, JSON.stringify(Object.keys(over))).toBe(400);
+            }
+        });
+
+        it('serves a name in any script, with an ASCII fallback and the exact name, and never throws', async () => {
+            const { app, inspectionId, clientToken } = await seed();
+            const base = `/api/public/inspections/${inspectionId}/messages`;
+            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm('\u898b\u7a4d\u66f8 "quote".png') }, reqEnv());
+            const real = (await up.json<{ data: { id: string; key: string } }>()).data;
+            expect((await send(app, `${base}?token=${clientToken}`, [real])).status).toBe(201);
+            const download = await app.request(`${base}/attachments/${real.id}?token=${clientToken}`, {}, reqEnv());
+            expect(download.status).toBe(200);
+            const disposition = download.headers.get('content-disposition') ?? '';
+            expect(disposition).toMatch(/^attachment; filename="[\x20-\x7e]*"; filename\*=UTF-8''/);
+            expect(disposition).toContain(encodeURIComponent('\u898b\u7a4d\u66f8'));
+            expect(disposition.split('filename="')[1]?.split('"; ')[0]).not.toContain('"');
+        });
+
+        describe('a download is served only from this company message folder, and only from the caller thread', () => {
+            type Ctx = Awaited<ReturnType<typeof seed>>;
+            const seedMessage = async (ctx: Ctx, key: string, attachmentId: string, contactId: string) => {
+                await ctx.message.createMessage({
+                    tenantId: TENANT, inspectionId: ctx.inspectionId, contactId, fromRole: 'inspector', fromName: 'Ivan', body: 'file',
+                    attachments: [{ id: attachmentId, key, name: 'x.png', size: 1, type: 'image/png', uploadedAt: 1 }],
+                });
+                stored.set(key, { bytes: PNG, type: 'image/png' });
+            };
+            const fetchBoth = async (ctx: Awaited<ReturnType<typeof seed>>, attachmentId: string) => {
+                const client = await ctx.app.request(`/api/public/inspections/${ctx.inspectionId}/messages/attachments/${attachmentId}?token=${ctx.clientToken}`, {}, reqEnv());
+                const staff = await ctx.app.request(`/api/inspections/${ctx.inspectionId}/messages/attachments/${attachmentId}`, {}, reqEnv());
+                return { client: client.status, staff: staff.status };
+            };
+
+            it('refuses a stored key that names another company or a photo, and serves an old-shape key of the company', async () => {
+                const ctx = await seed();
+                await seedMessage(ctx, '99999999-0000-4000-8000-000000000099/messages/m/a.png', 'a-foreign', 'contact-client-1');
+                expect(await fetchBoth(ctx, 'a-foreign')).toEqual({ client: 404, staff: 404 });
+                await seedMessage(ctx, `${TENANT}/inspections/insp1/photos/p1.jpg`, 'a-photo', 'contact-client-1');
+                expect(await fetchBoth(ctx, 'a-photo')).toEqual({ client: 404, staff: 404 });
+                await seedMessage(ctx, `${TENANT}/messages/a-old/a-old.png`, 'a-old', 'contact-client-1');
+                expect(await fetchBoth(ctx, 'a-old')).toEqual({ client: 200, staff: 200 });
+            });
+
+            it('does not hand a client the attachment of another participant thread, and does hand over their own', async () => {
+                const ctx = await seed();
+                await seedMessage(ctx, `${TENANT}/messages/insp1/a-other.png`, 'a-other', 'contact-someone-else');
+                expect(await fetchBoth(ctx, 'a-other')).toEqual({ client: 404, staff: 200 });
+                await seedMessage(ctx, `${TENANT}/messages/insp1/a-own.png`, 'a-own', 'contact-client-1');
+                expect(await fetchBoth(ctx, 'a-own')).toEqual({ client: 200, staff: 200 });
+            });
+        });
     });
 });

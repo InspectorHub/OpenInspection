@@ -13,7 +13,7 @@ export interface Message {
   fromRole: string;
   fromName: string | null;
   createdAt: string | number;
-  attachments: Array<{ id: string; key: string; name: string }>;
+  attachments: Array<{ id: string; key?: string; name: string }>;
 }
 
 interface InspectionInfo {

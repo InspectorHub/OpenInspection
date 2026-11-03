@@ -9,6 +9,7 @@
  * combined RepairBuilderApi type and every route path/method stay identical.
  */
 
+import { RepairShareLineSchema } from '../../lib/validations/repair-request-view.schema';
 import { createRoute, z } from '@hono/zod-openapi';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
@@ -23,7 +24,7 @@ const ShareViewResponseSchema = z.object({
     data: z.object({
         propertyAddress: z.string().nullable(),
         customIntro:     z.string().nullable(),
-        items:           z.array(z.any()),
+        items:           z.array(RepairShareLineSchema),
         creditTotal:     z.number(),
     }),
 });

@@ -147,7 +147,7 @@ app.openapi(verifyRoute, async (c) => {
     const { envelopeId } = c.req.valid('param');
     const data = await loadVerifyData(c, envelopeId);
     if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
-    return c.json({
+    return c.json({ // projection-allow: the nested value is a boolean computed from the stored disclosure
         success: true as const,
         data: {
             envelopeId,

@@ -134,7 +134,7 @@ bookingProfileRoutes.openapi(companyProfileRoute, async (c) => {
         inspectors.sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
     }
 
-    return c.json({
+    return c.json({ // projection-allow: turnstileSiteKey is the public widget site key
         success: true as const,
         data: {
             company: tenantRow.name,
@@ -200,7 +200,7 @@ bookingProfileRoutes.openapi(inspectorProfileRoute, async (c) => {
         .limit(1)
         .get();
 
-    return c.json({
+    return c.json({ // projection-allow: turnstileSiteKey is the public widget site key
         success: true as const,
         data: {
             inspectorId: inspector.id,

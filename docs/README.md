@@ -77,6 +77,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 | [`develop/architecture.md`](develop/architecture.md) | Single-worker architecture, request flow, module map, the shared mode-aware editor surfaces, cost model |
 | [`develop/testing.md`](develop/testing.md) | Five suites, where a spec lives, how to run each one |
 | [`develop/gates.md`](develop/gates.md) | The conformance gates — the registry, the two rungs, and the conventions a new gate has to meet |
+| [`develop/public-response-projection.md`](develop/public-response-projection.md) | How a route reachable without signing in builds its response from a field list, the helper, the gate and the escape comment |
 | [`develop/integration-adapters.md`](develop/integration-adapters.md) | Writing code that talks to somebody else's API — shape, credentials, failure recording, contract tests |
 | [`develop/integration-sources.md`](develop/integration-sources.md) | Whose credentials a service runs on — the `provided` / `own` source model, the resolver, and what a company that never chose keeps |
 | [`develop/native-clients.md`](develop/native-clients.md) | Server side of the native app: the `NATIVE_CLIENT_ENABLED` switch, OAuth `native` scope, version handshake, signed uploads, offline package import and limits, and the add-only contract |

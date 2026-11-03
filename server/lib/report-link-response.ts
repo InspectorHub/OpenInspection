@@ -13,6 +13,7 @@
  * was handled. Row identifiers of the company and of the person who signed are not part of the report.
  */
 import type { ReportData } from './translation/report-span-register';
+import { projectFields } from './response-projection';
 
 type Inspection = ReportData['inspection'];
 type Signoff = ReportData['reportSignoffs'][number];
@@ -79,14 +80,6 @@ export type ReportLinkPayload = Omit<ReportData, 'inspection' | 'reportSignoffs'
     documentReview: Array<Pick<DocumentReviewRow, (typeof REPORT_LINK_DOCUMENT_REVIEW_FIELDS)[number]>>;
 };
 
-function pick<T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> {
-    const out: Partial<Pick<T, K>> = {};
-    for (const key of keys) {
-        if (key in source) out[key] = source[key];
-    }
-    return out as Pick<T, K>;
-}
-
 /**
  * Defensive about absent keys: the service always builds the whole payload (a pinned version only overlays the inspector, the credentials and
  * the style profile), so every key is present today. A payload that lacks one, such as a test double or a later change, is projected without
@@ -95,8 +88,8 @@ function pick<T extends object, K extends keyof T>(source: T, keys: readonly K[]
 export function projectReportForLink(data: ReportData): ReportLinkPayload {
     const { inspection, reportSignoffs, documentReview, ...rest } = data;
     const out: Record<string, unknown> = Object.fromEntries(Object.entries(rest).filter(([key]) => TOP_LEVEL[key as keyof ReportData] === 'whole'));
-    if (inspection !== undefined && inspection !== null) out.inspection = pick(inspection, REPORT_LINK_INSPECTION_FIELDS);
-    if (Array.isArray(reportSignoffs)) out.reportSignoffs = reportSignoffs.map((row) => pick(row, REPORT_LINK_SIGNOFF_FIELDS));
-    if (Array.isArray(documentReview)) out.documentReview = documentReview.map((row) => pick(row, REPORT_LINK_DOCUMENT_REVIEW_FIELDS));
+    if (inspection !== undefined && inspection !== null) out.inspection = projectFields(inspection, REPORT_LINK_INSPECTION_FIELDS);
+    if (Array.isArray(reportSignoffs)) out.reportSignoffs = reportSignoffs.map((row) => projectFields(row, REPORT_LINK_SIGNOFF_FIELDS));
+    if (Array.isArray(documentReview)) out.documentReview = documentReview.map((row) => projectFields(row, REPORT_LINK_DOCUMENT_REVIEW_FIELDS));
     return out as ReportLinkPayload;
 }

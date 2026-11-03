@@ -171,7 +171,7 @@ app.openapi(resolveRoute, async (c) => {
     const cfg = await db.select({ companyName: tenantConfigs.companyName })
         .from(tenantConfigs).where(eq(tenantConfigs.tenantId, grant.tenantId)).get();
 
-    return c.json({
+    return c.json({ // projection-allow: the nested value is a boolean: whether the class is muted
         success: true as const,
         data: {
             companyName: cfg?.companyName ?? 'this company',
@@ -199,7 +199,7 @@ app.openapi(setRoute, async (c) => {
             enabled,
         });
     }
-    return c.json({ success: true as const, enabled }, 200);
+    return c.json({ success: true as const, enabled }, 200); // projection-allow: the boolean preference the link holder just set
 });
 
 /** Registration order. Drives `UnsubscribeApi`; a test pins it to what `app` really registered. */

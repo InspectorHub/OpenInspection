@@ -56,7 +56,7 @@ agentReportContextRoutes.openapi(reportContextRoute, async (c) => {
         // kindForKey call (server/services/agent/magic-login.service.ts).
         const kind = await c.var.services.people.kindForKey(grant.tenantId, grant.role);
         if (kind !== 'agent') {
-            return c.json({ success: true as const, data: { kind } }, 200);
+            return c.json({ success: true as const, data: { kind } }, 200); // projection-allow: the nested values are the kind of link and a boolean: scalars
         }
 
         // Anti-oracle note (deliberate, safe): returning recipientEmail to the
@@ -64,7 +64,7 @@ agentReportContextRoutes.openapi(reportContextRoute, async (c) => {
         // already IS that recipient (they presented the token that resolves to
         // it). No side effects here (read-only probe), so no audit log.
         const hasAccount = await c.var.services.agent.accountExistsForEmail(grant.recipientEmail);
-        return c.json({
+        return c.json({ // projection-allow: the nested values are a boolean and the grant own recipient email: scalars
             success: true as const,
             data: { kind: 'agent' as const, recipientEmail: grant.recipientEmail, hasAccount },
         }, 200);

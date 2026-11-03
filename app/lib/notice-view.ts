@@ -36,7 +36,8 @@ export interface NoticeChannelAttempt {
 
 export interface NoticeRowData {
   id: string;
-  tenantId: string;
+  /** Present in the agent inbox (it spans companies); the client portal list is one company and carries none. */
+  tenantId?: string;
   type: string;
   title: string;
   body: string | null;
