@@ -50,6 +50,7 @@ export const clientMessageSendRoute = createRoute(withMcpMetadata({
         400: errorBody('The JSON body is not a valid message'),
         401: errorBody('No valid client grant for the inspection'),
         403: errorBody('The caller has no client seat on this inspection'),
+        503: errorBody('Attachment storage could not be read'),
     },
     operationId: 'sendClientMessage', summary: 'Send a message as the client',
     description: 'Client-portal send of one message into the caller thread; the inspector is notified by email. The JSON body is {body, attachments?}: body is 1 to 5000 characters and attachments holds at most 5 descriptors from the upload route. The caller authenticates with a portal session or a per-inspection token inside the handler, not with a staff session.',

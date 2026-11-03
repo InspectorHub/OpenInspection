@@ -106,7 +106,7 @@ async function seed(h: Harness): Promise<void> {
     // The cast is unavoidable: `inspections` has dozens of columns with database defaults that the insert type still lists as required.
     await h.db.insert(schema.inspections).values({
         id: INSPECTION_ID, tenantId: TENANT_ID, inspectorId: INSPECTOR_ID, propertyAddress: '12 Harbor Lane', propertyType: 'single_family',
-        date: '2026-11-01', status: 'draft', reportStatus: 'draft', paymentStatus: 'unpaid', createdAt: now,
+        date: '2026-11-01', status: 'requested', reportStatus: 'in_progress', paymentStatus: 'unpaid', createdAt: now,
         // Stored as a JSON-encoded string, the way the editor saves it; the routes serve it as an object.
         templateSnapshot: JSON.stringify(SNAPSHOT),
         scheduledStartMs: new Date('2026-11-01T14:00:00Z'), scheduledEndMs: new Date('2026-11-01T16:00:00Z'), confirmedAt: now, addressGeocodedAt: now,

@@ -278,6 +278,7 @@ app.openapi(verifyByTokenRoute, async (c) => {
         .where(eq(agreementRequests.verificationToken, token))
         .get();
     if (!row) return c.json({ success: false as const, error: { message: 'Not found', code: 'NOT_FOUND' } }, 404);
+    // projection-allow: the envelope id the verification token resolved to, which the verify page links to
     return c.json({ success: true as const, data: { envelopeId: row.id } }, 200);
 });
 

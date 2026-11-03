@@ -125,7 +125,7 @@ const reportPhotoRoute = createRoute(withMcpMetadata({
             id: z.string().describe('Inspection id.'),
         }),
         query: z.object({
-            key: z.string().describe('Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<userId>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working.'),
+            key: z.string().describe('Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<id>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working.'),
             token: z.string().optional().describe('Persistent portal access token.'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
             render: z.string().optional().describe('Server-minted render token (headless PDF only).'),
@@ -308,14 +308,12 @@ app.openapi(reportRoute, async (c) => {
     let ownerPreview = false;
     if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
 
-    // OPTION A — a delivered report renders what it FROZE.
+    // OPTION A — a delivered report renders what it froze.
     //
     // A recipient reading their link gets the latest PUBLISHED version's
-    // snapshot, not live tables. Without this the everyday web read tracked
-    // current state, so an inspector who renewed a licence or left an
-    // association silently retro-edited every report they had ever issued —
-    // on a document that carries a signature and an integrity hash claiming
-    // it had not changed.
+    // snapshot, not live tables, so later changes to the inspector's
+    // credentials do not alter an issued report that carries a signature and
+    // an integrity hash.
     //
     // Three deliberate exclusions:
     //  - RENDER TOKEN already names its own version (above); it must keep
@@ -359,10 +357,7 @@ app.openapi(reportRoute, async (c) => {
         .from(inspections)
         .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
         .get();
-    // TWO gates, not one. `releaseGate` is the agreement/payment hold the
-    // client Hub already reports; this endpoint used to check only whether
-    // the report was published, so a workspace that required payment got a
-    // Hub saying the report was held back and this endpoint handing it over.
+    // `releaseGate` is the agreement or payment hold the client Hub reports; this endpoint applies it too, in addition to the published check.
     const releaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
     if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: gateRow?.reportStatus, releaseGate })) {
         return c.json(releaseGate
@@ -535,20 +530,10 @@ app.openapi(invoiceRoute, async (c) => {
     });
     // IA-44 — and the slug, so the page can hand off to the slug-keyed Hub
     // once payment succeeds.
-    // IA-86 — project through the declared shape instead of spreading the
-    // row. `PublicInvoiceBodySchema` always described what a payer may see,
-    // but hono/zod-openapi does not validate or trim RESPONSES, so the
-    // declaration was decorative and the row shipped whole: `notes` (the
-    // inspector's private remark), `qboSyncStatus`, `tenantId`, `contactId`,
-    // `clientEmail`. Parsing here makes the declaration load-bearing —
-    // zod strips anything undeclared, so a column added later cannot leak by
-    // default. Same failure IA-33 fixed on the report endpoint.
-    // The two nested shapes are normalized first. A legacy/imported line
-    // item with a missing description, or a brand that gains a field the
-    // branding service does not yet return, would make `.parse()` THROW —
-    // and trading an information leak for a 500 on the pay page is not a
-    // fix. Every other declared field is a plain string/number from the
-    // invoice row (createdAt goes through safeISODate).
+    // Project through the declared shape: `PublicInvoiceBodySchema.parse` keeps only declared fields, so a column added later does not
+    // reach the response.
+    // A missing description or a new brand field must not turn the pay page into a 500, so the nested shapes are normalized first.
+    // Every other declared field is a plain string or number from the invoice row (createdAt goes through safeISODate).
     //
     // `brand` in particular crosses a service boundary, so its shape is not
     // this file's to guarantee: name the fields the payer's page needs and
@@ -607,6 +592,7 @@ app.openapi(payIntentRoute, async (c) => {
             // e.g. 'cad'), not a hardcoded USD, so the charge matches the billed amount.
             { tenantId, currency: inv.currency, descriptionPrefix: 'Inspection invoice' },
         );
+        // projection-allow: the client secret and publishable key of this invoice's payment intent, which the payment form needs
         return c.json({ success: true as const, data: { clientSecret, publishableKey, amountCents: inv.amountCents } }, 200);
     } catch (err) {
         if (err instanceof InvoiceNotPayableError) {

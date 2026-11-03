@@ -6,11 +6,11 @@
  * detail, not report content. So the response states each key from `inspections/` on, and the photo route
  * puts the company back from the verified link before it checks ownership.
  *
- * The rewrite runs on the SERIALIZED body, once, after the payload has been projected (see report-link-response.ts):
+ * The rewrite runs once on the serialized body, after the payload has been projected (see report-link-response.ts):
  * `<companyId>/inspections/` and `<companyId>/credentials/`, in their literal and percent-encoded (`%2F`) forms, lose the
- * company id. A walk over the object tree did the same job at several times the cost of serializing it, which matters on a
- * plan with a few milliseconds of CPU per request. The translation and hash readers keep receiving the payload as the
- * service built it, because only the serialized copy is rewritten.
+ * company id. This is cheaper than rewriting each string in the object tree, which matters on a plan with a few milliseconds of
+ * CPU per request. The translation and hash readers keep receiving the payload as the service built it, because only the
+ * serialized copy is rewritten.
  */
 import type { Context, TypedResponse } from 'hono';
 import type { JSONParsed } from 'hono/utils/types';

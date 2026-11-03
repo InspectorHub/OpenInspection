@@ -13,6 +13,11 @@
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+/** Import aliases the schema files use for code shared with the browser. */
+const ALIASES = [['@core/field-ui/', join(ROOT, 'packages', 'field-ui', 'src')]];
 
 /**
  * The array literal assigned to `name` in `text`, or null.
@@ -41,8 +46,9 @@ export function literalFor(name, text) {
 function importedSource(name, fileText, fileDir) {
     const im = new RegExp(`import\\s*(?:type\\s*)?\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*'([^']+)'`).exec(fileText);
     if (!im) return null;
+    const alias = ALIASES.find(([prefix]) => im[1].startsWith(prefix));
     for (const ext of ['.ts', '/index.ts']) {
-        const target = join(fileDir, im[1] + ext);
+        const target = alias ? join(alias[1], im[1].slice(alias[0].length) + ext) : join(fileDir, im[1] + ext);
         if (existsSync(target)) return [readFileSync(target, 'utf8'), dirname(target)];
     }
     return null;

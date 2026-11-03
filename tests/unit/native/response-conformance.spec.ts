@@ -265,6 +265,25 @@ describe('the response walker', () => {
         expect(compareToSchema({ status: 'draft', a: 'x' }, tagged, {}).extraKeys).toEqual(['a']);
     });
 
+    it('reports a string that is not one of the listed enum values, and passes one that is', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                status: { type: 'string', enum: ['open', 'closed'] },
+                kind: { type: 'string', nullable: true, enum: ['a'] },
+                tags: { type: 'array', items: { type: 'string', enum: ['x', 'y'] } },
+                fixed: { type: 'string', const: 'only' },
+            },
+        };
+        expect(compareToSchema({ status: 'open', kind: null, tags: ['x'], fixed: 'only' }, schema, {}).typeMismatch).toEqual([]);
+        expect(compareToSchema({ status: 'draft' }, schema, {}).typeMismatch).toEqual(['status']);
+        expect(compareToSchema({ tags: ['x', 'z'] }, schema, {}).typeMismatch).toEqual(['tags[]']);
+        expect(compareToSchema({ fixed: 'other' }, schema, {}).typeMismatch).toEqual(['fixed']);
+        // A null, or a key the body leaves out, is not a miss; formats are not checked.
+        expect(compareToSchema({ kind: null }, schema, {}).typeMismatch).toEqual([]);
+        expect(compareToSchema({}, schema, {}).typeMismatch).toEqual([]);
+    });
+
     it('lists the declared arrays of objects, follows map values and unions, and survives a cycle', () => {
         const components = {
             Node: { type: 'object', properties: { children: { type: 'array', items: { $ref: '#/components/schemas/Node' } } } },

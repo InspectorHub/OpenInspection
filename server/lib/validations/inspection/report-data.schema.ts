@@ -55,7 +55,10 @@ const ReportItemSchema = z.object({
   naKind: z.enum(['not_inspected', 'not_present']).nullable().optional().describe('Which kind of not-applicable rating the item carries, or null when it carries none.'),
   notInspectedReason: z.string().nullable().optional().describe('Why the item was not inspected, as the inspector wrote it, or null.'),
   unit: z.string().nullable().optional().describe('Unit of the captured value for a number item (from the template item options), or null.'),
-  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]).nullable().optional().describe('The value captured for a non-rich item: text, a date or a choice as a string, a number, a yes or no, or the choices of a multi-select (a comma-separated string from the web editor, a list of strings from other clients). Null when nothing was captured or the stored value is of another shape.'),
+  value: z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]).nullable().optional()
+    // Null rides on the string branch, so a typed client reads `string | null` and not an untyped member of the union.
+    .openapi({ anyOf: [{ type: 'string', nullable: true }, { type: 'number' }, { type: 'boolean' }, { type: 'array', items: { type: 'string' } }] })
+    .describe('The value captured for a non-rich item: text, a date or a choice as a string, a number, a yes or no, or the choices of a multi-select (a comma-separated string from the web editor, a list of strings from other clients). Null when nothing was captured or the stored value is of another shape.'),
   // No item-level estimateMin / estimateMax: the "Estimated cost" badge they
   // fed is gone. The `repairItems[]` pair below is a LEGACY READ — findings
   // written before repair pricing was withdrawn still hold the snapshot, and it
@@ -164,7 +167,7 @@ export const ReportDataFullSchema = ReportDataResponseSchema.extend({
   propertyFacts: z.record(z.string(), z.unknown()).nullable().optional().describe('The Property Facts values (year built, size, foundation and the like), or null.'),
   reportTier: z.string().nullable().optional().describe('Report tier of a commercial inspection (light_commercial or full_pca), or null.'),
   costTables: OPAQUE('The cost tables of a commercial report, or null.'),
-  propertyType: z.string().nullable().optional().describe('What kind of property was inspected, or null when it was never classified.'),
+  propertyType: z.string().nullable().optional().describe('What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified.'),
   commercialSubtype: z.string().nullable().optional().describe('Commercial property subtype, or null.'),
   buildingProfile: z.array(z.unknown()).optional().describe('Building profile rows of a commercial report.'),
   pcaReport: OPAQUE('The property condition report block of a commercial inspection, or null.'),

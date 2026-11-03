@@ -905,8 +905,40 @@ npm run lint:native-contract # registry and committed document must agree
   file, when an operation has no registry entry, when none are found, or when the
   registry is empty. It prints both numbers on every run.
 - In CI, **oasdiff** compares the file against the base branch's copy and fails
-  the pull request on any breaking change. The comparison is skipped only in the
-  pull request that first introduces the file.
+  the pull request on any breaking change. The step reads the base copy with
+  `git show origin/<base>:contracts/native-contract.openapi.json` under `set -eu`,
+  so a base branch that cannot be resolved, or that has no contract file, fails
+  the step; it never skips.
+- A second CI step keeps the list of undeclared response keys (below) from
+  growing. It is the one step that skips, and only when the base branch has no
+  such list yet (the pull request that introduces it); it says so and prints both
+  counts.
+
+### Response conformance
+
+The contract states what the routes return. `tests/unit/native/response-conformance.spec.ts`
+checks that it does: every covered operation is requested through the real
+application, and the JSON body is walked against the response schema of the status
+it answers in the committed contract.
+
+- A documented required key that is missing, a value of the wrong type, or a string
+  outside the listed `enum` or `const` values always fails. Formats (date-time,
+  email, uri) are not checked.
+- A key the body returns that the schema does not declare must be recorded in
+  `tests/unit/helpers/undeclared-response-keys.allowlist.json` with a specific
+  reason. That list may only shrink; CI compares its key count with the base branch.
+- Every array of objects the schema declares must be reached with at least one
+  element, or the path is listed in `EMPTY_OK`
+  (`tests/unit/helpers/response-conformance-skips.ts`). An operation the suite does
+  not request is listed in `NOT_COVERED` in the same file, with the reason.
+- The walker is `tests/unit/helpers/response-shape.ts` (pure, with its own
+  controls in the spec); the operations, the seed and the checker are in
+  `tests/unit/helpers/response-conformance.ts`.
+
+To shrink an entry, document the field in the schema instead
+(`.describe(...)` on the response schema), run `npm run native:contract`, and
+delete the key from its allow-list entry (the entry itself when it has no key left).
+The spec fails on an entry that no longer matches anything.
 
 ### Editor operations in the contract
 

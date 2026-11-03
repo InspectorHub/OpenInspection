@@ -71,6 +71,7 @@ calendarIcsLinkRoutes.openapi(icsLinksRoute, async (c) => {
         if (cfg?.icsToken) companyPath = `/api/ics/${cfg.icsToken}`;
     }
 
+    // projection-allow: feed paths made from the caller's own calendar tokens; no row is involved
     return c.json({ success: true as const, data: { busyPath, schedulePath, companyPath } }, 200);
 });
 

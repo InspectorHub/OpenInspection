@@ -123,6 +123,7 @@ app.openapi(legalDocRoute, async (c) => {
     // tenant has published once, and the page then says nothing rather than
     // inventing a date.
     const latest = await c.var.services.legalVersion.latest(row.id, doc);
+    // projection-allow: the company name and the published legal text shown on the inspector profile page
     return c.json({ success: true as const, data: {
         companyName, body, lastUpdated: latest?.version ?? null,
     } }, 200);

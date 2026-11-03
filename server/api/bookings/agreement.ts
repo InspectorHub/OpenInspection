@@ -242,7 +242,7 @@ const agreementRoutes = createApiRouter()
         const signers = await svc.listSigners(envelope.tenantId, envelope.id);
         const signedCount = signers.filter((s) => s.status === 'signed').length;
 
-        return c.json({
+        return c.json({ // projection-allow: the signer's own envelope: the agreement text they are asked to sign and their own status
             success: true as const,
             data: {
                 status: envelope.status as EnvelopeStatus,
@@ -359,7 +359,7 @@ const agreementRoutes = createApiRouter()
             }
         }
 
-        return c.json({
+        return c.json({ // projection-allow: the signer's own status, the agreement hash and the portal link token issued to this signer
             success: true as const,
             data: {
                 signer: {

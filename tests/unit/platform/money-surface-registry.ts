@@ -137,4 +137,6 @@ export const UNSCANNED_MONEY_SURFACE: Record<string, Disposition> = {
     'POST /api/inspections/{id}/clone': redact('inspectionFees', 'inspections/core.ts'),
     'PATCH /api/inspections/{id}': gate('inspectionFees', 'inspections/core.ts'),
     'GET /api/admin/export': redact('companyFinance', 'admin/admin-data.ts'),
+    'POST /api/identities/account/export': redact('inspectionFees', 'identity.ts'),
+    'GET /api/admin/audit-logs': redact('inspectionFees', 'admin/admin-data.ts'),
 };

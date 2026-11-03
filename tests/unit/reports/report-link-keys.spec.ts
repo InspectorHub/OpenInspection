@@ -63,7 +63,7 @@ function payload(): Record<string, unknown> {
 }
 
 describe('relativizeSerialized', () => {
-    it('gives byte-identical output to the tree walk on a payload with every carrier of a key and the strings that must not change', () => {
+    it('rewrites every carrier of a key (url, key, originalKey, media, cover, badge) and leaves the strings that must not change', () => {
         const body = payload();
         const viaTree = JSON.stringify(refTree(body, T));
         const viaText = relativizeSerialized(JSON.stringify(body), T);
@@ -103,7 +103,7 @@ describe('relativizeSerialized', () => {
         expect(relativizeSerialized('(t)/credentials/x', '(t)')).toBe('credentials/x');
     });
 
-    it('documents the one deliberate difference from the tree walk: the sequence inside free text is rewritten too', () => {
+    it('also rewrites the sequence inside free text, which is not something a person types into a note', () => {
         const note = JSON.stringify({ note: `see ${T}/inspections/${I}/x for the file` });
         expect(refTree(JSON.parse(note), T)).toEqual(JSON.parse(note));
         expect(relativizeSerialized(note, T)).toBe(JSON.stringify({ note: `see inspections/${I}/x for the file` }));

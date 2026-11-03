@@ -146,6 +146,7 @@ app.openapi(confirmRoute, async (c) => {
         }
     }
 
+    // projection-allow: the new inspection id and the report path the confirming client is sent to
     return c.json({
         success: true as const,
         data: { inspectionId: result.inspectionId, redirect },

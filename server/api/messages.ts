@@ -29,7 +29,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { mounted, type ApiOf } from '../lib/api-schema';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
-import { Errors } from '../lib/errors';
+import { AppError, Errors } from '../lib/errors';
 import { serveAttachment, storeAttachment, verifyAttachments } from '../lib/message-attachment';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { resolveClientActor } from '../lib/portal-client-actor';
@@ -289,7 +289,7 @@ clientMessageRoutes.openapi(clientMessageListRoute, async (c) => {
     // thread the moment one of them looked (per-contact threading, design §3.9).
     const thread = await svc.resolveThreadContact(actor.tenantId, inspectionId, actor.ref);
     const all = await svc.listForInspection(inspectionId, actor.tenantId);
-    const messages = thread ? all.filter((mrow) => mrow.contactId === thread.contactId) : []; // no seat, no thread: never the other participants' threads
+    const messages = thread ? all.filter((mrow) => mrow.contactId === thread.contactId) : []; // a caller with no seat has no thread, so the list is empty
     if (thread) await svc.markThreadReadForContact(actor.tenantId, thread.contactId, inspectionId);
     return c.json({ success: true as const, data: messages.map((message) => projectClientMessage(message)) }, 200);
 });
@@ -299,7 +299,13 @@ clientMessageRoutes.openapi(clientMessageSendRoute, async (c) => {
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
     const parsed = sendBodySchema.safeParse(await c.req.json().catch(() => null));
-    const stored = parsed.success ? await verifyAttachments(c.env.PHOTOS, parsed.data.attachments ?? [], actor.tenantId, inspectionId) : null;
+    let stored: Awaited<ReturnType<typeof verifyAttachments>>;
+    try {
+        stored = parsed.success ? await verifyAttachments(c.env.PHOTOS, parsed.data.attachments ?? [], actor.tenantId, inspectionId) : null;
+    } catch (err) {
+        if (err instanceof AppError && err.status === 503) return c.json({ error: 'Attachment storage is unavailable.' }, 503);
+        throw err;
+    }
     if (!parsed.success || !stored) return c.json({ error: 'Invalid message payload.' }, 400);
     const svc = c.var.services.message;
     // Attribution goes through the actor's OWN seat (matched by their verified
@@ -346,10 +352,15 @@ clientMessageRoutes.get('/inspections/:id/messages/attachments/:attachmentId', a
     const attachmentId = c.req.param('attachmentId');
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
-    // Only the attachments of the caller's own thread, not every participant's on the inspection.
+    // A client downloads the attachments of its own thread.
     const thread = await c.var.services.message.resolveThreadContact(actor.tenantId, inspectionId, actor.ref);
     const att = thread ? await c.var.services.message.resolveAttachmentForInspection(inspectionId, actor.tenantId, attachmentId, thread.contactId) : null;
-    return (att ? await serveAttachment(c.env.PHOTOS, att, actor.tenantId) : null) ?? c.json({ error: 'Not found' }, 404);
+    try {
+        return (att ? await serveAttachment(c.env.PHOTOS, att, actor.tenantId) : null) ?? c.json({ error: 'Not found' }, 404);
+    } catch (err) {
+        if (err instanceof AppError && err.status === 503) return c.json({ error: 'Attachment storage is unavailable.' }, 503);
+        throw err;
+    }
 });
 
 export const clientMessageRouteConfigs = [clientMessageListRoute, clientMessageSendRoute] as const;

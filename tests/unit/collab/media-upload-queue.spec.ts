@@ -366,7 +366,7 @@ describe('media-upload-queue', () => {
     });
 
     describe('a throwing onUploaded', () => {
-        it('cannot wedge the drain or lose the photo: the record is kept, later records still upload, it is not uploaded again this session, nothing leaks the host text', async () => {
+        it('cannot wedge the drain or lose the photo: the record is kept, later records still upload, it is not uploaded again this session, nothing carries the host text', async () => {
             await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 1, pendingId: 'SWAPFAIL' }));
             await enqueueMedia(store, makeRecord({ inspectionId: 'insp-1', createdAt: 2, pendingId: 'AFTER' }));
             const { uploader, calls } = okUploader();

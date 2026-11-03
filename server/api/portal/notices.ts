@@ -150,6 +150,7 @@ const portalNoticeRoutes = router
             listNoticesForContacts(db, { contactIds }),
             unreadNoticeCountForContacts(db, contactIds),
         ]);
+        // projection-allow: the number of unread notices for the reader's own contacts
         return c.json({ success: true as const, data: { notices: notices.map(projectPortalNotice), unread } }, 200);
     })
     .openapi(markReadRoute, async (c) => {

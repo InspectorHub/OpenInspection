@@ -83,6 +83,7 @@ clientRoutes.openapi(getClientCompatRoute, (c) => {
     const { platform } = c.req.valid('query');
     const policy = readVersionPolicy(c.env, platform);
     const accountUrl = readAccountUrl(c.env);
+    // projection-allow: the version policy and server contract version, both configuration the app reads before it signs in
     return c.json({ success: true as const, data: {
         ...policy, serverContractVersion: SERVER_CONTRACT_VERSION, ...(accountUrl ? { accountUrl } : {}),
         ...(nativeClientEnabled(c.env) ? { videoUpload: {
@@ -104,6 +105,7 @@ clientRoutes.openapi(getClientSessionRoute, async (c) => {
     // The app calls this on every start and refresh, which makes it the place to learn which
     // versions are still in use. Throttled and bounded inside; never fails the response.
     await recordNativeClientSeen(db, tenantId, c.req.header('X-Client-Platform'), c.req.header('X-Client-Version'));
+    // projection-allow: the signed-in native session's own identity, its company name and the server clock
     return c.json({ success: true as const, data: {
         userId: user.sub, tenantId, role: user.role, offlineMaxDays: row?.days ?? DEFAULT_OFFLINE_MAX_DAYS,
         tenantName: displayName(row?.name),
@@ -126,6 +128,7 @@ clientRoutes.openapi(visibleInspectionsRoute, async (c) => {
     }
     const scope = await resolveInspectionScope(c);
     const visible = await findVisibleInspectionIds(getDrizzle(c), scope, tenantId, ids);
+    // projection-allow: the ids the caller asked about that its own scope can see
     return c.json({ success: true as const, data: { visible } }, 200);
 });
 clientRoutes.openapi(importOfflinePackageRoute, async (c) => {
@@ -140,6 +143,7 @@ clientRoutes.openapi(importOfflinePackageRoute, async (c) => {
         throw new AppError(body.status, ErrorCode.BAD_REQUEST, message);
     }
     const data = await importOfflinePackage(c, body.bytes, limits);
+    // projection-allow: the import summary the service builds for the caller's own offline package
     return c.json({ success: true as const, data }, 200);
 });
 

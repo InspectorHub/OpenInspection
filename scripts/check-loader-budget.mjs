@@ -23,7 +23,7 @@
  * Usage: node scripts/check-loader-budget.mjs [--write-baseline]
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { detectLoaderBudget } from './lib/loader-budget-detect.mjs';
@@ -107,4 +107,4 @@ function main() {
     console.log(`${TAG} OK\n`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main();

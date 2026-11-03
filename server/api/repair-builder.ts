@@ -139,6 +139,7 @@ app.openapi(sourceRoute, async (c) => {
         loadQuickPhrases(c, tenantId),
     ]);
 
+    // projection-allow: the report's defect list and the quick phrases the repair builder shows; the creator's own requests are projected
     return c.json({ success: true as const, data: { defects, mine: mine.map(projectRepairRequestWithLines), quickPhrases } }, 200);
 });
 

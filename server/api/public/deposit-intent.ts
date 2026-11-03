@@ -104,6 +104,7 @@ app.openapi(depositIntentRoute, async (c) => {
             { inspectionId: id, outstandingCents: owed.outstandingCents },
             { tenantId, currency },
         );
+        // projection-allow: the client secret, publishable key, amount and currency of this deposit's payment intent
         return c.json({
             success: true as const,
             data: { clientSecret, publishableKey, amountCents: owed.outstandingCents, currency },

@@ -15,7 +15,6 @@
 import { z } from '@hono/zod-openapi';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
 import { REPORT_STATUSES } from '../../status/report-status';
-import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 
 /** A timestamp column as it reaches a client: an ISO 8601 string, or null. */
 const when = (what: string) => z.string().datetime().nullable().optional().describe(`${what} (ISO 8601), or null.`);
@@ -33,7 +32,7 @@ export const INSPECTION_ROW_FIELDS = {
     addressGeocodedAt: when('When the address was geocoded'),
     unit: z.string().nullable().optional().describe('Suite or unit designation of the inspected property, or null.'),
     county: z.string().nullable().optional().describe('County as the Property Facts strip edits it, or null.'),
-    propertyType: z.enum(INSPECTION_PROPERTY_TYPES).nullable().optional().describe('What kind of property is being inspected, or null when it was never classified.'),
+    propertyType: z.string().nullable().optional().describe('What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified.'),
     commercialSubtype: z.string().nullable().optional().describe('Commercial property subtype, or null. Only meaningful when the property type is commercial.'),
     yearBuilt: z.number().int().nullable().optional().describe('Year the property was built, or null.'),
     sqft: z.number().int().nullable().optional().describe('Floor area in square feet, or null.'),

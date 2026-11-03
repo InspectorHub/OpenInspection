@@ -14201,13 +14201,7 @@
               "propertyType": {
                 "type": "string",
                 "nullable": true,
-                "enum": [
-                  "single_family",
-                  "multi_unit",
-                  "commercial",
-                  null
-                ],
-                "description": "What kind of property is being inspected, or null when it was never classified."
+                "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified."
               },
               "commercialSubtype": {
                 "type": "string",
@@ -15539,13 +15533,7 @@
                   "propertyType": {
                     "type": "string",
                     "nullable": true,
-                    "enum": [
-                      "single_family",
-                      "multi_unit",
-                      "commercial",
-                      null
-                    ],
-                    "description": "What kind of property is being inspected, or null when it was never classified."
+                    "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified."
                   },
                   "commercialSubtype": {
                     "type": "string",
@@ -16073,7 +16061,7 @@
               "propertyType": {
                 "type": "string",
                 "nullable": true,
-                "description": "What kind of property was inspected, or null when it was never classified."
+                "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified."
               },
               "commercialSubtype": {
                 "type": "string",
@@ -16326,7 +16314,8 @@
           "value": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "nullable": true
               },
               {
                 "type": "number"
@@ -16339,9 +16328,6 @@
                 "items": {
                   "type": "string"
                 }
-              },
-              {
-                "nullable": true
               }
             ],
             "description": "The value captured for a non-rich item: text, a date or a choice as a string, a number, a yes or no, or the choices of a multi-select (a comma-separated string from the web editor, a list of strings from other clients). Null when nothing was captured or the stored value is of another shape."

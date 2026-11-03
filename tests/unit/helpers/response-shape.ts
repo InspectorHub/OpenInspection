@@ -5,8 +5,9 @@
  * ever holds plain values. The schema is the OpenAPI 3.x subset @hono/zod-openapi emits:
  * `$ref` into `#/components/schemas`, `allOf`, `anyOf`/`oneOf`, `nullable` and type arrays,
  * `items`, `properties`/`required` and `additionalProperties`. Formats and numeric limits are
- * ignored: this is a question about KEYS and TYPES, not about values. `enum` and `const` are read
- * for one purpose only, picking the matching branch of a union.
+ * ignored: this is a question about KEYS and TYPES, with one exception for values. A string whose schema
+ * lists `enum` or `const` values must be one of them, or its path is reported as a mismatch. Formats
+ * (date-time, email, uri and the like) are not checked.
  *
  * Paths read `data.inspection.tenantId`; an array element collapses to `[]` (`data.items[].foo`)
  * and a key of a map-shaped object to `.*`. Each distinct path is reported once.
@@ -262,6 +263,10 @@ function isObjectLike(node: Node, components: Record<string, unknown>): boolean 
 function walkNode(value: unknown, node: Node, components: Record<string, unknown>, path: string, out: Collected, depth: number): void {
     if (value === undefined || node.empty) return;
     if (!fits(node, value)) {
+        out.mismatch.add(path === '' ? '$' : path);
+        return;
+    }
+    if (typeof value === 'string' && node.enumValues !== null && !node.enumValues.includes(value)) {
         out.mismatch.add(path === '' ? '$' : path);
         return;
     }

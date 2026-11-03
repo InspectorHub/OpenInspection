@@ -489,7 +489,7 @@ smsAdminRoutes.openapi(consentStatusRoute, async (c) => {
     // Task 13).
     const contactId = await new PeopleService(c.env).contactIdForRole(tenantId, inspectionId, PRIMARY_CLIENT_KEY);
     const latest = contactId ? await new SmsConsentService(c.env.DB).getLatest(tenantId, contactId) : null;
-    return c.json({ success: true as const, data: { consent: latest ?? 'none' } }, 200);
+    return c.json({ success: true as const, data: { consent: latest ?? 'none' } }, 200); // projection-allow: the consent state of the inspection's own client contact
 });
 smsAdminRoutes.openapi(smsConfigRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
@@ -549,7 +549,7 @@ smsAdminRoutes.openapi(complianceRoute, async (c) => {
 
     const stored = await complianceSvc.getStatus(tenantId);
     const managedRow = await getManagedSubRow(db, tenantId);
-    return c.json({
+    return c.json({ // projection-allow: a signed-in admin route of this module: the company's own SMS mode and compliance state
         success: true as const,
         data: {
             mode,
@@ -647,7 +647,7 @@ smsAdminRoutes.openapi(complianceProvisionRoute, async (c) => {
     try { cfgRow = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get(); }
     catch { cfgRow = undefined; }
     const mode = (cfgRow?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'managed_dedicated';
-    return c.json({
+    return c.json({ // projection-allow: a signed-in admin route of this module: the company's own SMS mode and compliance state
         success: true as const,
         data: {
             mode,
@@ -748,7 +748,7 @@ smsAdminRoutes.openapi(complianceResubmitRoute, async (c) => {
 
     auditFromContext(c, 'sms.compliance.resubmit', 'tenant', { metadata: { channel } });
 
-    return c.json({
+    return c.json({ // projection-allow: a signed-in admin route of this module: the company's own SMS mode and compliance state
         success: true as const,
         data: {
             mode,

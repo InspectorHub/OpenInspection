@@ -347,7 +347,7 @@ const coreRoutes = createApiRouter()
             metadata: { clonedFrom: id, propertyAddress: clone.propertyAddress },
         });
         fireQuotaThresholdNotice(c, tenantId);
-        return c.json({ success: true, data: { inspection: await moneyView(c, clone, 'inspectionFees') } }, 201);
+        return c.json({ success: true, data: { inspection: await moneyView(c, withReadableSnapshot(clone), 'inspectionFees') } }, 201);
     })
     .openapi(createFromWizardRoute, async (c) => {
         const input    = c.req.valid('json');

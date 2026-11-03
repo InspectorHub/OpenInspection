@@ -7,6 +7,8 @@ import { describe, it, expect } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { INSPECTION_COMPUTED_FIELDS, INSPECTION_COMPUTED_KEYS, INSPECTION_ROW_FIELDS } from '../../../server/lib/validations/inspection/inspection-row';
 import { isMoneyField } from '../../../server/lib/auth/money-redaction';
+import { ReportDataFullSchema } from '../../../server/lib/validations/inspection/report-data.schema';
+import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 
 const COLUMNS = new Set(Object.keys(getTableColumns(schema.inspections)));
 
@@ -54,5 +56,20 @@ describe('the documented inspection record keys', () => {
         for (const [key, field] of Object.entries(INSPECTION_ROW_FIELDS)) {
             expect(field.safeParse(undefined).success, key).toBe(true);
         }
+    });
+
+    it('describe property type as one open string, in the inspection record and in the report data alike', () => {
+        const row = INSPECTION_ROW_FIELDS.propertyType;
+        const report = ReportDataFullSchema.shape.propertyType;
+        for (const field of [row, report]) {
+            // A row written before the lists were unified may hold a value outside today's three; reading it must not fail.
+            expect(field.safeParse('townhouse').success).toBe(true);
+            expect(field.safeParse(null).success).toBe(true);
+            expect(field.safeParse(undefined).success).toBe(true);
+            expect(field.safeParse(5).success).toBe(false);
+            for (const value of INSPECTION_PROPERTY_TYPES) expect(field.description, value).toContain(value);
+            expect(field.description).toContain('before the lists were unified');
+        }
+        expect(row.description).toBe(report.description);
     });
 });

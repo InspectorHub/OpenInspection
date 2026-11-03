@@ -402,12 +402,12 @@ const portalRoutes = portalRouter
         // tenant) — agent-kind gets `agent: true` + no Set-Cookie instead.
         const kind = await c.var.services.people.kindForKey(grant.tenantId, grant.role);
         if (kind === 'agent') {
-            return c.json({ data: { email: grant.recipientEmail, agent: true } }, 200);
+            return c.json({ data: { email: grant.recipientEmail, agent: true } }, 200); // projection-allow: the recipient email of the caller's own grant
         }
 
         const sess = await signPortalSession(c.env.JWT_SECRET, grant.recipientEmail);
         setCookie(c, PORTAL_SESSION_COOKIE_NAME, sess, portalSessionCookieOptions());
-        return c.json({ data: { email: grant.recipientEmail } }, 200);
+        return c.json({ data: { email: grant.recipientEmail } }, 200); // projection-allow: the recipient email of the caller's own grant
     })
     .openapi(logoutRoute, async (c) => {
         // Tenant-agnostic + idempotent: clearing the cookie works regardless of
@@ -461,7 +461,7 @@ const portalRoutes = portalRouter
 
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: { ...overview, token, signerToken } }, 200); // projection-allow: hubOverview builds the typed HubOverview the portal page states; token and signerToken are the reader own
+        return c.json({ data: { ...overview, token, signerToken } }, 200); // projection-allow: hubOverview builds the typed HubOverview the portal page states; token and signerToken are the reader's own
     })
     .openapi(observeRoute, async (c) => {
         const tenantId = resolveTenantId(c);

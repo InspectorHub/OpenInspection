@@ -218,6 +218,15 @@ specs skip (they do not pass) when there is no connection, so a run reports
 **Refreshing a vendored schema** is a deliberate act, not a chore: follow
 `tests/contract/qbo/vendor/SOURCES.md`, then read what went red.
 
+### Native response conformance (`tests/unit/native/response-conformance.spec.ts`)
+
+Requests each covered native operation through the real application and walks the JSON body against the response schema in
+`contracts/native-contract.openapi.json`: a missing required key, a wrong type or a string outside an `enum` fails; an undeclared key
+must be listed in `tests/unit/helpers/undeclared-response-keys.allowlist.json` (shrink-only; CI compares its key count with the base
+branch). The helpers are `tests/unit/helpers/response-shape.ts` (the walker), `response-conformance.ts` (operations, seed, checker) and
+`response-conformance-skips.ts` (`NOT_COVERED`, `EMPTY_OK`). To shrink an entry, document the field in the schema, run
+`npm run native:contract`, and delete the key from the allow-list; see `docs/develop/native-clients.md`, section 12.
+
 ### E2E (`tests/e2e/*.spec.ts`)
 
 - **One spec = one Playwright project.** Register the project in

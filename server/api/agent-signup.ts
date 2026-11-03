@@ -121,6 +121,7 @@ app.openapi(agentTermsRoute, async (c) => {
         // to be able to tell them apart to close itself honestly.
         throw Errors.NotFound('This deployment has not published agent terms');
     }
+    // projection-allow: the version and text of the agent terms in force, which are shown to a visitor before sign-up
     return c.json({
         success: true as const,
         data: {

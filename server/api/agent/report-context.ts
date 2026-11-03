@@ -64,7 +64,7 @@ agentReportContextRoutes.openapi(reportContextRoute, async (c) => {
         // already IS that recipient (they presented the token that resolves to
         // it). No side effects here (read-only probe), so no audit log.
         const hasAccount = await c.var.services.agent.accountExistsForEmail(grant.recipientEmail);
-        return c.json({ // projection-allow: the nested values are a boolean and the grant own recipient email: scalars
+        return c.json({ // projection-allow: a boolean and the recipient email of the caller's own grant
             success: true as const,
             data: { kind: 'agent' as const, recipientEmail: grant.recipientEmail, hasAccount },
         }, 200);

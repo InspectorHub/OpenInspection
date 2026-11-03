@@ -9453,10 +9453,10 @@
           "name": "key",
           "in": "query",
           "required": true,
-          "description": "Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<userId>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working.",
+          "description": "Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<id>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working.",
           "schema": {
             "type": "string",
-            "description": "Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<userId>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working."
+            "description": "Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<id>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working."
           }
         },
         {

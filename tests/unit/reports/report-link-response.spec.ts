@@ -34,8 +34,8 @@ const INSPECTION_WITHHELD = [
     'scheduledEndMs', 'scheduledStartMs', 'sourceInspectionId', 'sqft', 'teamMode', 'templateId', 'templateSnapshot', 'templateSnapshotVersion',
     'tenantId', 'unit', 'unitInspectionMode', 'unlockReason', 'unlockedAt', 'unlockedBy', 'yearBuilt',
 ];
-const SIGNOFF_WITHHELD = ['inspectionId', 'personId', 'tenantId'];
-const DOCUMENT_REVIEW_WITHHELD = ['inspectionId', 'tenantId'];
+const SIGNOFF_WITHHELD = ['id', 'inspectionId', 'personId', 'signatureRef', 'tenantId'];
+const DOCUMENT_REVIEW_WITHHELD = ['id', 'inspectionId', 'sortOrder', 'tenantId'];
 
 describe('the report link response: every column is classified', () => {
     it.each([

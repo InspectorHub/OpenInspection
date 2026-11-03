@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 // @ts-expect-error -- plain .mjs helpers, no types alongside them (same as the other tooling specs).
 import { detectPublicProjection, MIN_REASON } from '../../../scripts/lib/public-projection-detect.mjs';
 // @ts-expect-error -- plain .mjs helper.
-import { CONTROLS, DELEGATES, PUBLIC_MODULES, missedControls, publicMounts } from '../../../scripts/check-public-projection.mjs';
+import { CONTROLS, DELEGATES, OUT_OF_SCOPE, PUBLIC_MODULES, missedControls, parseMounts, publicMounts, publicPathModules } from '../../../scripts/check-public-projection.mjs';
 
 interface Hit { line: number; rule: string }
 const run = (src: string) => detectPublicProjection(src, 'route.ts') as { sites: number; violations: Hit[] };
@@ -32,7 +35,8 @@ describe('public-projection detector', () => {
         expect(rules(route('  return c.json({ success: true, data: { id: row.id, name: row.name } }, 200);'))).toEqual([]);
         expect(rules(route('  return c.json({ success: true, data: Schema.parse(row) }, 200);'))).toEqual([]);
         expect(rules(route('  return c.json({ success: true, data: rows.map((r) => projectFields(r, FIELDS)) }, 200);'))).toEqual([]);
-        expect(rules(route('  return c.json({ success: true, data: { ...projectFields(row, FIELDS), tenantSlug: slug } }, 200);'))).toEqual([]);
+        expect(rules(route('  return c.json({ success: true, data: { ...projectFields(row, FIELDS), tenantSlug: "acme" } }, 200);'))).toEqual([]);
+        expect(rules(route('  return c.json({ success: true, data: { ...projectFields(row, FIELDS), tenantSlug: slug } }, 200);'))).toEqual(['unprojected-response']);
         expect(rules(route('  return c.json({ success: true, data: null }, 200);'))).toEqual([]);
     });
 
@@ -44,7 +48,9 @@ describe('public-projection detector', () => {
     describe('which values and which forms are looked at', () => {
         it('looks at every property of the response, whatever its key, and a shorthand property', () => {
             expect(rules(route('  return c.json({ success: true, meta: row }, 200);'))).toEqual(['unprojected-response']);
-            expect(rules(route('  return c.json({ success: false, error: row.error }, 400);'))).toEqual(['unprojected-response']);
+            expect(rules(route('  return c.json({ success: false, error: row.inner }, 400);'))).toEqual(['unprojected-response']);
+            // A property picked under its own name is a field pick wherever it sits.
+            expect(rules(route('  return c.json({ success: false, error: row.error }, 400);'))).toEqual([]);
             expect(rules(route('  return c.json({ success: true, row }, 200);'))).toEqual(['unprojected-response']);
             expect(rules(route('  return c.json({ [key]: row }, 200);'))).toEqual(['unprojected-response']);
         });
@@ -68,10 +74,10 @@ describe('public-projection detector', () => {
             expect(rules(route('  return c.json({ data: { request: await svc.get() } }, 200);'))).toEqual(['unprojected-response']);
             expect(rules(route('  return c.json({ data: { items: svc.items() } }, 200);'))).toEqual(['unprojected-response']);
         });
-        it('accepts a projected value, a picked property, a literal and a parameter', () => {
+        it('accepts a projected value, a picked property and a literal, and reports a parameter of unknown origin', () => {
             expect(rules(route('  const mine = projectThing(await svc.list());', '  return c.json({ data: { mine } }, 200);'))).toEqual([]);
             expect(rules(route('  return c.json({ data: { id: row.id, ok: true, n: 3 } }, 200);'))).toEqual([]);
-            expect(rules('app.get("/x", async (c) => (n) => c.json({ data: { n } }, 200));')).toEqual([]);
+            expect(rules('app.get("/x", async (c) => (n) => c.json({ data: { n } }, 200));')).toEqual(['unprojected-response']);
         });
     });
 
@@ -110,6 +116,52 @@ describe('public-projection detector', () => {
         });
     });
 
+    describe('a row at any depth inside the response', () => {
+        const nested = (expr: string, ...pre: string[]) => rules(route(...pre, `  return c.json({ data: ${expr} }, 200);`));
+        it('flags a property, a spread, a parameter, a let and a destructured binding of a row', () => {
+            expect(nested('{ item: row.inner }')).toEqual(['unprojected-response']);
+            expect(nested('{ item: { ...row } }')).toEqual(['unprojected-response']);
+            expect(nested('{ a: { b: row } }', '  let more = 1;')).toEqual(['unprojected-response']);
+            expect(rules('function f(c, row) { return c.json({ data: { item: row } }); }')).toEqual(['unprojected-response']);
+            expect(rules('app.get("/x", async (c) => { let row = await db.get(); return c.json({ data: { a: { b: row } } }); });')).toEqual(['unprojected-response']);
+            expect(rules('app.get("/x", async (c) => { const { inner } = await db.get(); return c.json({ data: { a: { b: inner } } }); });')).toEqual(['unprojected-response']);
+        });
+        it('accepts a property picked under its own name, a literal and a projection at the same depth', () => {
+            expect(nested('{ item: { id: row.id, name: row.name } }')).toEqual([]);
+            expect(nested('{ a: { b: projectFields(row, F) } }')).toEqual([]);
+            expect(nested('{ a: { b: 1, c: "x", d: null } }')).toEqual([]);
+        });
+    });
+
+    describe('forms that look like a projection and are not', () => {
+        it('inspects a stringified row given to newResponse, html or Response, and accepts a stringified literal', () => {
+            expect(rules(route('  return c.newResponse(JSON.stringify(row));'))).toEqual(['unprojected-response']);
+            expect(rules(route('  return c.html(JSON.stringify(row));'))).toEqual(['unprojected-response']);
+            expect(rules(route('  return new Response(JSON.stringify(row));'))).toEqual(['unprojected-response']);
+            expect(rules(route('  return new Response(JSON.stringify({ id: row.id }));'))).toEqual([]);
+        });
+        it('does not take a comma expression for a field pick', () => {
+            expect(rules(route('  return c.json({ data: (0, row) }, 200);'))).toEqual(['unprojected-response']);
+            expect(rules(route('  return c.json({ data: row.a + row.b }, 200);'))).toEqual([]);
+        });
+        it('inspects a function of the same file that is named like a projector, and accepts one imported from the projection module', () => {
+            const local = 'function projectThing(x) { return x; }' + NL + route('  return c.json({ data: projectThing(row) }, 200);');
+            expect(rules(local)).toEqual(['unprojected-response']);
+            const wrong = 'import { projectThing } from "../lib/other";' + NL + route('  return c.json({ data: projectThing(row) }, 200);');
+            expect(rules(wrong)).toEqual(['unprojected-response']);
+            const right = 'import { projectThing } from "../lib/response-projection";' + NL + route('  return c.json({ data: projectThing(row) }, 200);');
+            expect(rules(right)).toEqual([]);
+        });
+        it('reports a response helper it does not know', () => {
+            expect(rules(route('  return jsonOk(c, row);'))).toEqual(['unknown-response-helper']);
+            expect(rules(route('  return sendSuccess(c, projectFields(row, F));'))).toEqual([]);
+        });
+        it('accepts a schema parse, and does not accept one whose schema is z.any()', () => {
+            expect(rules(route('  return c.json({ data: PublicSchema.parse(row) }, 200);'))).toEqual([]);
+            expect(rules('const S = z.any();' + NL + route('  return c.json({ data: S.parse(row) }, 200);'))).toEqual(['unprojected-response']);
+        });
+    });
+
     describe('projection-allow', () => {
         it('exempts the statement under it when it gives a reason', () => {
             expect(rules(route('  // projection-allow: the row is the public listing itself', '  return c.json({ success: true, data: row }, 200);'))).toEqual([]);
@@ -126,6 +178,10 @@ describe('public-projection detector', () => {
         });
         it('accepts the marker at the end of the call line', () => {
             expect(rules(route('  return c.json({ success: true, data: row }, 200); // projection-allow: the row is the public listing itself'))).toEqual([]);
+        });
+        it('covers only the call it ends its line on, when one statement holds two responses', () => {
+            const src = route('  return a', '    ? c.json({ data: row }, 200) // projection-allow: the first branch is a public listing', '    : c.json({ data: row }, 200);');
+            expect(run(src).violations.map((v: Hit) => v.line)).toEqual([5]);
         });
         it('exempts only the statement it sits above', () => {
             const src = route('  // projection-allow: the first one is a public listing', '  if (a) return c.json({ success: true, data: row }, 200);', '  return c.json({ success: true, data: row }, 200);');
@@ -153,7 +209,7 @@ describe('the gate run as a command', () => {
 
     it('prints its summary with both numbers and ends OK, so a command that did nothing would fail here', () => {
         const out = run('scripts/check-public-projection.mjs');
-        expect(out).toMatch(/\d+ module\(s\) scanned \(\d+ by independent count\) \| \d+ response\(s\) \| \d+ finding\(s\) vs \d+ baselined/);
+        expect(out).toMatch(/\d+ module\(s\) scanned, \d+ out of scope \| \d+ response\(s\) \| \d+ finding\(s\) vs \d+ baselined/);
         expect(out).toContain('[public-projection] OK');
     }, 120_000);
 
@@ -168,4 +224,64 @@ describe('the gate run as a command', () => {
         expect(mounts.map((m: { target: string }) => m.target)).toEqual(['server/api/repair-builder', 'server/api/messages']);
         expect(Object.keys(DELEGATES).length).toBeGreaterThan(0);
     });
+
+    it('stops, rather than skips, a /api/public mount it cannot read', () => {
+        const head = "import good from './api/good';" + NL + "import elsewhere from './features/elsewhere';" + NL + "import { viaPkg } from 'some-package';" + NL;
+        expect(publicMounts(head + "app.route('/api/public', good);").map((m: { name: string }) => m.name)).toEqual(['good']);
+        // Double-quoted, and the identifier is read like a single-quoted one.
+        expect(publicMounts(head + 'app.route("/api/public", good);').map((m: { name: string }) => m.name)).toEqual(['good']);
+        expect(() => publicMounts(head + "app.route('/api/public', elsewhere);")).toThrow(/not under \.\/api\//);
+        expect(() => publicMounts(head + "app.route('/api/public', viaPkg);")).toThrow(/not a relative import/);
+        expect(() => publicMounts(head + "app.route('/api/public', declaredHere);")).toThrow(/not a relative import/);
+        expect(() => publicMounts(head + "app.route('/api/public', makeRoutes(env));")).toThrow(/could not parse/);
+        // Control: a mount that is not under /api/public is not this check's business.
+        expect(() => publicMounts(head + "app.route('/api/admin', elsewhere);")).not.toThrow();
+    });
+
+    it('resolves each unauthenticated path to the modules mounted at it, and notices one that no mount answers', () => {
+        const { mounts } = parseMounts("import a from './api/a';" + NL + "import b from './api/b';" + NL + "import { onlyRoot } from './api/root-page';" + NL + "app.route('/api/open', a).route('/api/open/sub', b).route('/', onlyRoot);", 'server/index.ts');
+        const paths = [
+            "const x = path.startsWith('/api/open/') || path === '/api/open/exact' || path === '/page' || path.startsWith('/api/ghost/');",
+            "// path.startsWith('/api/commented/')",
+        ].join(NL);
+        const { unresolved, modules } = publicPathModules(paths, mounts);
+        expect(unresolved).toEqual(['/api/ghost/']);
+        expect(modules.map((m: { mount: { name: string } }) => m.mount.name).sort()).toEqual(['a', 'b']);
+    });
+
+    it('lists out-of-scope modules with a reason, and none of them is also scanned', () => {
+        expect(Object.keys(OUT_OF_SCOPE).length).toBeGreaterThan(0);
+        for (const [file, reason] of Object.entries(OUT_OF_SCOPE)) expect((reason as string).length, file).toBeGreaterThan(10);
+        expect(Object.keys(OUT_OF_SCOPE)).not.toContain('server/api/client.ts');
+        expect(PUBLIC_MODULES).toContain(':(glob)server/api/client.ts');
+    });
+
+    it('reads the real mounts: every unauthenticated /api path resolves to a module that is scanned or out of scope', () => {
+        const all = ['server/index.ts', 'server/portal/integration.module.ts'].flatMap((f) => {
+            const r = parseMounts(readFileSync(f, 'utf8'), f);
+            expect(r.problems, f).toEqual([]);
+            return r.mounts;
+        });
+        const open = publicPathModules(readFileSync('server/lib/auth/public-paths.ts', 'utf8'), all);
+        expect(open.unresolved).toEqual([]);
+        const paths = open.modules.map((m: { mount: { path: string } }) => m.mount.path);
+        for (const must of ['/api/public', '/api/portal', '/api/client', '/api/platform', '/webhooks/stripe']) expect(paths, must).toContain(must);
+    });
+
+    it('runs from a symlinked path as it does from the real one', () => {
+        // The entry-point guard compares real paths, so a link to the script still runs the gate.
+        const dir = mkdtempSync(join(tmpdir(), 'pp-link-'));
+        const link = join(dir, 'check.mjs');
+        try {
+            symlinkSync(join(process.cwd(), 'scripts/check-public-projection.mjs'), link);
+        } catch {
+            return; // The platform refuses to create a link without privileges; the plain-path run above still covers the guard.
+        }
+        try {
+            const out = execFileSync(process.execPath, [link], { cwd: process.cwd(), encoding: 'utf8' });
+            expect(out).toContain('[public-projection] OK');
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    }, 120_000);
 });

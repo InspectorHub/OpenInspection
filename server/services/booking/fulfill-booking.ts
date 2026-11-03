@@ -320,6 +320,7 @@ export async function fulfillBooking(
         fireAutomation(c.env.DB, tenantId, inspectionId, 'booking.received'),
     );
 
+    // projection-allow: the ids and deposit amount of the booking the client has just created
     return c.json({
         success: true,
         data: {

@@ -10,7 +10,8 @@
  *
  * What the report page reads of the inspection is its id, address, date, status and the inspector's name; of a signoff, who signed as what,
  * the licence, the qualifications reference, when, and whether the roles were combined; of a document-review row, which document and how it
- * was handled. Row identifiers of the company and of the person who signed are not part of the report.
+ * was handled. Company row identifiers and signer account ids are not fields of the report; a credential badge key is a storage path.
+ * A signoff's own id and signature reference, and a document-review row's id and sort order, are not read by the report page and are not carried.
  */
 import type { ReportData } from './translation/report-span-register';
 import { projectFields } from './response-projection';
@@ -23,10 +24,10 @@ type DocumentReviewRow = ReportData['documentReview'][number];
 export const REPORT_LINK_INSPECTION_FIELDS = ['id', 'propertyAddress', 'date', 'status', 'inspectorName'] as const satisfies readonly (keyof Inspection)[];
 
 /** The signoff fields a report reader receives (not the company, the inspection or the signer's account id). */
-export const REPORT_LINK_SIGNOFF_FIELDS = ['id', 'role', 'name', 'license', 'qualificationsRef', 'signedAt', 'signatureRef', 'dualRole'] as const satisfies readonly (keyof Signoff)[];
+export const REPORT_LINK_SIGNOFF_FIELDS = ['role', 'name', 'license', 'qualificationsRef', 'signedAt', 'dualRole'] as const satisfies readonly (keyof Signoff)[];
 
 /** The document-review fields a report reader receives (not the company or the inspection). */
-export const REPORT_LINK_DOCUMENT_REVIEW_FIELDS = ['id', 'documentKey', 'label', 'requested', 'received', 'reviewed', 'na', 'notes', 'sortOrder'] as const satisfies readonly (keyof DocumentReviewRow)[];
+export const REPORT_LINK_DOCUMENT_REVIEW_FIELDS = ['documentKey', 'label', 'requested', 'received', 'reviewed', 'na', 'notes'] as const satisfies readonly (keyof DocumentReviewRow)[];
 
 /**
  * Every top-level key of the report, and what the response does with it. A key added to `getReportData` is a compile error here until it is
