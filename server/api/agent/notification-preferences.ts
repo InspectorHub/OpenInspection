@@ -210,6 +210,7 @@ app.openapi(getScreenRoute, async (c) => {
     return c.json({
         success: true as const,
         data: {
+            // The company id is the selector the page sends back to choose which company's preferences to read or change.
             companies: companies.map((x) => ({ id: x.tenantId, name: x.name })),
             selected: selected?.tenantId ?? null,
             ...buildScreenModel('agent', chosen),

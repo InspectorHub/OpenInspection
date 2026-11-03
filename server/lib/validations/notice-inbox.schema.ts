@@ -22,7 +22,6 @@ const NoticeChannelSchema = z.object({
 
 const NoticeRowSchema = z.object({
     id: z.string().describe('Notice header id.'),
-    tenantId: z.string().optional().describe('Company this notice came from. Present in the agent inbox, which spans several companies; absent from the client portal list, which is one company.'),
     type: z.string().describe('The event that produced the notice (report.published, ...).'),
     title: z.string().describe('Notice title.'),
     body: z.string().nullable().describe('Optional notice body.'),

@@ -25,7 +25,7 @@ import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
-import { patchRevisionReport, revisionStatusField, withReadableSnapshot } from './patch-revision-report';
+import { patchRevisionReport, revisionStatusField, toInspectionRecord, templateRecord } from './patch-revision-report';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
 import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
@@ -196,7 +196,7 @@ const coreRoutes = createApiRouter()
             success: true,
             // Only the inspection row is projected: `template` is customer-authored
             // schema JSON and may legitimately contain a field called `price`.
-            data: { ...result, inspection: await moneyView(c, withReadableSnapshot(result.inspection), 'inspectionFees'), primaryReportId, ...revisionStatusField(result.inspection) },
+            data: { ...result, inspection: await moneyView(c, toInspectionRecord(result.inspection), 'inspectionFees'), template: templateRecord(result.template), primaryReportId, ...revisionStatusField(result.inspection) },
         }, 200);
     })
     .openapi(deleteInspectionRoute, async (c) => {
@@ -305,7 +305,7 @@ const coreRoutes = createApiRouter()
         // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).
         if (body.id) {
             const existing = await service.findInspectionById(tenantId, body.id);
-            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, withReadableSnapshot(await completeReplayedCreate(c, existing, body)), 'inspectionFees') } }, 200);
+            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, toInspectionRecord(await completeReplayedCreate(c, existing, body)), 'inspectionFees') } }, 200);
         }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
@@ -327,13 +327,13 @@ const coreRoutes = createApiRouter()
         });
         // A concurrent request with the same client id won the insert: this one is a
         // replay, so it answers like one and repeats none of the side effects below.
-        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, withReadableSnapshot(await completeReplayedCreate(c, inspection, body)), 'inspectionFees') } }, 200);
+        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, toInspectionRecord(await completeReplayedCreate(c, inspection, body)), 'inspectionFees') } }, 200);
 
         fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({
             success: true,
-            data: { inspection: await moneyView(c, withReadableSnapshot(inspection), 'inspectionFees') },
+            data: { inspection: await moneyView(c, toInspectionRecord(inspection), 'inspectionFees') },
         }, 201);
     })
     .openapi(cloneInspectionRoute, async (c) => {
@@ -347,7 +347,7 @@ const coreRoutes = createApiRouter()
             metadata: { clonedFrom: id, propertyAddress: clone.propertyAddress },
         });
         fireQuotaThresholdNotice(c, tenantId);
-        return c.json({ success: true, data: { inspection: await moneyView(c, withReadableSnapshot(clone), 'inspectionFees') } }, 201);
+        return c.json({ success: true, data: { inspection: await moneyView(c, toInspectionRecord(clone), 'inspectionFees') } }, 201);
     })
     .openapi(createFromWizardRoute, async (c) => {
         const input    = c.req.valid('json');

@@ -132,7 +132,6 @@ export const PaymentLedgerRowSchema = z.object({
 
 export const InvoiceResponseSchema = z.object({
     id: z.string().trim().min(1),
-    tenantId: z.string().trim().min(1),
     inspectionId: z.string().trim().min(1).nullable(),
     clientName: z.string().nullable(),
     clientEmail: z.string().nullable(),

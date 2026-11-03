@@ -37,7 +37,6 @@ const channel = (over: Partial<NoticeChannelAttempt>): NoticeChannelAttempt => (
 
 const notice = (channels: NoticeChannelAttempt[]): NoticeRowData => ({
   id: "n-1",
-  tenantId: "t-1",
   type: "report.published",
   title: "Your report is ready",
   body: null,

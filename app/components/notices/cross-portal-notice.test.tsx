@@ -30,7 +30,6 @@ import type { NoticeRowData } from "~/lib/notice-view";
 
 const NOTICE: NoticeRowData = {
   id: "n-1",
-  tenantId: "t-1",
   type: "report.published",
   title: "Report ready",
   body: null,

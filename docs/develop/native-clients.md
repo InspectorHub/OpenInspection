@@ -482,6 +482,11 @@ Rules the upload route applies, in order:
   or `image/heic`).
 - The storage key is a pure function of the token, so sending the same token
   twice overwrites one object instead of adding another.
+- A photo upload answers `{ "data": { "key": ... } }` with the key relative to the
+  company (`inspections/{inspectionId}/photos/...`). The native client does not
+  read it: it records the key from the `upload-url` response, which is the full
+  form. The relative form is for this answer only; other routes keep taking and
+  returning the key as their own contract states.
 
 ### Chunked video upload
 
@@ -926,7 +931,9 @@ it answers in the committed contract.
   email, uri) are not checked.
 - A key the body returns that the schema does not declare must be recorded in
   `tests/unit/helpers/undeclared-response-keys.allowlist.json` with a specific
-  reason. That list may only shrink; CI compares its key count with the base branch.
+  reason. That list is now empty and may only shrink; CI compares its key count with
+  the base branch. A new undeclared key is documented in the schema or removed from
+  the response, not added to the list.
 - Every array of objects the schema declares must be reached with at least one
   element, or the path is listed in `EMPTY_OK`
   (`tests/unit/helpers/response-conformance-skips.ts`). An operation the suite does
@@ -935,7 +942,7 @@ it answers in the committed contract.
   controls in the spec); the operations, the seed and the checker are in
   `tests/unit/helpers/response-conformance.ts`.
 
-To shrink an entry, document the field in the schema instead
+If the list ever holds an entry, shrink it by documenting the field in the schema instead
 (`.describe(...)` on the response schema), run `npm run native:contract`, and
 delete the key from its allow-list entry (the entry itself when it has no key left).
 The spec fails on an entry that no longer matches anything.

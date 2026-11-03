@@ -24,6 +24,7 @@ import {
 } from '../lib/validations/agent.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
+import { withoutCompanyId } from '../lib/response-projection';
 import agentPhotoRoutes, { agentPhotoRouteConfigs } from './agent/photo';
 import agentNotificationPreferenceRoutes, { agentNotificationPreferenceRouteConfigs } from './agent/notification-preferences';
 import { getDrizzle } from '../lib/route-helpers';
@@ -239,8 +240,7 @@ const inspectorsRoute = createRoute(withMcpMetadata({
 const app = createApiRouter();
 // Byte-serving lives in its own module (file-size ratchet on this one).
 app.route('/', agentPhotoRoutes);
-// Per-company notification preferences (§4) — see that module for why the
-// agent cannot share the staff route.
+// Per-company notification preferences (§4) — see that module for why the agent cannot share the staff route.
 app.route('/', agentNotificationPreferenceRoutes);
 app.openapi(getReportsRoute, async (c) => {
     // Move RBAC check inside to fix OpenAPIHono type inference issues with context
@@ -296,7 +296,7 @@ app.openapi(getReportsRoute, async (c) => {
 
     return c.json({
         success: true,
-        data: { agentId, reports: rows }
+        data: { agentId, reports: rows.map(withoutCompanyId) }
     }, 200);
 });
 app.openapi(myRecommendationsRoute, async (c) => {
@@ -384,12 +384,12 @@ app.openapi(referralsRoute, async (c) => {
     await requireRole('agent')(c, async () => {});
     const user = c.get('user');
     const data = await c.var.services.agent.listReferrals(user.sub, { limit: 100 });
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: data.map(withoutCompanyId) }, 200);
 });
 app.openapi(inspectorsRoute, async (c) => {
     await requireRole('agent')(c, async () => {});
     const user = c.get('user');
-    const data = await c.var.services.agent.listInspectors(user.sub);
+    const data = await c.var.services.agent.listInspectors(user.sub); // each row names its company id: it is the selector a booking sends back
     return c.json({ success: true as const, data }, 200);
 });
 

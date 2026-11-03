@@ -39,7 +39,6 @@ export const UpdateContactSchema = ContactFieldsSchema.partial().openapi('Update
 
 export const ContactResponseSchema = z.object({
     id: z.string().trim().min(1),
-    tenantId: z.string().trim().min(1),
     type: z.enum(ROLE_KINDS),
     name: z.string(),
     email: z.string().nullable(),

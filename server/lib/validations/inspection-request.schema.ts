@@ -66,7 +66,6 @@ const SubInspectionResponseSchema = z.object({
 
 export const InspectionRequestResponseSchema = z.object({
     id:               z.string(),
-    tenantId:         z.string(),
     clientName:       z.string(),
     clientEmail:      z.string().nullable(),
     clientPhone:      z.string().nullable(),

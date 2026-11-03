@@ -24,3 +24,12 @@ export function projectFields<T extends object, K extends keyof T>(source: T, ke
     // Every key in `out` was copied from `source` under a key of `K`, so the partial is the picked subset.
     return out as Projected<T, K>;
 }
+
+/**
+ * A row without its company id. A response to a signed-in caller of that company does not restate the company, which the
+ * caller already knows from its session; a row is copied, never changed.
+ */
+export function withoutCompanyId<T extends object>(row: T): Omit<T, 'tenantId'> {
+    // Every entry but the company id is kept, so the result is the row without that one key.
+    return Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'tenantId')) as Omit<T, 'tenantId'>;
+}

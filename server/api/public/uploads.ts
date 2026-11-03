@@ -45,6 +45,7 @@ import { MAX_PHOTO_BYTES, isSignedPhotoExt, sniffedPhotoExt, storePhotoAtKey } f
 import { storeVideoUpload } from '../inspections/media-video-r2';
 import { MAX_FORM_VIDEO_BYTES } from '../../lib/media/video-types';
 import { videoChunkedRoutes } from './video-chunked';
+import { relativizeSerialized } from '../../lib/report-link-keys';
 
 /** Multipart framing adds a little to the file itself; this much headroom is allowed before the body is read. */
 const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
@@ -117,7 +118,7 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         logger.info('public-upload: stored photo', {
             tenantId: claims.tenantId, inspectionId: claims.inspectionId, mediaId: claims.mediaId, key,
         });
-        return c.json({ success: true, data: { key } }, 200); // projection-allow: the key of the object the holder of this signed upload URL just stored; the native client records it
+        return c.json({ success: true, data: { key: relativizeSerialized(key, claims.tenantId) } }, 200); // projection-allow: the key of the object the holder of this signed upload URL just stored, relative to the company
     })
     .post('/uploads/video', async (c) => {
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'video');

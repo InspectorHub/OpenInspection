@@ -19869,10 +19869,10 @@
           "name": "key",
           "in": "query",
           "required": true,
-          "description": "R2 object key (`${tenantId}/inspections/${inspectionId}/...`).",
+          "description": "Photo key as the repair items response states it, relative to the company: `inspections/${inspectionId}/...`. The full form `${companyId}/inspections/${inspectionId}/...` is also accepted.",
           "schema": {
             "type": "string",
-            "description": "R2 object key (`${tenantId}/inspections/${inspectionId}/...`)."
+            "description": "Photo key as the repair items response states it, relative to the company: `inspections/${inspectionId}/...`. The full form `${companyId}/inspections/${inspectionId}/...` is also accepted."
           }
         },
         {

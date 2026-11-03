@@ -48,7 +48,11 @@ describe('photo upload URL (real app)', () => {
         const { url, key } = await mintUrl();
         const res = await u!.call(url, { method: 'POST', body: filePart('image/jpeg') }, { auth: null });
         expect(res.status, await res.clone().text()).toBe(200);
-        expect(((await res.json()) as { data: { key: string } }).data.key).toBe(key);
+        const stated = ((await res.json()) as { data: { key: string } }).data.key;
+        // The answer states the key relative to the company; the minted key (full) is where the object sits.
+        expect(stated).toBe(key.slice(key.indexOf('/') + 1));
+        expect(stated.startsWith('inspections/')).toBe(true);
+        expect(key.endsWith(`/${stated}`)).toBe(true);
         expect(u!.r2.store.has(key)).toBe(true);
         expect(u!.r2.store.size).toBe(1);
     });

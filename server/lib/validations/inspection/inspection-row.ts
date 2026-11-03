@@ -9,8 +9,7 @@
  * `tests/unit/inspections/inspection-row-schema.spec.ts` checks that each key here is a column of `inspections`,
  * or one of the computed keys below.
  *
- * Not listed on purpose: `tenantId`, which the record also carries. It is not part of the published contract and is tracked in
- * the undeclared-keys allow-list (tests/unit/helpers/undeclared-response-keys.allowlist.json).
+ * Not listed on purpose: `tenantId`. The record does not carry the company id.
  */
 import { z } from '@hono/zod-openapi';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';

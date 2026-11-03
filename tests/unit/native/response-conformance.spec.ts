@@ -74,16 +74,20 @@ describe('native response conformance', () => {
         expect(observed.filter((o) => walkedElements(o).some((n) => n > 0)).length).toBeGreaterThanOrEqual(MIN_EXERCISED);
     });
 
-    it('control: removing an allow-list entry makes the check fail, and so does a stale, weak or duplicate one', () => {
-        expect(allowList.length).toBeGreaterThan(0);
-        const problems = checkConformance(observed, allowList.slice(1));
-        expect(problems.length).toBeGreaterThan(0);
-        expect(problems.every((p) => p.startsWith('undeclared key not listed'))).toBe(true);
-        const stale: AllowEntry[] = [...allowList, { method: 'get', path: '/api/tags', at: 'data[]', keys: ['notReturned'], reason: 'a key the route no longer returns at all' }];
-        expect(checkConformance(observed, stale).some((p) => p.startsWith('stale entry'))).toBe(true);
-        const weak = allowList.map((e, i) => (i === 0 ? { ...e, reason: 'todo' } : e));
-        expect(checkConformance(observed, weak).some((p) => p.startsWith('reason too short'))).toBe(true);
-        expect(checkConformance(observed, [...allowList, allowList[0] as AllowEntry]).some((p) => p.startsWith('duplicate entry'))).toBe(true);
+    it('control: an unlisted extra key fails the check, and a stale, weak or duplicate entry does too', () => {
+        const entry: AllowEntry = { method: 'get', path: '/api/tags', at: 'data[]', keys: ['extraKey'], reason: 'a key the contract does not document yet, kept for this control' };
+        const base = { method: 'get', path: '/api/tags', expected: 200, status: 200, contentType: 'application/json', declared: true, bodyKeys: 1, elements: {}, arrays: [], missingRequired: [], typeMismatch: [] };
+        const withExtra: Observation = { ...base, extras: [{ at: 'data[]', key: 'extraKey' }] };
+        const clean: Observation = { ...base, extras: [] };
+        expect(checkConformance([withExtra], [entry])).toEqual([]);
+        const problems = checkConformance([withExtra], []);
+        expect(problems).toEqual(['undeclared key not listed: GET /api/tags @ data[] extraKey']);
+        expect(checkConformance([clean], [entry]).some((p) => p.startsWith('stale entry'))).toBe(true);
+        expect(checkConformance([withExtra], [{ ...entry, reason: 'todo' }]).some((p) => p.startsWith('reason too short'))).toBe(true);
+        expect(checkConformance([withExtra], [entry, entry]).some((p) => p.startsWith('duplicate entry'))).toBe(true);
+        // The shipped list holds nothing, so every body must match the contract with no exception.
+        expect(allowList).toEqual([]);
+        expect(checkConformance(observed, allowList)).toEqual([]);
     });
 
     it('control: a missing required key and a type mismatch are reported even when the allow-list is complete', () => {

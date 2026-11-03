@@ -3,6 +3,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { servePhotoObject, imagesBinding } from '../../lib/media/serve-photo';
+import { resolveReportPhotoKey } from '../../lib/report-link-keys';
 
 /**
  * GET /api/agent/inspections/:id/photo
@@ -11,7 +12,8 @@ import { servePhotoObject, imagesBinding } from '../../lib/media/serve-photo';
  * owner/manager/inspector-only and the public one wants a portal token, so an
  * agent session satisfies neither. Access here is exactly the agent's referral
  * association (the same predicate the repair-items feed uses) and never wider:
- * the key must live under the associated tenant + the inspection in the path.
+ * the key must live under the associated tenant + the inspection in the path, whether it is
+ * given relative to the company or in full.
  */
 const agentPhotoRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -21,7 +23,7 @@ const agentPhotoRoute = createRoute(withMcpMetadata({
     request: {
         params: z.object({ id: z.string().describe('Inspection id the agent was referred on.') }),
         query: z.object({
-            key: z.string().describe('R2 object key (`${tenantId}/inspections/${inspectionId}/...`).'),
+            key: z.string().describe('Photo key as the repair items response states it, relative to the company: `inspections/${inspectionId}/...`. The full form `${companyId}/inspections/${inspectionId}/...` is also accepted.'),
             w: z.string().optional().describe('Optional max width in px for an on-the-fly thumbnail.'),
             download: z.string().optional().describe('Set to "1" to force an attachment download.'),
         }),
@@ -44,10 +46,11 @@ app.openapi(agentPhotoRoute, async (c) => {
     // Association first: an unassociated agent must not even probe the bucket.
     const access = await c.var.services.agent.accessToInspection(user.sub, id);
     if (!access) return c.notFound();
-    // Key scope. Without this an associated agent could read any object in
-    // any tenant by passing someone else's key.
-    if (!key.startsWith(`${access.tenantId}/inspections/${id}/`)) return c.notFound();
-    const photo = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
+    // Key scope, resolved against the associated company: one agent cannot name another company's object or another
+    // inspection's. Only this inspection's photos are served here, not the company's credential badges.
+    const fullKey = resolveReportPhotoKey(key, access.tenantId, id);
+    if (fullKey === null || !fullKey.startsWith(`${access.tenantId}/inspections/${id}/`)) return c.notFound();
+    const photo = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), fullKey, {
         width: w,
         download: download === '1',
     });

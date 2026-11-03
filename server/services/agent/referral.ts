@@ -335,8 +335,7 @@ export async function listRecommendationsForAgent(
         })
         .from(inspections)
         .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
-        // Left join: a company with no config row falls back to the policy
-        // default in resolveAgentRepairAccess.
+        // Left join: a company with no config row falls back to the policy default in resolveAgentRepairAccess.
         .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, inspections.tenantId))
         // Buyer's-agent attribution via inspection_people — see listReferrals
         // above for why contact_role_profiles is joined before
@@ -387,6 +386,7 @@ export async function listRecommendationsForAgent(
     // IA-104 — no post-filter; the join is the access check.
     const flat = rows.flatMap((r) => flattenInspectionToRecommendations({
         id:               r.id,
+        tenantId:         r.tenantId,
         tenantName:       r.tenantName,
         tenantSlug:       r.tenantSlug,
         repairAccess:     resolveAgentRepairAccess(r.inspectionPrefs),

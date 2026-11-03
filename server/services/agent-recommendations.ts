@@ -10,6 +10,7 @@
 
 import type { DefectCategory } from '@core/field-ui/shared/template-schema';
 import type { AgentRepairAccess } from '../lib/people/agent-repair-access';
+import { relativizeSerialized } from '../lib/report-link-keys';
 import { readItemDefectStates, readItemEntry } from '../lib/read-item-defects';
 import type { ResultsProjection, DefectState } from '@core/field-ui/shared/results-doc.types';
 
@@ -57,6 +58,8 @@ interface SnapshotShape { sections?: SectionShape[] }
 
 export interface RawInspectionForRecommendations {
     id:               string;
+    /** The owning company. Photo keys in the rows are stated relative to it (`inspections/<id>/...`); it is not itself returned. */
+    tenantId:         string;
     tenantName:       string;
     tenantSlug:       string;
     repairAccess:     AgentRepairAccess;
@@ -94,6 +97,7 @@ export function flattenInspectionToRecommendations(
     if (!snapshot || !Array.isArray(snapshot.sections)) return [];
 
     const out: AgentRecommendationRow[] = [];
+    const relative = (key: string): string => relativizeSerialized(key, insp.tenantId);
     for (const section of snapshot.sections) {
         for (const item of section.items ?? []) {
             const cannedDefects = item.tabs?.defects ?? [];
@@ -127,7 +131,7 @@ export function flattenInspectionToRecommendations(
                     category,
                     comment:         (state.comment ?? canned.comment ?? '').toString(),
                     location:        state.location ?? null,
-                    photos:          flattenPhotos(state.photos),
+                    photos:          flattenPhotos(state.photos).map(relative),
                     isCustom:        false,
                 });
             }
@@ -152,7 +156,7 @@ export function flattenInspectionToRecommendations(
                     category:        (cd.category ?? 'maintenance').toString(),
                     comment:         (cd.comment ?? '').toString(),
                     location:        cd.location ?? null,
-                    photos:          flattenPhotos(cd.photos),
+                    photos:          flattenPhotos(cd.photos).map(relative),
                     isCustom:        true,
                 });
             }

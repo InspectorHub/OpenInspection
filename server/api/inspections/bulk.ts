@@ -30,26 +30,18 @@ import { moneyViewWith } from '../../lib/auth/money-access';
 import { resolveInspectionScope } from '../../lib/inspection/visibility';
 import { requireBatchInScope } from './bulk-scope-guard';
 import { safeISODate } from '../../lib/date';
+import { withoutCompanyId } from '../../lib/response-projection';
 import { assertStaffMayMove } from './staff-order-guard';
 
 /**
- * `getDashboardBuckets` hands back raw `inspections` rows, whose `created_at` /
- * `confirmed_at` are `timestamp_ms` columns — drizzle materialises them as `Date`
- * instances. `DashboardResponseSchema` says those two fields are ISO strings, and
- * the schema is the one telling the truth: it is the published OpenAPI/MCP
- * contract, `app/lib/dashboard-schema.ts` declares `confirmedAt?: string | null`,
- * and JSON has no Date — `JSON.stringify` was already emitting exactly
- * `Date#toISOString()` on the wire. So the handler was the wrong side: it fed
- * `c.json()` a value the response type never described.
- *
- * Serialising here (per the D1 date-safety rule in CLAUDE.md) is byte-identical
- * on the wire — `safeISODate(Date)` IS `toISOString()`. `null` is passed through
- * rather than run through `safeISODate`, which would turn it into `''` and
- * genuinely change the payload.
+ * `getDashboardBuckets` hands back raw `inspections` rows, whose `created_at` / `confirmed_at` are `timestamp_ms` columns that drizzle
+ * materialises as `Date`. `DashboardResponseSchema` says those two fields are ISO strings (as does `app/lib/dashboard-schema.ts`), and JSON
+ * has no Date, so they are serialised here with `safeISODate` (byte-identical to `toISOString()`). `null` is passed through rather than
+ * run through `safeISODate`, which would turn it into `''`. The row leaves without the company id, which the caller knows from its session.
  */
 const toWireDates = <T extends { createdAt: Date; confirmedAt: Date | null }>(rows: T[]) =>
     rows.map((row) => ({
-        ...row,
+        ...withoutCompanyId(row),
         createdAt:   safeISODate(row.createdAt),
         confirmedAt: row.confirmedAt === null ? null : safeISODate(row.confirmedAt),
     }));

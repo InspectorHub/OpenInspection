@@ -140,8 +140,7 @@ const OPAQUE = (what: string) => z.unknown().optional().describe(`${what} Its sh
  * somebody writes their shape down.
  *
  * The inspection row extras are the same object the create and single-read responses use (inspection-row.ts), less the two columns the
- * report service removes (`price`, `internalNotes`). `tenantId` is not part of the published contract and is tracked in the undeclared-keys
- * allow-list.
+ * report service removes (`price`, `internalNotes`). The record does not carry the company id.
  */
 const ReportStaffItemSchema = ReportItemSchema.extend({
   tabs: OPAQUE('The canned-comment tabs of the template item (information, limitations, defects), or null.'),

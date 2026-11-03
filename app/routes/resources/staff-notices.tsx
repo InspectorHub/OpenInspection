@@ -38,7 +38,6 @@ interface StaffNoticeDto {
 function toNoticeRow(dto: StaffNoticeDto): NoticeRowData {
   return {
     id: dto.id,
-    tenantId: "",
     type: dto.type,
     title: dto.title,
     body: dto.body,
