@@ -76,7 +76,7 @@
   "app/routes/calendar.tsx": 417,
   "server/api/admin/admin-data.ts": 416,
   "server/services/email/base.ts": 416,
-  "server/lib/db/schema/inspection/core.ts": 415,
+  "server/lib/db/schema/inspection/core.ts": 418,
   "packages/field-ui/src/components/editor/CostItemsPanel.tsx": 413,
   "server/api/migration-intake.ts": 413,
   "server/services/agreement/signer-state.ts": 413,

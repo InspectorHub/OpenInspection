@@ -5857,7 +5857,13 @@
                                 "propertyType": {
                                   "type": "string",
                                   "nullable": true,
-                                  "description": "What kind of property is being inspected, or null when it was never classified. Usually single_family, multi_unit or commercial; the booking wizard can also store condo, townhouse or multi_family, so a client must tolerate other values."
+                                  "enum": [
+                                    "single_family",
+                                    "multi_unit",
+                                    "commercial",
+                                    null
+                                  ],
+                                  "description": "What kind of property is being inspected, or null when it was never classified."
                                 },
                                 "reportStatus": {
                                   "type": "string",
@@ -15049,6 +15055,29 @@
             "type": "string",
             "nullable": true,
             "description": "Unit of the captured value for a number item (from the template item options), or null."
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "nullable": true
+              }
+            ],
+            "description": "The value captured for a non-rich item: text, a date or a choice as a string, a number, a yes or no, or the choices of a multi-select (a comma-separated string from the web editor, a list of strings from other clients). Null when nothing was captured or the stored value is of another shape."
           },
           "repairItems": {
             "type": "array",

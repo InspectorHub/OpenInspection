@@ -263,7 +263,7 @@ export const GetInspectionResponseSchema = createApiResponseSchema(z.object({
         pcaNarrative: z.record(z.string(), z.string()).nullable().optional().describe('The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders.'),
         // Returned by this route (the handler answers with the whole inspections row) and read by the native app. Optional here: a server that
         // predates the field leaves it out, and a client must cope with that.
-        propertyType: z.string().nullable().optional().describe('What kind of property is being inspected, or null when it was never classified. Usually single_family, multi_unit or commercial; the booking wizard can also store condo, townhouse or multi_family, so a client must tolerate other values.'),
+        propertyType: z.enum(INSPECTION_PROPERTY_TYPES).nullable().optional().describe('What kind of property is being inspected, or null when it was never classified.'),
         reportStatus: z.enum(REPORT_STATUSES).optional().describe('Where the report is in its life: in_progress, submitted or published.'),
     }).describe('The inspection record.'),
     template: z.unknown().openapi({ description: 'The associated template schema' }),

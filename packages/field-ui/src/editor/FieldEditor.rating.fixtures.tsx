@@ -11,7 +11,7 @@ import { FieldEditor } from "./FieldEditor";
 import { stubCamera, stubViewport } from "./FieldEditor.capabilities.fixtures";
 
 export const RATING_DATA: EditorData = createEmptyEditorData({
-  inspection: { id: "insp-1", propertyAddress: "1 Main St", propertyType: "residential" },
+  inspection: { id: "insp-1", propertyAddress: "1 Main St", propertyType: "single_family" },
   resultId: "res-1",
   schema: {
     sections: [

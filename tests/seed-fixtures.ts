@@ -610,12 +610,13 @@ export function seedFixtures(appDir: string): void {
     ) => {
         const tenantId     = opts.tenantId ?? TENANT_A_ID;
         const inspectorId  = opts.inspectorId ?? LEAD_INSPECTOR_ID;
-        const propertyType = opts.propertyType ?? 'residential';
+        // NULL is "unclassified" and reads the same as the value that stood here before the property types were unified.
+        const propertyType = opts.propertyType === undefined ? 'NULL' : `'${opts.propertyType}'`;
         return `INSERT OR REPLACE INTO inspections
          (id, tenant_id, inspector_id, property_address, property_type, date, status, report_status, payment_status,
           price_cents, is_payment_required, is_agreement_required, created_at)
          VALUES ('${id}', '${tenantId}',
-                 '${inspectorId}', '${addr}', '${propertyType}',
+                 '${inspectorId}', '${addr}', ${propertyType},
                  '2026-06-01', '${status}', '${reportStatus}', 'unpaid', 0, 0, 0, '${now}')`;
     };
     d1(inspectionRow('seed-empty-inspection',        '1 Empty St',        'scheduled', 'in_progress',
@@ -718,7 +719,7 @@ export function seedFixtures(appDir: string): void {
           report_status, payment_status, price_cents, is_payment_required,
           is_agreement_required, created_at)
          VALUES ('${STATUTORY_INSPECTION_ID}', '${TENANT_A_ID}', '${HALF_INSPECTOR_ID}',
-                 '7 Statutory Way, Plano TX', 'residential', '2026-06-01', 'scheduled',
+                 '7 Statutory Way, Plano TX', NULL, '2026-06-01', 'scheduled',
                  'in_progress', 'unpaid', 0, 0, 0, '${now}')`, cwd);
     d1Script(
         `UPDATE inspections SET template_snapshot = '${JSON.stringify(STATUTORY_TEMPLATE_SNAPSHOT)}'

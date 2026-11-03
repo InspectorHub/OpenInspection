@@ -8,7 +8,7 @@ import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-sco
 import { Errors } from '../../lib/errors';
 import { resolveTenantTimeZone } from '../../lib/tz';
 import { parseReinspectionStatuses } from '@core/field-ui/shared/reinspection-status';
-import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
+import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, toReportItemValue, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
 import { renderTemplate } from '../../lib/mustache';
 import { mapRepairItems } from '../../lib/report-repair-items';
@@ -427,7 +427,7 @@ export class InspectionReportService extends InspectionSubService {
                     // res.value; surface it to the report viewer plus the
                     // unit from item.options so the customer sees "Year
                     // built · 1995 · yr" instead of an empty rating chip.
-                    value: (res as { value?: unknown }).value ?? null,
+                    value: toReportItemValue((res as { value?: unknown }).value),
                     unit:  (item as unknown as { options?: { unit?: string } }).options?.unit ?? null,
                     // Spec 5B v2 resolved tab payload — report PDFs render
                     // only entries where `included === true`.

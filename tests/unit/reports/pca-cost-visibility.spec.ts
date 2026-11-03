@@ -106,7 +106,7 @@ describe('cost visibility follows the report tier', () => {
      */
     it('withholds it on a residential report', async () => {
         const id = '11111111-1111-1111-1111-11111111bbbb';
-        await seedInspection(testDb, id, { propertyType: 'residential', reportTier: null });
+        await seedInspection(testDb, id, { propertyType: 'single_family', reportTier: null });
         const report = await svc.getReportData(id, TENANT);
         expect(report.showEstimates).toBe(false);
     });

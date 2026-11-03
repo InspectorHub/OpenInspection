@@ -7,7 +7,7 @@ describe('resolveBuildingProfile', () => {
   });
 
   it('returns [] for a propertyType with no matching preset', () => {
-    expect(resolveBuildingProfile({ propertyType: 'townhouse', propertyFacts: { yearBuilt: 1975 } })).toEqual([]);
+    expect(resolveBuildingProfile({ propertyType: 'not-a-known-type', propertyFacts: { yearBuilt: 1975 } })).toEqual([]);
   });
 
   // Phase T root-cause fix — inspections store the underscore wizard slug

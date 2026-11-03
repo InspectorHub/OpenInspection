@@ -155,6 +155,21 @@ export function bucketToSeverity(
 }
 
 /**
+ * What a non-rich item can carry as its captured value: text, a date or a choice (a string), a number, a yes or no, or the choices of a
+ * multi-select. The web editor writes the choices of a multi-select as one comma-joined string, other clients may write a list of strings,
+ * so both are passed on. The result store types the field as `unknown`, so what reaches the report is narrowed here to those shapes;
+ * anything else (an object, a list of something else, a non-finite number) is reported as null instead of being passed on as it is.
+ */
+export type ReportItemValue = string | number | boolean | string[];
+
+export function toReportItemValue(raw: unknown): ReportItemValue | null {
+  if (typeof raw === 'string' || typeof raw === 'boolean') return raw;
+  if (typeof raw === 'number') return Number.isFinite(raw) ? raw : null;
+  if (Array.isArray(raw) && raw.every((entry): entry is string => typeof entry === 'string')) return raw;
+  return null;
+}
+
+/**
  * Commercial PCA Phase F (F1) — distinguish "Not Inspected" (NI) from
  * "Not Present" (NP). Both seed levels map to bucket 'na' → severity 'minor'
  * (see server/data/rating-system-seeds.ts + map-rating-levels.ts), so they are
@@ -269,9 +284,8 @@ export function computeReportStats(
       if (ratingId) {
         completedCount++;
       } else {
-        const v = result?.value;
-        if (v !== undefined && v !== null && v !== ''
-            && !(Array.isArray(v) && v.length === 0)) {
+        const v = toReportItemValue(result?.value);
+        if (v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)) {
           completedCount++;
         }
       }
