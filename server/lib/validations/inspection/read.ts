@@ -280,7 +280,7 @@ export const AgreementRequestCreatedSchema = createApiResponseSchema(
   }),
 ).openapi('AgreementRequestCreatedResponse');
 
-export { ReportDataResponseSchema } from './report-data.schema';
+export { ReportDataResponseSchema, ReportDataFullSchema } from './report-data.schema';
 
 const InspectionListItemSchema = z.object({
     id:           z.string(),

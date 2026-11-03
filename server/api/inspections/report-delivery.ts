@@ -23,7 +23,7 @@ import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import {
     InspectionRecipientsResponseSchema,
     InspectionHubResponseSchema,
-    ReportDataResponseSchema,
+    ReportDataFullSchema,
 } from '../../lib/validations/inspection.schema';
 import { SendReportSchema, SendReportResponseDataSchema } from '../../lib/validations/send-report.schema';
 import { inspections as inspectionTable, contacts, tenants } from '../../lib/db/schema';
@@ -39,6 +39,7 @@ import { interpolate } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
 import { hubPayLink } from '../../lib/inspection/hub-pay-url';
 import { moneyView } from '../../lib/auth/money-access';
+import { withReadableSnapshot } from './patch-revision-report';
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -82,7 +83,7 @@ const getReportDataRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(ReportDataResponseSchema),
+                    schema: createApiResponseSchema(ReportDataFullSchema),
                 },
             },
             description: 'Report data',
@@ -476,7 +477,7 @@ reportDeliveryRoutes.openapi(getReportDataRoute, async (c) => {
     const service = c.var.services.inspection;
     const data = await service.getReportData(id, tenantId);
     // The inspection row carries the fee fields; this route follows the same rule as GET /api/inspections/{id}.
-    return c.json({ success: true, data: { ...data, inspection: await moneyView(c, data.inspection, 'inspectionFees') } }, 200);
+    return c.json({ success: true, data: { ...data, inspection: await moneyView(c, withReadableSnapshot(data.inspection), 'inspectionFees') } }, 200);
 });
 reportDeliveryRoutes.openapi(getRepairListRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;

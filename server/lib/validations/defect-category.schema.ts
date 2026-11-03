@@ -21,6 +21,7 @@ export const DefectCategoryResponseSchema = z.object({
     drivesSummary: z.boolean().describe('Whether defects in this category count toward the report Summary.'),
     sortOrder:     z.number().int().describe('Display order.'),
     isSeed:        z.boolean().describe('True for the built-in maintenance/recommendation/safety rows (not user-deletable).'),
+    createdAt:     z.string().datetime().optional().describe('When the category was created (ISO 8601).'),
 }).openapi('DefectCategory');
 
 export type CreateDefectCategoryInput = z.infer<typeof CreateDefectCategorySchema>;

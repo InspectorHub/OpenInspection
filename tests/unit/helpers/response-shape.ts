@@ -101,6 +101,11 @@ function enumOf(schema: Record<string, unknown>): unknown[] | null {
     return 'const' in schema ? [schema.const] : null;
 }
 
+/** True when two schema fragments are the same document: the same schema met twice through an extended schema. */
+function same(a: unknown, b: unknown): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function normalize(schema: unknown, components: Record<string, unknown>, depth = 0): Node {
     const node: Node = {
         types: null, nullable: false, properties: {}, required: [], additionalProperties: undefined, items: undefined,
@@ -125,14 +130,14 @@ function normalize(schema: unknown, components: Record<string, unknown>, depth =
             node.types = node.types ?? folded.types;
             node.nullable = node.nullable || folded.nullable;
             for (const [key, sub] of Object.entries(folded.properties)) {
-                node.properties[key] = key in node.properties ? { allOf: [node.properties[key], sub] } : sub;
+                node.properties[key] = key in node.properties && !same(node.properties[key], sub) ? { allOf: [node.properties[key], sub] } : sub;
             }
             node.required = [...new Set([...node.required, ...folded.required])];
             node.additionalProperties = node.additionalProperties ?? folded.additionalProperties;
-            node.items = node.items ?? folded.items;
+            node.items = node.items !== undefined && folded.items !== undefined && !same(node.items, folded.items) ? { allOf: [node.items, folded.items] } : (node.items ?? folded.items);
             node.enumValues = node.enumValues ?? folded.enumValues;
             if (folded.branches !== null) {
-                if (node.branches !== null) throw new Error('Two allOf parts each carry a union; folding them would drop one');
+                if (node.branches !== null && !same(node.branches, folded.branches)) throw new Error('Two allOf parts each carry a union; folding them would drop one');
                 node.branches = folded.branches;
             }
         }

@@ -256,13 +256,17 @@ describe('the committed contract for GET /api/inspections/{id}', () => {
     expect(dataSchema?.required ?? []).toContain('primaryReportId');
   });
 
-  it('declares templateSnapshot as optional on the inspection, beside the shared Inspection component', () => {
+  it('declares templateSnapshot as optional on the inspection record, which extends the shared Inspection component', () => {
+    const components = (JSON.parse(readFileSync(CONTRACT_PATH, 'utf-8')) as { components: { schemas: Record<string, Schema> } }).components.schemas;
     const parts = dataSchema?.properties?.['inspection']?.allOf ?? [];
-    const extension = parts.find((p) => p.properties !== undefined);
+    // The response names the record component; the record is the shared Inspection plus the optional row keys.
+    expect(JSON.stringify(parts)).toContain('#/components/schemas/InspectionRecord');
+    const record = components['InspectionRecord'];
+    const extension = record?.allOf?.find((p) => p.properties !== undefined);
     expect(extension?.properties).toHaveProperty('templateSnapshot');
     expect(extension?.required ?? []).not.toContain('templateSnapshot');
     // Control: the shared component is still referenced, so list responses are untouched.
-    expect(JSON.stringify(parts)).toContain('#/components/schemas/Inspection');
+    expect(JSON.stringify(record?.allOf)).toContain('#/components/schemas/Inspection');
   });
 
   it('leaves the contract version where it was (the key is detected by its presence)', () => {

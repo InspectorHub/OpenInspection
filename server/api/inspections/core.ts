@@ -305,7 +305,7 @@ const coreRoutes = createApiRouter()
         // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).
         if (body.id) {
             const existing = await service.findInspectionById(tenantId, body.id);
-            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, existing, body), 'inspectionFees') } }, 200);
+            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, withReadableSnapshot(await completeReplayedCreate(c, existing, body)), 'inspectionFees') } }, 200);
         }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
@@ -327,13 +327,13 @@ const coreRoutes = createApiRouter()
         });
         // A concurrent request with the same client id won the insert: this one is a
         // replay, so it answers like one and repeats none of the side effects below.
-        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, inspection, body), 'inspectionFees') } }, 200);
+        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, withReadableSnapshot(await completeReplayedCreate(c, inspection, body)), 'inspectionFees') } }, 200);
 
         fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({
             success: true,
-            data: { inspection: await moneyView(c, inspection, 'inspectionFees') },
+            data: { inspection: await moneyView(c, withReadableSnapshot(inspection), 'inspectionFees') },
         }, 201);
     })
     .openapi(cloneInspectionRoute, async (c) => {

@@ -1,11 +1,11 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema, SuccessResponseSchema } from '../shared.schema';
 import { INSPECTION_STATUSES } from '../../status/inspection-status';
-import { REPORT_STATUSES } from '../../status/report-status';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
 import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 import { RESERVED_INSPECTION_SEGMENTS } from '../../inspection/reserved-segments';
 import { RevisionStatusSchema } from '../statutory-revision.schema';
+import { INSPECTION_ROW_FIELDS, INSPECTION_COMPUTED_FIELDS } from './inspection-row';
 
 /**
  * Core Inspection Schema (Output)
@@ -28,6 +28,13 @@ export const InspectionSchema = z.object({
     templateId: z.string().min(1).nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('Id of the template the inspection is built from, or null when none is attached.'),
     createdAt: z.string().datetime().openapi({ example: '2024-03-20T10:00:00Z' }).describe('When the inspection record was created (ISO 8601).'),
 }).openapi('Inspection');
+
+/**
+ * The inspection record as a single read or a create returns it: the `Inspection` header plus the columns of the row.
+ * Kept apart from `Inspection` because that one is the short DTO the list and the agent account track publish; the row fields are
+ * shared with the staff report payload (inspection-row.ts), so the two cannot drift.
+ */
+export const InspectionRecordSchema = InspectionSchema.extend(INSPECTION_ROW_FIELDS).openapi('InspectionRecord');
 
 /**
  * Validation schema for list filtering and pagination.
@@ -254,18 +261,9 @@ export const BulkInspectionSchema = z.object({
  */
 export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionSchema)).openapi('InspectionListResponse');
 
-/** Response of GET /api/inspections/{id}. Kept inline-shaped (unnamed) so the published contract does not gain a component. */
+/** Response of GET /api/inspections/{id}. Inline-shaped (unnamed): the record is expanded in place, with the two computed keys a single read adds. */
 export const GetInspectionResponseSchema = createApiResponseSchema(z.object({
-    inspection: InspectionSchema.extend({
-        templateSnapshot: z.record(z.string(), z.unknown()).nullable().optional().describe('The template structure frozen onto this inspection, or null when it has none or the stored value is not a readable object. The editor reads it to render the checklist.'),
-        coverPhotoId: z.string().nullable().optional().describe('Storage key of the photo chosen as the report cover, or null when none is chosen.'),
-        propertyFacts: z.record(z.string(), z.unknown()).nullable().optional().describe('The Property Facts values (year built, size, foundation and the like), or null when none are stored.'),
-        pcaNarrative: z.record(z.string(), z.string()).nullable().optional().describe('The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders.'),
-        // Returned by this route (the handler answers with the whole inspections row) and read by the native app. Optional here: a server that
-        // predates the field leaves it out, and a client must cope with that.
-        propertyType: z.enum(INSPECTION_PROPERTY_TYPES).nullable().optional().describe('What kind of property is being inspected, or null when it was never classified.'),
-        reportStatus: z.enum(REPORT_STATUSES).optional().describe('Where the report is in its life: in_progress, submitted or published.'),
-    }).describe('The inspection record.'),
+    inspection: InspectionRecordSchema.extend(INSPECTION_COMPUTED_FIELDS).describe('The inspection record.'),
     template: z.unknown().openapi({ description: 'The associated template schema' }),
     primaryReportId: z.string().nullable().describe('Id of the primary report of this inspection, or null when it has none yet. A native device writes it into the manifest of an exported package; the importer refuses a package for an existing inspection whose report id differs from this one. The key is always present on a server that supports it; a missing key means an older server.'),
     revisionStatus: RevisionStatusSchema.optional().describe('How the inspection date sits against the statutory form revision its template produces. Present only for an inspection whose template declares a statutory form and names its revision; absent means there is nothing to say, never that nobody looked. It changes with the date and with the current time, so a cached copy can show an earlier answer.'),

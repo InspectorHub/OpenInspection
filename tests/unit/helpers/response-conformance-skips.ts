@@ -62,4 +62,5 @@ export const EMPTY_OK: Record<string, string> = {
     'GET /api/inspections/{id}/report-data::data.sections[].items[].repairItems[]': 'repair items are derived from a rated defect that carries repair fields; seeding one needs a full rating system and defect payload',
     'GET /api/inspections/{id}/publish-readiness::blockingDefects[]': 'lists defects missing required repair fields; the seeded draft has no rated defects, and seeding one needs a defect payload',
     'GET /api/inspections/{id}/publish-readiness::warningDefects[]': 'lists defects with unresolved tokens; the seeded draft has no rated defects, and seeding one needs a defect payload',
+    'POST /api/inspections::data.inspection.deviations[]': 'a freshly created inspection records no deviations from the standard guide; they are added later by the commercial report flow',
 };

@@ -40,6 +40,16 @@ describe('native response conformance', () => {
         }
     });
 
+    it('a snapshot stored as a JSON-encoded string is served as an object by the single read and the staff report payload', () => {
+        const withSnapshot = observed.filter((o) => o.snapshot !== undefined);
+        expect(withSnapshot.map(name).sort()).toEqual(['GET /api/inspections/{id}', 'GET /api/inspections/{id}/report-data']);
+        for (const o of withSnapshot) {
+            // Control: the row really holds a string, so an object here was made by the route.
+            expect(o.snapshot, name(o)).toEqual({ served: 'object', stored: 'string' });
+            expect(o.typeMismatch, name(o)).toEqual([]);
+        }
+    });
+
     it('no documented required key is missing, no value has the wrong type, no undeclared key is unlisted, no listed key is stale', () => {
         expect(checkConformance(observed, allowList)).toEqual([]);
     });

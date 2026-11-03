@@ -35,6 +35,8 @@ export interface Observation {
     missingRequired: string[];
     typeMismatch: string[];
     elements: Record<string, number>;
+    /** For a body that carries the inspection record: the JSON type of its template snapshot as served, and as stored. */
+    snapshot?: { served: string; stored: string };
     /** Every array of objects the response schema declares, from the schema alone. */
     arrays: string[];
 }
@@ -104,7 +106,11 @@ async function seed(h: Harness): Promise<void> {
     // The cast is unavoidable: `inspections` has dozens of columns with database defaults that the insert type still lists as required.
     await h.db.insert(schema.inspections).values({
         id: INSPECTION_ID, tenantId: TENANT_ID, inspectorId: INSPECTOR_ID, propertyAddress: '12 Harbor Lane', propertyType: 'single_family',
-        date: '2026-11-01', status: 'draft', reportStatus: 'draft', paymentStatus: 'unpaid', createdAt: now, templateSnapshot: SNAPSHOT,
+        date: '2026-11-01', status: 'draft', reportStatus: 'draft', paymentStatus: 'unpaid', createdAt: now,
+        // Stored as a JSON-encoded string, the way the editor saves it; the routes serve it as an object.
+        templateSnapshot: JSON.stringify(SNAPSHOT),
+        scheduledStartMs: new Date('2026-11-01T14:00:00Z'), scheduledEndMs: new Date('2026-11-01T16:00:00Z'), confirmedAt: now, addressGeocodedAt: now,
+        deviations: [{ id: 'dev-1', area: 'Roof', baselineRequirement: 'Walk the roof surface.', deviation: 'Viewed from the ground.', reason: 'Steep pitch.' }],
     } as never);
     await h.db.insert(schema.tags).values([
         { id: 'tag-1', tenantId: TENANT_ID, name: 'Follow up', color: '#ff0000', isSeed: false, createdAt: now },
@@ -127,11 +133,23 @@ async function seed(h: Harness): Promise<void> {
     });
     await h.db.insert(schema.inspectionResults).values({
         id: 'res-1', tenantId: TENANT_ID, inspectionId: INSPECTION_ID, lastSyncedAt: now,
-        data: { itm_cover: { rating: 'satisfactory', value: 'Intact', notes: 'No visible wear.', photos: [{ key: `${TENANT_ID}/${INSPECTION_ID}/a.jpg` }] } },
+        data: { itm_cover: { rating: 'satisfactory', value: 'Intact', notes: 'No visible wear.', photos: [{ key: `${TENANT_ID}/${INSPECTION_ID}/a.jpg` }],
+            original: { rating: 'poor', notes: 'Earlier finding.', photos: [{ key: `${TENANT_ID}/${INSPECTION_ID}/old.jpg` }] } } },
     });
     await h.db.insert(schema.inspectorCredentials).values({
         id: 'cred-1', tenantId: TENANT_ID, userId: INSPECTOR_ID, label: 'InterNACHI CPI', memberNumber: '12345', sortOrder: 1, active: true, createdAt: now, updatedAt: now,
     });
+}
+
+function jsonType(value: unknown): string {
+    return value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+}
+
+/** The JSON type of the snapshot as it sits in the table (a string when the editor wrote it). */
+function storedSnapshotType(h: Harness, id: string): string {
+    const row = h.sqlite.prepare('SELECT template_snapshot AS raw FROM inspections WHERE id = ?').get(id) as { raw: string | null } | undefined;
+    if (row?.raw == null) return 'null';
+    return jsonType(JSON.parse(row.raw));
 }
 
 function responseSchema(method: string, path: string, status: number): unknown {
@@ -167,6 +185,8 @@ export async function observeAll(): Promise<Observation[]> {
             let body: unknown = null;
             try { body = JSON.parse(text); } catch { body = null; }
             const checked = res.status === expected && schemaNode !== undefined;
+            const served = (body as { data?: { inspection?: { templateSnapshot?: unknown } } } | null)?.data?.inspection;
+            const snapshot = !op.path.includes('{id}') || typeof served !== 'object' || served === null || !('templateSnapshot' in served) ? undefined : { served: jsonType(served.templateSnapshot), stored: storedSnapshotType(h, INSPECTION_ID) };
             const components = contract.components?.schemas ?? {};
             const problems = checked ? compareToSchema(body, schemaNode, components) : null;
             if (res.status === expected) op.save?.(body, vars);
@@ -175,7 +195,7 @@ export async function observeAll(): Promise<Observation[]> {
                 method: op.method, path: op.path, expected, status: res.status, contentType: res.headers.get('content-type') ?? '',
                 declared: schemaNode !== undefined, bodyKeys,
                 extras: problems?.extras ?? [], missingRequired: problems?.missingRequired ?? [], typeMismatch: problems?.typeMismatch ?? [],
-                elements: problems?.elements ?? {}, arrays: schemaNode === undefined ? [] : declaredObjectArrays(schemaNode, components),
+                elements: problems?.elements ?? {}, ...(snapshot === undefined ? {} : { snapshot }), arrays: schemaNode === undefined ? [] : declaredObjectArrays(schemaNode, components),
             });
         }
         return out;

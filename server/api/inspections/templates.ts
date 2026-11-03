@@ -51,6 +51,8 @@ const listTemplatesRoute = createRoute(withMcpMetadata({
                             // written to it. See app/lib/template-order.ts.
                             jurisdiction: z.string().nullable()
                                 .describe('The state or country whose rules this template is written to, or null when it is written to none'),
+                            marketplaceLibraryId: z.string().nullable().optional()
+                                .describe('Id of the marketplace library this template was installed from, or null for a template the company wrote'),
                         })),
                         meta: PaginatedMetaSchema,
                     }),

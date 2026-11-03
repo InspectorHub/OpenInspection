@@ -71,6 +71,9 @@ export function revisionStatusField(
  * The editor's own saves write the snapshot as a JSON-encoded string into a JSON column, so such a row reads back
  * as a string. Normalised here, on read, so the client sees one shape; the stored value is left as it is.
  */
-export function withReadableSnapshot<T extends { templateSnapshot?: unknown }>(inspection: T): Omit<T, 'templateSnapshot'> & { templateSnapshot: { sections: unknown[] } | null } {
-    return { ...inspection, templateSnapshot: parseSnapshot(inspection.templateSnapshot) };
+export function withReadableSnapshot<T extends object>(inspection: T): Omit<T, 'templateSnapshot'> & { templateSnapshot: { sections: unknown[] } | null } {
+    // `T extends object`, not a weak type with the key optional: the short Inspection DTO a replayed create answers with does not name the key,
+    // but the row behind it carries it at run time.
+    const stored: unknown = 'templateSnapshot' in inspection ? inspection.templateSnapshot : undefined;
+    return { ...inspection, templateSnapshot: parseSnapshot(stored) };
 }
