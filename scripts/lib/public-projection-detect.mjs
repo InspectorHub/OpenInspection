@@ -10,13 +10,13 @@
  *  - allow-without-reason: a `projection-allow:` marker with no reason, or a short one.
  *
  * RESPONSE FORMS, with the context named by the handler's first parameter (not a fixed `c`):
- *    ctx.json(x) | sendSuccess(ctx, x) | Response.json(x) | new Response(JSON.stringify(x)) | ctx.body|text(JSON.stringify(x)).
+ *    ctx.json(x) | sendSuccess(ctx, x) | respondRelativizedJson(ctx, x, tenantId) | Response.json(x) | new Response(JSON.stringify(x)) | ctx.body|text(JSON.stringify(x)).
  * For an object literal every property value is looked at, whatever its key (`data`, `error`, `meta`, ...), and so is every
  * property of an object literal that is the value of one (`data: { request: row }`).
  *
  * WHAT COUNTS AS BUILT FROM A FIELD LIST (conservative: anything not recognised is reported):
  *  - a literal, an object literal of explicit properties, an array of such, a template or arithmetic on them;
- *  - a bare call to `projectFields`, `projectReportForLink`, `finishReportLink`, `relativizeReportKeys` or any function named
+ *  - a bare call to `projectFields`, `projectReportForLink` or any function named
  *    `project<Something>` (the convention for a function that builds its result from a field list);
  *  - `<Name>Schema.parse(...)` / `.safeParse(...)` (a schema import or const, never `JSON`);
  *  - a primitive conversion: `String`, `Number`, `Boolean`, `parseInt`, `safeISODate`, `Object.keys`, `Math.*`, `Date.now`,
@@ -39,7 +39,7 @@ import ts from 'typescript';
 export const MIN_REASON = 10;
 const ALLOW_RE = /projection-allow:(.*)/;
 
-const PROJECTORS = new Set(['projectFields', 'projectReportForLink', 'finishReportLink', 'relativizeReportKeys']);
+const PROJECTORS = new Set(['projectFields', 'projectReportForLink']);
 const PRIMITIVE_BARE = new Set(['String', 'Number', 'Boolean', 'parseInt', 'parseFloat', 'safeISODate', 'safeTimestamp', 'encodeURIComponent', 'decodeURIComponent']);
 /** `Receiver.method` calls whose result is a primitive. */
 const PRIMITIVE_QUALIFIED = new Set(['Object.keys', 'Date.now', 'Array.isArray', 'Number.isInteger', 'Number.isFinite']);
@@ -296,7 +296,7 @@ function responseSite(node, contexts) {
             return { content: [] };
         }
     }
-    if (ts.isIdentifier(callee) && callee.text === 'sendSuccess' && node.arguments.length >= 2 && ts.isIdentifier(node.arguments[0]) && contexts.has(node.arguments[0].text)) {
+    if (ts.isIdentifier(callee) && (callee.text === 'sendSuccess' || callee.text === 'respondRelativizedJson') && node.arguments.length >= 2 && ts.isIdentifier(node.arguments[0]) && contexts.has(node.arguments[0].text)) {
         return { content: [node.arguments[1]] };
     }
     return null;

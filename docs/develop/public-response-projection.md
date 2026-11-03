@@ -25,11 +25,12 @@ every top-level key of the report and rebuilds the inspection, sign-off and docu
 ## The gate
 
 `npm run lint:public-projection` (`scripts/check-public-projection.mjs`, push rung) reads the route modules that serve public
-and token-gated routes and reports each response (`c.json`, `sendSuccess`, `Response.json`, `new Response(JSON.stringify(...))`)
+and token-gated routes and reports each response (`c.json`, `sendSuccess`, `respondRelativizedJson(ctx, body, tenantId)`, `Response.json`,
+`new Response(JSON.stringify(...))`)
 whose data is a bare row, a property or spread of one, or the result of a call that is not a known projection. It looks at every
 property of the response object, not only `data`.
 
-- **What counts as a projection:** `projectFields`, `projectReportForLink`, `finishReportLink`, `relativizeReportKeys`, any
+- **What counts as a projection:** `projectFields`, `projectReportForLink`, `projectCredentialBadgeUrls`, any
   function named `project<Something>`, a `<Name>Schema.parse(...)`, an object literal of explicit properties, a primitive
   conversion (`String`, `Object.keys`, `Math.*`, `Date.now`, ...), a function of the same file whose every return is one of
   these, and a `const` declared from one. Calls are matched by their qualified form, so `JSON.parse(x)` or `obj.projectFields(x)`

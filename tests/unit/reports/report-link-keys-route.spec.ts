@@ -13,7 +13,7 @@ import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
 import { signRenderToken } from '../../../server/lib/render-token';
 import { projectReportForLink } from '../../../server/lib/report-link-response';
-import { relativizeReportKeys } from '../../../server/lib/report-link-keys';
+import { relativizeSerialized } from '../../../server/lib/report-link-keys';
 import type { ReportData } from '../../../server/lib/translation/report-span-register';
 import * as schema from '../../../server/lib/db/schema';
 import { makeExecutionContext } from '../helpers/exec-ctx';
@@ -142,7 +142,7 @@ describe('the report link response carries no company id', () => {
     it('control: a payload with the key in full does carry the id until the helper runs, so the check above can fail', () => {
         const built = projectReportForLink({ inspection: { id: ID, tenantId: TENANT_ID }, sections: [{ id: 's', items: [{ photos: [{ key: KEY }] }] }] } as unknown as ReportData);
         expect(carriers(built, TENANT_ID)).toEqual(['$.sections[0].items[0].photos[0].key']);
-        expect(carriers(relativizeReportKeys(built, TENANT_ID), TENANT_ID)).toEqual([]);
+        expect(carriers(JSON.parse(relativizeSerialized(JSON.stringify(built), TENANT_ID)), TENANT_ID)).toEqual([]);
     });
 });
 

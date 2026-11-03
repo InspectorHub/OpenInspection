@@ -51,6 +51,8 @@ describe('public-projection detector', () => {
         it('takes the context from the first parameter of the handler, and follows sendSuccess, Response.json, new Response and body/text', () => {
             expect(rules('app.get("/x", async (ctx2) => { const row = await db.get(); return ctx2.json({ data: row }); });')).toEqual(['unprojected-response']);
             expect(rules('app.get("/x", async (c) => { const row = await db.get(); return sendSuccess(c, row); });')).toEqual(['unprojected-response']);
+            expect(rules('app.get("/x", async (c) => { const row = await db.get(); return respondRelativizedJson(c, { success: true, data: row }, t); });')).toEqual(['unprojected-response']);
+            expect(rules('app.get("/x", async (c) => { const row = await db.get(); return respondRelativizedJson(c, { success: true, data: projectFields(row, F) }, t); });')).toEqual([]);
             expect(rules(route('  return Response.json(row);'))).toEqual(['unprojected-response']);
             expect(rules(route('  return new Response(JSON.stringify(row));'))).toEqual(['unprojected-response']);
             expect(rules(route('  return c.body(JSON.stringify(row));'))).toEqual(['unprojected-response']);

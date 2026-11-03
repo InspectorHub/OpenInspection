@@ -6,58 +6,46 @@
  * detail, not report content. So the response states each key from `inspections/` on, and the photo route
  * puts the company back from the verified link before it checks ownership.
  *
- * `relativizeReportKeys` runs once, on the already projected payload (see report-link-response.ts), and builds a
- * new value: the translation and hash readers keep receiving the payload as the service built it.
+ * The rewrite runs on the SERIALIZED body, once, after the payload has been projected (see report-link-response.ts):
+ * `<companyId>/inspections/` and `<companyId>/credentials/`, in their literal and percent-encoded (`%2F`) forms, lose the
+ * company id. A walk over the object tree did the same job at several times the cost of serializing it, which matters on a
+ * plan with a few milliseconds of CPU per request. The translation and hash readers keep receiving the payload as the
+ * service built it, because only the serialized copy is rewritten.
  */
-
+import type { Context, TypedResponse } from 'hono';
+import type { JSONParsed } from 'hono/utils/types';
 import { isServableBrandAsset } from './report-style/brand-asset-key';
 
 const BRAND_ASSET_PATH = '/api/public/brand-asset';
 
-/** The folders of a company that a report link response may name an object in. */
-const KEY_FOLDERS = ['inspections', 'credentials'] as const;
-
-/** Key parameter of a photo URL: `key=<percent-encoded value>`, up to the next `&` or `#`. */
-const KEY_PARAMETER = /([?&]key=)([^&#]*)/g;
-
-function decode(value: string): string | null {
-    try { return decodeURIComponent(value); } catch { return null; }
+function escapeForPattern(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function relativizeString(value: string, tenantId: string): string {
-    const own = `${tenantId}/`;
-    // Only a string that is a key into one of the company's report folders; any other string that happens to begin with the id stays.
-    if (value.startsWith(own)) return KEY_FOLDERS.some((folder) => value.startsWith(`${own}${folder}/`)) ? value.slice(own.length) : value;
-    // An absolute brand-asset URL has no relative form: that route cannot resolve a company, so its key stays whole.
-    if (!value.includes('key=') || value.includes(BRAND_ASSET_PATH)) return value;
-    // Only a `key` that names an object in one of this company's report folders is rewritten; any other URL is left as it is.
-    return value.replace(KEY_PARAMETER, (whole, name: string, raw: string) => {
-        const key = decode(raw);
-        if (key === null || !KEY_FOLDERS.some((folder) => key.startsWith(`${tenantId}/${folder}/`))) return whole;
-        return `${name}${encodeURIComponent(key.slice(own.length))}`;
-    });
+/**
+ * The body text with the company id removed from every key into the company's report folders.
+ *
+ * One precompiled pattern over the whole string (about a third of the cost of four separate passes). The id has to be followed by
+ * a separator and one of the two folders, so the id on its own, a note that merely mentions it, or a key of another company is
+ * left alone. The id must also stand on its own on the left: preceded by a letter, digit, `_` or `-` it is the tail of some longer
+ * identifier and is not touched. A free-text value that itself contains `<companyId>/inspections/` would be rewritten too; an identifier
+ * followed by a storage path is not something a person types into a note. A brand-asset URL that was not routed through the photo
+ * route is rewritten as well, and is not servable either way (the service builds only the relative form, which is routed first).
+ */
+export function relativizeSerialized(text: string, tenantId: string): string {
+    if (!text.includes(tenantId)) return text;
+    const ownFolders = new RegExp(`(?<![A-Za-z0-9_-])${escapeForPattern(tenantId)}(/|%2[Ff])(inspections|credentials)(/|%2[Ff])`, 'g');
+    return text.replace(ownFolders, '$2$3');
 }
 
-/** A plain object: one made by a literal or `Object.create(null)`. A Date, a Map or a class instance is not, and is left as it is. */
-function isPlainObject(value: unknown): value is object {
-    if (value === null || typeof value !== 'object') return false;
-    const prototype = Object.getPrototypeOf(value);
-    return prototype === Object.prototype || prototype === null;
-}
-
-function relativize(value: unknown, tenantId: string): unknown {
-    if (typeof value === 'string') return relativizeString(value, tenantId);
-    if (Array.isArray(value)) return value.map((element) => relativize(element, tenantId));
-    if (isPlainObject(value)) {
-        return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, relativize(child, tenantId)]));
-    }
-    return value;
-}
-
-/** A copy of `payload` in which every storage key (and the `key=` of every photo URL) is stated without the company id. */
-export function relativizeReportKeys<T>(payload: T, tenantId: string): T {
-    // The walk preserves the shape of plain JSON values, which is all a report payload holds.
-    return relativize(payload, tenantId) as T;
+/**
+ * A JSON response whose body has been serialized once and relativized. Same status, content type and key order as `c.json`.
+ * The type is the one `c.json(body, 200)` gives, so the route keeps its typed response; the cast only restates that the text
+ * IS the serialization of `body`.
+ */
+export function respondRelativizedJson<T extends object>(c: Context, body: T, tenantId: string): Response & TypedResponse<JSONParsed<T>, 200, 'json'> {
+    const text = relativizeSerialized(JSON.stringify(body), tenantId);
+    return c.newResponse(text, 200, { 'Content-Type': 'application/json' }) as Response & TypedResponse<JSONParsed<T>, 200, 'json'>;
 }
 
 /**
@@ -99,18 +87,15 @@ function routeCredential(credential: unknown, tenantId: string, photoUrl: (key: 
 }
 
 /**
- * The exit of a report link response: credential badges are served through the report's own photo route, then every
- * storage key is stated without the company id. Runs on the already projected payload; a payload without
- * `inspectorCredentials` (a pinned older version, a test double) stays without it.
+ * The payload with each credential badge image served through the report's own photo route. Walks only `inspectorCredentials`;
+ * a payload without it (a pinned older version, a test double) stays without it, and nothing else is copied.
  */
-export function finishReportLink<T extends object>(
+export function projectCredentialBadgeUrls<T extends object>(
     payload: T,
     tenantId: string,
     photoUrl: (key: string) => string,
 ): T {
     const credentials: unknown = 'inspectorCredentials' in payload ? payload.inspectorCredentials : undefined;
-    const routed = Array.isArray(credentials)
-        ? { ...payload, inspectorCredentials: credentials.map((credential: unknown) => routeCredential(credential, tenantId, photoUrl)) }
-        : payload;
-    return relativizeReportKeys(routed, tenantId);
+    if (!Array.isArray(credentials)) return payload;
+    return { ...payload, inspectorCredentials: credentials.map((credential: unknown) => routeCredential(credential, tenantId, photoUrl)) };
 }

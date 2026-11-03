@@ -27,7 +27,7 @@ import { getDrizzle } from '../lib/route-helpers';
 import { readCourtesyTranslationForReport } from '../lib/translation/read-for-report';
 import { projectReportForLink } from '../lib/report-link-response';
 import { projectFields } from '../lib/response-projection';
-import { finishReportLink } from '../lib/report-link-keys';
+import { projectCredentialBadgeUrls, respondRelativizedJson } from '../lib/report-link-keys';
 import { serveReportPhoto } from '../lib/report-link-photo';
 import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/validations/courtesy-translation.schema';
 
@@ -422,7 +422,7 @@ app.openapi(reportRoute, async (c) => {
     );
     // The translation reader above got the report as built; the response carries only the report link's fields,
     // with storage keys stated relative to the company (the photo route puts the company back).
-    return c.json({ success: true as const, data: finishReportLink(projectReportForLink(data), tenantId, makePhotoUrl), courtesyTranslation }, 200); // projection-allow: courtesyTranslation is the stored translation payload declared by CourtesyTranslationPayloadSchema, or null
+    return respondRelativizedJson(c, { success: true as const, data: projectCredentialBadgeUrls(projectReportForLink(data), tenantId, makePhotoUrl), courtesyTranslation }, tenantId); // projection-allow: courtesyTranslation is the stored translation payload declared by CourtesyTranslationPayloadSchema, or null
 });
 app.openapi(reportPhotoRoute, async (c) => {
     const { id } = c.req.valid('param');
