@@ -8,14 +8,13 @@ import { createApiRouter } from '../lib/openapi-router';
 import { mounted, type ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
-import { resolvePortalAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
+import { resolvePortalAccess, resolveOwnerPreview, resolveOwnerPreviewFromCookie, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
 import { recordReportView, readReportViewCountingEnabled } from '../lib/report-views';
 import publicViewTrackingRoutes, { viewTrackingRouteConfigs } from './public/view-tracking';
 // Re-exported for existing importers (tests); both now live in lib/.
 export { resolveOwnerPreviewToken } from '../lib/public-access';
 export { resolveRenderAccess } from '../lib/render-token';
-import { servePhotoObject, imagesBinding } from '../lib/media/serve-photo';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
@@ -27,6 +26,8 @@ import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { readCourtesyTranslationForReport } from '../lib/translation/read-for-report';
 import { projectReportForLink } from '../lib/report-link-response';
+import { finishReportLink } from '../lib/report-link-keys';
+import { serveReportPhoto } from '../lib/report-link-photo';
 import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/validations/courtesy-translation.schema';
 
 /**
@@ -123,11 +124,12 @@ const reportPhotoRoute = createRoute(withMcpMetadata({
             id: z.string().describe('Inspection id.'),
         }),
         query: z.object({
-            key: z.string().describe('R2 object key (`${tenantId}/${inspectionId}/...`).'),
+            key: z.string().describe('Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<userId>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working.'),
             token: z.string().optional().describe('Persistent portal access token.'),
             download: z.string().optional().describe('Set to "1" to force an attachment download named after the original file.'),
             render: z.string().optional().describe('Server-minted render token (headless PDF only).'),
             w: z.string().optional().describe('Optional max width in px for an on-the-fly WebP thumbnail; omitted serves the original.'),
+            v: z.string().optional().describe('Badge render variant for a credential badge key: email | reportSignature | reportCover. Omitted or unrecognised serves the original, never an error.'),
         }),
     },
     responses: {
@@ -386,15 +388,13 @@ app.openapi(reportRoute, async (c) => {
         method: c.req.header('x-oi-client-method') ?? c.req.method,
         purpose: c.req.header('purpose'), secPurpose: c.req.header('sec-purpose'),
     });
-    // Photo URLs: render mode carries the render token so the headless browser
-    // can load photos without a session cookie. Owner-preview points at the
-    // authed editor photo route (cookie authenticates there). Public client
-    // viewers use the token-scoped public photo route.
+    // Photo URLs: render mode carries the render token (no session cookie in the headless browser); owner preview needs no token
+    // (the photo route accepts the owner's session). Every mode uses the public photo route, which takes the company-relative key.
     const tk = token ?? '';
     const makePhotoUrl = renderMode
         ? (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&render=${encodeURIComponent(render!)}`
         : ownerPreview
-            ? (key: string) => `/api/inspections/${id}/photo?key=${encodeURIComponent(key)}`
+            ? (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}`
             : (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
     // Plan 7 — video media context. `renderMode` (the render-token/PDF path)
     // forces video entries to a poster + QR (the headless PDF browser cannot
@@ -419,12 +419,13 @@ app.openapi(reportRoute, async (c) => {
         { db: c.env.DB, inspection: c.var.services.inspection, translations: c.var.services.reportTranslation },
         { tenantId, inspectionId: id, locale: COURTESY_TRANSLATION_LOCALE, data },
     );
-    // The translation reader above got the report as built; the response carries only the report link's fields.
-    return c.json({ success: true as const, data: projectReportForLink(data), courtesyTranslation }, 200);
+    // The translation reader above got the report as built; the response carries only the report link's fields,
+    // with storage keys stated relative to the company (the photo route puts the company back).
+    return c.json({ success: true as const, data: finishReportLink(projectReportForLink(data), tenantId, makePhotoUrl), courtesyTranslation }, 200);
 });
 app.openapi(reportPhotoRoute, async (c) => {
     const { id } = c.req.valid('param');
-    const { key, token, download, render, w } = c.req.valid('query');
+    const { key, token, download, render, w, v } = c.req.valid('query');
     let tenantId = (await resolveClientTenant(c, token, id))?.tenantId ?? null;
     let renderMode = false;
     let ownerPreview = false;
@@ -440,7 +441,7 @@ app.openapi(reportPhotoRoute, async (c) => {
     // Owner-session preview — same fallback as the report data route so the
     // owner's tokenless preview can load its photos (the key is re-checked
     // against this tenant + inspection below).
-    if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
+    if (!tenantId) { tenantId = await resolveOwnerPreviewFromCookie(c); ownerPreview = !!tenantId; }
     if (!tenantId) return c.notFound();
     const photoGate = await getDrizzle(c)
         .select({ reportStatus: inspections.reportStatus })
@@ -452,13 +453,9 @@ app.openapi(reportPhotoRoute, async (c) => {
     if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus, releaseGate: photoReleaseGate })) {
         return c.notFound();
     }
-    // Ownership: keys are `${tenantId}/inspections/${inspectionId}/...` — reject
-    // anything outside the token's tenant + the requested inspection.
-    if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
-    const photo = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
-        width: w,
-        download: download === '1',
-    });
+    // Ownership is checked on the full key inside (report-link-keys.ts): the request may name it relative to the company
+    // (what a response carries) or in full (links issued earlier).
+    const photo = await serveReportPhoto(c.env, { key, width: w, download: download === '1', variant: v }, tenantId, id);
     return photo ?? c.notFound();
 });
 app.openapi(reportPdfDownloadRoute, async (c) => {

@@ -29,9 +29,9 @@ const ReportMediaSchema = z.object({
 });
 
 const ReportPhotoSchema = z.object({
-  key: z.string().describe('Storage key of the photo as the report shows it (the annotated or cropped copy when there is one).'),
+  key: z.string().describe('Storage key of the photo as the report shows it (the annotated or cropped copy when there is one). The public report states it relative to the company (`inspections/<inspectionId>/...`); the staff payload carries the full key. The public photo route accepts both forms.'),
   url: z.string().describe('Download URL of the photo.'),
-  originalKey: z.string().optional().describe('Storage key of the photo as it was first uploaded, before any crop or annotation.'),
+  originalKey: z.string().optional().describe('Storage key of the photo as it was first uploaded, before any crop or annotation. Stated like `key`: relative to the company in the public report, in full in the staff payload.'),
   media: ReportMediaSchema.optional().describe('How a video entry is presented (player, poster with a link, or a plain image). Present when the report is built with video context, as the public report is.'),
   photoNo: z.number().optional().describe('Continuous photo number in render order, used by the photo appendix. Present once the report numbers its photos.'),
 });

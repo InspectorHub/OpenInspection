@@ -15,7 +15,8 @@ import { verifyJwt, type JwtKeyring } from './jwt-keyring';
 import { classifyJwtPayload } from './auth/jwt-claims';
 import type { HonoConfig } from '../types/hono';
 import { portalLinkState, type PortalLinkState } from './portal-link-state';
-import { bearerToken } from './auth-helpers';
+import { getCookie } from 'hono/cookie';
+import { AUTH_COOKIE_NAME, bearerToken } from './auth-helpers';
 
 // A role-profile KEY (tenant.contact_role_profiles.key) — free-form, not a
 // fixed set. `client` remains the seeded default; validation against the
@@ -226,8 +227,7 @@ export async function resolveAgentSession(
  *
  * Returns the resolved tenantId, or null on any failure.
  */
-export async function resolveOwnerPreview(c: Context<HonoConfig>): Promise<string | null> {
-    const token = bearerToken(c);
+export async function resolveOwnerPreview(c: Context<HonoConfig>, token: string | undefined = bearerToken(c)): Promise<string | null> {
     // Public client viewers carry no Bearer token — bail before touching the
     // keyring or KV so the common (tokenless-public) path stays side-effect-free.
     if (!token) return null;
@@ -248,4 +248,13 @@ export async function resolveOwnerPreviewFull(
     const keyring = await c.var.keyringPromise?.catch(() => undefined);
     const kv = c.env?.TENANT_CACHE;
     return resolveOwnerPreviewTokenFull(token, keyring, kv ? (k) => kv.get(k) : undefined);
+}
+
+/**
+ * Owner preview for a request a BROWSER makes by itself, such as an <img src>: it carries the session cookie and cannot carry an
+ * Authorization header. Same verification as `resolveOwnerPreview` (keyring, role class, password-change invalidation); only where
+ * the token is read from differs. For read-only GET routes that re-check the object against the resolved company.
+ */
+export function resolveOwnerPreviewFromCookie(c: Context<HonoConfig>): Promise<string | null> {
+    return resolveOwnerPreview(c, bearerToken(c) ?? getCookie(c, AUTH_COOKIE_NAME));
 }

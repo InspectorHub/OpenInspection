@@ -16211,7 +16211,7 @@
               "properties": {
                 "key": {
                   "type": "string",
-                  "description": "Storage key of the photo as the report shows it (the annotated or cropped copy when there is one)."
+                  "description": "Storage key of the photo as the report shows it (the annotated or cropped copy when there is one). The public report states it relative to the company (`inspections/<inspectionId>/...`); the staff payload carries the full key. The public photo route accepts both forms."
                 },
                 "url": {
                   "type": "string",
@@ -16219,7 +16219,7 @@
                 },
                 "originalKey": {
                   "type": "string",
-                  "description": "Storage key of the photo as it was first uploaded, before any crop or annotation."
+                  "description": "Storage key of the photo as it was first uploaded, before any crop or annotation. Stated like `key`: relative to the company in the public report, in full in the staff payload."
                 },
                 "media": {
                   "type": "object",
@@ -16375,7 +16375,7 @@
                   "properties": {
                     "key": {
                       "type": "string",
-                      "description": "Storage key of the photo as the report shows it (the annotated or cropped copy when there is one)."
+                      "description": "Storage key of the photo as the report shows it (the annotated or cropped copy when there is one). The public report states it relative to the company (`inspections/<inspectionId>/...`); the staff payload carries the full key. The public photo route accepts both forms."
                     },
                     "url": {
                       "type": "string",
@@ -16383,7 +16383,7 @@
                     },
                     "originalKey": {
                       "type": "string",
-                      "description": "Storage key of the photo as it was first uploaded, before any crop or annotation."
+                      "description": "Storage key of the photo as it was first uploaded, before any crop or annotation. Stated like `key`: relative to the company in the public report, in full in the staff payload."
                     },
                     "media": {
                       "type": "object",

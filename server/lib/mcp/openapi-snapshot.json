@@ -9449,10 +9449,10 @@
           "name": "key",
           "in": "query",
           "required": true,
-          "description": "R2 object key (`${tenantId}/${inspectionId}/...`).",
+          "description": "Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<userId>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working.",
           "schema": {
             "type": "string",
-            "description": "R2 object key (`${tenantId}/${inspectionId}/...`)."
+            "description": "Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<userId>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working."
           }
         },
         {
@@ -9493,6 +9493,16 @@
           "schema": {
             "type": "string",
             "description": "Optional max width in px for an on-the-fly WebP thumbnail; omitted serves the original."
+          }
+        },
+        {
+          "name": "v",
+          "in": "query",
+          "required": false,
+          "description": "Badge render variant for a credential badge key: email | reportSignature | reportCover. Omitted or unrecognised serves the original, never an error.",
+          "schema": {
+            "type": "string",
+            "description": "Badge render variant for a credential badge key: email | reportSignature | reportCover. Omitted or unrecognised serves the original, never an error."
           }
         }
       ],

@@ -36,6 +36,23 @@ describe('badge variants', () => {
     });
 });
 
+describe('badgeUrl on a report photo URL', () => {
+    const REPORT = '/api/public/report/acme/insp-1/photo?key=credentials%2Fu1%2Flogo-1.png&token=abc';
+
+    it('appends the variant to the photo URL of a credential badge', () => {
+        expect(badgeUrl(REPORT, 'reportCover')).toBe(`${REPORT}&v=reportCover`);
+        expect(badgeUrl(REPORT, 'reportSignature')).toBe(`${REPORT}&v=reportSignature`);
+    });
+
+    it('leaves the photo URL of an inspection photo, and any other URL, alone', () => {
+        const photo = '/api/public/report/acme/insp-1/photo?key=inspections%2Finsp-1%2Fphotos%2Fp1.jpg&token=abc';
+        expect(badgeUrl(photo, 'reportCover')).toBe(photo);
+        expect(badgeUrl('/api/public/report/acme/insp-1?token=abc', 'reportCover')).toBe('/api/public/report/acme/insp-1?token=abc');
+        expect(badgeUrl('https://elsewhere.test/api/public/report/a/b/photo?key=credentials%2Fx', 'reportCover')).toBe('https://elsewhere.test/api/public/report/a/b/photo?key=credentials%2Fx');
+        expect(badgeUrl(null, 'reportCover')).toBeNull();
+    });
+});
+
 describe('badgeUrl', () => {
     it('appends the variant to a brand-asset url', () => {
         expect(badgeUrl(BASE, 'email')).toBe(`${BASE}&v=email`);
