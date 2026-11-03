@@ -37,7 +37,7 @@ import inspectionRequestsRoutes from '../../../server/api/inspection-requests';
 
 const T = '00000000-0000-0000-0000-000000000001';
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
-const MONEY_KEY = /"(price|[A-Za-z]*Cents)"\s*:/;
+const MONEY_KEY = /"(price|discountAmount|priceOverride|priceSnapshot|[A-Za-z]*Cents)"\s*:/;
 
 let db: BetterSQLite3Database<typeof schema>;
 type Overrides = Record<string, boolean> | null;
@@ -90,7 +90,7 @@ beforeEach(async () => {
     } as never);
     await db.insert(schema.inspections).values({
         id: 'i1', tenantId: T, propertyAddress: '1 Oak St', date: '2099-01-01', status: 'confirmed',
-        paymentStatus: 'unpaid', price: 45000, depositRequiredCents: 9000, requestId: 'req1',
+        paymentStatus: 'unpaid', price: 45000, discountAmount: 2500, depositRequiredCents: 9000, requestId: 'req1',
         paymentRequired: false, agreementRequired: false, createdAt: now,
     });
     await db.insert(schema.contacts).values({
@@ -107,6 +107,7 @@ beforeEach(async () => {
 // Money on one inspection: gated by inspectionFees.
 const FEE_SURFACES: Array<[string, string]> = [
     ['GET /api/inspections/:id', '/api/inspections/i1'],
+    ['GET /api/inspections/:id/report-data', '/api/inspections/i1/report-data'],
     ['GET /api/inspections/dashboard', '/api/inspections/dashboard'],
     ['GET /api/inspection-requests/by-inspection/:id', '/api/inspection-requests/by-inspection/i1'],
 ];

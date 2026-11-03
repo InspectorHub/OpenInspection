@@ -32,9 +32,16 @@ export type MoneyBucket = 'inspectionFees' | 'companyFinance';
  * schemas mark these fields optional so the compiler forces the UI to handle it.
  */
 
+/**
+ * Money fields whose key does not end in `Cents`: the legacy `price`, and the columns named before the rule (`discountAmount`, and the service
+ * line's `priceOverride` and `priceSnapshot`). tests/unit/auth/money-columns.spec.ts fails for any other `_cents` column whose key is not
+ * matched, so a new one cannot slip by.
+ */
+const MONEY_KEYS_WITHOUT_SUFFIX: ReadonlySet<string> = new Set(['price', 'discountAmount', 'priceOverride', 'priceSnapshot']);
+
 /** A money field, by the naming convention the schema rules require. */
 export function isMoneyField(key: string): boolean {
-    return key === 'price' || /Cents$/.test(key);
+    return MONEY_KEYS_WITHOUT_SUFFIX.has(key) || /Cents$/.test(key);
 }
 
 /** True when `value` carries a money field anywhere. Lets a caller skip the capability lookup for a payload with nothing to redact. */

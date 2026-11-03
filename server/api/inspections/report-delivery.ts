@@ -38,6 +38,7 @@ import { resolveRoleEmailTemplate } from '../../lib/people/role-template';
 import { interpolate } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
 import { hubPayLink } from '../../lib/inspection/hub-pay-url';
+import { moneyView } from '../../lib/auth/money-access';
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -474,7 +475,8 @@ reportDeliveryRoutes.openapi(getReportDataRoute, async (c) => {
     const { id } = c.req.valid('param');
     const service = c.var.services.inspection;
     const data = await service.getReportData(id, tenantId);
-    return c.json({ success: true, data }, 200);
+    // The inspection row carries the fee fields; this route follows the same rule as GET /api/inspections/{id}.
+    return c.json({ success: true, data: { ...data, inspection: await moneyView(c, data.inspection, 'inspectionFees') } }, 200);
 });
 reportDeliveryRoutes.openapi(getRepairListRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;

@@ -24,6 +24,7 @@ const MONEY_WRITE_FIELDS: Readonly<Record<string, MoneyBucket>> = {
     priceOverride: 'inspectionFees',
     priceOverrideCents: 'inspectionFees',
     depositRequiredCents: 'inspectionFees',
+    discountAmount: 'inspectionFees',
     defaultPriceCents: 'companyFinance',
 };
 
