@@ -26,6 +26,7 @@ import publicInspectorProfileRoutes, { publicInspectorProfileRouteConfigs } from
 import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { readCourtesyTranslationForReport } from '../lib/translation/read-for-report';
+import { projectReportForLink } from '../lib/report-link-response';
 import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/validations/courtesy-translation.schema';
 
 /**
@@ -418,7 +419,8 @@ app.openapi(reportRoute, async (c) => {
         { db: c.env.DB, inspection: c.var.services.inspection, translations: c.var.services.reportTranslation },
         { tenantId, inspectionId: id, locale: COURTESY_TRANSLATION_LOCALE, data },
     );
-    return c.json({ success: true as const, data, courtesyTranslation }, 200);
+    // The translation reader above got the report as built; the response carries only the report link's fields.
+    return c.json({ success: true as const, data: projectReportForLink(data), courtesyTranslation }, 200);
 });
 app.openapi(reportPhotoRoute, async (c) => {
     const { id } = c.req.valid('param');

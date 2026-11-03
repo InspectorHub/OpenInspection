@@ -1,11 +1,10 @@
 /**
  * IA-33 (boundary A) — getReportData spreads the whole inspections row into
- * data.inspection, and GET /api/public/report/:tenant/:id returns that data
- * verbatim to any holder of the link (incl. agent-kind tokens). The row
- * carries `internal_notes` (inspector's private notes) and `price_cents`
- * (commercial pricing), which the account track explicitly withholds from
- * agents at the schema layer. The public report track must not expose them
- * just because the current SSR page happens not to render them.
+ * data.inspection. The row carries `internal_notes` (inspector's private notes)
+ * and `price_cents` (commercial pricing), which the account track withholds
+ * from agents at the schema layer, so the service removes both. The response
+ * for a report link is built from field lists (see report-link-response.spec.ts);
+ * this spec pins the service-level removal, which stays as a second layer.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
