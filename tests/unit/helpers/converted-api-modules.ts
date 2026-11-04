@@ -953,6 +953,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/public/report-video.ts',
+        tuple: 'reportVideoRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/public/report-video');
+            return { app: m.default, configs: m.reportVideoRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/public-share.ts',
         tuple: 'publicShareRouteConfigs',
         load: async () => {

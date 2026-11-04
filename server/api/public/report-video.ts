@@ -62,7 +62,7 @@ const app = createApiRouter();
 app.openapi(clipRoute, async (c) => {
     const { id, mediaId } = c.req.valid('param');
     const access = await authorizeReportMedia(c, id, c.req.valid('query'));
-    if (!access) return c.notFound();
+    if (!access) return c.body(null, 404);
     const row = await getDrizzle(c)
         .select({ r2Key: inspectionMediaPool.r2Key })
         .from(inspectionMediaPool)
@@ -75,13 +75,13 @@ app.openapi(clipRoute, async (c) => {
         ))
         .get();
     const clipKey = row && ownClipKey(row.r2Key, access.tenantId, id);
-    if (!clipKey || !c.env.PHOTOS) return c.notFound();
-    return (await serveVideoClip(c.env.PHOTOS, clipKey, c.req.header('Range'), PRIVATE_CACHE)) ?? c.notFound();
+    if (!clipKey || !c.env.PHOTOS) return c.body(null, 404);
+    return (await serveVideoClip(c.env.PHOTOS, clipKey, c.req.header('Range'), PRIVATE_CACHE)) ?? c.body(null, 404);
 });
 app.openapi(posterRoute, async (c) => {
     const { id, mediaId } = c.req.valid('param');
     const access = await authorizeReportMedia(c, id, c.req.valid('query'));
-    if (!access) return c.notFound();
+    if (!access) return c.body(null, 404);
     const row = await getDrizzle(c)
         .select({ r2Key: inspectionMediaPool.r2Key, posterKey: inspectionMediaPool.posterKey })
         .from(inspectionMediaPool)
@@ -94,8 +94,8 @@ app.openapi(posterRoute, async (c) => {
         .get();
     // The poster key is derived from the clip key, so the clip key must name this company and inspection too.
     const posterKey = row && ownClipKey(row.r2Key, access.tenantId, id) && ownPosterKey(row, access.tenantId);
-    if (!posterKey || !c.env.PHOTOS) return c.notFound();
-    return (await serveVideoPoster(c.env.PHOTOS, posterKey, PRIVATE_CACHE)) ?? c.notFound();
+    if (!posterKey || !c.env.PHOTOS) return c.body(null, 404);
+    return (await serveVideoPoster(c.env.PHOTOS, posterKey, PRIVATE_CACHE)) ?? c.body(null, 404);
 });
 
 /** Registration order. Drives the typed client; a test pins it to what `app` really registered. */

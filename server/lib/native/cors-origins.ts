@@ -50,7 +50,7 @@ function normalizeOrigin(value: string): string | null {
 }
 
 /** The explicit allow-list from `CORS_ALLOWED_ORIGINS` (comma-separated origins). Invalid entries are ignored. */
-export function parseAllowedOrigins(raw: string | undefined): string[] {
+function parseAllowedOrigins(raw: string | undefined): string[] {
     if (!raw) return [];
     const out: string[] = [];
     for (const part of raw.split(',')) {
@@ -68,7 +68,7 @@ const LOCAL_DEV_ORIGINS: readonly string[] = ['http://localhost:5173', 'http://1
  * Origins that may call the API WITH credentials (cookies): this deployment's own origin, its configured public
  * base URL, the operator's `CORS_ALLOWED_ORIGINS` list, and (loopback hosts only) the Vite dev server.
  */
-export function credentialedOrigins(requestUrl: string, env: { APP_BASE_URL?: string; CORS_ALLOWED_ORIGINS?: string }): string[] {
+function credentialedOrigins(requestUrl: string, env: { APP_BASE_URL?: string; CORS_ALLOWED_ORIGINS?: string }): string[] {
     const own = new URL(requestUrl);
     const list = [own.origin];
     const base = env.APP_BASE_URL ? normalizeOrigin(env.APP_BASE_URL) : null;
@@ -76,6 +76,15 @@ export function credentialedOrigins(requestUrl: string, env: { APP_BASE_URL?: st
     list.push(...parseAllowedOrigins(env.CORS_ALLOWED_ORIGINS));
     if (LOCAL_HOSTS.has(own.hostname)) list.push(...LOCAL_DEV_ORIGINS);
     return list;
+}
+
+/**
+ * Set a response header through `c.res`. `c.header()` before the route runs is dropped when the route returns a
+ * fresh Response (a Durable Object or R2 answer), because Hono only merges headers already written to `c.res`.
+ */
+function putHeader(c: Context, name: string, value: string, append = false): void {
+    if (append) c.res.headers.append(name, value);
+    else c.res.headers.set(name, value);
 }
 
 type CorsEnv = { APP_BASE_URL?: string; CORS_ALLOWED_ORIGINS?: string };
@@ -108,29 +117,31 @@ export const apiCors: MiddlewareHandler = async (c, next) => {
     const origin = c.req.header('Origin') ?? '';
     const isPreflight = c.req.method === 'OPTIONS';
 
+    // Every answer here depends on the Origin header, widget routes included.
+    putHeader(c, 'Vary', 'Origin', true);
+
     if (isWidgetPath(c.req.path)) {
         if (!origin) return next();
         if (isPreflight) return preflight(c, '*', { credentials: false, methods: WIDGET_ALLOW_METHODS, headers: WIDGET_ALLOW_HEADERS });
-        c.header('Access-Control-Allow-Origin', '*');
+        putHeader(c, 'Access-Control-Allow-Origin', '*');
         return next();
     }
 
-    c.header('Vary', 'Origin', { append: true });
     if (!origin) return next();
 
     if (NATIVE_APP_ORIGINS.includes(origin)) {
         if (isPreflight) return preflight(c, origin, { credentials: false, methods: API_ALLOW_METHODS, headers: NATIVE_ALLOW_HEADERS });
-        c.header('Access-Control-Allow-Origin', origin);
-        c.header('Access-Control-Expose-Headers', NATIVE_EXPOSE_HEADERS.join(','));
+        putHeader(c, 'Access-Control-Allow-Origin', origin);
+        putHeader(c, 'Access-Control-Expose-Headers', NATIVE_EXPOSE_HEADERS.join(','));
         return next();
     }
 
     const allowed = credentialedOrigins(c.req.url, c.env as CorsEnv).includes(origin);
     if (isPreflight) return preflight(c, allowed ? origin : null, { credentials: true, methods: API_ALLOW_METHODS, headers: API_ALLOW_HEADERS });
     if (allowed) {
-        c.header('Access-Control-Allow-Origin', origin);
-        c.header('Access-Control-Allow-Credentials', 'true');
-        c.header('Access-Control-Expose-Headers', 'Set-Cookie');
+        putHeader(c, 'Access-Control-Allow-Origin', origin);
+        putHeader(c, 'Access-Control-Allow-Credentials', 'true');
+        putHeader(c, 'Access-Control-Expose-Headers', 'Set-Cookie');
     }
     return next();
 };
