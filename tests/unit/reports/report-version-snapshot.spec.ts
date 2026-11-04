@@ -143,25 +143,37 @@ describe('snapshotOnPublish — credentials and appearance', () => {
     });
 
     describe('the version insert after the status flip', () => {
-        const failVersionInsert = (times: number) => {
-            const real = db.insert.bind(db);
+        // The service builds its own drizzle over the binding, so the failure has to be injected at the binding.
+        const serviceFailingVersionInserts = (times: number) => {
+            const real = testD1.binding;
             let failures = 0;
-            vi.spyOn(db, 'insert').mockImplementation(((table: unknown) => {
-                if (table === schema.reportVersions && failures < times) { failures++; throw new Error('D1 hiccup'); }
-                return real(table as never);
-            }) as never);
+            const failing = new Proxy(real, {
+                get(target, prop) {
+                    if (prop === 'prepare') {
+                        return (sql: string) => {
+                            if (/insert into "report_versions"/i.test(sql) && failures < times) { failures++; throw new Error('D1 hiccup'); }
+                            return target.prepare(sql);
+                        };
+                    }
+                    const value = Reflect.get(target, prop) as unknown;
+                    return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+                },
+            });
+            return { svc: new ReportVersionService(failing as typeof real, 'test-encryption-secret-key', []), failures: () => failures };
         };
 
         it('is retried once, so one transient failure still leaves the report with its frozen version', async () => {
-            failVersionInsert(1);
-            const out = await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+            const failing = serviceFailingVersionInserts(1);
+            const out = await failing.svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+            expect(failing.failures()).toBe(1);
             expect(out.versionNumber).toBe(1);
             expect(await db.select().from(schema.reportVersions).all()).toHaveLength(1);
         });
 
         it('is thrown after the second failure, for the route to log, and writes no half version', async () => {
-            failVersionInsert(2);
-            await expect(svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a')).rejects.toThrow('D1 hiccup');
+            const failing = serviceFailingVersionInserts(2);
+            await expect(failing.svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a')).rejects.toThrow('D1 hiccup');
+            expect(failing.failures()).toBe(2);
             expect(await db.select().from(schema.reportVersions).all()).toHaveLength(0);
         });
     });

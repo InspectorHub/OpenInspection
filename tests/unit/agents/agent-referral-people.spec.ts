@@ -167,10 +167,10 @@ describe('listRecommendationsForAgent — buyer_agent via inspection_people (Tas
             id: 'rv-9', tenantId: T1, inspectionId: 'i-9', versionNumber: 1, publishedAt: new Date(), publishedBy: 'u1',
             snapshotJson: JSON.stringify({ data: resultsData, units: [], inspection: { templateSnapshot } }),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, 'i-9', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
 
-        const groups = await listRecommendationsForAgent({} as D1Database, AGENT_USER);
+        const groups = await listRecommendationsForAgent(testD1.binding, AGENT_USER);
         expect(groups.safety.map((r) => r.defectTitle)).toEqual(['Missing shingles']);
     });
 
