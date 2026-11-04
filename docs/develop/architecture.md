@@ -215,7 +215,7 @@ yourself. Three sanctioned readers, by what you are holding:
 
 ### Trust model
 
-Per-tenant Ed25519 keypair generated on first use (`SigningKeyService.ensureKeypair`). The private key is AES-GCM encrypted with `KEY_ENCRYPTION_SECRET` and stored in D1; the public key is exposed unauthenticated at `/.well-known/openinspection/tenant-keys/:slug` (1-hour cache) so any third party can verify signatures independently.
+Per-tenant Ed25519 keypair generated on first use (`SigningKeyService.ensureKeypair`). The private key is AES-GCM encrypted with `KEY_ENCRYPTION_SECRET` (or `JWT_SECRET` when that is not set) and stored in D1. A key wrapped under an earlier secret (`JWT_SECRET_PREVIOUS`, one earlier secret only) is opened with it and re-wrapped under the current one, on first use or by the hosted re-encrypt endpoint, which also reports how many active keys remain under an earlier secret; the public key is exposed unauthenticated at `/.well-known/openinspection/tenant-keys/:slug` (1-hour cache) so any third party can verify signatures independently.
 
 ### Audit chain
 
@@ -242,7 +242,7 @@ The cache directives are part of that claim rather than a separate concern. A st
 ### Verification flow
 
 - **Public verifier** (`/v/:verificationToken`): SSR page resolves the token to an envelope, runs a server-side audit-chain integrity check and Ed25519 signature check, and displays the result with download links. QR code on signed.pdf and certificate.pdf points here.
-- **Offline self-verify** (`/verify`): accepts an `evidence.zip` upload and re-runs SHA-256 chain re-derivation + Ed25519 signature verification entirely in the browser via Web Crypto API — no server involvement, court-friendly independence from the operator.
+- **Offline self-verify** (`/verify`): accepts an `evidence.zip` upload and checks it entirely in the browser via the Web Crypto API (nothing is sent to the server). It applies the server's own rules (`server/lib/esign/chain-verify.ts`): SHA-256 chain re-derivation, Ed25519 signatures checked against the key each event names, and a recomputed fingerprint for every key the pack carries, shown so it can be compared with the online page. A pack that lacks a key an event was signed with is reported as not fully verified, not as invalid.
 
 ### Optional features
 

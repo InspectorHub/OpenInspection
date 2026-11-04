@@ -1,85 +1,31 @@
 import { useState } from "react";
-import { unzipSync, strFromU8 } from "fflate";
+import { verifyEvidenceZip } from "~/lib/evidence-zip-verify";
+import type { ChainProblem } from "../../../server/lib/esign/chain-verify";
 import { m } from "~/paraglide/messages";
 
-interface AuditEvent {
-  id: string;
-  event: string;
-  createdAt: number;
-  payloadJson: string;
-  prevHash: string;
-  hash: string;
-  signature: string;
-  keyFingerprint: string;
-}
-
 interface VerificationResult {
-  valid: boolean;
+  outcome: "valid" | "invalid" | "partial";
   errors: string[];
   eventCount: number;
+  fingerprints: string[];
 }
 
-function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const body = pem
-    .replace(/-----BEGIN [^-]+-----/, "")
-    .replace(/-----END [^-]+-----/, "")
-    .replace(/\s/g, "");
-  const bin = atob(body);
-  const buf = new ArrayBuffer(bin.length);
-  const u8 = new Uint8Array(buf);
-  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
-  return buf;
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
-  return bytes;
-}
-
-async function verifyChain(events: AuditEvent[], publicKeyPem: string): Promise<string[]> {
-  const errors: string[] = [];
-
-  // 1. Recompute SHA-256 chain
-  let expectedPrev = "";
-  for (const ev of events) {
-    const canonical = JSON.stringify({
-      event: ev.event,
-      payloadJson: ev.payloadJson,
-      prevHash: ev.prevHash,
-      createdAt: ev.createdAt,
-    });
-    const buf = new TextEncoder().encode(canonical);
-    const digest = await crypto.subtle.digest("SHA-256", buf);
-    const hashHex = Array.from(new Uint8Array(digest))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-    if (ev.prevHash !== expectedPrev) errors.push(`Event ${ev.id}: prevHash mismatch`);
-    if (ev.hash !== hashHex) errors.push(`Event ${ev.id}: SHA-256 hash mismatch`);
-    expectedPrev = ev.hash;
+/** One plain line per problem. A missing key is described as exactly that, never as a bad signature. */
+function describe(problem: ChainProblem): string {
+  const event = problem.eventId ?? "";
+  switch (problem.reason) {
+    case "hash": return m.report_verify_offline_problem_hash({ event });
+    case "signature": return m.report_verify_offline_problem_signature({ event });
+    case "no_key": return m.report_verify_offline_problem_no_key({ event, key: problem.detail ?? "" });
+    case "bad_key": return m.report_verify_offline_problem_bad_key({ detail: problem.detail ?? "" });
+    case "key_mismatch": return m.report_verify_offline_problem_key_mismatch({ key: problem.detail ?? "" });
+    case "fork": return m.report_verify_offline_problem_fork({ event });
+    case "chain": return m.report_verify_offline_problem_chain({ event });
+    case "empty": return m.report_verify_offline_problem_empty();
   }
-
-  // 2. Verify Ed25519 signatures
-  try {
-    const keyDer = pemToArrayBuffer(publicKeyPem);
-    const key = await crypto.subtle.importKey("spki", keyDer, { name: "Ed25519" }, false, ["verify"]);
-    for (const ev of events) {
-      const sig = hexToBytes(ev.signature);
-      const data = new TextEncoder().encode(ev.hash);
-      const ok = await crypto.subtle.verify(
-        { name: "Ed25519" },
-        key,
-        sig as unknown as ArrayBuffer,
-        data as unknown as ArrayBuffer,
-      );
-      if (!ok) errors.push(`Event ${ev.id}: Ed25519 signature invalid`);
-    }
-  } catch (e) {
-    errors.push(`Ed25519 import or verify failed: ${(e as Error).message}`);
-  }
-
-  return errors;
 }
+
+const unreadable = (message: string): VerificationResult => ({ outcome: "invalid", errors: [message], eventCount: 0, fingerprints: [] });
 
 export function meta() {
   return [{ title: m.report_verify_offline_meta_title() }];
@@ -93,24 +39,18 @@ export default function VerifyOffline() {
     setBusy(true);
     setResult(null);
     try {
-      if (!file.name.endsWith(".zip")) {
-        setResult({ valid: false, errors: [m.report_verify_offline_error_not_zip()], eventCount: 0 });
+      if (!file.name.toLowerCase().endsWith(".zip")) {
+        setResult(unreadable(m.report_verify_offline_error_not_zip()));
         return;
       }
-      const buf = await file.arrayBuffer();
-      const unzipped = unzipSync(new Uint8Array(buf));
-      const trailFile = unzipped["audit-trail.json"];
-      const pemFile = unzipped["public-key.pem"];
-      if (!trailFile || !pemFile) {
-        setResult({ valid: false, errors: [m.report_verify_offline_error_missing_files()], eventCount: 0 });
-        return;
-      }
-      const trail = JSON.parse(strFromU8(trailFile));
-      const pem = strFromU8(pemFile);
-      const errors = await verifyChain(trail.events, pem);
-      setResult({ valid: errors.length === 0, errors, eventCount: trail.events.length });
-    } catch (e) {
-      setResult({ valid: false, errors: [(e as Error).message], eventCount: 0 });
+      const verdict = await verifyEvidenceZip(new Uint8Array(await file.arrayBuffer()));
+      if (verdict.unreadable === "not_zip") setResult(unreadable(m.report_verify_offline_error_not_zip()));
+      else if (verdict.unreadable === "missing_files") setResult(unreadable(m.report_verify_offline_error_missing_files()));
+      else if (verdict.unreadable === "bad_trail") setResult(unreadable(m.report_verify_offline_error_bad_trail()));
+      else if (verdict.unreadable === "too_large") setResult(unreadable(m.report_verify_offline_error_too_large()));
+      else setResult({ outcome: verdict.outcome, errors: verdict.problems.map(describe), eventCount: verdict.eventCount, fingerprints: verdict.fingerprints });
+    } catch {
+      setResult(unreadable(m.report_verify_offline_error_unexpected()));
     } finally {
       setBusy(false);
     }
@@ -146,23 +86,40 @@ export default function VerifyOffline() {
         <div
           className={
             "mt-6 p-4 rounded " +
-            (result.valid ? "bg-ih-ok-bg border border-ih-ok" : "bg-ih-bad-bg border border-ih-bad")
+            (result.outcome === "valid" ? "bg-ih-ok-bg border border-ih-ok"
+              : result.outcome === "partial" ? "bg-ih-watch-bg border border-ih-watch"
+                : "bg-ih-bad-bg border border-ih-bad")
           }
         >
           <p className="font-semibold">
-            {result.valid
+            {result.outcome === "valid"
               ? m.report_verify_offline_result_valid({ count: result.eventCount })
-              : m.report_verify_offline_result_invalid({ count: result.errors.length })}
+              : result.outcome === "partial"
+                ? m.report_verify_offline_result_partial({ count: result.errors.length })
+                : m.report_verify_offline_result_invalid({ count: result.errors.length })}
           </p>
+          {result.outcome === "valid" && result.fingerprints.length > 0 && (
+            <p className="font-semibold mt-1 break-all">
+              {m.report_verify_offline_result_valid_compare({ fingerprints: result.fingerprints.join(", ") })}
+            </p>
+          )}
           {result.errors.map((err, i) => (
             <p key={i} className="text-sm mt-1">
               {err}
             </p>
           ))}
+          {result.outcome !== "valid" && result.fingerprints.length > 0 && (
+            <p className="text-xs mt-3 break-all">
+              {m.report_verify_offline_fingerprints({ fingerprints: result.fingerprints.join(", ") })}
+            </p>
+          )}
         </div>
       )}
       <p className="mt-12 text-xs text-ih-fg-3">
         {m.report_verify_offline_footer()}
+      </p>
+      <p className="mt-2 text-xs text-ih-fg-3">
+        {m.report_verify_offline_footer_truncation()}
       </p>
     </main>
   );

@@ -71,7 +71,7 @@ export class InspectionService {
     private readonly publish: InspectionPublishService;
     private readonly core: InspectionCoreService;
 
-    constructor(db: D1Database, r2?: R2Bucket, sdb?: ScopedDB, kv?: KVNamespace, images?: ImagesBinding, planQuota?: PlanQuotaGuard, encryptionSecret?: string) {
+    constructor(db: D1Database, r2?: R2Bucket, sdb?: ScopedDB, kv?: KVNamespace, images?: ImagesBinding, planQuota?: PlanQuotaGuard, encryptionSecret?: string, previousSecrets: readonly string[] = []) {
         this.sharing = new InspectionSharingService(db, r2, sdb, kv, images);
         this.analytics = new InspectionAnalyticsService(db, r2, sdb, kv, images, this);
         this.status = new InspectionStatusService(db, r2, sdb, kv, images);
@@ -81,7 +81,7 @@ export class InspectionService {
         // Commercial PCA Phase M — encryptionSecret only feeds the ComplianceService
         // this sub-service constructs internally for full_pca reports (§ signoff
         // key material); every other sub-service is unaffected by this param.
-        this.report = new InspectionReportService(db, r2, sdb, kv, images, encryptionSecret);
+        this.report = new InspectionReportService(db, r2, sdb, kv, images, encryptionSecret, previousSecrets);
         this.publish = new InspectionPublishService(db, r2, sdb, kv, images, this);
         // Only the create/clone/reinspection paths (owned by InspectionCoreService)
         // consume the free-tier quota — no other sub-service needs the guard.

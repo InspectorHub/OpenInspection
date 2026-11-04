@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { signViaClaim } from '../helpers/sign-via-claim';
 import { eq, asc } from 'drizzle-orm';
 import { AgreementService } from '../../../server/services/agreement.service';
 import { createTestDb, setupSchema } from '../db';
@@ -152,11 +153,11 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const link1 = await svc.getSignerLink(TENANT_A, r.requestId, signers[0].id);
         const link2 = await svc.getSignerLink(TENANT_A, r.requestId, signers[1].id);
 
-        const first = await svc.markSignedBySigner(link1, 'sig-jane', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
+        const first = await signViaClaim(svc, link1, 'sig-jane', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
         expect(first.envelopeCompletedNow).toBe(false);
         expect(first.envelopeStatus).toBe('viewed');
 
-        const second = await svc.markSignedBySigner(link2, 'sig-john', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
+        const second = await signViaClaim(svc, link2, 'sig-john', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
         expect(second.envelopeCompletedNow).toBe(true);
         expect(second.envelopeStatus).toBe('signed');
 
@@ -184,7 +185,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const signers = await testDb.select().from(schema.agreementSigners)
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
         const link1 = await svc.getSignerLink(TENANT_A, r.requestId, signers[0].id);
-        const res = await svc.markSignedBySigner(link1, 'sig-jane', { signedAtMs: 1000, channel: 'in_person', languageDisclosureVersion: null });
+        const res = await signViaClaim(svc, link1, 'sig-jane', { signedAtMs: 1000, channel: 'in_person', languageDisclosureVersion: null });
         expect(res.envelopeCompletedNow).toBe(true);
         expect(res.envelopeStatus).toBe('signed');
     });
@@ -229,9 +230,9 @@ describe('AgreementService — signer-level envelope state machine', () => {
         });
         const s = await testDb.select().from(schema.agreementSigners).all();
         const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
-        const first = await svc.markSignedBySigner(link, 'sig', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
+        const first = await signViaClaim(svc, link, 'sig', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
         expect(first.envelopeCompletedNow).toBe(true);
-        const second = await svc.markSignedBySigner(link, 'sig-again', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
+        const second = await signViaClaim(svc, link, 'sig-again', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
         expect(second.envelopeCompletedNow).toBe(false);
     });
 
@@ -309,11 +310,11 @@ describe('AgreementService — signer-level envelope state machine', () => {
         expect(after.find((s) => s.id === signers[1].id)!.status).toBe('expired');
     });
 
-    it('on-behalf + channel + ip/ua persist on signer through markSignedBySigner', async () => {
+    it('on-behalf + channel + ip/ua persist on signer through the claim', async () => {
         const r = await svc.findOrCreate(TENANT_A, INSP_ID, { signers: [{ name: 'Agent', email: 'agent@test.com', role: 'agent' }], completionPolicy: 'one' });
         const s = await testDb.select().from(schema.agreementSigners).all();
         const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
-        await svc.markSignedBySigner(link, 'sig', {
+        await signViaClaim(svc, link, 'sig', {
             signedAtMs: 5000, channel: 'in_person',
             ipAddress: '1.2.3.4', userAgent: 'UA/1.0',
             onBehalfOf: 'Jane Buyer', onBehalfDisclaimer: 'authorized agent',
@@ -334,7 +335,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const r = await svc.findOrCreate(TENANT_A, INSP_ID, { signers: [{ name: 'Jane', email: 'jane@test.com' }], completionPolicy: 'one' });
         const s = await testDb.select().from(schema.agreementSigners).all();
         const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
-        await svc.markSignedBySigner(link, 'sig', {
+        await signViaClaim(svc, link, 'sig', {
             signedAtMs: 5000, channel: 'remote', languageDisclosureVersion: 7,
         });
         const row = await testDb.select().from(schema.agreementSigners).where(eq(schema.agreementSigners.id, s[0].id)).get();
@@ -347,7 +348,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const r = await svc.findOrCreate(TENANT_A, INSP_ID, { signers: [{ name: 'Jane', email: 'jane@test.com' }], completionPolicy: 'one' });
         const s = await testDb.select().from(schema.agreementSigners).all();
         const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
-        await svc.markSignedBySigner(link, 'sig', {
+        await signViaClaim(svc, link, 'sig', {
             signedAtMs: 5000, channel: 'in_person', languageDisclosureVersion: null,
         });
         const row = await testDb.select().from(schema.agreementSigners).where(eq(schema.agreementSigners.id, s[0].id)).get();
@@ -368,13 +369,13 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const linkB = await svc.getSignerLink(TENANT_A, r.requestId, signers[1].id);
 
         // A signs first: envelope 1/2, not complete.
-        const a = await svc.markSignedBySigner(linkA, 'sig-jane', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
+        const a = await signViaClaim(svc, linkA, 'sig-jane', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null });
         expect(a.envelopeCompletedNow).toBe(false);
 
         // B signs (2/2) — this completes the envelope. Second call is the
         // idempotent re-sign of an already-signed signer.
-        const b1 = await svc.markSignedBySigner(linkB, 'sig-john', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
-        const b2 = await svc.markSignedBySigner(linkB, 'sig-john-again', { signedAtMs: 3000, channel: 'remote', languageDisclosureVersion: null });
+        const b1 = await signViaClaim(svc, linkB, 'sig-john', { signedAtMs: 2000, channel: 'remote', languageDisclosureVersion: null });
+        const b2 = await signViaClaim(svc, linkB, 'sig-john-again', { signedAtMs: 3000, channel: 'remote', languageDisclosureVersion: null });
 
         const fires = [a, b1, b2].filter((x) => x.envelopeCompletedNow).length;
         expect(fires).toBe(1);
@@ -392,7 +393,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         expect(raceSigners.every((x) => x.signatureBase64 !== null)).toBe(true);
     });
 
-    it('concurrent: Promise.all two markSignedBySigner for the same last signer -> at most one envelopeCompletedNow=true', async () => {
+    it('concurrent: Promise.all two signings for the same last signer -> at most one envelopeCompletedNow=true', async () => {
         const r = await svc.findOrCreate(TENANT_A, INSP_ID, {
             signers: [{ name: 'Jane', email: 'jane@test.com' }],
             completionPolicy: 'one',
@@ -403,11 +404,12 @@ describe('AgreementService — signer-level envelope state machine', () => {
         // better-sqlite3 is synchronous under the hood so this resolves
         // deterministically, but the service awaits between read + write, so the
         // atomic claim (conditional UPDATE row-count) is what guarantees single-fire.
-        const [c1, c2] = await Promise.all([
-            svc.markSignedBySigner(link, 'sig-1', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null }),
-            svc.markSignedBySigner(link, 'sig-2', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null }),
+        // The loser meets a signing in flight (409) or an already confirmed one: either way it completes nothing.
+        const settled = await Promise.allSettled([
+            signViaClaim(svc, link, 'sig-1', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null }),
+            signViaClaim(svc, link, 'sig-2', { signedAtMs: 1000, channel: 'remote', languageDisclosureVersion: null }),
         ]);
-        const fires = [c1, c2].filter((x) => x.envelopeCompletedNow).length;
+        const fires = settled.filter((x) => x.status === 'fulfilled' && x.value.envelopeCompletedNow).length;
         expect(fires).toBeLessThanOrEqual(1);
         expect(fires).toBe(1);
 
@@ -454,7 +456,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             signers: [{ name: 'Jane', email: 'jane@test.com' }],
             completionPolicy: 'one',
         });
-        await svc.markSignedBySigner(r.token, 'sig-jane', { signedAtMs: 4242, channel: 'remote', languageDisclosureVersion: null });
+        await signViaClaim(svc, r.token, 'sig-jane', { signedAtMs: 4242, channel: 'remote', languageDisclosureVersion: null });
 
         const signer = (await testDb.select().from(schema.agreementSigners)
             .where(eq(schema.agreementSigners.requestId, r.requestId)).all())[0];
@@ -545,7 +547,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             // Sign as Jane → envelope may stay 'viewed' (policy 'all', Bob outstanding),
             // but Jane's signer row becomes 'signed'. Her token must still resolve.
             await svc.markViewedBySigner(janeToken);
-            await svc.markSignedBySigner(janeToken, 'data:image/png;base64,XX', { signedAtMs: Date.now(), channel: 'remote', languageDisclosureVersion: null });
+            await signViaClaim(svc, janeToken, 'data:image/png;base64,XX', { signedAtMs: Date.now(), channel: 'remote', languageDisclosureVersion: null });
             const link = await svc.getSignerLinkByEmail(TENANT_A, INSP_ID, 'jane@test.com');
             expect(link).toBeTruthy();
         });

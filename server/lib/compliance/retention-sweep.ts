@@ -14,8 +14,8 @@
  * For each tenant, a signed `agreement_requests` row is "past window" when
  *   signedAt + tenant_configs.agreement_retention_years < now.
  * The per-tenant year is applied via a single cross-tenant join to
- * `tenant_configs` (NO N+1: one grouped SELECT, then one UPDATE per due envelope's
- * scope). Already-purged rows (`purged_at IS NOT NULL`) are skipped → idempotent.
+ * `tenant_configs` (NO N+1: one grouped SELECT, oldest signature first, then bounded chunked
+ * UPDATEs of SWEEP_CHUNK envelopes each). Already-purged rows (`purged_at IS NOT NULL`) are skipped → idempotent.
  *
  * Action per due envelope:
  *  - ERASE IN PLACE the satellite PII on the envelope + its `agreement_signers`
@@ -32,10 +32,13 @@
  *    plus the surviving esign_audit_logs chain remain the tamper-evident attestation.
  *
  * Hard rules: NEVER delete or touch `esign_audit_logs` (chain integrity — it is the
- * minimal PII-light attestation that survives final destruction). The summary line
+ * signed record that survives final destruction). It is not free of personal data:
+ * its rows keep what was recorded when each event happened, such as the signer's email
+ * address, the address and browser of the signing device, and the country. That
+ * is why it is retained on purpose and described as retained, not as harmless. The summary line
  * carries counts ONLY — no PII, no token material.
  */
-import { and, eq, isNull, isNotNull, inArray } from 'drizzle-orm';
+import { and, asc, eq, isNull, isNotNull, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import {
     agreementRequests,
@@ -49,6 +52,8 @@ import {
 import { r2Keys } from '../r2-keys';
 import { loadActiveHolds } from './legal-hold';
 import { changeCount, toMs, subtractYearsMs } from './db-row-utils';
+import { logger } from '../logger';
+import { errorSummary } from '../error-summary';
 
 // Accept either the D1 drizzle type (prod) or the better-sqlite3 test db.
 type AnyDb = DrizzleD1Database<Record<string, unknown>> | { [k: string]: unknown };
@@ -66,6 +71,11 @@ const DEFAULT_RETENTION_YEARS = 6;
  */
 const SIGNATURE_ARTEFACTS = ['signed.pdf', 'certificate.pdf', 'evidence.zip'] as const;
 
+/** Envelopes handled per statement: 40 ids plus the other bound values stay well inside D1's 100-per-statement limit, and 3 keys each stay far under a bucket delete's 1000. */
+const SWEEP_CHUNK = 40;
+/** Envelopes handled per run. The rest are due on the next run. */
+const SWEEP_MAX_ENVELOPES_PER_RUN = 400;
+
 export interface RetentionSweepSummary {
     /** Number of envelopes whose signatures were destroyed this run. */
     purgedEnvelopes: number;
@@ -81,6 +91,8 @@ export interface RetentionSweepSummary {
      * destruction record needs, not "this many existed".
      */
     purgedArtefacts: number;
+    /** Chunks skipped because the bucket delete failed. Their envelopes are NOT marked purged, so the next run tries them again. */
+    failedChunks: number;
 }
 
 /**
@@ -129,11 +141,12 @@ export async function runRetentionSweep(
             isNotNull(agreementRequests.signedAt),
             isNull(agreementRequests.purgedAt),
         ))
+        // Oldest signature first, so the per-run cap spends itself on what has been due longest (id breaks ties, so the order is stable).
+        .orderBy(asc(agreementRequests.signedAt), asc(agreementRequests.id))
         .all();
 
     // A row is past-window when signedAt < now - years (i.e. signedAt + years < now).
-    const dueIds: string[] = [];
-    const dueArtefactKeys: string[] = [];
+    const dueEnvelopes: Array<{ id: string; keys: string[] }> = [];
     for (const r of due as Array<{
         id: string; tenantId: string; inspectionId: string | null; signedAt: unknown; years: number | null;
     }>) {
@@ -143,18 +156,16 @@ export async function runRetentionSweep(
         const years = r.years ?? DEFAULT_RETENTION_YEARS;
         const cutoff = subtractYearsMs(now, years);
         if (signedAtMs >= cutoff) continue;
-        dueIds.push(r.id);
         // The three artefacts that hold a picture of the same signature the
         // column below is about to lose. Keyed per envelope, so a prefix built
         // from the wrong row would destroy a live agreement's evidence.
-        if (r.inspectionId) {
-            for (const name of SIGNATURE_ARTEFACTS) {
-                dueArtefactKeys.push(r2Keys.agreementFile(r.tenantId, r.inspectionId, r.id, name));
-            }
-        }
+        const keys = r.inspectionId
+            ? SIGNATURE_ARTEFACTS.map((name) => r2Keys.agreementFile(r.tenantId, r.inspectionId as string, r.id, name))
+            : [];
+        dueEnvelopes.push({ id: r.id, keys });
     }
 
-    if (dueIds.length === 0) return { purgedEnvelopes: 0, purgedSigners: 0, purgedArtefacts: 0 };
+    if (dueEnvelopes.length === 0) return { purgedEnvelopes: 0, purgedSigners: 0, purgedArtefacts: 0, failedChunks: 0 };
 
     // Nulling the column while `signed.pdf` still embeds the
     // same image is DATABASE retention wearing the name of retention. The column
@@ -170,39 +181,63 @@ export async function runRetentionSweep(
             + 'while signed.pdf still embeds the same image. Pass { photos } to runRetentionSweep.',
         );
     }
-    // Objects first, for the same reason as the report-PDF sweep: a failure
-    // after this point leaves rows whose objects are gone, which the next pass
-    // retries harmlessly. The reverse leaves objects nothing points at.
-    if (dueArtefactKeys.length > 0) await bucket.delete(dueArtefactKeys);
-    const purgedArtefacts = dueArtefactKeys.length;
+    // In bounded chunks, and a bounded number of them per run. One statement or one bucket call over EVERY due envelope fails outright
+    // once the backlog is large: D1 allows 100 bound values per statement, and a bucket delete takes at most 1000 keys. A sweep that
+    // throws on the first oversized batch would then never purge anything again. What is left past the per-run cap is simply due on the
+    // next run (the `purged_at IS NULL` filter picks it up), oldest first (the query orders them). A chunk whose bucket delete fails is logged
+    // (envelope ids only), left unmarked and skipped, so one persistently failing object cannot hold up the rest of the backlog every day.
+    const batch = dueEnvelopes.slice(0, SWEEP_MAX_ENVELOPES_PER_RUN);
+    let purgedArtefacts = 0;
+    let purgedSigners = 0;
+    let purgedEnvelopes = 0;
+    let failedChunks = 0;
+    for (let at = 0; at < batch.length; at += SWEEP_CHUNK) {
+        const chunk = batch.slice(at, at + SWEEP_CHUNK);
+        const ids = chunk.map((e) => e.id);
+        const keys = chunk.flatMap((e) => e.keys);
 
-    // Anonymize satellite PII + destroy signer signatures for the due envelopes
-    // (keep the audit chain). The PII SET is the SHARED `ANONYMIZE_SIGNER_PII`
-    // (same mapping the erase orchestrator uses → no drift); signature_base64 is
-    // layered on here because the sweep destroys the seal the orchestrator keeps.
-    const signerRes = await db.update(agreementSigners)
-        .set({ ...ANONYMIZE_SIGNER_PII, signatureBase64: null })
-        .where(inArray(agreementSigners.requestId, dueIds))
-        .run();
-    const purgedSigners = changeCount(signerRes);
+        // Objects first, for the same reason as the report-PDF sweep: a failure
+        // after this point leaves rows whose objects are gone, which the next pass
+        // retries harmlessly. The reverse leaves objects nothing points at.
+        if (keys.length > 0) {
+            try {
+                await bucket.delete(keys);
+            } catch (e) {
+                failedChunks += 1;
+                logger.error('retention.sweep.chunk.failed', { envelopeIds: ids, error: errorSummary(e) });
+                continue;
+            }
+        }
+        purgedArtefacts += keys.length;
 
-    // Anonymize denormalized client identity + mark purged. The signatures were
-    // destroyed on the signer rows above — the envelope has none of its own since
-    // the column moved there. The `purged_at IS NULL` guard in the WHERE keeps
-    // the count truthful and the operation idempotent under a race. PII SET =
-    // shared `ANONYMIZE_REQUEST_PII`; purged_at layered on here.
-    // `inspectorSignatureBase64` goes in the SAME pass, and that is a decision
-    // rather than tidiness: it is the company's countersignature ON THIS
-    // ENVELOPE, so its purpose ends when the envelope's does. The inspector's
-    // SAVED DEFAULT signature (`users.default_signature_base64`) is a different
-    // clock — an account asset that expires with the account — and both are now
-    // written down in erasure-out-of-scope.ts rather than left indefinite by
-    // omission.
-    const envRes = await db.update(agreementRequests)
-        .set({ ...ANONYMIZE_REQUEST_PII, inspectorSignatureBase64: null, purgedAt: new Date(now) })
-        .where(and(inArray(agreementRequests.id, dueIds), isNull(agreementRequests.purgedAt)))
-        .run();
-    const purgedEnvelopes = changeCount(envRes);
+        // Anonymize satellite PII + destroy signer signatures for the due envelopes
+        // (keep the audit chain). The PII SET is the SHARED `ANONYMIZE_SIGNER_PII`
+        // (same mapping the erase orchestrator uses → no drift); signature_base64 is
+        // layered on here because the sweep destroys the seal the orchestrator keeps.
+        const signerRes = await db.update(agreementSigners)
+            .set({ ...ANONYMIZE_SIGNER_PII, signatureBase64: null })
+            .where(inArray(agreementSigners.requestId, ids))
+            .run();
+        purgedSigners += changeCount(signerRes);
 
-    return { purgedEnvelopes, purgedSigners, purgedArtefacts };
+        // Anonymize denormalized client identity + mark purged. The signatures were
+        // destroyed on the signer rows above — the envelope has none of its own since
+        // the column moved there. The `purged_at IS NULL` guard in the WHERE keeps
+        // the count truthful and the operation idempotent under a race. PII SET =
+        // shared `ANONYMIZE_REQUEST_PII`; purged_at layered on here.
+        // `inspectorSignatureBase64` goes in the SAME pass, and that is a decision
+        // rather than tidiness: it is the company's countersignature ON THIS
+        // ENVELOPE, so its purpose ends when the envelope's does. The inspector's
+        // SAVED DEFAULT signature (`users.default_signature_base64`) is a different
+        // clock — an account asset that expires with the account — and both are now
+        // written down in erasure-out-of-scope.ts rather than left indefinite by
+        // omission.
+        const envRes = await db.update(agreementRequests)
+            .set({ ...ANONYMIZE_REQUEST_PII, inspectorSignatureBase64: null, purgedAt: new Date(now) })
+            .where(and(inArray(agreementRequests.id, ids), isNull(agreementRequests.purgedAt)))
+            .run();
+        purgedEnvelopes += changeCount(envRes);
+    }
+
+    return { purgedEnvelopes, purgedSigners, purgedArtefacts, failedChunks };
 }

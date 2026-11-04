@@ -12,7 +12,7 @@ import { m } from "~/paraglide/messages";
  * via data-color-scheme (no hardcoded colors).
  */
 
-type SignerStatus = "pending" | "sent" | "viewed" | "signed" | "declined" | "expired" | "delivery_failed";
+type SignerStatus = "pending" | "sent" | "viewed" | "signing" | "signed" | "declined" | "expired" | "delivery_failed";
 
 export interface SignerRow {
     id: string;
@@ -27,7 +27,8 @@ export interface SignerRow {
     lastRemindedAt?: number | null;
 }
 
-const TERMINAL: ReadonlySet<string> = new Set(["signed", "declined", "expired"]);
+// `signing` is not final, but a signature is being recorded for it right now: there is nothing to remind it of.
+const TERMINAL: ReadonlySet<string> = new Set(["signing", "signed", "declined", "expired"]);
 
 /** A signer in a terminal state can no longer be reminded or re-signed. */
 export function isTerminal(status: string): boolean {
@@ -41,6 +42,7 @@ export function statusChip(status: string): { tone: ChipTone; label: string; too
     switch (status) {
         case "signed":          return { tone: "sat",     label: "Signed" };
         case "viewed":          return { tone: "info",    label: "Viewed" };
+        case "signing":         return { tone: "info",    label: "Signing" };
         case "sent":            return { tone: "monitor", label: "Sent" };
         case "declined":        return { tone: "defect",  label: "Declined" };
         case "expired":         return { tone: "neutral", label: "Expired" };

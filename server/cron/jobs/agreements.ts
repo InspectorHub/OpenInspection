@@ -85,7 +85,7 @@ export const retentionAgreementsJob: CronJob = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const agreementSweepDb = drizzle(env.DB) as any;
         const summary = await runRetentionSweep(agreementSweepDb, Date.now(), { photos: env.PHOTOS });
-        if (summary.purgedEnvelopes > 0) {
+        if (summary.purgedEnvelopes > 0 || summary.failedChunks > 0) {
             logger.info('[cron] retention sweep purged signatures', summary);
         }
         return { processed: summary.purgedEnvelopes, nextCursor: null };

@@ -47,7 +47,7 @@ const migrationSql = import.meta.glob('../../migrations/*.sql', {
 const applyMigrations = () => replayMigrations(b.DB, migrationSql);
 
 function reportVersionService(): ReportVersionService {
-    return new ReportVersionService(b.DB, KEY_SECRET);
+    return new ReportVersionService(b.DB, KEY_SECRET, []);
 }
 function inspectionService(): InspectionService {
     return new InspectionService(b.DB);

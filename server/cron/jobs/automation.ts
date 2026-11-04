@@ -6,6 +6,7 @@
  * rules and inspections, the other talks to mail and SMS providers - and a
  * delivery outage must not also stop reminders being scheduled.
  */
+import { signingKeySecrets } from '../../services/signing-key.service';
 import { and, eq, ne } from 'drizzle-orm';
 import { automationLogs, automations } from '../../lib/db/schema/inspection/automation';
 import { tenants } from '../../lib/db/schema/tenant/core';
@@ -150,6 +151,7 @@ export const automationFlushJob: CronJob = {
                     env.DB, env.PHOTOS,
                     /* sdb */ undefined, env.TENANT_CACHE, /* IMAGES */ undefined, /* quota */ undefined,
                     env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET,
+                    signingKeySecrets(env).previous,
                 ).getReportContentHash(inspectionId, tenantId),
             renderHost: appHostForRender,
             renderSecret: env.JWT_SECRET,

@@ -117,7 +117,7 @@ describe('document review — the seeded checklist is the whole catalog', () => 
         await testDb.insert(schema.tenants).values([
             { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        svc = new ComplianceService({} as D1Database, 'test-encryption-secret-32-bytes-long!!');
+        svc = new ComplianceService({} as D1Database, 'test-encryption-secret-32-bytes-long!!', []);
     });
 
     it('seeding writes one row per catalog entry — the catalog IS the disclosure universe', async () => {

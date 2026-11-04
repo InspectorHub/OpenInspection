@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { users, inspections, agreementRequests } from './db/schema';
 import { logger } from './logger';
+import { errorSummary } from './error-summary';
 import { resolveAutomationCompanyName } from '../services/automation/company-name';
 import { getBookingHost } from './url';
 import { envelopeVerifyUrl } from './agreement-verify-url';
@@ -145,7 +146,7 @@ export async function runEnvelopeCompletionPipeline(
                     getBookingHost(c),
                 );
             } catch (e) {
-                logger.error('agreement.signed confirmation email failed', {}, e instanceof Error ? e : undefined);
+                logger.error('agreement.signed confirmation email failed', { error: errorSummary(e) });
             }
         })());
     }
@@ -241,7 +242,7 @@ export async function runSignerReceiptEffects(
                 getBookingHost(c),
             );
         } catch (e) {
-            logger.error('agreement.signer receipt email failed', {}, e instanceof Error ? e : undefined);
+            logger.error('agreement.signer receipt email failed', { error: errorSummary(e) });
         }
     })());
 }

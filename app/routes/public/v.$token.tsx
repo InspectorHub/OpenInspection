@@ -140,16 +140,12 @@ export async function loader({
     return { kind: "error", message: "Verification service unavailable" };
   }
 
-  // 2. Fall back: try the agreement verifier (GET /api/public/verify-by-token/:token)
-  // This endpoint is a plain Hono GET (not part of the typed OpenAPI router),
-  // so we call it via fetch through the underlying API base URL.
+  // 2. Fall back: the agreement verifier. GET /api/public/verify-by-token/:token turns the token printed on a signed agreement into
+  //    its envelope id. (This used to call the envelope route with the token in the id slot, which never found anything and spent the
+  //    rate-limited verification route on every miss.)
   try {
-    const res = await api.publicReport.verify[":envelopeId"].$get({
-      // We intentionally misuse the envelopeId slot here to hit
-      // GET /api/public/verify/:token so we can check if the token is an
-      // agreement verification token (old /verify/:envelopeId pattern).
-      // If that also 404s, the token is genuinely unknown.
-      param: { envelopeId: token },
+    const res = await api.publicReport["verify-by-token"][":token"].$get({
+      param: { token },
     });
 
     if (res.ok) {

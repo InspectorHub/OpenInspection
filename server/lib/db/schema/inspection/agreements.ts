@@ -112,10 +112,12 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     // `delivery_failed` marks a signer whose email was rejected at the provider
     // level (transient failure or unclassified error). The signer can be
     // re-emailed via the Remind action; the envelope itself is not expired.
-    status:             text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired', 'delivery_failed'] }).notNull().default('pending'),
+    // `signing` is the claim in flight: the drawing is stored but its audit row is not yet written. It is not terminal and is never
+    // counted or shown as signed; it becomes `signed` only after the `signer.signed` row was appended (claimSignedBySigner).
+    status:             text('status', { enum: ['pending', 'sent', 'viewed', 'signing', 'signed', 'declined', 'expired', 'delivery_failed'] }).notNull().default('pending'),
     // The drawn signature image. Bare base64 OR a full `data:` URL — both are
     // accepted, and agreements-render prefixes the bare form when composing the
-    // signed PDF. Written only by markSignedBySigner. A DSAR erase KEEPS it (it
+    // signed PDF. Written only by claimSignedBySigner. A DSAR erase KEEPS it (it
     // is the retained evidence); the retention sweep NULLs it past the window,
     // which is the one column that separates those two paths.
     signatureBase64:    text('signature_base64'),
@@ -163,7 +165,7 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     // so that nobody reading `signature -> Alice` years from now mistakes an
     // attribution we derived for an identity the signing event recorded.
     //
-    //   signing_event                 the signer signed here; `markSignedBySigner`
+    //   signing_event                 the signer signed here; `claimSignedBySigner`
     //                                 wrote the image and the identity together.
     //   relocated_single_signer       the signature came off the envelope, and
     //                                 this was the envelope's ONLY signer row.

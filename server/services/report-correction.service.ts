@@ -41,6 +41,8 @@ export async function correctReport(
     d1: D1Database,
     encryptionSecret: string,
     input: CorrectReportInput,
+    /** Earlier secrets a stored signing key may still be wrapped under (`signingKeySecrets(env).previous`). */
+    previousSecrets: readonly string[] = [],
 ): Promise<CorrectionResult> {
     const parsed = CorrectReportSchema.parse(input);
 
@@ -67,7 +69,7 @@ export async function correctReport(
         .get();
     if (!row) throw new CorrectionRefusedError('Inspection not found');
 
-    const versions = new ReportVersionService(d1, encryptionSecret);
+    const versions = new ReportVersionService(d1, encryptionSecret, previousSecrets);
 
     // Snapshot the pre-correction state FIRST when nothing was ever published.
     //

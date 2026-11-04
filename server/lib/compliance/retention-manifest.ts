@@ -312,7 +312,7 @@ export const RETENTION_OUT_OF_SCOPE: RetentionOutOfScopeEntry[] = [
     // ── Tamper-evident attestation ───────────────────────────────────────────
     {
         table: 'esign_audit_logs',
-        reason: 'Hash-chained, signed attestation. retention-sweep.ts states never touching it as a hard rule: it is the minimal PII-light record that survives even final destruction, and removing any row breaks the chain for every row after it.',
+        reason: 'Hash-chained, signed attestation. retention-sweep.ts states never touching it as a hard rule: it is the signed record that survives even final destruction, and removing any row breaks the chain for every row after it. It is not free of personal data: its rows keep what was recorded at each event (signer email addresses, the address and browser of the signing device, the country), and it is retained for that reason, as evidence.',
     },
 
     // ── Not logs, whatever they are called ───────────────────────────────────

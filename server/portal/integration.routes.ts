@@ -11,6 +11,7 @@ import { logger } from '../lib/logger';
 import { tenantConfigs, tenants } from '../lib/db/schema';
 import { tenantDisplayName } from '../lib/tenant-display-name';
 import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
+import { SigningKeyService } from '../services/signing-key.service';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
@@ -412,10 +413,8 @@ api.post('/sync-redrive', requireServiceBinding, async (c) => {
 });
 
 /**
- * POST /api/platform/secrets/reencrypt — JWT_SECRET rotation tool.
- * SaaS-only by construction (this seam is unmounted in standalone); a
- * standalone tenant converges lazily on its next secrets write instead.
- * Idempotent; SOP: docs/saas-ops/jwt-secret-rotation-sop.md.
+ * POST /api/platform/secrets/reencrypt — JWT_SECRET rotation: tenant secrets AND every active e-sign key. SaaS-only (unmounted in
+ * standalone). Idempotent; `signingKeys.remaining` must be 0 before JWT_SECRET_PREVIOUS is removed. SOP: docs/saas-ops/jwt-secret-rotation-sop.md.
  */
 api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
     try {
@@ -442,11 +441,12 @@ api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
             await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
         },
     }, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS);
+    const signingKeys = await SigningKeyService.fromEnv(c.env.DB, c.env).rewrapAll();
     logger.info('secrets reencrypt completed', {
-        migrated: report.migrated, rewrapped: report.rewrapped,
-        alreadyCurrent: report.alreadyCurrent, failed: report.failed.length,
+        migrated: report.migrated, rewrapped: report.rewrapped, alreadyCurrent: report.alreadyCurrent, failed: report.failed.length,
+        signingKeysRewrapped: signingKeys.rewrapped, signingKeysRemaining: signingKeys.remaining,
     });
-    return c.json({ success: true, data: report });
+    return c.json({ success: true, data: { ...report, signingKeys } });
     } catch (error: unknown) {
         logger.error('secrets reencrypt failed', {}, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Internal server error' } }, 500);

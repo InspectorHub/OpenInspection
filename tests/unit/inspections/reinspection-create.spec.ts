@@ -99,7 +99,7 @@ describe('InspectionService.createReinspection (#119)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sdb = new ScopedDB(testDb as any, TENANT);
         svc = new InspectionService({} as D1Database, undefined, sdb);
-        reportVersionSvc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        reportVersionSvc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []);
     });
 
     it('creates a linked re-inspection seeding only the selected items', async () => {

@@ -52,7 +52,7 @@ describe('snapshotOnPublish — credentials and appearance', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(db);
         await seed(db);
-        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []);
 
         for (const [id, name] of [[LEAD, 'Dana Lead'], [HELPER, 'Sam Helper']] as const) {
             await db.insert(schema.users).values({
@@ -180,7 +180,7 @@ describe('snapshot growth vs. already-signed versions', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(db);
         await seed(db);
-        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []);
     });
 
     it('still verifies a snapshot written in the pre-credentials shape', async () => {

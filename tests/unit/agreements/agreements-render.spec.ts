@@ -75,7 +75,7 @@ describe('agreement-render handler', () => {
       createdAt: new Date(),
     });
     await db.insert(schema.agreementSigners).values(clientSigner('iVBORw0KGgo='));
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     const body = await res.text();
@@ -126,7 +126,7 @@ describe('agreement-render handler', () => {
       createdAt: new Date(),
     });
     await db.insert(schema.agreementSigners).values(clientSigner('data:image/png;base64,clientsig'));
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('clientsig');
@@ -143,7 +143,7 @@ describe('agreement-render handler', () => {
       createdAt: new Date(),
     });
     await db.insert(schema.agreementSigners).values(clientSigner('data:image/png;base64,clientsig'));
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('clientsig');
@@ -198,7 +198,7 @@ describe('agreement-render handler', () => {
         channel: 'remote', signedAt: new Date(), createdAt: new Date(2),
       },
     ]);
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('Jane Doe');
@@ -229,7 +229,7 @@ describe('agreement-render handler', () => {
       status: 'signed', signatureBase64: 'data:image/png;base64,signersig',
       channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('signersig');
@@ -297,29 +297,53 @@ describe('agreement-render handler', () => {
     expect(body).toContain('Signed by Agent Smith on behalf of Jane Doe');
   });
 
-  // Track I-a — signatureBase64 is interpolated into <img src="...">; a payload
-  // that breaks out of the attribute (`" onerror=...`) must be escaped, not live.
-  it('escapes a signature data URL that tries to break out of the img src attribute', async () => {
-    await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-      clientEmail: 'jane@x', clientName: 'Jane Doe',
-      status: 'signed',
-      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
-      createdAt: new Date(),
+  // signatureBase64 arrives as text from the signer's browser and is interpolated into <img src="...">. Only a base64 PNG, JPEG, GIF
+  // or WebP data URL (or bare base64) is embedded; anything else, including a payload that tries to break out of the attribute, is
+  // never emitted at all.
+  describe('what is embedded as a signature picture', () => {
+    async function signedWith(signatureBase64: string) {
+      await db.insert(schema.agreementRequests).values({
+        id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+        clientEmail: 'jane@x', clientName: 'Jane Doe',
+        status: 'signed',
+        signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
+        createdAt: new Date(),
+      });
+      await db.insert(schema.agreementSigners).values({
+        id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
+        name: '', email: 'jane@x', role: 'client',
+        status: 'signed', signatureBase64,
+        channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+      });
+      return (await agreementRenderHandler({} as D1Database, 'acme', REQ_ID, '', true)).text();
+    }
+
+    it('embeds a PNG data URL and bare base64, as before', async () => {
+      expect(await signedWith('data:image/png;base64,aGVsbG8=')).toContain('<img src="data:image/png;base64,aGVsbG8="');
     });
-    await db.insert(schema.agreementSigners).values({
-      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
-      name: 'Jane Doe', email: 'jane@x', role: 'client',
-      status: 'signed',
-      signatureBase64: 'data:image/png;base64,abc" onerror="x',
-      channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+
+    it('embeds nothing for a payload that breaks out of the attribute, a non-image data URL, a link or script text, and says so in the block', async () => {
+      for (const bad of [
+        'data:image/png;base64,abc" onerror="x',
+        'data:text/html;base64,PHNjcmlwdD4=',
+        'data:image/svg+xml;base64,PHN2Zy8+',
+        'javascript:alert(1)',
+        'https://evil.example/x.png',
+      ]) {
+        await db.delete(schema.agreementSigners);
+        await db.delete(schema.agreementRequests);
+        const body = await signedWith(bad);
+        expect(body, bad).not.toContain('<img src=');
+        expect(body, bad).not.toContain('onerror');
+        expect(body, bad).toContain('[signature image not available]');
+      }
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
-    const body = await res.text();
-    // The quote is escaped...
-    expect(body).toContain('&quot; onerror=&quot;x');
-    // ...and the raw attribute-injection sequence is NOT present as live markup.
-    expect(body).not.toContain('" onerror=');
+
+    it('shows a signer with no name as "Signer", never by email address', async () => {
+      const body = await signedWith('data:image/png;base64,aGVsbG8=');
+      expect(body).toContain('Signer');
+      expect(body).not.toContain('jane@x');
+    });
   });
 });
 
@@ -360,6 +384,22 @@ describe('cert-render handler', () => {
     });
     const res = await certRenderHandler({} as D1Database, REQ_ID);
     expect(res.status).toBe(404);
+  });
+
+  it('never prints an email address: a client and a signer with no name show as "the client" / "Signer"', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+      clientEmail: 'jane@example.test', clientName: null,
+      status: 'signed', signedAt: new Date(), createdAt: new Date(),
+    });
+    await db.insert(schema.agreementSigners).values({
+      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID, name: '', email: 'jane@example.test', role: 'client',
+      status: 'signed', signatureBase64: 'data:image/png;base64,aGVsbG8=', channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+    });
+    const body = await (await certRenderHandler({} as D1Database, REQ_ID)).text();
+    expect(body).toContain('Signed agreement for the client');
+    expect(body).toContain('Client: Signer');
+    expect(body).not.toContain('jane@example.test');
   });
 
   it('renders certificate HTML with audit chain summary', async () => {

@@ -135,7 +135,7 @@ describe('a signed report is corrected by amendment', () => {
             },
         ]);
 
-        svc = new ReportVersionService({} as D1Database, SECRET);
+        svc = new ReportVersionService({} as D1Database, SECRET, []);
     });
 
     const correct = (extra: Record<string, unknown> = {}) =>

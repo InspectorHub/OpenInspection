@@ -1,3 +1,4 @@
+import { checkRateLimit } from '../../lib/rate-limit';
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import { agreementRequests, inspections, reportVersions } from '../../lib/db/schema';
@@ -148,6 +149,8 @@ const verifyByTokenRoute = createRoute(withMcpMetadata({
 const app = createApiRouter();
 app.openapi(verifyRoute, async (c) => {
     const { envelopeId } = c.req.valid('param');
+    // Each call re-verifies the whole chain, so an anonymous caller is counted per network (the key and document links are, too).
+    await checkRateLimit(c, 'verify-public');
     const data = await loadVerifyData(c, envelopeId);
     if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
     return c.json({
@@ -165,11 +168,13 @@ app.openapi(verifyRoute, async (c) => {
             eventCount: data.auditRows.length,
             contentSnapshot: data.reqRow.contentSnapshot ?? null, // projection-allow: the signed agreement text: the verifier link (the envelope id) is the capability and the verifier page shows the text by design
             contentHash: data.reqRow.contentHash ?? null, // projection-allow: the hash of the signed text, the value the verifier page compares
+            // projection-allow: the public roster by design: name, role, status, signing time and channel of each signer (never an email address)
             signers: data.signers.map((s) => ({
                 name: s.name,
                 role: s.role,
-                status: s.status,
-                signedAt: s.signedAt ? new Date(s.signedAt).toISOString() : null,
+                // A signature still being recorded is not a signature: the roster shows it as viewed, with no signing time.
+                status: s.status === 'signing' ? 'viewed' : s.status,
+                signedAt: s.signedAt && s.status !== 'signing' ? new Date(s.signedAt).toISOString() : null,
                 channel: s.channel ?? null,
             })),
             // SIGNED signers only. A pending signer has been shown nothing

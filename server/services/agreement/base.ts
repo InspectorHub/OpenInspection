@@ -8,6 +8,20 @@ export interface SignerInput {
     contactId?: string | null;
 }
 
+/** What a sign request carries besides the drawing. */
+export interface SignedOpts {
+    signedAtMs: number; channel: 'remote' | 'in_person'; ipAddress?: string | null; userAgent?: string | null;
+    onBehalfOf?: string | null; onBehalfDisclaimer?: string | null;
+    /**
+     * Which language-disclosure version this signer was SHOWN, or null
+     * when the platform did not draw the screen and so cannot say.
+     * REQUIRED and never defaulted here: only the caller knows what
+     * reached a screen, and an optional field would let a future sign
+     * surface record silence that reads like a pre-feature signature.
+     */
+    languageDisclosureVersion: number | null;
+}
+
 export interface ResolvedSigner {
     signer: typeof agreementSigners.$inferSelect;
     envelope: typeof agreementRequests.$inferSelect;
@@ -34,7 +48,7 @@ export function computeEnvelopeStatus(
         if (any('declined')) return 'declined';
         if (all('signed')) return 'signed';
     }
-    if (any('viewed') || any('signed')) return 'viewed';
+    if (any('viewed') || any('signing') || any('signed')) return 'viewed';
     if (any('sent')) return 'sent';
     return 'pending';
 }

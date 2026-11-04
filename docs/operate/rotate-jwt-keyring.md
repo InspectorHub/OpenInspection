@@ -137,7 +137,12 @@ Run `wrangler logout && wrangler login` to refresh the OAuth token. Re-run the r
   signature it verified. It is an owner-facing operation that exists in both
   deployment modes, so it is documented with the product:
   <https://inspectorhub.io/docs/rotate-signing-key>.
-- **JWT_SECRET** (the legacy env var) is no longer used for JWT signing. It's still active as KDF input for `config-crypto`, `qbo-crypto`, and audit signing-key encryption. Rotating it requires a separate procedure (data re-encryption) not covered here.
+- **JWT_SECRET** (the legacy env var) is no longer used for JWT signing. It is still active as KDF input for `config-crypto`, `qbo-crypto`, and the encryption of the tenant signing keys' private halves (when `KEY_ENCRYPTION_SECRET` is not set). Rotating it is a data re-encryption, not a key swap:
+  1. Set the new value as `JWT_SECRET` and the old value as `JWT_SECRET_PREVIOUS`, and deploy. Anything wrapped under the old value still opens, and a signing key is re-wrapped the first time it is used.
+  2. Run the re-encrypt endpoint (`POST /api/platform/secrets/reencrypt`, hosted deployments). It re-wraps every tenant's stored secrets **and every active tenant signing key**, and reports `signingKeys.remaining`: the number of signing keys still not under the current secret.
+  3. Remove `JWT_SECRET_PREVIOUS` **only when that number is zero**. Removing it earlier strands every tenant that has not signed since the rotation: their signing is refused until the old value is supplied again.
+  4. Only ONE previous secret is supported. A second rotation (A to B to C) must wait until step 2 reported zero for B; otherwise keys still under A can no longer be opened.
+  A standalone deployment has no such endpoint; its (single) tenant's key is re-wrapped the first time the tenant signs after the change, so keep `JWT_SECRET_PREVIOUS` until the company has signed once. The session keyring above is a different system and is not affected.
 - **CF account API token** (the OAuth credential `wrangler login` provisions) — rotate via `wrangler logout && wrangler login`. Operational hygiene, not in this runbook.
 - **Stripe / Resend / Google API keys** — vendor-side rotation; follow each vendor's docs.
 

@@ -63,7 +63,7 @@ export async function emailSignersTheirLinks(
     const db = getDrizzle(c);
 
     for (const s of opts.signers) {
-        if (['signed', 'declined', 'expired'].includes(s.status)) continue;
+        if (['signed', 'signing', 'declined', 'expired'].includes(s.status)) continue;
 
         let signUrl: string;
         try {

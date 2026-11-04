@@ -6,6 +6,13 @@ import { esignAuditLogs } from '../db/schema';
 const INTENT_LOG_WINDOW = 50;
 
 /**
+ * A repeat presentation of the same content to the same signer inside this window adds no audit row. Every view of the signing page used
+ * to append one, so anyone holding a link could grow the chain without bound. The first presentation of a signer at a given content hash
+ * is always recorded (it is what the signing-intent check and a verifier read); a later one is recorded again only after the window.
+ */
+export const PRESENTATION_DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
  * The presentation rows the signing-intent check needs for one signer: this signer's, newest first, a fixed number of them.
  *
  * Presentation rows are appended on every view of the signing page, so the full set of an envelope grows with every reload by anyone

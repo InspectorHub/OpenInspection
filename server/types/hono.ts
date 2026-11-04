@@ -39,8 +39,11 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv, NativeVisible
      *  remaining usages. */
     JWT_SECRET: string;
     /** Optional rotation-window fallback for JWT_SECRET (envelope secrets KEK
-     *  unwrap + legacy blob decrypt). Set during a JWT_SECRET rotation, run the
-     *  reencrypt endpoint, then delete. Never used for new writes. */
+     *  unwrap + legacy blob decrypt + tenant signing-key unwrap). Set during a JWT_SECRET
+     *  rotation and run the reencrypt endpoint, which re-wraps the tenant secrets AND every
+     *  active signing key. Delete it only when the endpoint reports zero signing keys remaining
+     *  under an earlier secret. Only ONE previous secret is supported, so a second rotation
+     *  (A to B to C) must wait until that count is zero. Never used for new writes. */
     JWT_SECRET_PREVIOUS?: string;
     /** Spec 5H — AES-GCM key for encrypting tenant Ed25519 private keys. Falls back to JWT_SECRET. */
     KEY_ENCRYPTION_SECRET: string;
