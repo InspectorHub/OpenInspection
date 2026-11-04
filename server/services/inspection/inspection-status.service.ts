@@ -6,6 +6,7 @@ import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspe
 import { statusBeforeCancel } from '../../lib/inspection/cancel-restore';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { InspectionSubService } from './base';
+import { ensurePrimaryReportAndResults } from '../../lib/inspection/primary-report';
 import type { CancellationReason } from '../../lib/cancellation-reason';
 
 /**
@@ -121,10 +122,21 @@ export class InspectionStatusService extends InspectionSubService {
      * `published` (a report is out), no link expires, nothing is sent. Returns the report's id.
      */
     async reopenReport(inspectionId: string, tenantId: string, reportId?: string): Promise<string> {
-        const { db } = await this.fetchForStatusChange(tenantId, inspectionId);
-        const row = await db.select({ id: reports.id, status: reports.status, publishedAt: reports.publishedAt }).from(reports)
+        const { db, inspection } = await this.fetchForStatusChange(tenantId, inspectionId);
+        const find = () => db.select({ id: reports.id, status: reports.status, publishedAt: reports.publishedAt }).from(reports)
             .where(and(eq(reports.tenantId, tenantId), eq(reports.inspectionId, inspectionId),
                 reportId ? eq(reports.id, reportId) : eq(reports.kind, 'primary'))).get();
+        let row = await find();
+        // A published order that never got its primary report row (data that predates the reports table): the order status is the
+        // only record, so create the row already in the "editing again" state instead of leaving the inspector locked out.
+        if (!row && !reportId && inspection.reportStatus === REPORT_STATUS.PUBLISHED) {
+            const created = await ensurePrimaryReportAndResults(db, tenantId, inspectionId, inspection.templateId ?? null, new Date());
+            if (created) {
+                await db.update(reports).set({ status: REPORT_STATUS.IN_PROGRESS, publishedAt: new Date() })
+                    .where(and(eq(reports.id, created), eq(reports.tenantId, tenantId)));
+                row = await find();
+            }
+        }
         if (!row) throw Errors.NotFound('Report not found');
         // Already being edited again: the same answer, so a double tap or a retried request is harmless.
         if (row.status !== REPORT_STATUS.PUBLISHED && row.publishedAt) return row.id;

@@ -115,6 +115,26 @@ describe('edit again and retract', () => {
             expect((await request('/edit-again', { reportId: 'nope' })).status).toBe(404);
         });
 
+        it('reopens a published order that has no report row at all, by creating the primary report already in the editing state', async () => {
+            await db.delete(schema.reports).where(eq(schema.reports.inspectionId, INSP));
+            expect(await db.select().from(schema.reports).all()).toHaveLength(0);
+
+            const res = await request('/edit-again');
+            expect(res.status).toBe(200);
+
+            const rows = await db.select().from(schema.reports).all();
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ kind: 'primary', status: 'in_progress' });
+            expect(rows[0]!.publishedAt).not.toBeNull();
+            expect((await order()).reportStatus).toBe('published');
+            // A named report that does not exist is still a 404: only the primary one is created on demand.
+            expect((await request('/edit-again', { reportId: 'nope' })).status).toBe(404);
+            // An order that was never published has nothing to reopen.
+            await db.delete(schema.reports).where(eq(schema.reports.inspectionId, INSP));
+            await db.update(schema.inspections).set({ reportStatus: 'in_progress' }).where(eq(schema.inspections.id, INSP));
+            expect((await request('/edit-again')).status).toBe(404);
+        });
+
         it('is idempotent: a second call on a report already being edited again answers the same 200 and changes nothing', async () => {
             const first = await request('/edit-again');
             const before = await row(PRIMARY);
