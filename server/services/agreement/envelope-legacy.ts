@@ -280,7 +280,7 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 added.push(id);
             }
 
-            const nothingSigned = current.every((s) => s.status !== 'signed');
+            const nothingSigned = current.every((s) => s.status !== 'signed' && s.status !== 'signing');
             if (completionPolicy && completionPolicy !== envelope.completionPolicy && nothingSigned) {
                 await db.update(agreementRequests)
                     .set({ completionPolicy })

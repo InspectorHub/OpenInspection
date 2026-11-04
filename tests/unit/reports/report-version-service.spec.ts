@@ -35,7 +35,7 @@ describe('ReportVersionService (subsystem D P7 T7.2)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         await seed(testDb);
-        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []);
     });
 
     it('snapshotOnPublish writes version 1', async () => {

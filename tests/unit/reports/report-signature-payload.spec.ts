@@ -72,7 +72,7 @@ describe('getReportData — signature + verification payload (layer 2)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         svc = new InspectionService({} as D1Database);
-        versionSvc = new ReportVersionService({} as D1Database, 'test-secret-key-long-enough-16');
+        versionSvc = new ReportVersionService({} as D1Database, 'test-secret-key-long-enough-16', []);
         await seedBase(testDb);
     });
 

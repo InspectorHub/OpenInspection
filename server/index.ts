@@ -30,12 +30,11 @@ import { setupWizardRoutes } from './features/setup-wizard';
 import { jwtAuthMiddleware } from './lib/middleware/jwt-auth';
 import { agentTermsGate } from './lib/middleware/agent-terms-gate';
 import { idempotencyMiddleware } from './lib/middleware/idempotency';
-import { agreementRenderPath } from './lib/public-urls';
-import { loadVerifyData } from './lib/verify-data';
 
 import coreAuthRoutes, { ssoRootRoutes } from './api/auth';
 import testHooksRoutes from './api/test-hooks';
 import { verifyExportRoutes } from './api/public/verify-export';
+import { verifyLinkRoutes } from './api/public/verify-links';
 import { signRedirectRoutes } from './api/sign-redirect';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
@@ -578,32 +577,9 @@ app.get('/agreements/sign', (c) => c.redirect('/not-found?from=agreement-sign', 
 app.route('/', signRedirectRoutes);
 
 // Spec 5H P2 — Public verifier (no-auth, court-friendly). The base JSON route
-// `GET /api/public/verify/:envelopeId` is now the typed route in
-// server/api/public-report.ts; these siblings stay raw (not consumed via hc).
-// `loadVerifyData` moved to server/lib/verify-data.ts.
-app.get('/api/public/verify/:envelopeId/public-key', async (c) => {
-    const envelopeId = c.req.param('envelopeId') as string;
-    const data = await loadVerifyData(c, envelopeId);
-    if (!data || !data.pubKey) return c.text('Not found', 404);
-    c.header('Content-Type', 'application/x-pem-file');
-    c.header('Content-Disposition', `attachment; filename="pubkey-${envelopeId.slice(0, 8)}.pem"`);
-    return c.body(data.pubKeyPem);
-});
-
-// Spec 5H D-patch — view the signed document.
-//
-// Redirects to the renderer, which is keyed by the envelope's requestId. It
-// used to redirect to /agreements/sign/{token} built from the envelope-level
-// `token` column, and that stopped working when envelope lookup went hash-only:
-// nothing resolves that value any more, so the reader followed a verification
-// link and landed on a 404. The rest of the codebase had already moved to the
-// requestId-keyed renderer; this route was the one that had not.
-app.get('/api/public/verify/:envelopeId/document', async (c) => {
-    const envelopeId = c.req.param('envelopeId') as string;
-    const data = await loadVerifyData(c, envelopeId);
-    if (!data) return c.text('Not found', 404);
-    return c.redirect(agreementRenderPath(data.tenantSlug, data.reqRow.id), 302);
-});
+// `GET /api/public/verify/:envelopeId` is the typed route in server/api/public/verify.ts; its key and document siblings
+// are in server/api/public/verify-links.ts.
+app.route('/api/public', verifyLinkRoutes);
 
 app.route('/api/public', verifyExportRoutes);
 

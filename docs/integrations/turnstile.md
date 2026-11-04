@@ -117,21 +117,28 @@ The Workers Free plan allows 100,000 D1 row writes a day for the whole account, 
 refusals are write-free. The order is: body check (400), id format, the binding
 limiter (per network; a no-op when the binding is
 absent), one read for the envelope (an unknown id gets the usual 403), the bot token
-(missing where the challenge is enforced: 403), one read-only lock check (429 with
-`Retry-After`), the token verification (403), and only then the reservation.
+(missing where the challenge is enforced: 403), one read-only lock check of the email counters (429 with
+`Retry-After`), the token verification (403), and only then the reservation. The postal counters are read
+and reserved after the email matched a signer, and a spent postal allowance there answers the uniform 403.
+
+Counts are counter-row writes: one for each reservation (an upsert) and one for each reservation handed back. With a client
+address the email-side reservation is two counters (the per-address email counter and the envelope-wide one); without an
+address it is one (the envelope-wide counter only), and the figures in brackets apply.
 
 | Request class | Row writes |
 |---|---|
 | Unknown envelope, no token, failed token, locked out | 0 |
-| Wrong email after a passed challenge | 2 |
-| Wrong postal code | 3 |
-| Both fields wrong | 4 |
-| A right answer | the counters reserved, then handed back: 4 for an email |
+| Wrong email after a passed challenge, with or without a postal code (the postal counters are not touched) | 2 (1) |
+| Right email, no postal code: reserved, then handed back | 4 (2) |
+| Right email with a wrong postal code: the email-side and postal reservations are both kept | 4 (2) |
+| Right email with a right postal code: both reserved, then both handed back | 8 (4) |
 
 A request that loses a race past the lock check releases what it reserved. Each
 real envelope is capped by its own envelope-wide counters at 50 kept attempts an
-hour, so a caller who knows no answer causes about 200 writes an hour (4,800 a day)
-per envelope. What bounds the number of envelopes written to depends on the key:
+hour, so a caller who knows no answer causes about 100 writes an hour (2,400 a day) per envelope (two per wrong email), and one who
+knows a signer's email and guesses postal codes about 120 an hour (2,880 a day): only the first 10 postal guesses an hour reach the
+postal counters (4 writes each), and the other 40 attempts write the email side only (2 each). What bounds the number of envelopes
+written to depends on the key:
 
 | Configuration | What bounds the writes |
 |---|---|
@@ -139,9 +146,15 @@ per envelope. What bounds the number of envelopes written to depends on the key:
 | saas with no secret (the always-pass test key is used and logged as `verify.export.turnstile.test_key`) | The challenge bounds nothing; the binding limiter does |
 | standalone with no secret | No challenge; the binding limiter does |
 
-The binding limiter allows about 10 requests a minute per network,
-so where the challenge bounds nothing one network can write on the order of 57,000
-rows a day across many envelopes. Configure `TURNSTILE_SECRET_KEY`.
+The binding limiter allows about 10 requests a minute per network, so where
+the challenge bounds nothing one network can write on the order of 29,000 rows a day across many envelopes (14,400 requests at two
+writes each), and more only for a caller who already holds signers' emails. Configure `TURNSTILE_SECRET_KEY`.
+
+The verification page, its key download and its document link share one allowance of the same size (10 a minute per network, counted
+apart from the export request), so several people checking from one shared network address (an office behind one NAT, say) can reach it
+and be answered `429` for a short while. The document link answers
+`302` for any envelope that exists; the renderer behind it then answers `404` unless the envelope is signed, and shows the
+document without the drawn signatures.
 
 Residual: the envelope-wide counters bound guessing from many networks, so after enough counted attempts in an hour they refuse every network for the rest
 of the hour, the signer's included. A request with no `CF-Connecting-IP` skips the binding limiter.

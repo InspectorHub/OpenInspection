@@ -37,7 +37,7 @@ type DocumentReviewPatch = z.infer<typeof DocReviewPatchSchema>;
  * reads/writes are tenant-scoped.
  */
 export class ComplianceService {
-    constructor(private db: D1Database, private encryptionSecret: string) {}
+    constructor(private db: D1Database, private encryptionSecret: string, private previousSecrets: readonly string[]) {}
 
     private get drizzle() { return drizzle(this.db); }
 
@@ -61,7 +61,7 @@ export class ComplianceService {
             inspectionId, role: input.role, personId: input.personId, name: input.name,
             license: input.license, signedAt: signedAtMs,
         });
-        const signing = new SigningKeyService(this.db, this.encryptionSecret);
+        const signing = SigningKeyService.fromSecrets(this.db, this.encryptionSecret, this.previousSecrets);
         const { privateKey } = await signing.ensureKeypair(tenantId);
         const sigBytes = new Uint8Array(await crypto.subtle.sign(
             { name: 'Ed25519' }, privateKey, new TextEncoder().encode(payload),
@@ -95,7 +95,7 @@ export class ComplianceService {
             .where(and(eq(reportSignoff.tenantId, tenantId), eq(reportSignoff.inspectionId, inspectionId), eq(reportSignoff.role, role)))
             .get();
         if (!row) return false;
-        const signing = new SigningKeyService(this.db, this.encryptionSecret);
+        const signing = SigningKeyService.fromSecrets(this.db, this.encryptionSecret, this.previousSecrets);
         const pub = await signing.getPublicKey(tenantId);
         if (!pub) return false;
         const payload = buildAttestationPayload({

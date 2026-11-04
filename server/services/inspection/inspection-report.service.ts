@@ -89,7 +89,7 @@ export class InspectionReportService extends InspectionSubService {
         sdb?: ScopedDB,
         kv?: KVNamespace,
         images?: ImagesBinding,
-        private readonly encryptionSecret?: string,
+        private readonly encryptionSecret?: string, private readonly previousSecrets: readonly string[] = [],
     ) {
         super(db, r2, sdb, kv, images);
     }
@@ -764,7 +764,7 @@ export class InspectionReportService extends InspectionSubService {
         let documentReview: Awaited<ReturnType<ComplianceService['getCompliance']>>['documentReview'] = [];
         let relianceText: typeof RELIANCE_TEMPLATES = { ...RELIANCE_TEMPLATES };
         if (isFullPca) {
-            const compliance = new ComplianceService(this.db, this.encryptionSecret ?? '');
+            const compliance = new ComplianceService(this.db, this.encryptionSecret ?? '', this.previousSecrets);
             const c = await compliance.getCompliance(tenantId, inspectionId);
             const deviations = (inspection as { deviations?: Deviation[] | null }).deviations ?? [];
             // `signedAt` is a drizzle `timestamp_ms` column — reads yield Date

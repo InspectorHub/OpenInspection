@@ -65,6 +65,28 @@ export async function loadVerifyData(c: Context<HonoConfig>, envelopeId: string)
 }
 
 /**
+ * What the key and document links of the public verifier need, and nothing more: the envelope, the company slug, and the key(s) its
+ * chain was sealed with. `loadVerifyData` also reads every audit row and re-verifies every signature of the chain (Ed25519 per row), which
+ * is the right price for the verifier page and the wrong one for a link that only hands out a public key or a redirect. This reads the
+ * distinct key fingerprints only, and checks no signature.
+ */
+export async function loadVerifyKeys(c: Context<HonoConfig>, envelopeId: string) {
+    const db = drizzle(c.env.DB, { schema });
+    const reqRow = await db.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, envelopeId)).get();
+    if (!reqRow) return null;
+    const fingerprints = (await db.selectDistinct({ fp: schema.esignAuditLogs.keyFingerprint }).from(schema.esignAuditLogs)
+        .where(and(eq(schema.esignAuditLogs.tenantId, reqRow.tenantId), eq(schema.esignAuditLogs.requestId, envelopeId)))
+        .all()).map((r) => r.fp);
+    const chainKeys = (await Promise.all(fingerprints.map((fp) =>
+        c.var.services.signingKey.getPublicKeyByFingerprint(reqRow.tenantId, fp),
+    ))).filter((k): k is NonNullable<typeof k> => k !== null);
+    const pubKey = chainKeys[0] ?? await c.var.services.signingKey.getPublicKey(reqRow.tenantId);
+    const tenantRow = await db.select({ slug: schema.tenants.slug }).from(schema.tenants).where(eq(schema.tenants.id, reqRow.tenantId)).get();
+    const pubKeyPem = (chainKeys.length > 0 ? chainKeys.map((k) => k.pem) : [pubKey?.pem ?? '']).join('');
+    return { reqRow, pubKey, pubKeyPem, tenantSlug: tenantRow?.slug ?? '' };
+}
+
+/**
  * #120 — public report-version verifier loader. Token = report_versions.
  * verification_token. No PII beyond the masked property address is exposed.
  */

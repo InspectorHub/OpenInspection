@@ -44,6 +44,7 @@ import type { Context } from 'hono';
 import type { HonoConfig } from '../../types/hono';
 import { loadVerifyData } from '../../lib/verify-data';
 import { checkRateLimit } from '../../lib/rate-limit';
+import { errorSummary } from '../../lib/error-summary';
 import { logger } from '../../lib/logger';
 import { resolveTurnstile, turnstileKeysMismatched, verifyTurnstileOutcome, TURNSTILE_TEST_KEY_WARNING } from '../../lib/middleware/bot-protection';
 import { VerifyExportBodySchema } from '../../lib/validations/verify-export.schema';
@@ -103,7 +104,7 @@ export const verifyExportRoutes = new Hono<HonoConfig>()
         try {
             exists = await envelopeExists(c.env.DB, envelopeId);
         } catch (err) {
-            logger.error('verify.export.lookup.failed', {}, err instanceof Error ? err : undefined);
+            logger.error('verify.export.lookup.failed', { error: errorSummary(err) });
             return refuse(c);
         }
         if (!exists) return refuse(c);
@@ -133,7 +134,7 @@ export const verifyExportRoutes = new Hono<HonoConfig>()
             const wait = await lockedSeconds(c.env.DB, buckets, Date.now());
             if (wait > 0) return tooManyAttempts(c, wait);
         } catch (err) {
-            logger.error('verify.export.attempts.unavailable', { hint: 'the attempt counters could not be read or written; run db:migrate if verify_export_attempts is missing' }, err instanceof Error ? err : undefined);
+            logger.error('verify.export.attempts.unavailable', { hint: 'the attempt counters could not be read or written; run db:migrate if verify_export_attempts is missing', error: errorSummary(err) });
             return refuse(c);
         }
 
@@ -160,7 +161,7 @@ export const verifyExportRoutes = new Hono<HonoConfig>()
         try {
             reservation = await reserveAttempts(c.env.DB, buckets, Date.now());
         } catch (err) {
-            logger.error('verify.export.attempts.unavailable', { hint: 'the attempt counters could not be read or written; run db:migrate if verify_export_attempts is missing' }, err instanceof Error ? err : undefined);
+            logger.error('verify.export.attempts.unavailable', { hint: 'the attempt counters could not be read or written; run db:migrate if verify_export_attempts is missing', error: errorSummary(err) });
             return refuse(c);
         }
         if (reservation.waitSeconds > 0) return tooManyAttempts(c, reservation.waitSeconds);
@@ -192,7 +193,7 @@ export const verifyExportRoutes = new Hono<HonoConfig>()
             // A store failure after the reservation: hand it back (the caller was not at fault), log without values, refuse uniformly.
             await reservation.release();
             await postalReservation?.release();
-            logger.error('verify.export.read.failed', {}, err instanceof Error ? err : undefined);
+            logger.error('verify.export.read.failed', { error: errorSummary(err) });
             return refuse(c);
         }
         // A wrong answer keeps its reservation. A right one hands it back, so a success does not use up the allowance.

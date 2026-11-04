@@ -101,6 +101,7 @@ export async function applyReportCorrection(
     encryptionSecret: string,
     data: ReportCorrectionCommand,
     opts: { correctedBy?: string | undefined } = {},
+    previousSecrets: readonly string[] = [],
 ): Promise<ReportCorrectedReply> {
     /**
      * The published amendment records WHAT AUTHORISED IT, which arrives as the
@@ -131,7 +132,7 @@ export async function applyReportCorrection(
             to: data.to,
             reason: data.reason,
             correctedBy: opts.correctedBy,
-        });
+        }, previousSecrets);
         logger.info('[cmd] report correction applied', {
             tenantId: data.tenantId,
             inspectionId: data.inspectionId,

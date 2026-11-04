@@ -49,7 +49,7 @@ function buildApp() {
         c.set('user', { sub: USER } as never);
         c.set('services', {
             inspection: { publishInspection },
-            reportVersion: new ReportVersionService({} as D1Database, 'test-encryption-secret-key'),
+            reportVersion: new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []),
             reportPdf: { purgeTransientPdfs: vi.fn().mockResolvedValue(undefined), isPipelineEnabled: vi.fn().mockResolvedValue(false) },
         } as never);
         await next();

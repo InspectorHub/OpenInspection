@@ -292,7 +292,7 @@ app.openapi(listSignersRoute, async (c) => {
         role: s.role,
         status: s.status,
         channel: s.channel ?? null,
-        signedAt: s.signedAt ? s.signedAt.getTime() : null,
+        signedAt: s.signedAt && s.status !== 'signing' ? s.signedAt.getTime() : null,
         viewedAt: s.viewedAt ? s.viewedAt.getTime() : null,
         onBehalfOf: s.onBehalfOf ?? null,
         lastRemindedAt: s.lastRemindedAt ? s.lastRemindedAt.getTime() : null,
@@ -344,7 +344,7 @@ app.openapi(remindSignerRoute, async (c) => {
         .get();
     if (!row) throw Errors.NotFound('Signer not found');
     // Terminal signers can't be reminded.
-    if (['signed', 'declined', 'expired'].includes(row.status)) {
+    if (['signed', 'signing', 'declined', 'expired'].includes(row.status)) {
         throw Errors.Conflict('Signer is no longer awaiting signature');
     }
     // Rate limit: at most once per hour, measured against lastRemindedAt.

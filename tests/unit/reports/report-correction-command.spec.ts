@@ -102,7 +102,7 @@ describe('applyReportCorrection — the applier behind cmd.report.correct', () =
             .where(eq(schema.reportVersions.inspectionId, INSPECTION)).all()).length;
 
     it('carries the correction out and the amendment is really in the ledger', async () => {
-        await new ReportVersionService({} as D1Database, SECRET)
+        await new ReportVersionService({} as D1Database, SECRET, [])
             .snapshotOnPublish(TENANT, INSPECTION, ACTOR);
 
         const reply = await apply();
@@ -187,4 +187,16 @@ describe('applyReportCorrection — the applier behind cmd.report.correct', () =
         await expect(apply({}, {})).rejects.toThrow(/authorising record/i);
         expect(await versionCount()).toBe(0);
     });
+
+    it('a correction after the signing secret was rotated succeeds when the earlier secret is supplied, and fails (retryably) without it', async () => {
+        const NEW_SECRET = 'rotated-encryption-secret-key-9999';
+        await new ReportVersionService({} as D1Database, SECRET, []).snapshotOnPublish(TENANT, INSPECTION, ACTOR);
+        // Without the earlier secret the stored signing key cannot be opened: the command throws, so the queue retries it.
+        await expect(applyReportCorrection({} as D1Database, NEW_SECRET, { ...DATA }, { correctedBy: AUTHORISED_BY })).rejects.toThrow(/cannot be opened/);
+        expect(await versionCount()).toBe(1);
+        const reply = await applyReportCorrection({} as D1Database, NEW_SECRET, { ...DATA }, { correctedBy: AUTHORISED_BY }, [SECRET]);
+        expect(reply).toMatchObject({ outcome: 'corrected', versionNumber: 2 });
+        expect(await versionCount()).toBe(2);
+    });
+
 });

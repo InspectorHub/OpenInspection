@@ -274,7 +274,7 @@ describe('the audit export counters', () => {
                 expect(res.status, table).toBe(403);
                 expect(await res.json()).toEqual({ error: 'verification_failed' });
             }
-            expect(logged).toHaveBeenCalledWith('verify.export.read.failed', {}, expect.any(Error));
+            expect(logged).toHaveBeenCalledWith('verify.export.read.failed', { error: expect.stringContaining('store down') });
             // The caller was not at fault: nothing stays counted, so the same answer goes through afterwards.
             for (const row of await rows()) expect(row.attempts, row.key).toBe(0);
             expect((await post(ENV1, withToken({ email: EMAIL1 }), '192.0.2.200')).status).toBe(200);
@@ -286,7 +286,7 @@ describe('the audit export counters', () => {
             const res = await post(ENV1, withToken({ email: EMAIL1 }));
             expect(res.status).toBe(403);
             expect(await res.json()).toEqual({ error: 'verification_failed' });
-            expect(logged).toHaveBeenCalledWith('verify.export.attempts.unavailable', expect.objectContaining({ hint: expect.stringContaining('db:migrate') }), expect.any(Error));
+            expect(logged).toHaveBeenCalledWith('verify.export.attempts.unavailable', expect.objectContaining({ hint: expect.stringContaining('db:migrate'), error: expect.any(String) }));
             h.sqlite.exec('CREATE TABLE verify_export_attempts (key text PRIMARY KEY NOT NULL, attempts integer NOT NULL, window_ends_at integer NOT NULL)');
             expect((await post(ENV1, withToken({ email: EMAIL1 }))).status).toBe(200);
         });
@@ -375,9 +375,13 @@ describe('the audit export counters', () => {
             expect(doc).toContain(`${postal.limit} wrong postal codes per ${minutes(postal.windowSeconds)} minutes`);
             expect(doc).toContain(`${envelopePostal.limit} postal codes per hour`);
             expect(doc).toContain(`${envelope.limit} attempts of either kind per hour`);
-            // A caller who knows no answer writes at most four rows per kept attempt, up to the envelope-wide ceiling.
-            const perHour = envelope.limit * 4;
+            // A caller who knows no answer writes two rows per kept attempt (the per-address email counter and the envelope-wide one), up to
+            // the envelope-wide ceiling. One who knows a signer's email writes four per attempt while the envelope's postal allowance lasts
+            // (two more counters) and two per attempt after that.
+            const perHour = envelope.limit * 2;
             expect(doc).toContain(`about ${perHour} writes an hour (${(perHour * 24).toLocaleString('en-US')} a day)`);
+            const knownEmail = envelopePostal.limit * 4 + (envelope.limit - envelopePostal.limit) * 2;
+            expect(doc).toContain(`about ${knownEmail} an hour (${(knownEmail * 24).toLocaleString('en-US')} a day)`);
             // Control: the check reads real text, so a different number is not found.
             expect(doc).not.toContain(`${email.limit + 1} wrong emails per`);
         });

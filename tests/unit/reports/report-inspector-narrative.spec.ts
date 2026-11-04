@@ -146,7 +146,7 @@ describe('the narrative is not report_versions.summary', () => {
     it('publishing an amendment does not overwrite the narrative', async () => {
         await setReportNarrative(asD1(), TENANT, INSPECTION, REPORT, NARRATIVE);
 
-        const svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        const svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []);
         await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a', undefined, REPORT);
         const amended = await svc.snapshotOnPublish(
             TENANT, INSPECTION, 'user-a', AMENDMENT_REASON, REPORT,

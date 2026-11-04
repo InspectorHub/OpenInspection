@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { signViaClaim } from '../helpers/sign-via-claim';
 import { AgreementService } from '../../../server/services/agreement.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -29,6 +30,6 @@ describe('AgreementService', () => {
     it('markSignedBySigner on a declined signer throws Conflict', async () => {
         const { token } = await svc.findOrCreate(TENANT_A, INSP_ID);
         await svc.markDeclinedBySigner(token);
-        await expect(svc.markSignedBySigner(token, 'sig', { signedAtMs: Date.now(), channel: 'remote', languageDisclosureVersion: null })).rejects.toThrow();
+        await expect(signViaClaim(svc, token, 'sig', { signedAtMs: Date.now(), channel: 'remote', languageDisclosureVersion: null })).rejects.toThrow();
     });
 });

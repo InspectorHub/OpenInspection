@@ -36,7 +36,7 @@ describe('pre-survey questionnaire (ASTM E2018 §8.5)', () => {
             { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: 't2', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        svc = new ComplianceService({} as D1Database, 'test-encryption-secret-32-bytes-long!!');
+        svc = new ComplianceService({} as D1Database, 'test-encryption-secret-32-bytes-long!!', []);
     });
 
     it('an inspection nobody sent a questionnaire for reads as null, not as an empty exhibit', async () => {

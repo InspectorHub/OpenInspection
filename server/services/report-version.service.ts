@@ -36,7 +36,7 @@ function parseResultsData(raw: unknown): ResultsData {
 }
 
 export class ReportVersionService {
-    constructor(private db: D1Database, private encryptionSecret: string) {}
+    constructor(private db: D1Database, private encryptionSecret: string, private previousSecrets: readonly string[]) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -128,7 +128,7 @@ export class ReportVersionService {
         const contentHash = await sha256Hex(snapshotJson);
         const prevHash = prev?.contentHash ?? null;
 
-        const signing = new SigningKeyService(this.db, this.encryptionSecret);
+        const signing = SigningKeyService.fromSecrets(this.db, this.encryptionSecret, this.previousSecrets);
         const { privateKey, fingerprint } = await signing.ensureKeypair(tenantId);
         const sigBytes = new Uint8Array(await crypto.subtle.sign(
             { name: 'Ed25519' }, privateKey, new TextEncoder().encode(contentHash),
@@ -268,7 +268,7 @@ export class ReportVersionService {
         let signatureValid = false;
         let keyMissing = false;
         if (!legacy) {
-            const signing = new SigningKeyService(this.db, this.encryptionSecret);
+            const signing = SigningKeyService.fromSecrets(this.db, this.encryptionSecret, this.previousSecrets);
             const pub = row.keyFingerprint
                 ? await signing.getPublicKeyByFingerprint(row.tenantId, row.keyFingerprint)
                 : null;

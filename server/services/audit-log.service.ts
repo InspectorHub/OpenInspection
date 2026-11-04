@@ -1,7 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, type SQL } from 'drizzle-orm';
 import { esignAuditLogs } from '../lib/db/schema';
 import { logger } from '../lib/logger';
+import { Errors } from '../lib/errors';
 import type { SigningKeyService} from './signing-key.service';
 import { sha256Hex } from '../lib/sha256';
 import { hexDecode, base64UrlDecode } from './signing-key.service';
@@ -31,6 +32,39 @@ export type AuditEvent =
     | 'workflow.complete';
 
 /**
+ * Optional guard on an append, evaluated in the same statement that writes the row (so two requests cannot both pass it): the row is not
+ * written when the NEWEST row of this event for this signer already carries the same values for every key in `match` (and, when
+ * `windowMs` is given, is newer than the window). The existing row is returned instead.
+ *
+ * It is the newest row that counts, not any earlier one: a signer whose rows read A, then B must not have A "found" again by a retry
+ * with A, because the chain's last word about that signer would then no longer be the last thing recorded.
+ */
+export interface AppendOptions {
+    dedupe?: { signerId: string; match?: Record<string, string | null>; windowMs?: number };
+}
+
+/** How many times an append retries after losing its position to another writer, before it gives up and says so. */
+const MAX_APPEND_ATTEMPTS = 8;
+/** Upper bound of the random pause before a retry, per attempt already lost (milliseconds). */
+const RETRY_JITTER_MS = 12;
+
+/** True for the database's unique-constraint failure, however the driver wraps it (the message may sit on a `cause`). */
+function isUniqueViolation(err: unknown): boolean {
+    for (let e: unknown = err, depth = 0; e && depth < 4; depth += 1) {
+        const message = e instanceof Error ? e.message : String(e);
+        if (/UNIQUE constraint failed/i.test(message)) return true;
+        e = (e as { cause?: unknown }).cause;
+    }
+    return false;
+}
+
+/** Rows written by a statement, from either driver's result shape (D1: `meta.changes`; the test driver: `changes`). */
+function changesOf(result: unknown): number {
+    const r = result as { changes?: number; meta?: { changes?: number } } | undefined;
+    return r?.meta?.changes ?? r?.changes ?? 0;
+}
+
+/**
  * Spec 5H — Hash-chained, Ed25519-signed audit log.
  *
  * Each event row's hash = SHA-256(canonical_payload_json + (prev_hash ?? '')).
@@ -49,66 +83,105 @@ export class AuditLogService {
     }
 
     /**
-     * Append a new event to the chain. The PARTIAL unique index
-     * `idx_esign_audit_logs_event_dedup` (on tenant_id, request_id, event,
-     * WHERE event NOT LIKE 'signer.%') makes envelope-level events
-     * ('agreement.signed', 'workflow.complete', …) idempotent — a duplicate
-     * append hits the constraint and returns the existing row instead of
-     * forking the chain. Per-signer events ('signer.signed', 'signer.declined')
-     * are EXCLUDED from the index so a multi-signer envelope can legitimately
-     * append the same event type once per signer.
+     * True for the row of this signer and event that is the NEWEST, when it has the wanted values (see AppendOptions). Written as a
+     * condition on the table's own columns so it serves both the lookup and the "not exists" guard of the insert.
+     */
+    private duplicateCondition(tenantId: string, requestId: string, event: AuditEvent, dedupe: NonNullable<AppendOptions['dedupe']>, now: number): SQL {
+        const newest = sql`(select "id" from "esign_audit_logs" where "tenant_id" = ${tenantId} and "request_id" = ${requestId} and "event" = ${event} and json_extract("payload_json", '$.signerId') = ${dedupe.signerId} order by "created_at" desc, rowid desc limit 1)`;
+        const parts: SQL[] = [sql`"id" = ${newest}`];
+        for (const [key, value] of Object.entries(dedupe.match ?? {})) {
+            parts.push(sql`json_extract("payload_json", ${`$.${key}`}) is ${value}`);
+        }
+        if (dedupe.windowMs !== undefined) parts.push(sql`"created_at" > ${now - dedupe.windowMs}`);
+        return sql.join(parts, sql` and `);
+    }
+
+    private async findDuplicate(tenantId: string, requestId: string, event: AuditEvent, dedupe: NonNullable<AppendOptions['dedupe']>): Promise<{ id: string; hash: string } | null> {
+        const row = await this.getDrizzle().select({ id: esignAuditLogs.id, hash: esignAuditLogs.hash }).from(esignAuditLogs)
+            .where(this.duplicateCondition(tenantId, requestId, event, dedupe, Date.now())).limit(1).get();
+        return row ?? null;
+    }
+
+    /**
+     * Append a new event to the chain, taking the next position exactly once.
+     *
+     * The row is written by ONE statement that also checks the position: it inserts only while the newest row of the chain is still the
+     * one this event was hashed onto (`prev_hash`). A read followed by a plain insert would let two requests that read the same newest
+     * row both write, and the chain would fork (two rows with one predecessor). When the position was taken meanwhile, nothing is
+     * written and the append starts again from the new end of the chain, re-hashing and re-signing, after a short random pause.
+     *
+     * "Newest" is by `created_at`, then insertion order (`rowid`). A new row's `created_at` is never earlier than the newest row's, even
+     * when this isolate's clock is behind the one that wrote it: the chain is read in that order, and a row dated before its predecessor
+     * would read as a break.
+     *
+     * The PARTIAL unique index `idx_esign_audit_logs_event_dedup` (on tenant_id, request_id, event, WHERE event NOT LIKE 'signer.%')
+     * makes envelope-level events ('agreement.signed', 'workflow.complete', …) idempotent: a duplicate hits the constraint and the
+     * existing row is returned. ONLY that case is treated as "already recorded". Any other failure is thrown, so a caller never
+     * mistakes a write that did not happen for one that did (and never receives another signer's row). Per-signer events are not
+     * covered by the index, so they never reach that branch; `options.dedupe` is their idempotency, checked in the same statement.
+     *
+     * After the last lost position it throws `ServiceUnavailable`; callers decide whether that refuses their action (signing) or is
+     * logged and tolerated (see the callers in server/api).
      */
     async append(
         tenantId: string,
         requestId: string,
         event: AuditEvent,
-        payload: Record<string, unknown>
+        payload: Record<string, unknown>,
+        options: AppendOptions = {},
     ): Promise<{ id: string; hash: string }> {
         const { privateKey, fingerprint } = await this.signingKeys.ensureKeypair(tenantId);
-
-        const prev = await this.getDrizzle().select().from(esignAuditLogs)
-            .where(and(eq(esignAuditLogs.tenantId, tenantId), eq(esignAuditLogs.requestId, requestId)))
-            .orderBy(desc(esignAuditLogs.createdAt)).limit(1).get();
-
-        const prevHash = prev?.hash ?? null;
+        const db = this.getDrizzle();
         const canonicalPayload = canonicalJson(payload);
-        const hash = await sha256Hex(canonicalPayload + (prevHash ?? ''));
-        const sig = await crypto.subtle.sign('Ed25519', privateKey, hexDecode(hash) as unknown as ArrayBuffer);
-        const signature = base64UrlEncode(new Uint8Array(sig));
+        const { dedupe } = options;
 
-        const id = crypto.randomUUID();
-        try {
-            await this.getDrizzle().insert(esignAuditLogs).values({
-                id,
-                tenantId,
-                requestId,
-                event,
-                payloadJson: canonicalPayload,
-                prevHash,
-                hash,
-                signature,
-                keyFingerprint: fingerprint,
-                createdAt: new Date(),
-            });
-        } catch (e) {
-            // Partial UNIQUE INDEX on (tenant_id, request_id, event) for
-            // envelope-level (non-signer) events means double-appends are
-            // idempotent — return the existing row. Per-signer events are not
-            // covered by the index, so they never reach this branch.
-            const existing = await this.getDrizzle().select().from(esignAuditLogs)
-                .where(and(
-                    eq(esignAuditLogs.tenantId, tenantId),
-                    eq(esignAuditLogs.requestId, requestId),
-                    eq(esignAuditLogs.event, event),
-                )).get();
-            if (existing) {
-                logger.info('audit.append.idempotent', { tenantId, requestId, event });
-                return { id: existing.id, hash: existing.hash };
+        for (let attempt = 0; attempt < MAX_APPEND_ATTEMPTS; attempt += 1) {
+            if (attempt > 0) await new Promise<void>((resolve) => { setTimeout(resolve, Math.random() * RETRY_JITTER_MS * attempt); });
+            if (dedupe) {
+                const duplicate = await this.findDuplicate(tenantId, requestId, event, dedupe);
+                if (duplicate) return duplicate;
             }
-            throw e;
-        }
+            const prev = await db.select({ hash: esignAuditLogs.hash, createdAt: esignAuditLogs.createdAt }).from(esignAuditLogs)
+                .where(and(eq(esignAuditLogs.tenantId, tenantId), eq(esignAuditLogs.requestId, requestId)))
+                .orderBy(desc(esignAuditLogs.createdAt), desc(sql`rowid`)).limit(1).get();
 
-        return { id, hash };
+            const prevHash = prev?.hash ?? null;
+            const hash = await sha256Hex(canonicalPayload + (prevHash ?? ''));
+            const sig = await crypto.subtle.sign('Ed25519', privateKey, hexDecode(hash) as unknown as ArrayBuffer);
+            const signature = base64UrlEncode(new Uint8Array(sig));
+            const id = crypto.randomUUID();
+            const now = Date.now();
+            const createdAt = prev ? Math.max(now, prev.createdAt.getTime()) : now;
+
+            const notDuplicate = dedupe ? sql` and not exists (select 1 from "esign_audit_logs" where ${this.duplicateCondition(tenantId, requestId, event, dedupe, now)})` : sql``;
+            let result: unknown;
+            try {
+                result = await db.run(sql`insert into "esign_audit_logs" ("id", "tenant_id", "request_id", "event", "payload_json", "prev_hash", "hash", "signature", "key_fingerprint", "created_at")
+                    select ${id}, ${tenantId}, ${requestId}, ${event}, ${canonicalPayload}, ${prevHash}, ${hash}, ${signature}, ${fingerprint}, ${createdAt}
+                    where (select "hash" from "esign_audit_logs" where "tenant_id" = ${tenantId} and "request_id" = ${requestId} order by "created_at" desc, rowid desc limit 1) is ${prevHash}${notDuplicate}`);
+            } catch (e) {
+                // Envelope-level events are one per envelope: a unique-constraint failure on one means it is already recorded.
+                if (isUniqueViolation(e) && !event.startsWith('signer.')) {
+                    const existing = await db.select().from(esignAuditLogs)
+                        .where(and(eq(esignAuditLogs.tenantId, tenantId), eq(esignAuditLogs.requestId, requestId), eq(esignAuditLogs.event, event))).get();
+                    if (existing) {
+                        logger.info('audit.append.idempotent', { tenantId, requestId, event });
+                        return { id: existing.id, hash: existing.hash };
+                    }
+                }
+                throw e;
+            }
+            if (changesOf(result) > 0) return { id, hash };
+            // Nothing was written: another writer took this position (retry from the new end), or the once-only guard fired (found next round).
+            logger.info('audit.append.position_taken', { tenantId, requestId, event, attempt: attempt + 1 });
+        }
+        // The last round may have lost to the guard rather than to a writer: look once more before giving up.
+        if (dedupe) {
+            const duplicate = await this.findDuplicate(tenantId, requestId, event, dedupe);
+            if (duplicate) return duplicate;
+        }
+        logger.error('audit.append.contended', { tenantId, requestId, event });
+        throw Errors.ServiceUnavailable('The signing record is busy. Try again in a moment.');
     }
 
     /**
@@ -135,7 +208,7 @@ export class AuditLogService {
     > {
         const events = await this.getDrizzle().select().from(esignAuditLogs)
             .where(and(eq(esignAuditLogs.tenantId, tenantId), eq(esignAuditLogs.requestId, requestId)))
-            .orderBy(asc(esignAuditLogs.createdAt)).all();
+            .orderBy(asc(esignAuditLogs.createdAt), asc(sql`rowid`)).all();
         if (events.length === 0) return { valid: false, reason: 'not_found' };
 
         // Distinguishes "this tenant has never had a key" from "this row names a

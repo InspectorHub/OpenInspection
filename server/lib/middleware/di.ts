@@ -44,7 +44,7 @@ import { TemplateSeedService } from '../../services/template-seed.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
 import { ReportTranslationService } from '../../services/report-translation.service';
 import { ReportExportService } from '../../services/report-export.service';
-import { SigningKeyService } from '../../services/signing-key.service';
+import { SigningKeyService, signingKeySecrets } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
 import { ImportHistoryService } from '../../services/import-history.service';
 import { InspectionRequestService } from '../../services/inspection-request.service';
@@ -241,7 +241,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     }));
                     break;
                 case 'inspection':
-                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET, signingKeySecrets(c.env).previous);
                     // This middleware is the only layer holding `c.env`, so it is
                     // the only place the request scope can enter the service tree.
                     // Without it PeopleService.listPeople cannot memoise and the
@@ -252,7 +252,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     // PortalService depends on InspectionService — resolve it via the
                     // proxy target the same way auditLog resolves signingKey.
                     if (!target.inspection) {
-                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET, signingKeySecrets(c.env).previous);
                         target.inspection.setRequestEnv(c.env);
                     }
                     target.portal = new PortalService(c.env.DB, target.inspection);
@@ -273,13 +273,13 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     });
                     break;
                 case 'signingKey':
-                    target.signingKey = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+                    target.signingKey = SigningKeyService.fromEnv(c.env.DB, c.env);
                     break;
                 case 'auditLog':
                     {
                         // auditLog depends on signingKey — pull via the proxy so it lazy-resolves the same way
                         if (!target.signingKey) {
-                            target.signingKey = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+                            target.signingKey = SigningKeyService.fromEnv(c.env.DB, c.env);
                         }
                         target.auditLog = new AuditLogService(c.env.DB, target.signingKey);
                     }
@@ -431,7 +431,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.unitSwitch = new UnitSwitchService(c.env.DB);
                     break;
                 case 'reportVersion':
-                    target.reportVersion = new ReportVersionService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+                    target.reportVersion = new ReportVersionService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET, signingKeySecrets(c.env).previous);
                     break;
                 case 'integrations':
                     target.integrations = new IntegrationsService(c.env.DB, c.env);
@@ -448,7 +448,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                 case 'compliance':
                     // Commercial PCA Phase M — reuses the tenant Ed25519 signing key
                     // (same secret as signingKey/reportVersion) for dual sign-off attestations.
-                    target.compliance = new ComplianceService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+                    target.compliance = new ComplianceService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET, signingKeySecrets(c.env).previous);
                     break;
             }
             return target[prop];

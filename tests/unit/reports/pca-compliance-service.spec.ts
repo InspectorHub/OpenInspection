@@ -36,7 +36,7 @@ describe('ComplianceService (Phase M Task 5 — dual sign-off + PSQ + doc-review
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         await seedTenants(testDb);
-        svc = new ComplianceService({} as D1Database, SECRET);
+        svc = new ComplianceService({} as D1Database, SECRET, []);
     });
 
     it('signs a reviewer attestation that verifies against the tenant key', async () => {

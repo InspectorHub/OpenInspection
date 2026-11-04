@@ -70,6 +70,7 @@ export async function applyCmdEnvelope(
     dos?: PurgeDurableObjects,
     emailEnv?: EmailServiceEnv,
     encryptionSecret?: string,
+    previousSecrets: readonly string[] = [],
 ): Promise<CmdApplyResult> {
     const db = drizzle(dbBinding);
     const env = parseCmdEnvelope(raw);
@@ -175,7 +176,7 @@ export async function applyCmdEnvelope(
     }
 
     try {
-        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets, dos, emailEnv, encryptionSecret);
+        const replyExtra = await applyKnownCmd(dbBinding, kv, env, buckets, dos, emailEnv, encryptionSecret, previousSecrets);
         // Advance the high-water mark (guarded so a concurrent higher write wins).
         if (tenantId) {
             await db.update(tenants)
@@ -234,6 +235,7 @@ async function applyKnownCmd(
     dos?: PurgeDurableObjects,
     emailEnv?: EmailServiceEnv,
     encryptionSecret?: string,
+    previousSecrets: readonly string[] = [],
 ): Promise<Record<string, unknown> | undefined> {
     switch (env.type) {
         case 'io.inspectorhub.cmd.tenant.update': {
@@ -362,7 +364,7 @@ async function applyKnownCmd(
             }
             const { applyReportCorrection } = await import('./apply-report-correction');
             return applyReportCorrection(dbBinding, encryptionSecret, data,
-                env.replyto !== undefined ? { correctedBy: env.replyto } : {});
+                env.replyto !== undefined ? { correctedBy: env.replyto } : {}, previousSecrets);
         }
         case 'io.inspectorhub.cmd.migration.deliver':
         case 'io.inspectorhub.cmd.migration.decline':
