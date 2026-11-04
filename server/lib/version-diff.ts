@@ -40,6 +40,9 @@ export interface SnapshotInspector {
  * 1 — `{ inspection, data, units }`. Every row written before the credential
  *     snapshot. Absent `schemaVersion` means 1; the field did not exist.
  * 2 — adds `inspectors` and `styleProfile`.
+ * 3 — adds what the report reads that is not in `inspection`, `data` or `units`: `ratingSystemSnapshot`,
+ *     and, for a commercial report, `costItems`, `costYear`, `reserve` and `compliance`. A version published
+ *     under 1 or 2 lacks them, and the reader falls back to the live value for exactly those.
  *
  * The version exists so a READER can tell "this report predates credentials"
  * from "this inspector held none" — two states that look identical as an empty
@@ -54,7 +57,7 @@ export interface SnapshotInspector {
  * kind of reasoning that is easy to get wrong in the safe direction and
  * expensive to get wrong in the other.
  */
-export const SNAPSHOT_SCHEMA_VERSION = 2;
+export const SNAPSHOT_SCHEMA_VERSION = 3;
 
 /**
  * The inspector a PINNED version credits, or null when the snapshot cannot say.
@@ -93,6 +96,20 @@ export interface Snapshot {
     inspectors?: SnapshotInspector[];
     /** v2+. The appearance profile resolved at publish (Report Style Presets). */
     styleProfile?: Record<string, unknown> | null;
+    /** v3+. The results row's frozen rating system (null when the row had none). */
+    ratingSystemSnapshot?: unknown;
+    /** v3+, commercial reports only. The cost line items the cost tables were built from. */
+    costItems?: Array<Record<string, unknown>>;
+    /** v3+, with `costItems`. The company's reserve-schedule assumptions the cost tables were built under. */
+    reserve?: { reserveScheduleEnabled: boolean; reserveTermYears: number; inflationRateBps: number | null };
+    /** v3+, with `costItems`. The calendar year the reserve schedule counted from, so it does not drift each January. */
+    costYear?: number;
+    /** v3+, full PCA reports only. Sign-offs (with `signedAt` as epoch milliseconds), the PSQ and the document review. */
+    compliance?: {
+        reportSignoffs: Array<Record<string, unknown>>;
+        psq: Record<string, unknown> | null;
+        documentReview: Array<Record<string, unknown>>;
+    };
 }
 
 interface ItemDiff {

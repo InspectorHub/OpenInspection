@@ -15,6 +15,7 @@ import { InspectionSubService } from './base';
 import { templateSnapshotSectionsOrNone } from './shared';
 import type { InspectionService } from '../inspection.service';
 import { r2Keys } from '../../lib/r2-keys';
+import { loadFrozenFileKeys } from '../../lib/report-snapshot';
 
 /** D1's JSON column comes back as a string (D1) or a parsed object (driver
  *  cache). Normalize either into a record; an empty object when absent. */
@@ -469,6 +470,12 @@ export class InspectionPhotoService extends InspectionSubService {
             .get();
         if (insp && (insp.coverPhotoId === row.r2Key || insp.coverImageKey === row.r2Key)) {
             throw Errors.Conflict('This photo is set as the report cover — clear the cover first.');
+        }
+
+        // A photo a published version shows is part of that frozen report (and of its PDFs) however the working copy
+        // has changed: deleting the stored file would leave the client's page with a broken picture.
+        if ((await loadFrozenFileKeys(this.getDrizzle(), tenantId, inspectionId)).has(row.r2Key)) {
+            throw Errors.Conflict('This photo is part of a published version of the report and cannot be deleted.');
         }
 
         await db.delete(inspectionMediaPool)

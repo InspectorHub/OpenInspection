@@ -8,6 +8,7 @@ import { inspections, inspectionResults } from '../../lib/db/schema/inspection';
 import { inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { Errors } from '../../lib/errors';
+import { loadLatestFrozenFindings } from '../../lib/report-snapshot';
 import { logger } from '../../lib/logger';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { resolveAgentRepairAccess, effectiveRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
@@ -396,6 +397,8 @@ export async function listRecommendationsForAgent(
         .where(eq(inspections.reportStatus, REPORT_STATUS.PUBLISHED))
         .all();
 
+    // The agent reads the same report the client was sent, as published, never the inspector's working copy.
+    const frozen = await loadLatestFrozenFindings(db, rows);
     // IA-104 — no post-filter; the join is the access check.
     const flat = rows.flatMap((r) => flattenInspectionToRecommendations({
         id:               r.id,
@@ -405,8 +408,8 @@ export async function listRecommendationsForAgent(
         repairAccess:     resolveAgentRepairAccess(r.inspectionPrefs),
         propertyAddress:  r.propertyAddress,
         date:             r.date,
-        templateSnapshot: r.templateSnapshot,
-        resultsData:      r.resultsData,
+        templateSnapshot: frozen.get(`${r.tenantId}:${r.id}`)?.templateSnapshot ?? r.templateSnapshot,
+        resultsData:      frozen.get(`${r.tenantId}:${r.id}`)?.data ?? r.resultsData,
     }));
     return groupRecommendations(flat);
 }

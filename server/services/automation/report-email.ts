@@ -31,8 +31,12 @@ import type { ReportPdfService } from '../report-pdf.service';
 export interface ReportDeliveryDeps {
     portalAccess: PortalAccessService;
     reportPdf: ReportPdfService;
-    /** Resolve the render-cache content hash for an inspection (wraps InspectionService.getReportContentHash). */
-    getContentHash: (inspectionId: string, tenantId: string) => Promise<string>;
+    /**
+     * Which document the attached PDF is made from: the published version the client's link shows, and the hash
+     * its render is cached under (`resolveClientPdfTarget`). One answer, so the version and the hash cannot come
+     * from two different moments. A null version means no frozen version exists, and the live report is rendered.
+     */
+    resolvePdfTarget: (inspectionId: string, tenantId: string) => Promise<{ versionNumber: number | null; contentHash: string }>;
     /** Bare host (no protocol) for the render URL — the cron path's appHost. */
     renderHost: string;
     /** JWT_SECRET used to sign the short-TTL render token (buildRenderReportUrl). */
@@ -142,13 +146,13 @@ export async function deliverReportEmail(
         if (!pdfPromise) {
             pdfPromise = (async () => {
                 try {
+                    const { versionNumber: version, contentHash } = await reportDelivery.resolvePdfTarget(inspection.id, inspection.tenantId);
                     const renderUrl = await buildRenderReportUrl(
-                        reportDelivery.renderHost, tenant.slug, inspection.id, reportDelivery.renderSecret,
+                        reportDelivery.renderHost, tenant.slug, inspection.id, reportDelivery.renderSecret, version ?? undefined,
                     );
-                    const contentHash = await reportDelivery.getContentHash(inspection.id, inspection.tenantId);
                     const record = await reportDelivery.reportPdf.getOrRender(
                         inspection.id, inspection.tenantId, 'full',
-                        { reportUrl: renderUrl, contentHash, versionNumber: null },
+                        { reportUrl: renderUrl, contentHash, versionNumber: version },
                     );
                     const obj = await reportDelivery.reportPdf.streamPdf(record);
                     if (!obj) return null;

@@ -71,7 +71,8 @@ function buildApp() {
                 }),
             },
             reportVersion: {
-                snapshotOnPublish: vi.fn().mockResolvedValue({ versionNumber: 1 }),
+                assertSnapshotFits: vi.fn().mockResolvedValue(undefined),
+                snapshotOnPublish: vi.fn().mockResolvedValue({ versionNumber: 1, contentHash: 'h1' }),
             },
             reportPdf: {
                 purgeTransientPdfs: vi.fn().mockResolvedValue(undefined),

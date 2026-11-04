@@ -38,6 +38,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import type { InspectionService } from '../../services/inspection.service';
 import type { ReportTranslationService } from '../../services/report-translation.service';
 import { resolveRenderedReportId } from '../../services/inspection/report-grain';
+import { loadLatestPublishedRef } from '../report-snapshot';
 import { segmentReport, type ReportSpan } from './segment-report';
 import type { ReportData } from './report-span-register';
 import {
@@ -176,8 +177,10 @@ export async function readTranslationState(
 ): Promise<ReportTranslationState> {
     const stored = await deps.translations.read(input.tenantId, input.reportId, input.locale);
     if (!stored) return 'none';
+    // On the version the client reads, like the reader path: the working copy is not what the translation is for.
+    const published = await loadLatestPublishedRef(drizzle(deps.db), input.tenantId, input.inspectionId, input.reportId);
     const current = await deps.inspection.getReportContentHash(
-        input.inspectionId, input.tenantId, input.reportId,
+        input.inspectionId, input.tenantId, input.reportId, null, published?.versionNumber,
     );
     // The SAME comparison the reader path makes, on purpose. Two answers to
     // "is this fresh" is how a surface comes to promise something the client

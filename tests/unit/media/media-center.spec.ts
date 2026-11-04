@@ -269,6 +269,24 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         expect(r2Mock.delete).toHaveBeenCalledWith(pool.key);
     });
 
+    it('deletePoolPhoto refuses a photo a published version shows, and keeps both the row and the file', async () => {
+        const pool = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([JPEG_BYTES], 'r.jpg', { type: 'image/jpeg' }));
+        await testDb.insert(schema.reportVersions).values({
+            id: 'rv-pool', tenantId: TENANT, inspectionId: INSPECTION_ID, versionNumber: 1, publishedAt: new Date(), publishedBy: 'u',
+            snapshotJson: JSON.stringify({ data: { item: { photos: [{ key: pool.key }] } }, units: [] }),
+        });
+        r2Mock.delete.mockClear();
+
+        await expect(svc.deletePoolPhoto(INSPECTION_ID, TENANT, pool.id)).rejects.toMatchObject({ status: 409 });
+        expect((await svc.getMediaCenter(INSPECTION_ID, TENANT)).pool).toHaveLength(1);
+        expect(r2Mock.delete).not.toHaveBeenCalled();
+
+        // Control: a pool photo no version names is deleted as before.
+        const other = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([JPEG_BYTES], 'o.jpg', { type: 'image/jpeg' }));
+        await svc.deletePoolPhoto(INSPECTION_ID, TENANT, other.id);
+        expect(r2Mock.delete).toHaveBeenCalledWith(other.key);
+    });
+
     it('tenant isolation — pool rows for another tenant are invisible to attach/list/delete', async () => {
         // Seed a pool row that belongs to a *different* tenant + inspection.
         await testDb.insert(schema.inspectionMediaPool).values({

@@ -139,7 +139,32 @@ describe('snapshotOnPublish — credentials and appearance', () => {
         // An empty `inspectors` on a v2 row means "held none"; a missing one on
         // a v1 row means "this predates the feature". Identical as JSON,
         // opposite as a claim on a cover page.
-        expect((await snapshotOf()).schemaVersion).toBe(2);
+        // 3 adds the rating system and the commercial parts a client's frozen report reads.
+        expect((await snapshotOf()).schemaVersion).toBe(3);
+    });
+
+    describe('the version insert after the status flip', () => {
+        const failVersionInsert = (times: number) => {
+            const real = db.insert.bind(db);
+            let failures = 0;
+            vi.spyOn(db, 'insert').mockImplementation(((table: unknown) => {
+                if (table === schema.reportVersions && failures < times) { failures++; throw new Error('D1 hiccup'); }
+                return real(table as never);
+            }) as never);
+        };
+
+        it('is retried once, so one transient failure still leaves the report with its frozen version', async () => {
+            failVersionInsert(1);
+            const out = await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+            expect(out.versionNumber).toBe(1);
+            expect(await db.select().from(schema.reportVersions).all()).toHaveLength(1);
+        });
+
+        it('is thrown after the second failure, for the route to log, and writes no half version', async () => {
+            failVersionInsert(2);
+            await expect(svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a')).rejects.toThrow('D1 hiccup');
+            expect(await db.select().from(schema.reportVersions).all()).toHaveLength(0);
+        });
     });
 
     it('never reaches into another tenant credentials', async () => {
