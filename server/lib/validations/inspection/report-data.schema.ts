@@ -142,18 +142,23 @@ const OPAQUE = (what: string) => z.unknown().optional().describe(`${what} Its sh
  * The inspection row extras are the same object the create and single-read responses use (inspection-row.ts), less the two columns the
  * report service removes (`price`, `internalNotes`). The record does not carry the company id.
  */
-const ReportStaffItemSchema = ReportItemSchema.extend({
+const ReportStaffItemSchema = z.object({
+  ...ReportItemSchema.shape,
   tabs: OPAQUE('The canned-comment tabs of the template item (information, limitations, defects), or null.'),
   resolvedTabs: OPAQUE('The canned comments per tab with the choices of this inspection applied: information, limitations and defects.'),
 });
 
-export const ReportDataFullSchema = ReportDataResponseSchema.extend({
+// Built by spreading the public document's shape, NOT by `.extend` on the registered schema: `.extend` makes the generated contract a wrapper
+// (`allOf` of a reference to ReportData and the extra fields), and a consumer that reads only one branch at a time (or a contract diff tool
+// without allOf flattening) then sees the shared fields as removed. Spread, the document is one flat object.
+export const ReportDataFullSchema = z.object({
+  ...ReportDataResponseSchema.shape,
   inspection: ReportDataResponseSchema.shape.inspection.extend({
     ...InspectionSchema.pick({ inspectorId: true, templateId: true, createdAt: true }).partial().shape,
     // The report service removes these two from the inspection it returns, so this payload never carries them.
     ...inspectionRowFieldsWithout('price', 'internalNotes'),
   }),
-  sections: z.array(ReportSectionSchema.extend({ items: z.array(ReportStaffItemSchema).describe('Items in the section.') })).describe('Report sections in display order.'),
+  sections: z.array(z.object({ ...ReportSectionSchema.shape, items: z.array(ReportStaffItemSchema).describe('Items in the section.') })).describe('Report sections in display order.'),
   amendmentTrail: OPAQUE('Versions of the report published so far and whether it was amended.'),
   reinspection: OPAQUE('The re-inspection summary, or null on a normal report.'),
   coverPhotoUrl: z.string().nullable().optional().describe('Download URL of the report cover image, or null when none is chosen.'),

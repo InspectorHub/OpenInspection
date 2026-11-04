@@ -15230,7 +15230,7 @@
           "data"
         ]
       },
-      "ReportData": {
+      "ReportDataFull": {
         "type": "object",
         "properties": {
           "inspection": {
@@ -15256,6 +15256,497 @@
                 "type": "string",
                 "nullable": true,
                 "description": "Name of the inspector, or null."
+              },
+              "inspectorId": {
+                "type": "string",
+                "nullable": true,
+                "minLength": 1,
+                "example": "550e8400-e29b-41d4-a716-446655440001",
+                "description": "Assigned inspector (users.id)."
+              },
+              "templateId": {
+                "type": "string",
+                "nullable": true,
+                "minLength": 1,
+                "example": "550e8400-e29b-41d4-a716-446655440002",
+                "description": "Id of the template the inspection is built from, or null when none is attached."
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2024-03-20T10:00:00Z",
+                "description": "When the inspection record was created (ISO 8601)."
+              },
+              "addressPlaceId": {
+                "type": "string",
+                "nullable": true,
+                "description": "Place identifier returned by the address autocomplete, or null."
+              },
+              "addressStreet": {
+                "type": "string",
+                "nullable": true,
+                "description": "Street line of the geocoded address, or null."
+              },
+              "addressCity": {
+                "type": "string",
+                "nullable": true,
+                "description": "City of the geocoded address, or null."
+              },
+              "addressState": {
+                "type": "string",
+                "nullable": true,
+                "description": "State or region code of the geocoded address, or null."
+              },
+              "addressZip": {
+                "type": "string",
+                "nullable": true,
+                "description": "Postal code of the geocoded address, or null."
+              },
+              "addressCounty": {
+                "type": "string",
+                "nullable": true,
+                "description": "County as the address autocomplete returned it, or null. The Property Facts county is `county`."
+              },
+              "addressLat": {
+                "type": "number",
+                "nullable": true,
+                "description": "Latitude of the geocoded address, or null."
+              },
+              "addressLng": {
+                "type": "number",
+                "nullable": true,
+                "description": "Longitude of the geocoded address, or null."
+              },
+              "addressGeocodedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time",
+                "description": "When the address was geocoded (ISO 8601), or null."
+              },
+              "unit": {
+                "type": "string",
+                "nullable": true,
+                "description": "Suite or unit designation of the inspected property, or null."
+              },
+              "county": {
+                "type": "string",
+                "nullable": true,
+                "description": "County as the Property Facts strip edits it, or null."
+              },
+              "propertyType": {
+                "type": "string",
+                "nullable": true,
+                "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows."
+              },
+              "commercialSubtype": {
+                "type": "string",
+                "nullable": true,
+                "description": "Commercial property subtype, or null. Only meaningful when the property type is commercial."
+              },
+              "yearBuilt": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Year the property was built, or null."
+              },
+              "sqft": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Floor area in square feet, or null."
+              },
+              "foundationType": {
+                "type": "string",
+                "nullable": true,
+                "description": "Foundation type, or null."
+              },
+              "bedrooms": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Number of bedrooms, or null."
+              },
+              "bathrooms": {
+                "type": "number",
+                "nullable": true,
+                "description": "Number of bathrooms (may be fractional), or null."
+              },
+              "lotSize": {
+                "type": "string",
+                "nullable": true,
+                "description": "Lot size as free text, such as \"0.25 acres\", or null."
+              },
+              "propertyFacts": {
+                "type": "object",
+                "nullable": true,
+                "additionalProperties": {
+                  "nullable": true
+                },
+                "description": "The Property Facts values (year built, size, foundation and the like), or null when none are stored."
+              },
+              "reportStatus": {
+                "type": "string",
+                "enum": [
+                  "in_progress",
+                  "submitted",
+                  "published"
+                ],
+                "description": "Where the report is in its life: in_progress, submitted or published."
+              },
+              "paymentStatus": {
+                "type": "string",
+                "enum": [
+                  "unpaid",
+                  "partial",
+                  "paid"
+                ],
+                "description": "How much of the order has been paid."
+              },
+              "paymentRequired": {
+                "type": "boolean",
+                "description": "Whether payment is required before the report is released."
+              },
+              "agreementRequired": {
+                "type": "boolean",
+                "description": "Whether a signed agreement is required before the report is released."
+              },
+              "autoSignOnPublish": {
+                "type": "boolean",
+                "description": "Whether the inspector signature is applied automatically when the report is published."
+              },
+              "disableAutomations": {
+                "type": "boolean",
+                "description": "True when automations are switched off for this inspection."
+              },
+              "teamMode": {
+                "type": "boolean",
+                "description": "True when the inspection is worked by a team."
+              },
+              "confirmedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time",
+                "description": "When the client confirmed the booking (ISO 8601), or null."
+              },
+              "scheduledStartMs": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time",
+                "description": "Start of the scheduled time slot, or null. An ISO 8601 string here, unlike the epoch-millisecond number the schedule request takes."
+              },
+              "scheduledEndMs": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time",
+                "description": "End of the scheduled time slot, or null. An ISO 8601 string here, unlike the epoch-millisecond number the schedule request takes."
+              },
+              "durationMin": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Expected duration in minutes, or null."
+              },
+              "requestId": {
+                "type": "string",
+                "nullable": true,
+                "description": "Id of the booking request this inspection came from, or null."
+              },
+              "conciergeStatus": {
+                "type": "string",
+                "nullable": true,
+                "description": "Status of the concierge booking flow for this inspection, or null."
+              },
+              "referenceNumber": {
+                "type": "string",
+                "nullable": true,
+                "description": "External order or reference number, or null."
+              },
+              "referralSource": {
+                "type": "string",
+                "nullable": true,
+                "description": "Free-text label for the referral channel, or null."
+              },
+              "referredByContactId": {
+                "type": "string",
+                "nullable": true,
+                "description": "Contact who referred this job, or null."
+              },
+              "closingDate": {
+                "type": "string",
+                "nullable": true,
+                "description": "Closing date of the property sale (YYYY-MM-DD), or null."
+              },
+              "discountAmount": {
+                "type": "number",
+                "nullable": true,
+                "description": "Discount applied to the order, in cents, or null. ABSENT without the inspectionFees capability."
+              },
+              "discountCodeId": {
+                "type": "string",
+                "nullable": true,
+                "description": "Id of the discount code applied to the order, or null."
+              },
+              "depositRequiredCents": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Deposit owed on this order, in integer cents, or null. ABSENT without the inspectionFees capability."
+              },
+              "depositOverridden": {
+                "type": "boolean",
+                "description": "True when an operator set the deposit by hand, so a later re-resolve does not replace it."
+              },
+              "cancelReason": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "client_cancelled",
+                  "no_show",
+                  "weather",
+                  "inspector_unavailable",
+                  "property_unavailable",
+                  "rescheduled",
+                  "other",
+                  null
+                ],
+                "description": "Why the inspection was cancelled, or null when it was not."
+              },
+              "cancelNotes": {
+                "type": "string",
+                "nullable": true,
+                "description": "Free-text note stored with a cancellation, or null."
+              },
+              "coverPhotoId": {
+                "type": "string",
+                "nullable": true,
+                "description": "Storage key of the photo chosen as the report cover, or null when none is chosen."
+              },
+              "coverCrop": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "aspect": {
+                    "type": "string",
+                    "enum": [
+                      "3:2",
+                      "16:9",
+                      "1.91:1",
+                      "4:3"
+                    ]
+                  },
+                  "orientation": {
+                    "type": "string",
+                    "enum": [
+                      "landscape",
+                      "portrait"
+                    ]
+                  },
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "width": {
+                    "type": "number"
+                  },
+                  "height": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "aspect",
+                  "orientation",
+                  "x",
+                  "y",
+                  "width",
+                  "height"
+                ],
+                "description": "The crop rectangle chosen for the cover photo, or null. It is only meaningful against the current cover photo."
+              },
+              "coverImageKey": {
+                "type": "string",
+                "nullable": true,
+                "description": "Storage key of the cropped cover image the report uses when set, or null."
+              },
+              "reportTier": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "light_commercial",
+                  "full_pca",
+                  null
+                ],
+                "description": "Report tier of a commercial inspection, or null for none."
+              },
+              "reportPhotoMode": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "appendix",
+                  "inline",
+                  null
+                ],
+                "description": "Forced photo presentation mode, or null to derive it from the report tier."
+              },
+              "reportPhotoColumns": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Photo grid columns for this report (1-4), or null to inherit the profile."
+              },
+              "profileOverride": {
+                "type": "string",
+                "nullable": true,
+                "description": "Appearance profile id for this report, or null to inherit."
+              },
+              "badgeLayoutOverride": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "strip",
+                  "inline",
+                  null
+                ],
+                "description": "Credential badge layout for this report, or null to inherit the profile."
+              },
+              "requireDefectFieldsOverride": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "none",
+                  "location",
+                  "trade",
+                  "both",
+                  null
+                ],
+                "description": "Which defect fields the publish gate requires for this inspection, or null to inherit the company default."
+              },
+              "reportsGeneratedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time",
+                "description": "When the report files were last generated (ISO 8601), or null."
+              },
+              "templateSnapshot": {
+                "type": "object",
+                "nullable": true,
+                "additionalProperties": {
+                  "nullable": true
+                },
+                "description": "The template structure frozen onto this inspection, or null when it has none or the stored value is not a readable object. The editor reads it to render the checklist."
+              },
+              "templateSnapshotVersion": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Version of the template at the time the snapshot was taken, or null."
+              },
+              "pcaNarrative": {
+                "type": "object",
+                "nullable": true,
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders."
+              },
+              "unitInspectionMode": {
+                "type": "string",
+                "enum": [
+                  "tagged",
+                  "per_unit"
+                ],
+                "description": "Whether findings are tagged with a location or recorded per unit."
+              },
+              "locationOptions": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "type": "string"
+                },
+                "description": "Locations a finding can be tagged with in tagged mode, or null."
+              },
+              "samplingDeclaration": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "samplingMethod": {
+                    "type": "string",
+                    "enum": [
+                      "exhaustive",
+                      "representative"
+                    ]
+                  },
+                  "unitsTotal": {
+                    "type": "number"
+                  },
+                  "unitsInspected": {
+                    "type": "number"
+                  },
+                  "basis": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "samplingMethod"
+                ],
+                "description": "What was sampled and what was not, or null."
+              },
+              "deviations": {
+                "type": "array",
+                "nullable": true,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "area": {
+                      "type": "string"
+                    },
+                    "baselineRequirement": {
+                      "type": "string"
+                    },
+                    "deviation": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "area",
+                    "baselineRequirement",
+                    "deviation",
+                    "reason"
+                  ]
+                },
+                "description": "Deviations from the standard guide, or null when none are recorded."
+              },
+              "sourceInspectionId": {
+                "type": "string",
+                "nullable": true,
+                "description": "Inspection this one was created from, or null."
+              },
+              "rootInspectionId": {
+                "type": "string",
+                "nullable": true,
+                "description": "First inspection of a re-inspection chain, or null."
+              },
+              "reinspectionRound": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Position in a re-inspection chain, or null."
+              },
+              "unlockedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time",
+                "description": "When the published report was unlocked for editing (ISO 8601), or null."
+              },
+              "unlockedBy": {
+                "type": "string",
+                "nullable": true,
+                "description": "Id of the person who unlocked the report, or null."
+              },
+              "unlockReason": {
+                "type": "string",
+                "nullable": true,
+                "description": "Reason given for unlocking the report, or null."
               }
             },
             "required": [
@@ -15264,8 +15755,7 @@
               "date",
               "status",
               "inspectorName"
-            ],
-            "description": "Header facts about the inspection."
+            ]
           },
           "styleProfile": {
             "type": "object",
@@ -15367,7 +15857,400 @@
           "sections": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ReportSection"
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Section id."
+                },
+                "title": {
+                  "type": "string",
+                  "description": "Section title."
+                },
+                "icon": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Icon name for the section, or null."
+                },
+                "defectCount": {
+                  "type": "number",
+                  "description": "Number of items in the section rated as defects."
+                },
+                "disclaimerText": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Disclaimer printed under the section heading, or null when the template sets none."
+                },
+                "alwaysPageBreak": {
+                  "type": "boolean",
+                  "description": "True when the section always starts on a new page."
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Item id."
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Item label as shown in the report."
+                      },
+                      "rating": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Rating level id chosen for the item, or null when unrated."
+                      },
+                      "ratingColor": {
+                        "type": "string",
+                        "description": "Display colour of the chosen rating level."
+                      },
+                      "ratingLabel": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Display label of the chosen rating level, or null when unrated."
+                      },
+                      "severityBucket": {
+                        "type": "string",
+                        "enum": [
+                          "satisfactory",
+                          "monitor",
+                          "defect",
+                          "other"
+                        ],
+                        "description": "Report grouping the rating falls into."
+                      },
+                      "notes": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Inspector notes for the item, or null."
+                      },
+                      "photos": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "key": {
+                              "type": "string",
+                              "description": "Storage key of the photo as the report shows it (the annotated or cropped copy when there is one). The public report states it relative to the company (`inspections/<inspectionId>/...`); the staff payload carries the full key. The public photo route accepts both forms."
+                            },
+                            "url": {
+                              "type": "string",
+                              "description": "Download URL of the photo."
+                            },
+                            "originalKey": {
+                              "type": "string",
+                              "description": "Storage key of the photo as it was first uploaded, before any crop or annotation. Stated like `key`: relative to the company in the public report, in full in the staff payload."
+                            },
+                            "media": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "image",
+                                    "video-player",
+                                    "video-poster",
+                                    "r2-video-player",
+                                    "r2-video-poster"
+                                  ],
+                                  "description": "Which presentation applies."
+                                },
+                                "src": {
+                                  "type": "string",
+                                  "description": "Image source (image)."
+                                },
+                                "key": {
+                                  "type": "string",
+                                  "description": "Storage key (image)."
+                                },
+                                "streamUid": {
+                                  "type": "string",
+                                  "description": "Stream video id (video-player, video-poster)."
+                                },
+                                "mediaId": {
+                                  "type": "string",
+                                  "description": "Stored video id (r2-video-player, r2-video-poster)."
+                                },
+                                "posterUrl": {
+                                  "type": "string",
+                                  "description": "Poster image URL (all video kinds)."
+                                },
+                                "playerSrc": {
+                                  "type": "string",
+                                  "description": "Player source URL (video-player, r2-video-player)."
+                                },
+                                "playerLinkUrl": {
+                                  "type": "string",
+                                  "description": "Link to the player page (video-poster)."
+                                },
+                                "durationSec": {
+                                  "type": "number",
+                                  "description": "Video duration in seconds."
+                                },
+                                "qr": {
+                                  "type": "boolean",
+                                  "description": "True when the poster carries a QR code to the player (video-poster)."
+                                }
+                              },
+                              "required": [
+                                "kind"
+                              ],
+                              "description": "How a video entry is presented (player, poster with a link, or a plain image). Present when the report is built with video context, as the public report is."
+                            },
+                            "photoNo": {
+                              "type": "number",
+                              "description": "Continuous photo number in render order, used by the photo appendix. Present once the report numbers its photos."
+                            }
+                          },
+                          "required": [
+                            "key",
+                            "url"
+                          ]
+                        },
+                        "description": "Photos attached to the item."
+                      },
+                      "recommendation": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Recommendation text attached to the item, if any."
+                      },
+                      "type": {
+                        "type": "string",
+                        "description": "How the item is filled in: one of rich, boolean, text, textarea, number, select, multi_select, date, photo_only. rich is a rating with canned-comment tabs, the others capture a value. A template item that names no type is rich. A client must treat a type it does not know as a plain captured value."
+                      },
+                      "parentId": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Id of the item this one hangs under, or null for a top-level item."
+                      },
+                      "naKind": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                          "not_inspected",
+                          "not_present",
+                          null
+                        ],
+                        "description": "Which kind of not-applicable rating the item carries, or null when it carries none."
+                      },
+                      "notInspectedReason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Why the item was not inspected, as the inspector wrote it, or null."
+                      },
+                      "unit": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Unit of the captured value for a number item (from the template item options), or null."
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ],
+                        "description": "The value captured for a non-rich item: text, a date or a choice as a string, a number, a yes or no, or the choices of a multi-select (a comma-separated string from the web editor, a list of strings from other clients). Null when nothing was captured or the stored value is of another shape."
+                      },
+                      "ratingOptions": {
+                        "type": "array",
+                        "nullable": true,
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "The rating labels offered at the top of the item card, or null when the template sets none."
+                      },
+                      "original": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "rating": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Rating the item carried in the inspection this one follows up on, or null."
+                          },
+                          "notes": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Notes the item carried in that earlier inspection, or null."
+                          },
+                          "photos": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string",
+                                  "description": "Storage key of the photo as the report shows it (the annotated or cropped copy when there is one). The public report states it relative to the company (`inspections/<inspectionId>/...`); the staff payload carries the full key. The public photo route accepts both forms."
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "description": "Download URL of the photo."
+                                },
+                                "originalKey": {
+                                  "type": "string",
+                                  "description": "Storage key of the photo as it was first uploaded, before any crop or annotation. Stated like `key`: relative to the company in the public report, in full in the staff payload."
+                                },
+                                "media": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "image",
+                                        "video-player",
+                                        "video-poster",
+                                        "r2-video-player",
+                                        "r2-video-poster"
+                                      ],
+                                      "description": "Which presentation applies."
+                                    },
+                                    "src": {
+                                      "type": "string",
+                                      "description": "Image source (image)."
+                                    },
+                                    "key": {
+                                      "type": "string",
+                                      "description": "Storage key (image)."
+                                    },
+                                    "streamUid": {
+                                      "type": "string",
+                                      "description": "Stream video id (video-player, video-poster)."
+                                    },
+                                    "mediaId": {
+                                      "type": "string",
+                                      "description": "Stored video id (r2-video-player, r2-video-poster)."
+                                    },
+                                    "posterUrl": {
+                                      "type": "string",
+                                      "description": "Poster image URL (all video kinds)."
+                                    },
+                                    "playerSrc": {
+                                      "type": "string",
+                                      "description": "Player source URL (video-player, r2-video-player)."
+                                    },
+                                    "playerLinkUrl": {
+                                      "type": "string",
+                                      "description": "Link to the player page (video-poster)."
+                                    },
+                                    "durationSec": {
+                                      "type": "number",
+                                      "description": "Video duration in seconds."
+                                    },
+                                    "qr": {
+                                      "type": "boolean",
+                                      "description": "True when the poster carries a QR code to the player (video-poster)."
+                                    }
+                                  },
+                                  "required": [
+                                    "kind"
+                                  ],
+                                  "description": "How a video entry is presented (player, poster with a link, or a plain image). Present when the report is built with video context, as the public report is."
+                                },
+                                "photoNo": {
+                                  "type": "number",
+                                  "description": "Continuous photo number in render order, used by the photo appendix. Present once the report numbers its photos."
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "url"
+                              ]
+                            },
+                            "description": "Photos of the item from that earlier inspection."
+                          }
+                        },
+                        "required": [
+                          "rating",
+                          "notes",
+                          "photos"
+                        ],
+                        "description": "The baseline finding of a re-inspection, or null on a normal report."
+                      },
+                      "followupStatus": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Follow-up status recorded for the item in a re-inspection, or null."
+                      },
+                      "followupNotes": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Follow-up notes recorded for the item in a re-inspection, or null."
+                      },
+                      "repairItems": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "summary": {
+                              "type": "string"
+                            },
+                            "estimateMin": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "estimateMax": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "contractorType": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "summary",
+                            "estimateMin",
+                            "estimateMax",
+                            "contractorType"
+                          ]
+                        },
+                        "description": "Attached repair items snapshotted on this finding (dollars, not cents)."
+                      },
+                      "tabs": {
+                        "nullable": true,
+                        "description": "The canned-comment tabs of the template item (information, limitations, defects), or null. Its shape is not written down yet."
+                      },
+                      "resolvedTabs": {
+                        "nullable": true,
+                        "description": "The canned comments per tab with the choices of this inspection applied: information, limitations and defects. Its shape is not written down yet."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label",
+                      "rating",
+                      "ratingColor",
+                      "ratingLabel",
+                      "severityBucket",
+                      "notes",
+                      "photos"
+                    ]
+                  },
+                  "description": "Items in the section."
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "defectCount",
+                "items"
+              ]
             },
             "description": "Report sections in display order."
           },
@@ -15411,6 +16294,159 @@
               ]
             },
             "description": "Rating levels available to the report, in display order."
+          },
+          "amendmentTrail": {
+            "nullable": true,
+            "description": "Versions of the report published so far and whether it was amended. Its shape is not written down yet."
+          },
+          "reinspection": {
+            "nullable": true,
+            "description": "The re-inspection summary, or null on a normal report. Its shape is not written down yet."
+          },
+          "coverPhotoUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "Download URL of the report cover image, or null when none is chosen."
+          },
+          "outline": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            },
+            "description": "Table of contents of a commercial report; empty for residential reports."
+          },
+          "photoMode": {
+            "type": "string",
+            "enum": [
+              "appendix",
+              "inline"
+            ],
+            "description": "Where photos are shown: inline with the findings or in a central appendix."
+          },
+          "photoAppendix": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            },
+            "description": "The numbered photo appendix of a commercial report."
+          },
+          "showEstimates": {
+            "type": "boolean",
+            "description": "Whether repair estimates are shown in the report."
+          },
+          "enableCustomerRepairExport": {
+            "type": "boolean",
+            "description": "Whether the client may export the repair list."
+          },
+          "reportTimeZone": {
+            "type": "string",
+            "description": "IANA time zone the report dates are shown in."
+          },
+          "propertyFacts": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "The Property Facts values (year built, size, foundation and the like), or null."
+          },
+          "reportTier": {
+            "type": "string",
+            "nullable": true,
+            "description": "Report tier of a commercial inspection (light_commercial or full_pca), or null."
+          },
+          "costTables": {
+            "nullable": true,
+            "description": "The cost tables of a commercial report, or null. Its shape is not written down yet."
+          },
+          "propertyType": {
+            "type": "string",
+            "nullable": true,
+            "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows."
+          },
+          "commercialSubtype": {
+            "type": "string",
+            "nullable": true,
+            "description": "Commercial property subtype, or null."
+          },
+          "buildingProfile": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            },
+            "description": "Building profile rows of a commercial report."
+          },
+          "pcaReport": {
+            "nullable": true,
+            "description": "The property condition report block of a commercial inspection, or null. Its shape is not written down yet."
+          },
+          "unitInspectionMode": {
+            "type": "string",
+            "enum": [
+              "tagged",
+              "per_unit"
+            ],
+            "description": "Whether findings are tagged with a location or recorded per unit."
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            },
+            "description": "The unit tree of a per-unit inspection; empty otherwise."
+          },
+          "unitConditionMatrix": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            },
+            "description": "Units by systems condition matrix; empty outside per-unit mode."
+          },
+          "defectCountsByUnit": {
+            "nullable": true,
+            "description": "Defect counts keyed by unit; empty outside per-unit mode. Its shape is not written down yet."
+          },
+          "samplingDeclaration": {
+            "nullable": true,
+            "description": "What was sampled and what was not, or null. Its shape is not written down yet."
+          },
+          "isPublished": {
+            "type": "boolean",
+            "description": "True when the report has been published."
+          },
+          "signature": {
+            "nullable": true,
+            "description": "The inspector signature block of a published report, or null. Its shape is not written down yet."
+          },
+          "verification": {
+            "nullable": true,
+            "description": "The verification block of a published report, or null. Its shape is not written down yet."
+          },
+          "astmConformance": {
+            "nullable": true,
+            "description": "The ASTM conformance summary of a commercial report, or null. Its shape is not written down yet."
+          },
+          "reportSignoffs": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            },
+            "description": "Sign-offs recorded for the report."
+          },
+          "psq": {
+            "nullable": true,
+            "description": "The pre-survey questionnaire status and answers, or null. Its shape is not written down yet."
+          },
+          "documentReview": {
+            "type": "array",
+            "items": {
+              "nullable": true
+            },
+            "description": "Documents requested and reviewed for the report."
+          },
+          "relianceText": {
+            "nullable": true,
+            "description": "The reliance wording printed in a commercial report, or null. Its shape is not written down yet."
           }
         },
         "required": [
@@ -15420,1128 +16456,8 @@
           "stats",
           "sections",
           "ratingLevels"
-        ]
-      },
-      "ReportDataFull": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/ReportData"
-          },
-          {
-            "type": "object",
-            "properties": {
-              "inspection": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "description": "Inspection id."
-                  },
-                  "propertyAddress": {
-                    "type": "string",
-                    "description": "Street address of the inspected property."
-                  },
-                  "date": {
-                    "type": "string",
-                    "description": "Inspection date."
-                  },
-                  "status": {
-                    "type": "string",
-                    "description": "Lifecycle status of the inspection."
-                  },
-                  "inspectorName": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Name of the inspector, or null."
-                  },
-                  "inspectorId": {
-                    "type": "string",
-                    "nullable": true,
-                    "minLength": 1,
-                    "example": "550e8400-e29b-41d4-a716-446655440001",
-                    "description": "Assigned inspector (users.id)."
-                  },
-                  "templateId": {
-                    "type": "string",
-                    "nullable": true,
-                    "minLength": 1,
-                    "example": "550e8400-e29b-41d4-a716-446655440002",
-                    "description": "Id of the template the inspection is built from, or null when none is attached."
-                  },
-                  "createdAt": {
-                    "type": "string",
-                    "format": "date-time",
-                    "example": "2024-03-20T10:00:00Z",
-                    "description": "When the inspection record was created (ISO 8601)."
-                  },
-                  "addressPlaceId": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Place identifier returned by the address autocomplete, or null."
-                  },
-                  "addressStreet": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Street line of the geocoded address, or null."
-                  },
-                  "addressCity": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "City of the geocoded address, or null."
-                  },
-                  "addressState": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "State or region code of the geocoded address, or null."
-                  },
-                  "addressZip": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Postal code of the geocoded address, or null."
-                  },
-                  "addressCounty": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "County as the address autocomplete returned it, or null. The Property Facts county is `county`."
-                  },
-                  "addressLat": {
-                    "type": "number",
-                    "nullable": true,
-                    "description": "Latitude of the geocoded address, or null."
-                  },
-                  "addressLng": {
-                    "type": "number",
-                    "nullable": true,
-                    "description": "Longitude of the geocoded address, or null."
-                  },
-                  "addressGeocodedAt": {
-                    "type": "string",
-                    "nullable": true,
-                    "format": "date-time",
-                    "description": "When the address was geocoded (ISO 8601), or null."
-                  },
-                  "unit": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Suite or unit designation of the inspected property, or null."
-                  },
-                  "county": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "County as the Property Facts strip edits it, or null."
-                  },
-                  "propertyType": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows."
-                  },
-                  "commercialSubtype": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Commercial property subtype, or null. Only meaningful when the property type is commercial."
-                  },
-                  "yearBuilt": {
-                    "type": "integer",
-                    "nullable": true,
-                    "description": "Year the property was built, or null."
-                  },
-                  "sqft": {
-                    "type": "integer",
-                    "nullable": true,
-                    "description": "Floor area in square feet, or null."
-                  },
-                  "foundationType": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Foundation type, or null."
-                  },
-                  "bedrooms": {
-                    "type": "integer",
-                    "nullable": true,
-                    "description": "Number of bedrooms, or null."
-                  },
-                  "bathrooms": {
-                    "type": "number",
-                    "nullable": true,
-                    "description": "Number of bathrooms (may be fractional), or null."
-                  },
-                  "lotSize": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Lot size as free text, such as \"0.25 acres\", or null."
-                  },
-                  "propertyFacts": {
-                    "type": "object",
-                    "nullable": true,
-                    "additionalProperties": {
-                      "nullable": true
-                    },
-                    "description": "The Property Facts values (year built, size, foundation and the like), or null when none are stored."
-                  },
-                  "reportStatus": {
-                    "type": "string",
-                    "enum": [
-                      "in_progress",
-                      "submitted",
-                      "published"
-                    ],
-                    "description": "Where the report is in its life: in_progress, submitted or published."
-                  },
-                  "paymentStatus": {
-                    "type": "string",
-                    "enum": [
-                      "unpaid",
-                      "partial",
-                      "paid"
-                    ],
-                    "description": "How much of the order has been paid."
-                  },
-                  "paymentRequired": {
-                    "type": "boolean",
-                    "description": "Whether payment is required before the report is released."
-                  },
-                  "agreementRequired": {
-                    "type": "boolean",
-                    "description": "Whether a signed agreement is required before the report is released."
-                  },
-                  "autoSignOnPublish": {
-                    "type": "boolean",
-                    "description": "Whether the inspector signature is applied automatically when the report is published."
-                  },
-                  "disableAutomations": {
-                    "type": "boolean",
-                    "description": "True when automations are switched off for this inspection."
-                  },
-                  "teamMode": {
-                    "type": "boolean",
-                    "description": "True when the inspection is worked by a team."
-                  },
-                  "confirmedAt": {
-                    "type": "string",
-                    "nullable": true,
-                    "format": "date-time",
-                    "description": "When the client confirmed the booking (ISO 8601), or null."
-                  },
-                  "scheduledStartMs": {
-                    "type": "string",
-                    "nullable": true,
-                    "format": "date-time",
-                    "description": "Start of the scheduled time slot, or null. An ISO 8601 string here, unlike the epoch-millisecond number the schedule request takes."
-                  },
-                  "scheduledEndMs": {
-                    "type": "string",
-                    "nullable": true,
-                    "format": "date-time",
-                    "description": "End of the scheduled time slot, or null. An ISO 8601 string here, unlike the epoch-millisecond number the schedule request takes."
-                  },
-                  "durationMin": {
-                    "type": "integer",
-                    "nullable": true,
-                    "description": "Expected duration in minutes, or null."
-                  },
-                  "requestId": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Id of the booking request this inspection came from, or null."
-                  },
-                  "conciergeStatus": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Status of the concierge booking flow for this inspection, or null."
-                  },
-                  "referenceNumber": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "External order or reference number, or null."
-                  },
-                  "referralSource": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Free-text label for the referral channel, or null."
-                  },
-                  "referredByContactId": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Contact who referred this job, or null."
-                  },
-                  "closingDate": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Closing date of the property sale (YYYY-MM-DD), or null."
-                  },
-                  "discountAmount": {
-                    "type": "number",
-                    "nullable": true,
-                    "description": "Discount applied to the order, in cents, or null. ABSENT without the inspectionFees capability."
-                  },
-                  "discountCodeId": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Id of the discount code applied to the order, or null."
-                  },
-                  "depositRequiredCents": {
-                    "type": "integer",
-                    "nullable": true,
-                    "description": "Deposit owed on this order, in integer cents, or null. ABSENT without the inspectionFees capability."
-                  },
-                  "depositOverridden": {
-                    "type": "boolean",
-                    "description": "True when an operator set the deposit by hand, so a later re-resolve does not replace it."
-                  },
-                  "cancelReason": {
-                    "type": "string",
-                    "nullable": true,
-                    "enum": [
-                      "client_cancelled",
-                      "no_show",
-                      "weather",
-                      "inspector_unavailable",
-                      "property_unavailable",
-                      "rescheduled",
-                      "other",
-                      null
-                    ],
-                    "description": "Why the inspection was cancelled, or null when it was not."
-                  },
-                  "cancelNotes": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Free-text note stored with a cancellation, or null."
-                  },
-                  "coverPhotoId": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Storage key of the photo chosen as the report cover, or null when none is chosen."
-                  },
-                  "coverCrop": {
-                    "type": "object",
-                    "nullable": true,
-                    "properties": {
-                      "aspect": {
-                        "type": "string",
-                        "enum": [
-                          "3:2",
-                          "16:9",
-                          "1.91:1",
-                          "4:3"
-                        ]
-                      },
-                      "orientation": {
-                        "type": "string",
-                        "enum": [
-                          "landscape",
-                          "portrait"
-                        ]
-                      },
-                      "x": {
-                        "type": "number"
-                      },
-                      "y": {
-                        "type": "number"
-                      },
-                      "width": {
-                        "type": "number"
-                      },
-                      "height": {
-                        "type": "number"
-                      }
-                    },
-                    "required": [
-                      "aspect",
-                      "orientation",
-                      "x",
-                      "y",
-                      "width",
-                      "height"
-                    ],
-                    "description": "The crop rectangle chosen for the cover photo, or null. It is only meaningful against the current cover photo."
-                  },
-                  "coverImageKey": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Storage key of the cropped cover image the report uses when set, or null."
-                  },
-                  "reportTier": {
-                    "type": "string",
-                    "nullable": true,
-                    "enum": [
-                      "light_commercial",
-                      "full_pca",
-                      null
-                    ],
-                    "description": "Report tier of a commercial inspection, or null for none."
-                  },
-                  "reportPhotoMode": {
-                    "type": "string",
-                    "nullable": true,
-                    "enum": [
-                      "appendix",
-                      "inline",
-                      null
-                    ],
-                    "description": "Forced photo presentation mode, or null to derive it from the report tier."
-                  },
-                  "reportPhotoColumns": {
-                    "type": "integer",
-                    "nullable": true,
-                    "description": "Photo grid columns for this report (1-4), or null to inherit the profile."
-                  },
-                  "profileOverride": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Appearance profile id for this report, or null to inherit."
-                  },
-                  "badgeLayoutOverride": {
-                    "type": "string",
-                    "nullable": true,
-                    "enum": [
-                      "strip",
-                      "inline",
-                      null
-                    ],
-                    "description": "Credential badge layout for this report, or null to inherit the profile."
-                  },
-                  "requireDefectFieldsOverride": {
-                    "type": "string",
-                    "nullable": true,
-                    "enum": [
-                      "none",
-                      "location",
-                      "trade",
-                      "both",
-                      null
-                    ],
-                    "description": "Which defect fields the publish gate requires for this inspection, or null to inherit the company default."
-                  },
-                  "reportsGeneratedAt": {
-                    "type": "string",
-                    "nullable": true,
-                    "format": "date-time",
-                    "description": "When the report files were last generated (ISO 8601), or null."
-                  },
-                  "templateSnapshot": {
-                    "type": "object",
-                    "nullable": true,
-                    "additionalProperties": {
-                      "nullable": true
-                    },
-                    "description": "The template structure frozen onto this inspection, or null when it has none or the stored value is not a readable object. The editor reads it to render the checklist."
-                  },
-                  "templateSnapshotVersion": {
-                    "type": "integer",
-                    "nullable": true,
-                    "description": "Version of the template at the time the snapshot was taken, or null."
-                  },
-                  "pcaNarrative": {
-                    "type": "object",
-                    "nullable": true,
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "description": "The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders."
-                  },
-                  "unitInspectionMode": {
-                    "type": "string",
-                    "enum": [
-                      "tagged",
-                      "per_unit"
-                    ],
-                    "description": "Whether findings are tagged with a location or recorded per unit."
-                  },
-                  "locationOptions": {
-                    "type": "array",
-                    "nullable": true,
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Locations a finding can be tagged with in tagged mode, or null."
-                  },
-                  "samplingDeclaration": {
-                    "type": "object",
-                    "nullable": true,
-                    "properties": {
-                      "samplingMethod": {
-                        "type": "string",
-                        "enum": [
-                          "exhaustive",
-                          "representative"
-                        ]
-                      },
-                      "unitsTotal": {
-                        "type": "number"
-                      },
-                      "unitsInspected": {
-                        "type": "number"
-                      },
-                      "basis": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "samplingMethod"
-                    ],
-                    "description": "What was sampled and what was not, or null."
-                  },
-                  "deviations": {
-                    "type": "array",
-                    "nullable": true,
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "area": {
-                          "type": "string"
-                        },
-                        "baselineRequirement": {
-                          "type": "string"
-                        },
-                        "deviation": {
-                          "type": "string"
-                        },
-                        "reason": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "area",
-                        "baselineRequirement",
-                        "deviation",
-                        "reason"
-                      ]
-                    },
-                    "description": "Deviations from the standard guide, or null when none are recorded."
-                  },
-                  "sourceInspectionId": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Inspection this one was created from, or null."
-                  },
-                  "rootInspectionId": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "First inspection of a re-inspection chain, or null."
-                  },
-                  "reinspectionRound": {
-                    "type": "integer",
-                    "nullable": true,
-                    "description": "Position in a re-inspection chain, or null."
-                  },
-                  "unlockedAt": {
-                    "type": "string",
-                    "nullable": true,
-                    "format": "date-time",
-                    "description": "When the published report was unlocked for editing (ISO 8601), or null."
-                  },
-                  "unlockedBy": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Id of the person who unlocked the report, or null."
-                  },
-                  "unlockReason": {
-                    "type": "string",
-                    "nullable": true,
-                    "description": "Reason given for unlocking the report, or null."
-                  }
-                },
-                "required": [
-                  "id",
-                  "propertyAddress",
-                  "date",
-                  "status",
-                  "inspectorName"
-                ]
-              },
-              "sections": {
-                "type": "array",
-                "items": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/ReportSection"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "items": {
-                          "type": "array",
-                          "items": {
-                            "allOf": [
-                              {
-                                "$ref": "#/components/schemas/ReportItem"
-                              },
-                              {
-                                "type": "object",
-                                "properties": {
-                                  "tabs": {
-                                    "nullable": true,
-                                    "description": "The canned-comment tabs of the template item (information, limitations, defects), or null. Its shape is not written down yet."
-                                  },
-                                  "resolvedTabs": {
-                                    "nullable": true,
-                                    "description": "The canned comments per tab with the choices of this inspection applied: information, limitations and defects. Its shape is not written down yet."
-                                  }
-                                }
-                              }
-                            ]
-                          },
-                          "description": "Items in the section."
-                        }
-                      }
-                    }
-                  ]
-                },
-                "description": "Report sections in display order."
-              },
-              "amendmentTrail": {
-                "nullable": true,
-                "description": "Versions of the report published so far and whether it was amended. Its shape is not written down yet."
-              },
-              "reinspection": {
-                "nullable": true,
-                "description": "The re-inspection summary, or null on a normal report. Its shape is not written down yet."
-              },
-              "coverPhotoUrl": {
-                "type": "string",
-                "nullable": true,
-                "description": "Download URL of the report cover image, or null when none is chosen."
-              },
-              "outline": {
-                "type": "array",
-                "items": {
-                  "nullable": true
-                },
-                "description": "Table of contents of a commercial report; empty for residential reports."
-              },
-              "photoMode": {
-                "type": "string",
-                "enum": [
-                  "appendix",
-                  "inline"
-                ],
-                "description": "Where photos are shown: inline with the findings or in a central appendix."
-              },
-              "photoAppendix": {
-                "type": "array",
-                "items": {
-                  "nullable": true
-                },
-                "description": "The numbered photo appendix of a commercial report."
-              },
-              "showEstimates": {
-                "type": "boolean",
-                "description": "Whether repair estimates are shown in the report."
-              },
-              "enableCustomerRepairExport": {
-                "type": "boolean",
-                "description": "Whether the client may export the repair list."
-              },
-              "reportTimeZone": {
-                "type": "string",
-                "description": "IANA time zone the report dates are shown in."
-              },
-              "propertyFacts": {
-                "type": "object",
-                "nullable": true,
-                "additionalProperties": {
-                  "nullable": true
-                },
-                "description": "The Property Facts values (year built, size, foundation and the like), or null."
-              },
-              "reportTier": {
-                "type": "string",
-                "nullable": true,
-                "description": "Report tier of a commercial inspection (light_commercial or full_pca), or null."
-              },
-              "costTables": {
-                "nullable": true,
-                "description": "The cost tables of a commercial report, or null. Its shape is not written down yet."
-              },
-              "propertyType": {
-                "type": "string",
-                "nullable": true,
-                "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows."
-              },
-              "commercialSubtype": {
-                "type": "string",
-                "nullable": true,
-                "description": "Commercial property subtype, or null."
-              },
-              "buildingProfile": {
-                "type": "array",
-                "items": {
-                  "nullable": true
-                },
-                "description": "Building profile rows of a commercial report."
-              },
-              "pcaReport": {
-                "nullable": true,
-                "description": "The property condition report block of a commercial inspection, or null. Its shape is not written down yet."
-              },
-              "unitInspectionMode": {
-                "type": "string",
-                "enum": [
-                  "tagged",
-                  "per_unit"
-                ],
-                "description": "Whether findings are tagged with a location or recorded per unit."
-              },
-              "units": {
-                "type": "array",
-                "items": {
-                  "nullable": true
-                },
-                "description": "The unit tree of a per-unit inspection; empty otherwise."
-              },
-              "unitConditionMatrix": {
-                "type": "array",
-                "items": {
-                  "nullable": true
-                },
-                "description": "Units by systems condition matrix; empty outside per-unit mode."
-              },
-              "defectCountsByUnit": {
-                "nullable": true,
-                "description": "Defect counts keyed by unit; empty outside per-unit mode. Its shape is not written down yet."
-              },
-              "samplingDeclaration": {
-                "nullable": true,
-                "description": "What was sampled and what was not, or null. Its shape is not written down yet."
-              },
-              "isPublished": {
-                "type": "boolean",
-                "description": "True when the report has been published."
-              },
-              "signature": {
-                "nullable": true,
-                "description": "The inspector signature block of a published report, or null. Its shape is not written down yet."
-              },
-              "verification": {
-                "nullable": true,
-                "description": "The verification block of a published report, or null. Its shape is not written down yet."
-              },
-              "astmConformance": {
-                "nullable": true,
-                "description": "The ASTM conformance summary of a commercial report, or null. Its shape is not written down yet."
-              },
-              "reportSignoffs": {
-                "type": "array",
-                "items": {
-                  "nullable": true
-                },
-                "description": "Sign-offs recorded for the report."
-              },
-              "psq": {
-                "nullable": true,
-                "description": "The pre-survey questionnaire status and answers, or null. Its shape is not written down yet."
-              },
-              "documentReview": {
-                "type": "array",
-                "items": {
-                  "nullable": true
-                },
-                "description": "Documents requested and reviewed for the report."
-              },
-              "relianceText": {
-                "nullable": true,
-                "description": "The reliance wording printed in a commercial report, or null. Its shape is not written down yet."
-              }
-            }
-          }
         ],
         "description": "Response payload"
-      },
-      "ReportItem": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Item id."
-          },
-          "label": {
-            "type": "string",
-            "description": "Item label as shown in the report."
-          },
-          "rating": {
-            "type": "string",
-            "nullable": true,
-            "description": "Rating level id chosen for the item, or null when unrated."
-          },
-          "ratingColor": {
-            "type": "string",
-            "description": "Display colour of the chosen rating level."
-          },
-          "ratingLabel": {
-            "type": "string",
-            "nullable": true,
-            "description": "Display label of the chosen rating level, or null when unrated."
-          },
-          "severityBucket": {
-            "type": "string",
-            "enum": [
-              "satisfactory",
-              "monitor",
-              "defect",
-              "other"
-            ],
-            "description": "Report grouping the rating falls into."
-          },
-          "notes": {
-            "type": "string",
-            "nullable": true,
-            "description": "Inspector notes for the item, or null."
-          },
-          "photos": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "key": {
-                  "type": "string",
-                  "description": "Storage key of the photo as the report shows it (the annotated or cropped copy when there is one). The public report states it relative to the company (`inspections/<inspectionId>/...`); the staff payload carries the full key. The public photo route accepts both forms."
-                },
-                "url": {
-                  "type": "string",
-                  "description": "Download URL of the photo."
-                },
-                "originalKey": {
-                  "type": "string",
-                  "description": "Storage key of the photo as it was first uploaded, before any crop or annotation. Stated like `key`: relative to the company in the public report, in full in the staff payload."
-                },
-                "media": {
-                  "type": "object",
-                  "properties": {
-                    "kind": {
-                      "type": "string",
-                      "enum": [
-                        "image",
-                        "video-player",
-                        "video-poster",
-                        "r2-video-player",
-                        "r2-video-poster"
-                      ],
-                      "description": "Which presentation applies."
-                    },
-                    "src": {
-                      "type": "string",
-                      "description": "Image source (image)."
-                    },
-                    "key": {
-                      "type": "string",
-                      "description": "Storage key (image)."
-                    },
-                    "streamUid": {
-                      "type": "string",
-                      "description": "Stream video id (video-player, video-poster)."
-                    },
-                    "mediaId": {
-                      "type": "string",
-                      "description": "Stored video id (r2-video-player, r2-video-poster)."
-                    },
-                    "posterUrl": {
-                      "type": "string",
-                      "description": "Poster image URL (all video kinds)."
-                    },
-                    "playerSrc": {
-                      "type": "string",
-                      "description": "Player source URL (video-player, r2-video-player)."
-                    },
-                    "playerLinkUrl": {
-                      "type": "string",
-                      "description": "Link to the player page (video-poster)."
-                    },
-                    "durationSec": {
-                      "type": "number",
-                      "description": "Video duration in seconds."
-                    },
-                    "qr": {
-                      "type": "boolean",
-                      "description": "True when the poster carries a QR code to the player (video-poster)."
-                    }
-                  },
-                  "required": [
-                    "kind"
-                  ],
-                  "description": "How a video entry is presented (player, poster with a link, or a plain image). Present when the report is built with video context, as the public report is."
-                },
-                "photoNo": {
-                  "type": "number",
-                  "description": "Continuous photo number in render order, used by the photo appendix. Present once the report numbers its photos."
-                }
-              },
-              "required": [
-                "key",
-                "url"
-              ]
-            },
-            "description": "Photos attached to the item."
-          },
-          "recommendation": {
-            "type": "string",
-            "nullable": true,
-            "description": "Recommendation text attached to the item, if any."
-          },
-          "type": {
-            "type": "string",
-            "description": "How the item is filled in: one of rich, boolean, text, textarea, number, select, multi_select, date, photo_only. rich is a rating with canned-comment tabs, the others capture a value. A template item that names no type is rich. A client must treat a type it does not know as a plain captured value."
-          },
-          "parentId": {
-            "type": "string",
-            "nullable": true,
-            "description": "Id of the item this one hangs under, or null for a top-level item."
-          },
-          "naKind": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "not_inspected",
-              "not_present",
-              null
-            ],
-            "description": "Which kind of not-applicable rating the item carries, or null when it carries none."
-          },
-          "notInspectedReason": {
-            "type": "string",
-            "nullable": true,
-            "description": "Why the item was not inspected, as the inspector wrote it, or null."
-          },
-          "unit": {
-            "type": "string",
-            "nullable": true,
-            "description": "Unit of the captured value for a number item (from the template item options), or null."
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "string",
-                "nullable": true
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            ],
-            "description": "The value captured for a non-rich item: text, a date or a choice as a string, a number, a yes or no, or the choices of a multi-select (a comma-separated string from the web editor, a list of strings from other clients). Null when nothing was captured or the stored value is of another shape."
-          },
-          "ratingOptions": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "type": "string"
-            },
-            "description": "The rating labels offered at the top of the item card, or null when the template sets none."
-          },
-          "original": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "rating": {
-                "type": "string",
-                "nullable": true,
-                "description": "Rating the item carried in the inspection this one follows up on, or null."
-              },
-              "notes": {
-                "type": "string",
-                "nullable": true,
-                "description": "Notes the item carried in that earlier inspection, or null."
-              },
-              "photos": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "key": {
-                      "type": "string",
-                      "description": "Storage key of the photo as the report shows it (the annotated or cropped copy when there is one). The public report states it relative to the company (`inspections/<inspectionId>/...`); the staff payload carries the full key. The public photo route accepts both forms."
-                    },
-                    "url": {
-                      "type": "string",
-                      "description": "Download URL of the photo."
-                    },
-                    "originalKey": {
-                      "type": "string",
-                      "description": "Storage key of the photo as it was first uploaded, before any crop or annotation. Stated like `key`: relative to the company in the public report, in full in the staff payload."
-                    },
-                    "media": {
-                      "type": "object",
-                      "properties": {
-                        "kind": {
-                          "type": "string",
-                          "enum": [
-                            "image",
-                            "video-player",
-                            "video-poster",
-                            "r2-video-player",
-                            "r2-video-poster"
-                          ],
-                          "description": "Which presentation applies."
-                        },
-                        "src": {
-                          "type": "string",
-                          "description": "Image source (image)."
-                        },
-                        "key": {
-                          "type": "string",
-                          "description": "Storage key (image)."
-                        },
-                        "streamUid": {
-                          "type": "string",
-                          "description": "Stream video id (video-player, video-poster)."
-                        },
-                        "mediaId": {
-                          "type": "string",
-                          "description": "Stored video id (r2-video-player, r2-video-poster)."
-                        },
-                        "posterUrl": {
-                          "type": "string",
-                          "description": "Poster image URL (all video kinds)."
-                        },
-                        "playerSrc": {
-                          "type": "string",
-                          "description": "Player source URL (video-player, r2-video-player)."
-                        },
-                        "playerLinkUrl": {
-                          "type": "string",
-                          "description": "Link to the player page (video-poster)."
-                        },
-                        "durationSec": {
-                          "type": "number",
-                          "description": "Video duration in seconds."
-                        },
-                        "qr": {
-                          "type": "boolean",
-                          "description": "True when the poster carries a QR code to the player (video-poster)."
-                        }
-                      },
-                      "required": [
-                        "kind"
-                      ],
-                      "description": "How a video entry is presented (player, poster with a link, or a plain image). Present when the report is built with video context, as the public report is."
-                    },
-                    "photoNo": {
-                      "type": "number",
-                      "description": "Continuous photo number in render order, used by the photo appendix. Present once the report numbers its photos."
-                    }
-                  },
-                  "required": [
-                    "key",
-                    "url"
-                  ]
-                },
-                "description": "Photos of the item from that earlier inspection."
-              }
-            },
-            "required": [
-              "rating",
-              "notes",
-              "photos"
-            ],
-            "description": "The baseline finding of a re-inspection, or null on a normal report."
-          },
-          "followupStatus": {
-            "type": "string",
-            "nullable": true,
-            "description": "Follow-up status recorded for the item in a re-inspection, or null."
-          },
-          "followupNotes": {
-            "type": "string",
-            "nullable": true,
-            "description": "Follow-up notes recorded for the item in a re-inspection, or null."
-          },
-          "repairItems": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "summary": {
-                  "type": "string"
-                },
-                "estimateMin": {
-                  "type": "number",
-                  "nullable": true
-                },
-                "estimateMax": {
-                  "type": "number",
-                  "nullable": true
-                },
-                "contractorType": {
-                  "type": "string",
-                  "nullable": true
-                }
-              },
-              "required": [
-                "summary",
-                "estimateMin",
-                "estimateMax",
-                "contractorType"
-              ]
-            },
-            "description": "Attached repair items snapshotted on this finding (dollars, not cents)."
-          }
-        },
-        "required": [
-          "id",
-          "label",
-          "rating",
-          "ratingColor",
-          "ratingLabel",
-          "severityBucket",
-          "notes",
-          "photos"
-        ]
-      },
-      "ReportSection": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "description": "Section id."
-          },
-          "title": {
-            "type": "string",
-            "description": "Section title."
-          },
-          "icon": {
-            "type": "string",
-            "nullable": true,
-            "description": "Icon name for the section, or null."
-          },
-          "defectCount": {
-            "type": "number",
-            "description": "Number of items in the section rated as defects."
-          },
-          "disclaimerText": {
-            "type": "string",
-            "nullable": true,
-            "description": "Disclaimer printed under the section heading, or null when the template sets none."
-          },
-          "alwaysPageBreak": {
-            "type": "boolean",
-            "description": "True when the section always starts on a new page."
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReportItem"
-            },
-            "description": "Items in the section."
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "defectCount",
-          "items"
-        ]
       },
       "SessionContextResponse": {
         "type": "object",

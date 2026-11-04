@@ -40,6 +40,12 @@ function mount() {
 }
 
 const submit = (form: HTMLFormElement) => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+/**
+ * A submit that is declined (no token yet, nothing typed) still closes the action latch until the next macrotask. A person cannot press again
+ * within one, but a test can, and on a loaded runner the timer had not fired yet when the next submit arrived. Waiting one macrotask lets the
+ * latch's own timer (set earlier, same delay) run first.
+ */
+const afterLatch = () => new Promise<void>((resolve) => { setTimeout(resolve, 0); });
 const sentBody = () => JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string) as Record<string, unknown>;
 
 describe("VerifyExportForm", () => {
@@ -173,10 +179,12 @@ describe("VerifyExportForm", () => {
       fireEvent.change(view.email, { target: { value: "jane@example.test" } });
       expect(view.button.disabled).toBe(true);
       await act(async () => { submit(view.form); });
+      await afterLatch();
       expect(fetchMock).not.toHaveBeenCalled();
       await solve(0, "tok1");
       expect(view.button.disabled).toBe(false);
       await act(async () => { submit(view.form); });
+      await afterLatch();
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
       expect(sentBody()).toEqual({ email: "jane@example.test", turnstileToken: "tok1" });
     });
@@ -186,6 +194,7 @@ describe("VerifyExportForm", () => {
       fireEvent.change(view.email, { target: { value: "jane@example.test" } });
       await solve(0, "tok1");
       await act(async () => { submit(view.form); });
+      await afterLatch();
       await waitFor(() => expect(saved).toHaveLength(1));
       // The first token was spent: the challenge is asked again and the button waits for the new token.
       await waitFor(() => expect(renders).toHaveLength(2));
@@ -193,9 +202,11 @@ describe("VerifyExportForm", () => {
       // The success line stays while the challenge is asked again, and goes when the next request starts.
       expect(view.container.querySelector('[role="status"]')?.textContent).toBe("The signed record was downloaded.");
       await act(async () => { submit(view.form); });
+      await afterLatch();
       expect(fetchMock).toHaveBeenCalledTimes(1);
       await solve(1, "tok2");
       await act(async () => { submit(view.form); });
+      await afterLatch();
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
       expect(JSON.parse((fetchMock.mock.calls[1]![1] as RequestInit).body as string)).toEqual({ email: "jane@example.test", turnstileToken: "tok2" });
       await waitFor(() => expect(saved).toHaveLength(2));
@@ -209,9 +220,11 @@ describe("VerifyExportForm", () => {
       await act(async () => { renders[0]!["expired-callback"]!(); });
       expect(view.button.disabled).toBe(true);
       await act(async () => { submit(view.form); });
+      await afterLatch();
       expect(fetchMock).not.toHaveBeenCalled();
       await solve(0, "tok1b");
       await act(async () => { submit(view.form); });
+      await afterLatch();
       await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
       expect(sentBody()).toEqual({ email: "jane@example.test", turnstileToken: "tok1b" });
     });

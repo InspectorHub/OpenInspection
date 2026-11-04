@@ -154,7 +154,7 @@ export function summarize(results) {
 }
 
 async function latestOf(name, fetchImpl) {
-    const url = `${REGISTRY}/${name.replace('/', '%2f')}/latest`;
+    const url = `${REGISTRY}/${name.replaceAll('/', '%2f')}/latest`;
     try {
         const res = await fetchImpl(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(15000) });
         if (!res.ok) return { status: 'error' };
