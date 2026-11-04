@@ -7524,7 +7524,8 @@
           },
           "message": {
             "type": "string",
-            "description": "Optional personal message included in the email."
+            "maxLength": 1000,
+            "description": "Optional personal message included in the email, up to 1000 characters."
           }
         },
         "required": [
@@ -7533,7 +7534,7 @@
       }
     },
     "summary": "Email a shared repair request link (publish-gated)",
-    "description": "Sends the share URL to a contractor or other recipient. Rate-limited. Report must be published."
+    "description": "Sends the share URL to a contractor or other recipient. Limited per minute and per day per share link, per recipient address and per company. Report must be published."
   },
   {
     "operationId": "exportInspectionCostItemsCsv",
@@ -9591,6 +9592,136 @@
     "description": "Public, no-login download of the immutable archived PDF for a specific published report version. Identified by the report_versions verification token (same token as the verifier page). Rendered once on-demand and cached forever by version number."
   },
   {
+    "operationId": "getPublicReportVideo",
+    "method": "GET",
+    "pathTemplate": "/api/public/report/{tenant}/{id}/video/r2-object/{mediaId}",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (display only; tenant is resolved from the proof).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (display only; tenant is resolved from the proof)."
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id."
+          }
+        },
+        {
+          "name": "mediaId",
+          "in": "path",
+          "required": true,
+          "description": "Media id of an R2 video of this inspection (the pool row id).",
+          "schema": {
+            "type": "string",
+            "description": "Media id of an R2 video of this inspection (the pool row id)."
+          }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent portal access token.",
+          "schema": {
+            "type": "string",
+            "description": "Persistent portal access token."
+          }
+        },
+        {
+          "name": "render",
+          "in": "query",
+          "required": false,
+          "description": "Server-minted render token (headless PDF only).",
+          "schema": {
+            "type": "string",
+            "description": "Server-minted render token (headless PDF only)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Public token-gated report video clip",
+    "description": "Public, no-login video clip gated by the same portal token and report gates as the report photos. Supports HTTP Range. 404 when the proof is missing or the report is not published or is held back."
+  },
+  {
+    "operationId": "getPublicReportVideoPoster",
+    "method": "GET",
+    "pathTemplate": "/api/public/report/{tenant}/{id}/video/r2-object/{mediaId}/poster",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (display only; tenant is resolved from the proof).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (display only; tenant is resolved from the proof)."
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id."
+          }
+        },
+        {
+          "name": "mediaId",
+          "in": "path",
+          "required": true,
+          "description": "Media id of an R2 video of this inspection (the pool row id).",
+          "schema": {
+            "type": "string",
+            "description": "Media id of an R2 video of this inspection (the pool row id)."
+          }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent portal access token.",
+          "schema": {
+            "type": "string",
+            "description": "Persistent portal access token."
+          }
+        },
+        {
+          "name": "render",
+          "in": "query",
+          "required": false,
+          "description": "Server-minted render token (headless PDF only).",
+          "schema": {
+            "type": "string",
+            "description": "Server-minted render token (headless PDF only)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Public token-gated report video poster",
+    "description": "Public, no-login poster image for a report video, gated exactly like the clip."
+  },
+  {
     "operationId": "getPublicVerify",
     "method": "GET",
     "pathTemplate": "/api/public/verify/{envelopeId}",
@@ -9927,7 +10058,7 @@
       "body": null
     },
     "summary": "Download a PDF of a shared repair request (publish-gated)",
-    "description": "Renders a PDF of the repair request share page via Browser Rendering. Report must be published."
+    "description": "Renders a PDF of the repair request share page via Browser Rendering. A stored copy is served while the content is unchanged; a new render is rate-limited per share link and per company. Report must be published."
   },
   {
     "operationId": "getRepairRequestShareView",

@@ -1,14 +1,12 @@
-import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
-import type { HonoConfig } from '../types/hono';
 import { inspections, tenants } from '../lib/db/schema';
 import { resolveRenderAccess } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { mounted, type ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
-import { resolvePortalAccess, resolveOwnerPreview, resolveOwnerPreviewFromCookie, classifyPortalAccess } from '../lib/public-access';
+import { resolvePortalAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
 import { recordReportView, readReportViewCountingEnabled } from '../lib/report-views';
 import publicViewTrackingRoutes, { viewTrackingRouteConfigs } from './public/view-tracking';
@@ -20,6 +18,8 @@ import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, getBaseUrl } from '../lib/url';
 import { publicReportAccessAllowed, shouldPinLatestPublished } from '../lib/report-access';
+import { resolveClientTenant, releaseGateFor, authorizeReportMedia, companySlugFor } from '../lib/report-link-access';
+import publicReportVideoRoutes, { reportVideoRouteConfigs } from './public/report-video';
 import publicVerifyRoutes, { publicVerifyRouteConfigs } from './public/verify';
 import publicInspectorProfileRoutes, { publicInspectorProfileRouteConfigs } from './public/inspector-profile';
 import { PublicInvoiceBodySchema, PUBLIC_INVOICE_FIELDS } from '../lib/validations/invoice.schema';
@@ -30,53 +30,6 @@ import { projectFields } from '../lib/response-projection';
 import { projectCredentialBadgeUrls, respondRelativizedJson } from '../lib/report-link-keys';
 import { serveReportPhoto } from '../lib/report-link-photo';
 import { COURTESY_TRANSLATION_LOCALE, PublicReportResponseSchema } from '../lib/validations/courtesy-translation.schema';
-
-/**
- * The outstanding release gate for a public request, or null when nothing holds
- * the report back.
- *
- * Skipped entirely on the bypass paths rather than computed and discarded: the
- * predicate ignores it there, and asking anyway would put two database reads on
- * every page the headless PDF renderer loads.
- *
- * Takes the service structurally so this module needs no new import, and so a
- * test can hand it a stub without constructing the whole service graph.
- */
-async function releaseGateFor(
-    services: { inspection: { resolveReleaseGate(inspectionId: string, tenantId: string): Promise<{ reason: 'payment' | 'agreement' } | null> } },
-    id: string,
-    tenantId: string,
-    bypass: boolean,
-): Promise<'payment' | 'agreement' | null> {
-    if (bypass) return null;
-    const gate = await services.inspection.resolveReleaseGate(id, tenantId);
-    return gate?.reason ?? null;
-}
-
-/**
- * Shared client-facing tenant resolution for the public report endpoints:
- * the persistent per-(recipient, order) portal token, falling back to the
- * legacy KV agent-view-token bridge (`?view=agent&token=`). Returns the
- * AUTHORITATIVE tenantId from whichever token resolves to THIS inspection, or
- * null. Identical across the report-data, report-photo, and report-PDF routes.
- * `accessTokenId` is the per-recipient token row's id, or null on the legacy
- * KV bridge (no row) — so a bridge view is never counted, which is right: it
- * names no recipient. It is the identity delivery confirmation counts against.
- */
-async function resolveClientTenant(
-    c: Context<HonoConfig>, token: string | undefined, id: string,
-): Promise<{ tenantId: string; accessTokenId: string | null } | null> {
-    const grant = await resolvePortalAccess(c.var.services.portalAccess, token, id);
-    if (grant) return { tenantId: grant.tenantId, accessTokenId: grant.accessTokenId };
-    if (!token) return null;
-    // Bridge: existing customer share links carry the KV agent-view-token until
-    // persistent per-recipient token issuance is wired (see plan
-    // 2026-06-01-core-esign-redesign). Validate it the same way: token must
-    // resolve to THIS inspection; tenantId from the token.
-    const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
-    if (legacy && legacy.inspectionId === id) return { tenantId: legacy.tenantId, accessTokenId: null };
-    return null;
-}
 
 /**
  * Public, no-login portal endpoints (`/api/public/*`). Access is gated by the
@@ -281,6 +234,7 @@ const reportGateRoute = createRoute(withMcpMetadata({
 const app = createApiRouter();
 app.route('/', publicVerifyRoutes);
 app.route('/', publicViewTrackingRoutes);
+app.route('/', publicReportVideoRoutes);
 app.openapi(reportRoute, async (c) => {
     const { tenant, id } = c.req.valid('param');
     const { token, render } = c.req.valid('query');
@@ -403,20 +357,21 @@ app.openapi(reportRoute, async (c) => {
     // link.
     const streamCustomerSubdomain = c.env.STREAM_CUSTOMER_SUBDOMAIN ?? '';
     const appBaseUrl = new URL(c.req.url).origin;
-    // R2 video serve base: PDF consumes only the poster JPEG (render-token);
-    // web viewer fetches clips, tenant-guarded by the pool-row lookup.
+    // R2 video: the clip and poster are served by the report's own token-gated video routes, so the URLs carry the same proof the
+    // photo URLs do (render token for the PDF renderer, none for an owner session, the portal token otherwise).
     const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl, {
         isPdf: renderMode,
         streamCustomerSubdomain,
         appBaseUrl,
-        r2BaseUrl: `/api/inspections/${id}/media/video`,
+        r2BaseUrl: `/api/public/report/${tenant}/${id}/video`,
+        r2Query: renderMode ? `render=${encodeURIComponent(render!)}` : ownerPreview ? '' : `token=${encodeURIComponent(tk)}`,
     }, pinnedVersion);
     // #23 — the courtesy translation, when one is stored AND still describes
     // this English. ⚠️ No tenant setting is read: production is gated,
     // consumption never is. See lib/translation/read-for-report.ts.
     const courtesyTranslation = await readCourtesyTranslationForReport(
         { db: c.env.DB, inspection: c.var.services.inspection, translations: c.var.services.reportTranslation },
-        { tenantId, inspectionId: id, locale: COURTESY_TRANSLATION_LOCALE, data },
+        { tenantId, inspectionId: id, locale: COURTESY_TRANSLATION_LOCALE, data, versionNumber: pinnedVersion },
     );
     // The translation reader above got the report as built; the response carries only the report link's fields,
     // with storage keys stated relative to the company (the photo route puts the company back).
@@ -425,36 +380,12 @@ app.openapi(reportRoute, async (c) => {
 app.openapi(reportPhotoRoute, async (c) => {
     const { id } = c.req.valid('param');
     const { key, token, download, render, w, v } = c.req.valid('query');
-    let tenantId = (await resolveClientTenant(c, token, id))?.tenantId ?? null;
-    let renderMode = false;
-    let ownerPreview = false;
-    if (!tenantId && render) {
-        const r = await resolveRenderAccess(render, id, c.env.JWT_SECRET);
-        if (r) {
-            const db = getDrizzle(c);
-            const row = await db.select({ tenantId: inspections.tenantId })
-                .from(inspections).where(eq(inspections.id, id)).get();
-            if (row) { tenantId = row.tenantId; renderMode = true; }
-        }
-    }
-    // Owner-session preview — same fallback as the report data route so the
-    // owner's tokenless preview can load its photos (the key is re-checked
-    // against this tenant + inspection below).
-    if (!tenantId) { tenantId = await resolveOwnerPreviewFromCookie(c); ownerPreview = !!tenantId; }
-    if (!tenantId) return c.notFound();
-    const photoGate = await getDrizzle(c)
-        .select({ reportStatus: inspections.reportStatus })
-        .from(inspections)
-        .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
-        .get();
-    // A gate that holds the report but serves its photographs is not a gate.
-    const photoReleaseGate = await releaseGateFor(c.var.services, id, tenantId, renderMode || ownerPreview);
-    if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus, releaseGate: photoReleaseGate })) {
-        return c.notFound();
-    }
+    // Same proof and the same two gates as the report data: a gate that holds the report but serves its photographs is not a gate.
+    const access = await authorizeReportMedia(c, id, { token, render });
+    if (!access) return c.notFound();
     // Ownership is checked on the full key inside (report-link-keys.ts): the request may name it relative to the company
     // (what a response carries) or in full (links issued earlier).
-    const photo = await serveReportPhoto(c.env, { key, width: w, download: download === '1', variant: v }, tenantId, id);
+    const photo = await serveReportPhoto(c.env, { key, width: w, download: download === '1', variant: v }, access.tenantId, id);
     return photo ?? c.notFound();
 });
 app.openapi(reportPdfDownloadRoute, async (c) => {
@@ -496,13 +427,25 @@ app.openapi(reportPdfDownloadRoute, async (c) => {
             ? { success: false as const, error: { code: 'REPORT_GATED', message: 'This report has not been released yet.' } }
             : { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
     }
-    // Everyday download always tracks current content (versionNumber: null →
-    // content-hash cache, renders live data). Frozen per-version PDFs are only
-    // served from the verify page via GET /api/public/verify/report/:token/pdf.
-    const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenant, id, c.env.JWT_SECRET);
-    const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+    // The client's PDF is the PUBLISHED version, like the report page they read: the render is pinned to that version through the
+    // signed render token, and the cache key is the version's own content hash, so a later edit of the live tables cannot change
+    // what a client downloads. The same version is also what the verify page serves, so the two share one stored render. A report
+    // with no version row (not yet frozen) keeps the live hash.
+    // NOTE: keying the cache by the version's frozen hash assumes the report page is frozen at that version too. Today the page still
+    // reads findings, notes and units live (only identity, credentials and style are overlaid from the snapshot), so after a
+    // post-publish edit a cached PDF can show older text than the page. The follow-up that overlays the snapshot's `data` and `units`
+    // in getReportData removes the difference; until then this key is only as frozen as the page.
+    const latest = await c.var.services.reportVersion.getLatestPublished(tenantId, id);
+    const versionNumber = latest?.versionNumber ?? null;
+    // The slug in the render URL comes from the company's own row. The URL segment is the caller's text: it is not a path the
+    // headless browser (which carries a render token) may be steered by.
+    const slug = await companySlugFor(c, tenantId, tenant);
+    const reportUrl = await buildRenderReportUrl(getBookingHost(c), slug, id, c.env.JWT_SECRET, versionNumber ?? undefined);
+    const contentHash = latest?.contentHash
+        ?? await c.var.services.inspection.getReportContentHash(id, tenantId, undefined, null, versionNumber ?? undefined);
+    const footer = await c.var.services.inspection.getReportPdfFooterContext(id, tenantId);
     const record = await c.var.services.reportPdf.getOrRender(id, tenantId, reportType, {
-        reportUrl, contentHash, versionNumber: null,
+        reportUrl, contentHash, versionNumber, footer,
     });
     const obj = await c.var.services.reportPdf.streamPdf(record);
     if (!obj) return c.notFound();
@@ -621,6 +564,7 @@ app.openapi(reportGateRoute, async (c) => {
 export const publicReportRouteParts = [
     mounted('/', publicVerifyRoutes, publicVerifyRouteConfigs),
     mounted('/', publicViewTrackingRoutes, viewTrackingRouteConfigs),
+    mounted('/', publicReportVideoRoutes, reportVideoRouteConfigs),
     reportRoute,
     reportPhotoRoute,
     reportPdfDownloadRoute,

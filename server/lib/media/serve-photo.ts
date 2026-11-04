@@ -24,10 +24,19 @@ export interface ServePhotoOptions {
     download?: boolean | undefined;
 }
 
-/** Clamp a caller-supplied width; 0 means "serve the original". */
+/**
+ * The widths a thumbnail is produced at. Every distinct width is a separate image transform (billed, and a separate cache entry), so a
+ * caller-chosen number is a way to spend them: asking for 1, 2, 3 ... 2000 would be two thousand renders of one photo. A request is
+ * therefore rounded UP to the next width in this list (never down, so a thumbnail is never smaller than asked for) and anything past
+ * the last is the last. The widths the web report, the media grid, the gallery and the agent page ask for are all in it.
+ */
+export const THUMBNAIL_WIDTHS = [16, 64, 160, 240, 320, 480, 640, 800, 1024, 1280, 1600, 2000] as const;
+
+/** Round a caller-supplied width to an allowed one; 0 means "serve the original". */
 function parseWidth(w: string | undefined): number {
     if (!w) return 0;
-    return Math.min(Math.max(parseInt(w, 10) || 0, 16), 2000);
+    const wanted = parseInt(w, 10) || 0;
+    return THUMBNAIL_WIDTHS.find((allowed) => allowed >= wanted) ?? THUMBNAIL_WIDTHS[THUMBNAIL_WIDTHS.length - 1]!;
 }
 
 /** Raster types a photo key may be served as; an object stored under any other type (a legacy upload) is never replayed under it. */

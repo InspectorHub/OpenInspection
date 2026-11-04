@@ -225,6 +225,13 @@ export async function writeViewTrackingObjection(
 export type RecordOutcome = 'counted' | 'suppressed' | 'skipped';
 
 /**
+ * A recipient who reloads, or whose mail client opens the link twice, is one reading. Within this window of the recipient's last
+ * counted open nothing is written at all: not a count, not a timestamp. It bounds the write cost of a link that is opened often (one
+ * row write per recipient per window instead of one per page load) and keeps the counter from reading a refresh as a second reading.
+ */
+const VIEW_DEDUPE_WINDOW_MS = 10 * 60 * 1000;
+
+/**
  * Count one view, unless the request is non-human or the recipient has objected.
  *
  * Never throws: a delivery-confirmation counter must not be able to fail a
@@ -248,7 +255,13 @@ export async function recordReportView(
     if (!shouldCountReportView(signals)) return 'skipped';
     const accessTokenId = signals.accessTokenId as string;
     try {
-        if (await readViewTrackingObjection(db, scope.tenantId, accessTokenId) != null) return 'suppressed';
+        // Both reads before any write: an objection wins, and a recent open ends the request here with no write.
+        const [objectedAt, previous] = await Promise.all([
+            readViewTrackingObjection(db, scope.tenantId, accessTokenId),
+            getReportView(db, { tenantId: scope.tenantId, inspectionId: scope.inspectionId, accessTokenId }),
+        ]);
+        if (objectedAt != null) return 'suppressed';
+        if (previous?.lastViewedAt && now - previous.lastViewedAt.getTime() < VIEW_DEDUPE_WINDOW_MS) return 'skipped';
         const at = new Date(now);
         await db.insert(reportViews).values({
             id: crypto.randomUUID(),
@@ -275,6 +288,8 @@ export async function recordReportView(
                 // against the conflicting row.
                 viewCount: sql`view_count + 1`,
             },
+            // Two requests that both read "no recent open" count once: the second finds the first's row inside the window.
+            setWhere: sql`${reportViews.lastViewedAt} IS NULL OR ${reportViews.lastViewedAt} <= ${at.getTime() - VIEW_DEDUPE_WINDOW_MS}`,
         }).run();
         return 'counted';
     } catch (err) {

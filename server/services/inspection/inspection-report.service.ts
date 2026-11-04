@@ -278,7 +278,7 @@ export class InspectionReportService extends InspectionSubService {
         // looked up per-defect below with no N+1 query. Keyed by BOTH name
         // and id: seed template JSON stores category NAMES ("safety"), while
         // a template authored after Plan-4 may store a defect_categories.id.
-        const defectCategories = await new DefectCategoryService(this.db).ensureSeed(tenantId);
+        const defectCategories = await new DefectCategoryService(this.db).listOrDefaults(tenantId);
         const categoryColorByKey = new Map<string, string>();
         for (const cat of defectCategories) {
             categoryColorByKey.set(cat.name, cat.color);
@@ -896,12 +896,12 @@ export class InspectionReportService extends InspectionSubService {
      * is two different deliverables and must not share a cached PDF.
      */
     async getReportContentHash(
-        id: string,
-        tenantId: string,
+        id: string, tenantId: string,
         reportId?: string,
         translation: TranslationIdentity | null = null,
+        versionNumber?: number, // the published version the document is read at; absent hashes the live read
     ): Promise<string> {
-        const data = await this.getReportData(id, tenantId, (key: string) => key, undefined, undefined, reportId);
+        const data = await this.getReportData(id, tenantId, (key: string) => key, undefined, versionNumber, reportId);
         return reportContentHash(data, translation);
     }
 

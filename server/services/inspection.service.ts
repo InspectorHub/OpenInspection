@@ -740,8 +740,8 @@ export class InspectionService {
      * it is not returned by getReportData — branding changes are instead
      * covered by bumping RENDER_VERSION.
      */
-    async getReportContentHash(id: string, tenantId: string, reportId?: string, translation: TranslationIdentity | null = null): Promise<string> {
-        return this.report.getReportContentHash(id, tenantId, reportId, translation);
+    async getReportContentHash(id: string, tenantId: string, reportId?: string, translation: TranslationIdentity | null = null, versionNumber?: number): Promise<string> {
+        return this.report.getReportContentHash(id, tenantId, reportId, translation, versionNumber);
     }
 
     async getReportPdfFooterContext(

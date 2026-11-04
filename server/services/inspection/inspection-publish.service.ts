@@ -214,9 +214,13 @@ export class InspectionPublishService extends InspectionSubService {
         const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor, defaultLocale: tenantConfigs.defaultLocale })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 
+        // Who is asking decides what the page may say about the job. The inspection id is not a credential, so a caller with no proof of
+        // being a recipient (`recipientEmail` comes from their portal token) learns that a report is held and what to do next, but not
+        // where the property is, when it was inspected, or how to reach the inspector directly: that is the report's own content.
+        const proven = !!recipientEmail;
         let inspector: { name: string | null; email: string | null; phone: string | null } | undefined;
         let licenseNumber: string | null = null;
-        if (insp.inspectorId) {
+        if (proven && insp.inspectorId) {
             inspector = await db.select({
                 name: users.name, email: users.email, phone: users.phone,
             }).from(users)
@@ -293,12 +297,12 @@ export class InspectionPublishService extends InspectionSubService {
             primaryColor: branding?.primaryColor ?? null,
             actionUrl,
             actionLabel,
-            propertyAddress: insp.propertyAddress ?? null,
+            propertyAddress: proven ? (insp.propertyAddress ?? null) : null,
             inspectorName: inspector?.name ?? null,
             inspectorEmail: inspector?.email ?? null,
             inspectorPhone: inspector?.phone ?? null,
             inspectorLicense: licenseNumber,
-            scheduledDate: insp.date ?? null,
+            scheduledDate: proven ? (insp.date ?? null) : null,
             amountCents,
             // Snapshot currency from the invoice (Phase B); fall back to USD only
             // when an amount exists without a resolvable currency.

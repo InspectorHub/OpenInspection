@@ -46,8 +46,7 @@ export class ReportPdfService {
         private r2: R2Bucket | undefined,            // REPORTS bucket binding (optional during local dev)
     ) {}
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private getDrizzle() { return drizzle(this.db as any); }
+    private getDrizzle() { return drizzle(this.db); }
 
     /**
      * Gate the Browser-Rendering pipeline behind a tenant

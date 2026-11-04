@@ -28,7 +28,8 @@ import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { flattenReportDefects } from '../lib/repair-defects';
 import { generatePdfFromUrl } from '../lib/pdf';
-import { checkRateLimit } from '../lib/rate-limit';
+import { boundSharePdf, boundShareEmail } from '../lib/repair-share-limits';
+import { cachedSharePdf, sharePdfContentKey } from '../lib/repair-share-pdf';
 import { resolveBuilderAccess } from '../lib/repair-access';
 import { runBuilderGate, runAssertCanEdit, runAssertMayAuthorTag, runShareGate, loadQuickPhrases } from '../lib/repair-gates';
 import { getBaseUrl } from '../lib/url';
@@ -328,15 +329,24 @@ app.openapi(sharePdfRoute, async (c) => {
     const gateResult = await runShareGate(c, shareToken);
     if (gateResult instanceof Response) return gateResult;
 
-    const baseUrl = getBaseUrl(c);
-    const pageUrl = `${baseUrl}/repair-request/${shareToken}`;
-    const pdfBuffer = await generatePdfFromUrl(c.env.BROWSER, pageUrl);
-
+    const { request, items, tenantId, propertyAddress } = gateResult;
+    // A stored copy while the page content is unchanged; a render (bounded per link and per company) otherwise.
+    const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.inspectionId, request.id);
+    const contentKey = await sharePdfContentKey({
+        requestId: request.id, inspectionId: request.inspectionId,
+        content: { propertyAddress, customIntro: request.customIntro, items: items.map(projectRepairShareLine), creditTotal },
+    });
+    const pageUrl = `${getBaseUrl(c)}/repair-request/${shareToken}`;
+    const pdfBuffer = await cachedSharePdf(tenantId, contentKey, async () => {
+        await boundSharePdf(c, tenantId, shareToken);
+        return generatePdfFromUrl(c.env.BROWSER, pageUrl);
+    });
     return new Response(pdfBuffer, {
         status: 200,
         headers: {
             'Content-Type': 'application/pdf',
             'Content-Disposition': 'attachment; filename="repair-request.pdf"',
+            'Cache-Control': 'private, max-age=300',
         },
     });
 });
@@ -351,7 +361,8 @@ app.openapi(shareEmailRoute, async (c) => {
 
     const { propertyAddress, tenantId } = gateResult;
 
-    await checkRateLimit(c, 'book');
+    // Bounded per link, company, recipient and day: this sends mail from the company's domain to an address the caller types.
+    await boundShareEmail(c, tenantId, shareToken, body.to);
 
     const baseUrl = getBaseUrl(c);
 

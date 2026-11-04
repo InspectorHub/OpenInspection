@@ -2,6 +2,7 @@ import { and, eq, getTableColumns, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, inspectionTombstones, reportTranslations, reports, videoUploadParts, videoUploads } from '../../lib/db/schema';
 import { inspectionScopedTables } from '../../lib/db/scoped-tables';
+import { r2Keys } from '../../lib/r2-keys';
 import { abortStorage } from '../video/chunked-upload.service';
 import { purgeCollabDocs, type CollabPurgeOutcome } from './collab-purge';
 
@@ -91,14 +92,17 @@ export async function deleteInspectionCascade(
         await db.delete(tbl).where(eq(col, inspectionId));
     }
 
-    // 2. R2 objects — every inspection asset lives under `{tenantId}/inspections/{id}/`.
-    const prefix = `${tenantId}/inspections/${inspectionId}/`;
-    let cursor: string | undefined;
-    do {
-        const list = await r2.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
-        if (list.objects.length) await r2.delete(list.objects.map((o) => o.key));
-        cursor = list.truncated ? list.cursor : undefined;
-    } while (cursor);
+    // 2. R2 objects — every inspection asset lives under `{tenantId}/inspections/{id}/`, and the files attached to the
+    // inspection's messages under `{tenantId}/messages/{id}/` (see messageAttachmentPrefix). Both prefixes end in the
+    // inspection id and a slash, so neither can reach another inspection's objects.
+    for (const prefix of [`${tenantId}/inspections/${inspectionId}/`, r2Keys.messageAttachmentPrefix(tenantId, inspectionId)]) {
+        let cursor: string | undefined;
+        do {
+            const list = await r2.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
+            if (list.objects.length) await r2.delete(list.objects.map((o) => o.key));
+            cursor = list.truncated ? list.cursor : undefined;
+        } while (cursor);
+    }
 
     // 3. Finally the inspection row itself (keyed by `id`, not `inspection_id`).
     await db.delete(inspections).where(eq(inspections.id, inspectionId));

@@ -32,6 +32,10 @@ function makeR2(objectsByPrefix: Record<string, string[]> = {}) {
     };
 }
 
+/** The inspection-prefix listings of a run, in order (the message-attachment listings are the other half of each inspection's two). */
+const mediaPrefixes = (r2: { list: { mock: { calls: unknown[][] } } }) =>
+    r2.list.mock.calls.map((c) => (c[0] as { prefix?: string }).prefix).filter((p) => !p?.includes('/messages/'));
+
 describe('sweepOrphanedMedia paging', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
 
@@ -53,7 +57,9 @@ describe('sweepOrphanedMedia paging', () => {
             limit: 2, afterInspectionId: null,
         });
         expect(first.nextCursor, 'a partial sweep must say where to resume').toBe('i2');
-        expect(r2.list, 'exactly `limit` inspections may be listed').toHaveBeenCalledTimes(2);
+        // Two listings per inspection: its own prefix, and the folder of the files uploaded for its messages.
+        expect(r2.list, 'exactly `limit` inspections may be listed').toHaveBeenCalledTimes(2 * 2);
+        expect(mediaPrefixes(r2)).toEqual([`${TENANT}/i1/`, `${TENANT}/i2/`]);
     });
 
     it('resumes after the cursor rather than restarting', async () => {
@@ -65,8 +71,7 @@ describe('sweepOrphanedMedia paging', () => {
             limit: 2, afterInspectionId: first.nextCursor,
         });
         expect(second.nextCursor).toBe('i4');
-        expect(r2.list.mock.calls.map((c) => (c[0] as { prefix?: string }).prefix))
-            .toEqual([`${TENANT}/i1/`, `${TENANT}/i2/`, `${TENANT}/i3/`, `${TENANT}/i4/`]);
+        expect(mediaPrefixes(r2)).toEqual([`${TENANT}/i1/`, `${TENANT}/i2/`, `${TENANT}/i3/`, `${TENANT}/i4/`]);
     });
 
     it('returns a null cursor on the last page, so the sweep can end', async () => {
@@ -75,7 +80,7 @@ describe('sweepOrphanedMedia paging', () => {
             limit: 100, afterInspectionId: null,
         });
         expect(last.nextCursor).toBeNull();
-        expect(r2.list).toHaveBeenCalledTimes(IDS.length);
+        expect(r2.list).toHaveBeenCalledTimes(IDS.length * 2);
     });
 
     it('does not read the report blob for an inspection whose R2 prefix is empty', async () => {

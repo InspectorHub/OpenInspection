@@ -24,7 +24,8 @@ import { logger } from '../../lib/logger';
 import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
 import { getDrizzle } from '../../lib/route-helpers';
-import { r2Put, r2Get, r2Head } from '../../lib/r2/objects';
+import { r2Put, r2Head } from '../../lib/r2/objects';
+import { serveVideoClip, serveVideoPoster } from '../../lib/media/serve-video';
 import { MAX_PHOTO_BYTES } from '../../lib/media/store-photo';
 import { headBytes, sniffPosterType, sniffVideoType } from '../../lib/media/sniff';
 import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, MIME_TO_EXT, mimeToExt } from '../../lib/media/video-types';
@@ -33,12 +34,8 @@ import { ownClipKey, ownPosterKey } from '../../services/video/r2-backend';
 // ── MIME / extension helpers (shared with the chunked upload; see lib/media/video-types.ts) ──
 export { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt };
 
-const POSTER_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-
-/** The type a clip is served as: its stored one when that is a video type we accept, otherwise mp4. Never a replayed script-capable type. */
-function storedVideoType(stored: string | undefined): string {
-    return stored && ALLOWED_VIDEO_MIMES.has(stored) ? stored : 'video/mp4';
-}
+/** Staff session responses are private to the browser; the report link route states its own policy. */
+const STAFF_VIDEO_CACHE = 'private, max-age=86400';
 
 export type StoreVideoResult =
     | { ok: true; mediaId: string; r2Key: string }
@@ -222,64 +219,15 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'Video not found' }, 404);
         }
 
-        const rangeHeader = c.req.header('Range');
-
-        if (rangeHeader) {
-            const rangeMatch = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader.trim());
-            if (!rangeMatch) {
-                return c.json({ error: 'Invalid Range header' }, 416);
-            }
-            const start = parseInt(rangeMatch[1], 10);
-            const endStr = rangeMatch[2];
-
-            const obj = await r2Get(c.env.PHOTOS, clipKey, {
-                range: endStr
-                    ? { offset: start, length: parseInt(endStr, 10) - start + 1 }
-                    : { offset: start },
-            });
-
-            if (!obj) {
-                return c.json({ error: 'Video not found in storage' }, 404);
-            }
-
-            const contentType = storedVideoType(obj.httpMetadata?.contentType);
-            const end = endStr ? parseInt(endStr, 10) : (obj.size - 1);
-            const contentLength = end - start + 1;
-
-            return new Response(obj.body, {
-                status: 206,
-                headers: {
-                    'Content-Type': contentType,
-                    'Content-Range': `bytes ${start}-${end}/${obj.size}`,
-                    'Content-Length': String(contentLength),
-                    'Accept-Ranges': 'bytes',
-                },
-            });
-        }
-
-        // Full-object request.
-        const obj = await r2Get(c.env.PHOTOS, clipKey);
-        if (!obj) {
-            return c.json({ error: 'Video not found in storage' }, 404);
-        }
-
-        const contentType = storedVideoType(obj.httpMetadata?.contentType);
-
-        return new Response(obj.body, {
-            status: 200,
-            headers: {
-                'Content-Type': contentType,
-                'Content-Length': String(obj.size),
-                'Accept-Ranges': 'bytes',
-            },
-        });
+        const served = await serveVideoClip(c.env.PHOTOS, clipKey, c.req.header('Range'), STAFF_VIDEO_CACHE);
+        return served ?? c.json({ error: 'Video not found in storage' }, 404);
     });
 
     /**
      * GET /:id/media/video/r2-object/:mediaId/poster
      *
      * Serve the poster JPEG for an R2 video. Tenant-guarded via pool row lookup.
-     * Long-lived cache (1 day) — poster images are immutable once finalized.
+     * Cached privately for a day — poster images are immutable once finalized.
      */
     router.get('/:id/media/video/r2-object/:mediaId/poster', async (c) => {
         const tenantId = c.get('tenantId');
@@ -302,22 +250,7 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'Poster not found' }, 404);
         }
 
-        const obj = await r2Get(c.env.PHOTOS, posterKey);
-        if (!obj) {
-            return c.json({ error: 'Poster not found in storage' }, 404);
-        }
-
-        // A poster stored before the upload allowlist may carry a script-capable type; never replay one.
-        const stored = obj.httpMetadata?.contentType;
-        const contentType = stored && POSTER_MIMES.has(stored) ? stored : 'image/jpeg';
-
-        return new Response(obj.body, {
-            status: 200,
-            headers: {
-                'Content-Type': contentType,
-                'Content-Length': String(obj.size),
-                'Cache-Control': 'public, max-age=86400',
-            },
-        });
+        const served = await serveVideoPoster(c.env.PHOTOS, posterKey, STAFF_VIDEO_CACHE);
+        return served ?? c.json({ error: 'Poster not found in storage' }, 404);
     });
 }

@@ -144,17 +144,16 @@ describe('inspection path guard: visibility', { timeout: 60_000 }, () => {
         expect((await call(null, UNIQUE_ROUTES[0]!, INSP.own)).status).toBe(401);
     });
 
-    it('the published report video clip stays reachable with no session (the one anonymous route in this family)', async () => {
+    it('the staff video clip and poster routes need a session (the report link has its own token-gated video routes)', async () => {
         const reached = { n: 0 };
         const a = new OpenAPIHono<HonoConfig>();
         a.onError((err, c) => err instanceof AppError ? c.json({ error: err.message }, err.status) : c.json({ error: String(err) }, 500));
         registerInspectionScopeGuards(a);
         a.get('/api/inspections/:id/media/video/r2-object/:poolRowId', (c) => { reached.n++; return c.json({ ok: true }); });
-        a.get('/api/inspections/:id/media/video/other', (c) => c.json({ ok: true }));
-        expect((await a.request('/api/inspections/i1/media/video/r2-object/row1', {}, { DB: {} })).status).toBe(200);
-        expect(reached.n).toBe(1);
-        // control: a neighbouring path with no session is refused
-        expect((await a.request('/api/inspections/i1/media/video/other', {}, { DB: {} })).status).toBe(401);
+        a.get('/api/inspections/:id/media/video/r2-object/:poolRowId/poster', (c) => { reached.n++; return c.json({ ok: true }); });
+        expect((await a.request('/api/inspections/i1/media/video/r2-object/row1', {}, { DB: {} })).status).toBe(401);
+        expect((await a.request('/api/inspections/i1/media/video/r2-object/row1/poster', {}, { DB: {} })).status).toBe(401);
+        expect(reached.n).toBe(0);
     });
 
     it('a repeat lookup inside one request scope is shared (one inspection query per request)', async () => {

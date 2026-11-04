@@ -131,3 +131,26 @@ describe('selectReportMedia — graceful fail-closed (no subdomain)', () => {
         expect(r.kind).toBe('image');
     });
 });
+
+describe('selectReportMedia — proof on the R2 serve URLs', () => {
+    const r2 = { ...ctx, r2BaseUrl: '/api/public/report/acme/insp1/video' };
+    const entry = { key: 'k', mediaType: 'video' as const, provider: 'r2' as const, mediaId: 'm 1', url: '' };
+
+    it('appends the proof to the clip and the poster URL, and leaves them bare when there is none', () => {
+        const withProof = selectReportMedia(entry, { ...r2, r2Query: 'token=abc' });
+        expect(withProof).toMatchObject({
+            kind: 'r2-video-player',
+            playerSrc: '/api/public/report/acme/insp1/video/r2-object/m%201?token=abc',
+            posterUrl: '/api/public/report/acme/insp1/video/r2-object/m%201/poster?token=abc',
+        });
+        const bare = selectReportMedia(entry, r2);
+        expect(bare).toMatchObject({ playerSrc: '/api/public/report/acme/insp1/video/r2-object/m%201' });
+        expect(selectReportMedia(entry, { ...r2, r2Query: '' })).toMatchObject({ playerSrc: '/api/public/report/acme/insp1/video/r2-object/m%201' });
+    });
+
+    it('the PDF path states the poster with the proof too', () => {
+        expect(selectReportMedia(entry, { ...r2, isPdf: true, r2Query: 'render=t' })).toMatchObject({
+            kind: 'r2-video-poster', posterUrl: '/api/public/report/acme/insp1/video/r2-object/m%201/poster?render=t',
+        });
+    });
+});
