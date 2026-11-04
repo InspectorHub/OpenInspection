@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte, lt } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema/inspection';
 import { tenantConfigs, contactRoleProfiles, inspectionPeople } from '../lib/db/schema';
 import { contacts } from '../lib/db/schema/contact';
@@ -8,6 +8,7 @@ import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { logger } from '../lib/logger';
 import { IcsService } from '../services/ics.service';
 import { resolveInspectorIcsToken } from '../lib/calendar/inspector-ics-token';
+import { icsUid, icsWindow } from '../lib/calendar/ics-uid';
 import type { AppEnv } from '../types/hono';
 
 const icsRoutes = new Hono<{ Bindings: AppEnv }>();
@@ -36,7 +37,7 @@ icsRoutes.get('/inspector/:token', async (c) => {
     if (!resolved) return c.text('Not found', 404);
 
     const host = c.req.header('host') ?? 'openinspection';
-    const ics = await new IcsService(c.env.DB, host)
+    const ics = await new IcsService(c.env.DB, host, c.env.JWT_SECRET)
         .scheduleFeedForInspector(resolved.tenantId, resolved.userId);
 
     return new Response(ics, {
@@ -58,7 +59,8 @@ icsRoutes.get('/inspector/:token', async (c) => {
  */
 icsRoutes.get('/:token', async (c) => {
     const { token } = c.req.param();
-    if (!token || token.length < 16) return c.text('Not found', 404);
+    // Without the deployment secret no event UID can be built, so answer before any query rather than after the rows are read.
+    if (!token || token.length < 16 || !c.env.JWT_SECRET) return c.text('Not found', 404);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = drizzle(c.env.DB as any);
@@ -72,8 +74,7 @@ icsRoutes.get('/:token', async (c) => {
     if (!configs[0]) return c.text('Not found', 404);
     const tenantId = configs[0].tenantId;
 
-    const today = new Date().toISOString().slice(0, 10);
-    const future = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const span = icsWindow();
 
     // Task 9c (people-role-profiles) — the client name embedded in each
     // VEVENT's DESCRIPTION is sourced from the inspection_people
@@ -100,11 +101,9 @@ icsRoutes.get('/:token', async (c) => {
                 eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
             ))
-            .where(eq(inspections.tenantId, tenantId));
-        upcoming = allRows.filter((r) => {
-            const d = r.inspection.date ?? '';
-            return d >= today && d <= future;
-        });
+            // The window is applied in the query: a company's whole history is not read to publish the next 90 days.
+            .where(and(eq(inspections.tenantId, tenantId), gte(inspections.date, span.from), lt(inspections.date, span.until)));
+        upcoming = allRows;
     } catch (e) {
         logger.error('[ics] Failed to load inspections', { tenantId }, e instanceof Error ? e : undefined);
     }
@@ -133,16 +132,20 @@ icsRoutes.get('/:token', async (c) => {
         ? `https://${reqHost}`
         : (c.env.APP_BASE_URL ?? 'https://openinspection.app');
 
-    const vevents = upcoming.map(({ inspection: r, primaryClientName }) => [
+    // The inspection id is not published: it is the key other public pages accept. The UID is a keyed hash of it, and the event links
+    // to the schedule rather than to one record.
+    const secret = c.env.JWT_SECRET;
+    const uids = await Promise.all(upcoming.map(({ inspection: r }) => icsUid(secret, r.id, 'openinspection')));
+    const vevents = upcoming.map(({ inspection: r, primaryClientName }, i) => [
         'BEGIN:VEVENT',
-        `UID:${r.id}@openinspection`,
+        `UID:${uids[i]}`,
         `SUMMARY:${escICS(r.propertyAddress ?? 'Inspection')}`,
         `DTSTART:${fmtDT(r.date)}`,
         `DTEND:${fmtDTEnd(r.date)}`,
         // No fee: this feed is one URL for the whole company and cannot tell who is
         // reading it, so it carries nothing the money capabilities would hide.
         `DESCRIPTION:Client: ${escICS(primaryClientName ?? '')}`,
-        `URL:${baseUrl}/inspections/${r.id}/edit`,
+        `URL:${baseUrl}/inspections`,
         'END:VEVENT',
     ].join('\r\n')).join('\r\n');
 

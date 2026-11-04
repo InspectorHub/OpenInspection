@@ -30,12 +30,13 @@ import { setupWizardRoutes } from './features/setup-wizard';
 import { jwtAuthMiddleware } from './lib/middleware/jwt-auth';
 import { agentTermsGate } from './lib/middleware/agent-terms-gate';
 import { idempotencyMiddleware } from './lib/middleware/idempotency';
-import { agreementSignPath, agreementRenderPath } from './lib/public-urls';
+import { agreementRenderPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
 
 import coreAuthRoutes, { ssoRootRoutes } from './api/auth';
 import testHooksRoutes from './api/test-hooks';
 import { verifyExportRoutes } from './api/public/verify-export';
+import { signRedirectRoutes } from './api/sign-redirect';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
 import integrationsAiRoutes from './api/integrations-ai';
@@ -310,9 +311,8 @@ const routes = app
   // Auth mounts ONCE. `GET /sso` alone also answers at the root, because portal mints that absolute URL and the browser follows it.
   .route('/api/auth', coreAuthRoutes)
   .route('/', ssoRootRoutes)
-  // Agent unified link (Spec 3 Task 2) — GET /agent/magic-login redeem. Root
-  // mount (not /api) mirrors the /sso pattern above; workers/app.ts forwards
-  // this exact path to the API app since it isn't under /api/*.
+  // Agent unified link — the GET /agent/magic-login redeem handler. The entry does NOT forward that address: it is a page, and the
+  // page's Continue action calls this handler in-process, so the handler is never reached from outside the worker.
   .route('/', agentMagicLoginRedeemRoutes)
   // Test-only hooks, fail-closed behind E2E_EMAIL_SINK (404 in prod). See test-hooks.ts.
   .route('/api/__test__', testHooksRoutes)
@@ -407,8 +407,7 @@ const routes = app
   .route('/api/admin', adminDefectCategoriesRoutes)
   .route('/api/agent', agentRoutes)
   // Agent unified link (Spec 3 Task 2) — POST /api/agent/magic-login/request.
-  // The GET /agent/magic-login redeem endpoint is mounted at root, below
-  // (not under /api — see workers/app.ts's explicit forward for that path).
+  // The GET /agent/magic-login redeem handler is mounted at root (above); it is in-process only, called by the page's action.
   .route('/api/agent', agentMagicLoginRequestRoutes)
   .route('/api/agent', agentReportContextRoutes) // Spec 3 Task 3 — POST /api/agent/report-context
   .route('/api/agent', agentNoticeRoutes) // C3 — the agent's Notices inbox
@@ -555,7 +554,8 @@ app.get('/inspector/:tenant/:slug/calendar.ics', async (c) => {
     // Tenant slug from path must match what tenant-router resolved.
     // The middleware only sets resolvedTenantId on a successful match,
     // so an unresolved path tenant manifests as a 404 here.
-    if (!tenantId || c.get('requestedTenantSlug') !== tenantSlugFromPath) {
+    // No secret means no UIDs can be built: 404, not a failure partway through the feed.
+    if (!tenantId || !c.env.JWT_SECRET || c.get('requestedTenantSlug') !== tenantSlugFromPath) {
         return c.text('Not found', 404);
     }
     const ics = await c.var.services.ics.busyFeedForInspector(tenantId, slug);
@@ -575,52 +575,7 @@ app.get('/inspector/:tenant/:slug/calendar.ics', async (c) => {
 app.get('/agreement-sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
 app.get('/agreements/sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
 
-// iter-2 production bug #9 — `/sign/:id` redirect target for the
-// ReportGatePage "Sign agreement" CTA. Sprint 1 D-7 minted the URL
-// `${baseUrl}/sign/${id}` with id = inspection id, but no route was
-// registered, so the customer who hit the gate landed on a 404.
-//
-// Resolves the inspection's most recent non-terminal agreement request
-// and 302s to the canonical token-gated page `/agreements/sign/:token`.
-// When no live request exists (every row is signed / declined / expired
-// / never created), redirects to the friendly not-found page so the
-// customer at least sees branded copy instead of the bare 404.
-//
-// Public — no JWT required. tenantId resolves from the slug via
-// tenantRouter middleware (`resolvedTenantId`), the same way the public
-// `/report/:id` viewer is scoped.
-app.get('/sign/:tenant/:id', async (c) => {
-    const id = c.req.param('id') as string;
-    const tenantSlugFromPath = c.req.param('tenant');
-    const tenantId = c.get('resolvedTenantId') || c.get('tenantId');
-    // Tenant slug from path must match what tenant-router resolved.
-    // The middleware only sets resolvedTenantId on a successful match,
-    // so an unresolved path tenant manifests as a 404 here. Use the
-    // friendly not-found page to match the rest of this handler's
-    // failure modes (token miss / no live request).
-    if (!tenantId || c.get('requestedTenantSlug') !== tenantSlugFromPath) {
-        return c.redirect('/not-found?from=agreement-sign', 302);
-    }
-
-    try {
-        const pending = await c.var.services.agreement.findPendingByInspectionId(tenantId as string, id);
-        if (pending) {
-            // The signer's real tier-2 link is the ONLY thing worth redirecting
-            // to; the service is DI-constructed with the JWT secret so it can
-            // reconstruct the sealed token server-side. The old fallback to the
-            // envelope's own `token` column is gone with the plaintext lookup
-            // that resolved it — it could now only send a customer to a 404, and
-            // no link beats a broken one.
-            const signerLink = await c.var.services.agreement.getFirstOutstandingSignerLink(tenantId as string, id);
-            if (signerLink) {
-                return c.redirect(agreementSignPath(tenantSlugFromPath as string, signerLink), 302);
-            }
-        }
-    } catch (e) {
-        logger.warn('sign-redirect: lookup failed', { inspectionId: id.slice(0, 8), error: (e as Error).message });
-    }
-    return c.redirect('/not-found?from=agreement-sign', 302);
-});
+app.route('/', signRedirectRoutes);
 
 // Spec 5H P2 — Public verifier (no-auth, court-friendly). The base JSON route
 // `GET /api/public/verify/:envelopeId` is now the typed route in

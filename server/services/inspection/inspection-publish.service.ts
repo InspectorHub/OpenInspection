@@ -146,7 +146,7 @@ export class InspectionPublishService extends InspectionSubService {
         return { reason, paymentOutstanding };
     }
 
-    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService): Promise<{
+    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService, recipientEmail?: string | null): Promise<{
         reason: 'payment' | 'agreement';
         companyName: string;
         primaryColor: string | null;
@@ -256,9 +256,13 @@ export class InspectionPublishService extends InspectionSubService {
         // which is NULL on exactly the envelopes the fallback was there for. It
         // was handing the customer a link that could only 404, which is worse
         // than offering no link: no link routes them to their report instead.
+        //
+        // A signer's link is handed out only to a recipient who has proved who they are (`recipientEmail`, taken from their portal token by
+        // the caller): the link returned is that recipient's own, never "the first outstanding signer's". With no proof the page gets no
+        // token and falls back to the client portal, which asks for an email sign-in. The inspection id alone is not a credential.
         let signerLink: string | null = null;
-        if ((bothOutstanding || reason === 'agreement') && agreementService) {
-            signerLink = await agreementService.getFirstOutstandingSignerLink(tenantId, inspectionId);
+        if ((bothOutstanding || reason === 'agreement') && agreementService && recipientEmail) {
+            signerLink = await agreementService.getSignerLinkByEmail(tenantId, inspectionId, recipientEmail);
         }
         const agreementLinkToken = signerLink;
 

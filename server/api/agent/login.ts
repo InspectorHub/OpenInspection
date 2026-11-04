@@ -8,6 +8,7 @@ import { getBaseUrl } from '../../lib/url';
 import { signJwt } from '../../lib/jwt-keyring';
 import { logger } from '../../lib/logger';
 import { Errors } from '../../lib/errors';
+import { checkRateLimit } from '../../lib/rate-limit';
 import { verifyPassword, hashPassword } from '../../lib/password';
 import { users } from '../../lib/db/schema/tenant';
 import { DUMMY_HASH } from '../../services/auth.service';
@@ -102,6 +103,7 @@ const loginLinkRoute = createRoute(withMcpMetadata({
 
 export const agentLoginRoutes = createApiRouter();
 agentLoginRoutes.openapi(loginRoute, async (c) => {
+    await checkRateLimit(c, 'agent-login');
     const { email, password } = c.req.valid('json');
 
     const row = await findGlobalAgentByEmail(c.env.DB, email);
@@ -147,6 +149,7 @@ agentLoginRoutes.openapi(loginRoute, async (c) => {
     return c.json({ success: true as const, data: { ok: true as const } }, 200);
 });
 agentLoginRoutes.openapi(loginLinkRoute, async (c) => {
+    await checkRateLimit(c, 'agent-login-link');
     const { email } = c.req.valid('json');
 
     const loginUrl = await requestMagicLoginByEmail({

@@ -185,6 +185,8 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv, NativeVisible
     // Inbound-webhook ceilings (120/60s QuickBooks, 300/60s Stripe), per source.
     QBO_WEBHOOK_RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
     STRIPE_WEBHOOK_RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+    // The OAuth token endpoint's ceiling (120/60s per source), apart from the 10/60s registration door because native clients behind one shared address refresh tokens.
+    OAUTH_TOKEN_RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
 
     // PDF Generation (Cloudflare Browser Run — formerly Browser Rendering).
     // Quick Actions API: env.BROWSER.quickAction("pdf", { url }) → Response.

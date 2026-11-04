@@ -44,12 +44,12 @@ describe('the audit export check, edges', () => {
             expect(known.emails).toContain(EMAIL1B);
             // Controls: the other signer's real email goes through.
             expect((await post(ENV1, withToken({ email: EMAIL1B }), '192.0.2.4')).status).toBe(200);
-            // The postal code still works on an envelope whose every email was erased.
+            // On an envelope whose every email was erased there is no email to match, and the postal code is no way in on its own.
             await h.db.update(schema.agreementSigners).set(ANONYMIZE_SIGNER_PII).where(eq(schema.agreementSigners.requestId, ENV3));
             await h.db.update(schema.agreementRequests).set({ clientEmail: ERASED_SENTINEL }).where(eq(schema.agreementRequests.id, ENV3));
             expect((await candidatesFor(h.env.DB, ENV3)).emails).toEqual([]);
-            expect((await post(ENV3, withToken({ postalCode: 'K1A 0B1' }), '192.0.2.5')).status).toBe(200);
-            expect((await post(ENV3, withToken({ email: 'third.signer@example.test' }), '192.0.2.6')).status).toBe(403);
+            expect((await post(ENV3, withToken({ postalCode: 'K1A 0B1' }), '192.0.2.5')).status).toBe(400);
+            expect((await post(ENV3, withToken({ email: 'third.signer@example.test', postalCode: 'K1A 0B1' }), '192.0.2.6')).status).toBe(403);
         });
 
         it('answers 400 for an email that is not shaped like one, and accepts an ordinary one', async () => {
@@ -57,8 +57,8 @@ describe('the audit export check, edges', () => {
                 expect((await post(ENV1, withToken({ email }), '192.0.2.7')).status, email).toBe(400);
             }
             expect((await post(ENV1, withToken({ email: EMAIL1 }), '192.0.2.7')).status).toBe(200);
-            // An empty email beside a postal code is just a postal request.
-            expect((await post(ENV1, withToken({ email: '', postalCode: '78701' }), '192.0.2.7')).status).toBe(200);
+            // An empty email beside a postal code is a request with no email.
+            expect((await post(ENV1, withToken({ email: '', postalCode: '78701' }), '192.0.2.7')).status).toBe(400);
         });
     });
 
@@ -74,7 +74,7 @@ describe('the audit export check, edges', () => {
                 }
             }
             // Controls: a real code still works where one is stored, and a placeholder beside a real email does not stop the email.
-            expect((await post(ENV1, withToken({ postalCode: '78701' }), '192.0.2.41')).status).toBe(200);
+            expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: '78701' }), '192.0.2.41')).status).toBe(200);
             expect((await post(ENV4, withToken({ email: 'fourth.signer@example.test', postalCode: '-' }), '192.0.2.42')).status).toBe(200);
             // A placeholder stored on the inspection leaves no candidate at all.
             await h.db.update(schema.inspections).set({ addressZip: '-' }).where(eq(schema.inspections.id, 'insp-1'));
@@ -85,19 +85,20 @@ describe('the audit export check, edges', () => {
     describe('the postal code of the request the inspection came from', () => {
         it('releases the export for a code that matches only the request, and not for a request of another company', async () => {
             // insp-4 has no code of its own: only its request carries one.
-            expect((await post(ENV4, withToken({ postalCode: '60601' }), '192.0.2.50')).status).toBe(200);
-            expect((await post(ENV4, withToken({ postalCode: '60602' }), '192.0.2.51')).status).toBe(403);
+            const fourth = 'fourth.signer@example.test';
+            expect((await post(ENV4, withToken({ email: fourth, postalCode: '60601' }), '192.0.2.50')).status).toBe(200);
+            expect((await post(ENV4, withToken({ email: fourth, postalCode: '60602' }), '192.0.2.51')).status).toBe(403);
             // insp-3 points at a request of another company, whose code must not be used; its own code still works.
             expect((await candidatesFor(h.env.DB, ENV3)).postalCodes).toEqual(['K1A0B1']);
-            expect((await post(ENV3, withToken({ postalCode: '99999' }), '192.0.2.52')).status).toBe(403);
-            expect((await post(ENV3, withToken({ postalCode: 'K1A 0B1' }), '192.0.2.53')).status).toBe(200);
+            expect((await post(ENV3, withToken({ email: 'third.signer@example.test', postalCode: '99999' }), '192.0.2.52')).status).toBe(403);
+            expect((await post(ENV3, withToken({ email: 'third.signer@example.test', postalCode: 'K1A 0B1' }), '192.0.2.53')).status).toBe(200);
         });
 
         it('treats a placeholder on the request as no candidate', async () => {
             await h.db.update(schema.inspectionRequests).set({ propertyZip: '-' }).where(eq(schema.inspectionRequests.id, REQUEST_OWN));
             expect((await candidatesFor(h.env.DB, ENV4)).postalCodes).toEqual([]);
             expect((await post(ENV4, withToken({ postalCode: '-' }), '192.0.2.54')).status).toBe(400);
-            expect((await post(ENV4, withToken({ postalCode: '60601' }), '192.0.2.55')).status).toBe(403);
+            expect((await post(ENV4, withToken({ email: 'fourth.signer@example.test', postalCode: '60601' }), '192.0.2.55')).status).toBe(403);
         });
     });
 

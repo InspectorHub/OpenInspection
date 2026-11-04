@@ -22,6 +22,7 @@ import portalRoutes from '../../../server/api/portal';
 import { PortalService } from '../../../server/services/portal.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { asD1Db } from '../helpers/test-db';
+import { MockKV } from '../mocks';
 
 /**
  * Spec 3 Task 7 — GET /api/portal/:tenant/redeem (find-my-report magic-link
@@ -97,7 +98,7 @@ describe('GET /api/portal/:tenant/redeem — find-my-report agent destination', 
         vi.clearAllMocks();
     });
 
-    function reqEnv() { return { DB: {}, JWT_SECRET } as unknown as HonoConfig['Bindings']; }
+    function reqEnv() { return { DB: {}, JWT_SECRET, TENANT_CACHE: new MockKV() } as unknown as HonoConfig['Bindings']; }
 
     it('a global agent email -> sets __Host-inspector_token (agent claims, no tenantId), NO __Host-portal_session, { agent: true }', async () => {
         const AGENT_ID = '00000000-0000-0000-0000-0000000000a9';

@@ -2,6 +2,8 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { checkRateLimit } from '../lib/rate-limit';
+import { WidgetEventMetadataSchema } from '../lib/validations/widget-event.schema';
 
 const recordEventRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -15,7 +17,7 @@ const recordEventRoute = createRoute(withMcpMetadata({
                 'application/json': {
                     schema: z.object({
                         event: z.enum(['view', 'submit', 'success', 'error']).describe('What happened in the widget: it was viewed, the form was submitted, the booking succeeded, or the widget hit an error.'),
-                        metadata: z.record(z.string(), z.unknown()).optional().describe('Free-form details about the event, stored with it as sent. Optional.'),
+                        metadata: WidgetEventMetadataSchema.optional().describe('Small details about the event (at most 10 keys, short text, number or boolean values), stored with it. Optional.'),
                     }).describe('The widget event to record, with optional free-form details.'),
                 },
             },
@@ -37,6 +39,8 @@ const recordEventRoute = createRoute(withMcpMetadata({
 
 const app = createApiRouter();
 app.openapi(recordEventRoute, async (c) => {
+    // Every recorded event is a database write made on behalf of an anonymous caller: counted per caller address before anything else runs.
+    await checkRateLimit(c, 'widget-event');
     const tenantId = c.get('resolvedTenantId') || c.get('tenantId');
     if (!tenantId) {
         return c.json({ success: true }, 200);

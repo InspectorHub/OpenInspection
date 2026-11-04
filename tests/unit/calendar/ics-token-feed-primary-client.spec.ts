@@ -85,7 +85,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
     });
 
     it('embeds the primary client\'s name in the VEVENT DESCRIPTION', async () => {
-        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {} } as unknown as AppEnv, makeExecCtx());
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {}, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
         expect(res.status).toBe(200);
         const body = await res.text();
         expect(body).toContain('BEGIN:VEVENT');
@@ -96,11 +96,40 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
         expect(body).not.toMatch(/Fee|25000/);
     });
 
+    it('publishes neither the inspection id nor a link to the record: the UID is a keyed hash and the URL names no id', async () => {
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {}, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
+        const body = await res.text();
+        expect(body).not.toContain(INSP);
+        expect(body).toMatch(/UID:[0-9a-f]{32}@openinspection/);
+        expect(body).toMatch(/URL:https?:[/][/][^/]*[/]inspections$/m);
+        // Control: the row really is in the feed.
+        expect(body).toContain('SUMMARY:1 Main St');
+    });
+
+    it('bounds the read to the window: an inspection years ahead or behind is not in the feed', async () => {
+        for (const [id, date] of [['insp-far-ahead', '2031-01-01'], ['insp-long-ago', '2020-01-01']] as const) {
+            await db.insert(schema.inspections).values({
+                id, tenantId: TENANT, propertyAddress: `${id} Road`, price: 0, date, status: 'confirmed', paymentStatus: 'unpaid',
+                paymentRequired: false, agreementRequired: false, createdAt: new Date(),
+            });
+        }
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {}, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
+        const body = await res.text();
+        expect(body).toContain('SUMMARY:1 Main St');
+        expect(body).not.toContain('insp-far-ahead Road');
+        expect(body).not.toContain('insp-long-ago Road');
+    });
+
+    it('answers 404 rather than publish raw ids when the deployment has no secret', async () => {
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {} } as unknown as AppEnv, makeExecCtx());
+        expect(res.status).toBe(404);
+    });
+
     it('no primary client at all — DESCRIPTION renders an empty client name (no legacy-column fallback)', async () => {
         const { eq } = await import('drizzle-orm');
         await db.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, INSP));
 
-        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {} } as unknown as AppEnv, makeExecCtx());
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {}, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
         expect(res.status).toBe(200);
         const body = await res.text();
         expect(body).toContain('DESCRIPTION:Client: ');

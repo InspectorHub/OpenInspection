@@ -351,6 +351,9 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
       expect(code, 'the emailed sign-in link must contain a magic-login code').toBeTruthy();
 
       await freshPage.goto(`${BASE_URL}/agent/magic-login?code=${code}`, { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
+      // The emailed link opens a Continue page; the code is spent by the button, not by opening the link.
+      await freshPage.getByRole('button', { name: 'Continue' }).click();
+      await freshPage.waitForURL(/agent-dashboard/, { timeout: NAV_TIMEOUT });
       expect(freshPage.url()).toContain('/agent-dashboard');
       await expect(freshPage.getByRole('heading', { name: 'Agent Dashboard' })).toBeVisible({ timeout: 10000 });
       await expect(freshPage.getByTestId(`referral-row-${inspectionAId}`)).toBeVisible({ timeout: 10000 });
@@ -453,6 +456,8 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
       waitUntil: 'networkidle',
       timeout: NAV_TIMEOUT,
     });
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.waitForURL(/agent-dashboard/, { timeout: NAV_TIMEOUT });
     expect(page.url()).toContain('/agent-dashboard');
     await expect(page.getByRole('heading', { name: 'Agent Dashboard' })).toBeVisible({ timeout: 10000 });
   });
@@ -518,14 +523,19 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
     expect(code, 'a fresh magic-login code must be emailed').toBeTruthy();
     const loginUrl = `${BASE_URL}/agent/magic-login?code=${code}`;
 
-    const first = await request.get(loginUrl, { maxRedirects: 0 });
+    // Opening the link (a GET, as a mail scanner would) shows the Continue page and spends nothing.
+    const opened = await request.get(loginUrl, { maxRedirects: 0 });
+    expect(opened.status(), 'opening the link must not redeem it').toBe(200);
+    expect(opened.headers()['set-cookie'], 'opening the link must NOT mint a cookie').toBeUndefined();
+
+    const first = await request.post(loginUrl, { maxRedirects: 0 });
     expect(first.status(), 'first redeem must succeed').toBe(302);
     expect(first.headers()['location']).toContain('/agent-dashboard');
     expect(first.headers()['set-cookie'] ?? '', 'first redeem must mint the session cookie').toContain(
       '__Host-inspector_token',
     );
 
-    const second = await request.get(loginUrl, { maxRedirects: 0 });
+    const second = await request.post(loginUrl, { maxRedirects: 0 });
     expect(second.status(), 'second redeem of the SAME code must fail').toBe(302);
     expect(second.headers()['location']).toContain('/agent-login');
     expect(second.headers()['location']).toContain('error=expired_link');

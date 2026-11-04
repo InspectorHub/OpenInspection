@@ -9,6 +9,7 @@ import { logger } from '../lib/logger';
 import { getDeploymentProfile } from '../lib/deployment-profile';
 import { getBaseUrl } from '../lib/url';
 import { checkRateLimit } from '../lib/rate-limit';
+import { constantTimeEquals } from '../lib/email/webhook-crypto';
 import { requireCsrfToken } from '../lib/middleware/csrf';
 import { signJwt } from '../lib/jwt-keyring';
 import { writeAuditLog, auditFromContext } from '../lib/audit';
@@ -520,6 +521,8 @@ coreAuthRoutes.openapi(resetPasswordRoute, async (c) => {
     return c.json({ success: true }, 200);
 });
 coreAuthRoutes.openapi(setupRoute, async (c) => {
+    // The setup code is a short secret an anonymous caller guesses at: counted per address before anything is read.
+    await checkRateLimit(c, 'setup');
     // 1. Safety Check: Only allow if no tenant-scoped users exist.
     // Agent Accounts A1 — global agents (tenant_id IS NULL) are unrelated to
     // first-time tenant initialization, so they must not block setup.
@@ -537,7 +540,7 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
     if (!storedCode) {
         return c.json({ success: false, error: { code: 'setup_code_unset', message: 'SETUP_CODE is not configured on this Worker. Set it as a secret and try again.' } }, 400);
     }
-    if (body.verificationCode !== storedCode) {
+    if (!body.verificationCode || !constantTimeEquals(body.verificationCode, storedCode)) {
         return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
     }
 

@@ -40,13 +40,17 @@ describe('the audit export attempt allowance', () => {
     });
 
     it('gives a postal code a smaller allowance than an email: three wrong ones, and an email from the same address still works', async () => {
-        for (let i = 0; i < 3; i += 1) expect((await post(ENV1, withToken({ postalCode: `0000${i}` }))).status).toBe(403);
-        expect((await post(ENV1, withToken({ postalCode: '78701' }))).status).toBe(429);
+        // A postal code only counts beside an email that matched a signer: each wrong attempt here carries the right email and a wrong code.
+        for (let i = 0; i < 3; i += 1) expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: `0000${i}` }))).status).toBe(403);
+        // The postal path is locked for this address: even the right code beside the right email is refused, as every other refusal is (403, no wait).
+        const locked = await post(ENV1, withToken({ email: EMAIL1, postalCode: '78701' }));
+        expect(locked.status).toBe(403);
+        expect(locked.headers.get('retry-after')).toBeNull();
         // Control: the email allowance of that address is separate and untouched.
         expect((await post(ENV1, withToken({ email: EMAIL1 }))).status).toBe(200);
         // Control: before the third miss a right postal code goes through.
-        expect((await post(ENV3, withToken({ postalCode: '00000' }), '192.0.2.20')).status).toBe(403);
-        expect((await post(ENV3, withToken({ postalCode: 'K1A 0B1' }), '192.0.2.20')).status).toBe(200);
+        expect((await post(ENV3, withToken({ email: 'wrong@example.test', postalCode: '00000' }), '192.0.2.20')).status).toBe(403);
+        expect((await post(ENV3, withToken({ email: 'third.signer@example.test', postalCode: 'K1A 0B1' }), '192.0.2.20')).status).toBe(200);
     });
 
     it('bounds guessing from many addresses with an envelope-wide ceiling of fifty attempts an hour', async () => {

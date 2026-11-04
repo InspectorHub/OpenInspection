@@ -22,6 +22,7 @@ import { logger } from '../lib/logger';
 import { sendSuccess } from '../lib/response';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
+import { checkRateLimit } from '../lib/rate-limit';
 
 const shareTokenRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -81,6 +82,9 @@ app.openapi(shareTokenRoute, async (c) => {
         throw Errors.Forbidden('Report has not been published yet');
     }
 
+    // Each mint is a stored token with a 30-day lifetime, so minting is limited per inspection (after the proof above, so a caller with no proof
+    // costs nothing here). A report is shared a handful of times, not hundreds.
+    await checkRateLimit(c, 'share-token', id);
     const shareToken = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
     const baseUrl = c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`;
     const tenantSlug = c.get('requestedTenantSlug') ?? '';

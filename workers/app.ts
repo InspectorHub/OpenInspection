@@ -31,7 +31,7 @@ import { withResolvedUiLocale } from "../server/lib/i18n/ui-locale";
 import { registerApiAppLoader } from "../server/lib/api-app";
 import type { WorkerEnv } from "./env";
 import { cloudflareContext } from "../app/lib/load-context";
-import { withHumanToken } from "./human-token";
+import { forInProcessApi } from "./inprocess-request";
 // Imports nothing, like the three above: safe at the top level.
 import { sessionMarkerFromCookie } from "../server/lib/session-marker";
 // Imports only react-router (already above) and the logger, which imports nothing.
@@ -90,7 +90,7 @@ const ssr = async (c: Ctx) => {
     API_WORKER: {
       fetch: async (req: Request) => {
         inprocCalls += 1;
-        return (await getApi()).app.fetch(withHumanToken(req, c.req.header("cookie")), innerEnv, c.executionCtx);
+        return (await getApi()).app.fetch(forInProcessApi(req, c.req.raw.headers), innerEnv, c.executionCtx);
       },
     },
   };
@@ -222,7 +222,6 @@ app.all("/.well-known/*", toApi);
 app.all("/doc", toApi); // OpenAPI JSON (the RR /ui Swagger page fetches it); /ui itself is now an RR route
 app.all("/sso", toApi); // saas SSO handoff — the one auth route mounted at '/' (ssoRootRoutes)
 app.all("/sign/*", toApi); // public signing pages — no React Router /sign route
-app.all("/agent/magic-login", toApi); // agent unified link redeem — no React Router page for this path
 app.get("/inspector/:tenant/:slug/calendar.ics", toApi); // ICS feed (API-only)
 // Removed: `/observe/:token`. It forwarded to the API app, which has never had
 // a route there, and the React Router route its comment claimed ("RR owns

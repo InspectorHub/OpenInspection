@@ -61,7 +61,6 @@ export const moduleFile = (target, present) => [`${target}.ts`, `${target}/index
  * /api that is neither mounted nor listed here fails the gate, and so does a listed path that is no longer open.
  */
 export const PAGE_PATHS = {
-    '/agent-invite/': 'a page of the server-rendered app',
     '/agent-signup': 'a page of the server-rendered app (its API is /api/agent-signup, scanned)',
     '/agent/magic-login': 'a page; the redeem route is mounted at the root from agent/magic-login.ts (scanned)',
     '/confirm/': 'a page of the server-rendered app',

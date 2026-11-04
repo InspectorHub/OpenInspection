@@ -45,10 +45,8 @@ import { MAX_PHOTO_BYTES, isSignedPhotoExt, sniffedPhotoExt, storePhotoAtKey } f
 import { storeVideoUpload } from '../inspections/media-video-r2';
 import { MAX_FORM_VIDEO_BYTES } from '../../lib/media/video-types';
 import { videoChunkedRoutes } from './video-chunked';
+import { declaredLengthRefusal } from '../../lib/declared-length';
 import { relativizeSerialized } from '../../lib/report-link-keys';
-
-/** Multipart framing adds a little to the file itself; this much headroom is allowed before the body is read. */
-const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 
 /** The single-request route buffers the clip, so larger ones go through the chunked route. */
 const FORM_TOO_LARGE = {
@@ -58,19 +56,6 @@ const FORM_TOO_LARGE = {
 } as const;
 
 const INVALID_TOKEN = { error: 'Invalid or expired upload token' } as const;
-
-/**
- * Refuse a body that does not declare its size, or declares too much, before it
- * is read into memory. A missing or non-numeric length is 411 rather than zero:
- * a chunked body has no declared size to check.
- */
-function checkDeclaredLength(c: Context<HonoConfig>, maxBytes: number, tooLarge: Record<string, unknown>): Response | null {
-    const header = c.req.header('content-length');
-    if (header === undefined || !/^\d+$/.test(header.trim())) {
-        return c.json({ error: 'Content-Length is required.' }, 411);
-    }
-    return Number(header) > maxBytes + MULTIPART_OVERHEAD_BYTES ? c.json(tooLarge, 413) : null; // projection-allow: a refusal body the caller built from literals (error code and limits)
-}
 
 /** The token's issuer is still an active member and its inspection still exists, both in the token's tenant. */
 async function checkDestination(c: Context<HonoConfig>, claims: UploadTokenClaims): Promise<Response | null> {
@@ -100,7 +85,7 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'photo');
         if (!claims || !claims.userId || !isSignedPhotoExt(claims.ext)) return c.json(INVALID_TOKEN, 401);
 
-        const refusedLength = checkDeclaredLength(c, MAX_PHOTO_BYTES, { error: 'Photo is too large.' });
+        const refusedLength = declaredLengthRefusal(c, MAX_PHOTO_BYTES, { error: 'Photo is too large.' });
         if (refusedLength) return refusedLength;
         const refusedDestination = await checkDestination(c, claims);
         if (refusedDestination) return refusedDestination;
@@ -124,7 +109,7 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'video');
         if (!claims) return c.json(INVALID_TOKEN, 401);
 
-        const refusedLength = checkDeclaredLength(c, MAX_FORM_VIDEO_BYTES, FORM_TOO_LARGE);
+        const refusedLength = declaredLengthRefusal(c, MAX_FORM_VIDEO_BYTES, FORM_TOO_LARGE);
         if (refusedLength) return refusedLength;
         const refusedDestination = await checkDestination(c, claims);
         if (refusedDestination) return refusedDestination;

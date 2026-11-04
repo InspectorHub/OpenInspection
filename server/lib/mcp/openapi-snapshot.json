@@ -1621,7 +1621,8 @@
           "signatureBase64": {
             "type": "string",
             "minLength": 1,
-            "description": "The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail"
+            "maxLength": 500000,
+            "description": "The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail. 1-500000 characters."
           },
           "onBehalfOf": {
             "type": "string",
@@ -5793,9 +5794,23 @@
           "metadata": {
             "type": "object",
             "additionalProperties": {
-              "nullable": true
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true
+                }
+              ]
             },
-            "description": "Free-form details about the event, stored with it as sent. Optional."
+            "description": "Small details about the event (at most 10 keys, short text, number or boolean values), stored with it. Optional."
           }
         },
         "required": [
@@ -9353,6 +9368,16 @@
           "schema": {
             "type": "string",
             "description": "Inspection id."
+          }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent portal access token of the recipient; without it the payload carries no signer link.",
+          "schema": {
+            "type": "string",
+            "description": "Persistent portal access token of the recipient; without it the payload carries no signer link."
           }
         }
       ],
@@ -18034,7 +18059,7 @@
       "body": null
     },
     "summary": "Redeem a single-use agent magic-login code",
-    "description": "Public, unauthenticated endpoint for the agent unified link. Redeems the single-use code minted by POST /api/agent/magic-login/request into an agent session cookie, then redirects into the agent dashboard. A missing, expired, or already-used code redirects to a friendly recovery page instead of surfacing a raw error."
+    "description": "Public, unauthenticated endpoint for the agent unified link. Redeems the single-use code minted by POST /api/agent/magic-login/request into an agent session cookie, then redirects into the agent dashboard. Reached only in-process, by the Continue action of the page at /agent/magic-login; the worker entry does not forward that address to the API. A missing, expired, or already-used code redirects to a friendly recovery page instead of surfacing a raw error."
   },
   {
     "operationId": "refreshInspection",

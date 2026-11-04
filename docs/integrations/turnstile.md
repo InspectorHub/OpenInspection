@@ -3,7 +3,7 @@
 Cloudflare Turnstile guards the surfaces an anonymous visitor can submit to:
 the public booking form, agent self-signup and the request for the signed audit
 record of an envelope (`POST /api/public/verify/:envelopeId/export`, which also
-asks for an email recorded on the envelope or the property's postal code).
+asks for an email recorded on the envelope; the property's postal code is accepted only together with an email).
 
 ## What you need
 
@@ -81,8 +81,10 @@ outage is distinguishable from a real bot.
 ## The signed audit export request
 
 `POST /api/public/verify/:envelopeId/export` releases the signed audit record to a
-caller who supplies an email recorded on the envelope or the postal code of the
-inspected property, after the challenge. Its attempt allowance is kept in the
+caller who supplies an email recorded on the envelope, after the challenge. The
+postal code of the inspected property is a second factor and never a first: it is
+accepted only together with an email, and when one is supplied it must match as
+well. A request without an email is answered 400 and counts for nothing. Its attempt allowance is kept in the
 database (`verify_export_attempts`), reserved before the answer is compared, so
 parallel requests cannot exceed it:
 
@@ -94,6 +96,14 @@ parallel requests cannot exceed it:
 A postal code is a weaker factor than a signer's email, since it has a small
 keyspace and is printed on documents the participants share; that is why its
 allowances are smaller and why it also counts toward the envelope-wide ceilings.
+A postal attempt is counted only once the email in the same request matched a signer;
+a request with a wrong email is counted under the email counters alone. Once a postal
+allowance is spent, the postal path answers like every other refusal (the same status
+and body, no wait is announced) and reserves nothing more, whether the email was right
+or wrong: a distinct answer would tell someone who spent the allowance with one known
+email which other guesses are signers. The email alone still works. Accepted residual:
+a correct email with a postal code costs one extra counter write before the refusal,
+a small timing difference, bounded by the per-network and per-envelope email counters.
 The strict limits are per network so a third party cannot lock the signer out
 from their own address: an IPv4 address is one network, an IPv6 address counts as
 its /64 prefix. The residual risk is a caller who changes network: only the

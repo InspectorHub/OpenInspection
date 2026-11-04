@@ -17,7 +17,7 @@ import { logger } from './logger';
 
 const ATTACHMENT_ID = /^[A-Za-z0-9-]{1,64}$/;
 const EXTENSION = /^[a-z0-9]{1,8}$/;
-const MAX_BYTES = 10 * 1024 * 1024;
+export const MAX_BYTES = 10 * 1024 * 1024;
 const MAX_NAME = 255;
 
 /** A name cut to `max` characters by code point, so an emoji or other pair at the cut is kept whole or dropped whole. */

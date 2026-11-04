@@ -2,7 +2,8 @@
  * The knowledge check in front of the signed audit export on the public verifier page.
  *
  * The verification result above it is public; the signed record lists every event with the emails given at signing, so it is released
- * to someone who can name an email recorded on the agreement or the postal code of the inspected property (either one is enough).
+ * to someone who can name an email recorded on the agreement. The postal code of the inspected property is optional and only ever
+ * an extra condition: it is never enough on its own.
  * The request is a POST with the values in the body, never in a URL. Every refusal is shown as one neutral line, and a failed attempt
  * asks for a fresh bot-challenge token, because a token is good for one request: a download that went through uses its token up as
  * well, so the next one also waits for a new token. Where a site key is configured the button stays off until a token exists, and a
@@ -60,7 +61,7 @@ export function VerifyExportForm({ envelopeId, siteKey }: { envelopeId: string; 
   });
 
   const send = async () => {
-    if (!email.trim() && !postalCode.trim()) {
+    if (!email.trim()) {
       setError(m.public_verify_export_error_required());
       return;
     }
@@ -112,6 +113,7 @@ export function VerifyExportForm({ envelopeId, siteKey }: { envelopeId: string; 
     >
       <h2 className="text-sm font-semibold uppercase tracking-wide text-ih-fg-3">{m.public_verify_export_heading()}</h2>
       <p className="text-[13px] text-ih-fg-2">{m.public_verify_export_intro()}</p>
+      <p className="text-[12px] text-ih-fg-3">{m.public_verify_export_contents()}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Input
           id="verify-export-email"
@@ -132,7 +134,7 @@ export function VerifyExportForm({ envelopeId, siteKey }: { envelopeId: string; 
           onChange={(e) => setPostalCode(e.target.value)}
         />
       </div>
-      <p className="text-[11px] text-ih-fg-3">{m.public_verify_export_either()}</p>
+      <p className="text-[11px] text-ih-fg-3">{m.public_verify_export_postal_note()}</p>
       {siteKey ? <div key={attempt} ref={widgetHost} /> : null}
       {error ? <Banner tone="danger">{error}</Banner> : null}
       {done ? <Banner tone="success">{m.public_verify_export_done()}</Banner> : null}

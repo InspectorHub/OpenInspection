@@ -474,7 +474,7 @@ export class InspectionService {
         return this.publish.resolveReleaseGate(inspectionId, tenantId);
     }
 
-    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService): Promise<{
+    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService, recipientEmail?: string | null): Promise<{
         reason: 'payment' | 'agreement';
         companyName: string;
         primaryColor: string | null;
@@ -489,7 +489,7 @@ export class InspectionService {
         amountCents: number | null;
         currency: string | null;
     } | null> {
-        return this.publish.getReportGate(inspectionId, tenantId, tenantSlug, agreementService);
+        return this.publish.getReportGate(inspectionId, tenantId, tenantSlug, agreementService, recipientEmail);
     }
 
     /**

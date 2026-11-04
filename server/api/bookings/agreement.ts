@@ -6,10 +6,11 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { eq, and, desc } from 'drizzle-orm';
-import { agreements, tenantConfigs, invoices, inspections, esignAuditLogs } from '../../lib/db/schema';
+import { agreements, tenantConfigs, invoices, inspections } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { signingIntentProblem } from '../../lib/esign/signing-intent';
+import { presentationRowsOf } from '../../lib/esign/signer-presentations';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
@@ -136,7 +137,7 @@ const signAgreementRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        signatureBase64: z.string().min(1).describe('The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail'),
+                        signatureBase64: z.string().min(1).max(500_000).describe('The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail'),
                         onBehalfOf: z.string().max(200).optional().describe('Client name an authorized agent is signing on behalf of'),
                         onBehalfDisclaimer: z.string().max(2000).optional().describe('Authorized-agent disclaimer text shown at sign time'),
                     }).describe('The signature and, when signing for someone else, who for'),
@@ -416,14 +417,7 @@ const agreementRoutes = createApiRouter()
         // neither — an envelope predating content hashing has nothing to compare,
         // and refusing there would block a signature for a reason about our own
         // history rather than about the signer.
-        const intentLogs = await getDrizzle(c)
-            .select({ event: esignAuditLogs.event, payloadJson: esignAuditLogs.payloadJson })
-            .from(esignAuditLogs)
-            .where(and(
-                eq(esignAuditLogs.tenantId, envelope.tenantId),
-                eq(esignAuditLogs.requestId, envelope.id),
-            ))
-            .all();
+        const intentLogs = await presentationRowsOf(getDrizzle(c), envelope, signer.id);
         const intentProblem = signingIntentProblem({
             logs: intentLogs, signerId: signer.id, signedHash: envelope.contentHash ?? null,
         });

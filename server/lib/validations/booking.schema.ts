@@ -63,8 +63,8 @@ export const PublicBookingSchema = z.object({
     // JWT) does not apply to a public cross-mode endpoint — the slug is the
     // public tenant identifier, resolved server-side exactly like the
     // GET /book/:tenant/:slug page data.
-    tenant: z.string().min(1, 'Tenant is required').openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
-    address: z.string().min(5, 'Address is too short').openapi({ example: '123 Main St, City, ST 12345' }).describe('Property address to inspect, free text of at least 5 characters'),
+    tenant: z.string().min(1, 'Tenant is required').max(100).openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
+    address: z.string().min(5, 'Address is too short').max(500, 'Address is too long').openapi({ example: '123 Main St, City, ST 12345' }).describe('Property address to inspect, free text of at least 5 characters'),
     // The structured half of the address, present when the visitor picked a
     // suggestion from the public autocomplete instead of typing free text.
     //
@@ -79,8 +79,8 @@ export const PublicBookingSchema = z.object({
         .describe('ZIP hint from the selected autocomplete suggestion. Re-resolved server-side when a placeId is supplied.'),
     addressPlaceId: z.string().trim().min(8).max(200).optional().openapi({ example: 'ChIJxxx' })
         .describe('Google place id of the selected suggestion. Resolved server-side to the property coordinates used by `closest` routing.'),
-    clientName: z.string().min(1, 'Client name is required').openapi({ example: 'John Doe' }).describe('Name of the client booking the inspection'),
-    clientEmail: z.string().email('Invalid email address').openapi({ example: 'john@example.com' }).describe('Client email address. The confirmation email goes here, and the client contact is matched or created by it'),
+    clientName: z.string().min(1, 'Client name is required').max(200, 'Client name is too long').openapi({ example: 'John Doe' }).describe('Name of the client booking the inspection'),
+    clientEmail: z.string().email('Invalid email address').max(254, 'Email address is too long').openapi({ example: 'john@example.com' }).describe('Client email address. The confirmation email goes here, and the client contact is matched or created by it'),
     // F42 — the bounds are enforced by the two object-level refinements below,
     // not here: a `.refine()` on the field would wrap it in a ZodEffects, and
     // this object is registered with `.openapi('PublicBooking')` for the MCP
@@ -96,14 +96,14 @@ export const PublicBookingSchema = z.object({
     // the inspector is unavailable or belongs to a different tenant the request
     // is rejected; the server will NOT silently reassign to a free inspector.
     inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Optional inspector id. Omit for company-level auto-assign; supply to target a specific inspector (deep link / inspector-choice flow).'),
-    turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }).describe('Token from the Turnstile bot challenge on the booking page. Required where the deployment enforces the challenge; verified server-side'),
+    turnstileToken: z.string().max(2048).optional().openapi({ example: '0.xtoken...' }).describe('Token from the Turnstile bot challenge on the booking page. Required where the deployment enforces the challenge; verified server-side'),
     // Sprint 2 S2-2 — Multi-inspection per request. Customer can pick multiple
     // services in a single visit. When omitted (legacy single-service flow),
     // the server still creates a one-inspection request to keep the data model
     // uniform. `serviceIds` are tenant Service entries; their templateId is
     // resolved server-side.
     services: z.array(z.object({
-        serviceId: z.string().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Id of a service offered by this company; each service creates its own inspection, and a service with no template is refused'),
+        serviceId: z.string().min(1).max(100).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Id of a service offered by this company; each service creates its own inspection, and a service with no template is refused'),
     })).min(1).max(10).optional().openapi({ description: 'Optional list of services to book in one visit (1-10)' }),
     // UC-A-1 — agent referral attribution. The `?ref=<agentSlug>` query param
     // on /book/<inspectorSlug> flows through the form as a hidden field. Server

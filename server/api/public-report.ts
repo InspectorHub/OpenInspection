@@ -266,6 +266,9 @@ const reportGateRoute = createRoute(withMcpMetadata({
             tenant: z.string().describe('Tenant slug (display + CTA-URL building; tenant is resolved from the slug).'),
             id: z.string().describe('Inspection id.'),
         }),
+        query: z.object({
+            token: z.string().optional().describe('Persistent portal access token of the recipient; without it the payload carries no signer link.'),
+        }),
     },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(ReportGateResponseSchema) } }, description: 'Gate payload (or null when the report is not gated)' },
@@ -606,7 +609,11 @@ app.openapi(reportGateRoute, async (c) => {
     const { tenant, id } = c.req.valid('param');
     const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
     if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
-    const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant, c.var.services.agreement);
+    // The signer link in the payload is the caller's own and only for a caller holding a portal token for THIS inspection.
+    const { token } = c.req.valid('query');
+    const grant = await resolvePortalAccess(c.var.services.portalAccess, token, id);
+    const recipientEmail = grant && grant.tenantId === tenantId ? grant.recipientEmail : null;
+    const gate = await c.var.services.inspection.getReportGate(id, tenantId, tenant, c.var.services.agreement, recipientEmail);
     return c.json({ success: true as const, data: gate }, 200); // projection-allow: getReportGate builds the typed gate the report page states (reason, labels, links)
 });
 

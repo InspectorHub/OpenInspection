@@ -1,5 +1,5 @@
 /**
- * Ingress guard for the unauthenticated inbound webhooks (QuickBooks, Stripe).
+ * Ingress guard for the unauthenticated inbound webhooks (QuickBooks, Stripe, and the SMS and email provider callbacks).
  *
  * Runs BEFORE tenant routing, the stored-secrets merge and the handlers, so a
  * refused delivery costs no tenant, KV or D1 lookup and no decryption:
@@ -18,7 +18,12 @@
  * a small pool of addresses, so a legitimate burst is a handful of requests;
  * Stripe 300 per minute per company and source IP -- one company's payment burst
  * (a busy day closing many invoices) fits well inside it. Bodies: QuickBooks
- * 256 KB (a batch of CloudEvents is a few KB); Stripe 1 MB (events are a few KB).
+ * 256 KB (a batch of CloudEvents is a few KB); Stripe 1 MB (events are a few KB). The SMS and email provider callbacks (`/webhooks/sms/*`,
+ * `/webhooks/compliance-status/*`, `/webhooks/email/*`) are small form or JSON posts with bodies up to 256 KB. They are NOT limited per
+ * delivery: a provider sends a bulk run (every message of a campaign reports its status) from a few addresses, and refusing one of those
+ * would depend on the provider retrying. Only a delivery that FAILED verification (the handler answered 401 or 403) is counted, per source
+ * address, and a source that keeps failing gets 429 in place of the refusal. A signature-valid delivery is never counted, so never refused.
+ * What this does not do is stop the lookup an unverified request causes: the secret is per company, so it cannot be checked before the lookup.
  */
 import type { MiddlewareHandler } from 'hono';
 import type { HonoConfig } from '../../types/hono';
@@ -27,12 +32,16 @@ import { logger } from '../logger';
 
 const QBO_MAX_BODY_BYTES = 256 * 1024;
 const STRIPE_MAX_BODY_BYTES = 1024 * 1024;
+const PROVIDER_MAX_BODY_BYTES = 256 * 1024;
+/** The provider callbacks mounted at the top level: SMS inbound and status, compliance status, and email events. */
+const PROVIDER_PREFIXES = ['/webhooks/sms/', '/webhooks/compliance-status/', '/webhooks/email/'] as const;
 
-type Route = 'quickbooks' | 'stripe';
+type Route = 'quickbooks' | 'stripe' | 'provider';
 
 function classify(path: string): Route | null {
     if (path === '/webhooks/quickbooks') return 'quickbooks';
     if (path === '/webhooks/stripe' || path.startsWith('/webhooks/stripe/')) return 'stripe';
+    if (PROVIDER_PREFIXES.some((prefix) => path.startsWith(prefix))) return 'provider';
     return null;
 }
 
@@ -66,7 +75,7 @@ export const webhookIngressGuard: MiddlewareHandler<HonoConfig> = async (c, next
     try {
         if (route === 'quickbooks') {
             await checkRateLimit(c, 'webhook-qbo', undefined, 'QBO_WEBHOOK_RATE_LIMITER');
-        } else {
+        } else if (route === 'stripe') {
             const slug = c.req.path.split('/')[3] ?? '';
             const ip = c.req.header('CF-Connecting-IP') ?? 'unknown';
             await checkRateLimit(c, 'webhook-stripe', `${slug}:${ip}`, 'STRIPE_WEBHOOK_RATE_LIMITER');
@@ -76,7 +85,7 @@ export const webhookIngressGuard: MiddlewareHandler<HonoConfig> = async (c, next
         throw err;
     }
 
-    const max = route === 'quickbooks' ? QBO_MAX_BODY_BYTES : STRIPE_MAX_BODY_BYTES;
+    const max = route === 'quickbooks' ? QBO_MAX_BODY_BYTES : route === 'provider' ? PROVIDER_MAX_BODY_BYTES : STRIPE_MAX_BODY_BYTES;
     const tooLarge = () => {
         logger.warn('Webhook delivery too large -- refused', { route, maxBytes: max });
         return c.json({ success: false, error: { message: 'Payload too large' } }, 413);
@@ -88,5 +97,14 @@ export const webhookIngressGuard: MiddlewareHandler<HonoConfig> = async (c, next
     const bytes = await readCapped(c.req.raw, max);
     if (!bytes) return tooLarge();
     c.req.raw = new Request(c.req.raw.url, { method: 'POST', headers: c.req.raw.headers, body: bytes });
-    return next();
+    await next();
+    if (route === 'provider' && (c.res.status === 401 || c.res.status === 403)) {
+        // Counted only after verification failed (see the header comment): the key is the source network, shared by every provider path.
+        try {
+            await checkRateLimit(c, 'webhook-provider-failed', c.req.header('CF-Connecting-IP') ?? 'unknown', 'STRIPE_WEBHOOK_RATE_LIMITER');
+        } catch (err) {
+            logger.warn('Webhook deliveries failing verification rate limited -- refused', { route });
+            throw err;
+        }
+    }
 };

@@ -12,6 +12,7 @@ import { imagesBinding } from './serve-photo';
 import { resolveBadgeVariant, isVectorBadge } from './badge-variant';
 import { r2Get } from '../r2/objects';
 import { logger } from '../logger';
+import { BRAND_ASSET_SAFETY_HEADERS } from './svg-safety';
 
 /** The stored bytes, unchanged: the answer whenever a transform is not wanted or not possible. */
 function brandAssetResponse(obj: R2ObjectBody, cacheControl: string | undefined): Response {
@@ -19,6 +20,8 @@ function brandAssetResponse(obj: R2ObjectBody, cacheControl: string | undefined)
     headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
     headers.set('Cache-Control', cacheControl ?? 'public, max-age=3600');
     if (obj.httpEtag) headers.set('etag', obj.httpEtag);
+    // A stored SVG opened directly is a document: the sandbox policy keeps it from running script on the application origin.
+    for (const [name, value] of Object.entries(BRAND_ASSET_SAFETY_HEADERS)) headers.set(name, value);
     return new Response(obj.body, { status: 200, headers });
 }
 
@@ -47,6 +50,7 @@ export async function serveBrandAssetObject(
             const h = new Headers(r.headers);
             // Immutable: the key carries a uuid, so a replaced badge is a new key. Longer than the original's hour for that reason.
             h.set('Cache-Control', cacheControl ?? 'public, max-age=31536000, immutable');
+            for (const [name, value] of Object.entries(BRAND_ASSET_SAFETY_HEADERS)) h.set(name, value);
             return new Response(r.body, { status: 200, headers: h });
         } catch (err) {
             logger.warn('[brand-asset] badge transform failed — serving original', { key, variant, error: String(err) });

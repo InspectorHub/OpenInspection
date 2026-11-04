@@ -84,6 +84,12 @@ describe('client message routes (resolveClientActor-gated)', () => {
     }
 
     const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+    /** The POST init for an upload, with the length a browser declares (the public route refuses a body that declares none). */
+    const upload = async (name?: string | FormData) => {
+        const req = new Request('http://x.test/', { method: 'POST', body: typeof name === 'object' ? name : uploadForm(name) });
+        const body = await req.arrayBuffer();
+        return { method: 'POST', body, headers: { 'content-type': req.headers.get('content-type') ?? '', 'content-length': String(body.byteLength) } };
+    };
     const uploadForm = (name = 'quote.png') => { const fd = new FormData(); fd.append('file', new File([PNG], name, { type: 'image/png' })); fd.append('itemId', 'x'); return fd; };
 
     async function seed() {
@@ -206,7 +212,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
 
         it('POST and GET carry the listed fields, and an attachment carries no storage key', async () => {
             const { app, inspectionId, clientToken } = await seed();
-            const up = await app.request(`/api/public/inspections/${inspectionId}/messages/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv());
+            const up = await app.request(`/api/public/inspections/${inspectionId}/messages/upload?token=${clientToken}`, await upload(), reqEnv());
             expect(up.status).toBe(200);
             const ATTACHMENT = (await up.json<{ data: { id: string; key: string } }>()).data;
             const sent = await app.request(`/api/public/inspections/${inspectionId}/messages?token=${clientToken}`, {
@@ -249,7 +255,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
         it('client path: an upload followed by a send is accepted and the file downloads; keys outside this company and inspection are refused', async () => {
             const { app, inspectionId, clientToken } = await seed();
             const base = `/api/public/inspections/${inspectionId}/messages`;
-            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv());
+            const up = await app.request(`${base}/upload?token=${clientToken}`, await upload(), reqEnv());
             const real = (await up.json<{ data: { id: string; key: string } & Record<string, unknown> }>()).data;
             expect(real.key).toBe(`${TENANT}/messages/${inspectionId}/${real.id}.png`);
             const ok = await send(app, `${base}?token=${clientToken}`, [real]);
@@ -286,7 +292,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
             await testDb.insert(schema.users).values({ id: INSPECTOR_USER, tenantId: TENANT, email: 'ivan@x.com', passwordHash: 'h', role: 'inspector', name: 'Ivan', createdAt: new Date() });
             await testDb.update(schema.inspections).set({ inspectorId: INSPECTOR_USER }).where(eq(schema.inspections.id, inspectionId));
             const base = `/api/inspections/${inspectionId}/messages`;
-            const up = await app.request(`${base}/upload`, { method: 'POST', body: uploadForm() }, reqEnv());
+            const up = await app.request(`${base}/upload`, await upload(), reqEnv());
             expect(up.status).toBe(200);
             const real = (await up.json<{ data: { id: string; key: string } }>()).data;
             expect(real.key).toBe(`${TENANT}/messages/${inspectionId}/${real.id}.png`);
@@ -306,7 +312,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
         it('rebuilds name, size and type from the stored object, whatever the send claims, and bounds the claimed fields', async () => {
             const { app, inspectionId, clientToken, message } = await seed();
             const base = `/api/public/inspections/${inspectionId}/messages`;
-            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm('quote.png') }, reqEnv());
+            const up = await app.request(`${base}/upload?token=${clientToken}`, await upload('quote.png'), reqEnv());
             const real = (await up.json<{ data: { id: string; key: string } }>()).data;
             const claimed = { ...real, name: 'posted-name.html', size: 99999, type: 'text/html', uploadedAt: 1 };
             const ok = await send(app, `${base}?token=${clientToken}`, [claimed]);
@@ -324,7 +330,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
         it('serves a name in any script, with an ASCII fallback and the exact name, and never throws', async () => {
             const { app, inspectionId, clientToken } = await seed();
             const base = `/api/public/inspections/${inspectionId}/messages`;
-            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm('\u898b\u7a4d\u66f8 "quote".png') }, reqEnv());
+            const up = await app.request(`${base}/upload?token=${clientToken}`, await upload('\u898b\u7a4d\u66f8 "quote".png'), reqEnv());
             const real = (await up.json<{ data: { id: string; key: string } }>()).data;
             expect((await send(app, `${base}?token=${clientToken}`, [real])).status).toBe(201);
             const download = await app.request(`${base}/attachments/${real.id}?token=${clientToken}`, {}, reqEnv());
@@ -341,7 +347,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
             const emoji = '\u{1F600}';
             // 254 letters, then an emoji that occupies UTF-16 units 254 and 255: a cut at 255 units would split the pair.
             const name = `${'a'.repeat(254)}${emoji}.png`;
-            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm(name) }, reqEnv());
+            const up = await app.request(`${base}/upload?token=${clientToken}`, await upload(name), reqEnv());
             expect(up.status).toBe(200);
             const real = (await up.json<{ data: { id: string; key: string; name: string } }>()).data;
             expect(Array.from(real.name)).toHaveLength(255);
@@ -380,7 +386,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
             const base = `/api/public/inspections/${inspectionId}/messages`;
             const fd = new FormData();
             fd.append('file', new File([new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])], 'photo.heic', { type: 'text/html' }));
-            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: fd }, reqEnv());
+            const up = await app.request(`${base}/upload?token=${clientToken}`, await upload(fd), reqEnv());
             expect(up.status).toBe(200);
             const real = (await up.json<{ data: { key: string; type: string } }>()).data;
             expect(real.type).toBe('image/heic');
@@ -388,7 +394,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
             // Control: a file the sniffer recognises keeps the sniffed type whatever the client declared.
             const fd2 = new FormData();
             fd2.append('file', new File([PNG], 'pic.png', { type: 'text/html' }));
-            const up2 = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: fd2 }, reqEnv());
+            const up2 = await app.request(`${base}/upload?token=${clientToken}`, await upload(fd2), reqEnv());
             expect((await up2.json<{ data: { type: string } }>()).data.type).toBe('image/png');
         });
 
@@ -397,7 +403,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
             await testDb.insert(schema.users).values({ id: INSPECTOR_USER, tenantId: TENANT, email: 'ivan@x.com', passwordHash: 'h', role: 'inspector', name: 'Ivan', createdAt: new Date() });
             await testDb.update(schema.inspections).set({ inspectorId: INSPECTOR_USER }).where(eq(schema.inspections.id, inspectionId));
             const base = `/api/inspections/${inspectionId}/messages`;
-            const up = await app.request(`${base}/upload`, { method: 'POST', body: uploadForm() }, reqEnv());
+            const up = await app.request(`${base}/upload`, await upload(), reqEnv());
             const real = (await up.json<{ data: { id: string; key: string } }>()).data;
             const twice = await send(app, base, [real, real]);
             expect(twice.status).toBe(400);
@@ -408,10 +414,27 @@ describe('client message routes (resolveClientActor-gated)', () => {
             expect((await send(app, base, [real])).status).toBe(201);
         });
 
+        it('refuses an upload that declares no length, or too much, before the multipart is read, and accepts one at the cap', async () => {
+            const { app, inspectionId, clientToken } = await seed();
+            const url = `/api/public/inspections/${inspectionId}/messages/upload?token=${clientToken}`;
+            const parse = vi.spyOn(Request.prototype, 'formData');
+            const good = await upload();
+            const without = { ...good, headers: { 'content-type': good.headers['content-type'] } };
+            // A streamed body carries no length; the test runtime would add one for a buffer, so send a stream.
+            const streamed = { method: 'POST', duplex: 'half', body: new Blob([good.body]).stream(), headers: without.headers } as RequestInit;
+            expect((await app.request(url, streamed, reqEnv())).status).toBe(411);
+            const tooBig = { ...good, headers: { ...good.headers, 'content-length': String(12 * 1024 * 1024 + 1) } };
+            expect((await app.request(url, tooBig, reqEnv())).status).toBe(413);
+            expect(parse).not.toHaveBeenCalled();
+            // Control: the same upload with its true length goes through.
+            expect((await app.request(url, good, reqEnv())).status).toBe(200);
+            parse.mockRestore();
+        });
+
         it('refuses a send that names the same upload twice, and accepts it named once', async () => {
             const { app, inspectionId, clientToken } = await seed();
             const base = `/api/public/inspections/${inspectionId}/messages`;
-            const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv());
+            const up = await app.request(`${base}/upload?token=${clientToken}`, await upload(), reqEnv());
             const real = (await up.json<{ data: { id: string; key: string } }>()).data;
             expect((await send(app, `${base}?token=${clientToken}`, [real, real])).status).toBe(400);
             expect((await send(app, `${base}?token=${clientToken}`, [real])).status).toBe(201);
@@ -429,7 +452,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
             it('answers a client send with 503 in the route error shape, and keeps a missing object a 400', async () => {
                 const { app, inspectionId, clientToken } = await seed();
                 const base = `/api/public/inspections/${inspectionId}/messages`;
-                const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv());
+                const up = await app.request(`${base}/upload?token=${clientToken}`, await upload(), reqEnv());
                 const real = (await up.json<{ data: { id: string; key: string } }>()).data;
                 const post = (photos: R2Bucket, attachments: unknown[]) => app.request(`${base}?token=${clientToken}`, {
                     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: 'files', attachments }),
@@ -447,7 +470,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
                 try {
                     const { app, inspectionId, clientToken } = await seed();
                     const base = `/api/public/inspections/${inspectionId}/messages`;
-                    const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv());
+                    const up = await app.request(`${base}/upload?token=${clientToken}`, await upload(), reqEnv());
                     const real = (await up.json<{ data: { id: string; key: string } }>()).data;
                     const sent = await app.request(`${base}?token=${clientToken}`, {
                         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: 'files', attachments: [real] }),
@@ -456,11 +479,11 @@ describe('client message routes (resolveClientActor-gated)', () => {
                     expect(await sent.text()).not.toContain('R2 is down');
                     expect(warn).toHaveBeenCalledWith('message attachment storage failed', { op: 'head', cause: 'R2 is down' });
                     // A write that fails is the same 503 on the client upload route, with the cause logged.
-                    const refused = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv(failing('put')));
+                    const refused = await app.request(`${base}/upload?token=${clientToken}`, await upload(), reqEnv(failing('put')));
                     expect(refused.status).toBe(503);
                     expect(warn).toHaveBeenCalledWith('message attachment storage failed', { op: 'put', cause: 'R2 is down' });
                     // Control: a healthy bucket stores it.
-                    expect((await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv())).status).toBe(200);
+                    expect((await app.request(`${base}/upload?token=${clientToken}`, await upload(), reqEnv())).status).toBe(200);
                 } finally {
                     warn.mockRestore();
                 }
@@ -471,7 +494,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
                 await testDb.insert(schema.users).values({ id: INSPECTOR_USER, tenantId: TENANT, email: 'ivan@x.com', passwordHash: 'h', role: 'inspector', name: 'Ivan', createdAt: new Date() });
                 await testDb.update(schema.inspections).set({ inspectorId: INSPECTOR_USER }).where(eq(schema.inspections.id, ctx.inspectionId));
                 const staffBase = `/api/inspections/${ctx.inspectionId}/messages`;
-                const up = await ctx.app.request(`${staffBase}/upload`, { method: 'POST', body: uploadForm() }, reqEnv());
+                const up = await ctx.app.request(`${staffBase}/upload`, await upload(), reqEnv());
                 const real = (await up.json<{ data: { id: string; key: string } }>()).data;
                 const staffPost = (photos: R2Bucket, attachments: unknown[]) => ctx.app.request(staffBase, {
                     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: 'files', attachments }),

@@ -19,7 +19,7 @@ describe('API seam request scope', () => {
         expect(SRC).toMatch(/createRequestScope\(\)/);
         expect(SRC).toMatch(/\[REQUEST_SCOPE\]\s*:\s*scope/);
         // The inner fetch must pass the augmented env, not the raw c.env.
-        expect(SRC).toMatch(/app\.fetch\(withHumanToken\(req,[^)]*\)[^)]*\),\s*innerEnv,\s*c\.executionCtx\)/);
+        expect(SRC).toMatch(/app\.fetch\(forInProcessApi\(req,[^)]*\),\s*innerEnv,\s*c\.executionCtx\)/);
     });
 
     it('leaves the external route dispatcher on the raw env', () => {
@@ -28,5 +28,18 @@ describe('API seam request scope', () => {
         const toApi = SRC.slice(SRC.indexOf('const toApi'), SRC.indexOf('const app = new Hono'));
         expect(toApi).toMatch(/app\.fetch\(c\.req\.raw,\s*c\.env,\s*c\.executionCtx\)/);
         expect(toApi).not.toMatch(/REQUEST_SCOPE|innerEnv|scope/);
+    });
+
+    it('hands the visitor address on: every in-process call goes through forInProcessApi with the outer request headers', () => {
+        // The per-address limiters read the caller's address from the request they are given. A page loader or action builds its own
+        // request, which carries none, so unless the entry copies it over from the outer request every visitor shares one bucket.
+        // (The real entry cannot be loaded here, so this pins the wiring; the behaviour of the function is covered by
+        // app/routes/public/portal-auth.through-page.test.ts.)
+        expect(SRC).toMatch(/import \{ forInProcessApi \} from "\.\/inprocess-request"/);
+        expect(SRC).toMatch(/forInProcessApi\(req,\s*c\.req\.raw\.headers\)/);
+        // And nothing else feeds the in-process app a raw request: the only app.fetch with an innerEnv is the wrapped one.
+        const inner = SRC.match(/\.app\.fetch\([^;]*innerEnv[^;]*\)/g) ?? [];
+        expect(inner).toHaveLength(1);
+        expect(inner[0]).toContain('forInProcessApi');
     });
 });

@@ -30,7 +30,8 @@ import { mounted, type ApiOf } from '../lib/api-schema';
 import { z } from '@hono/zod-openapi';
 import { requireRole } from '../lib/middleware/rbac';
 import { AppError, Errors } from '../lib/errors';
-import { serveAttachment, storeAttachment, verifyAttachments } from '../lib/message-attachment';
+import { serveAttachment, storeAttachment, verifyAttachments, MAX_BYTES as ATTACHMENT_MAX_BYTES } from '../lib/message-attachment';
+import { declaredLengthRefusal } from '../lib/declared-length';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { resolveClientActor } from '../lib/portal-client-actor';
 import { buildPortalUrl } from '../lib/portal-urls';
@@ -339,6 +340,9 @@ clientMessageRoutes.post('/inspections/:id/messages/upload', async (c) => {
     const inspectionId = c.req.param('id');
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
+    // A link holder can send any body: its declared size is checked before the multipart is buffered.
+    const refused = declaredLengthRefusal(c, ATTACHMENT_MAX_BYTES, { error: 'Upload rejected.' });
+    if (refused) return refused;
     const fd = await c.req.parseBody();
     try {
         const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, actor.tenantId, inspectionId);

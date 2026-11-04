@@ -3,7 +3,11 @@
  * answered before any tenant, KV or D1 work. Real app, real middleware chain.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { Hono } from 'hono';
 import { app } from '../../../server/index';
+import { webhookIngressGuard } from '../../../server/lib/middleware/webhook-ingress';
+import { AppError } from '../../../server/lib/errors';
+import type { HonoConfig } from '../../../server/types/hono';
 import { logger } from '../../../server/lib/logger';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 import { TENANT_SLUG, type Harness } from '../helpers/tenant-email-harness';
@@ -14,6 +18,13 @@ const QBO_MAX = 256 * 1024;
 const STRIPE_MAX = 1024 * 1024;
 const QBO_PATH = '/webhooks/quickbooks';
 const STRIPE_PATH = `/webhooks/stripe/${TENANT_SLUG}`;
+const PROVIDER_MAX = 256 * 1024;
+const PROVIDER_PATHS = [
+    `/webhooks/sms/inbound/${TENANT_SLUG}`,
+    `/webhooks/sms/status/${TENANT_SLUG}`,
+    `/webhooks/compliance-status/twilio/${TENANT_SLUG}`,
+    `/webhooks/email/resend/${TENANT_SLUG}`,
+] as const;
 
 /** Counts every D1 statement prepared and every KV read the request causes. */
 function watchLookups(h: Harness) {
@@ -144,5 +155,61 @@ describe('webhook rate limit', () => {
     it('with no binding configured (local dev, self-host) nothing is limited', T, async () => {
         h = await webhookHarness('standalone');
         for (let i = 0; i < 4; i++) expect((await post(h, QBO_PATH, '[]')).status).toBe(200);
+    });
+});
+
+/** The real guard in front of a stub handler that answers a chosen status, standing in for "signature verified" (200) or not (403). */
+function guardedApp(limit: number) {
+    const limiter = fakeLimiter(limit);
+    const stub = new Hono<HonoConfig>();
+    stub.onError((err, c) => c.json({ error: err.message }, err instanceof AppError ? (err.status as 429) : 500));
+    stub.use('/webhooks/*', webhookIngressGuard);
+    stub.post('/webhooks/sms/inbound/:slug', (c) => c.body(null, Number(c.req.header('x-answer')) as 200));
+    const run = (ip: string, answer: number) => stub.request(`/webhooks/sms/inbound/${TENANT_SLUG}`, {
+        method: 'POST', body: 'To=%2B15550001111', headers: { 'CF-Connecting-IP': ip, 'x-answer': String(answer) },
+    }, { STRIPE_WEBHOOK_RATE_LIMITER: limiter });
+    return { app: run, limiter };
+}
+
+describe('SMS and email provider callbacks', () => {
+    let h: Harness;
+    afterEach(() => { vi.restoreAllMocks(); h?.close(); });
+
+    it.each(PROVIDER_PATHS)('%s refuses a body one byte over the cap with 413, before any lookup; the cap itself passes', T, async (path) => {
+        h = await webhookHarness('saas');
+        const seen = watchLookups(h);
+        expect((await post(h, path, 'a'.repeat(PROVIDER_MAX + 1))).status).toBe(413);
+        expect(seen.db()).toBe(0);
+        expect(seen.kv()).toBe(0);
+        // Control: exactly the cap gets past the guard.
+        expect((await post(h, path, 'a'.repeat(PROVIDER_MAX))).status).not.toBe(413);
+    });
+
+    it('through the real app and its real error handler: the source that keeps failing verification gets a 429, the first failures keep their 403', T, async () => {
+        h = await webhookHarness('saas');
+        Object.assign(h.env, { STRIPE_WEBHOOK_RATE_LIMITER: fakeLimiter(1) });
+        const from = (ip: string) => post(h, PROVIDER_PATHS[0], 'To=%2B15550001111', { 'CF-Connecting-IP': ip });
+        expect((await from('8.8.8.8')).status).toBe(403);
+        const refused = await from('8.8.8.8');
+        // The refusal is thrown after the downstream handler has answered; the app's own handler turns it into the response.
+        expect(refused.status).toBe(429);
+        expect(refused.headers.get('content-type') ?? '').toContain('application/json');
+        expect((await from('9.9.9.9')).status).toBe(403);
+    });
+
+    it('never refuses a delivery that verifies, however many arrive, and counts none of them', async () => {
+        const { app: guarded, limiter } = guardedApp(2);
+        for (let i = 0; i < 25; i++) expect((await guarded('7.7.7.7', 200)).status).toBe(200);
+        expect(limiter.keys).toEqual([]);
+    });
+
+    it('counts only deliveries that fail verification, per source address: the Nth failure from one source trips 429, another source is unaffected', async () => {
+        const { app: guarded, limiter } = guardedApp(2);
+        expect([(await guarded('5.5.5.5', 403)).status, (await guarded('5.5.5.5', 403)).status]).toEqual([403, 403]);
+        expect((await guarded('5.5.5.5', 403)).status).toBe(429);
+        expect((await guarded('6.6.6.6', 403)).status).toBe(403);
+        expect(limiter.keys).toContain('webhook-provider-failed:5.5.5.5');
+        // A verified delivery from the source that is over its failure allowance still goes through.
+        expect((await guarded('5.5.5.5', 200)).status).toBe(200);
     });
 });

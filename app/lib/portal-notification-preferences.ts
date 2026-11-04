@@ -102,13 +102,11 @@ export async function bulkPortalNotificationChoice(
     return res.ok ? { ok: true } : { ok: false, error: m.portal_notif_save_error() };
 }
 
-/** Cookie plus the two evidence headers, omitting any the request lacks. */
+/** Cookie plus the user agent, omitting it when the request lacks one. The visitor's address is forwarded by the worker entry (workers/inprocess-request.ts). */
 function forwardedEvidence(request: Request): Record<string, string> {
-    const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for");
     const ua = request.headers.get("user-agent");
     return {
         Cookie: request.headers.get("cookie") ?? "",
-        ...(ip ? { "cf-connecting-ip": ip } : {}),
         ...(ua ? { "user-agent": ua } : {}),
     };
 }

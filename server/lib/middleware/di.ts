@@ -397,7 +397,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         // are stable across environments; falls back to a
                         // generic 'openinspection' tag in local dev.
                         const host = c.env.APP_BASE_URL?.replace(/^https?:\/\//, '').replace(/\/$/, '') || 'openinspection';
-                        target.ics = new IcsService(c.env.DB, host);
+                        target.ics = new IcsService(c.env.DB, host, c.env.JWT_SECRET);
                     }
                     break;
                 case 'agent':

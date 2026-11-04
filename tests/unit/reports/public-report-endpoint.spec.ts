@@ -172,9 +172,9 @@ describe('GET /api/public/report-gate/:tenant/:id — ③-A.2', () => {
         expect(body.success).toBe(true);
         expect(body.data.reason).toBe('payment');
         expect(body.data.amountCents).toBe(45000);
-        // Task 7 — the route now threads the agreement service through as the
-        // 4th arg (undefined here since this stub omits it).
-        expect(getReportGate).toHaveBeenCalledWith('insp1', 't1', 'WRONG-TENANT', undefined);
+        // The route threads the agreement service through as the 4th arg (undefined here since this stub omits it) and the recipient
+        // the caller proved to be as the 5th (null: this request carried no portal token).
+        expect(getReportGate).toHaveBeenCalledWith('insp1', 't1', 'WRONG-TENANT', undefined, null);
     });
 });
 
@@ -248,7 +248,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         const { token, signers } = await createEnvelope();
         const { inspection, agreement } = makeService();
 
-        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'jane@test.com');
         expect(gate).not.toBeNull();
         expect(gate!.reason).toBe('agreement');
         expect(gate!.actionLabel).toBe('Sign & pay');
@@ -265,7 +265,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         const { token, signers } = await createEnvelope();
         const { inspection, agreement } = makeService();
 
-        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'jane@test.com');
         expect(gate!.reason).toBe('agreement');
         expect(gate!.actionLabel).toBe('Sign agreement');
         // The agreement-only sign URL must route through the first outstanding
@@ -295,12 +295,30 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
         const { inspection, agreement } = makeService();
 
-        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'jane@test.com');
         expect(gate!.reason).toBe('agreement');
         const urlToken = gate!.actionUrl.split('/').pop()!;
         expect(urlToken).not.toContain('x:');
         const resolved = await agreement.getSignerByPresentedToken(urlToken);
         expect(resolved?.signer.id).toBe(signers[0].id);
+        // The link is the PROVEN recipient's own: John gets his, never signer 1's.
+        const johns = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'John@Test.com');
+        const johnToken = johns!.actionUrl.split('/').pop()!;
+        expect((await agreement.getSignerByPresentedToken(johnToken))?.signer.id).toBe(signers[1].id);
+        expect(johnToken).not.toBe(urlToken);
+    });
+
+    it('without a proven recipient the gate carries NO signer token: it points at the client portal (agreement) or the invoice (payment)', async () => {
+        await seed({ agreementRequired: true, paymentRequired: true, paymentStatus: 'unpaid' });
+        const { token } = await createEnvelope();
+        const { inspection, agreement } = makeService();
+        for (const email of [undefined, null, '', 'stranger@test.com']) {
+            const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, email);
+            expect(gate!.actionUrl, String(email)).not.toContain(token);
+            expect(gate!.actionUrl, String(email)).not.toContain('/checkout/');
+            expect(gate!.actionUrl, String(email)).not.toContain('/agreements/sign/');
+            expect(gate!.actionUrl, String(email)).toBe(`/portal/${SLUG}/i/${INSP_ID}?section=overview`);
+        }
     });
 
     it('ONLY payment outstanding -> /invoice/:id URL', async () => {

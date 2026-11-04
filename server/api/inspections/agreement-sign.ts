@@ -80,8 +80,8 @@ agreementSignRoutes.openapi(signInspectionRoute, async (c) => {
 
         const raw = await c.req.json();
         const parsed = z.object({
-            signatureBase64: z.string().min(1).describe('Base64-encoded signature image (data URL or raw base64) drawn by the signer on-site.'),
-            signerId: z.string().optional().describe('Target signer within the envelope; defaults to the first non-terminal signer.'),
+            signatureBase64: z.string().min(1).max(500_000).describe('Base64-encoded signature image (data URL or raw base64) drawn by the signer on-site.'),
+            signerId: z.string().max(100).optional().describe('Target signer within the envelope; defaults to the first non-terminal signer.'),
             onBehalfOf: z.string().max(200).optional().describe('Name of the party an authorized agent signs for.'),
             onBehalfDisclaimer: z.string().max(2000).optional().describe('Disclaimer the authorized agent attests to when signing on behalf of another.'),
         }).safeParse(raw);

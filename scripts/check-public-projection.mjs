@@ -74,6 +74,8 @@ export const PUBLIC_MODULES = [
     ':(glob)server/api/agents.ts',
     ':(glob)server/api/concierge.ts',
     ':(glob)server/api/ics.ts',
+    // The bare sign link: answers redirects only, and is public, so it is scanned like the rest.
+    ':(glob)server/api/sign-redirect.ts',
     ':(glob)server/api/calendar-ics-links.ts',
     ':(glob)server/api/well-known.ts',
     ':(glob)server/api/auth.ts',

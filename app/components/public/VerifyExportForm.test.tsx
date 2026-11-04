@@ -43,7 +43,7 @@ const submit = (form: HTMLFormElement) => form.dispatchEvent(new Event("submit",
 const sentBody = () => JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string) as Record<string, unknown>;
 
 describe("VerifyExportForm", () => {
-  it("shows both fields, and either one alone submits a POST with that value in the body", async () => {
+  it("shows both fields, sends the email alone, and sends a postal code only beside the email", async () => {
     const a = mount();
     expect(a.email).not.toBeNull();
     expect(a.postal).not.toBeNull();
@@ -57,10 +57,28 @@ describe("VerifyExportForm", () => {
     fetchMock.mockClear();
 
     const b = mount();
+    fireEvent.change(b.email, { target: { value: "jane@example.test" } });
     fireEvent.change(b.postal, { target: { value: "78701" } });
     await act(async () => { submit(b.form); });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(sentBody()).toEqual({ postalCode: "78701" });
+    expect(sentBody()).toEqual({ email: "jane@example.test", postalCode: "78701" });
+  });
+
+  it("does not send a postal code on its own: it asks for the email first", async () => {
+    const view = mount();
+    fireEvent.change(view.postal, { target: { value: "78701" } });
+    await act(async () => { submit(view.form); });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(view.container.textContent).toContain("Enter an email address recorded on this agreement.");
+  });
+
+  it("states what the file holds and that a postal code needs an email", () => {
+    const view = mount();
+    const text = view.container.textContent ?? "";
+    for (const part of ["signer ids", "emails given at signing", "previous hash", "signature", "key fingerprint", "public keys", "time of the export"]) {
+      expect(text, part).toContain(part);
+    }
+    expect(text).toContain("A postal code is never enough on its own");
   });
 
   it("downloads the file under the name the server gave it, and shows no error", async () => {
@@ -77,7 +95,7 @@ describe("VerifyExportForm", () => {
     const view = mount();
     await act(async () => { submit(view.form); });
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(view.container.textContent).toContain("Enter an email address or a postal code.");
+    expect(view.container.textContent).toContain("Enter an email address recorded on this agreement.");
   });
 
   it.each([

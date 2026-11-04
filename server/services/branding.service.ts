@@ -6,6 +6,7 @@ import { memoOnce } from '../lib/request-scope';
 import { policyChargesFees } from '../lib/billing/cancellation-policy';
 import type { EmailIdentityConfig } from '../lib/email/sender-identity';
 import { r2Keys } from '../lib/r2-keys';
+import { svgUploadRefusal } from '../lib/media/svg-safety';
 import { resolveTenantLegalUrls, type LegalMode } from '../lib/legal-links';
 import { resolveLocale } from '../lib/locale';
 import { resolveDisplayPrefs, type DateFormat, type TimeFormat } from '@core/field-ui/shared/display-prefs';
@@ -328,9 +329,12 @@ export class BrandingService {
         if (!this.r2) throw Errors.BadRequest('Logo upload not available');
 
         const extension = file.type.split('/')[1] === 'svg+xml' ? 'svg' : file.type.split('/')[1];
+        const bytes = await file.arrayBuffer();
+        const svgRefusal = file.type === 'image/svg+xml' ? svgUploadRefusal(bytes) : null;
+        if (svgRefusal) throw Errors.BadRequest(svgRefusal);
         const key = r2Keys.brandingLogo(tenantId, crypto.randomUUID(), extension);
 
-        await this.r2.put(key, await file.arrayBuffer(), {
+        await this.r2.put(key, bytes, {
             httpMetadata: { contentType: file.type },
         });
 

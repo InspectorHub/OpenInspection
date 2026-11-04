@@ -1,13 +1,15 @@
 /**
  * The signed audit export of one envelope, released after a knowledge check.
  *
- *   POST /api/public/verify/:envelopeId/export   body { email?, postalCode?, turnstileToken? }
+ *   POST /api/public/verify/:envelopeId/export   body { email, postalCode?, turnstileToken? }
  *   GET  /api/public/verify/:envelopeId/audit-trail   answers 403 verification_required (the export moved to the POST above)
  *
  * The online verification result (chain validity, key fingerprint, signer names and status, the public key, the document redirect) stays
  * public. The export carries the signed events whole, so an offline verifier can recompute each hash; their payloads record signer ids and
- * the emails given at signing. It is therefore released only to a caller who supplies an email recorded on the envelope, or the postal code
- * of the inspected property (see server/lib/verify-export-check.ts), after the bot challenge where the deployment enforces one.
+ * the emails given at signing. It is therefore released only to a caller who supplies an email recorded on the envelope (see
+ * server/lib/verify-export-check.ts), after the bot challenge where the deployment enforces one. The postal code of the inspected property
+ * is a second factor and never a first: it is accepted only together with an email, and when one is supplied it has to match as well.
+ * A request without an email answers 400 email_required, whatever else it carries, and counts for nothing.
  *
  * Every failure answers the same 403 body whatever was wrong, with the same headers, and nothing the caller supplied is echoed. The
  * success response is the export as it always was, with one header added: Cache-Control: no-store, because the body is released to one
@@ -79,7 +81,7 @@ export const verifyExportRoutes = new Hono<HonoConfig>()
         // A supplied value that is a placeholder (fewer than two letters or digits) is not a value either.
         const postalSupplied = postalOrNull((readField('postalCode') ?? '').trim()) ?? '';
         const postalCode = normalizePostalCode(postalSupplied) === '' ? '' : postalSupplied;
-        if (!email && !postalCode) return c.json({ error: 'email_or_postal_code_required' }, 400);
+        if (!email) return c.json({ error: 'email_required' }, 400);
         if (!ENVELOPE_ID.test(envelopeId)) return refuse(c);
 
         // Cheap gates first, none of which writes. The binding limiter is keyed by the network the counters use (an IPv6 address counts
@@ -117,13 +119,17 @@ export const verifyExportRoutes = new Hono<HonoConfig>()
 
         // Without an address only the envelope-wide counters apply.
         const buckets: AttemptBucket[] = [];
+        const postalBuckets: AttemptBucket[] = [];
         try {
             const who = rawAddress ? await addressDigest(rawAddress, c.env.JWT_SECRET) : null;
             if (who && email) buckets.push(emailBucket(envelopeId, who));
-            if (who && postalCode) buckets.push(postalBucket(envelopeId, who));
-            if (postalCode) buckets.push(envelopePostalBucket(envelopeId));
+            if (who && postalCode) postalBuckets.push(postalBucket(envelopeId, who));
+            if (postalCode) postalBuckets.push(envelopePostalBucket(envelopeId));
             buckets.push(envelopeBucket(envelopeId));
-            // Read-only: a request that is already locked out answers 429 without a single write.
+            // Read-only: a request that is already locked out answers 429 without a single write. Only the email-side counters are read
+            // here. The postal counters are consulted after the email matched a signer (below), so a spent postal allowance changes
+            // nothing for a request with a wrong email: anyone who knows one signer email could otherwise exhaust it and turn every
+            // request that carries a postal code into a 429, whatever email it carries.
             const wait = await lockedSeconds(c.env.DB, buckets, Date.now());
             if (wait > 0) return tooManyAttempts(c, wait);
         } catch (err) {
@@ -147,7 +153,9 @@ export const verifyExportRoutes = new Hono<HonoConfig>()
         }
 
         // Reserve the attempt before comparing, strictest counter first. The atomic upsert is what holds the cap when requests race
-        // past the read above.
+        // past the read above. Only the email-side counters are reserved here: the postal counters (which include one for the whole
+        // envelope) are reserved below, and only for a request whose email matched a signer. Otherwise anyone could send a junk email
+        // with a postal code and use up the postal allowance the people who know a real email depend on.
         let reservation: Reservation;
         try {
             reservation = await reserveAttempts(c.env.DB, buckets, Date.now());
@@ -158,21 +166,39 @@ export const verifyExportRoutes = new Hono<HonoConfig>()
         if (reservation.waitSeconds > 0) return tooManyAttempts(c, reservation.waitSeconds);
 
         let data: Awaited<ReturnType<typeof loadVerifyData>>;
+        let postalReservation: Reservation | null = null;
         try {
             const known = await candidatesFor(c.env.DB, envelopeId);
             // Both comparisons always run, over every candidate.
-            const emailOk = email ? matchesAny(normalizeEmail(email), known.emails) : false;
-            const postalOk = postalCode ? matchesAny(normalizePostalCode(postalCode), known.postalCodes) : false;
-            data = emailOk || postalOk ? await loadVerifyData(c, envelopeId) : null;
+            const emailOk = matchesAny(normalizeEmail(email), known.emails);
+            // The email is the factor; a postal code, when supplied, is an added condition and never a way in on its own.
+            const postalOk = postalCode ? matchesAny(normalizePostalCode(postalCode), known.postalCodes) : true;
+            if (emailOk && postalCode) {
+                // The email matched, so this is an attempt at the second factor and counts against its allowance. Once that allowance is
+                // spent the answer is the same uniform refusal as every other one (same status and body, no wait): a distinct answer here
+                // would tell someone who spent the allowance with one known email which other guesses are signers. Nothing more is
+                // reserved on the postal path; the email alone still works, and a successful request hands its reservations back.
+                // Accepted residual: this path costs one extra counter write that a wrong email does not, a small timing difference. It
+                // is bounded by the per-address and per-envelope email counters reserved above, and the comparison itself ran over every
+                // candidate either way.
+                // The email-side reservation is kept, as for any wrong answer: handing it back would make a guess that hits a signer cheaper
+                // than one that misses, which the email counters would then reveal.
+                if (await lockedSeconds(c.env.DB, postalBuckets, Date.now()) > 0) return refuse(c);
+                postalReservation = await reserveAttempts(c.env.DB, postalBuckets, Date.now());
+                if (postalReservation.waitSeconds > 0) return refuse(c);
+            }
+            data = emailOk && postalOk ? await loadVerifyData(c, envelopeId) : null;
         } catch (err) {
             // A store failure after the reservation: hand it back (the caller was not at fault), log without values, refuse uniformly.
             await reservation.release();
+            await postalReservation?.release();
             logger.error('verify.export.read.failed', {}, err instanceof Error ? err : undefined);
             return refuse(c);
         }
         // A wrong answer keeps its reservation. A right one hands it back, so a success does not use up the allowance.
         if (!data) return refuse(c);
         await reservation.release();
+        await postalReservation?.release();
 
         const payload = {
             envelopeId,

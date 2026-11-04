@@ -24,6 +24,8 @@ import portalRoutes from '../../../server/api/portal';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { hashToken } from '../../../server/lib/token-hash';
+import { AppError } from '../../../server/lib/errors';
+import { MockKV } from '../mocks';
 
 const SECRET = 'test-jwt-secret';
 
@@ -164,7 +166,7 @@ describe('portal API', () => {
 
     // JWT_SECRET is injected via the env arg to app.request().
     function reqEnv() {
-        return { JWT_SECRET: SECRET, APP_BASE_URL: 'https://example.test' } as unknown as HonoConfig['Bindings'];
+        return { JWT_SECRET: SECRET, APP_BASE_URL: 'https://example.test', TENANT_CACHE: new MockKV() } as unknown as HonoConfig['Bindings'];
     }
 
     beforeEach(async () => {
@@ -296,6 +298,39 @@ describe('portal API', () => {
 
         const bad = await app.request('/api/portal/acme/redeem?link=garbage', {}, reqEnv());
         expect(bad.status).toBe(401);
+    });
+
+    it('GET /redeem signs in once: the same link a second time is refused like an expired one, and a different link still works', async () => {
+        const app = buildApp();
+        const env = reqEnv();
+        const link = await signMagicLink(SECRET, 'a@x.com');
+        const url = `/api/portal/acme/redeem?link=${encodeURIComponent(link)}`;
+        expect((await app.request(url, {}, env)).status).toBe(200);
+        const again = await app.request(url, {}, env);
+        expect(again.status).toBe(401);
+        expect(again.headers.get('set-cookie') ?? '').not.toContain('__Host-portal_session=');
+        // Control: another link (a new request-link mails a new token) signs in.
+        const other = await signMagicLink(SECRET, 'a@x.com', 899);
+        expect((await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(other)}`, {}, env)).status).toBe(200);
+    });
+
+    it('GET /redeem refuses when there is no store to remember a used link in, rather than letting it through unchecked', async () => {
+        const app = buildApp();
+        const link = await signMagicLink(SECRET, 'a@x.com');
+        const env = { ...reqEnv(), TENANT_CACHE: undefined } as unknown as HonoConfig['Bindings'];
+        expect((await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(link)}`, {}, env)).status).toBe(401);
+    });
+
+    it('GET /redeem and POST /request-link answer 429 when the caller is over the limit, before reading the link or the address', async () => {
+        const app = buildApp();
+        // The route throws the shared rate-limit error; the real application maps it to 429 in its error handler, which this stub app lacks.
+        app.onError((err, c) => c.json({ error: err.message }, err instanceof AppError ? err.status as 429 : 500));
+        const limited = { ...reqEnv(), RATE_LIMITER: { limit: async () => ({ success: false }) } } as unknown as HonoConfig['Bindings'];
+        const link = await signMagicLink(SECRET, 'a@x.com');
+        expect((await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(link)}`, {}, limited)).status).toBe(429);
+        expect((await app.request('/api/portal/acme/request-link', {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'a@x.com' }),
+        }, limited)).status).toBe(429);
     });
 
     it('GET /exchange with a valid client token for the matching inspection → 200 + Set-Cookie', async () => {

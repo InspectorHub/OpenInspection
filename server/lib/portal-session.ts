@@ -22,7 +22,7 @@ import { timingSafeEqual } from './password';
 
 const encoder = new TextEncoder();
 
-const MAGIC_LINK_TTL_SECONDS = 900;      // 15 minutes
+export const MAGIC_LINK_TTL_SECONDS = 900;      // 15 minutes
 const SESSION_TTL_SECONDS = 2592000;     // 30 days
 
 type PortalTokenType = 'ml' | 'sess';

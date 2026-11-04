@@ -207,6 +207,31 @@ describe('Agent magic-login primitive', () => {
             expect(JSON.parse(raw!)).toMatchObject({ userId: AGENT_USER_ID, returnTo });
         });
 
+        it('does not store an unsafe returnTo at all (tab, CR, LF, backslash, scheme-relative, absolute), and keeps a normal path', async () => {
+            await seedRoleProfile('buyer_agent', 'agent');
+            await seedGlobalAgent(AGENT_USER_ID, AGENT_EMAIL);
+            const stored = async (returnTo: string): Promise<Record<string, unknown>> => {
+                const kv = makeKv();
+                const resolveToken = vi.fn().mockResolvedValue({
+                    inspectionId: INSP_ID, tenantId: TENANT_ID, role: 'buyer_agent',
+                    recipientEmail: AGENT_EMAIL, revokedAt: null, expiresAt: null,
+                });
+                const { app, sendAgentLoginLink } = buildRequestApp(resolveToken, kv);
+                const res = await app.request('/api/agent/magic-login/request', {
+                    method: 'POST', headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ tenant: 'acme', inspectionId: INSP_ID, token: 'live', returnTo }),
+                });
+                expect(res.status).toBe(200);
+                const [, loginUrl] = sendAgentLoginLink.mock.calls[0] as [string, string];
+                const code = new URL(loginUrl, 'http://x').searchParams.get('code');
+                return JSON.parse((await kv.get(`agent_ml:${code}`))!) as Record<string, unknown>;
+            };
+            for (const bad of ['/\t/evil.example', '/\r/evil.example', '/\n/evil.example', '/a\\b', '//evil.example', 'https://evil.example/x']) {
+                expect(await stored(bad), JSON.stringify(bad)).not.toHaveProperty('returnTo');
+            }
+            expect(await stored('/portal/acme/i/x?token=t&section=report')).toMatchObject({ returnTo: '/portal/acme/i/x?token=t&section=report' });
+        });
+
         it('invalid/revoked/expired/inspection-mismatched report token → 401', async () => {
             const resolveToken = vi.fn().mockResolvedValue(null);
             const kv = makeKv();
@@ -286,7 +311,7 @@ describe('Agent magic-login primitive', () => {
 
         it('IA-47 — ignores an unsafe returnTo (open-redirect) and falls back to /agent-dashboard', async () => {
             await seedGlobalAgent(AGENT_USER_ID, AGENT_EMAIL);
-            for (const bad of ['//evil.com', 'https://evil.com', 'http://x', '/\\evil.com', 'evil.com']) {
+            for (const bad of ['//evil.com', 'https://evil.com', 'http://x', '/\\evil.com', 'evil.com', '/\t/evil.example', '/\r/evil.example', '/\n/evil.example', '/ok\\path']) {
                 const kv = makeKv({
                     'agent_ml:bad': JSON.stringify({ userId: AGENT_USER_ID, issuedAt: Date.now(), returnTo: bad }),
                 });

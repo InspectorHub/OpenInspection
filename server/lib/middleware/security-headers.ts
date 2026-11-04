@@ -25,7 +25,11 @@ export const securityHeaders: MiddlewareHandler<HonoConfig> = async (c, next) =>
     const isWidgetEmbed = isWidgetEmbedPath(c.req.path, c.req.query('embed'));
 
     // The allowlist lives in lib/csp-policy.ts, shared with the page headers.
-    c.header('Content-Security-Policy', buildCsp({ widgetEmbed: isWidgetEmbed }));
+    // A handler that set its own policy keeps it: a stored brand asset is served with a sandbox policy that must not be replaced by the page policy.
+    if (!c.res.headers.has('Content-Security-Policy')) c.header('Content-Security-Policy', buildCsp({ widgetEmbed: isWidgetEmbed }));
+    // The public JSON doors carry tokens, links and personal details: unless the handler chose a cache policy itself (a brand asset, a photo),
+    // nothing in /api/public/ may be stored by a shared cache or kept by the browser.
+    if (c.req.path.startsWith('/api/public/') && !c.res.headers.has('Cache-Control')) c.header('Cache-Control', 'no-store');
     if (!isWidgetEmbed) {
         c.header('X-Frame-Options', 'DENY');
     }

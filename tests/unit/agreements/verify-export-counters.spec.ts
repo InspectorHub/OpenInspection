@@ -86,15 +86,15 @@ describe('the audit export counters', () => {
             expect(control.writes()).toHaveLength(2);
         });
 
-        it('writes 2 for a wrong email, 3 for a wrong postal code and 4 for both, after a passed challenge', async () => {
+        it('writes 2 for a wrong email, 2 for a wrong email with a postal code (the postal counters are not touched), and 4 for a right email with a wrong postal code', async () => {
             const counts: number[] = [];
-            for (const [i, body] of [wrongEmail(1), withToken({ postalCode: '00000' }), withToken({ email: 'nobody@example.test', postalCode: '00000' })].entries()) {
+            for (const [i, body] of [wrongEmail(1), withToken({ email: 'nobody@example.test', postalCode: '00000' }), withToken({ email: EMAIL1, postalCode: '00000' })].entries()) {
                 const watch = watchDb(h);
                 expect((await post(ENV1, body, `192.0.2.${80 + i}`)).status).toBe(403);
                 watch.restore();
                 counts.push(watch.writes().length);
             }
-            expect(counts).toEqual([2, 3, 4]);
+            expect(counts).toEqual([2, 2, 4]);
         });
 
         it('checks the lock with one read-only select, and verifies the challenge before the first write', async () => {
@@ -184,25 +184,59 @@ describe('the audit export counters', () => {
             expect((await post(ENV2, withToken({ email: EMAIL2 }), '2001:db8:eeee:dddd::1')).status).toBe(200);
         });
 
-        it('bounds postal guesses for the envelope at ten an hour whatever the address, and an email still works from another address', async () => {
+        it('bounds postal guesses for the envelope at ten an hour whatever the address: later ones are refused like any other, and an email still works from another address', async () => {
             const statuses: number[] = [];
-            for (let i = 0; i < 12; i += 1) statuses.push((await post(ENV1, withToken({ postalCode: `0000${i}` }), `192.0.2.${100 + Math.floor(i / 3)}`)).status);
-            expect(statuses.filter((s) => s === 403)).toHaveLength(10);
-            expect(statuses.slice(10)).toEqual([429, 429]);
+            // Each guess carries the right email: only then does a postal code count.
+            for (let i = 0; i < 12; i += 1) statuses.push((await post(ENV1, withToken({ email: EMAIL1, postalCode: `0000${i}` }), `192.0.2.${100 + Math.floor(i / 3)}`)).status);
+            expect(statuses).toEqual(Array(12).fill(403));
+            // The allowance is used up after ten: the writes stop there (a refused eleventh and twelfth reserve nothing on the postal path).
+            const postal = (await rows()).find((r) => r.key.startsWith('envelope-postal:'));
+            expect(postal?.attempts).toBe(10);
             expect((await post(ENV1, withToken({ email: EMAIL1 }), '192.0.2.200')).status).toBe(200);
             // Control: a postal code from a fresh address is refused by the envelope-wide postal counter, a right one included.
-            expect((await post(ENV1, withToken({ postalCode: '78701' }), '192.0.2.201')).status).toBe(429);
+            const fresh = await post(ENV1, withToken({ email: EMAIL1, postalCode: '78701' }), '192.0.2.201');
+            expect(fresh.status).toBe(403);
+            expect(fresh.headers.get('retry-after')).toBeNull();
         });
 
-        it('counts a request that carries both fields on the email and the postal counters', async () => {
+        it('a caller who sends a junk email with a postal code cannot use up the postal allowance of the people who know a real email', async () => {
+            for (let i = 0; i < 30; i += 1) {
+                expect((await post(ENV1, withToken({ email: `junk.${i}@example.test`, postalCode: `9${String(i).padStart(4, '0')}` }), `198.51.100.${i + 1}`)).status).toBe(403);
+            }
+            const postal = (await rows()).filter((r) => r.key.startsWith('postal:') || r.key.startsWith('envelope-postal:'));
+            expect(postal).toEqual([]);
+            // Control: a participant with the right email and postal code still gets in.
+            expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: '78701' }), '192.0.2.222')).status).toBe(200);
+        });
+
+        it('a spent postal allowance changes nothing for anyone: the same 403 and body for a wrong email and for the right one, and no wait is announced', async () => {
+            const wrong = () => post(ENV1, withToken({ email: 'nobody@example.test', postalCode: '00000' }), '192.0.2.160');
+            const before = await wrong();
+            const beforeBody = await before.text();
+            // Spend the envelope's postal allowance with the right email and wrong codes, from several addresses.
+            const spent: number[] = [];
+            for (let i = 0; i < 12; i += 1) spent.push((await post(ENV1, withToken({ email: EMAIL1, postalCode: `0000${i}` }), `192.0.2.${170 + Math.floor(i / 3)}`)).status);
+            expect(spent).toEqual(Array(12).fill(403));
+            // A fresh address with a wrong email and a postal code, and with the right email and a postal code (right or wrong): all the same.
+            for (const [email, postalCode] of [['nobody@example.test', '00000'], [EMAIL1, '00000'], [EMAIL1, '78701']] as const) {
+                const after = await post(ENV1, withToken({ email, postalCode }), '192.0.2.161');
+                expect(after.status, email + postalCode).toBe(before.status);
+                expect(await after.text(), email + postalCode).toBe(beforeBody);
+                expect(after.headers.get('retry-after')).toBeNull();
+            }
+            // The postal path stays locked (the right code no longer opens it), but the email alone still does.
+            expect((await post(ENV1, withToken({ email: EMAIL1 }), '192.0.2.162')).status).toBe(200);
+        });
+
+        it('counts a postal code on the postal counters only once the email matched; a wrong email is counted under the email counters alone', async () => {
             expect((await post(ENV1, withToken({ email: 'nobody@example.test', postalCode: '00000' }))).status).toBe(403);
-            const keys = (await rows()).map((r) => r.key.split(':')[0]).sort();
-            expect(keys).toEqual(['email', 'envelope', 'envelope-postal', 'postal']);
-            // One right and one wrong is satisfied, and both reservations are handed back.
-            expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: '00000' }), '192.0.2.31')).status).toBe(200);
-            expect((await post(ENV1, withToken({ email: 'nobody@example.test', postalCode: '78701' }), '192.0.2.32')).status).toBe(200);
+            expect((await rows()).map((r) => r.key.split(':')[0]).sort()).toEqual(['email', 'envelope']);
+            expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: '00000' }), '192.0.2.30')).status).toBe(403);
+            expect([...new Set((await rows()).map((r) => r.key.split(':')[0]))].sort()).toEqual(['email', 'envelope', 'envelope-postal', 'postal']);
+            // Both right is released, and every reservation is handed back; a wrong one of the two keeps its counts.
+            expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: '78701' }), '192.0.2.31')).status).toBe(200);
             const after = await rows();
-            expect(after.find((r) => r.key.startsWith('envelope:'))?.attempts).toBe(1);
+            expect(after.find((r) => r.key.startsWith('envelope:'))?.attempts).toBe(2);
             expect(after.find((r) => r.key.startsWith('envelope-postal:'))?.attempts).toBe(1);
         });
     });

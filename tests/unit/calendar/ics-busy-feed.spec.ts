@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IcsService } from '../../../server/services/ics.service';
+import { icsUid } from '../../../server/lib/calendar/ics-uid';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -10,13 +11,22 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const USER = '00000000-0000-0000-0000-000000000010';
 const HELPER = '00000000-0000-0000-0000-000000000011';
+const SECRET = 'ics-test-secret-ics-test-secret-12';
+const HOST = 'openinspection';
 
 describe('IcsService — inspector feeds', () => {
     let svc: IcsService;
+    let UID1 = '';
+    let UID2 = '';
     let testDb: BetterSQLite3Database<typeof schema>;
     let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
     beforeEach(async () => {
+        // The feeds cover a window around today, so the fixtures' June dates need a today near them.
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-05-30T12:00:00Z'));
+        UID1 = await icsUid(SECRET, 'i1', HOST);
+        UID2 = await icsUid(SECRET, 'i2', HOST);
         const fixture = createTestDb();
         testDb = fixture.db;
         sqlite = fixture.sqlite;
@@ -61,10 +71,11 @@ describe('IcsService — inspector feeds', () => {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new IcsService({} as unknown as D1Database);
+        svc = new IcsService({} as unknown as D1Database, HOST, SECRET);
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         sqlite.close();
         vi.clearAllMocks();
     });
@@ -75,8 +86,8 @@ describe('IcsService — inspector feeds', () => {
             expect(ics).toContain('BEGIN:VCALENDAR');
             expect(ics).toContain('END:VCALENDAR');
             expect(ics).toContain('SUMMARY:Busy');
-            expect(ics).toContain('UID:i1@');
-            expect(ics).not.toContain('UID:i2@');
+            expect(ics).toContain(`UID:${UID1}`);
+            expect(ics).not.toContain(`UID:${UID2}`);
             expect(ics).not.toContain('1 Main St');
             expect(ics).not.toContain('Sarah');
             expect(ics).not.toContain('s@t.com');
@@ -93,7 +104,7 @@ describe('IcsService — inspector feeds', () => {
         it('reads assignment from the link table, not the dead inspector_id column', async () => {
             const ics = await svc.busyFeedForInspector(TENANT, 'mike');
             expect(ics).toContain('BEGIN:VEVENT');
-            expect(ics).toContain('UID:i1@');
+            expect(ics).toContain(`UID:${UID1}`);
         });
 
         it('shows lead assignments only, not helper work', async () => {
@@ -166,8 +177,8 @@ describe('IcsService — inspector feeds', () => {
 
         it('still excludes cancelled work and helper assignments', async () => {
             const ics = await svc.scheduleFeedForInspector(TENANT, USER);
-            expect(ics).toContain('UID:i1@');
-            expect(ics).not.toContain('UID:i2@');
+            expect(ics).toContain(`UID:${UID1}`);
+            expect(ics).not.toContain(`UID:${UID2}`);
             expect(await svc.scheduleFeedForInspector(TENANT, HELPER)).not.toContain('BEGIN:VEVENT');
         });
 
@@ -181,6 +192,45 @@ describe('IcsService — inspector feeds', () => {
                 .set({ propertyAddress: '1 Main St, Apt; 2' });
             const ics = await svc.scheduleFeedForInspector(TENANT, USER);
             expect(ics).toContain('LOCATION:1 Main St\\, Apt\\; 2');
+        });
+    });
+
+    describe('what the feeds publish', () => {
+        it('never publishes the inspection id: the UID is a keyed hash, stable for the same inspection and different for another', async () => {
+            const busy = await svc.busyFeedForInspector(TENANT, 'mike');
+            const schedule = await svc.scheduleFeedForInspector(TENANT, USER);
+            for (const ics of [busy, schedule]) {
+                expect(ics).not.toContain('UID:i1@');
+                expect(ics).toMatch(/UID:[0-9a-f]{32}@openinspection/);
+            }
+            expect(await icsUid(SECRET, 'i1', HOST)).toBe(UID1);
+            expect(UID1).not.toBe(UID2);
+            // A different deployment secret gives a different UID: the hash is not computable from the id alone.
+            expect(await icsUid('another-secret-another-secret-123456', 'i1', HOST)).not.toBe(UID1);
+        });
+
+        it('refuses to build a feed with no secret rather than publish raw ids', async () => {
+            const bare = new IcsService({} as unknown as D1Database, HOST);
+            await expect(bare.busyFeedForInspector(TENANT, 'mike')).rejects.toThrow(/JWT_SECRET/);
+        });
+
+        it('covers a window, not the whole history: yesterday through 90 days ahead', async () => {
+            const add = async (id: string, date: string) => {
+                await testDb.insert(schema.inspections).values({
+                    id, tenantId: TENANT, propertyAddress: `${id} Road`, date, status: 'confirmed', paymentStatus: 'unpaid',
+                    price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+                });
+                await testDb.insert(schema.inspectionInspectors).values({ tenantId: TENANT, inspectionId: id, userId: USER, role: 'lead', createdAt: new Date() });
+            };
+            await add('old', '2025-01-15');
+            await add('edge', '2026-08-28');
+            await add('far', '2027-03-01');
+            const ics = await svc.busyFeedForInspector(TENANT, 'mike');
+            const has = async (id: string) => ics.includes(`UID:${await icsUid(SECRET, id, HOST)}`);
+            expect(await has('i1')).toBe(true);
+            expect(await has('edge')).toBe(true);
+            expect(await has('old')).toBe(false);
+            expect(await has('far')).toBe(false);
         });
     });
 });

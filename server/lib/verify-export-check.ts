@@ -3,7 +3,7 @@
  *
  * The online verification result is public. The export carries the signed events whole (their payloads record signer ids and the
  * emails given at signing), so it is released only to someone who can name something a participant knows: an email recorded on the
- * envelope, or the postal code of the inspected property. This module holds the pure parts: normalisation, the comparison and the lookup
+ * envelope, together with, optionally, the postal code of the inspected property as a second factor. This module holds the pure parts: normalisation, the comparison and the lookup
  * of what could be supplied. The attempt allowance lives in verify-export-attempts.ts.
  *
  * Any signer row of the envelope counts, whatever its status (including one that declined or was removed): the signed events record

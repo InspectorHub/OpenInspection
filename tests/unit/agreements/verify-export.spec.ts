@@ -63,34 +63,38 @@ describe('the signed audit export knowledge check', () => {
             expect((await post(ENV2, withToken({ email: EMAIL2 }))).status).toBe(200);
         });
 
-        it('releases the export for the postal code of the inspected property, however it is written', async () => {
+        it('takes the postal code of the inspected property as a second factor, however it is written, and only beside the right email', async () => {
             for (const postalCode of ['78701', ' 78701 ', '78701-1234', '787011234']) {
-                expect((await post(ENV1, withToken({ postalCode }))).status, postalCode).toBe(200);
+                expect((await post(ENV1, withToken({ email: EMAIL1, postalCode }))).status, postalCode).toBe(200);
             }
             for (const postalCode of ['K1A 0B1', 'k1a0b1', 'K1A-0B1']) {
-                expect((await post(ENV3, withToken({ postalCode }))).status, postalCode).toBe(200);
+                expect((await post(ENV3, withToken({ email: 'third.signer@example.test', postalCode }))).status, postalCode).toBe(200);
             }
-            expect((await post(ENV1, withToken({ postalCode: '90210' }))).status).toBe(403);
-            expect((await post(ENV1, withToken({ postalCode: '78702' }))).status).toBe(403);
-            expect((await post(ENV3, withToken({ postalCode: 'K1A 0B2' }))).status).toBe(403);
+            // A wrong postal code beside the right email refuses: it is an added condition, not a free pass.
+            expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: '90210' }))).status).toBe(403);
+            expect((await post(ENV3, withToken({ email: 'third.signer@example.test', postalCode: 'K1A 0B2' }))).status).toBe(403);
         });
 
-        it('cannot be satisfied by a postal code when the inspection has none, and an email still works there', async () => {
-            expect((await post(ENV4, withToken({ postalCode: '12345' }))).status).toBe(403);
-            expect((await post(ENV4, withToken({ postalCode: '' , email: 'fourth.signer@example.test' }))).status).toBe(200);
+        it('never releases on a postal code alone, right or wrong, and never on a right postal code beside a wrong email', async () => {
+            const alone = await post(ENV1, withToken({ postalCode: '78701' }));
+            expect(alone.status).toBe(400);
+            expect(await alone.json()).toEqual({ error: 'email_required' });
+            expect((await post(ENV1, withToken({ email: 'nobody@example.test', postalCode: '78701' }))).status).toBe(403);
+            // Control: the right email with the right postal code goes through.
+            expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: '78701' }))).status).toBe(200);
         });
 
-        it('takes a request that carries both fields as satisfied when either is right', async () => {
-            expect((await post(ENV1, withToken({ email: 'nobody@example.test', postalCode: '78701' }))).status).toBe(200);
-            expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: '00000' }))).status).toBe(200);
-            expect((await post(ENV1, withToken({ email: 'nobody@example.test', postalCode: '00000' }))).status).toBe(403);
+        it('compares the postal code to the request the inspection came from when the inspection has none of its own', async () => {
+            expect((await post(ENV4, withToken({ email: 'fourth.signer@example.test', postalCode: '12345' }))).status).toBe(403);
+            expect((await post(ENV4, withToken({ email: 'fourth.signer@example.test', postalCode: '60601' }))).status).toBe(200);
+            expect((await post(ENV4, withToken({ email: 'fourth.signer@example.test' }))).status).toBe(200);
         });
 
-        it('answers 400 when neither field is supplied, and refuses a body that is not JSON', async () => {
-            for (const body of [{}, { email: '   ' }, { postalCode: '' }, { email: '', postalCode: '' }, { turnstileToken: TOKEN }, 'not json', 'null']) {
+        it('answers 400 email_required when there is no email, and refuses a body that is not JSON', async () => {
+            for (const body of [{}, { email: '   ' }, { postalCode: '78701' }, { email: '', postalCode: '' }, { turnstileToken: TOKEN }, 'not json', 'null']) {
                 const res = await post(ENV1, typeof body === 'string' ? body : withToken(body as Record<string, unknown>));
                 expect(res.status, JSON.stringify(body)).toBe(400);
-                expect(await res.json()).toEqual({ error: 'email_or_postal_code_required' });
+                expect(await res.json()).toEqual({ error: 'email_required' });
             }
             expect((await post(ENV1, withToken({ email: EMAIL1 }))).status).toBe(200);
         });
@@ -100,7 +104,7 @@ describe('the signed audit export knowledge check', () => {
         it('is one body for a wrong value, an unknown envelope and missing data, and never echoes what was sent', async () => {
             const wrong = await post(ENV1, withToken({ email: 'wrong.value@example.test' }));
             const unknown = await post('eeeeeeee-0000-4000-8000-00000000ffff', withToken({ email: 'wrong.value@example.test' }));
-            const noZip = await post(ENV4, withToken({ postalCode: '99999' }));
+            const noZip = await post(ENV4, withToken({ email: 'wrong.value@example.test', postalCode: '99999' }));
             const texts = await Promise.all([wrong, unknown, noZip].map((r) => r.text()));
             for (const res of [wrong, unknown, noZip]) expect(res.status).toBe(403);
             expect(new Set(texts).size).toBe(1);
@@ -136,7 +140,7 @@ describe('the signed audit export knowledge check', () => {
                 failedChallenge,
                 await post(ENV1, withToken({ email: 'wrong.value@example.test' }), '192.0.2.32'),
                 await post('eeeeeeee-0000-4000-8000-00000000ffff', withToken({ email: 'wrong.value@example.test' }), '192.0.2.33'),
-                await post(ENV4, withToken({ postalCode: '99999' }), '192.0.2.34'),
+                await post(ENV4, withToken({ email: 'wrong.value@example.test', postalCode: '99999' }), '192.0.2.34'),
                 await post('not a valid envelope id because it is far too long '.repeat(3), withToken({ email: 'wrong.value@example.test' }), '192.0.2.35'),
             ];
             const shape = (r: Response) => JSON.stringify([r.status, [...r.headers.entries()].sort()]);
@@ -165,17 +169,17 @@ describe('the signed audit export knowledge check', () => {
             expect((await post(ENV1, withToken({ email: EMAIL1 }), '192.0.2.40')).status).toBe(200);
         });
 
-        it('reads each field on its own: a malformed field is treated as not supplied, so the other can still satisfy the check', async () => {
-            // A malformed email beside a right postal code: the postal code carries it. Alone, the malformed email is a 400.
-            expect((await post(ENV1, withToken({ email: 'not-an-email', postalCode: '78701' }), '192.0.2.60')).status).toBe(200);
+        it('reads each field on its own: a malformed one counts as not supplied, and without a valid email there is nothing to check', async () => {
+            // A malformed email, even beside a right postal code, leaves no email: 400, and the postal code is no way in.
+            expect((await post(ENV1, withToken({ email: 'not-an-email', postalCode: '78701' }), '192.0.2.60')).status).toBe(400);
             expect((await post(ENV1, withToken({ email: 'not-an-email' }), '192.0.2.61')).status).toBe(400);
-            // The same the other way round: a right email beside a malformed postal code.
+            // A right email beside a malformed postal code: the malformed field is not supplied, so the email carries it.
             expect((await post(ENV1, withToken({ email: EMAIL1, postalCode: ['78701'] }), '192.0.2.62')).status).toBe(200);
             expect((await post(ENV1, withToken({ postalCode: ['78701'] }), '192.0.2.63')).status).toBe(400);
             // A malformed field is never echoed, and a wrong right-shaped value is still the uniform refusal.
-            const bad = await post(ENV1, withToken({ email: 'not-an-email', postalCode: '00000' }), '192.0.2.64');
+            const bad = await post(ENV1, withToken({ email: 'wrong@example.test', postalCode: ['x'] }), '192.0.2.64');
             expect(bad.status).toBe(403);
-            expect(await bad.text()).not.toContain('not-an-email');
+            expect(await bad.text()).not.toContain('wrong@example.test');
         });
 
         it('counts the email of a signer who declined as a recorded email, because the signed events record it', async () => {

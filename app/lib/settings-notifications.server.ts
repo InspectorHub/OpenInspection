@@ -111,13 +111,12 @@ export async function grantNotificationSms(
     api: Api,
     request: Request,
 ): Promise<{ success: boolean; error: string | null }> {
-    const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for");
     const ua = request.headers.get("user-agent");
     const res = await api.notificationPrefs["notification-preferences"]["sms-consent"].$put(
         { json: {} },
         // Absent headers are OMITTED, not sent empty — a consent row claiming
         // "we recorded an ip and it was blank" is worse than one with none.
-        { headers: { ...(ip ? { "cf-connecting-ip": ip } : {}), ...(ua ? { "user-agent": ua } : {}) } },
+        { headers: { ...(ua ? { "user-agent": ua } : {}) } },
     );
     return res.ok
         ? { success: true, error: null }

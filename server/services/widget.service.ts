@@ -78,7 +78,8 @@ export class WidgetService {
             entityType: 'widget',
             entityId: null,
             metadata,
-            ipAddress: (metadata.ip as string) ?? null,
+            // Never read from the caller's own payload: a field the caller writes is not an address.
+            ipAddress: null,
             createdAt: new Date(),
         });
     }

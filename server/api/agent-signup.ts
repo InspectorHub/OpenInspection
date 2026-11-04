@@ -3,6 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
+import { checkRateLimit } from '../lib/rate-limit';
 import { verifyTurnstile, resolveTurnstile, TURNSTILE_TEST_KEY_WARNING } from '../lib/middleware/bot-protection';
 import { signJwt } from '../lib/jwt-keyring';
 import { logger } from '../lib/logger';
@@ -131,6 +132,7 @@ app.openapi(agentTermsRoute, async (c) => {
     }, 200);
 });
 app.openapi(signupRoute, async (c) => {
+    await checkRateLimit(c, 'agent-signup');
     const body = c.req.valid('json');
 
     // Bot protection. A deployment capability, not a test on whether someone
