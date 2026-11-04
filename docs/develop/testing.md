@@ -126,6 +126,27 @@ tests/
 - A file that needs a DOM opts in per-file with `// @vitest-environment happy-dom`
   (vitest v4 replacement for `environmentMatchGlobs`).
 - Prefer asserting **service-layer** behavior directly over reconstructing HTTP.
+- `createTestDb()` returns a database that already carries the full migrated schema
+  (it opens a serialized image built once per process), so the `await setupSchema(sqlite)`
+  that follows it is a no-op. `setupSchema` still replays the migration files for a handle
+  you created yourself with `new Database(':memory:')`.
+- **Two vitest projects.** `vitest.api.config.ts` splits the specs by `tests/unit/isolation.json`:
+  `api-shared` runs with `isolate: false` (files handled by one worker reuse its module
+  graph, which removes most of the import cost) and `api-isolated` is the historical
+  one-fresh-graph-per-file behaviour. A spec is shareable only if it has no module mock,
+  registry reset, global or env write, fake timers or `@vitest-environment` docblock and
+  reaches no module that keeps state. `npm run lint:unit-isolation` fails when a listed
+  spec breaks those rules; `npm run gen:unit-isolation` regenerates the list (a spec that
+  passes the rules but fails or flakes when shared goes under `forcedIsolated` with a
+  reason, and stays there). A new spec is isolated until the generator lists it, so
+  nothing breaks by default.
+- **CI re-runs the shared project shuffled** (`npm run test:unit:shared-shuffled`, same
+  `--shard=N/4` split). The seed is printed at the START of the run. To replay a failure:
+  `npx vitest run --config vitest.api.config.ts --project api-shared --sequence.shuffle --sequence.seed=<seed> --maxWorkers=1`
+  (plus the same `--shard=N/4`). Use one worker: with `isolate: false` which files share a
+  worker depends on scheduling, so only a single worker reproduces the order. Shuffle also
+  reorders the tests inside a file, so a failure there may be an order-dependent test within
+  one file rather than a leak between files; run that file alone with the same seed to tell.
 
 ### Every route is OpenAPI or a named exception
 

@@ -4,35 +4,69 @@ import * as schema from '../../server/lib/db/schema';
 import * as path from 'path';
 
 /**
- * Creates an in-memory SQLite database initialized with the latest migrations.
- * This provides a high-fidelity environment for testing business logic.
+ * The migration set, replayed once per process and kept as a serialized
+ * database image. Replaying ~120 tables costs tens of milliseconds; opening an
+ * image costs about one, and the suite opens one per test.
+ *
+ * Sharing the image is safe because it is never handed out: every caller gets
+ * its own `new Database(image)`, a private in-memory copy, so a write in one test
+ * cannot reach another. The image itself is immutable after it is built.
+ *
+ * Built with `process.getBuiltinModule` so a spec that mocks `node:fs` for its
+ * own purposes cannot break the template.
  */
-export function createTestDb() {
-    const sqlite = new Database(':memory:');
-    const db = drizzle(sqlite, { schema });
-    
-    // We can also run migrations here if we want to be 100% sure
-    // For now, let's assume we can also just use the schema synchronization if needed.
-    // However, Drizzle-kit push is better for dev. For tests, we'll manually execute 
-    // the migration SQL files for maximum fidelity.
-    
-    return { sqlite, db };
-}
+let schemaImage: Buffer | undefined;
 
-/**
- * Helper to initialize the schema by executing migration files.
- */
-export async function setupSchema(sqlite: any) {
+/** Handles that already carry the full schema, so `setupSchema` has nothing to do for them. */
+const hasSchema = new WeakSet<object>();
+
+function replayMigrations(sqlite: { exec: (sql: string) => unknown }) {
+    const fs = process.getBuiltinModule('node:fs');
     const migrationsDir = path.resolve(__dirname, '../../migrations');
-    const fs = await import('node:fs');
     const migrationFiles = fs.readdirSync(migrationsDir).sort();
-    
+
     for (const file of migrationFiles) {
         if (file.endsWith('.sql')) {
             const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
             sqlite.exec(sql);
         }
     }
+}
+
+function getSchemaImage(): Buffer {
+    if (!schemaImage) {
+        const builder = new Database(':memory:');
+        replayMigrations(builder);
+        schemaImage = builder.serialize();
+        builder.close();
+    }
+    return schemaImage;
+}
+
+/**
+ * Creates an in-memory SQLite database initialized with the latest migrations.
+ * This provides a high-fidelity environment for testing business logic.
+ *
+ * The schema is already in place when this returns, so a following
+ * `setupSchema(sqlite)` is a no-op. It stays exported and awaited at the many
+ * call sites because it is still the way to apply the migrations to a handle
+ * that did not come from here (`new Database(':memory:')`).
+ */
+export function createTestDb() {
+    const sqlite = new Database(getSchemaImage());
+    hasSchema.add(sqlite);
+    const db = drizzle(sqlite, { schema });
+
+    return { sqlite, db };
+}
+
+/**
+ * Helper to initialize the schema by executing migration files. A no-op for a
+ * handle from `createTestDb()`, which starts with the schema applied.
+ */
+export async function setupSchema(sqlite: any) {
+    if (hasSchema.has(sqlite)) return;
+    replayMigrations(sqlite);
 }
 
 /**
