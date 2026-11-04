@@ -99,6 +99,10 @@ export default defineConfig({
         }),
     ],
     test: {
+        // Explicit ceilings instead of vitest's 5 s / 10 s defaults, which are tight when several heavy
+        // processes share the machine (see vitest.api.config.ts). A hung promise still fails at the ceiling.
+        testTimeout: 30_000,
+        hookTimeout: 60_000,
         include: ['tests/workers/**/*.spec.ts'],
         // Registers the API app loader the production entry registers.
         setupFiles: ['tests/workers/setup-api-app.ts'],

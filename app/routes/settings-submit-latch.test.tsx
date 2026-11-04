@@ -83,7 +83,7 @@ describe("settings-communication-template", () => {
 describe("settings-communication-templates", () => {
     it("posts the duplicate once for a double click", async () => {
         const row = {
-            id: "t1", tenantId: "x", name: "Reminder", channel: "email", subject: "s", body: "b", variables: [],
+            id: "t1", name: "Reminder", channel: "email", subject: "s", body: "b", variables: [],
             locale: "en", isSeeded: false, createdAt: 1, updatedAt: 1,
         };
         mount(SettingsCommunicationTemplates, { emailTemplates: [row], smsTemplates: [], loadFailed: false });

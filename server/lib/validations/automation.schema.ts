@@ -33,7 +33,6 @@ const ConditionsSchema = z.object({
 
 export const AutomationSchema = z.object({
     id:              z.string(),
-    tenantId:        z.string(),
     name:            z.string(),
     trigger:         z.enum(AUTOMATION_TRIGGERS),
     recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', 'all', or 'staff' (the workspace's owners + managers)."),

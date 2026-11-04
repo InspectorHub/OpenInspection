@@ -1,3 +1,4 @@
+import { withoutCompanyId } from '../lib/response-projection';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
@@ -54,11 +55,11 @@ const deleteTypeRoute = createRoute(withMcpMetadata({
 const inspectionTypesRoutes = createApiRouter();
 inspectionTypesRoutes.openapi(listRoute, async (c) => {
     const data = await c.var.services.inspectionType.listInspectionTypes(c.get('tenantId'));
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: data.map((row) => withoutCompanyId(row)) }, 200);
 });
 inspectionTypesRoutes.openapi(createTypeRoute, async (c) => {
     const row = await c.var.services.inspectionType.createInspectionType(c.get('tenantId'), c.req.valid('json'));
-    return c.json({ success: true as const, data: row }, 201);
+    return c.json({ success: true as const, data: withoutCompanyId(row) }, 201);
 });
 inspectionTypesRoutes.openapi(updateTypeRoute, async (c) => {
     const { id } = c.req.valid('param');

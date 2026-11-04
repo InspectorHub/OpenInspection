@@ -4,7 +4,6 @@ import { DepositPolicySchema } from './deposit-policy.schema';
 
 const ServiceSchema = z.object({
     id:              z.string(),
-    tenantId:        z.string(),
     name:            z.string(),
     description:     z.string().nullable(),
     price:           z.number().int(),
@@ -61,7 +60,6 @@ export const UpdateDiscountCodeSchema = z.object({
 // nothing they actually send — a copy-paste of the no-payload envelope.
 const DiscountCodeSchema = z.object({
     id:        z.string().describe('Discount code id.'),
-    tenantId:  z.string().describe('Owning tenant.'),
     code:      z.string().describe('The redeemable code. Stored upper-cased; matching is case-insensitive.'),
     type:      z.enum(['fixed', 'percent']).describe('fixed = a flat amount off; percent = a share of the subtotal off.'),
     value:     z.number().int().describe('Integer cents when type is fixed, whole percent when type is percent.'),

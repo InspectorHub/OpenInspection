@@ -112,3 +112,38 @@ export function returnedExpressions(fn) {
     visit(fn.body);
     return out;
 }
+
+/**
+ * `const res = await helper(c, row); ... return res;`: the call's value is stored in a `const` and the enclosing function returns that name
+ * unconditionally. Only the plain shape: a name that is reassigned, returned inside another function, or returned as part of a larger
+ * expression is not followed. A return sitting under an `if` that tests the name (`const denied = await gate(c, id); if (denied) return denied;`)
+ * is the guard pattern: the helper answers only to refuse, so it is not a response built from the value it was given.
+ */
+export function isStoredThenReturned(n) {
+    const declaration = n.parent;
+    if (declaration === undefined || !ts.isVariableDeclaration(declaration) || declaration.initializer !== n || !ts.isIdentifier(declaration.name)) return false;
+    const list = declaration.parent;
+    if (!ts.isVariableDeclarationList(list) || (list.flags & ts.NodeFlags.Const) === 0) return false;
+    let fn = list.parent;
+    while (fn !== undefined && !ts.isFunctionLike(fn)) fn = fn.parent;
+    if (fn === undefined || fn.body === undefined) return false;
+    const name = declaration.name.text;
+    const testsName = (expr) => {
+        let found = false;
+        const walk = (node) => { if (ts.isIdentifier(node) && node.text === name) found = true; ts.forEachChild(node, walk); };
+        walk(expr);
+        return found;
+    };
+    let unconditional = false;
+    const visit = (node, guarded) => {
+        if (ts.isFunctionLike(node) && node !== fn) return;
+        if (ts.isReturnStatement(node) && node.expression) {
+            const e = unwrap(node.expression);
+            if (!guarded && ts.isIdentifier(e) && e.text === name) unconditional = true;
+        }
+        const next = guarded || (ts.isIfStatement(node) && testsName(node.expression));
+        ts.forEachChild(node, (child) => visit(child, next));
+    };
+    visit(fn.body, false);
+    return unconditional;
+}

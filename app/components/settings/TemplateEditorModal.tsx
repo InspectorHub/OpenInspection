@@ -21,7 +21,6 @@ export function smsSegmentsClient(body: string): number {
 
 export interface MessageTemplate {
   id: string;
-  tenantId: string;
   name: string;
   channel: "email" | "sms";
   subject: string | null;

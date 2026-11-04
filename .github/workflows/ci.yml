@@ -133,7 +133,8 @@ jobs:
   # ── Lint ─────────────────────────────────────────────────────────────────
   # eslint is type-aware here (unlike pre-commit, which sets ESLINT_FAST and
   # drops the type-information program) and is by far the slower half, so it
-  # runs apart from the sixteen lint:* gates rather than in front of them.
+  # runs apart from the conformance gates (`npm run lint:gates-full`, every entry of
+  # scripts/lib/gate-registry.mjs) rather than in front of them.
   lint-eslint:
     name: lint (eslint)
     runs-on: ubuntu-latest
@@ -285,8 +286,8 @@ jobs:
   # ── Tests ────────────────────────────────────────────────────────────────
   # Sharded across four runners. This job was the longest in the workflow at
   # 7m22s, and the suite is import-bound rather than assertion-bound: `import`
-  # dominates `tests` because 723 spec files each rebuild the module graph in
-  # their own process.
+  # dominates `tests` because every spec file (well over a thousand now) rebuilds
+  # the module graph in its own process, except the ones listed as shareable.
   #
   # Sharding buys the wall-clock back WITHOUT touching a single test: each shard
   # is a run of a subset of the files, with no new failure mode of its own.
@@ -326,8 +327,10 @@ jobs:
       # --sequence.seed=<seed> --maxWorkers=1 (plus the same --shard). One worker is
       # the faithful replay: with isolate false, which files share a worker depends on
       # scheduling. Shuffle also reorders tests inside a file, so a failure may be an
-      # order-dependent test within one file rather than a sharing leak. Same shard
-      # split as above, so each file is still handled by exactly one job.
+      # order-dependent test within one file rather than a sharing leak. The shard
+      # flag is the same, but it is applied to the shared project alone, so a file may
+      # land on a different shard number here than in the step above; the four shards
+      # together still cover every shared file exactly once.
       - run: npm run test:unit:shared-shuffled -- --shard=${{ matrix.shard }}/4
 
   # Our outbound payloads against Intuit's own vendored schemas. No network, no

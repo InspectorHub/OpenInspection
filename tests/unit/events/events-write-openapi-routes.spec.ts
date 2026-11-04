@@ -23,6 +23,8 @@ vi.mock('../../../server/lib/inspection/visibility', async (importOriginal) => {
 // No money-named fields in the stored rows, so the response projection has nothing to redact and needs no lookup.
 const TYPE_ROW = { id: 'et9', tenantId: 't1', name: 'Radon', slug: 'radon', defaultDurationMin: 30, color: '#6366f1', sortOrder: 0, active: true };
 const EVENT_ROW = { id: 'ev9', tenantId: 't1', inspectionId: 'i9', eventTypeId: 'et1', durationMin: 60, status: 'scheduled' };
+/** The row as a signed-in caller receives it: the service row holds the company id, the response does not restate it. */
+const withoutCompany = (row: Record<string, unknown>) => Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'tenantId'));
 
 function buildApp(event: Record<string, unknown>, role = 'owner') {
     const app = new OpenAPIHono<HonoConfig>();
@@ -53,7 +55,8 @@ describe('POST /api/event-types', () => {
         const createEventType = vi.fn().mockResolvedValue(TYPE_ROW);
         const res = await buildApp({ createEventType }).request('/api/event-types', send('POST', { name: 'Radon', slug: 'radon' }));
         expect(res.status).toBe(201);
-        expect(await res.json()).toEqual({ success: true, data: TYPE_ROW });
+        expect(TYPE_ROW.tenantId).toBe('t1'); // control: the service row holds the company id
+        expect(await res.json()).toEqual({ success: true, data: withoutCompany(TYPE_ROW) });
         expect(createEventType).toHaveBeenCalledWith('t1', {
             name: 'Radon', slug: 'radon', defaultDurationMin: 30, defaultPriceCents: 0, color: '#6366f1', sortOrder: 0,
         });
@@ -87,7 +90,8 @@ describe('POST /api/inspections/{inspectionId}/events', () => {
         const createEvent = vi.fn().mockResolvedValue(EVENT_ROW);
         const res = await buildApp({ createEvent }, 'inspector').request('/api/inspections/i9/events', send('POST', body));
         expect(res.status).toBe(201);
-        expect(await res.json()).toEqual({ success: true, data: EVENT_ROW });
+        expect(EVENT_ROW.tenantId).toBe('t1'); // control: the service row holds the company id
+        expect(await res.json()).toEqual({ success: true, data: withoutCompany(EVENT_ROW) });
         expect(createEvent).toHaveBeenCalledWith('t1', 'i9', { ...body, priceCents: 0, scheduledAt: new Date(body.scheduledAt) });
     });
 

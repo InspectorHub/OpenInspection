@@ -89,6 +89,8 @@ export const OPERATIONS: readonly Operation[] = [
     { method: 'post', path: '/api/inspections', status: 201, body: { id: '44444444-0000-4000-8000-0000000000e5', propertyAddress: '14 Harbor Lane', templateId: 'tpl-1' } },
     { method: 'patch', path: `${B}/property-facts`, body: { yearBuilt: 1990 } },
     { method: 'patch', path: `${B}/pca-narrative`, body: { purpose: 'To record observed conditions.' } },
+    // Read-only despite the verb: the ids travel in the body. The seeded inspection is visible to the owner, so the answer has an element.
+    { method: 'post', path: '/api/client/inspections/visible', body: { ids: [INSPECTION_ID] } },
 ];
 
 export const opKey = (method: string, path: string): string => `${method.toUpperCase()} ${path}`;
