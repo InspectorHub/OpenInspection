@@ -24,6 +24,14 @@ vi.mock('../../../server/lib/sms/resolve-twilio', () => ({
     loadProviderForTenant: (env: Record<string, unknown>) => { loaderEnvs.push(env); return Promise.resolve(null); },
 }));
 
+const targetCalls: unknown[][] = [];
+vi.mock('../../../server/lib/client-pdf-target', () => ({
+    resolveClientPdfTarget: (...args: unknown[]) => {
+        targetCalls.push(args);
+        return Promise.resolve({ versionNumber: 7, contentHash: 'hash-of-v7' });
+    },
+}));
+
 import { automationFlushJob } from '../../../server/cron/jobs/automation';
 import type { ScheduledEnv } from '../../../server/scheduled';
 
@@ -82,5 +90,21 @@ describe('automation flush: the provider loader sees the dedicated-number creden
         const gate = await gateEnvFor({ TENANT_CACHE: {} as KVNamespace, JWT_SECRET: 's' });
         expect(gate).toMatchObject({ JWT_SECRET: 's' });
         expect(gate.DB).toBeDefined();
+    });
+});
+
+describe('automation flush: the report email attaches the published version', () => {
+    const REPORT_DELIVERY_ARG_INDEX = 7;
+
+    it('asks for the version and its hash in ONE lookup, so the two cannot straddle a publish', async () => {
+        flushCalls.length = 0;
+        targetCalls.length = 0;
+        await automationFlushJob.run({ DB: {} as D1Database, JWT_SECRET: 's' } as ScheduledEnv, null);
+        const delivery = flushCalls[0]![REPORT_DELIVERY_ARG_INDEX] as {
+            resolvePdfTarget: (inspectionId: string, tenantId: string) => Promise<unknown>;
+        };
+        expect(await delivery.resolvePdfTarget('insp-1', 'tenant-1')).toEqual({ versionNumber: 7, contentHash: 'hash-of-v7' });
+        expect(targetCalls).toHaveLength(1);
+        expect(targetCalls[0]!.slice(1, 3)).toEqual(['tenant-1', 'insp-1']);
     });
 });

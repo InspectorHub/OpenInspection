@@ -11,6 +11,8 @@ import { visibleInspectionsCondition, type InspectionScope } from '../../lib/ins
 import { chunkIds } from '../../lib/id-chunks';
 import { readDashboardInputs } from './dashboard-reads';
 import { InspectionSubService } from './base';
+import { loadPinnedSnapshot } from '../../lib/report-snapshot';
+import { resolveRenderedReportId } from './report-grain';
 import type { InspectionService } from '../inspection.service';
 
 type DefectCategory = 'safety' | 'recommendation' | 'maintenance';
@@ -137,9 +139,16 @@ export class InspectionAnalyticsService extends InspectionSubService {
      * Custom (per-inspection) defects added by the inspector are also
      * surfaced — they live under inspection_results.data[itemId].customComments
      * and are not exposed by getReportData yet, so we pull them separately.
+     *
+     * `versionNumber` reads the list as one PUBLISHED version froze it, which is what a client's repair
+     * builder must show; absent, it is the inspector's working copy.
      */
-    async getRepairList(inspectionId: string, tenantId: string) {
-        const report = await this.facade.getReportData(inspectionId, tenantId);
+    async getRepairList(inspectionId: string, tenantId: string, versionNumber?: number) {
+        const report = await this.facade.getReportData(inspectionId, tenantId, undefined, undefined, versionNumber);
+        const pinned = typeof versionNumber === 'number'
+            ? await loadPinnedSnapshot(this.getDrizzle(), tenantId, inspectionId, versionNumber,
+                await resolveRenderedReportId(this.getDrizzle(), tenantId, inspectionId))
+            : null;
 
         // Pull custom defects directly from inspection_results since
         // getReportData only resolves the template canned tabs.
@@ -162,10 +171,11 @@ export class InspectionAnalyticsService extends InspectionSubService {
             ))
             .get();
         const customByItem = new Map<string, CustomDefect[]>();
-        if (resultsRow?.data) {
-            const rawData = typeof resultsRow.data === 'string'
-                ? JSON.parse(resultsRow.data) as Record<string, unknown>
-                : resultsRow.data as Record<string, unknown>;
+        const storedData = pinned?.data ?? resultsRow?.data;
+        if (storedData) {
+            const rawData = typeof storedData === 'string'
+                ? JSON.parse(storedData) as Record<string, unknown>
+                : storedData as Record<string, unknown>;
             for (const key of Object.keys(rawData)) {
                 const parsedKey = parseFindingKey(key);
                 const entry = rawData[key] as { customComments?: { defects?: CustomDefect[] } } | null;

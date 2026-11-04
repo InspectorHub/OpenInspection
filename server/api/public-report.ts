@@ -431,10 +431,8 @@ app.openapi(reportPdfDownloadRoute, async (c) => {
     // signed render token, and the cache key is the version's own content hash, so a later edit of the live tables cannot change
     // what a client downloads. The same version is also what the verify page serves, so the two share one stored render. A report
     // with no version row (not yet frozen) keeps the live hash.
-    // NOTE: keying the cache by the version's frozen hash assumes the report page is frozen at that version too. Today the page still
-    // reads findings, notes and units live (only identity, credentials and style are overlaid from the snapshot), so after a
-    // post-publish edit a cached PDF can show older text than the page. The follow-up that overlays the snapshot's `data` and `units`
-    // in getReportData removes the difference; until then this key is only as frozen as the page.
+    // The report page is frozen at that same version (getReportData overlays the snapshot's findings and units), so the
+    // render, the page and the cache key all describe one document.
     const latest = await c.var.services.reportVersion.getLatestPublished(tenantId, id);
     const versionNumber = latest?.versionNumber ?? null;
     // The slug in the render URL comes from the company's own row. The URL segment is the caller's text: it is not a path the

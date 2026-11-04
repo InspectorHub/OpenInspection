@@ -9,6 +9,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { getBaseUrl } from '../../lib/url';
 import { Errors } from '../../lib/errors';
+import { loadFrozenFileKeys } from '../../lib/report-snapshot';
 import { logger } from '../../lib/logger';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { CoverCropSchema, PhotoCropSchema } from '../../lib/validations/inspection.schema';
@@ -429,8 +430,14 @@ mediaStudioRoutes.openapi(videoDeleteRoute, async (c) => {
 
     const { backend, provider } = await resolveVideoBackend(c, id);
     const db = getDrizzle(c);
+    // A video a published version shows is part of that frozen report and stays stored.
+    const frozen = await loadFrozenFileKeys(db, tenantId, id);
+    const refuseFrozen = (...refs: string[]) => {
+        if (refs.some((r) => frozen.has(r))) throw Errors.Conflict('This video is part of a published version of the report and cannot be deleted.');
+    };
 
     if (provider === 'stream') {
+        refuseFrozen(videoRef);
         await backend.delete({ provider: 'stream', streamUid: videoRef });
     } else {
         // R2: videoRef is the mediaId. Look up the pool row to get r2Key for
@@ -446,6 +453,7 @@ mediaStudioRoutes.openapi(videoDeleteRoute, async (c) => {
             ))
             .get();
         if (!row) throw Errors.NotFound('Video not found');
+        refuseFrozen(videoRef, row.r2Key);
         await backend.delete({ provider: 'r2', mediaId: videoRef, r2Key: row.r2Key });
     }
 

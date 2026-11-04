@@ -11,17 +11,19 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc } from 'drizzle-orm';
-import { reports, reportVersions, inspections, inspectionResults, inspectionUnits, users, inspectionInspectors, templates, tenantConfigs } from '../lib/db/schema';
+import { reports, reportVersions, inspections, inspectionUnits, users, inspectionInspectors, templates, tenantConfigs } from '../lib/db/schema';
+import { loadLatestPublishedRef } from '../lib/report-snapshot';
+import { assertSnapshotSize, CheckBuilds, commercialSnapshotParts, retryOnce } from '../lib/report-snapshot-build';
+import { resolveResultsRow } from './inspection/report-grain';
 import { computeDiff, SNAPSHOT_SCHEMA_VERSION, type Snapshot, type SnapshotInspector, type DiffPayload } from '../lib/version-diff';
 import { CredentialService } from './credential.service';
 import { resolveProfile } from '../lib/report-style/resolve';
 import { sha256Hex } from '../lib/sha256';
 import { SigningKeyService, base64UrlEncode, base64UrlDecode } from './signing-key.service';
 
-const MAX_SNAPSHOT_BYTES = 1024 * 1024;  // 1 MB
-
 export interface SnapshotResult {
     versionNumber: number;
+    contentHash:   string;   // SHA-256 of the stored snapshot: the key the version's own PDF is cached under
     summary?:      string;
 }
 
@@ -64,16 +66,14 @@ export class ReportVersionService {
         return primary?.id ?? null;
     }
 
-    /** What a publish would freeze now; `snapshotOnPublish` stores exactly this. */
-    async buildSnapshotJson(tenantId: string, inspectionId: string): Promise<string> {
+    /** What a publish would freeze now (`snapshotOnPublish` stores exactly this), from the named report's own results row. */
+    async buildSnapshotJson(tenantId: string, inspectionId: string, reportId?: string | null): Promise<string> {
         const db = this.getDrizzle();
         const ins = await db.select().from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!ins) throw new Error('Inspection not found');
-        const results = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .get();
+        const results = await resolveResultsRow(db, tenantId, inspectionId, reportId ?? await this.resolveReportId(db, tenantId, inspectionId));
         const data = parseResultsData(results?.data);
         const units = await db.select().from(inspectionUnits)
             .where(and(eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
@@ -89,8 +89,20 @@ export class ReportVersionService {
             // already delivered.
             inspectors: await this.resolveInspectors(tenantId, inspectionId, ins),
             styleProfile: await this.resolveStyleProfile(tenantId, ins),
+            ratingSystemSnapshot: (results as { ratingSystemSnapshot?: unknown } | undefined)?.ratingSystemSnapshot ?? null,
+            ...(await commercialSnapshotParts(this.db, this.encryptionSecret, this.previousSecrets, tenantId, inspectionId, ins)),
         };
         return JSON.stringify(snapshot);
+    }
+
+    private readonly checkBuilds = new CheckBuilds();
+    /** What a publish would freeze NOW, built once per request for the checks that run before anything changes (see `CheckBuilds`). */
+    buildSnapshotForCheck(tenantId: string, inspectionId: string, reportId?: string | null): Promise<string> {
+        return this.checkBuilds.get(`${tenantId}:${inspectionId}:${reportId ?? ''}`, () => this.buildSnapshotJson(tenantId, inspectionId, reportId));
+    }
+    /** Refuses a publish whose frozen copy would not fit one stored row, BEFORE anything is flipped to published. */
+    async assertSnapshotFits(tenantId: string, inspectionId: string, reportId?: string | null): Promise<void> {
+        assertSnapshotSize(await this.buildSnapshotForCheck(tenantId, inspectionId, reportId));
     }
 
     async snapshotOnPublish(
@@ -120,10 +132,8 @@ export class ReportVersionService {
             .get();
         const nextVersion = (prev?.versionNumber ?? 0) + 1;
 
-        const snapshotJson = await this.buildSnapshotJson(tenantId, inspectionId);
-        if (snapshotJson.length > MAX_SNAPSHOT_BYTES) {
-            throw new Error('Snapshot exceeds 1 MB limit');
-        }
+        const snapshotJson = await this.buildSnapshotJson(tenantId, inspectionId, targetReportId);
+        assertSnapshotSize(snapshotJson);
 
         const contentHash = await sha256Hex(snapshotJson);
         const prevHash = prev?.contentHash ?? null;
@@ -136,7 +146,8 @@ export class ReportVersionService {
         const signature = base64UrlEncode(sigBytes);
         const verificationToken = crypto.randomUUID();
 
-        await db.insert(reportVersions).values({
+        // The status has already flipped: a transient D1 failure must not leave no version, so the same row is tried once more.
+        await retryOnce(() => db.insert(reportVersions).values({
             id:             crypto.randomUUID(),
             tenantId,
             inspectionId,
@@ -153,9 +164,9 @@ export class ReportVersionService {
             keyFingerprint: fingerprint,
             isAmendment:    nextVersion > 1,
             verificationToken,
-        });
+        }), { tenantId, inspectionId, versionNumber: nextVersion });
 
-        return { versionNumber: nextVersion, ...(summary ? { summary } : {}) };
+        return { versionNumber: nextVersion, contentHash, ...(summary ? { summary } : {}) };
     }
 
     /**
@@ -320,29 +331,15 @@ export class ReportVersionService {
         };
     }
 
-    /**
-     * Layer-2 report page — surface the latest published version's verification
-     * metadata without loading the full snapshot blob. Returns null when no
-     * version row exists yet (draft) or when the row somehow has no token.
-     */
-    async getLatestPublished(tenantId: string, inspectionId: string): Promise<{
+    /** Layer-2 report page: the latest published version's verification metadata, without its snapshot. Null for a draft. */
+    async getLatestPublished(tenantId: string, inspectionId: string, reportId?: string | null): Promise<{
         versionNumber:     number;
         contentHash:       string | null;
         verificationToken: string | null;
         publishedAt:       number | null;
     } | null> {
-        const db = this.getDrizzle();
-        const row = await db.select({
-            versionNumber:     reportVersions.versionNumber,
-            contentHash:       reportVersions.contentHash,
-            verificationToken: reportVersions.verificationToken,
-            publishedAt:       reportVersions.publishedAt,
-        }).from(reportVersions)
-            .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
-            .orderBy(desc(reportVersions.versionNumber))
-            .limit(1)
-            .get();
-        if (!row || !row.verificationToken) return null;
+        const row = await loadLatestPublishedRef(this.getDrizzle(), tenantId, inspectionId, reportId);
+        if (!row) return null;   // a row without a verification token (older rows) is still a version: the pin counts it too
         return {
             versionNumber:     row.versionNumber,
             contentHash:       row.contentHash ?? null,

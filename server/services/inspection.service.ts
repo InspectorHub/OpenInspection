@@ -536,8 +536,8 @@ export class InspectionService {
      * surfaced — they live under inspection_results.data[itemId].customComments
      * and are not exposed by getReportData yet, so we pull them separately.
      */
-    async getRepairList(inspectionId: string, tenantId: string) {
-        return this.analytics.getRepairList(inspectionId, tenantId);
+    async getRepairList(inspectionId: string, tenantId: string, versionNumber?: number) {
+        return this.analytics.getRepairList(inspectionId, tenantId, versionNumber);
     }
 
     /** IA-35 / IA-73 — tenant policy for agent access to the repair list. */

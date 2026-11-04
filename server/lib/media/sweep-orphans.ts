@@ -4,6 +4,7 @@ import { inspections, inspectionResults, inspectionMediaPool, orphanedMedia } fr
 import { inspectionMessages } from '../db/schema/message';
 import { r2Keys } from '../r2-keys';
 import { collectAttachedPhotos } from './collect-attached';
+import { loadFrozenFileKeys } from '../report-snapshot';
 import { computeOrphans, ORPHAN_GRACE_MS } from './orphan-gc';
 import { logger } from '../logger';
 
@@ -120,6 +121,14 @@ export async function sweepOrphanedMedia(
       }
       if (insp.coverImageKey) live.add(insp.coverImageKey);
       if (insp.coverPhotoId) live.add(insp.coverPhotoId);
+      // Files a PUBLISHED version shows are live however the working copy has changed since: the client's page and
+      // PDF are rendered from the snapshot. If they cannot be listed, nothing of this inspection is reaped this run.
+      try {
+        for (const k of await loadFrozenFileKeys(db, insp.tenantId, insp.id)) live.add(k);
+      } catch (err) {
+        logger.error('[orphan-gc] frozen file keys unreadable; skipping this inspection', { tenantId: insp.tenantId, inspectionId: insp.id }, err instanceof Error ? err : undefined);
+        continue;
+      }
       const pool = await db
         .select({ r2Key: inspectionMediaPool.r2Key })
         .from(inspectionMediaPool)

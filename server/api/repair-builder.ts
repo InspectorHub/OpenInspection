@@ -26,7 +26,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { flattenReportDefects } from '../lib/repair-defects';
+import { flattenPublishedDefects } from '../lib/repair-defects';
 import { generatePdfFromUrl } from '../lib/pdf';
 import { boundSharePdf, boundShareEmail } from '../lib/repair-share-limits';
 import { cachedSharePdf, sharePdfContentKey } from '../lib/repair-share-pdf';
@@ -135,7 +135,7 @@ app.openapi(sourceRoute, async (c) => {
     // page can rehydrate initialSelected/initialDrafts/initialItemIds on reload
     // without re-adding items (which would inflate creditTotal).
     const [defects, mine, quickPhrases] = await Promise.all([
-        flattenReportDefects(c.var.services.inspection, id, tenantId),
+        flattenPublishedDefects(c.var.services.inspection, c.var.services.reportVersion, id, tenantId),
         c.var.services.repairRequest.listMineWithItems(tenantId, id, creator),
         loadQuickPhrases(c, tenantId),
     ]);

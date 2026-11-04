@@ -13,6 +13,7 @@ import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
 import { resolvePrimaryReportId } from '../lib/inspection/reports';
 import { r2Delete } from '../lib/r2/objects';
+import { loadFrozenFileKeys } from '../lib/report-snapshot';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 
 /**
@@ -146,7 +147,9 @@ await db.update(inspectionResults)
         eq(inspectionResults.id, row.id),
     ));
 
-if (deletedKey && c.env.PHOTOS) {
+// The picture leaves the working copy, but the stored file stays when a published version shows it: the
+// client's page and PDF are rendered from that version.
+if (deletedKey && c.env.PHOTOS && !(await loadFrozenFileKeys(db, tenantId, id)).has(deletedKey)) {
     await r2Delete(c.env.PHOTOS, deletedKey).catch(() => {});
 }
 

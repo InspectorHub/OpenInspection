@@ -32,7 +32,7 @@ async function isUnchanged(c: Context<HonoConfig>, id: string, reportIdInBody: s
         .limit(1)
         .get();
     if (!latest || latest.summary !== (summary ?? null)) return false;
-    return latest.snapshotJson === await versions.buildSnapshotJson(tenantId, id);
+    return latest.snapshotJson === await versions.buildSnapshotForCheck(tenantId, id, reportId);
 }
 
 export async function answerUnchangedPublish(c: Context<HonoConfig>, next: Next) {

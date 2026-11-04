@@ -151,6 +151,29 @@ describe('listRecommendationsForAgent — buyer_agent via inspection_people (Tas
         expect(groups.safety[0].defectTitle).toBe('Missing shingles');
     });
 
+    it("lists the PUBLISHED version's findings, not what the inspector has edited since", async () => {
+        await db.insert(schema.inspections).values({
+            id: 'i-9', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '9 Frozen Way',
+            date: '2026-06-01', status: 'completed', reportStatus: REPORT_STATUS.PUBLISHED, paymentStatus: 'paid',
+            price: 0, createdAt: new Date(),
+            templateSnapshot,
+        });
+        // The version froze a safety defect; the working copy has since had it switched off.
+        await db.insert(schema.inspectionResults).values({
+            id: 'res-9', tenantId: T1, inspectionId: 'i-9', lastSyncedAt: new Date(),
+            data: { '_default:sec1:item1': { tabs: { defects: [{ cannedId: 'd1', included: false }] } } },
+        });
+        await db.insert(schema.reportVersions).values({
+            id: 'rv-9', tenantId: T1, inspectionId: 'i-9', versionNumber: 1, publishedAt: new Date(), publishedBy: 'u1',
+            snapshotJson: JSON.stringify({ data: resultsData, units: [], inspection: { templateSnapshot } }),
+        });
+        const people = new PeopleService({ DB: {} as D1Database });
+        await people.addPerson(T1, 'i-9', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
+
+        const groups = await listRecommendationsForAgent({} as D1Database, AGENT_USER);
+        expect(groups.safety.map((r) => r.defectTitle)).toEqual(['Missing shingles']);
+    });
+
     it('no buyer_agent inspection_people row — excludes the published inspection', async () => {
         await db.insert(schema.inspections).values({
             id: 'i-2', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '2 Oak',

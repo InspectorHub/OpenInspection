@@ -20,6 +20,8 @@ import { getDeploymentProfile } from '../../lib/deployment-profile';
 import { PortalAccessService } from '../../services/portal-access.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
 import { InspectionService } from '../../services/inspection.service';
+import { resolveClientPdfTarget } from '../../lib/client-pdf-target';
+import { drizzle } from 'drizzle-orm/d1';
 import type { ReportDeliveryDeps } from '../../services/automation/report-email';
 import { logger } from '../../lib/logger';
 import { TICK, db, exists, type CronJob } from '../types';
@@ -146,12 +148,14 @@ export const automationFlushJob: CronJob = {
                 ...(env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: env.JWT_SECRET_PREVIOUS } : {}),
             }),
             reportPdf: new ReportPdfService(env.DB, env.BROWSER, env.PHOTOS),
-            getContentHash: (inspectionId: string, tenantId: string) =>
-                new InspectionService(
+            // The client's PDF is the published version: its own hash and its own number, so the email
+            // attaches the document the client's link shows rather than the inspector's working copy.
+            resolvePdfTarget: (inspectionId: string, tenantId: string) =>
+                resolveClientPdfTarget(drizzle(env.DB), tenantId, inspectionId, (version) => new InspectionService(
                     env.DB, env.PHOTOS,
                     /* sdb */ undefined, env.TENANT_CACHE, /* IMAGES */ undefined, /* quota */ undefined,
                     signingKeySecrets(env),
-                ).getReportContentHash(inspectionId, tenantId),
+                ).getReportContentHash(inspectionId, tenantId, undefined, null, version)),
             renderHost: appHostForRender,
             renderSecret: env.JWT_SECRET,
         } : undefined;

@@ -50,6 +50,8 @@ interface OnPublishTranslationInput {
     requestedLocale: string | null;
     /** `tenant_configs` — whether this workspace may produce translations at all. */
     productionEnabled: boolean;
+    /** The version this publish froze, so the translation is made from it. Absent when no snapshot was taken. */
+    versionNumber?: number | null;
 }
 
 export type OnPublishTranslationOutcome =
@@ -74,6 +76,7 @@ async function translateOnPublish(
             tenantId: input.tenantId,
             inspectionId: input.inspectionId,
             ...(input.reportId ? { reportId: input.reportId } : {}),
+            ...(typeof input.versionNumber === 'number' ? { versionNumber: input.versionNumber } : {}),
             locale: input.requestedLocale,
         });
         return {
@@ -114,6 +117,8 @@ export async function translateOnPublishForRequest(
     inspectionId: string,
     requestedLocale: string | null,
     reportId?: string,
+    /** The version this publish froze (null when the snapshot could not be taken). */
+    versionNumber?: number | null,
 ): Promise<OnPublishTranslationOutcome> {
     const tenantId = c.get('tenantId') ?? '';
     if (!requestedLocale) return { status: 'not_requested' };
@@ -129,6 +134,7 @@ export async function translateOnPublishForRequest(
             inspectionId,
             ...(reportId ? { reportId } : {}),
             requestedLocale,
+            versionNumber: versionNumber ?? null,
             productionEnabled: await isCourtesyTranslationEnabled(c.env.DB, tenantId),
         },
     );

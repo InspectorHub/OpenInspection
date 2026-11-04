@@ -16,6 +16,7 @@ import { hubLifecycleFor } from '../../lib/inspection/hub-lifecycle';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl } from '../../lib/public-urls';
+import { resolveClientPdfTarget } from '../../lib/client-pdf-target';
 import { buildPortalUrl } from '../../lib/portal-urls';
 import { Errors, AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
@@ -331,8 +332,18 @@ reportDeliveryRoutes.openapi(sendReportPdfRoute, async (c) => {
     const { inspection } = await service.getInspection(id, tenantId);
 
     const tenantSlug = await resolveTenantSlug(c, tenantId);
+    // What the recipients are sent is the PUBLISHED version, the document their link shows, however the
+    // inspector's working copy has moved since. A report with no frozen version renders live.
+    // A target that cannot be resolved is not a reason to refuse the send: recipients get the text-only email,
+    // as for any other render failure.
+    const target = await resolveClientPdfTarget(db, tenantId, id,
+        (version) => c.var.services.inspection.getReportContentHash(id, tenantId, undefined, null, version))
+        .catch((err: unknown) => {
+            logger.error('[send-report-pdf] could not resolve the published version', { inspectionId: id }, err instanceof Error ? err : undefined);
+            return null;
+        });
     // renderUrl: token-bearing URL for the headless browser PDF render.
-    const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
+    const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET, target?.versionNumber ?? undefined);
     const address = inspection.propertyAddress as string;
 
     // What `{{company_name}}` renders as, and the locale + timezone `{{scheduled_date}}` renders in.
@@ -359,10 +370,10 @@ reportDeliveryRoutes.openapi(sendReportPdfRoute, async (c) => {
     try {
         // Route through the PDF cache — reuses an existing render when content
         // is unchanged, avoiding a redundant Browser Rendering call.
-        // Always tracks current content (versionNumber: null); frozen PDFs
-        // are only accessible from the verify page.
-        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
-        const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber: null });
+        // Keyed by the published version's own hash, so it is the same stored render the client's download and the
+        // verify page use.
+        if (!target) throw new Error('published version unresolved');
+        const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash: target.contentHash, versionNumber: target.versionNumber });
         const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) throw new Error('PDF unavailable');
         pdf = await obj.arrayBuffer();
@@ -588,8 +599,11 @@ reportDeliveryRoutes.openapi(refreshPdfRoute, async (c) => {
         throw Errors.Forbidden('PDF pipeline is disabled for this workspace. Enable it in Settings → Reports.');
     }
     const tenantSlug = await resolveTenantSlug(c, tenantId);
+    // Re-rendered from the published version it refreshes, never from the working copy.
+    const target = await resolveClientPdfTarget(getDrizzle(c), tenantId, id,
+        (version) => c.var.services.inspection.getReportContentHash(id, tenantId, undefined, null, version));
     // renderUrl: token-bearing URL for the headless browser PDF render.
-    const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
+    const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET, target.versionNumber ?? undefined);
     const sourceVersion = Date.now();
 
     // Refresh re-renders the CURRENT (highest) version in place rather than
@@ -602,7 +616,7 @@ reportDeliveryRoutes.openapi(refreshPdfRoute, async (c) => {
     const fullVersion    = currentFull?.versionNumber ?? null;
     // Store content_hash so post-refresh downloads reuse this render (force
     // re-render is still guaranteed — renderAndStore always calls the browser).
-    const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+    const contentHash = target.contentHash;
     const footer = await c.var.services.inspection.getReportPdfFooterContext(id, tenantId);
 
     await Promise.all([

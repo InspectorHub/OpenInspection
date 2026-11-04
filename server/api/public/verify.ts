@@ -263,7 +263,7 @@ app.openapi(reportVerifyPdfRoute, async (c) => {
 
     // Use contentHash from the snapshot row if available; fall back to live hash
     // so even legacy rows (no contentHash) get a rendered PDF.
-    const hash = contentHash ?? await c.var.services.inspection.getReportContentHash(inspectionId, tenantId);
+    const hash = contentHash ?? await c.var.services.inspection.getReportContentHash(inspectionId, tenantId, undefined, null, versionNumber);
     const footer = await c.var.services.inspection.getReportPdfFooterContext(inspectionId, tenantId);
 
     const record = await c.var.services.reportPdf.getOrRender(inspectionId, tenantId, 'full', {
