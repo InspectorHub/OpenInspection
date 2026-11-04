@@ -648,6 +648,13 @@ export function seedFixtures(appDir: string): void {
         'seed-delivered-inspection', 'seed-republished-inspection']) {
         d1(rosterRow(id, LEAD_INSPECTOR_ID), cwd);
     }
+    // The republished inspection is the one specs publish, reopen and publish again. Created through the
+    // API an order always has its primary report row, and version numbers run per report, so this one gets
+    // its row up front instead of having one made halfway through a flow (which would restart the numbering).
+    d1(`INSERT OR REPLACE INTO reports
+         (id, tenant_id, inspection_id, kind, title, status, created_at, published_at, sort_order)
+         VALUES ('seed-republished-report', '${TENANT_A_ID}', '${SEED_INSPECTIONS.republished}', 'primary',
+                 'Home Inspection', 'published', ${nowMs}, ${nowMs}, 0)`, cwd);
     // The half-done inspection is the one owned by a DIFFERENT inspector — its
     // specs assert that publish pre-flight fails for its owner, so the roster
     // has to name that owner rather than the lead.
