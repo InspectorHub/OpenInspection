@@ -116,6 +116,10 @@ export function makeServices(overrides: {
         agent: {
             accessToInspection: overrides.accessToInspection ?? vi.fn().mockResolvedValue(null),
         },
+        // The source route lists the PUBLISHED version's defects; no published version means the report as it is.
+        reportVersion: {
+            getLatestPublished: vi.fn().mockResolvedValue(null),
+        },
         repairRequest: {
             listMine:          overrides.listMine ?? defaultListMine,
             // B1: source route now calls listMineWithItems; default to same value as listMine

@@ -72,7 +72,7 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
         expect(body.data.mine).toHaveLength(1);
 
         // Confirm getRepairList was called with the authoritative tenantId from the token
-        expect(getRepairList).toHaveBeenCalledWith('insp1', 't1');
+        expect(getRepairList).toHaveBeenCalledWith('insp1', 't1', undefined);
         // Confirm listMine was called with a client creator
         expect(listMine).toHaveBeenCalledWith(
             't1',
