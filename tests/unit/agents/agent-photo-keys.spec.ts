@@ -86,6 +86,7 @@ function build(userId: string) {
         c.set('userRole', 'agent');
         c.set('user', { sub: userId } as never);
         c.set('services', {
+            inspection: { resolveReleaseGate: async () => null },
             agent: {
                 accessToInspection: (agent: string, inspection: string) => accessToInspection({} as D1Database, agent, inspection),
                 listRecommendationsForAgent: (agent: string) => listRecommendationsForAgent({} as D1Database, agent),

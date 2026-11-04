@@ -252,15 +252,20 @@ export async function accessToInspection(
     rawDb: D1Database,
     agentUserId: string,
     inspectionId: string,
-): Promise<{ tenantId: string } | null> {
+): Promise<{ tenantId: string; repairAccess: AgentRepairAccess } | null> {
     const db = drizzle(rawDb);
     const rows = await db
         .select({
             tenantId:      inspections.tenantId,
             referredById:  inspectionPeople.contactId,
             contactEmail:  contacts.email,
+            inspectionPrefs: tenantConfigs.inspectionPrefs,
+            roleKind:      contactRoleProfiles.kind,
+            roleOverrides: contactRoleProfiles.capabilityOverrides,
         })
         .from(inspections)
+        // A company with no config row falls back to the policy default in resolveAgentRepairAccess.
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, inspections.tenantId))
         // Buyer's-agent attribution via inspection_people — see listReferrals
         // above for why contact_role_profiles is joined before
         // inspection_people (avoids fanning out over every role).
@@ -302,8 +307,16 @@ export async function accessToInspection(
     if (rows.length === 0) return null;
 
     // IA-104 — the join already restricted rows to inspections where THIS
-    // agent is the buyer_agent, so the first row is the answer.
-    return { tenantId: rows[0]!.tenantId };
+    // agent is the buyer_agent, so the first row is the answer. The repair-list access is the same stricter-of-two answer the
+    // agent portal list states, so a route behind this check applies the policy the portal showed.
+    const r = rows[0]!;
+    return {
+        tenantId: r.tenantId,
+        repairAccess: effectiveRepairAccess(
+            resolveAgentRepairAccess(r.inspectionPrefs),
+            capabilitiesForProfile((r.roleKind ?? 'other') as RoleKind, r.roleOverrides).canAccessRepairList,
+        ),
+    };
 }
 
 /**

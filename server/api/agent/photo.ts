@@ -4,16 +4,25 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { servePhotoObject, imagesBinding } from '../../lib/media/serve-photo';
 import { resolveReportPhotoKey } from '../../lib/report-link-keys';
+import { agentMayReadRepairList } from '../../lib/people/agent-repair-access';
+import { releaseGateFor } from '../../lib/report-link-access';
+import { getDrizzle } from '../../lib/route-helpers';
+import { isReportPublished } from '../../lib/status/report-status';
+import { inspections } from '../../lib/db/schema';
+import { and, eq } from 'drizzle-orm';
 
 /**
  * GET /api/agent/inspections/:id/photo
  *
  * Defect photos for the agent repair-items page. The staff photo route is
  * owner/manager/inspector-only and the public one wants a portal token, so an
- * agent session satisfies neither. Access here is exactly the agent's referral
- * association (the same predicate the repair-items feed uses) and never wider:
- * the key must live under the associated tenant + the inspection in the path, whether it is
- * given relative to the company or in full.
+ * agent session satisfies neither. Access here is the agent's referral
+ * association (the same predicate the repair-items feed uses) AND the gates the
+ * report itself applies to a recipient: the report is published, no agreement or
+ * payment hold is outstanding, and the company's repair-list policy for agents
+ * (the stricter of the company setting and the agent's role) has not turned the
+ * list off. The key must live under the associated tenant + the inspection in
+ * the path, whether it is given relative to the company or in full.
  */
 const agentPhotoRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -46,6 +55,13 @@ app.openapi(agentPhotoRoute, async (c) => {
     // Association first: an unassociated agent must not even probe the bucket.
     const access = await c.var.services.agent.accessToInspection(user.sub, id);
     if (!access) return c.notFound();
+    // The report's own gates, as a recipient meets them: a photo of a report that is withdrawn, held back, or whose repair list the
+    // company has switched off for agents is not served.
+    if (!agentMayReadRepairList(access.repairAccess)) return c.notFound();
+    const row = await getDrizzle(c).select({ reportStatus: inspections.reportStatus }).from(inspections)
+        .where(and(eq(inspections.id, id), eq(inspections.tenantId, access.tenantId))).get();
+    if (!isReportPublished(row?.reportStatus)) return c.notFound();
+    if (await releaseGateFor(c.var.services, id, access.tenantId, false)) return c.notFound();
     // Key scope, resolved against the associated company: one agent cannot name another company's object or another
     // inspection's. Only this inspection's photos are served here, not the company's credential badges.
     const fullKey = resolveReportPhotoKey(key, access.tenantId, id);

@@ -1,6 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, asc, eq, gt } from 'drizzle-orm';
 import { inspections, inspectionResults, inspectionMediaPool, orphanedMedia } from '../db/schema/inspection';
+import { inspectionMessages } from '../db/schema/message';
+import { r2Keys } from '../r2-keys';
 import { collectAttachedPhotos } from './collect-attached';
 import { computeOrphans, ORPHAN_GRACE_MS } from './orphan-gc';
 import { logger } from '../logger';
@@ -68,16 +70,40 @@ export async function sweepOrphanedMedia(
     // contains — so the report blob need not be read or parsed at all. That
     // parse was the most expensive single operation in the scheduled path, and
     // this skips it for every inspection nobody has attached a photo to.
-    const r2Keys: string[] = [];
+    // Report PDFs live under this prefix too (`{tenant}/{inspection}/reports/`), written by the PDF service and tracked by its own
+    // table, retention rules and refresh path. They are referenced by `report_pdfs`, not by anything this sweep reads, so listing
+    // them here would call every stored PDF an orphan and delete it once the grace window passed, leaving a row that says "ready"
+    // for a file that is gone.
+    const objectKeys: string[] = [];
     let cursor: string | undefined = undefined;
     do {
       const list: R2Objects = await r2.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
-      for (const o of list.objects) r2Keys.push(o.key);
+      for (const o of list.objects) if (!o.key.startsWith(`${prefix}reports/`)) objectKeys.push(o.key);
       cursor = list.truncated ? list.cursor : undefined;
     } while (cursor);
 
+    // Files uploaded for this inspection's messages. They are live only while a message carries the descriptor; one uploaded and
+    // never sent is referenced by nothing, and goes the same way an unplaced photo does: recorded, then deleted after the grace.
+    const attachmentKeys: string[] = [];
+    const attachmentPrefix = r2Keys.messageAttachmentPrefix(insp.tenantId, insp.id);
+    cursor = undefined;
+    do {
+      const list: R2Objects = await r2.list({ prefix: attachmentPrefix, limit: 1000, ...(cursor ? { cursor } : {}) });
+      for (const o of list.objects) attachmentKeys.push(o.key);
+      cursor = list.truncated ? list.cursor : undefined;
+    } while (cursor);
+    const allKeys = [...objectKeys, ...attachmentKeys];
+
     const live = new Set<string>();
-    if (r2Keys.length > 0) {
+    if (attachmentKeys.length > 0) {
+      const sent = await db
+        .select({ attachments: inspectionMessages.attachments })
+        .from(inspectionMessages)
+        .where(and(eq(inspectionMessages.inspectionId, insp.id), eq(inspectionMessages.tenantId, insp.tenantId)))
+        .all();
+      for (const m of sent) for (const a of m.attachments ?? []) live.add(a.key);
+    }
+    if (objectKeys.length > 0) {
       const resultRow = await db
         .select()
         .from(inspectionResults)
@@ -111,7 +137,7 @@ export async function sweepOrphanedMedia(
       seenRows.map((r) => [r.r2Key, r.firstSeenAt instanceof Date ? r.firstSeenAt.getTime() : Number(r.firstSeenAt)]),
     );
 
-    const plan = computeOrphans(live, r2Keys, seen, now, ORPHAN_GRACE_MS);
+    const plan = computeOrphans(live, allKeys, seen, now, ORPHAN_GRACE_MS);
     for (const key of plan.toRecord) {
       await db.insert(orphanedMedia).values({
         id: crypto.randomUUID(),

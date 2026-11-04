@@ -94,6 +94,11 @@ export interface ReadTranslationInput {
      * The English half the reader is looking at.
      */
     data: ReportData;
+    /**
+     * The published version `data` was built from, when the reader is shown a pinned version. The freshness hash is taken on that
+     * same read, so it describes the document on screen rather than whatever the live tables say now.
+     */
+    versionNumber?: number | undefined;
 }
 
 /**
@@ -113,10 +118,14 @@ export async function readCourtesyTranslationForReport(
     );
     if (!reportId) return null;
 
-    // The CURRENT English, on the same basis the row recorded: no translation
-    // identity in it, or the comparison would be circular.
+    // Most reports have no stored translation, and building the whole report a second time only to learn that is the cost this
+    // order avoids: the hash below is computed only for a report that has one.
+    if (!(await deps.translations.read(input.tenantId, reportId, input.locale))) return null;
+
+    // The English the reader is looking at, on the same basis the row recorded: no translation identity in it, or the comparison
+    // would be circular. A pinned read hashes the pinned version, not the live tables.
     const currentEnglishHash = await deps.inspection.getReportContentHash(
-        input.inspectionId, input.tenantId, reportId,
+        input.inspectionId, input.tenantId, reportId, null, input.versionNumber,
     );
 
     const stored = await deps.translations.readFresh(

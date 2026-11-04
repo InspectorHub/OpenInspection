@@ -28,6 +28,7 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { mounted, type ApiOf } from '../lib/api-schema';
 import { z } from '@hono/zod-openapi';
+import { getDrizzle } from '../lib/route-helpers';
 import { requireRole } from '../lib/middleware/rbac';
 import { AppError, Errors } from '../lib/errors';
 import { serveAttachment, storeAttachment, verifyAttachments, MAX_BYTES as ATTACHMENT_MAX_BYTES } from '../lib/message-attachment';
@@ -198,11 +199,9 @@ inspectorMessageRoutes.openapi(sendRoute, async (c) => {
     const authorId = (jwtUser as { sub?: string } | undefined)?.sub ?? null;
     let authorName: string | null = (jwtUser as { name?: string } | undefined)?.name ?? null;
     if (!authorName && authorId) {
-        const { drizzle } = await import('drizzle-orm/d1');
         const { users } = await import('../lib/db/schema');
         const { and, eq } = await import('drizzle-orm');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const u = await drizzle(c.env.DB as any).select({ name: users.name }).from(users)
+        const u = await getDrizzle(c).select({ name: users.name }).from(users)
             .where(and(eq(users.id, authorId), eq(users.tenantId, tenantId))).get();
         authorName = u?.name ?? null;
     }

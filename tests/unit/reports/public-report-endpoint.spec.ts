@@ -321,6 +321,32 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         }
     });
 
+    it('without a proven recipient the gate states no property address, inspection date or inspector contact; with one it does', async () => {
+        await seed({ agreementRequired: false, paymentRequired: true, paymentStatus: 'unpaid' });
+        await db.insert(schema.users).values({
+            id: '00000000-0000-0000-0000-0000000000a9', tenantId: TENANT_ID, email: 'pat@acme.test', role: 'inspector', name: 'Pat Inspector',
+            phone: '+15550100', createdAt: new Date(), passwordHash: 'h',
+        } as any);
+        await db.update(schema.inspections).set({ inspectorId: '00000000-0000-0000-0000-0000000000a9' } as any).where(eq(schema.inspections.id, INSP_ID));
+        await db.insert(schema.invoices).values({
+            id: '00000000-0000-0000-0000-0000000000f2', tenantId: TENANT_ID, inspectionId: INSP_ID,
+            amountCents: 45000, currency: 'USD', lineItems: [], createdAt: new Date(),
+        } as any);
+        const { inspection, agreement } = makeService();
+        // Control: with proof the page is whole, so the nulls below are the withholding and not an unseeded fixture.
+        const proven = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'jane@test.com');
+        expect(proven).toMatchObject({ propertyAddress: '1 Main St', scheduledDate: '2026-06-01', inspectorName: 'Pat Inspector', inspectorEmail: 'pat@acme.test', inspectorPhone: '+15550100' });
+        for (const email of [undefined, null, '']) {
+            const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, email);
+            expect(gate, String(email)).toMatchObject({
+                reason: 'payment', propertyAddress: null, scheduledDate: null,
+                inspectorName: null, inspectorEmail: null, inspectorPhone: null, inspectorLicense: null,
+                // What the earlier decisions keep: the amount, the company and the action to take.
+                amountCents: 45000, currency: 'USD', actionUrl: `/invoice/${INSP_ID}`,
+            });
+        }
+    });
+
     it('ONLY payment outstanding -> /invoice/:id URL', async () => {
         await seed({ agreementRequired: false, paymentRequired: true, paymentStatus: 'unpaid' });
         const { inspection, agreement } = makeService();

@@ -73,7 +73,23 @@ describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', (
         await people.addPerson(T1, 'i-1', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
 
         const result = await accessToInspection({} as D1Database, AGENT_USER, 'i-1');
-        expect(result).toEqual({ tenantId: T1 });
+        // Unset company policy reads as `read`; the answer travels with the grant so routes behind it apply the policy.
+        expect(result).toEqual({ tenantId: T1, repairAccess: 'read' });
+    });
+
+    it('states the repair-list access as the stricter of the company policy and the seat, so `off` is carried to the route', async () => {
+        await db.insert(schema.inspections).values({
+            id: 'i-4', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '4 Fir',
+            date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
+            price: 0, createdAt: new Date(),
+        });
+        const people = new PeopleService({ DB: {} as D1Database });
+        await people.addPerson(T1, 'i-4', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
+        await db.insert(schema.tenantConfigs).values({ tenantId: T1, inspectionPrefs: { agentRepairAccess: 'readwrite' }, updatedAt: new Date() } as never);
+        // Control: a company that allows writing yields a non-`off` answer, so the `off` below is the policy and not a broken join.
+        expect((await accessToInspection({} as D1Database, AGENT_USER, 'i-4'))?.repairAccess).not.toBe('off');
+        await db.update(schema.tenantConfigs).set({ inspectionPrefs: { agentRepairAccess: 'off' } } as never).where(eq(schema.tenantConfigs.tenantId, T1));
+        expect((await accessToInspection({} as D1Database, AGENT_USER, 'i-4'))?.repairAccess).toBe('off');
     });
 
     it('no buyer_agent inspection_people row — denies access even with an active link', async () => {
