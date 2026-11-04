@@ -6,7 +6,7 @@
  * from `inspections` entirely — inspection_people is now the SOLE
  * persistence of WHO.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionCoreService } from '../../../server/services/inspection/inspection-core.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
@@ -16,8 +16,8 @@ import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T1 = 't1';
 const BUYER_AGENT = 'contact-buyer-agent';
@@ -38,8 +38,7 @@ describe('InspectionCoreService.createInspection — writes inspection_people (T
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values([
             { id: T1, slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
@@ -50,13 +49,13 @@ describe('InspectionCoreService.createInspection — writes inspection_people (T
             { id: LISTING_AGENT, tenantId: T1, type: 'agent', name: 'Listing Agent', email: 'la@x.com', createdAt: new Date() },
         ]);
 
-        people = new PeopleService({ DB: {} as D1Database });
+        people = new PeopleService({ DB: testD1.binding });
     });
 
     function makeSvc() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sdb = new ScopedDB(db as any, T1);
-        return new InspectionCoreService({} as D1Database, undefined, sdb);
+        return new InspectionCoreService(testD1.binding, undefined, sdb);
     }
 
     it('writes client + buyer_agent + listing_agent rows to inspection_people', async () => {

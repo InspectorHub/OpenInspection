@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { tenantConfigs, tenants } from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { resolveAutomationCompanyName } from '../../../server/services/automation/company-name';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -16,8 +17,7 @@ describe('resolveAutomationCompanyName', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         // `tenant_configs.tenant_id` carries a real FK to `tenants`, so a config
         // row with no tenant fails the INSERT rather than the assertion.
         await testDb.insert(tenants).values({

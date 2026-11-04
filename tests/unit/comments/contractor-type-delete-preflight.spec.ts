@@ -7,14 +7,15 @@
  * cost visible, and pins the delete as still succeeding so a later reader does
  * not "fix" the disclosure into a 409.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { contractorTypes, comments, tenants } from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { ContractorTypeService } from '../../../server/services/contractor-type.service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER  = '00000000-0000-0000-0000-000000000002';
@@ -27,9 +28,8 @@ describe('ContractorTypeService.countReferences', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new ContractorTypeService({} as D1Database);
+        testD1.use(testDb);
+        svc = new ContractorTypeService(testD1.binding);
         for (const [id, name] of [[TENANT, 'Acme'], [OTHER, 'Globex']] as const) {
             await testDb.insert(tenants).values({
                 id, slug: name.toLowerCase(), status: 'active',

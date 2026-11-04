@@ -10,7 +10,7 @@
  * the route: a service-level round trip was already faithful and would have gone
  * on being green while every real upload was destroyed one layer above it.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { createTestDb, setupSchema } from '../db';
 import { withBatch } from '../helpers/d1-binding';
@@ -20,8 +20,8 @@ import type { Database as SqliteDatabase } from 'better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import migrationIntakeRoutes from '../../../server/api/migration-intake';
 import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
 import { intakeBucket } from '../helpers/migration-intake-routes-harness';
@@ -60,7 +60,7 @@ function appFor(store: Map<string, Uint8Array>) {
     return (form: FormData) => app.request(
         '/api/imports',
         { method: 'POST', body: form },
-        { DB: {}, PHOTOS: intakeBucket(store) },
+        { DB: testD1.binding, PHOTOS: intakeBucket(store) },
     );
 }
 
@@ -74,8 +74,7 @@ describe('POST /api/imports — the uploaded file reaches storage intact', () =>
         db = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(withBatch(db, sqlite));
+        testD1.use(withBatch(db, sqlite));
         store = new Map();
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

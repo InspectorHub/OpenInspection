@@ -20,8 +20,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const USER = '00000000-0000-0000-0000-000000000010';
@@ -30,7 +30,7 @@ const SUBJECT = 'jane@example.com';
 /** Minimal stand-in for the Hono context `auditFromContext` reads. */
 function fakeContext(metadata: Record<string, unknown>) {
     return {
-        env: { DB: {} as D1Database },
+        env: { DB: testD1.binding },
         get: (key: string) => (key === 'tenantId' ? TENANT : { sub: USER }),
         req: { header: () => '203.0.113.9' },
         get executionCtx(): never { throw new Error('no execution context'); },
@@ -51,8 +51,7 @@ describe('audit metadata never becomes a PII store', () => {
             id: TENANT, slug: 'a', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -67,7 +66,7 @@ describe('audit metadata never becomes a PII store', () => {
     }
 
     it('redacts contact details written through writeAuditLogWithSlug', async () => {
-        await writeAuditLogWithSlug({} as D1Database, {
+        await writeAuditLogWithSlug(testD1.binding, {
             tenantId: TENANT, actorUserId: USER,
             action: 'inspection.send_pdf', entityType: 'inspection', entityId: 'i1',
             metadata: { note: `called Jane Doe at ${SUBJECT} / 555-0142` },
@@ -94,7 +93,7 @@ describe('audit metadata never becomes a PII store', () => {
     it('catches an identifier under a key nobody named', async () => {
         // The point of filtering on the VALUE: a field added tomorrow is caught
         // because of what it holds, not because someone listed its name.
-        await writeAuditLogWithSlug({} as D1Database, {
+        await writeAuditLogWithSlug(testD1.binding, {
             tenantId: TENANT, action: 'inspection.share_agent', entityType: 'inspection',
             metadata: { someFutureField: SUBJECT },
         });
@@ -102,7 +101,7 @@ describe('audit metadata never becomes a PII store', () => {
     });
 
     it('drops a property address, which has no detectable value shape', async () => {
-        await writeAuditLogWithSlug({} as D1Database, {
+        await writeAuditLogWithSlug(testD1.binding, {
             tenantId: TENANT, action: 'inspection.create', entityType: 'inspection',
             metadata: { propertyAddress: '123 Oak St, Austin TX' },
         });
@@ -113,7 +112,7 @@ describe('audit metadata never becomes a PII store', () => {
         // Redaction must not cost the thing the row exists for. `name` here is a
         // template, not a person, and `previousTokenHash` is the only durable
         // answer to "the customer says their old link stopped opening".
-        await writeAuditLogWithSlug({} as D1Database, {
+        await writeAuditLogWithSlug(testD1.binding, {
             tenantId: TENANT, action: 'portal_access.rotated', entityType: 'inspection', entityId: 'i1',
             metadata: { name: 'Standard Home Inspection', previousTokenHash: 'a3f1'.repeat(16), sectionCount: 12 },
         });

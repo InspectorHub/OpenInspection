@@ -8,33 +8,34 @@
  * keys never reached EmailService/AIService construction. This pins the
  * canonical read end-to-end: real AES-GCM encrypt → store → load → decrypt.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { drizzle } from 'drizzle-orm/d1';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
+import { lazyD1 } from '../helpers/d1-binding';
 import { tenantConfigs, tenants } from '../../../server/lib/db/schema';
 import { encryptSecrets } from '../../../server/lib/config-crypto';
 import { loadTenantEmailConfig, type EmailServiceEnv } from '../../../server/lib/email/build-email-service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 const TENANT_ID = 't-1';
 const JWT_SECRET = 'x'.repeat(32);
 
+const testD1 = lazyD1();
 const env = {
-    DB: {} as never,
+    DB: testD1.binding,
     TENANT_CACHE: undefined as never, // no KV in unit env — loader falls through to D1
     JWT_SECRET,
 } as EmailServiceEnv;
 
 describe('loadTenantEmailConfig — canonical secrets store', () => {
+    let db: ReturnType<typeof createTestDb>['db'];
     beforeEach(async () => {
         const fix = createTestDb();
         await setupSchema(fix.sqlite);
-        vi.mocked(drizzle).mockReturnValue(fix.db as never);
+        db = fix.db;
+        testD1.use(fix.db);
     });
 
     it('reads Resend + Gemini keys from secrets_enc (ENV-name keys)', async () => {
-        const db = vi.mocked(drizzle)({} as never);
         await db.insert(tenants).values({
             id: TENANT_ID,
             slug: 't-1',

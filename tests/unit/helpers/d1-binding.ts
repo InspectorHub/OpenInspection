@@ -90,6 +90,17 @@ class StubStatement {
         private readonly params: SqlitePrimitive[] = [],
     ) {}
 
+    /**
+     * D1 accepts numbered placeholders (`?1`, `?2`, a number may repeat), which better-sqlite3 binds through an object keyed by the
+     * index, and refuses positional values for them. Anonymous `?` placeholders take positional values.
+     */
+    private args(): unknown[] {
+        if (!/\?\d/.test(this.sql)) return this.params;
+        const indexed: Record<number, SqlitePrimitive> = {};
+        this.params.forEach((v, i) => { indexed[i + 1] = v; });
+        return [indexed];
+    }
+
     bind(...values: unknown[]): StubStatement {
         return new StubStatement(this.sqlite, this.sql, values.map(toSqliteParam));
     }
@@ -104,9 +115,9 @@ class StubStatement {
     execSync(): D1ResultShape {
         const stmt = this.sqlite.prepare(this.sql);
         if (stmt.reader) {
-            return { success: true, results: stmt.all(...this.params) as unknown[], meta: meta() };
+            return { success: true, results: stmt.all(...this.args()) as unknown[], meta: meta() };
         }
-        const info = stmt.run(...this.params);
+        const info = stmt.run(...this.args());
         return { success: true, results: [], meta: meta(info.changes, Number(info.lastInsertRowid)) };
     }
 
@@ -121,10 +132,10 @@ class StubStatement {
     async first(column?: string): Promise<unknown> {
         const stmt = this.sqlite.prepare(this.sql);
         if (!stmt.reader) {
-            stmt.run(...this.params);
+            stmt.run(...this.args());
             return null;
         }
-        const row = stmt.get(...this.params) as Record<string, unknown> | undefined;
+        const row = stmt.get(...this.args()) as Record<string, unknown> | undefined;
         if (row === undefined) return null;
         return column === undefined ? row : (row[column] ?? null);
     }
@@ -135,10 +146,10 @@ class StubStatement {
     async raw(): Promise<unknown[][]> {
         const stmt = this.sqlite.prepare(this.sql);
         if (!stmt.reader) {
-            stmt.run(...this.params);
+            stmt.run(...this.args());
             return [];
         }
-        return stmt.raw().all(...this.params) as unknown[][];
+        return stmt.raw().all(...this.args()) as unknown[][];
     }
 }
 
@@ -202,4 +213,56 @@ export function toD1Binding(sqlite: SqliteDatabase): D1Database {
         },
     };
     return binding as unknown as D1Database;
+}
+
+/**
+ * A `D1Database` binding whose backing database is chosen later.
+ *
+ * Production code builds its own drizzle handle from the binding it is given
+ * (`drizzle(env.DB)`), so a spec has to hand it something that answers queries.
+ * A spec that builds its service or its `env` before the per-test database
+ * exists (a `describe`-level constant, a `beforeEach` that constructs first)
+ * passes `fixture.binding` there and calls `fixture.use(db)` once the in-memory
+ * database is created. `use` accepts the drizzle handle `createTestDb()` returns
+ * (it carries its better-sqlite3 client as `$client`) or the raw handle itself,
+ * and every later query on the binding runs against that database. Calling it
+ * again re-points the binding, which is what a spec that builds a new database
+ * per test needs. `useBinding` points it at a binding the spec wrapped itself.
+ */
+export function lazyD1(): { binding: D1Database; use: (db: unknown) => void; useBinding: (binding: D1Database) => void } {
+    let current: D1Database | undefined;
+    let client: SqliteDatabase | undefined;
+    const target = (): D1Database => {
+        if (!current) throw new Error('lazyD1: use(db) has not been called yet, so the binding has no database');
+        // A shared fixture outlives the spec that closed its database; reading it then is a bug in the reader.
+        if (client && !client.open) throw new Error('lazyD1: the database this binding was pointed at is closed; call use(db) with the current one');
+        return current;
+    };
+    const binding = {
+        prepare: (sql: string) => target().prepare(sql),
+        batch: (statements: never) => (target().batch as (s: never) => unknown)(statements),
+        exec: (sql: string) => target().exec(sql),
+    } as unknown as D1Database;
+    return {
+        binding,
+        use(db: unknown) {
+            client = (db as { $client?: SqliteDatabase }).$client ?? (db as SqliteDatabase);
+            current = toD1Binding(client);
+        },
+        /** Point the binding at a wrapper a spec built itself, for example one that fails a particular statement. */
+        useBinding(replacement: D1Database) {
+            client = undefined;
+            current = replacement;
+        },
+    };
+}
+
+/**
+ * The `D1Database` binding for a database a spec already holds: the drizzle
+ * handle `createTestDb()` returns (it carries its better-sqlite3 client as
+ * `$client`) or the raw handle. For a harness that is handed the database and
+ * builds services from it, so there is nothing to point later.
+ */
+export function d1For(db: unknown): D1Database {
+    return toD1Binding((db as { $client?: SqliteDatabase }).$client ?? (db as SqliteDatabase));
 }

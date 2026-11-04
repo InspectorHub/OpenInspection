@@ -10,8 +10,8 @@ import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { sweepOrphanedMedia } from '../../../server/lib/media/sweep-orphans';
 import { ORPHAN_GRACE_MS } from '../../../server/lib/media/orphan-gc';
 
@@ -36,14 +36,14 @@ function makeR2(objectsByPrefix: Record<string, string[]>) {
 describe('sweepOrphanedMedia — message attachments', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
     const sweep = (r2: ReturnType<typeof makeR2>, now: number) =>
-        sweepOrphanedMedia({} as D1Database, r2 as unknown as R2Bucket, now, { limit: 10, afterInspectionId: null });
+        sweepOrphanedMedia(testD1.binding, r2 as unknown as R2Bucket, now, { limit: 10, afterInspectionId: null });
     const recorded = async () => (await testDb.select().from(schema.orphanedMedia)).map((r) => r.r2Key).sort();
 
     beforeEach(async () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values([{ id: TENANT, slug: 'acme', createdAt: new Date(NOW) }]);
         await testDb.insert(schema.inspections).values(['i1', 'i2'].map((id) => ({
             id, tenantId: TENANT, propertyAddress: `${id} Main St`, date: '2026-08-20', createdAt: new Date(NOW),

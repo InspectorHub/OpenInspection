@@ -6,8 +6,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T = 'tenant-1';
 
@@ -38,12 +38,12 @@ describe('backfillAutomationTemplates', () => {
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
         fixture.sqlite.pragma('foreign_keys = OFF');   // FK is ON by default (baseline migration); these tests insert automations without a tenants row
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     it('creates seeded email + sms templates and sets the ids', async () => {
         await seedAuto(testDb);
-        const { created } = await backfillAutomationTemplates({} as D1Database, T);
+        const { created } = await backfillAutomationTemplates(testD1.binding, T);
         expect(created).toBe(2);
         const a = await testDb.select().from(schema.automations).where(eq(schema.automations.id, 'a1')).get();
         expect(a!.emailTemplateId).toBeTruthy();
@@ -61,9 +61,9 @@ describe('backfillAutomationTemplates', () => {
 
     it('is idempotent — a second run creates nothing and keeps the same ids', async () => {
         await seedAuto(testDb);
-        await backfillAutomationTemplates({} as D1Database, T);
+        await backfillAutomationTemplates(testD1.binding, T);
         const before = await testDb.select().from(schema.automations).where(eq(schema.automations.id, 'a1')).get();
-        const second = await backfillAutomationTemplates({} as D1Database, T);
+        const second = await backfillAutomationTemplates(testD1.binding, T);
         expect(second.created).toBe(0);
         const after = await testDb.select().from(schema.automations).where(eq(schema.automations.id, 'a1')).get();
         expect(after!.emailTemplateId).toBe(before!.emailTemplateId);
@@ -73,7 +73,7 @@ describe('backfillAutomationTemplates', () => {
 
     it('email-only automation gets only an email template', async () => {
         await seedAuto(testDb, { id: 'a2', name: 'Payment Received', channels: '["email"]' });
-        const { created } = await backfillAutomationTemplates({} as D1Database, T);
+        const { created } = await backfillAutomationTemplates(testD1.binding, T);
         expect(created).toBe(1);
         const a = await testDb.select().from(schema.automations).where(eq(schema.automations.id, 'a2')).get();
         expect(a!.smsTemplateId).toBeNull();

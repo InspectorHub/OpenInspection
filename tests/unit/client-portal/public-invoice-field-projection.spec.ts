@@ -12,8 +12,8 @@ import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -60,7 +60,7 @@ describe('IA-86 — public invoice response carries only declared fields', () =>
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {}, JWT_SECRET: SECRET };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding, JWT_SECRET: SECRET };
             c.set('resolvedTenantId', TENANT as never);
             c.set('services', {
                 portalAccess,
@@ -77,14 +77,13 @@ describe('IA-86 — public invoice response carries only declared fields', () =>
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT);
-        portalAccess = new PortalAccessService({} as D1Database, { jwtSecret: SECRET });
+        portalAccess = new PortalAccessService(testD1.binding, { jwtSecret: SECRET });
         token = await portalAccess.issueToken({ tenantId: TENANT, inspectionId: INSP, recipientEmail: 'dana@example.com' });
     });
 
@@ -136,7 +135,7 @@ describe('IA-86 — public invoice response carries only declared fields', () =>
     it('a null invoice still answers 200 with null data', async () => {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {}, JWT_SECRET: SECRET };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding, JWT_SECRET: SECRET };
             c.set('resolvedTenantId', TENANT as never);
             c.set('services', {
                 portalAccess,

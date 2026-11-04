@@ -11,11 +11,11 @@
  * withheld the standard report's translation. That is the safe direction of the
  * asymmetry, and it is still wrong.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { InspectionReportService } from '../../../server/services/inspection/inspection-report.service';
@@ -46,7 +46,7 @@ beforeEach(async () => {
     const created = createTestDb();
     await setupSchema(created.sqlite);
     db = created.db;
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'grain-tenant', status: 'active',
@@ -93,7 +93,7 @@ beforeEach(async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ] as any);
 
-    service = new InspectionReportService({} as unknown as D1Database);
+    service = new InspectionReportService(testD1.binding);
 });
 
 describe('the render path is report-grained', () => {

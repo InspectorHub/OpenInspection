@@ -9,8 +9,7 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { d1For } from '../helpers/d1-binding';
 import { SigningKeyService } from '../../../server/services/signing-key.service';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -21,22 +20,23 @@ describe('rotateKeypair as one batch', () => {
     let sqlite: ReturnType<typeof createTestDb>['sqlite'];
     let batches: unknown[][];
 
-    /** The test database plus a `batch` that runs its queries inside one transaction, as D1's batch does. */
-    function withBatch(): unknown {
-        return new Proxy(db, {
-            get(target, prop) {
-                if (prop === 'batch') {
-                    return (queries: Array<{ run: () => unknown }>) => {
-                        batches.push(queries);
-                        return sqlite.transaction(() => queries.map((q) => q.run()))();
-                    };
-                }
-                const value = Reflect.get(target, prop, target);
-                return typeof value === 'function' ? value.bind(target) : value;
+    /**
+     * The test database as a D1 binding whose `batch` is recorded. `atomic` runs the statements inside one transaction, as D1's batch
+     * does; without it they run in turn, which is how a driver with no transaction behind its batch would write them.
+     */
+    function batching(atomic: boolean): D1Database {
+        const real = d1For(db);
+        return {
+            prepare: (sql: string) => real.prepare(sql),
+            batch: async (queries: Array<{ execSync: () => unknown }>) => {
+                batches.push(queries);
+                const run = () => queries.map((q) => q.execSync());
+                return atomic ? sqlite.transaction(run)() : run();
             },
-        });
+        } as unknown as D1Database;
     }
-    const svc = () => new SigningKeyService({} as D1Database, SECRET, []);
+    let binding: D1Database;
+    const svc = () => new SigningKeyService(binding, SECRET, []);
     const activeRows = () => db.select().from(schema.signingKeys).where(and(eq(schema.signingKeys.tenantId, TENANT), isNull(schema.signingKeys.retiredAt))).all();
 
     beforeEach(async () => {
@@ -46,7 +46,7 @@ describe('rotateKeypair as one batch', () => {
         batches = [];
         await setupSchema(sqlite);
         await db.insert(schema.tenants).values({ id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(withBatch());
+        binding = batching(true);
     });
     afterEach(() => vi.restoreAllMocks());
 
@@ -72,8 +72,11 @@ describe('rotateKeypair as one batch', () => {
         expect(active[0]!.retiredAt).toBeNull();
     });
 
-    it('without a batch the same failure would leave no active key: the next signing request mints one, which is why the batch is used where it exists', async () => {
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    // The drizzle D1 handle always has batch(), so the service's no-batch fallback (typeof batch !== 'function') is
+    // not reachable through a D1 binding; this pins why the batch must be ATOMIC: a batch that ran its statements in
+    // turn would leave no active key after the same failure.
+    it('a batch that is not atomic would leave no active key after the same failure: the next signing request mints one, which is why the batch must be a transaction', async () => {
+        binding = batching(false);
         await svc().ensureKeypair(TENANT);
         sqlite.exec("CREATE TRIGGER refuse_new_key BEFORE INSERT ON signing_keys BEGIN SELECT RAISE(ABORT, 'insert refused'); END;");
         await expect(svc().rotateKeypair(TENANT)).rejects.toThrow(/insert refused/);

@@ -19,9 +19,9 @@ import { tenants, users } from '../../../server/lib/db/schema';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import billingRoutes from '../../../server/api/billing';
 import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
@@ -42,7 +42,7 @@ describe('GET /api/billing/summary', () => {
         testDb = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -81,7 +81,7 @@ describe('GET /api/billing/summary', () => {
     }
 
     async function fetchSummary(app: Hono<HonoConfig>) {
-        const res = await app.request('/summary', {}, { DB: {} } as never);
+        const res = await app.request('/summary', {}, { DB: testD1.binding } as never);
         return { res, body: (await res.json()) as SummaryBody };
     }
 

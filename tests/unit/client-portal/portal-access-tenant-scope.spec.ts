@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
@@ -9,8 +9,8 @@ import { eq } from 'drizzle-orm';
 import { sealToken } from '../../../server/lib/config-crypto';
 import { mintToken, hashToken } from '../../../server/lib/token-hash';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T1 = '00000000-0000-0000-0000-000000000001';
 const T2 = '00000000-0000-0000-0000-000000000002';
@@ -24,8 +24,7 @@ describe('PortalAccessService tenant scoping', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         for (const t of [T1, T2]) {
             await db.insert(schema.tenants).values({
                 id: t, slug: t, status: 'active',
@@ -37,7 +36,7 @@ describe('PortalAccessService tenant scoping', () => {
             // validation) is what the cross-tenant test exercises.
             await seedRoleProfiles(asD1Db(db), t);
         }
-        svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
+        svc = new PortalAccessService(testD1.binding, { jwtSecret: JWT });
     });
 
     it('issueToken: existing-token lookup scoped to tenant — T2 cannot reuse T1 row for same inspection', async () => {

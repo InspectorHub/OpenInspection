@@ -4,7 +4,7 @@
  * unassigned unless a lead is named, and a named lead or helper must be someone
  * who can inspect. Each refusal is paired with a control that goes through.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { InspectionService } from '../../../server/services/inspection.service';
@@ -13,8 +13,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { CreateInspectionFromWizardInput } from '../../../server/lib/validations/wizard.schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT = '00000000-0000-0000-0000-0000000000cc';
@@ -27,7 +27,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    vi.mocked(mockDrizzle).mockReturnValue(db as never);
+    testD1.use(db);
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'wiz', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
@@ -37,7 +37,7 @@ beforeEach(async () => {
             role: key === 'staff' ? key : 'inspector', createdAt: new Date(),
         })) as never,
     );
-    svc = new InspectionService({} as D1Database, undefined, new ScopedDB(db as never, TENANT));
+    svc = new InspectionService(testD1.binding, undefined, new ScopedDB(db as never, TENANT));
 });
 
 const wizard = (extra: Partial<CreateInspectionFromWizardInput> = {}): CreateInspectionFromWizardInput => ({

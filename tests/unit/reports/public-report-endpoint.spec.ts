@@ -3,14 +3,27 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import publicReportRoutes from '../../../server/api/public-report';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { eq, asc } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { AgreementService } from '../../../server/services/agreement.service';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+
+/** A database holding one tenant and one inspection whose report is published, which is all the publish gate reads. */
+function publishedReportDb(tenantId: string, inspectionId: string) {
+    const { db } = createTestDb();
+    db.insert(schema.tenants).values({
+        id: tenantId, slug: tenantId, status: 'active', deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
+    } as never).run();
+    db.insert(schema.inspections).values({
+        id: inspectionId, tenantId, propertyAddress: '1 Main St', date: '2026-06-01', status: 'requested',
+        paymentStatus: 'unpaid', price: 50000, reportStatus: 'published', createdAt: new Date(),
+    } as never).run();
+    return db;
+}
 
 /**
  * C-10 ③-A.1 — GET /api/public/report/:tenant/:id integration shape.
@@ -30,16 +43,17 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         // Option A — a recipient read resolves the latest PUBLISHED version and
         // renders its snapshot. `null` is the draft case: no version row yet.
         getLatestPublished = vi.fn().mockResolvedValue({ versionNumber: 7 }),
+        // The company that owns the published inspection the gate reads.
+        gateTenant = 't1',
     ) {
-        // The publish gate added to reportRoute runs drizzle(c.env.DB).select()...get()
+        // The publish gate added to reportRoute reads the inspection's report_status
         // on the resolved (client/legacy) path. These cases all use published
-        // reports, so the chainable fake resolves to report_status='published' and
-        // the gate lets them through (the 404 cases bail before the gate).
-        const publishedDb = { select: () => ({ from: () => ({ where: () => ({ get: async () => ({ reportStatus: 'published' }) }) }) }) };
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(publishedDb as any);
+        // reports, so the database holds one published inspection and the gate
+        // lets them through (the 404 cases bail before the gate).
+        testD1.use(publishedReportDb(gateTenant, 'insp1'));
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding };
             c.set('services', {
                 portalAccess: { resolveToken },
                 inspection: { getReportData, resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken },
@@ -66,7 +80,7 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
     it('200 via the legacy KV agent-view-token fallback (existing share links)', async () => {
         const getReportData = vi.fn().mockResolvedValue({ inspectionId: 'insp1' });
         const legacy = vi.fn().mockResolvedValue({ inspectionId: 'insp1', tenantId: 't9' });
-        const { app } = buildApp(vi.fn().mockResolvedValue(null), getReportData, legacy);
+        const { app } = buildApp(vi.fn().mockResolvedValue(null), getReportData, legacy, undefined, 't9');
         const res = await app.request('/api/public/report/t/insp1?token=kvtok');
         expect(res.status).toBe(200);
         // Third arg: the makePhotoUrl factory added by A-9 (photo serve routes).
@@ -216,7 +230,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
     }
 
     async function createEnvelope() {
-        const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const svc = new AgreementService(testD1.binding, { jwtSecret: JWT_SECRET });
         const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
             signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
             completionPolicy: 'all',
@@ -228,8 +242,8 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
     }
 
     function makeService() {
-        const inspection = new InspectionService({} as D1Database);
-        const agreement = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const inspection = new InspectionService(testD1.binding);
+        const agreement = new AgreementService(testD1.binding, { jwtSecret: JWT_SECRET });
         return { inspection, agreement };
     }
 
@@ -238,7 +252,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
     });
 
     afterEach(() => sqlite.close());
@@ -282,7 +296,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
     it('multi-signer agreement-only gate URL resolves to signer 1, never a sentinel', async () => {
         await seed({ agreementRequired: true, paymentRequired: false, paymentStatus: 'unpaid' });
         // Two-signer envelope: the gate must route to signer 1's real token.
-        const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const svc = new AgreementService(testD1.binding, { jwtSecret: JWT_SECRET });
         const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
             signers: [
                 { name: 'Jane', email: 'jane@test.com', role: 'client' },
@@ -406,18 +420,15 @@ describe('GET /api/public/report/:tenant/:id/photo — prefix guard (r2-key-conv
             inspectionId: INSP, tenantId: TENANT, role: 'client',
             recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null,
         });
-        // drizzle is mocked globally; the handler calls it twice:
+        // The handler reads the database twice:
         // (1) legacy agent-view-token path — irrelevant here (resolveToken already hits)
         // (2) photoGate: returns published so the report-status gate passes.
-        const publishedDb = {
-            select: () => ({ from: () => ({ where: () => ({ get: async () => ({ reportStatus: 'published' }) }) }) }),
-        };
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(publishedDb as any);
+        testD1.use(publishedReportDb(TENANT, INSP));
 
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             (c as unknown as { env: Record<string, unknown> }).env = {
-                DB: {},
+                DB: testD1.binding,
                 PHOTOS: {
                     get: async (k: string) => mockPhotos[k] ?? null,
                 },

@@ -4,7 +4,7 @@
  * absent from the read, and a write that sets or changes one is refused. A
  * write that leaves them alone (or resends them unchanged) is not.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -15,13 +15,13 @@ import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import adminBrandingRoutes from '../../../server/api/admin/branding';
 
 const T = '00000000-0000-0000-0000-000000000001';
-const ENV = { DB: {} } as HonoConfig['Bindings'];
+const ENV = { DB: testD1.binding } as HonoConfig['Bindings'];
 const POLICY = {
     noticeHours: 24,
     // Zero-fee rungs: a ladder that charges needs the agreement-clause attestation,
@@ -34,7 +34,7 @@ const DEPOSIT = { type: 'fixed', amountCents: 9000 };
 let db: BetterSQLite3Database<typeof schema>;
 
 function buildApp(role: UserRole, overrides: Record<string, boolean> | null = null) {
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => (err instanceof AppError
         ? c.json({ success: false, error: { code: err.code, message: err.message, details: err.details } }, err.status)
@@ -44,7 +44,7 @@ function buildApp(role: UserRole, overrides: Record<string, boolean> | null = nu
         c.set('userRole', role);
         c.set('user', { sub: 'actor', role, tenantId: T });
         c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as unknown as HonoConfig['Variables']['sdb']);
-        c.set('services', { branding: new BrandingService({} as D1Database) } as unknown as HonoConfig['Variables']['services']);
+        c.set('services', { branding: new BrandingService(testD1.binding) } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
     app.route('/api/admin', adminBrandingRoutes);
@@ -63,7 +63,7 @@ beforeEach(async () => {
     const fix = createTestDb();
     db = fix.db;
     await setupSchema(fix.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });

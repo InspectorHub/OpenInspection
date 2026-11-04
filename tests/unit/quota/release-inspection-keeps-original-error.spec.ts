@@ -6,11 +6,11 @@
  * called to clean up after.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createTestDb, setupSchema, toRawD1 } from '../db';
+import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const fakeD1 = lazyD1();
 
 import { InspectionService } from '../../../server/services/inspection.service';
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
@@ -30,9 +30,8 @@ describe('releasing an inspection allowance never masks the insert error', () =>
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        testD1 = toRawD1(fixture.sqlite);
+        fakeD1.use(testDb);
+        testD1 = fakeD1.binding;
         for (const id of [TENANT, OTHER]) {
             await testDb.insert(schema.tenants).values({
                 id, slug: id, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -42,7 +41,7 @@ describe('releasing an inspection allowance never masks the insert error', () =>
     afterEach(() => vi.restoreAllMocks());
 
     const serviceFor = (tenant: string) => new InspectionService(
-        {} as D1Database, undefined,
+        fakeD1.binding, undefined,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         new ScopedDB(testDb as any, tenant), undefined, undefined,
         new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null }),

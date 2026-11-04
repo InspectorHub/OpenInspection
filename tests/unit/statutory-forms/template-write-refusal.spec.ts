@@ -13,7 +13,7 @@
  *     `unrecognized_keys`, which tells an inspector that the software does not
  *     recognise one of its own fields.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -21,8 +21,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { TemplateSchemaV2Schema } from '../../../server/lib/validations/template.schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import templatesRoutes from '../../../server/api/inspections/templates';
 import resultsRoutes from '../../../server/api/inspections/results';
 import { TemplateService } from '../../../server/services/template.service';
@@ -41,7 +41,7 @@ let db: BetterSQLite3Database<typeof schema>;
 
 /** `auditFromContext` reads `c.env.DB`; drizzle itself is mocked to the test db,
  *  so the binding only has to exist. */
-const ENV = { DB: {} as D1Database } as unknown as HonoConfig['Bindings'];
+const ENV = { DB: testD1.binding } as unknown as HonoConfig['Bindings'];
 
 function buildApp() {
     const app = new OpenAPIHono<HonoConfig>();
@@ -49,7 +49,7 @@ function buildApp() {
         c.set('userRole', 'owner');
         c.set('tenantId', TENANT);
         c.set('services', {
-            template: new TemplateService({} as D1Database),
+            template: new TemplateService(testD1.binding),
             // Only the one method these routes reach. A fuller stub would hide
             // which call the positive control actually depends on.
             inspection: { updateTemplateSnapshot: async () => undefined },
@@ -74,7 +74,7 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    vi.mocked(mockDrizzle).mockReturnValue(db as never);
+    testD1.use(db);
     await db.insert(schema.tenants).values({ id: TENANT, slug: 'f1', createdAt: new Date() });
     await db.insert(schema.templates).values([
         {

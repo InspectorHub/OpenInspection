@@ -6,17 +6,15 @@
  * large tenant cannot blow the Worker's memory limit — photos beyond the budget
  * stay listed (with included=false) in photos-manifest.json.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { unzipSync, strFromU8 } from 'fflate';
+import { createTestDb } from '../db';
+import { d1For } from '../helpers/d1-binding';
 import { DataExportService } from '../../../server/services/data-export.service';
 
-// buildZip queries D1; stub drizzle to return empty result sets so the tests
-// focus on the photo-bytes behaviour. (vi.mock is hoisted above the import.)
-vi.mock('drizzle-orm/d1', () => {
-    const empty = { where: () => ({ all: async () => [] }) };
-    const d = { select: () => ({ from: () => empty }) };
-    return { drizzle: () => d };
-});
+// buildZip queries D1; the database is a real one with no rows, so every query
+// returns an empty result set and the tests focus on the photo-bytes behaviour.
+const emptyDb = () => d1For(createTestDb().sqlite);
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -41,7 +39,7 @@ describe('DataExportService.buildZip — photo bytes', () => {
             { key: `${TENANT}/inspections/i1/photos/a.jpg`, size: 3, bytes: [1, 2, 3] },
             { key: `${TENANT}/inspections/i1/documents/d.pdf`, size: 2, bytes: [9, 8] },
         ]);
-        const svc = new DataExportService({} as D1Database, r2);
+        const svc = new DataExportService(emptyDb(), r2);
         const { buffer, manifest } = await svc.buildZip(TENANT);
 
         const unzipped = unzipSync(buffer);
@@ -62,7 +60,7 @@ describe('DataExportService.buildZip — photo bytes', () => {
             { key: `${TENANT}/inspections/i1/photos/big.jpg`, size: 10, bytes: Array(10).fill(1) },
             { key: `${TENANT}/inspections/i1/photos/small.jpg`, size: 1, bytes: [7] },
         ]);
-        const svc = new DataExportService({} as D1Database, r2, { photoBytesBudget: 5 });
+        const svc = new DataExportService(emptyDb(), r2, { photoBytesBudget: 5 });
         const { buffer, manifest } = await svc.buildZip(TENANT);
 
         const unzipped = unzipSync(buffer);
@@ -86,7 +84,7 @@ describe('DataExportService.buildZip — photo bytes', () => {
             { key: `${TENANT}/inspections/i1/photos/mine.jpg`, size: 1, bytes: [1] },
             { key: `${OTHER}/inspections/i2/photos/theirs.jpg`, size: 1, bytes: [2] },
         ]);
-        const svc = new DataExportService({} as D1Database, r2);
+        const svc = new DataExportService(emptyDb(), r2);
         const { manifest } = await svc.buildZip(TENANT);
         // Only the tenant's own object should be counted
         expect(manifest.photos).toBe(1);
@@ -95,7 +93,7 @@ describe('DataExportService.buildZip — photo bytes', () => {
 
     it('still produces the CSV/JSON entries alongside photos', async () => {
         const r2 = makeR2([]);
-        const svc = new DataExportService({} as D1Database, r2);
+        const svc = new DataExportService(emptyDb(), r2);
         const { buffer } = await svc.buildZip(TENANT);
         const unzipped = unzipSync(buffer);
         expect(Object.keys(unzipped)).toEqual(

@@ -10,7 +10,7 @@
  * a default that happened to equal the stored value would pass a value check
  * and still be a silent overwrite waiting for the next stored value.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import contactRoutes from '../../../server/api/contacts';
@@ -21,8 +21,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const AGENT = '00000000-0000-0000-0000-0000000000a1';
@@ -58,7 +58,7 @@ describe('PUT /api/contacts/{id} keeps the stored type', () => {
             c.set('userRole', 'owner');
             c.set('user', { sub: 'u1' } as never);
             c.set('tenantId', TENANT);
-            c.set('services', { contact: new ContactService({} as D1Database) } as never);
+            c.set('services', { contact: new ContactService(testD1.binding) } as never);
             await next();
         });
         a.route('/api/contacts', contactRoutes);
@@ -83,7 +83,7 @@ describe('PUT /api/contacts/{id} keeps the stored type', () => {
             id: AGENT, tenantId: TENANT, type: 'agent', name: 'Ann Agent',
             email: 'ann@realty.test', phone: '555-0100', createdAt: new Date(),
         });
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
     });
 
     it.each([{ email: null }, { phone: null }])('an agent stays an agent when %j is sent', async (body) => {

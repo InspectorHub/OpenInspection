@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
@@ -21,8 +21,8 @@ describe('roleKeysWithCapability(selfRetrieveReport) — agent flip opens agent-
     await db.insert(schema.tenants).values([
       { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) },
     ]);
-    (mockDrizzle as any).mockReturnValue(db);
-    svc = new PeopleService({} as any);
+    testD1.use(db);
+    svc = new PeopleService({ DB: testD1.binding });
   });
 
   it('includes client, co_client, buyer_agent, and listing_agent', async () => {

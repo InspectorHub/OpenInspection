@@ -11,7 +11,7 @@
  * the table: a test that inspected the row would pass whether or not the
  * service still consults the live template.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
@@ -20,8 +20,8 @@ import {
     templateSnapshotSectionsOrNone,
 } from '../../../server/services/inspection/shared';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { InspectionService } from '../../../server/services/inspection.service';
 
 const TENANT = 'tenant-snapshot-required';
@@ -122,8 +122,7 @@ describe('computePublishReadiness stops re-acquiring the live template', () => {
         db = fx.db;
         sqlite = fx.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'snapshot-required', createdAt: new Date(),
@@ -136,7 +135,7 @@ describe('computePublishReadiness stops re-acquiring the live template', () => {
             createdAt: new Date(),
         } as never);
 
-        svc = new InspectionService({} as never);
+        svc = new InspectionService(testD1.binding);
     });
 
     afterEach(() => { sqlite.close(); });

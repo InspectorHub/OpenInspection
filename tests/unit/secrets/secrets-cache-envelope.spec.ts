@@ -6,14 +6,14 @@
  *
  * Real crypto roundtrip: sealSecrets (v2 envelope) → D1 row → loadTenantSecrets.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { drizzle } from 'drizzle-orm/d1';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { tenantConfigs, tenants } from '../../../server/lib/db/schema';
 import { sealSecrets } from '../../../server/lib/config-crypto';
 import { loadTenantSecrets, secretsCacheKey } from '../../../server/lib/secrets-cache';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // Minimal KV stub (string store, get/put/delete)
 function makeKv() {
@@ -40,7 +40,7 @@ const SECRET = 'cur-secret';
 async function makeDb(row?: { secretsEnc: string; dekEnc: string | null }) {
     const fix = createTestDb();
     await setupSchema(fix.sqlite);
-    vi.mocked(drizzle).mockReturnValue(fix.db as never);
+    testD1.use(fix.db);
     if (row) {
         await fix.db.insert(tenants).values({
             id: TENANT, slug: 't-1', createdAt: new Date(),
@@ -52,7 +52,7 @@ async function makeDb(row?: { secretsEnc: string; dekEnc: string | null }) {
             updatedAt: new Date(),
         } as never);
     }
-    return {} as unknown as D1Database;
+    return testD1.binding;
 }
 
 describe('loadTenantSecrets (envelope-aware, KV-cached)', () => {

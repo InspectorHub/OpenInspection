@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { InspectionService } from '../../../server/services/inspection.service';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -49,8 +49,8 @@ describe('InspectionService.publishInspection auto-sign behavior', () => {
             autoSignOnPublish: true,
             createdAt: new Date(),
         });
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-        svc = new InspectionService({} as D1Database);
+        testD1.use(db);
+        svc = new InspectionService(testD1.binding);
     });
 
     it('writes _inspector_signature when autoSignOnPublish is true and user has saved sig', async () => {

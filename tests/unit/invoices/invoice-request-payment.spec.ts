@@ -5,8 +5,8 @@ import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import invoiceRoutes from '../../../server/api/invoices';
 import { InvoiceService } from '../../../server/services/invoice.service';
@@ -53,9 +53,9 @@ function buildApp(role = 'manager') {
         c.set('user', { sub: USER_ID } as never);
         c.set('requestedTenantSlug', SLUG as never);
         c.set('services', {
-            invoice: new InvoiceService({} as D1Database),
-            people: new PeopleService({ DB: {} as D1Database }),
-            portalAccess: new PortalAccessService({} as D1Database, { jwtSecret: JWT_SECRET }),
+            invoice: new InvoiceService(testD1.binding),
+            people: new PeopleService({ DB: testD1.binding }),
+            portalAccess: new PortalAccessService(testD1.binding, { jwtSecret: JWT_SECRET }),
             email: { sendInvoiceRequest } as never,
             qbo: { upsertInvoice: vi.fn() } as never,
         } as never);
@@ -72,7 +72,7 @@ function buildApp(role = 'manager') {
     return app;
 }
 
-const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET } as never;
+const ENV = { DB: testD1.binding, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET } as never;
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --
 // it only removes any way to await it, which is how a run with every test
 // passing could still exit 1 on an unhandled teardown rejection.
@@ -90,7 +90,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: SLUG, status: 'active',
@@ -110,7 +110,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_ID, CLIENT, roleProfileId('client'));
     });
 
@@ -157,7 +157,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         const payUrl = sendInvoiceRequest.mock.calls[0][3] as string;
         const token = new URL(payUrl).searchParams.get('token');
         expect(token).toBeTruthy();
-        const grant = await new PortalAccessService({} as D1Database, { jwtSecret: JWT_SECRET }).resolveToken(token!);
+        const grant = await new PortalAccessService(testD1.binding, { jwtSecret: JWT_SECRET }).resolveToken(token!);
         expect(grant).not.toBeNull();
         expect(grant!.inspectionId).toBe(INSP_ID);
         expect(grant!.tenantId).toBe(TENANT);
@@ -205,7 +205,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
     });
 
     it('existing draft invoice — reused (no second row) and marked sent', async () => {
-        const svc = new InvoiceService(db as unknown as D1Database);
+        const svc = new InvoiceService(testD1.binding);
         const created = await svc.createInvoice(TENANT, {
             inspectionId: INSP_ID, clientName: 'Jane', clientEmail: 'jane@example.com',
             amountCents: 42000, lineItems: [{ description: 'Inspection services', amountCents: 42000 }],
@@ -225,7 +225,7 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
     });
 
     it('already paid invoice — 409, no email', async () => {
-        const svc = new InvoiceService(db as unknown as D1Database);
+        const svc = new InvoiceService(testD1.binding);
         const created = await svc.createInvoice(TENANT, {
             inspectionId: INSP_ID, clientName: 'Jane', clientEmail: 'jane@example.com',
             amountCents: 42000, lineItems: [{ description: 'Inspection services', amountCents: 42000 }],

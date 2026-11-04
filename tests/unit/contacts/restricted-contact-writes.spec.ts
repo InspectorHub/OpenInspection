@@ -3,12 +3,11 @@
  * the row it touched must not reach a contact outside the visible set, and a duplicate-email answer
  * must not name the contact it collided with. Every restriction is paired with a control that goes through.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1Db, asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asD1Db, asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { ContactService } from '../../../server/services/contact.service';
@@ -20,7 +19,8 @@ import { AppError } from '../../../server/lib/errors';
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const rp = (key: string) => `crp_${TENANT}_${key}`;
 type Role = 'owner' | 'manager' | 'inspector';
@@ -30,7 +30,7 @@ describe('contact writes honour the scope', () => {
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         // inspA is restricted and holds the contacts switch; inspAll holds the same switch, unrestricted.
         await db.update(schema.users).set({ permissionOverrides: { viewAllInspections: false, manageContacts: true } }).where(eq(schema.users.id, USERS.inspA));
@@ -43,7 +43,7 @@ describe('contact writes honour the scope', () => {
             { id: 'c-own-archived', name: 'Name own archived', email: null, archivedAt },
             { id: 'c-other-archived', name: 'Name other archived', email: null, archivedAt },
         ].map(r => ({ tenantId: TENANT, type: 'client' as const, createdAt: new Date(), ...r })));
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP.own, 'c-own', rp('client'));
         await people.addPerson(TENANT, INSP.other, 'c-other', rp('client'));
         await people.addPerson(TENANT, INSP.own, 'c-own-archived', rp('client'));
@@ -60,7 +60,7 @@ describe('contact writes honour the scope', () => {
             c.set('user', { sub: userId, role, tenantId: TENANT } as never);
             c.set('tenantId', TENANT);
             c.set('sdb', new ScopedDB(asScopedDbSource(db), TENANT));
-            c.set('services', { contact: new ContactService({} as D1Database) } as never);
+            c.set('services', { contact: new ContactService(testD1.binding) } as never);
             await next();
         });
         app.route('/api/contacts', contactRoutes);
@@ -71,7 +71,7 @@ describe('contact writes honour the scope', () => {
         const res = await app.request(p, {
             method,
             ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
-        }, { DB: {}, JWT_SECRET: 'x' } as never);
+        }, { DB: testD1.binding, JWT_SECRET: 'x' } as never);
         const text = await res.text();
         return { status: res.status, text };
     };

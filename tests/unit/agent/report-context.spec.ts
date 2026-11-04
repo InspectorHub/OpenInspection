@@ -12,8 +12,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 // eslint-disable-next-line import/order
@@ -38,7 +38,7 @@ describe('POST /api/agent/report-context', () => {
         db = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT_ID, slug: 'acme', status: 'active',
@@ -67,11 +67,11 @@ describe('POST /api/agent/report-context', () => {
     function buildApp(resolveToken: ReturnType<typeof vi.fn>) {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            c.env = { DB: {} } as unknown as HonoConfig['Bindings'];
+            c.env = { DB: testD1.binding } as unknown as HonoConfig['Bindings'];
             c.set('services', {
                 portalAccess: { resolveToken },
-                people: new PeopleService({ DB: {} as D1Database }),
-                agent: new AgentService({} as D1Database),
+                people: new PeopleService({ DB: testD1.binding }),
+                agent: new AgentService(testD1.binding),
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });

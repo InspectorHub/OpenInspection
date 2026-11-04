@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -11,8 +11,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // constraint only (SQLite stores plain TEXT) — widening it to accept any
 // tenant role-profile KEY (not just the legacy client/co_client/agent enum)
 // requires no migration. See spec 2026-07-18 Plan 1A Task 10.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000c2';
 const INSPECTION = '11111111-1111-1111-1111-1111111111c2';
@@ -26,14 +26,13 @@ describe('PortalAccessService — token role references a role-profile key', () 
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme-role-key', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT, new Date(1));
-        svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
+        svc = new PortalAccessService(testD1.binding, { jwtSecret: JWT });
     });
 
     it('issueToken accepts a non-legacy role-profile key (buyer_agent) and persists it', async () => {

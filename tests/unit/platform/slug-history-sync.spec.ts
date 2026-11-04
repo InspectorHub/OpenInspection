@@ -9,15 +9,15 @@
  * Core's copy answers RESOLUTION ("who used to own this"); portal's answers
  * CLAIMABILITY. Neither reads the other.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { tenants, tenantSlugHistory } from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { PortalProvider } from '../../../server/portal/portal.provider';
 
 const TENANT = '11111111-1111-1111-1111-111111111111';
@@ -45,9 +45,9 @@ describe('PortalProvider — slug history on sync', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         kv = fakeKv();
-        provider = new PortalProvider({} as D1Database, kv as unknown as KVNamespace);
+        provider = new PortalProvider(testD1.binding, kv as unknown as KVNamespace);
     });
 
     it('records the previous slug when a sync changes it', async () => {

@@ -10,7 +10,7 @@
  * handler in server/api/inspections/hierarchy.ts). Asserts per-unit rated/total
  * and the common-scope count.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { computeUnitProgress } from '../../../server/lib/unit-progress';
 import { UnitService } from '../../../server/services/unit.service';
@@ -19,8 +19,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { inspectionResults } from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000099';
 const INSPECTION = '11111111-1111-1111-1111-111111111111';
@@ -54,9 +54,8 @@ describe('unit-progress summary (Phase U Batch C2a)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        unitSvc = new UnitService({} as D1Database);
+        testD1.use(testDb);
+        unitSvc = new UnitService(testD1.binding);
         await seed(testDb);
     });
 

@@ -9,10 +9,14 @@ import { InspectionService } from '../../../server/services/inspection.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { inspectionsRoutes } from '../../../server/api/inspections';
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { drizzle as d1Drizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from './d1-binding';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { ROLE } from '../../../server/lib/auth/roles';
 import { asD1Db, asD1DrizzleReturn, asScopedDbSource, type TestDb } from './test-db';
+
+/** The binding every service built here queries; `buildApp(db)` points it at that database. */
+export const signD1 = lazyD1();
 
 export const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 export const INSP_ID = '00000000-0000-0000-0000-000000000010';
@@ -21,7 +25,7 @@ export const JWT_SECRET = 'test-secret';
 export const CLIENT_CONTACT_ID = '00000000-0000-0000-0000-0000000000c1';
 
 export const FAKE_ENV = {
-    DB: {},
+    DB: signD1.binding,
     APP_NAME: 'OpenInspection',
     APP_BASE_URL: 'https://example.test',
 } as unknown as HonoConfig['Bindings'];
@@ -68,7 +72,7 @@ export function buildApp(db: TestDb, stubs: Stubs = {}) {
     const emailAgreementRequest = stubs.emailAgreementRequest ?? vi.fn().mockResolvedValue(undefined);
     const workflowCreate = stubs.workflowCreate ?? vi.fn().mockResolvedValue(undefined);
 
-    const agreement = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+    const agreement = new AgreementService(signD1.binding, { jwtSecret: JWT_SECRET });
 
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => {
@@ -83,8 +87,8 @@ export function buildApp(db: TestDb, stubs: Stubs = {}) {
         c.set('userRole', ROLE.OWNER);
         c.set('services', {
             agreement,
-            inspection: new InspectionService({} as D1Database, undefined, new ScopedDB(asScopedDbSource(db), TENANT_ID)),
-            people: new PeopleService({ DB: {} as D1Database }),
+            inspection: new InspectionService(signD1.binding, undefined, new ScopedDB(asScopedDbSource(db), TENANT_ID)),
+            people: new PeopleService({ DB: signD1.binding }),
             auditLog: { append: auditAppend },
             automation: { trigger: automationTrigger },
             notification: { createForAllAdmins: notificationCreate },
@@ -102,9 +106,9 @@ export function buildApp(db: TestDb, stubs: Stubs = {}) {
         await next();
     });
     app.route('/', inspectionsRoutes);
-    // `drizzle-orm/d1` is vi.mock'd by the specs that use this helper; hand the
-    // mock the SQLite database every service under test will actually query.
-    vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(db));
+    signD1.use(db);
+    // A spec that still mocks `drizzle-orm/d1` for another reason gets the database through the mock as well.
+    if (vi.isMockFunction(d1Drizzle)) vi.mocked(d1Drizzle).mockReturnValue(asD1DrizzleReturn(db));
 
     return { app, auditAppend, automationTrigger, notificationCreate, emailConfirm, emailAgreementRequest, workflowCreate };
 }
@@ -143,7 +147,7 @@ export async function seedBase(db: TestDb, opts: { withTemplate?: boolean } = {}
 
 /** Seed a 2-signer envelope directly via the service. */
 export async function createTwoSignerEnvelope(db: TestDb, policy: 'all' | 'one' = 'all') {
-    const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+    const svc = new AgreementService(signD1.binding, { jwtSecret: JWT_SECRET });
     const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
         signers: [
             { name: 'Jane', email: 'jane@test.com', role: 'client' },

@@ -10,7 +10,7 @@
  * `contentHash` is SHA-256 over the stored snapshot STRING, so adding a field
  * there would invalidate every signature ever collected.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -23,13 +23,14 @@ import { AgreementService } from '../../../server/services/agreement.service';
 import { sha256Hex } from '../../../server/lib/sha256';
 import { certRenderHandler } from '../../../server/api/agreements-render';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // certRenderHandler takes a RAW D1Database and calls drizzle() on it itself —
 // which the mock above intercepts and points at the test db. asD1Db returns a
 // DrizzleD1Database, i.e. the wrapped shape, so it is the wrong tool here: the
 // handler would be wrapping an already-wrapped handle.
-const RAW_D1 = {} as D1Database;
+const RAW_D1 = testD1.binding;
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -44,8 +45,7 @@ describe('agreement identity snapshot', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -67,7 +67,7 @@ describe('agreement identity snapshot', () => {
             agreementRequired: true, paymentRequired: false, createdAt: new Date(),
         });
 
-        svc = new AgreementService({} as D1Database, { jwtSecret: 'test-secret' });
+        svc = new AgreementService(testD1.binding, { jwtSecret: 'test-secret' });
     });
 
     const readEnvelope = (id: string) =>

@@ -18,8 +18,8 @@ import { agentNoticeRoutes } from '../../../server/api/agent/notices';
 import type { HonoConfig } from '../../../server/types/hono';
 import { asD1Db } from '../helpers/test-db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T1 = '00000000-0000-0000-0000-000000000001';
 const T2 = '00000000-0000-0000-0000-000000000002';
@@ -48,7 +48,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await db.insert(schema.tenants).values({ id: T1, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
     await seedRoleProfiles(asD1Db(db), T1, new Date(1));
     await db.insert(schema.users).values([
@@ -65,7 +65,7 @@ beforeEach(async () => {
         });
         await db.insert(schema.inspectionResults).values({ id: `res-${id}`, tenantId: T1, inspectionId: id, data: resultsData, lastSyncedAt: new Date() });
     }
-    await new PeopleService({ DB: {} as D1Database }).addPerson(T1, 'i-1', AGENT_CONTACT, `crp_${T1}_buyer_agent`);
+    await new PeopleService({ DB: testD1.binding }).addPerson(T1, 'i-1', AGENT_CONTACT, `crp_${T1}_buyer_agent`);
     // A second company that has the same agent account on one of its own inspections.
     await db.insert(schema.tenants).values({ id: T2, slug: 'beta', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
     await seedRoleProfiles(asD1Db(db), T2, new Date(1));
@@ -77,7 +77,7 @@ beforeEach(async () => {
         reportStatus: REPORT_STATUS.PUBLISHED, paymentStatus: 'paid', price: 0, createdAt: new Date(), templateSnapshot,
     });
     await db.insert(schema.inspectionResults).values({ id: 'res-i-t2', tenantId: T2, inspectionId: 'i-t2', data: resultsData2, lastSyncedAt: new Date() });
-    await new PeopleService({ DB: {} as D1Database }).addPerson(T2, 'i-t2', AGENT_CONTACT_2, `crp_${T2}_buyer_agent`);
+    await new PeopleService({ DB: testD1.binding }).addPerson(T2, 'i-t2', AGENT_CONTACT_2, `crp_${T2}_buyer_agent`);
 });
 
 function build(userId: string) {
@@ -88,9 +88,9 @@ function build(userId: string) {
         c.set('services', {
             inspection: { resolveReleaseGate: async () => null },
             agent: {
-                accessToInspection: (agent: string, inspection: string) => accessToInspection({} as D1Database, agent, inspection),
-                listRecommendationsForAgent: (agent: string) => listRecommendationsForAgent({} as D1Database, agent),
-                listReferrals: (agent: string, opts: { limit: number }) => listReferrals({} as D1Database, agent, opts),
+                accessToInspection: (agent: string, inspection: string) => accessToInspection(testD1.binding, agent, inspection),
+                listRecommendationsForAgent: (agent: string) => listRecommendationsForAgent(testD1.binding, agent),
+                listReferrals: (agent: string, opts: { limit: number }) => listReferrals(testD1.binding, agent, opts),
             },
         } as never);
         await next();
@@ -102,7 +102,7 @@ function build(userId: string) {
 
 const bucket = (held: Record<string, Uint8Array>) => {
     const get = vi.fn(async (key: string) => (held[key] ? { body: new Blob([new Uint8Array(held[key]!)]).stream(), httpMetadata: { contentType: 'image/jpeg' }, httpEtag: '"e"' } : null));
-    return { env: { PHOTOS: { get } } as never, get };
+    return { env: { DB: testD1.binding, PHOTOS: { get } } as never, get };
 };
 const HELD = { [PHOTO_A]: BYTES, [PHOTO_B]: BYTES, [PHOTO_C]: BYTES };
 const photoUrl = (inspectionId: string, key: string) => `/api/agent/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}&w=320`;
@@ -130,7 +130,7 @@ describe('the agent repair items and the agent photo route', () => {
     });
 
     it('lists the referrals of every company without a company id in the body', async () => {
-        const rows = await listReferrals({} as D1Database, AGENT_USER, { limit: 100 });
+        const rows = await listReferrals(testD1.binding, AGENT_USER, { limit: 100 });
         // Control: the service rows do name their company, so the absence below is the route.
         expect(rows.map((r) => (r as { tenantId?: string }).tenantId).sort()).toEqual([T1, T2]);
         const res = await build(AGENT_USER).request('/api/agent/referrals', {}, bucket(HELD).env);

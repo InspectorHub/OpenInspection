@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
 import { tenants } from '../../../server/lib/db/schema';
@@ -15,8 +15,8 @@ import * as schema from '../../../server/lib/db/schema';
  * or overrides via ?inspectorId=. Only admin/owner may do so.
  */
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // Import AFTER mock is set up.
 // eslint-disable-next-line import/order
@@ -28,7 +28,7 @@ const CALLER_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const OTHER_ID   = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 const FAKE_ENV = {
-    DB: {},
+    DB: testD1.binding,
 } as HonoConfig['Bindings'];
 
 /**
@@ -61,7 +61,7 @@ function buildApp(
     });
 
     app.route('/', availabilityRoutes);
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
     return app;
 }
 
@@ -74,7 +74,7 @@ describe('GET /availability — on-behalf-of read role guard (IA-26)', () => {
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(tenants).values({
             id: TENANT_ID, slug: TENANT_SLUG,
@@ -129,7 +129,7 @@ describe('GET /overrides — on-behalf-of read role guard (IA-26)', () => {
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(tenants).values({
             id: TENANT_ID, slug: TENANT_SLUG,

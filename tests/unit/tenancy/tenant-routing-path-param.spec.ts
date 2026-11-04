@@ -9,8 +9,8 @@ import { tenants, tenantSlugHistory } from '../../../server/lib/db/schema';
 // History resolution is a D1 READ, so unlike the three tests above (whose
 // TENANT_CACHE double always hits and never touches `env.DB`) the slug-history
 // tests need a real database behind `drizzle(c.env.DB)`.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 function makeApp(profile = SAAS_PROFILE) {
     const app = new Hono<HonoConfig>();
@@ -37,7 +37,7 @@ describe('tenant-routing — path-param resolution', () => {
         const aTenant = { id: 'tenant-a', slug: 'acme', tier: 'pro', status: 'active' };
         const bTenant = { id: 'tenant-b', slug: 'bravo', tier: 'pro', status: 'active' };
         const get = vi.fn((key: string) => Promise.resolve(key.endsWith('acme') ? aTenant : bTenant));
-        const env: Partial<HonoConfig['Bindings']> = { DB: {} as never, TENANT_CACHE: { get, put: vi.fn() } as never };
+        const env: Partial<HonoConfig['Bindings']> = { DB: testD1.binding, TENANT_CACHE: { get, put: vi.fn() } as never };
         const app = makeApp();
         let capturedTenantId: string | undefined;
         app.get('/book/:tenant/:slug', (c) => { capturedTenantId = c.get('tenantId'); return c.text('ok'); });
@@ -46,7 +46,7 @@ describe('tenant-routing — path-param resolution', () => {
     });
 
     it('falls through to fixed tenant in standalone even when /book/<tenant>/<slug> is hit', async () => {
-        const env: Partial<HonoConfig['Bindings']> = { DB: {} as never, TENANT_CACHE: { get: vi.fn().mockResolvedValue(null), put: vi.fn() } as never };
+        const env: Partial<HonoConfig['Bindings']> = { DB: testD1.binding, TENANT_CACHE: { get: vi.fn().mockResolvedValue(null), put: vi.fn() } as never };
         const app = makeApp(STANDALONE_PROFILE);
         let capturedTenantId: string | undefined;
         app.get('/book/:tenant/:slug', (c) => { capturedTenantId = c.get('tenantId'); return c.text('ok'); });
@@ -62,7 +62,7 @@ describe('tenant-routing — resolution through slug history', () => {
     async function harness() {
         const fix = createTestDb();
         await setupSchema(fix.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fix.db);
+        testD1.use(fix.db);
         const seedTenant = (v: { id: string; slug: string }) =>
             fix.db.insert(tenants).values({
                 ...v, tier: 'pro', status: 'active', createdAt: new Date(),
@@ -73,7 +73,7 @@ describe('tenant-routing — resolution through slug history', () => {
                 changedAt: new Date('2026-08-10T00:00:00Z'),
                 retiredUntil: v.retiredUntil ?? new Date('2027-08-10T00:00:00Z'),
             } as typeof tenantSlugHistory.$inferInsert);
-        const env = { DB: {}, TENANT_CACHE: missingCache() } as never;
+        const env = { DB: testD1.binding, TENANT_CACHE: missingCache() } as never;
         return { fix, seedTenant, seedHistory, env };
     }
 

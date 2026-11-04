@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -39,9 +39,9 @@ describe('IA-44 — checkout mints the signer a portal token', () => {
     function buildApp() {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {}, JWT_SECRET: SECRET };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding, JWT_SECRET: SECRET };
             c.set('services', {
-                agreement: new AgreementService({} as D1Database, { jwtSecret: SECRET }),
+                agreement: new AgreementService(testD1.binding, { jwtSecret: SECRET }),
                 portalAccess,
             } as unknown as HonoConfig['Variables']['services']);
             await next();
@@ -73,7 +73,7 @@ describe('IA-44 — checkout mints the signer a portal token', () => {
     }
 
     async function envelopeWithSigners(signers: Array<{ name: string; email: string; role: string }>) {
-        const svc = new AgreementService({} as D1Database, { jwtSecret: SECRET });
+        const svc = new AgreementService(testD1.binding, { jwtSecret: SECRET });
         return svc.findOrCreate(TENANT, INSP, {
             signers: signers as never,
             completionPolicy: 'all',
@@ -85,10 +85,9 @@ describe('IA-44 — checkout mints the signer a portal token', () => {
         db = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seed();
-        portalAccess = new PortalAccessService({} as D1Database, { jwtSecret: SECRET });
+        portalAccess = new PortalAccessService(testD1.binding, { jwtSecret: SECRET });
     });
 
     afterEach(() => sqlite.close());
@@ -123,7 +122,7 @@ describe('IA-44 — checkout mints the signer a portal token', () => {
     });
 
     it('a co_client signer gets their OWN token, never the other signer grant', async () => {
-        const svc = new AgreementService({} as D1Database, { jwtSecret: SECRET });
+        const svc = new AgreementService(testD1.binding, { jwtSecret: SECRET });
         const env = await svc.findOrCreate(TENANT, INSP, {
             signers: [
                 { name: 'Jane', email: 'jane@test.com', role: 'client' },

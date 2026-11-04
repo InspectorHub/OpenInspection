@@ -19,15 +19,15 @@
  * template picker orders on it so a workspace is not offered another state's
  * statutory form first (`app/lib/template-order.ts`).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // Import routes AFTER mock is wired.
 import sessionContextRoutes from '../../../server/api/session-context';
@@ -41,7 +41,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+    testD1.use(testDb);
 });
 
 async function seedTenant() {
@@ -84,7 +84,7 @@ function buildApp() {
         } as never);
         c.set('profile', { mode: 'saas', hasBilling: true, hasSeatQuota: true } as never);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (c as any).env = { APP_MODE: 'saas', DB: {} as D1Database };
+        (c as any).env = { APP_MODE: 'saas', DB: testD1.binding };
         await next();
     });
     app.route('/api/session', sessionContextRoutes);

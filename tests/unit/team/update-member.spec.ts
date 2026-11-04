@@ -20,8 +20,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { Role } from '../../../server/lib/auth/roles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const OWNER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1';
@@ -63,8 +63,7 @@ describe('TeamService.updateMember', () => {
     const fix = createTestDb();
     db = fix.db;
     await setupSchema(fix.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
   });
 
   async function roleOf(id: string) {
@@ -75,7 +74,7 @@ describe('TeamService.updateMember', () => {
   it('changes a role and ends that member\'s sessions so the new role is real', async () => {
     await seed(db);
     const { kv, puts } = fakeKv();
-    const svc = new TeamService({} as D1Database, undefined, kv);
+    const svc = new TeamService(testD1.binding, undefined, kv);
 
     await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner', role: 'manager' });
 
@@ -88,7 +87,7 @@ describe('TeamService.updateMember', () => {
   it('does NOT sign anyone out for a capability-only change', async () => {
     await seed(db);
     const { kv, puts } = fakeKv();
-    const svc = new TeamService({} as D1Database, undefined, kv);
+    const svc = new TeamService(testD1.binding, undefined, kv);
 
     await svc.updateMember({
       tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner',
@@ -104,7 +103,7 @@ describe('TeamService.updateMember', () => {
 
   it('stores only what differs from the role template', async () => {
     await seed(db);
-    const svc = new TeamService({} as D1Database);
+    const svc = new TeamService(testD1.binding);
 
     // An inspector already has `publish`, so re-stating it is not an override
     // and must not be persisted — otherwise the row would pin a value that
@@ -120,7 +119,7 @@ describe('TeamService.updateMember', () => {
 
   it('diffs against the NEW role when the role moves in the same call', async () => {
     await seed(db);
-    const svc = new TeamService({} as D1Database);
+    const svc = new TeamService(testD1.binding);
 
     // `companyFinance` is false for an inspector but true for a manager. Promoting
     // to manager AND asking for it must store nothing: it is the new
@@ -139,7 +138,7 @@ describe('TeamService.updateMember', () => {
 
   it('refuses to change the last owner\'s role', async () => {
     await seed(db);
-    const svc = new TeamService({} as D1Database);
+    const svc = new TeamService(testD1.binding);
 
     // The requester id is not a live member, so the self-change rule does not
     // fire first and the last-owner backstop is what answers.
@@ -152,7 +151,7 @@ describe('TeamService.updateMember', () => {
 
   it('allows demoting an owner when another owner remains', async () => {
     await seed(db, true);
-    const svc = new TeamService({} as D1Database);
+    const svc = new TeamService(testD1.binding);
 
     await svc.updateMember({ tenantId: TENANT, userId: OWNER_2, requesterId: OWNER, requesterRole: 'owner', role: 'manager' });
     expect(await roleOf(OWNER_2)).toBe('manager');
@@ -161,7 +160,7 @@ describe('TeamService.updateMember', () => {
   describe('owner rank is changed only by an owner', () => {
     it('forbids a manager from demoting an owner', async () => {
       await seed(db, true);
-      const svc = new TeamService({} as D1Database);
+      const svc = new TeamService(testD1.binding);
 
       await expect(
         svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, requesterRole: 'manager', requesterCapabilities: MANAGER_CAPS, role: 'manager' }),
@@ -171,7 +170,7 @@ describe('TeamService.updateMember', () => {
 
     it('forbids a manager from editing an owner without a role change', async () => {
       await seed(db, true);
-      const svc = new TeamService({} as D1Database);
+      const svc = new TeamService(testD1.binding);
 
       await expect(
         svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: MANAGER, requesterRole: 'manager', requesterCapabilities: MANAGER_CAPS, permissionOverrides: { companyFinance: false } }),
@@ -180,7 +179,7 @@ describe('TeamService.updateMember', () => {
 
     it('forbids a manager from promoting anyone to owner', async () => {
       await seed(db);
-      const svc = new TeamService({} as D1Database);
+      const svc = new TeamService(testD1.binding);
 
       await expect(
         svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager', requesterCapabilities: MANAGER_CAPS, role: 'owner' }),
@@ -190,7 +189,7 @@ describe('TeamService.updateMember', () => {
 
     it('still lets a manager change a non-owner role', async () => {
       await seed(db);
-      const svc = new TeamService({} as D1Database);
+      const svc = new TeamService(testD1.binding);
 
       await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager', requesterCapabilities: MANAGER_CAPS, role: 'manager' });
       expect(await roleOf(INSPECTOR)).toBe('manager');
@@ -198,7 +197,7 @@ describe('TeamService.updateMember', () => {
 
     it('lets an owner promote a member to owner', async () => {
       await seed(db);
-      const svc = new TeamService({} as D1Database);
+      const svc = new TeamService(testD1.binding);
 
       await svc.updateMember({ tenantId: TENANT, userId: INSPECTOR, requesterId: OWNER, requesterRole: 'owner', role: 'owner' });
       expect(await roleOf(INSPECTOR)).toBe('owner');
@@ -207,7 +206,7 @@ describe('TeamService.updateMember', () => {
 
   it('refuses to change your own role', async () => {
     await seed(db, true);
-    const svc = new TeamService({} as D1Database);
+    const svc = new TeamService(testD1.binding);
 
     await expect(
       svc.updateMember({ tenantId: TENANT, userId: OWNER, requesterId: OWNER, requesterRole: 'owner', role: 'inspector' }),
@@ -216,7 +215,7 @@ describe('TeamService.updateMember', () => {
 
   it('refuses to assign the agent role', async () => {
     await seed(db);
-    const svc = new TeamService({} as D1Database);
+    const svc = new TeamService(testD1.binding);
 
     // An agent reaches an inspection through a per-inspection token that works
     // with no account. Minting one from the Team page would be a second,
@@ -230,7 +229,7 @@ describe('TeamService.updateMember', () => {
 
   it('will not reach across tenants', async () => {
     await seed(db);
-    const svc = new TeamService({} as D1Database);
+    const svc = new TeamService(testD1.binding);
 
     await expect(
       svc.updateMember({

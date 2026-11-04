@@ -5,11 +5,9 @@ import { seedStarterContent } from '../../../server/services/starter-content.ser
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: vi.fn(),
-}));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 describe('seedStarterContent seeds role profiles', () => {
   let fixture: ReturnType<typeof createTestDb>;
@@ -21,7 +19,7 @@ describe('seedStarterContent seeds role profiles', () => {
     testDb = fixture.db;
     sqlite = fixture.sqlite;
     await setupSchema(sqlite);
-    (mockDrizzle as any).mockReturnValue(testDb);
+    testD1.use(testDb);
 
     // Seed a default tenant to satisfy foreign keys
     await testDb.insert(schema.tenants).values({
@@ -37,7 +35,7 @@ describe('seedStarterContent seeds role profiles', () => {
   });
 
   it('creates the 8 default role profiles for the tenant', async () => {
-    await seedStarterContent({} as any, 't1');
+    await seedStarterContent(testD1.binding, 't1');
     const rows = await testDb.select().from(schema.contactRoleProfiles)
       .where(eq(schema.contactRoleProfiles.tenantId, 't1'));
     expect(rows).toHaveLength(8);

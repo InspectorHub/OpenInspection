@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { NotificationService } from '../../../server/services/notification.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const TENANT_B = '00000000-0000-0000-0000-000000000002';
@@ -31,10 +31,8 @@ describe('NotificationService', () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        svc = new NotificationService({} as any);
+        testD1.use(testDb);
+        svc = new NotificationService(testD1.binding);
         await seedTenantAndUsers(testDb);
     });
 

@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
@@ -20,8 +20,8 @@ describe('PeopleService', () => {
       { id: 'c1', tenantId: 't1', type: 'client', name: 'Buyer One', email: 'b1@x.com', phone: '111', createdAt: new Date(1) },
       { id: 'c2', tenantId: 't1', type: 'client', name: 'Buyer Two', email: 'b2@x.com', phone: '222', createdAt: new Date(1) },
     ]);
-    (mockDrizzle as any).mockReturnValue(db);
-    svc = new PeopleService({} as any);
+    testD1.use(db);
+    svc = new PeopleService({ DB: testD1.binding });
   });
 
   it('adds a primary client and resolves it', async () => {

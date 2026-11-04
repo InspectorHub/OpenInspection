@@ -16,7 +16,7 @@
  * estimates — for the same reason: the writer is the single chokepoint every
  * caller (dashboard, MCP, API client) goes through.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { BrandingService } from '../../../server/services/branding.service';
@@ -26,7 +26,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { CancellationPolicy } from '../../../server/lib/billing/cancellation-policy';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -53,10 +54,9 @@ describe('BrandingService — cancellation policy attestation gate', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        branding = new BrandingService({} as D1Database);
-        agreementSvc = new AgreementService({} as D1Database);
+        testD1.use(testDb);
+        branding = new BrandingService(testD1.binding);
+        agreementSvc = new AgreementService(testD1.binding);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

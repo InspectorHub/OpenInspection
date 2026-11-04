@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ImportHistoryService } from '../../../server/services/import-history.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { tenantMarketplaceImportHistory } from '../../../server/lib/db/schema/marketplace';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER_TENANT = '00000000-0000-0000-0000-000000000002';
@@ -47,10 +47,8 @@ describe('ImportHistoryService', () => {
             { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: OTHER_TENANT, slug: 'o', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        svc = new ImportHistoryService({} as any, TENANT);
+        testD1.use(testDb);
+        svc = new ImportHistoryService(testD1.binding, TENANT);
     });
 
     it('lists tenant rows ordered by createdAt DESC', async () => {

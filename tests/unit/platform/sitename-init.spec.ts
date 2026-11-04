@@ -18,10 +18,9 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
 // Both providers use drizzle-orm/d1 internally — redirect to in-memory SQLite.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-// Import providers AFTER the mock is set up.
 import { PortalProvider } from '../../../server/portal/portal.provider';
 import { StandaloneProvider } from '../../../server/lib/integration/standalone';
 
@@ -50,8 +49,8 @@ describe('PortalProvider — companyName init (SaaS path)', () => {
         testDb = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(testDb);
-        provider = new PortalProvider({} as any);
+        testD1.use(testDb);
+        provider = new PortalProvider(testD1.binding);
     });
 
     afterEach(() => {
@@ -165,8 +164,8 @@ describe('StandaloneProvider — companyName init (standalone path)', () => {
         testDb = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(testDb);
-        provider = new StandaloneProvider({} as any);
+        testD1.use(testDb);
+        provider = new StandaloneProvider(testD1.binding);
     });
 
     afterEach(() => {

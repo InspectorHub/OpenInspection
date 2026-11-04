@@ -8,7 +8,7 @@
  * (never from the body), a revoked binding stops being a target, and `scope:
  * 'all'` is what makes "I mean everyone" a single action instead of N.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -16,8 +16,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import agentNotificationPreferenceRoutes from '../../../server/api/agent/notification-preferences';
@@ -53,18 +53,17 @@ const put = (app: OpenAPIHono<HonoConfig>, body: unknown) =>
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
-    }, { DB: {} });
+    }, { DB: testD1.binding });
 
 const get = (app: OpenAPIHono<HonoConfig>, qs = '') =>
-    app.request(`/api/agent/notification-preferences${qs}`, {}, { DB: {} });
+    app.request(`/api/agent/notification-preferences${qs}`, {}, { DB: testD1.binding });
 
 beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db as BetterSQLite3Database<typeof schema>;
     sqlite = fx.sqlite;
     await setupSchema(fx.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
 
     // `name` used to ride on the tenant row. It no longer exists there, and the
     // `as never` cast below meant nothing complained when the column went — the

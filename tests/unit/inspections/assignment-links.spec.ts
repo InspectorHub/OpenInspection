@@ -5,7 +5,6 @@ import { syncInspectionAssignments, syncInspectionAssignmentsBatch } from '../..
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 describe('syncInspectionAssignments', () => {
     let db: BetterSQLite3Database<typeof schema>;

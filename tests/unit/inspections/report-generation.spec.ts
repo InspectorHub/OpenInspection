@@ -8,7 +8,7 @@
  * scheduled to begin, and it never re-titles or re-templates a document
  * somebody has already written into.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -23,7 +23,6 @@ import {
 } from '../../../server/lib/inspection/report-generation';
 import { createPrimaryReport, listReports } from '../../../server/lib/inspection/reports';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 const TENANT = '00000000-0000-0000-0000-0000000000r1';
 const INSPECTION = 'insp-generation';

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { signViaClaim } from '../helpers/sign-via-claim';
 import { AgreementService } from '../../../server/services/agreement.service';
 import { createTestDb, setupSchema } from '../db';
@@ -6,8 +6,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { TENANT_A, INSP_ID, seedBase } from '../helpers/agreement-signers-setup';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // Basic single-signer transition coverage (findOrCreate/markViewedBySigner/
 // markSignedBySigner/markDeclinedBySigner/expireOlderThan happy paths) lives
@@ -23,8 +23,8 @@ describe('AgreementService', () => {
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
         await seedBase(testDb);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new AgreementService({} as D1Database, { jwtSecret: 'test-secret' });
+        testD1.use(testDb);
+        svc = new AgreementService(testD1.binding, { jwtSecret: 'test-secret' });
     });
 
     it('markSignedBySigner on a declined signer throws Conflict', async () => {

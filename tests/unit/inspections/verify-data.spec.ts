@@ -3,8 +3,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { loadVerifyData } from '../../../server/lib/verify-data';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
@@ -19,7 +19,7 @@ const AGR_ID = '00000000-0000-0000-0000-000000000020';
  */
 function fakeCtx() {
   return {
-    env: { DB: {} as D1Database },
+    env: { DB: testD1.binding },
     var: {
       services: {
         auditLog: { verifyChain: vi.fn().mockResolvedValue({ valid: true, reason: null }) },
@@ -49,7 +49,7 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
       id: AGR_ID, tenantId: TENANT_A, name: 'Standard', content: '<p>Body</p>',
       version: 1, createdAt: new Date(),
     });
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
   });
 
   it('returns null when the envelope is unknown', async () => {

@@ -8,14 +8,14 @@
  * chain is the reader that matters. A line the client declined must stop being
  * summed into what the inspection is worth.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { ServiceService } from '../../../server/services/service.service';
 
 const TENANT = 'tenant-lines-1';
@@ -36,8 +36,7 @@ describe('inspection service lines — scope changes at the door', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 't', createdAt: new Date(),
@@ -52,7 +51,7 @@ describe('inspection service lines — scope changes at the door', () => {
             active: true, sortOrder: 1, createdAt: new Date(), defaultEventTypeSlugs: [],
         } as never);
 
-        svc = new ServiceService({} as never);
+        svc = new ServiceService(testD1.binding);
     });
 
     afterEach(() => { sqlite.close(); });

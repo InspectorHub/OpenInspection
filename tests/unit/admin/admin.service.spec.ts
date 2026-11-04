@@ -12,11 +12,9 @@ import { asD1Db } from '../helpers/test-db';
 import { PeopleService } from '../../../server/services/people.service';
 
 // Mock the drizzle-orm/d1 module to return our in-memory SQLite DB
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: vi.fn(),
-}));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 describe('AdminService', () => {
     let adminService: AdminService;
@@ -30,7 +28,7 @@ describe('AdminService', () => {
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
 
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         mockKV = new MockKV();
         
         // Seed a default tenant to satisfy foreign keys
@@ -40,7 +38,7 @@ describe('AdminService', () => {
             createdAt: new Date(),
         });
 
-        adminService = new AdminService({} as any, mockKV as any);
+        adminService = new AdminService(testD1.binding, mockKV as any);
     });
 
     afterEach(() => {
@@ -225,7 +223,7 @@ describe('AdminService', () => {
         expect(contact).toBeUndefined();
         const ip = await testDb.select().from(inspectionPeople).where(eq(inspectionPeople.id, 'ip-privacy')).get();
         expect(ip).toBeUndefined();
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         const primary = await people.getPrimaryClient(tenantId, 'insp-1');
         expect(primary).toBeNull();
 

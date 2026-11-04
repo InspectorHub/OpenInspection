@@ -28,8 +28,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { hashPassword } from '../../../server/lib/password';
 import { buildKeyring, type JwtKeyring } from '../../../server/lib/jwt-keyring';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import { jwtAuthMiddleware } from '../../../server/lib/middleware/jwt-auth';
@@ -100,8 +100,7 @@ describe('the signed unsubscribe link', () => {
         db = fx.db as BetterSQLite3Database<typeof schema>;
         sqlite = fx.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         kv = makeKv();
 
         await db.insert(schema.tenants).values({
@@ -145,7 +144,7 @@ describe('the signed unsubscribe link', () => {
             return c.json({ success: false, error: { code: 'internal', message: String(err) } }, 500);
         });
         app.use('*', async (c, next) => {
-            c.env = { DB: {}, TENANT_CACHE: kv, JWT_SECRET: SECRET } as unknown as HonoConfig['Bindings'];
+            c.env = { DB: testD1.binding, TENANT_CACHE: kv, JWT_SECRET: SECRET } as unknown as HonoConfig['Bindings'];
             c.set('profile', { mode: 'standalone' } as unknown as HonoConfig['Variables']['profile']);
             c.set('keyringPromise', Promise.resolve(keyring) as unknown as HonoConfig['Variables']['keyringPromise']);
             c.set('services', {

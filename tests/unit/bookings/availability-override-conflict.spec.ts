@@ -2,13 +2,13 @@
  * Adding a blocking override for a date that already has one, or for an inspector who is not in the company,
  * is a refusal about the request (409 / 400), not a database failure (500).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { AvailabilityService } from '../../../server/services/availability.service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T1 = '00000000-0000-0000-0000-0000000000a1';
 const T2 = '00000000-0000-0000-0000-0000000000a2';
@@ -21,14 +21,14 @@ describe('AvailabilityService.addOverride refusals', () => {
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite);
-        vi.mocked(mockDrizzle).mockReturnValue(db as never);
+        testD1.use(db);
         const now = new Date();
         await db.insert(schema.tenants).values([T1, T2].map((id, i) => ({ id, slug: `t${i}`, status: 'active' as const, deploymentMode: 'shared' as const, tier: 'free' as const, createdAt: now })));
         await db.insert(schema.users).values([
             { id: MINE, tenantId: T1, email: 'mine@x.test', passwordHash: 'h', role: 'inspector', createdAt: now },
             { id: THEIRS, tenantId: T2, email: 'theirs@x.test', passwordHash: 'h', role: 'inspector', createdAt: now },
         ] as never);
-        service = new AvailabilityService({} as D1Database);
+        service = new AvailabilityService(testD1.binding);
     });
 
     const block = (inspectorId: string, date = '2026-12-24') => service.addOverride(T1, { inspectorId, date, isAvailable: false });

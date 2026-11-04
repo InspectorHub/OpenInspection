@@ -1,14 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AdminService } from '../../../server/services/admin.service';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: vi.fn(),
-}));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = 't1';
 const OTHER_TENANT = 't2';
@@ -44,7 +42,7 @@ describe('AdminService.getMembers — calendar sync metadata', () => {
         testDb = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 'acme', createdAt: new Date() },
@@ -63,7 +61,7 @@ describe('AdminService.getMembers — calendar sync metadata', () => {
         // AdminService's optional 2nd parameter is an IntegrationProvider, read
         // only by the tenant-update path (admin.service.ts:282). getMembers never
         // consults it, so there is nothing for a stand-in to stand in for.
-        adminService = new AdminService({} as unknown as D1Database);
+        adminService = new AdminService(testD1.binding);
     });
 
     afterEach(() => sqlite.close());

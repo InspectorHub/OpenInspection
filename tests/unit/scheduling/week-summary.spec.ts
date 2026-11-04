@@ -2,16 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../server/lib/db/schema';
 import weekSummaryRoutes from '../../../server/api/schedule-week-summary';
 import { BookingService } from '../../../server/services/booking.service';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: vi.fn(),
-}));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000aa';
 const INSPECTOR = 'user-inspector-1';
@@ -35,7 +33,7 @@ function buildApp(userId: string, role: Role) {
         await next();
     });
     app.route('/api/schedule', weekSummaryRoutes);
-    return { app, env: { DB: {} as D1Database } };
+    return { app, env: { DB: testD1.binding } };
 }
 
 type DaySummary = { date: string; status: string; label?: string };
@@ -60,7 +58,7 @@ describe('schedule week-summary', () => {
         testDb = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         const now = new Date();
         await testDb.insert(schema.tenants).values({

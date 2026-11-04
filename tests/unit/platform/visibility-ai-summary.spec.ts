@@ -5,16 +5,16 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asScopedDbSource } from '../helpers/test-db';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import aiRoutes from '../../../server/api/ai';
 import { AppError } from '../../../server/lib/errors';
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('POST /api/ai/auto-summary honours the inspection scope', () => {
     let db: ReturnType<typeof createTestDb>['db'];
@@ -22,7 +22,7 @@ describe('POST /api/ai/auto-summary honours the inspection scope', () => {
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         summarise = vi.fn(async () => ({ summary: 'ok', aiCallId: null }));
     });
 
@@ -42,7 +42,7 @@ describe('POST /api/ai/auto-summary honours the inspection scope', () => {
         app.route('/api/ai', aiRoutes);
         return app.request('/api/ai/auto-summary', {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ inspectionId }),
-        }, { DB: {}, JWT_SECRET: 'x' } as never);
+        }, { DB: testD1.binding, JWT_SECRET: 'x' } as never);
     };
 
     it('a restricted inspector gets 404 for an inspection outside their set, and no summary is built', async () => {

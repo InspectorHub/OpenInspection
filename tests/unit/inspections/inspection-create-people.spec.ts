@@ -6,7 +6,7 @@
  * InspectionService + ContactService against an in-memory SQLite DB,
  * mirroring the inspection-create-policy.spec.ts pattern.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ContactService } from '../../../server/services/contact.service';
 import { PeopleService } from '../../../server/services/people.service';
@@ -18,8 +18,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq, and } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000bb';
 
@@ -36,8 +36,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(testDb);
+    testD1.use(testDb);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     sdb = new ScopedDB(testDb as any, TENANT);
 
@@ -60,9 +59,9 @@ beforeEach(async () => {
     // profiles must exist for the write to land.
     await seedRoleProfiles(asD1Db(testDb), TENANT, new Date());
 
-    inspectionSvc = new InspectionService({} as D1Database, undefined, sdb);
-    contactSvc = new ContactService({} as D1Database);
-    peopleSvc = new PeopleService({ DB: {} as D1Database });
+    inspectionSvc = new InspectionService(testD1.binding, undefined, sdb);
+    contactSvc = new ContactService(testD1.binding);
+    peopleSvc = new PeopleService({ DB: testD1.binding });
 });
 
 // ---------------------------------------------------------------------------

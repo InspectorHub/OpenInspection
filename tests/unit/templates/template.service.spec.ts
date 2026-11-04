@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { TemplateService } from '../../../server/services/template.service';
 import { CreateTemplateSchema, TemplateSchemaV2Schema } from '../../../server/lib/validations/template.schema';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -21,9 +21,8 @@ describe('Spec 5B — TemplateService + v2 schema round-trip', () => {
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new TemplateService({} as D1Database);
+        testD1.use(testDb);
+        svc = new TemplateService(testD1.binding);
     });
 
     const validV2 = {

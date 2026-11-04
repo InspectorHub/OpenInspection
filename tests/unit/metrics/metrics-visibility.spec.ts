@@ -3,18 +3,17 @@
  * they may see other people's work. A restricted inspector who also holds `companyFinance` gets the
  * same own-row view as an inspector without it, never the company figures.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn } from '../helpers/test-db';
 import metricsRoutes from '../../../server/api/metrics';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 import { seedVisibilityFixture, TENANT, USERS, VISIBLE_TO_A, ALL_OF_TENANT } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 interface Payload {
     scope: 'all' | 'self';
@@ -32,7 +31,7 @@ describe('GET /api/metrics honours the scope', () => {
     let db: ReturnType<typeof createTestDb>['db'];
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
     });
 
     async function metrics(role: UserRole, actor: string, overrides: Record<string, boolean> | null): Promise<Payload> {
@@ -45,7 +44,7 @@ describe('GET /api/metrics honours the scope', () => {
             await next();
         });
         app.route('/api/metrics', metricsRoutes);
-        const res = await app.request('/api/metrics', {}, { DB: {} } as never, CTX);
+        const res = await app.request('/api/metrics', {}, { DB: testD1.binding } as never, CTX);
         expect(res.status).toBe(200);
         return ((await res.json()) as { data: Payload }).data;
     }

@@ -9,8 +9,8 @@ import * as schema from '../../../server/lib/db/schema';
 // ReportExportService calls `drizzle(this.db)` internally, so mocking
 // `drizzle-orm/d1`'s `drizzle` to return the in-memory better-sqlite3 db lets
 // the service share the same test database as the seed helpers below.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 function fakeR2(objects: Map<string, { body: Uint8Array }>): R2Bucket {
     return {
@@ -38,10 +38,9 @@ describe('ReportExportService (Commercial PCA Phase W Task 4)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         r2Objects = new Map();
-        svc = new ReportExportService({} as D1Database, fakeR2(r2Objects));
+        svc = new ReportExportService(testD1.binding, fakeR2(r2Objects));
     });
 
     it('create() inserts a queued row', async () => {

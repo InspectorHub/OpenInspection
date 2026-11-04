@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
@@ -13,8 +13,8 @@ import { and, eq } from 'drizzle-orm';
  * id-stamping. Mirrors the sms-api.spec harness: mock drizzle-orm/d1 → test
  * sqlite, mount smsWebhookRoutes, drive app.request().
  */
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import { smsWebhookRoutes, recordSentStatus } from '../../../server/api/sms';
@@ -27,7 +27,7 @@ const APP_BASE_URL = 'https://app.example.test';
 const PLATFORM_TOKEN = 'platform-auth-token';
 
 const FAKE_ENV = {
-    DB: {},
+    DB: testD1.binding,
     APP_BASE_URL,
     JWT_SECRET: 'test-secret',
     TWILIO_AUTH_TOKEN: PLATFORM_TOKEN,
@@ -52,7 +52,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>) {
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
     app.route('/webhooks', smsWebhookRoutes);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     return app;
 }
 
@@ -71,7 +71,7 @@ beforeEach(async () => {
     db = fx.db as BetterSQLite3Database<typeof schema>;
     sqlite = fx.sqlite;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await seedTenant(db, TENANT, 'acme');
 });
 

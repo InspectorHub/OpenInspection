@@ -5,7 +5,7 @@
  * lifetime counter, that deletes never refund it, and that a deploy with
  * no guard injected (standalone) stays unlimited.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { createTestDb, setupSchema, toRawD1 } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -16,8 +16,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // Drizzle instance (matches the pattern in inspection-create-policy.spec.ts
 // and plan-quota.spec.ts). PlanQuotaGuard's raw `db.prepare(...).bind(...).run()`
 // path bypasses this mock — it runs against `testD1` (the toRawD1 adapter).
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const fakeD1 = lazyD1();
 
 import { InspectionService } from '../../../server/services/inspection.service';
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
@@ -54,9 +54,8 @@ describe('Inspection creation consumes the free-tier quota (Task 3)', () => {
         testDb = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        testD1 = toRawD1(sqlite);
+        fakeD1.use(testDb);
+        testD1 = fakeD1.binding;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         sdb = new ScopedDB(testDb as any, TENANT);
 
@@ -67,7 +66,7 @@ describe('Inspection creation consumes the free-tier quota (Task 3)', () => {
     });
 
     function makeService(planQuota?: PlanQuotaGuard) {
-        return new InspectionService({} as D1Database, undefined, sdb, undefined, undefined, planQuota);
+        return new InspectionService(fakeD1.binding, undefined, sdb, undefined, undefined, planQuota);
     }
 
     it('blocks the 6th create for a free tenant with 402/QUOTA_EXHAUSTED', async () => {

@@ -16,21 +16,19 @@
 //       tenants row exists (returns the row's slug) and where no row exists
 //       (returns the '' fallback, which still exercises the lookup code path).
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
 // ------------------------------------------------------------------
 // We need resolveTenantSlug from server/lib/url.ts.
-// That module imports `drizzle` from 'drizzle-orm/d1' and passes
-// c.env.DB (a D1Database) to it.  In the test we intercept that call
-// and return our better-sqlite3 test database instead.
+// That module builds a drizzle handle from c.env.DB (a D1Database).  In the
+// test the binding is a real one over the in-memory database, wrapped so the
+// number of statements that reached it can be read.
 // ------------------------------------------------------------------
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { d1For } from '../helpers/d1-binding';
 
-// Import the function under test AFTER the mock is in place.
 import { resolveTenantSlug } from '../../../server/lib/url';
 
 const TENANT_ID   = '00000000-0000-0000-0000-000000000099';
@@ -38,14 +36,19 @@ const TENANT_SLUG = 'acme-inspect';
 
 describe('resolveTenantSlug', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
+    let binding: D1Database;
+    let statements = 0;
 
     beforeEach(async () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        // Wire the d1 mock to return our better-sqlite3 db.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        const real = d1For(setup.sqlite);
+        statements = 0;
+        binding = {
+            prepare: (sql: string) => { statements += 1; return real.prepare(sql); },
+            batch: (list: never) => (real.batch as (l: never) => unknown)(list),
+        } as unknown as D1Database;
     });
 
     // ------------------------------------------------------------------
@@ -55,14 +58,14 @@ describe('resolveTenantSlug', () => {
     it('(a) returns requestedTenantSlug from context when present', async () => {
         const ctx = {
             get: (_key: string) => 'from-ctx-slug',
-            env: { DB: {} /* real DB not needed — must not be called */ },
+            env: { DB: binding /* must not be called */ },
         } as unknown as Parameters<typeof resolveTenantSlug>[0];
 
         const result = await resolveTenantSlug(ctx, TENANT_ID);
 
         expect(result).toBe('from-ctx-slug');
-        // drizzle should never have been called because the ctx shortcut fired.
-        expect(mockDrizzle).not.toHaveBeenCalled();
+        // No statement reached the database because the ctx shortcut fired.
+        expect(statements).toBe(0);
     });
 
     // ------------------------------------------------------------------
@@ -84,7 +87,7 @@ describe('resolveTenantSlug', () => {
         const ctx = {
             // get() returns undefined/null → !fromCtx branch executes.
             get: (_key: string) => undefined,
-            env: { DB: {} /* mock intercepts and uses testDb */ },
+            env: { DB: binding },
         } as unknown as Parameters<typeof resolveTenantSlug>[0];
 
         const result = await resolveTenantSlug(ctx, TENANT_ID);
@@ -103,14 +106,14 @@ describe('resolveTenantSlug', () => {
         // No row inserted → lookup returns undefined → ?? '' → ''.
         const ctx = {
             get: (_key: string) => undefined,
-            env: { DB: {} },
+            env: { DB: binding },
         } as unknown as Parameters<typeof resolveTenantSlug>[0];
 
         const result = await resolveTenantSlug(ctx, TENANT_ID);
 
         // The '' result proves the lookup executed (the ?? '' is reached).
         expect(result).toBe('');
-        // And drizzle was invoked, confirming the DB path was taken.
-        expect(mockDrizzle).toHaveBeenCalled();
+        // And a statement reached the database, confirming the DB path was taken.
+        expect(statements).toBeGreaterThan(0);
     });
 });

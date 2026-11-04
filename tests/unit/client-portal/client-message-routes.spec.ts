@@ -8,8 +8,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // MessageService + PortalAccessService both build their drizzle handle via
 // `drizzle(this.db)` (drizzle-orm/d1). Mock that factory to hand back the
 // in-memory better-sqlite3 test DB (mirrors client-document-routes.spec.ts).
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { Hono } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -80,7 +80,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
     } as unknown as R2Bucket;
 
     function reqEnv(photos: R2Bucket = PHOTOS) {
-        return { JWT_SECRET: SECRET, DB: {} as D1Database, PHOTOS: photos } as unknown as HonoConfig['Bindings'];
+        return { JWT_SECRET: SECRET, DB: testD1.binding, PHOTOS: photos } as unknown as HonoConfig['Bindings'];
     }
 
     const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
@@ -108,15 +108,15 @@ describe('client message routes (resolveClientActor-gated)', () => {
             id: 'contact-client-1', tenantId: TENANT, type: 'client', name: 'Pat Client',
             email: 'client@x.com', phone: null, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, inspectionId, 'contact-client-1', `crp_${TENANT}_client`);
 
-        const portalAccess = new PortalAccessService({} as D1Database, { jwtSecret: SECRET });
+        const portalAccess = new PortalAccessService(testD1.binding, { jwtSecret: SECRET });
         const clientEmail = 'client@x.com';
         const clientToken = await portalAccess.issueToken({
             tenantId: TENANT, inspectionId, recipientEmail: clientEmail, role: 'client',
         });
-        const message = new MessageService({} as D1Database);
+        const message = new MessageService(testD1.binding);
         const app = buildApp(portalAccess, message);
         return { app, inspectionId, clientToken, clientEmail, portalAccess, message };
     }
@@ -125,8 +125,7 @@ describe('client message routes (resolveClientActor-gated)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

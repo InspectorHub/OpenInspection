@@ -12,13 +12,12 @@
  * an invite email, which is what a plain `company_name` read would produce for
  * a tenant whose config row is missing or blank.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq, sql } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 import { tenantDisplayName } from '../../../server/lib/tenant-display-name';
 
@@ -50,8 +49,6 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (vi.mocked(await import('drizzle-orm/d1')).drizzle as unknown as ReturnType<typeof vi.fn>)
-        .mockReturnValue(db);
 });
 
 describe('tenantDisplayName', () => {

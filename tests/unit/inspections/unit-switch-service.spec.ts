@@ -17,8 +17,8 @@ import { Errors } from '../../../server/lib/errors';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000099';
 const INSPECTION = '11111111-1111-1111-1111-111111111111';
@@ -67,9 +67,9 @@ describe('UnitSwitchService', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(testDb));
-        switchSvc = new UnitSwitchService({} as D1Database);
-        unitSvc = new UnitService({} as D1Database);
+        testD1.use(asD1DrizzleReturn(testDb));
+        switchSvc = new UnitSwitchService(testD1.binding);
+        unitSvc = new UnitService(testD1.binding);
     });
 
     it('toPerUnit promotes location_options into units and re-keys unambiguous findings', async () => {

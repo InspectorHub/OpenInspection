@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { UpdateBrandingSchema } from '../../../server/lib/validations/admin.schema';
 import { BrandingService } from '../../../server/services/branding.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('UpdateBrandingSchema — Round-2 #10 block-report-policy fields', () => {
     it('accepts blockUnpaid + blockUnsignedAgreement booleans', () => {
@@ -37,8 +37,7 @@ describe('BrandingService — Round-2 #10 persistence', () => {
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         await testDb.insert(schema.tenants).values({
             id: TENANT,
@@ -51,7 +50,7 @@ describe('BrandingService — Round-2 #10 persistence', () => {
     });
 
     it('persists blockUnpaid + blockUnsignedAgreement via updateBranding()', async () => {
-        const svc = new BrandingService({} as D1Database);
+        const svc = new BrandingService(testD1.binding);
 
         await svc.updateBranding(TENANT, {
             blockUnpaid: true,
@@ -68,7 +67,7 @@ describe('BrandingService — Round-2 #10 persistence', () => {
     });
 
     it('toggles both flags back to false on subsequent update', async () => {
-        const svc = new BrandingService({} as D1Database);
+        const svc = new BrandingService(testD1.binding);
 
         await svc.updateBranding(TENANT, {
             blockUnpaid: true,

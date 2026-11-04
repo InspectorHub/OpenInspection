@@ -9,13 +9,13 @@
  *   3. marketplace-imported rows (libraryId set) are searchable,
  *   4. the pagination total is exact under search.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import adminRoutes from '../../../server/api/admin';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -40,7 +40,7 @@ async function search(q: string, pageSize = 12): Promise<{ texts: string[]; tota
     const res = await buildApp().request(
         `/api/admin/comments?search=${encodeURIComponent(q)}&pageSize=${pageSize}`,
         {},
-        { DB: {} },
+        { DB: testD1.binding },
     );
     expect(res.status).toBe(200);
     const body = await res.json() as { data: Array<{ text: string }>; meta: { total: number } };
@@ -55,7 +55,7 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 't', createdAt: new Date(),
         });
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
     });
 
     it('finds a match that sorts beyond the first page (the legacy JS post-filter missed it)', async () => {
@@ -115,7 +115,7 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
         const res = await buildApp().request(
             '/api/admin/comments?filterMode=all&severity=significant',
             {},
-            { DB: {} },
+            { DB: testD1.binding },
         );
         expect(res.status).toBe(200);
         const body = await res.json() as { data: Array<{ text: string }> };

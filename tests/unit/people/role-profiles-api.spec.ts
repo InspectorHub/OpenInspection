@@ -16,8 +16,8 @@ import { AppError } from '../../../server/lib/errors';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import roleProfilesRoutes from '../../../server/api/role-profiles';
 import { asD1Db } from '../helpers/test-db';
@@ -35,7 +35,7 @@ function buildApp(userRole: string = 'owner') {
     app.use('*', async (c, next) => {
         c.set('userRole', userRole as HonoConfig['Variables']['userRole']);
         c.set('tenantId', TENANT_ID);
-        c.set('services', { people: new PeopleService({ DB: {} as D1Database }) } as unknown as HonoConfig['Variables']['services']);
+        c.set('services', { people: new PeopleService({ DB: testD1.binding }) } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
     app.route('/api/role-profiles', roleProfilesRoutes);
@@ -59,8 +59,7 @@ describe('/api/role-profiles', () => {
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT_ID, new Date(1));
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -70,7 +69,7 @@ describe('/api/role-profiles', () => {
 
     it('GET / lists the seeded system profiles', async () => {
         const app = buildApp();
-        const res = await app.request('/api/role-profiles', {}, { DB: {} });
+        const res = await app.request('/api/role-profiles', {}, { DB: testD1.binding });
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean; data: Array<{ key: string; isSystem: boolean }> };
         expect(body.success).toBe(true);
@@ -84,7 +83,7 @@ describe('/api/role-profiles', () => {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Property Manager', kind: 'other' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(createRes.status).toBe(201);
         const createBody = await createRes.json() as { success: boolean; data: { id: string; key: string; label: string; isSystem: boolean } };
         expect(createBody.success).toBe(true);
@@ -92,7 +91,7 @@ describe('/api/role-profiles', () => {
         expect(createBody.data.key).toBe('property_manager');
         expect(createBody.data.isSystem).toBe(false);
 
-        const listRes = await app.request('/api/role-profiles', {}, { DB: {} });
+        const listRes = await app.request('/api/role-profiles', {}, { DB: testD1.binding });
         const listBody = await listRes.json() as { success: boolean; data: Array<{ id: string; label: string }> };
         expect(listBody.data.some(p => p.id === createBody.data.id && p.label === 'Property Manager')).toBe(true);
     });
@@ -103,20 +102,20 @@ describe('/api/role-profiles', () => {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Lender', kind: 'other' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         const { data: created } = await createRes.json() as { data: { id: string } };
 
         const putRes = await app.request(`/api/role-profiles/${created.id}`, {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Mortgage Lender' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(putRes.status).toBe(200);
         const putBody = await putRes.json() as { success: boolean; data: { updated: boolean } };
         expect(putBody.success).toBe(true);
         expect(putBody.data.updated).toBe(true);
 
-        const listRes = await app.request('/api/role-profiles', {}, { DB: {} });
+        const listRes = await app.request('/api/role-profiles', {}, { DB: testD1.binding });
         const listBody = await listRes.json() as { data: Array<{ id: string; label: string }> };
         expect(listBody.data.find(p => p.id === created.id)?.label).toBe('Mortgage Lender');
     });
@@ -127,28 +126,28 @@ describe('/api/role-profiles', () => {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Surveyor', kind: 'other' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         const { data: created } = await createRes.json() as { data: { id: string } };
 
-        const delRes = await app.request(`/api/role-profiles/${created.id}`, { method: 'DELETE' }, { DB: {} });
+        const delRes = await app.request(`/api/role-profiles/${created.id}`, { method: 'DELETE' }, { DB: testD1.binding });
         expect(delRes.status).toBe(200);
         const delBody = await delRes.json() as { success: boolean; data: { deactivated: boolean } };
         expect(delBody.success).toBe(true);
         expect(delBody.data.deactivated).toBe(true);
 
-        const listRes = await app.request('/api/role-profiles', {}, { DB: {} });
+        const listRes = await app.request('/api/role-profiles', {}, { DB: testD1.binding });
         const listBody = await listRes.json() as { data: Array<{ id: string; active: boolean }> };
         expect(listBody.data.find(p => p.id === created.id)?.active).toBe(false);
     });
 
     it('DELETE /:id on an isSystem profile returns 409', async () => {
         const app = buildApp();
-        const listRes = await app.request('/api/role-profiles', {}, { DB: {} });
+        const listRes = await app.request('/api/role-profiles', {}, { DB: testD1.binding });
         const listBody = await listRes.json() as { data: Array<{ id: string; isSystem: boolean }> };
         const systemProfile = listBody.data.find(p => p.isSystem);
         expect(systemProfile).toBeTruthy();
 
-        const delRes = await app.request(`/api/role-profiles/${systemProfile!.id}`, { method: 'DELETE' }, { DB: {} });
+        const delRes = await app.request(`/api/role-profiles/${systemProfile!.id}`, { method: 'DELETE' }, { DB: testD1.binding });
         expect(delRes.status).toBe(409);
         const delBody = await delRes.json() as { success: boolean; error: { code: string } };
         expect(delBody.success).toBe(false);
@@ -157,7 +156,7 @@ describe('/api/role-profiles', () => {
 
     it('PUT /:id with active:false on an isSystem profile returns 409', async () => {
         const app = buildApp();
-        const listRes = await app.request('/api/role-profiles', {}, { DB: {} });
+        const listRes = await app.request('/api/role-profiles', {}, { DB: testD1.binding });
         const listBody = await listRes.json() as { data: Array<{ id: string; isSystem: boolean }> };
         const systemProfile = listBody.data.find(p => p.isSystem);
 
@@ -165,13 +164,13 @@ describe('/api/role-profiles', () => {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ active: false }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(putRes.status).toBe(409);
     });
 
     it('allows inspector role to GET (list) role profiles', async () => {
         const app = buildApp('inspector');
-        const res = await app.request('/api/role-profiles', {}, { DB: {} });
+        const res = await app.request('/api/role-profiles', {}, { DB: testD1.binding });
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean; data: Array<{ key: string; isSystem: boolean }> };
         expect(body.success).toBe(true);
@@ -185,7 +184,7 @@ describe('/api/role-profiles', () => {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Blocked', kind: 'other' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(403);
     });
 
@@ -196,7 +195,7 @@ describe('/api/role-profiles', () => {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Test Profile', kind: 'other' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         const { data: created } = await createRes.json() as { data: { id: string } };
 
         // Now try to update as inspector
@@ -205,7 +204,7 @@ describe('/api/role-profiles', () => {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Updated' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(putRes.status).toBe(403);
     });
 
@@ -216,14 +215,14 @@ describe('/api/role-profiles', () => {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Test Profile', kind: 'other' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         const { data: created } = await createRes.json() as { data: { id: string } };
 
         // Now try to delete as inspector
         const inspectorApp = buildApp('inspector');
         const delRes = await inspectorApp.request(`/api/role-profiles/${created.id}`, {
             method: 'DELETE',
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(delRes.status).toBe(403);
     });
 });

@@ -13,7 +13,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER = '00000000-0000-0000-0000-0000000000ff';
@@ -41,8 +42,7 @@ describe('tenant purge: unfinished chunked video uploads', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
         for (const [id, slug] of [[TENANT, 'acme'], [OTHER, 'other']] as const) {
             await db.insert(schema.tenants).values({ id, slug, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
         }
@@ -62,7 +62,7 @@ describe('tenant purge: unfinished chunked video uploads', () => {
         await seed(TENANT, 'bare', 'open', null);
         await seed(OTHER, 'theirs', 'open', 'up-theirs');
         const { bucket, aborted } = makeR2();
-        await new TenantPurgeService({} as D1Database, bucket, kv).purge(TENANT);
+        await new TenantPurgeService(testD1.binding, bucket, kv).purge(TENANT);
         expect(aborted.sort()).toEqual([
             `${TENANT}/inspections/i1/video-busy.mp4#up-busy`,
             `${TENANT}/inspections/i1/video-open.mp4#up-open`,
@@ -75,7 +75,7 @@ describe('tenant purge: unfinished chunked video uploads', () => {
         await seed(TENANT, 'a', 'open', 'up-a');
         await seed(TENANT, 'b', 'open', 'up-b');
         const { bucket, aborted } = makeR2('up-a');
-        await new TenantPurgeService({} as D1Database, bucket, kv).purge(TENANT);
+        await new TenantPurgeService(testD1.binding, bucket, kv).purge(TENANT);
         expect(aborted).toEqual([`${TENANT}/inspections/i1/video-b.mp4#up-b`]);
         expect(await db.select().from(schema.videoUploads).where(eq(schema.videoUploads.tenantId, TENANT)).all()).toHaveLength(0);
         expect(await db.select().from(schema.tenants).where(eq(schema.tenants.id, TENANT)).all()).toHaveLength(0);

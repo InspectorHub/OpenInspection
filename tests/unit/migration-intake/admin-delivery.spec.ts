@@ -34,8 +34,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import adminDataImportRoutes from '../../../server/api/admin/admin-data-import';
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
@@ -128,7 +128,7 @@ function post(path: string, body: unknown) {
     return app().request(
         path,
         { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
-        { DB: {} },
+        { DB: testD1.binding },
     );
 }
 
@@ -177,7 +177,7 @@ describe('POST /api/admin/import — delivering a converted bundle', () => {
         await setupSchema(sqlite);
         // The delivery path batches its update and its row inserts, and
         // better-sqlite3 is the one Drizzle driver with no `batch()`.
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(withBatch(db, sqlite)));
+        testD1.use(asD1DrizzleReturn(withBatch(db, sqlite)));
         for (const id of [TENANT, OTHER_TENANT]) {
             await db.insert(schema.tenants).values({
                 id, slug: id.slice(0, 8), status: 'active',
@@ -204,7 +204,7 @@ describe('POST /api/admin/import — delivering a converted bundle', () => {
      * endpoint has to refuse rather than trust.
      */
     async function seedWaiting(key: string, authorised = true): Promise<{ batchId: string }> {
-        const svc = new MigrationStageService({} as D1Database);
+        const svc = new MigrationStageService(testD1.binding);
         const created = await svc.createAssistanceBatch({
             tenantId: TENANT, createdBy: USER, intent: 'assisted.full',
             sourceKey: `${TENANT}/migrations/${key}/source.csv`,

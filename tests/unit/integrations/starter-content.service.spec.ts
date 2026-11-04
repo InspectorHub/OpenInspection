@@ -12,8 +12,8 @@ import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { seedStarterContent } from '../../../server/services/starter-content.service';
 import { CONTRACTOR_TYPES } from '../../../server/services/starter-content/fixtures/contractor-types';
 import { DEFECT_TRADES } from '@core/field-ui/shared/defect-fields.types';
@@ -30,8 +30,7 @@ describe('seedStarterContent', () => {
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         // Seed a tenant row to satisfy FKs.
         await testDb.insert(schema.tenants).values({
@@ -47,8 +46,7 @@ describe('seedStarterContent', () => {
     });
 
     it('seeds expected counts of each starter-content type', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await seedStarterContent({} as any, tenantId);
+        const result = await seedStarterContent(testD1.binding, tenantId);
 
         expect(result.inspectionTemplatesSeeded).toBe(7);
         expect(result.agreementTemplatesSeeded).toBe(1);
@@ -68,10 +66,8 @@ describe('seedStarterContent', () => {
     });
 
     it('is idempotent — calling twice does not duplicate rows', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await seedStarterContent({} as any, tenantId);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const second = await seedStarterContent({} as any, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
+        const second = await seedStarterContent(testD1.binding, tenantId);
 
         // Second call inserts nothing — every fixture row was already present.
         expect(second.inspectionTemplatesSeeded).toBe(0);
@@ -93,8 +89,7 @@ describe('seedStarterContent', () => {
         // the markup that can express it is. Emphasis is asserted as a TAG now,
         // so a silent slide back to Markdown fails here as well as in
         // tests/unit/agreements/starter-agreement-markup.spec.ts.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await seedStarterContent({} as any, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const row = await testDb.select({ content: schema.agreements.content })
             .from(schema.agreements)
             .where(eq(schema.agreements.tenantId, tenantId))
@@ -106,8 +101,7 @@ describe('seedStarterContent', () => {
     });
 
     it('event_types align with inspection-template names', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await seedStarterContent({} as any, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const rows = await testDb.select({ name: schema.eventTypes.name })
             .from(schema.eventTypes)
             .where(eq(schema.eventTypes.tenantId, tenantId))
@@ -119,8 +113,7 @@ describe('seedStarterContent', () => {
     });
 
     it('tags use the expected colors', async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await seedStarterContent({} as any, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const rows = await testDb.select({ name: schema.tags.name, color: schema.tags.color })
             .from(schema.tags)
             .where(eq(schema.tags.tenantId, tenantId))
@@ -140,8 +133,7 @@ describe('seedStarterContent', () => {
         // exactly the copy the derivation removed — assert the DERIVATION held
         // instead. The fixture's own shape is covered in
         // starter-content-contractor-types.spec.ts.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await seedStarterContent({} as any, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const rows = await testDb.select({
             name: schema.contractorTypes.name,
             sortOrder: schema.contractorTypes.sortOrder,
@@ -164,15 +156,13 @@ describe('seedStarterContent', () => {
         // The reason the seed matches on slug rather than name. There is no
         // unique index on this table, so a name-keyed seed would insert a second
         // row for a trade the workspace already has and nothing would object.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await seedStarterContent({} as any, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         await testDb.update(schema.contractorTypes)
             .set({ name: 'Our Sparky' })
             .where(eq(schema.contractorTypes.tradeSlug, 'licensed-electrician'))
             .run();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await seedStarterContent({} as any, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const electricians = await testDb.select({ name: schema.contractorTypes.name })
             .from(schema.contractorTypes)
             .where(eq(schema.contractorTypes.tradeSlug, 'licensed-electrician'))

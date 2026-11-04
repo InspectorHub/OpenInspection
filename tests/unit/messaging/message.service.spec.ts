@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { MessageService } from '../../../server/services/message.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -8,8 +8,8 @@ import { inspectionMessages, inspections, tenants, contacts } from '../../../ser
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 describe('MessageService', () => {
@@ -20,15 +20,13 @@ describe('MessageService', () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(tenants).values({ id: 't1', slug: 't1', createdAt: new Date() });
         await testDb.insert(inspections).values({
             id: 'i1', tenantId: 't1', propertyAddress: '1 Main', date: '2026-05-01',
             createdAt: new Date(), price: 0,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        svc = new MessageService({} as any);
+        svc = new MessageService(testD1.binding);
     });
 
     it('createMessage inserts a row and returns it', async () => {
@@ -107,7 +105,7 @@ describe('MessageService', () => {
         });
 
         it('resolves the client email from the primary-client join', async () => {
-            const people = new PeopleService({ DB: {} as D1Database });
+            const people = new PeopleService({ DB: testD1.binding });
             await people.addPerson('t1', 'i1', 'contact-client-1', roleProfileId('client'));
 
             const email = await svc.clientEmailForInspection('i1', 't1');
@@ -115,7 +113,7 @@ describe('MessageService', () => {
         });
 
         it('resolves the client name from the primary-client join', async () => {
-            const people = new PeopleService({ DB: {} as D1Database });
+            const people = new PeopleService({ DB: testD1.binding });
             await people.addPerson('t1', 'i1', 'contact-client-1', roleProfileId('client'));
 
             const name = await svc.clientNameForInspection('i1', 't1');
@@ -142,7 +140,7 @@ describe('MessageService', () => {
                 { id: 'contact-client-1', tenantId: 't1', type: 'client', name: 'Jane Client', email: 'jane@example.com', phone: null, createdAt: new Date() },
                 { id: 'contact-coclient-1', tenantId: 't1', type: 'client', name: 'Joe Spouse', email: 'joe@example.com', phone: null, createdAt: new Date() },
             ]);
-            const people = new PeopleService({ DB: {} as D1Database });
+            const people = new PeopleService({ DB: testD1.binding });
             await people.addPerson('t1', 'i1', 'contact-client-1', roleProfileId('client'));
             await people.addPerson('t1', 'i1', 'contact-coclient-1', roleProfileId('co_client'));
         });

@@ -4,10 +4,9 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import adminAgreementsRoutes from '../../../server/api/admin/admin-agreements';
@@ -17,7 +16,8 @@ import { logger } from '../../../server/lib/logger';
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const ENV_ID = 'env-own';
 const SIGNATURE = `data:image/png;base64,${'A'.repeat(80)}`;
@@ -27,7 +27,7 @@ describe('the inspector pre-sign and its audit row', () => {
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         await db.insert(schema.agreements).values({ id: 'agr-1', tenantId: TENANT, name: 'A', content: 'x', version: 1, createdAt: new Date() } as never);
         await db.insert(schema.agreementRequests).values({
             id: ENV_ID, tenantId: TENANT, inspectionId: INSP.own, agreementId: 'agr-1', clientEmail: 'c@example.test', status: 'pending', createdAt: new Date(),
@@ -50,7 +50,7 @@ describe('the inspector pre-sign and its audit row', () => {
         app.route('/api/admin', adminAgreementsRoutes as never);
         return app.request(`/api/admin/agreement-requests/${ENV_ID}/inspector-sign`, {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signatureBase64: SIGNATURE }),
-        }, { DB: {}, JWT_SECRET: 'a-secret-long-enough-for-the-keys' } as never);
+        }, { DB: testD1.binding, JWT_SECRET: 'a-secret-long-enough-for-the-keys' } as never);
     }
 
     it('succeeds and keeps the countersignature when the audit append throws, and raises an alert with ids only', async () => {

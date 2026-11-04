@@ -2,15 +2,15 @@
  * UnitService.update / delete / move resolve the unit by company AND inspection; a parent named on create,
  * bulk create or move must belong to the same inspection. A mismatch is "not found", never a partial write.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { UnitService } from '../../../server/services/unit.service';
 import { createTestDb, setupSchema } from '../db';
 import { asD1DrizzleReturn } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = 't-one';
 const OTHER = 't-two';
@@ -30,7 +30,7 @@ describe('UnitService inspection scoping', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(asD1DrizzleReturn(db));
         const now = new Date();
         await db.insert(schema.tenants).values([TENANT, OTHER].map((id) => ({
             id, slug: id, status: 'active' as const, deploymentMode: 'shared' as const, tier: 'free' as const, createdAt: now,
@@ -40,7 +40,7 @@ describe('UnitService inspection scoping', () => {
             price: 0, paymentRequired: false, agreementRequired: false, createdAt: now,
         });
         await db.insert(schema.inspections).values([insp(INSP_A, TENANT), insp(INSP_B, TENANT), insp('insp-x', OTHER)]);
-        svc = new UnitService({} as D1Database);
+        svc = new UnitService(testD1.binding);
         a = await svc.create(TENANT, { inspectionId: INSP_A, parentUnitId: null, kind: 'building', name: 'A' });
         aChild = await svc.create(TENANT, { inspectionId: INSP_A, parentUnitId: a.id, kind: 'floor', name: 'A1' });
         b = await svc.create(TENANT, { inspectionId: INSP_B, parentUnitId: null, kind: 'building', name: 'B' });

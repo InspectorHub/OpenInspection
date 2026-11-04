@@ -11,15 +11,15 @@
  * INSPECTOR granted `scheduleOthers` (may dispatch) and an owner, who cannot be
  * reduced by an override at all.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import sessionContextRoutes, { deploymentPayload } from '../../../server/api/session-context';
@@ -34,7 +34,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+    testD1.use(testDb);
     await testDb.insert(schema.tenants).values({
         id: TENANT_ID,
         slug: 'caps-co',
@@ -77,7 +77,7 @@ function buildApp(role: 'owner' | 'manager' | 'inspector') {
         } as never);
         c.set('profile', { mode: 'standalone', hasBilling: false, hasSeatQuota: false } as never);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (c as any).env = { APP_MODE: 'standalone', DB: {} as D1Database };
+        (c as any).env = { APP_MODE: 'standalone', DB: testD1.binding };
         await next();
     });
     app.route('/api/session', sessionContextRoutes);

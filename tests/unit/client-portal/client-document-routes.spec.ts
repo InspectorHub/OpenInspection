@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
@@ -7,8 +7,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // Both ClientDocumentService and PortalAccessService build their drizzle handle
 // via `drizzle(this.db)` (drizzle-orm/d1). Mock that factory to hand back the
 // in-memory better-sqlite3 test DB (mirrors portal-routes.spec.ts).
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { Hono } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -111,7 +111,7 @@ describe('client document routes (token-gated)', () => {
     async function seedInspectionWithClientToken() {
         const inspectionId = 'insp1';
         await seedInspection(inspectionId);
-        const portalAccess = new PortalAccessService({} as D1Database, { jwtSecret: SECRET });
+        const portalAccess = new PortalAccessService(testD1.binding, { jwtSecret: SECRET });
         // Real tokens via issueToken so resolvePortalAccess(?token=) resolves.
         const clientEmail = 'client@x.com';
         const otherClientEmail = 'other@x.com';
@@ -121,7 +121,7 @@ describe('client document routes (token-gated)', () => {
         const otherClientToken = await portalAccess.issueToken({
             tenantId: TENANT, inspectionId, recipientEmail: otherClientEmail, role: 'co_client',
         });
-        const docs = new ClientDocumentService({} as D1Database, makeFakeBucket());
+        const docs = new ClientDocumentService(testD1.binding, makeFakeBucket());
         const app = buildApp(portalAccess, docs);
         // Issue requests as the seeded inspector. Identity is injected by the
         // `/api/inspections/*` middleware in buildApp (tenantId + user.sub), so
@@ -135,8 +135,7 @@ describe('client document routes (token-gated)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -184,7 +183,7 @@ describe('client document routes (token-gated)', () => {
     it('GET list hides inspector-internal docs but shows inspector client_visible docs', async () => {
         const { app, inspectionId, clientToken } = await seedInspectionWithClientToken();
         // Seed two inspector-uploaded rows directly.
-        const docs = new ClientDocumentService({} as D1Database, makeFakeBucket());
+        const docs = new ClientDocumentService(testD1.binding, makeFakeBucket());
         await docs.create(TENANT, inspectionId, { kind: 'inspector', ref: 'u1', name: 'Inspector' },
             { filename: 'internal.pdf', contentType: 'application/pdf', category: 'other', visibility: 'internal', label: null, sizeBytes: 1 },
             new Uint8Array([1]));
@@ -270,7 +269,7 @@ describe('client document routes (token-gated)', () => {
             // No-identity app (does not inject tenantId/user).
             const bare = new Hono<HonoConfig>();
             bare.use('*', async (c, next) => {
-                c.set('services', { clientDocument: new ClientDocumentService({} as D1Database, makeFakeBucket()) } as never);
+                c.set('services', { clientDocument: new ClientDocumentService(testD1.binding, makeFakeBucket()) } as never);
                 await next();
             });
             bare.route('/api/inspections', inspectorDocumentsRoutes);

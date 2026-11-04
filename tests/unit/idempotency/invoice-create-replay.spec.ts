@@ -26,8 +26,8 @@ import { createTestDb, setupSchema } from '../db';
 
 // InvoiceService resolves its own drizzle handle off the D1 binding, so the
 // fixture DB is injected the way the rest of the invoice suites do it.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import invoiceRoutes from '../../../server/api/invoices';
 import { InvoiceService } from '../../../server/services/invoice.service';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
@@ -55,7 +55,7 @@ function buildApp(tenantId = TENANT) {
         c.set('tenantId', tenantId);
         c.set('user', { sub: USER_ID } as never);
         c.set('services', {
-            invoice: new InvoiceService({} as D1Database),
+            invoice: new InvoiceService(testD1.binding),
             qbo: { upsertInvoice: qboUpsertInvoice } as never,
         } as never);
         await next();
@@ -73,7 +73,7 @@ function buildApp(tenantId = TENANT) {
 
 // QBO_CLIENT_ID present, so the push the handler schedules is live and a
 // duplicate would be observable rather than compiled out.
-const ENV = { DB: {}, QBO_CLIENT_ID: 'qbo-test-client' } as never;
+const ENV = { DB: testD1.binding, QBO_CLIENT_ID: 'qbo-test-client' } as never;
 // `void p` did not even attach a catch, so a rejecting background promise was
 // an unhandled rejection outright. The helper settles both at teardown.
 const CTX = makeExecutionContext().ctx as never;
@@ -104,7 +104,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     qboUpsertInvoice = vi.fn().mockResolvedValue(undefined);
 
     for (const [id, slug] of [[TENANT, 'acme'], [OTHER_TENANT, 'globex']] as const) {

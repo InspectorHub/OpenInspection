@@ -3,7 +3,7 @@
  * per-company limit, tenant isolation, the capability whitelist, the grant ceiling
  * applied to a template's content, and archiving. Against the real migrations.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { PermissionTemplateService } from '../../../server/services/team/permission-templates.service';
 import { MAX_COMPANY_TEMPLATES } from '../../../server/lib/auth/permission-templates';
@@ -12,8 +12,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const OTHER = '11111111-1111-1111-1111-1111111111b2';
@@ -29,9 +29,8 @@ describe('PermissionTemplateService', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new PermissionTemplateService({} as D1Database);
+        testD1.use(db);
+        svc = new PermissionTemplateService(testD1.binding);
     });
 
     it('creates a template and lists it for its own company only', async () => {
@@ -125,8 +124,7 @@ describe('PermissionTemplateService', () => {
 
     it('a missing table lists nothing instead of failing the page', async () => {
         const fix = createTestDb(); // no migrations applied
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(fix.db);
+        testD1.use(fix.db);
         expect(await svc.list(TENANT)).toEqual([]);
     });
 });

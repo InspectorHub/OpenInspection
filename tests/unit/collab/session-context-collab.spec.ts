@@ -11,15 +11,15 @@
  *
  * Mirrors the structure of session-context-video.spec.ts.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { d1For, lazyD1 } from '../helpers/d1-binding';
+const fakeD1 = lazyD1();
 
 // Import routes AFTER mock is wired.
 import sessionContextRoutes from '../../../server/api/session-context';
@@ -34,7 +34,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+    fakeD1.use(testDb);
 });
 
 // ── seed helpers ──────────────────────────────────────────────────────────────
@@ -83,7 +83,7 @@ function buildApp() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (c as any).env = {
             APP_MODE: 'standalone',
-            DB: {} as D1Database,
+            DB: fakeD1.binding,
         };
         await next();
     });
@@ -146,22 +146,14 @@ describe('session-context collabEditing resolution', () => {
         // alone. That is acceptable because those values all came from that one
         // row anyway — a split could report a timezone while claiming the row was
         // unreadable — but it is a real difference, not a refactor.
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-            new Proxy(testDb, {
-                get(target, prop, receiver) {
-                    if (prop === 'select') {
-                        return (fields?: Record<string, unknown>) => {
-                            const keys = fields ? Object.keys(fields) : [];
-                            if (keys.includes('collabEditing')) {
-                                throw new Error('simulated DB failure');
-                            }
-                            return (target.select as (f?: unknown) => unknown)(fields);
-                        };
-                    }
-                    return Reflect.get(target, prop, receiver);
-                },
-            }) as unknown as typeof testDb,
-        );
+        const real = d1For(testDb);
+        fakeD1.useBinding({
+            prepare: (sql: string) => {
+                if (sql.includes('"is_collab_editing_enabled"')) throw new Error('simulated DB failure');
+                return real.prepare(sql);
+            },
+            batch: (list: never) => (real.batch as (l: never) => unknown)(list),
+        } as unknown as D1Database);
 
         const res = await buildApp().request('/api/session/context');
         expect(res.status).toBe(200);

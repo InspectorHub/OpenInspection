@@ -8,15 +8,15 @@
  * company and this member. Hand-entered overrides are not deleted (the calendar
  * feed ignores a removed member's rows).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const OTHER_TENANT = '22222222-2222-2222-2222-2222222222b2';
@@ -66,10 +66,9 @@ describe('removing a member cleans up their calendar', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seed(db);
-        svc = new TeamService({} as D1Database);
+        svc = new TeamService(testD1.binding);
     });
 
     it('deletes the member\'s connection, read calendars, links and synced overrides together with the soft-delete, and nobody else\'s', async () => {

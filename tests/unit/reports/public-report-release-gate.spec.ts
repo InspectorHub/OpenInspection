@@ -20,8 +20,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { Hono } from 'hono';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -103,14 +103,14 @@ describe('InspectionService.resolveReleaseGate — the rule', () => {
         } as never);
     }
 
-    const gate = () => new InspectionService({} as D1Database).resolveReleaseGate(INSP_ID, TENANT_ID);
+    const gate = () => new InspectionService(testD1.binding).resolveReleaseGate(INSP_ID, TENANT_ID);
 
     beforeEach(async () => {
         const setup = createTestDb();
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite as { close(): void };
         await setupSchema(sqlite as never);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
     });
     afterEach(() => sqlite.close());
 
@@ -192,7 +192,7 @@ describe('GET /api/public/report/:tenant/:id — the endpoint asks', () => {
         const resolveReleaseGate = vi.fn().mockResolvedValue(releaseGate ? { reason: releaseGate, paymentOutstanding: releaseGate === 'payment' } : null);
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding };
             c.set('services', {
                 portalAccess: {
                     resolveToken: vi.fn().mockResolvedValue({
@@ -218,7 +218,7 @@ describe('GET /api/public/report/:tenant/:id — the endpoint asks', () => {
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite as { close(): void };
         await setupSchema(sqlite as never);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
         await seedPublished();
     });
     afterEach(() => sqlite.close());
@@ -263,7 +263,7 @@ describe('the repair builder is a door onto the same report', () => {
         const setup = createTestDb();
         sqlite = setup.sqlite as { close(): void };
         await setupSchema(sqlite as never);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(setup.db);
+        testD1.use(setup.db);
         await (setup.db as BetterSQLite3Database<typeof schema>).insert(schema.tenants).values({
             id: TENANT_ID, slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -283,7 +283,7 @@ describe('the repair builder is a door onto the same report', () => {
     async function builderAnswer(releaseGate: 'payment' | 'agreement' | null): Promise<string> {
         const app = new Hono<HonoConfig>();
         app.get('/gate', async (c) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding };
             c.set('services', {
                 inspection: {
                     resolveReleaseGate: async () => (releaseGate ? { reason: releaseGate, paymentOutstanding: false } : null),
@@ -323,7 +323,7 @@ describe('the repair-request SHARE track is the fifth door', () => {
         const setup = createTestDb();
         sqlite = setup.sqlite as { close(): void };
         await setupSchema(sqlite as never);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(setup.db);
+        testD1.use(setup.db);
         const db = setup.db as BetterSQLite3Database<typeof schema>;
         await db.insert(schema.tenants).values({
             id: TENANT_ID, slug: SLUG, status: 'active',
@@ -341,7 +341,7 @@ describe('the repair-request SHARE track is the fifth door', () => {
     async function shareAnswer(releaseGate: 'payment' | 'agreement' | null): Promise<string> {
         const app = new Hono<HonoConfig>();
         app.get('/share', async (c) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding };
             c.set('services', {
                 repairRequest: {
                     getByShareToken: async () => ({

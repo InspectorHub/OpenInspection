@@ -13,13 +13,13 @@
  * and one that deletes EVERYTHING both satisfy "the subject's row is gone" or
  * "another tenant's row survives" on its own; only the pair separates them.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { ERASURE_MANIFEST } from '../../../server/lib/compliance/erasure-manifest';
@@ -60,7 +60,7 @@ beforeEach(async () => {
     const created = createTestDb();
     await setupSchema(created.sqlite);
     db = created.db;
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     for (const [id, slug] of [[TENANT, 'erase-me'], [OTHER_TENANT, 'bystander']] as const) {
         await db.insert(schema.tenants).values({

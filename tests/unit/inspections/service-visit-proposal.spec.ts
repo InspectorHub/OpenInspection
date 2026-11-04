@@ -9,14 +9,14 @@
  * consequence of that choice — a slug with no matching row degrades to a
  * shorter proposal instead of a dangling id or a 500 on the order screen.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { ServiceService } from '../../../server/services/service.service';
 
 const TENANT = 'tenant-visits-1';
@@ -49,8 +49,7 @@ describe('ServiceService.proposeEventsForService', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 't', createdAt: new Date(),
         });
@@ -58,7 +57,7 @@ describe('ServiceService.proposeEventsForService', () => {
         await addEventType('radon_pickup', 'Radon Pickup');
         await addService('svc-radon', 'Radon Testing', ['radon_dropoff', 'radon_pickup']);
         await addService('svc-sewer', 'Sewer Scope', []);
-        svc = new ServiceService({} as never);
+        svc = new ServiceService(testD1.binding);
     });
 
     afterEach(() => { sqlite.close(); });

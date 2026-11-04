@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { MarketplaceService } from '../../../server/services/marketplace.service';
-import { createTestDb, setupSchema, toRawD1 } from '../db';
+import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { marketplaceLibraries, tenantLibraryImports } from '../../../server/lib/db/schema/marketplace';
 import { MARKETPLACE_LIBRARIES } from '../../../server/services/starter-content/fixtures/marketplace';
 import { CANNED_COMMENTS } from '../../../server/services/starter-content/fixtures/canned-comments';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -26,11 +26,10 @@ describe('MarketplaceService — import + update against the unified catalogue',
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         // The comment-pack path runs raw SQL through rawDb.prepare(...).bind(...).run(),
         // so the raw D1 adapter is the constructor's first argument.
-        svc = new MarketplaceService(toRawD1(setup.sqlite), TENANT);
+        svc = new MarketplaceService(testD1.binding, TENANT);
     });
 
     it('Spec 5B P3 — rejects v1 catalogue templates with a clear error', async () => {

@@ -14,14 +14,14 @@
  * comes from the session and is never read from the body. The call-ownership
  * half lives here, in the function, because that is where every caller meets it.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { recordContentReview } from '../../../server/lib/ai/content-review';
 
 const MINE   = '00000000-0000-0000-0000-0000000000m1';
@@ -43,7 +43,7 @@ async function seedCall(id: string, tenantId: string) {
 const reviews = () => db.select().from(schema.aiContentReviews).all();
 
 const record = (tenantId: string, aiCallId: string) => recordContentReview({
-    db: {} as D1Database,
+    db: testD1.binding,
     tenantId,
     artifactType: 'inspection_result',
     artifactId: 'artifact-1',
@@ -55,8 +55,7 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
 });
 
 describe('recordContentReview — the call must belong to the workspace', () => {

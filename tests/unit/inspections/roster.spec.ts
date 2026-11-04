@@ -7,12 +7,11 @@
  * to get two different answers. It was proven to go red against a deliberately
  * wrong implementation that reads the column (see the comment on that test).
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { getInspectionRoster, getInspectionRosters } from '../../../server/lib/inspection/roster';
 
 const TENANT = 'tenant-roster-1';

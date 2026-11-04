@@ -3,15 +3,15 @@
  * signature encoding and the key selection are the server's own), packed the way the sign-off workflow packs them, and read back by
  * the browser-side verifier.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { zipSync, unzipSync, strToU8 } from 'fflate';
 import { asc } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AuditLogService } from '../../../server/services/audit-log.service';
 import { SigningKeyService } from '../../../server/services/signing-key.service';
 import { verifyEvidenceZip, MAX_EVENTS } from '../../../app/lib/evidence-zip-verify';
@@ -30,9 +30,9 @@ describe('the offline verifier and a server-built pack', () => {
         db = fixture.db;
         await setupSchema(fixture.sqlite);
         await db.insert(schema.tenants).values({ id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-        keys = new SigningKeyService({} as D1Database, 'unit-test-key-encryption-secret-32b');
-        audit = new AuditLogService({} as D1Database, keys);
+        testD1.use(db);
+        keys = new SigningKeyService(testD1.binding, 'unit-test-key-encryption-secret-32b');
+        audit = new AuditLogService(testD1.binding, keys);
     });
 
     const events = async () => (await db.select().from(schema.esignAuditLogs).orderBy(asc(schema.esignAuditLogs.createdAt)).all())

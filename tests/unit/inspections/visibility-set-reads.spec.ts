@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asScopedDbSource } from '../helpers/test-db';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { InspectionService } from '../../../server/services/inspection.service';
 import bulkRoutes from '../../../server/api/inspections/bulk';
@@ -11,14 +10,15 @@ import { ALL_INSPECTIONS, type InspectionScope } from '../../../server/lib/inspe
 import { seedVisibilityFixture, TENANT, USERS, VISIBLE_TO_A, ALL_OF_TENANT } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('set reads honour the scope (service level)', () => {
     let svc: InspectionService;
     beforeEach(async () => {
         const f = createTestDb(); await setupSchema(f.sqlite); await seedVisibilityFixture(f.db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(f.db));
-        svc = new InspectionService({} as D1Database, undefined, new ScopedDB(asScopedDbSource(f.db), TENANT));
+        testD1.use(f.db);
+        svc = new InspectionService(testD1.binding, undefined, new ScopedDB(asScopedDbSource(f.db), TENANT));
     });
     const A: InspectionScope = { kind: 'assigned', userId: USERS.inspA };
 
@@ -90,7 +90,7 @@ describe('set reads honour the scope (route level)', () => {
     let db: ReturnType<typeof createTestDb>['db'];
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
     });
 
     function build(userId: string, role: 'owner' | 'manager' | 'inspector') {
@@ -105,7 +105,7 @@ describe('set reads honour the scope (route level)', () => {
             c.set('tenantId', TENANT);
             c.set('sdb', sdb);
             c.set('services', {
-                inspection: new InspectionService({} as D1Database, undefined, sdb),
+                inspection: new InspectionService(testD1.binding, undefined, sdb),
                 concierge: { listAwaitingInspector: async () => ({ count: 0 }) },
             } as never);
             await next();
@@ -114,7 +114,7 @@ describe('set reads honour the scope (route level)', () => {
         return app;
     }
     const get = async (userId: string, role: 'owner' | 'manager' | 'inspector', path: string) => {
-        const res = await build(userId, role).request(path, {}, { DB: {} });
+        const res = await build(userId, role).request(path, {}, { DB: testD1.binding });
         return { status: res.status, body: await res.json() as { data: unknown; meta?: { counts?: { total: number } } } };
     };
     const ids = (rows: unknown) => (rows as Array<{ id: string }>).map(r => r.id).sort();

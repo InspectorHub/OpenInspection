@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { BookingService } from '../../../server/services/booking.service';
 import { tenants, users, services, availability, availabilityOverrides, inspections, inspectionInspectors, serviceInspectors } from '../../../server/lib/db/schema';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // 2026-06-08 is a Monday (dayOfWeek = 1).
 // Must stay future-dated if a past-date guard ever lands in the booking handler.
@@ -21,8 +21,8 @@ describe('BookingService tenant aggregation (IA-26)', () => {
         const setup = createTestDb();
         db = setup.db; sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new BookingService({} as any);
+        testD1.use(db);
+        svc = new BookingService(testD1.binding);
 
         await db.insert(tenants).values({ id: 't1', slug: 'acme', createdAt: new Date() });
         const u = (id: string, role: NonNullable<(typeof users.$inferInsert)['role']>) => ({

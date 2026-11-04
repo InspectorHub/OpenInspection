@@ -19,7 +19,7 @@
  * `handleInbound` parses (`server/api/sms.ts`). Nothing here invents a
  * provider payload.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { and, eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
@@ -28,10 +28,9 @@ import type { HonoConfig } from '../../../server/types/hono';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-// Imported AFTER the mock is registered.
 // eslint-disable-next-line import/order
 import { smsWebhookRoutes } from '../../../server/api/sms';
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
@@ -45,7 +44,7 @@ const PLATFORM_TOKEN = 'platform-auth-token';
 const PHONE = '+15557654321';
 
 const FAKE_ENV = {
-    DB: {},
+    DB: testD1.binding,
     APP_BASE_URL,
     JWT_SECRET: 'test-secret',
     TWILIO_AUTH_TOKEN: PLATFORM_TOKEN,
@@ -69,7 +68,7 @@ function buildApp() {
         await next();
     });
     app.route('/webhooks', smsWebhookRoutes);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     return app;
 }
 
@@ -78,12 +77,12 @@ beforeEach(async () => {
     db = fx.db as BetterSQLite3Database<typeof schema>;
     sqlite = fx.sqlite;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await db.insert(schema.tenants).values([
         { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         { id: OTHER_TENANT, slug: 'beta', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
     ] as never);
-    await new SmsConsentService({} as D1Database).publishDisclosure('disclosure v1');
+    await new SmsConsentService(testD1.binding).publishDisclosure('disclosure v1');
 });
 afterEach(() => sqlite.close());
 
@@ -152,7 +151,7 @@ describe('inbound STOP — every subject the number stands for', () => {
         expect(written.length).toBe(2);
         expect(written.map((r) => `${r.subjectKind}:${r.subjectId}`).sort())
             .toEqual(['contact:c-jane', 'user:u-jane']);
-        const svc = new SmsConsentService({} as D1Database);
+        const svc = new SmsConsentService(testD1.binding);
         expect(await svc.getLatest(TENANT, 'c-jane', 'contact')).toBe('revoked');
         expect(await svc.getLatest(TENANT, 'u-jane', 'user')).toBe('revoked');
     });
@@ -164,7 +163,7 @@ describe('inbound STOP — every subject the number stands for', () => {
         await inbound('/webhooks/sms/inbound/acme', 'STOP');
         await inbound('/webhooks/sms/inbound/acme', 'START');
 
-        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-staff', 'user'))
+        expect(await new SmsConsentService(testD1.binding).getLatest(TENANT, 'u-staff', 'user'))
             .toBe('granted');
     });
 
@@ -188,7 +187,7 @@ describe('inbound STOP — every subject the number stands for', () => {
 
         expect((await inbound('/webhooks/sms/inbound', 'STOP')).status).toBe(404);
 
-        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-acme', 'user')).toBeNull();
+        expect(await new SmsConsentService(testD1.binding).getLatest(TENANT, 'u-acme', 'user')).toBeNull();
         expect(await rows()).toHaveLength(0);
         expect(await rows(OTHER_TENANT)).toHaveLength(0);
     });
@@ -209,7 +208,7 @@ describe('inbound STOP — every subject the number stands for', () => {
 
         await inbound('/webhooks/sms/inbound/acme', 'START');
 
-        const svc = new SmsConsentService({} as D1Database);
+        const svc = new SmsConsentService(testD1.binding);
         expect(await svc.getLatest(TENANT, 'u-acme', 'user')).toBe('granted');
         expect(await svc.getLatest(OTHER_TENANT, 'u-beta', 'user')).toBe('revoked');
     });
@@ -220,7 +219,7 @@ describe('inbound STOP — every subject the number stands for', () => {
 
         await inbound('/webhooks/sms/inbound/acme', 'STOP');
 
-        const svc = new SmsConsentService({} as D1Database);
+        const svc = new SmsConsentService(testD1.binding);
         expect(await svc.getLatest(TENANT, 'u-acme', 'user')).toBe('revoked');
         expect(await svc.getLatest(OTHER_TENANT, 'u-beta', 'user')).toBeNull();
     });
@@ -243,7 +242,7 @@ describe('inbound replay — the provider message id is applied once', () => {
 
         await inbound('/webhooks/sms/inbound/acme', 'START', 'SM-start-1');
 
-        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-staff', 'user')).toBe('revoked');
+        expect(await new SmsConsentService(testD1.binding).getLatest(TENANT, 'u-staff', 'user')).toBe('revoked');
     });
 
     it('CONTROL: a fresh START (new message id) after that STOP does re-grant', async () => {
@@ -253,7 +252,7 @@ describe('inbound replay — the provider message id is applied once', () => {
 
         await inbound('/webhooks/sms/inbound/acme', 'START', 'SM-start-3');
 
-        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, 'u-staff', 'user')).toBe('granted');
+        expect(await new SmsConsentService(testD1.binding).getLatest(TENANT, 'u-staff', 'user')).toBe('granted');
     });
 
     it('the same message id on another company is not a replay of this one', async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -15,8 +15,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
  * Mirrors checkout-public.spec.ts: drizzle-orm/d1 is mocked to the test DB.
  */
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import { shouldUseCheckoutLink } from '../../../server/lib/agreement-link';
@@ -24,7 +24,7 @@ import { shouldUseCheckoutLink } from '../../../server/lib/agreement-link';
 const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 const INSP_ID = '00000000-0000-0000-0000-000000000010';
 const INV_ID = '00000000-0000-0000-0000-000000000030';
-const FAKE_DB = {} as unknown as D1Database;
+const FAKE_DB = testD1.binding;
 
 describe('shouldUseCheckoutLink (Track I-a Task 8)', () => {
     let db: BetterSQLite3Database<typeof schema>;
@@ -35,7 +35,7 @@ describe('shouldUseCheckoutLink (Track I-a Task 8)', () => {
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values({
             id: TENANT_ID, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),

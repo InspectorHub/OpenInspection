@@ -5,10 +5,9 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import evidenceRoutes from '../../../server/api/evidence';
@@ -17,7 +16,8 @@ import { AppError } from '../../../server/lib/errors';
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 type Role = 'owner' | 'manager' | 'inspector';
 const AGR = 'agr-1';
@@ -29,7 +29,7 @@ describe('agreement envelopes follow the visibility of their inspection', () => 
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         await db.insert(schema.agreements).values({ id: AGR, tenantId: TENANT, name: 'A', content: 'x', version: 1, createdAt: new Date() } as never);
         const env = (id: string, inspectionId: string) => ({
             id, tenantId: TENANT, inspectionId, agreementId: AGR, clientEmail: 'c@example.test', status: 'signed', signedAt: new Date(), createdAt: new Date(),
@@ -53,7 +53,7 @@ describe('agreement envelopes follow the visibility of their inspection', () => 
         app.route(mount, router as never);
         return app;
     }
-    const get = (app: OpenAPIHono<HonoConfig>, p: string) => app.request(p, undefined, { DB: {}, JWT_SECRET: 'x', PHOTOS: { get: r2Get } } as never);
+    const get = (app: OpenAPIHono<HonoConfig>, p: string) => app.request(p, undefined, { DB: testD1.binding, JWT_SECRET: 'x', PHOTOS: { get: r2Get } } as never);
 
     for (const file of ['pdf', 'certificate.pdf', 'evidence.zip']) {
         it(`${file}: a restricted inspector gets 404 for an envelope of an inspection outside their set, and nothing is read from storage`, async () => {
@@ -77,7 +77,7 @@ describe('agreement envelopes follow the visibility of their inspection', () => 
         await db.update(schema.agreementRequests).set({ status: 'pending' });
         const res = await app.request(`/api/admin/agreement-requests/${ENV.other}/inspector-sign`, {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signatureBase64: `data:image/png;base64,${'A'.repeat(80)}` }),
-        }, { DB: {}, JWT_SECRET: 'x' } as never);
+        }, { DB: testD1.binding, JWT_SECRET: 'x' } as never);
         expect(res.status).toBe(404);
         const row = await db.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, ENV.other)).get();
         expect(row?.inspectorSignatureBase64 ?? null).toBeNull();
@@ -88,7 +88,7 @@ describe('agreement envelopes follow the visibility of their inspection', () => 
         await db.update(schema.agreementRequests).set({ status: 'pending' });
         const res = await app.request(`/api/admin/agreement-requests/${ENV.own}/inspector-sign`, {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ signatureBase64: `data:image/png;base64,${'A'.repeat(80)}` }),
-        }, { DB: {}, JWT_SECRET: 'x' } as never);
+        }, { DB: testD1.binding, JWT_SECRET: 'x' } as never);
         expect(res.status).not.toBe(404);
         const row = await db.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, ENV.own)).get();
         expect(row?.inspectorSignatureBase64).not.toBeNull();

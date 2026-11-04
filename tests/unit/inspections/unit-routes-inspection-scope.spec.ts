@@ -5,12 +5,11 @@
  * must belong to the same inspection. The scoping is by inspection, not by role: owners and managers cannot
  * cross inspections by id either. A unit of another company answers like a missing one.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asScopedDbSource } from '../helpers/test-db';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { AppError } from '../../../server/lib/errors';
 import { registerInspectionScopeGuards } from '../../../server/lib/middleware/inspection-scope';
@@ -20,7 +19,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { seedVisibilityFixture, TENANT, OTHER_TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 type Persona = { userId: string; role: 'owner' | 'manager' | 'inspector' };
 const A: Persona = { userId: USERS.inspA, role: 'inspector' };
@@ -39,7 +39,7 @@ describe('unit routes are scoped to the inspection in the path', () => {
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         const row = (id: string, tenantId: string, inspectionId: string, parentUnitId: string | null, name: string) =>
             ({ id, tenantId, inspectionId, parentUnitId, kind: 'unit' as const, type: 'unit' as const, name, sortOrder: 5, createdAt: new Date() });
         await db.insert(schema.inspectionUnits).values([
@@ -66,14 +66,14 @@ describe('unit routes are scoped to the inspection in the path', () => {
             c.set('user', { sub: persona.userId, role: persona.role, tenantId: TENANT } as never);
             c.set('tenantId', TENANT);
             c.set('sdb', new ScopedDB(asScopedDbSource(db), TENANT));
-            c.set('services', { unit: new UnitService({} as D1Database) } as never);
+            c.set('services', { unit: new UnitService(testD1.binding) } as never);
             await next();
         });
         registerInspectionScopeGuards(app);
         app.route('/api/inspections', hierarchyApp);
         const init: RequestInit = { method };
         if (body !== undefined) { init.body = JSON.stringify(body); init.headers = { 'content-type': 'application/json' }; }
-        const res = await app.request(`/api/inspections/${path}`, init, { DB: {} } as never);
+        const res = await app.request(`/api/inspections/${path}`, init, { DB: testD1.binding } as never);
         return { status: res.status, body: await res.json().catch(() => null) as unknown };
     }
 

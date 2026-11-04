@@ -16,8 +16,8 @@ import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = 't-native';
 const ALICE = 'u-alice';
@@ -46,7 +46,7 @@ describe('native grants are revoked wherever pwchanged is written', () => {
     db = setup.db;
     sqlite = setup.sqlite;
     await setupSchema(setup.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await db.insert(schema.tenants).values({ id: TENANT, slug: 'nat', createdAt: new Date() });
     const passwordHash = await hashPassword('old-pass');
     await db.insert(schema.users).values([
@@ -59,14 +59,14 @@ describe('native grants are revoked wherever pwchanged is written', () => {
 
   it('updatePassword revokes the caller\'s grants and leaves other users\' alone', async () => {
     const { oauth, grants } = fakeOauth();
-    const svc = new AuthService({} as D1Database, kv as unknown as KVNamespace, undefined, oauth);
+    const svc = new AuthService(testD1.binding, kv as unknown as KVNamespace, undefined, oauth);
     await svc.updatePassword(ALICE, 'old-pass', 'new-pass-1');
     expect([...grants.keys()]).toEqual(['g-bob']);
   });
 
   it('resetPassword revokes the reset user\'s grants and leaves other users\' alone', async () => {
     const { oauth, grants } = fakeOauth();
-    const svc = new AuthService({} as D1Database, kv as unknown as KVNamespace, undefined, oauth);
+    const svc = new AuthService(testD1.binding, kv as unknown as KVNamespace, undefined, oauth);
     await kv.put('pw_reset:tok', `${ALICE}:${Math.floor(Date.now() / 1000)}`);
     await svc.resetPassword('tok', 'new-pass-2');
     expect([...grants.keys()]).toEqual(['g-bob']);
@@ -74,12 +74,12 @@ describe('native grants are revoked wherever pwchanged is written', () => {
 
   it('a failing provider does not block the password change', async () => {
     const { oauth } = fakeOauth(true);
-    const svc = new AuthService({} as D1Database, kv as unknown as KVNamespace, undefined, oauth);
+    const svc = new AuthService(testD1.binding, kv as unknown as KVNamespace, undefined, oauth);
     await expect(svc.updatePassword(ALICE, 'old-pass', 'new-pass-3')).resolves.toBeUndefined();
   });
 
   it('works without a provider (OAuth not mounted)', async () => {
-    const svc = new AuthService({} as D1Database, kv as unknown as KVNamespace);
+    const svc = new AuthService(testD1.binding, kv as unknown as KVNamespace);
     await expect(svc.updatePassword(ALICE, 'old-pass', 'new-pass-4')).resolves.toBeUndefined();
   });
 
@@ -103,7 +103,7 @@ describe('native grants are revoked wherever pwchanged is written', () => {
     const markers = () => [...(kv as unknown as { store: Map<string, string> }).store].filter(([k]) => k.startsWith('native-end:'));
 
     it('removing a member marks the native grant of the removed member member_removed and nothing else', async () => {
-      const team = new TeamService({} as D1Database, undefined, kv as unknown as KVNamespace, nativeOauth());
+      const team = new TeamService(testD1.binding, undefined, kv as unknown as KVNamespace, nativeOauth());
       await team.removeMember(TENANT, ALICE, BOB, 'owner');
       expect(markers()).toEqual([['native-end:g-alice-native', 'member_removed']]);
     });
@@ -114,7 +114,7 @@ describe('native grants are revoked wherever pwchanged is written', () => {
     });
 
     it('CONTROL: a password change revokes the grant but records no reason', async () => {
-      const svc = new AuthService({} as D1Database, kv as unknown as KVNamespace, undefined, nativeOauth());
+      const svc = new AuthService(testD1.binding, kv as unknown as KVNamespace, undefined, nativeOauth());
       await svc.updatePassword(ALICE, 'old-pass', 'new-pass-5');
       expect(markers()).toEqual([]);
     });

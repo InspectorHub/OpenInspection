@@ -5,7 +5,7 @@
  * spec below seeds the inspection with the LEGACY column NULL and only
  * inspection_people populated, so it fails against the pre-rewrite implementation.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { accessToInspection, listRecommendationsForAgent, referralsByDay } from '../../../server/services/agent/referral';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -15,8 +15,8 @@ import { REPORT_STATUS } from '../../../server/lib/status/report-status';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { asD1Db } from '../helpers/test-db';
 
 const T1 = '00000000-0000-0000-0000-000000000001';
@@ -34,7 +34,7 @@ async function seedCommon() {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: T1, slug: 'acme', status: 'active',
@@ -69,10 +69,10 @@ describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', (
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
             price: 0, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, 'i-1', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
 
-        const result = await accessToInspection({} as D1Database, AGENT_USER, 'i-1');
+        const result = await accessToInspection(testD1.binding, AGENT_USER, 'i-1');
         // Unset company policy reads as `read`; the answer travels with the grant so routes behind it apply the policy.
         expect(result).toEqual({ tenantId: T1, repairAccess: 'read' });
     });
@@ -83,13 +83,13 @@ describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', (
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
             price: 0, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, 'i-4', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
         await db.insert(schema.tenantConfigs).values({ tenantId: T1, inspectionPrefs: { agentRepairAccess: 'readwrite' }, updatedAt: new Date() } as never);
         // Control: a company that allows writing yields a non-`off` answer, so the `off` below is the policy and not a broken join.
-        expect((await accessToInspection({} as D1Database, AGENT_USER, 'i-4'))?.repairAccess).not.toBe('off');
+        expect((await accessToInspection(testD1.binding, AGENT_USER, 'i-4'))?.repairAccess).not.toBe('off');
         await db.update(schema.tenantConfigs).set({ inspectionPrefs: { agentRepairAccess: 'off' } } as never).where(eq(schema.tenantConfigs.tenantId, T1));
-        expect((await accessToInspection({} as D1Database, AGENT_USER, 'i-4'))?.repairAccess).toBe('off');
+        expect((await accessToInspection(testD1.binding, AGENT_USER, 'i-4'))?.repairAccess).toBe('off');
     });
 
     it('no buyer_agent inspection_people row — denies access even with an active link', async () => {
@@ -98,7 +98,7 @@ describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', (
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
             price: 0, createdAt: new Date(),
         });
-        const result = await accessToInspection({} as D1Database, AGENT_USER, 'i-2');
+        const result = await accessToInspection(testD1.binding, AGENT_USER, 'i-2');
         expect(result).toBeNull();
     });
 
@@ -108,10 +108,10 @@ describe('accessToInspection — buyer_agent via inspection_people (Task 9c)', (
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
             price: 0, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, 'i-3', OTHER_CONTACT, roleProfileId(T1, 'buyer_agent'));
 
-        const result = await accessToInspection({} as D1Database, AGENT_USER, 'i-3');
+        const result = await accessToInspection(testD1.binding, AGENT_USER, 'i-3');
         expect(result).toBeNull();
     });
 });
@@ -143,10 +143,10 @@ describe('listRecommendationsForAgent — buyer_agent via inspection_people (Tas
         await db.insert(schema.inspectionResults).values({
             id: 'res-1', tenantId: T1, inspectionId: 'i-1', data: resultsData, lastSyncedAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, 'i-1', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
 
-        const groups = await listRecommendationsForAgent({} as D1Database, AGENT_USER);
+        const groups = await listRecommendationsForAgent(testD1.binding, AGENT_USER);
         expect(groups.safety).toHaveLength(1);
         expect(groups.safety[0].defectTitle).toBe('Missing shingles');
     });
@@ -161,7 +161,7 @@ describe('listRecommendationsForAgent — buyer_agent via inspection_people (Tas
         await db.insert(schema.inspectionResults).values({
             id: 'res-2', tenantId: T1, inspectionId: 'i-2', data: resultsData, lastSyncedAt: new Date(),
         });
-        const groups = await listRecommendationsForAgent({} as D1Database, AGENT_USER);
+        const groups = await listRecommendationsForAgent(testD1.binding, AGENT_USER);
         expect(groups.safety).toHaveLength(0);
     });
 });
@@ -177,10 +177,10 @@ describe('referralsByDay — buyer_agent via inspection_people (Task 9c)', () =>
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
             price: 0, createdAt: today,
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, 'i-1', AGENT_CONTACT, roleProfileId(T1, 'buyer_agent'));
 
-        const { created } = await referralsByDay({} as D1Database, AGENT_USER, 7);
+        const { created } = await referralsByDay(testD1.binding, AGENT_USER, 7);
         expect(created[6]).toBe(1); // today = last index
         expect(created.reduce((a, b) => a + b, 0)).toBe(1);
     });
@@ -193,7 +193,7 @@ describe('referralsByDay — buyer_agent via inspection_people (Task 9c)', () =>
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid',
             price: 0, createdAt: today,
         });
-        const { created } = await referralsByDay({} as D1Database, AGENT_USER, 7);
+        const { created } = await referralsByDay(testD1.binding, AGENT_USER, 7);
         expect(created.reduce((a, b) => a + b, 0)).toBe(0);
     });
 });

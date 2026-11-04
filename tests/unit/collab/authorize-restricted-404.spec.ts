@@ -4,12 +4,11 @@
  * status does not tell them it exists. An unrestricted caller who is simply not on the roster is
  * still refused with 403 (control), and an assigned inspection still passes.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { authorizeCollab } from '../../../server/lib/collab/authorize';
@@ -17,14 +16,15 @@ import { ensurePrimaryReportAndResults } from '../../../server/lib/inspection/pr
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('authorizeCollab honours the scope', () => {
     let db: ReturnType<typeof createTestDb>['db'];
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         for (const id of [INSP.own, INSP.other]) await ensurePrimaryReportAndResults(db as never, TENANT, id, null, new Date());
     });
 
@@ -48,7 +48,7 @@ describe('authorizeCollab honours the scope', () => {
             const r = await authorizeCollab(c, inspectionId);
             return r.ok ? c.json({ ok: true }) : r.response;
         });
-        const res = await outer.request('/probe/x', {}, { DB: {}, INSPECTION_DOC: {} } as never);
+        const res = await outer.request('/probe/x', {}, { DB: testD1.binding, INSPECTION_DOC: {} } as never);
         return res.status;
     }
 

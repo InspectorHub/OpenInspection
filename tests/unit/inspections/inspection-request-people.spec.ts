@@ -26,8 +26,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { logger } from '../../../server/lib/logger';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT  = '00000000-0000-0000-0000-000000000001';
 const TPL1    = '11111111-1111-1111-1111-111111111111';
@@ -43,10 +43,9 @@ describe('InspectionRequestService.create — writes inspection_people (Task 7b/
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new InspectionRequestService({} as D1Database);
-        people = new PeopleService({ DB: {} as D1Database });
+        testD1.use(testDb);
+        svc = new InspectionRequestService(testD1.binding);
+        people = new PeopleService({ DB: testD1.binding });
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
@@ -150,10 +149,9 @@ describe('InspectionRequestService.addSubInspection — writes inspection_people
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new InspectionRequestService({} as D1Database);
-        people = new PeopleService({ DB: {} as D1Database });
+        testD1.use(testDb);
+        svc = new InspectionRequestService(testD1.binding);
+        people = new PeopleService({ DB: testD1.binding });
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
