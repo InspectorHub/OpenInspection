@@ -259,6 +259,13 @@ export const SCRIPT_GATES = [
     { key: 'providerhelpers', label: 'lint:provider-helpers', script: 'check-provider-helpers.mjs', fix: 'npm run lint:provider-helpers', rung: PUSH },
     { key: 'notificationdispatch', label: 'lint:notification-dispatch', script: 'check-notification-dispatch.mjs', fix: 'npm run lint:notification-dispatch', rung: PUSH },
     { key: 'tests', label: 'lint:tests', script: 'check-test-layout.mjs', fix: 'npm run lint:tests', rung: PUSH },
+    // Every spec listed as shareable in tests/unit/isolation.json still obeys the rules that made it
+    // shareable (no module mock, no global or env write, no timers, no module that keeps state).
+    // PUSH, not PRECOMMIT: the walk reads ~660 specs and their import closures (about 2 s), and the
+    // failure appears in a different spec from the one that caused it, so the answer matters at the
+    // point a branch is shared, not on every commit. The CI shuffled run of the shared project is the
+    // dynamic half of the same check.
+    { key: 'unitisolation', label: 'lint:unit-isolation', script: 'check-unit-isolation.mjs', fix: 'npm run lint:unit-isolation', rung: PUSH },
     // The other direction of `tests` above, and the most expensive entry in
     // this list by an order of magnitude: it spawns `playwright test --list`
     // once per playwright config (5 today, ~10-15s in total) because Playwright

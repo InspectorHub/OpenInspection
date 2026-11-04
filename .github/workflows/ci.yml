@@ -288,16 +288,16 @@ jobs:
   # dominates `tests` because 723 spec files each rebuild the module graph in
   # their own process.
   #
-  # Sharding buys the wall-clock back WITHOUT touching a single test. Each shard
-  # is an ordinary, fully isolated run of a subset — no shared state, no new
-  # failure mode. Measured locally: shard 1/4 is 181 files / 1448 tests in 148s
-  # against 422s for the whole suite.
+  # Sharding buys the wall-clock back WITHOUT touching a single test: each shard
+  # is a run of a subset of the files, with no new failure mode of its own.
   #
-  # ⚠️ The other way to attack the same term — relaxing vitest's per-file process
-  # isolation — was investigated and REJECTED, not merely skipped. 348 specs mock
-  # `drizzle-orm/d1` at module scope and share one `vi.fn()` once the registry is
-  # shared; vitest offers no per-file isolation override. The measurement that
-  # settled it is kept beside the setting it protects, in `vitest.api.config.ts`.
+  # Relaxing vitest's per-file isolation for the WHOLE suite was investigated and
+  # rejected: hundreds of specs mock `drizzle-orm/d1` at module scope and share
+  # one `vi.fn()` once the registry is shared. Isolation is therefore relaxed only
+  # for the specs listed in tests/unit/isolation.json (vitest project
+  # `api-shared`), which `npm run lint:unit-isolation` keeps free of mocks, global
+  # writes and stateful modules; every other spec stays in `api-isolated`. The
+  # shuffled second step below is the dynamic check on that list.
   #
   # `fail-fast: false` so one red shard does not hide the others' results.
   test-unit:
@@ -316,6 +316,19 @@ jobs:
       - run: npm ci
       - run: npm run gen-version
       - run: npm run test:unit -- --shard=${{ matrix.shard }}/4
+      # The specs listed as shareable in tests/unit/isolation.json run with
+      # `isolate: false` in the step above, in whatever order the shard hands them
+      # out. Run just that project again with files and tests shuffled: a spec that
+      # only passes because of what ran before it in the same worker fails here
+      # instead of weeks later in an unrelated pull request. The seed is printed at the
+      # START of the run. Replay locally with: npx vitest run --config
+      # vitest.api.config.ts --project api-shared --sequence.shuffle
+      # --sequence.seed=<seed> --maxWorkers=1 (plus the same --shard). One worker is
+      # the faithful replay: with isolate false, which files share a worker depends on
+      # scheduling. Shuffle also reorders tests inside a file, so a failure may be an
+      # order-dependent test within one file rather than a sharing leak. Same shard
+      # split as above, so each file is still handled by exactly one job.
+      - run: npm run test:unit:shared-shuffled -- --shard=${{ matrix.shard }}/4
 
   # Our outbound payloads against Intuit's own vendored schemas. No network, no
   # credentials, ~0.3s — so it is its own job rather than a tail on another,
