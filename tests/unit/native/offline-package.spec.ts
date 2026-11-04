@@ -4,7 +4,7 @@
  * minus the fault is accepted) so a reader that rejects everything cannot pass.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { unzipSync, zipSync } from 'fflate';
+import { zipSync } from 'fflate';
 import {
     OfflinePackageManifestSchema, OutboxEntrySchema, OutboxSchema, MediaIndexSchema, OFFLINE_ID_PATTERN,
     PACKAGE_MAX_AGE_DAYS, APPLIED_RECORD_RETENTION_DAYS,
@@ -21,9 +21,22 @@ const MAX_PACKAGE_BYTES = DEFAULT_IMPORT_LIMITS.compressedBytes;
 // Counts inflate passes. Every pass re-reads the zip's whole central directory, so the count is
 // the cost of reading a package's entries, independent of how fast the machine is.
 const passes = vi.hoisted(() => ({ count: 0 }));
+// Counts the bytes the streaming inflater produced. The bounded reads are judged on this work
+// figure, not on a clock: it is the same on a loaded machine and an idle one.
+const inflated = vi.hoisted(() => ({ bytes: 0, pushes: 0 }));
 vi.mock('fflate', async (importOriginal) => {
     const real = await importOriginal<typeof import('fflate')>();
-    return { ...real, unzipSync: ((...args: Parameters<typeof real.unzipSync>) => { passes.count++; return real.unzipSync(...args); }) as typeof real.unzipSync };
+    class CountingInflate extends real.Inflate {
+        constructor(cb?: (chunk: Uint8Array, final: boolean) => void) {
+            super((chunk: Uint8Array, final: boolean) => { inflated.bytes += chunk.byteLength; cb?.(chunk, final); });
+        }
+        push(chunk: Uint8Array, final?: boolean): void { inflated.pushes++; super.push(chunk, final); }
+    }
+    return {
+        ...real,
+        Inflate: CountingInflate,
+        unzipSync: ((...args: Parameters<typeof real.unzipSync>) => { passes.count++; return real.unzipSync(...args); }) as typeof real.unzipSync,
+    };
 });
 
 const manifest = {
@@ -318,53 +331,56 @@ describe('offline package archive listing', () => {
 
     describe('CPU spent on an entry is bounded by what it declares', () => {
         const MIB = 1024 * 1024;
-        /** Wall time of `fn` in milliseconds. */
-        const timed = <T>(fn: () => T): { value: T; ms: number } => {
-            const start = performance.now();
-            const value = fn();
-            return { value, ms: performance.now() - start };
-        };
         /**
-         * Bounded work is judged against the unbounded work done on the same machine in the same run,
-         * not against a wall-clock figure: a slow runner slows both, and a bound that holds only on a
-         * fast one would fail for the wrong reason.
+         * Work done by `fn`, in bytes the inflater produced. Bounded reads are judged on this count
+         * (positive control: the unbounded read of the same stream), never on elapsed time.
          */
-        const FASTER_BY = 5;
-        const unboundedMs = (zip: Uint8Array): number => timed(() => unzipSync(zip)).ms;
+        const inflatedBy = <T>(fn: () => T): { value: T; bytes: number } => {
+            inflated.bytes = 0;
+            const value = fn();
+            return { value, bytes: inflated.bytes };
+        };
+        /** Generous: one inflater step may overshoot a declaration by about twice the declaration plus ~132 KB. */
+        const overshootLimit = (declared: number): number => 3 * declared + 256 * 1024;
 
-        it('refuses an entry that declares 10 bytes and carries a 64 MiB zero stream, from the directory and at once (positive control: the honest entry)', () => {
-            const honest = zipSync({ 'yjs/insp-1.bin': [new Uint8Array(64 * MIB), { level: 9 }] });
+        it('refuses an entry that declares 10 bytes and carries a 32 MiB zero stream, from the directory and at once (positive control: the honest entry)', () => {
+            const honest = zipSync({ 'yjs/insp-1.bin': [new Uint8Array(32 * MIB), { level: 9 }] });
             expect(honest.byteLength, 'the bomb is small on the wire').toBeLessThan(200 * 1024);
             const bomb = declareEntrySize(honest, 'yjs/insp-1.bin', 10);
 
-            const inflateAll = unboundedMs(honest);
-            const listed = timed(() => listPackage(bomb));
+            const listed = inflatedBy(() => listPackage(bomb));
             expect(listed.value.ok).toBe(false);
             if (!listed.value.ok) expect(listed.value.reason).toMatch(/compressed data/);
-            expect(listed.ms, 'refused without inflating anything').toBeLessThan(inflateAll / FASTER_BY);
-            expect(timed(() => verifyPackageEntries(bomb, new Map([['yjs/insp-1.bin', 10]]))).ms).toBeLessThan(inflateAll / FASTER_BY);
+            expect(listed.bytes, 'refused without inflating anything').toBe(0);
+            const verified = inflatedBy(() => verifyPackageEntries(bomb, new Map([['yjs/insp-1.bin', 10]])));
+            expect(verified.bytes, 'refused without inflating anything').toBe(0);
+            expect(inflatedBy(() => readPackageEntry(bomb, 'yjs/insp-1.bin', 10)).bytes).toBe(0);
             expect(readPackageEntry(bomb, 'yjs/insp-1.bin', 10)).toBeNull();
 
             // Control: the same stream declaring a size an encoder could have produced it from is not refused by the directory.
             expect(listPackage(declareEntrySize(honest, 'yjs/insp-1.bin', 100_000)).ok).toBe(true);
+            // Control for the instrument: the honest read of the whole stream does register its full size.
+            expect(inflatedBy(() => readPackageEntry(honest, 'yjs/insp-1.bin', 32 * MIB)).bytes).toBe(32 * MIB);
         });
 
         it('stops inflating an entry that declares about what it carries but expands a thousand-fold (positive control: the directory accepts it)', () => {
-            // 128 MiB of zeros is ~130 KB compressed. Declaring 200 KB passes the directory checks,
+            // 32 MiB of zeros is ~32 KB compressed. Declaring 200 KB passes the directory checks,
             // and only the inflater can find out how much the stream really holds.
-            const honest = zipSync({ 'yjs/insp-1.bin': [new Uint8Array(128 * MIB), { level: 9 }] });
+            const honest = zipSync({ 'yjs/insp-1.bin': [new Uint8Array(32 * MIB), { level: 9 }] });
             expect(honest.byteLength).toBeLessThan(200 * 1024);
             const bomb = declareEntrySize(honest, 'yjs/insp-1.bin', 200 * 1024);
             const wanted = new Map([['yjs/insp-1.bin', 200 * 1024]]);
             expect(listPackage(bomb).ok, 'the directory alone looks fine').toBe(true);
 
-            const inflateAll = unboundedMs(honest);
-            const verified = timed(() => verifyPackageEntries(bomb, wanted));
+            const verified = inflatedBy(() => verifyPackageEntries(bomb, wanted));
             expect(verified.value).toBe('yjs/insp-1.bin');
-            expect(verified.ms, 'abandoned as soon as it passes its declaration').toBeLessThan(inflateAll / FASTER_BY);
-            const read = timed(() => readPackageEntry(bomb, 'yjs/insp-1.bin', 200 * 1024));
+            expect(verified.bytes, 'abandoned as soon as it passes its declaration').toBeGreaterThan(0);
+            expect(verified.bytes, 'abandoned as soon as it passes its declaration').toBeLessThan(overshootLimit(200 * 1024));
+            const read = inflatedBy(() => readPackageEntry(bomb, 'yjs/insp-1.bin', 200 * 1024));
             expect(read.value).toBeNull();
-            expect(read.ms, 'abandoned as soon as it passes its declaration').toBeLessThan(inflateAll / FASTER_BY);
+            expect(read.bytes, 'abandoned as soon as it passes its declaration').toBeLessThan(overshootLimit(200 * 1024));
+            // Control for the instrument: left unbounded, the same stream would have produced 32 MiB.
+            expect(overshootLimit(200 * 1024)).toBeLessThan(32 * MIB / 20);
         });
 
         it('still reads a legitimate entry that compresses about 1000:1 (declared size equals actual size)', () => {

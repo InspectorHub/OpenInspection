@@ -40,6 +40,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Explicit per-test and per-hook ceilings. Vitest's own defaults (5 s / 10 s) were in force before
+    // this and are tight for a machine that runs several heavy processes at once: the slowest single
+    // tests in recent full runs took 10-20 s under load (route-metadata and projection-gate specs), and
+    // specs that know they are slow already carry their own larger argument. A hung promise still
+    // fails, at this ceiling, rather than waiting for the job-level CI timeout.
+    testTimeout: 30_000,
+    hookTimeout: 60_000,
     // Every run leaves a machine-readable record behind, because the console
     // one is not durable and an intermittent failure only shows up in a run
     // nobody was watching.

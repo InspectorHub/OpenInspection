@@ -41,7 +41,8 @@
  */
 import ts from 'typescript';
 import { isContainerName } from './public-projection-containers.mjs';
-import { collectDeclarations, resolveConst, returnedExpressions, unwrap } from './public-projection-scope.mjs';
+import { collectDeclarations, isStoredThenReturned, resolveConst, returnedExpressions, unwrap } from './public-projection-scope.mjs';
+import { isPassthroughImport } from './public-projection-imports.mjs';
 
 export const MIN_REASON = 10;
 const ALLOW_RE = /projection-allow:(.*)/;
@@ -132,7 +133,8 @@ function isProjectedCall(e, decl, depth) {
         if (receiverName === 'JSON' && method === 'stringify') return e.arguments.length > 0 && isProjected(e.arguments[0], decl, depth + 1);
         if (SCHEMA_PARSE.has(method) && receiverName.endsWith('Schema')) {
             const declared = decl.consts.get(receiverName);
-            return declared === undefined || !OPEN_SCHEMA.test(declared.getText());
+            if (declared === undefined) return !isPassthroughImport(receiverName, decl);
+            return !OPEN_SCHEMA.test(declared.getText());
         }
     }
     if (PRIMITIVE_METHODS.has(method)) return true;
@@ -270,7 +272,8 @@ function responseSite(node, contexts) {
 function isReturned(node) {
     let n = node;
     while (n.parent && (ts.isParenthesizedExpression(n.parent) || ts.isAwaitExpression(n.parent) || ts.isAsExpression(n.parent) || ts.isNonNullExpression(n.parent))) n = n.parent;
-    return n.parent !== undefined && (ts.isReturnStatement(n.parent) || (ts.isArrowFunction(n.parent) && n.parent.body === n));
+    if (n.parent !== undefined && (ts.isReturnStatement(n.parent) || (ts.isArrowFunction(n.parent) && n.parent.body === n))) return true;
+    return isStoredThenReturned(n);
 }
 
 /**
@@ -289,9 +292,13 @@ function unknownResponseHelper(node, contexts, decl) {
     return NON_RESPONSE_HELPERS.test(name) || !isReturned(node) ? null : name;
 }
 
-export function detectPublicProjection(src, path = 'route.ts') {
+export function detectPublicProjection(src, path = 'route.ts', options = {}) {
     const sf = ts.createSourceFile(path, src, ts.ScriptTarget.Latest, true, path.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
     const decl = collectDeclarations(sf);
+    // `options.readImport(fromModule, name)` answers `{ init, module }` for the exported const `name` of the module this file imports it from
+    // (`init` is its initializer text, `module` where a name used at its head is found), or null when it cannot be read.
+    // Without it an imported schema is taken at its word, as it always was.
+    if (options.readImport !== undefined) decl.readImport = options.readImport;
     const violations = [];
     let sites = 0;
     const lineOf = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;

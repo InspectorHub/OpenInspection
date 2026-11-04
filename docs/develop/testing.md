@@ -141,7 +141,8 @@ tests/
   reason, and stays there). A new spec is isolated until the generator lists it, so
   nothing breaks by default.
 - **CI re-runs the shared project shuffled** (`npm run test:unit:shared-shuffled`, same
-  `--shard=N/4` split). The seed is printed at the START of the run. To replay a failure:
+  `--shard=N/4` flag, applied to the shared project alone, so a file can sit on a different shard
+  number than in the main run). The seed is printed at the START of the run. To replay a failure:
   `npx vitest run --config vitest.api.config.ts --project api-shared --sequence.shuffle --sequence.seed=<seed> --maxWorkers=1`
   (plus the same `--shard=N/4`). Use one worker: with `isolate: false` which files share a
   worker depends on scheduling, so only a single worker reproduces the order. Shuffle also

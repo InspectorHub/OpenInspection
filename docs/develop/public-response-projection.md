@@ -67,9 +67,24 @@ property of the response object, not only `data`.
   covered without editing a list. Any other name copied under its own name is taken at its word. An optional chain on a plain
   identifier (`row?.total`) still counts as a pick, and `.length` is accepted on any receiver (`a.b.length`) because it is a number. A property assigned after the declaration is not followed. A call that hands the
   request context and another value to a function the file does not declare, and whose value the handler returns (`return fail(c, row)`),
-  is reported as an unknown response helper; a helper whose value is stored first and returned later is not seen. A schema `.parse(...)`
-  counts as a projection unless the schema in the same file is `z.any()` or passes unknown keys through; a schema imported from
-  elsewhere is taken at its word. The gate finds a response with no field list; it does not judge whether a list names too much.
+  is reported as an unknown response helper, and so is one whose value is stored in a `const` and returned unconditionally later
+  (`const res = await created(c, row); return res;`); a return under an `if` that tests the name (`if (denied) return denied;`) is the
+  guard pattern and is not reported. A schema `.parse(...)` counts as a projection unless the schema in the same file is `z.any()` or passes
+  unknown keys through; a schema imported from a relative module is read there (`scripts/lib/public-projection-imports.mjs`, followed through
+  `B.extend(...)`-style chains a few steps) and is not accepted when it is declared `.passthrough()`, `.loose()` or `z.looseObject(...)`. A
+  `z.unknown()` field inside it does not count, because that is one opaque value and not a whole row. A schema from a package or a path
+  alias, or one that cannot be read, is taken at its word. The gate finds a response with no field list; it does not judge whether a list
+  names too much.
+- **Shapes the gate does not scan, and why:**
+  - *HTML and redirects* (`c.html(...)`, `c.redirect(...)`): the content is a string, and nothing in the syntax tells a field list from
+    an interpolated row; the control there is escaping, which this gate cannot judge. A redirect carries a location, not a record.
+  - *A projector trusted by name* (`project<Something>` imported from a projection module): the name is the whole check. Reading the
+    function it names would be possible, but a projector may legitimately return a typed row built elsewhere, so a rule strict enough to
+    catch a lazy one would reject honest ones; the projector's own spec is where its field list is pinned.
+  - *The OAuth wrapper, loaders and the anonymous allow-list*: they are not route modules the mount reader resolves, so they are covered by
+    `OUT_OF_SCOPE` and `PAGE_PATHS` entries with their reasons, not by the detector.
+  - *Data flow*: a value assigned after its declaration, a helper reached through a value other than a plain `const`, and a schema built at
+    run time are not followed.
 
 ## An intentional exception
 

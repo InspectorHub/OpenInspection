@@ -4,7 +4,7 @@ import { smsSegmentsClient, groupTemplateVariants } from '~/routes/settings-comm
 
 type Row = Parameters<typeof groupTemplateVariants>[0][number];
 const row = (over: Partial<Row> & Pick<Row, 'id' | 'name' | 'locale'>): Row => ({
-  tenantId: 't', channel: 'email', subject: null, body: 'b', variables: [],
+  channel: 'email', subject: null, body: 'b', variables: [],
   isSeeded: false, createdAt: 0, updatedAt: 0, ...over,
 });
 

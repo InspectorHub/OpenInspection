@@ -1,3 +1,4 @@
+import { withoutCompanyId } from '../lib/response-projection';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -98,12 +99,12 @@ const updateEventStatusRoute = createRoute(withMcpMetadata({
 const eventsRoutes = createApiRouter()
     .openapi(listEventTypesRoute, async (c) => {
         const data = await c.var.services.event.listEventTypes(c.get('tenantId'));
-        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
+        return c.json({ success: true as const, data: (await moneyView(c, data, 'inspectionFees')).map((row) => withoutCompanyId(row)) }, 200);
     })
     .openapi(listInspectionEventsRoute, async (c) => {
         const { inspectionId } = c.req.valid('param');
         const data = await c.var.services.event.listInspectionEvents(c.get('tenantId'), inspectionId);
-        return c.json({ success: true as const, data: await moneyView(c, data, 'inspectionFees') }, 200);
+        return c.json({ success: true as const, data: (await moneyView(c, data, 'inspectionFees')).map((row) => withoutCompanyId(row)) }, 200);
     })
     .openapi(deleteEventRoute, async (c) => {
         const { id } = c.req.valid('param');
@@ -116,7 +117,7 @@ const eventsRoutes = createApiRouter()
         const parsed = TypeBody.safeParse(await guardMoneyWrite(c, await c.req.json(), null));
         if (!parsed.success) throw Errors.BadRequest('Invalid event type', parsed.error.flatten().fieldErrors);
         const row = await c.var.services.event.createEventType(c.get('tenantId'), parsed.data);
-        return c.json({ success: true as const, data: await moneyView(c, row, 'inspectionFees') }, 201);
+        return c.json({ success: true as const, data: withoutCompanyId(await moneyView(c, row, 'inspectionFees')) }, 201);
     })
     // ---- Inspection events ----
     .openapi(createInspectionEventRoute, async (c) => {
@@ -127,7 +128,7 @@ const eventsRoutes = createApiRouter()
             ...parsed.data,
             scheduledAt: new Date(parsed.data.scheduledAt),
         });
-        return c.json({ success: true as const, data: await moneyView(c, row, 'inspectionFees') }, 201);
+        return c.json({ success: true as const, data: withoutCompanyId(await moneyView(c, row, 'inspectionFees')) }, 201);
     })
     .openapi(updateEventStatusRoute, async (c) => {
         const { id } = c.req.valid('param');

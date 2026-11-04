@@ -5,7 +5,7 @@
  * same ones the route specs make, and the ones that must fail do fail.
  */
 import { describe, expect, it } from 'vitest';
-import { measureWall, recordRoundTrips, wallWithinBudget } from '../helpers/round-trip-recorder';
+import { recordRoundTrips, runCounted } from '../helpers/round-trip-recorder';
 
 function fakeD1(): D1Database {
     const stmt = { bind: () => stmt, all: async () => ({ results: [] }), run: async () => ({}), first: async () => null, raw: async () => [] };
@@ -63,27 +63,33 @@ describe('round-trip recorder', () => {
         expect(rec.log.waves).toBe(1);
     });
 
-    describe('the wall-time bound (budget of 3 round trips at 40 ms)', () => {
-        const serial = async (n: number) => {
-            const rec = recordRoundTrips(fakeD1(), 40);
+    describe('the count does not depend on how fast the machine runs', () => {
+        // CPU contention is simulated by burning the event loop between statements. The old wall-time
+        // bound moved with this; the causal depth must not.
+        const burn = (ms: number) => { const end = performance.now() + ms; while (performance.now() < end) { /* spin */ } };
+
+        it('a serial chain keeps its depth however slow each step is', async () => {
+            const rec = recordRoundTrips(fakeD1(), 1);
             const q = () => rec.binding.prepare('select 1').bind().all();
-            const m = await measureWall(rec, 40, async () => { for (let i = 0; i < n; i++) await q(); });
-            return { m, ok: wallWithinBudget(m, 3, 40) };
-        };
-
-        it('a request inside its budget passes', async () => {
-            expect((await serial(3)).ok).toBe(true);
+            await runCounted(rec, 1, async () => { for (let i = 0; i < 4; i++) { burn(30); await q(); } });
+            expect(rec.log.waves).toBe(4);
         });
 
-        it('three extra serial reads fail it, and so do two', async () => {
-            expect((await serial(6)).ok).toBe(false);
-            expect((await serial(5)).ok).toBe(false);
+        it('statements issued together stay one wave however slow the loop is', async () => {
+            const rec = recordRoundTrips(fakeD1(), 1);
+            const q = () => rec.binding.prepare('select 1').bind().all();
+            await runCounted(rec, 1, async () => { burn(30); await Promise.all([q(), q(), q()]); });
+            expect(rec.log.waves).toBe(1);
+            expect(rec.log.statements).toBe(3);
         });
 
-        it('the base is the request without any delay, so it does not loosen the bound', async () => {
-            const { m } = await serial(3);
-            expect(m.base).toBeLessThan(40);
-            expect(m.ms).toBeGreaterThanOrEqual(3 * 40 - 5);
+        it('runCounted starts from a fresh count', async () => {
+            const rec = recordRoundTrips(fakeD1(), 1);
+            const q = () => rec.binding.prepare('select 1').bind().all();
+            await q(); await q();
+            await runCounted(rec, 1, async () => { await q(); });
+            expect(rec.log.waves).toBe(1);
+            expect(rec.log.statements).toBe(1);
         });
     });
 });

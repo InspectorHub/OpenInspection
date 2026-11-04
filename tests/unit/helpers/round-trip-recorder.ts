@@ -94,33 +94,23 @@ export function recordRoundTrips(db: D1Database, initialLatencyMs = 5): Recordin
 }
 
 /**
- * Wall time of one request, against its own cost.
+ * Runs one request with `latencyMs` of simulated delay per D1 call and a fresh count, so the
+ * recorder's log describes exactly that request.
  *
- * The request is timed first with no delay per D1 call (`base`: what the code itself costs on this
- * machine, median of three) and then with `latencyMs` per call (`ms`). The bound that follows from a
- * budget of N sequential round trips is `ms <= base + (N + 1) * latencyMs`: one call of headroom
- * for timer granularity, so each extra serial read beyond the budget costs a full latency and is
- * caught on a slow machine as well as a fast one.
+ * Nothing here reads a clock, and that is deliberate. An earlier version also compared the request's
+ * wall time with a baseline measured in the same run (`base + (budget + 1) * latency`). That bound
+ * failed on a loaded machine ("wall 143ms vs base 20ms"): one sample of a few tens of milliseconds
+ * is dominated by scheduler noise, whichever baseline it is compared with. The budget is the
+ * causal depth in `log.waves`, which depends only on which statement waited for which, never on how
+ * fast the machine ran them. The sleep stays because it makes statements that are issued together
+ * genuinely overlap, not because anything measures it.
  */
-export async function measureWall(
+export async function runCounted(
     rec: RecordingBinding,
     latencyMs: number,
     call: () => Promise<unknown>,
-): Promise<{ base: number; ms: number }> {
-    rec.setLatency(0);
-    const bases: number[] = [];
-    for (let i = 0; i < 3; i++) {
-        const start = performance.now();
-        await call();
-        bases.push(performance.now() - start);
-    }
-    bases.sort((a, b) => a - b);
+): Promise<void> {
     rec.setLatency(latencyMs);
     rec.reset();
-    const start = performance.now();
     await call();
-    return { base: bases[1]!, ms: performance.now() - start };
 }
-
-export const wallWithinBudget = (m: { base: number; ms: number }, budget: number, latencyMs: number) =>
-    m.ms <= m.base + (budget + 1) * latencyMs;

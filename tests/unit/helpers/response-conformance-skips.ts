@@ -1,13 +1,14 @@
 /**
  * Native contract operations the response conformance suite does not request, each with the reason.
  * Shrink-only: an operation that becomes testable moves into OPERATIONS in response-conformance.ts and leaves this list.
+ * The read-only operations that can be requested with a simple fixture have been moved. What remains either writes (and has not been given a body),
+ * needs a binding, or declares no JSON response body in the contract: the last kind can only be covered after the route declares a response schema.
  */
 const BINDING = 'needs a binding the node harness does not provide (object storage, a Durable Object, the AI provider, signing or an external lookup)';
 const NO_BODY = 'writes data and has not been given a request body in this suite yet; nothing about the route prevents it';
 
 export const NOT_COVERED: Record<string, string> = {
     'POST /api/client/import': BINDING,
-    'POST /api/client/inspections/visible': NO_BODY,
     'POST /api/inspections/{id}/complete': NO_BODY,
     'GET /api/inspections/{id}/units': 'the contract declares no JSON response body for this operation, so there is nothing to compare',
     'GET /api/inspections/{id}/unit-progress': 'the contract declares no JSON response body for this operation, so there is nothing to compare',

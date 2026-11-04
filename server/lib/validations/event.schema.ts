@@ -8,7 +8,6 @@ import { EVENT_STATUSES } from '../status/event-status';
  */
 export const EventTypeSchema = z.object({
     id:                 z.string().describe('Event type id.'),
-    tenantId:           z.string().describe('Id of the company the event type belongs to.'),
     name:               z.string().describe('Display name of the event type.'),
     slug:               z.string().describe('Stable lowercase identifier of the event type, unique within the company.'),
     defaultDurationMin: z.number().describe('Length in minutes a new visit of this type is given by default.'),
@@ -22,7 +21,6 @@ export const EventTypeSchema = z.object({
 
 export const InspectionEventSchema = z.object({
     id:                z.string().describe('Visit id.'),
-    tenantId:          z.string().describe('Id of the company the visit belongs to.'),
     inspectionId:      z.string().describe('Id of the inspection the visit belongs to.'),
     eventTypeId:       z.string().describe('Id of the event type this visit is an instance of.'),
     inspectorId:       z.string().nullable().describe('Id of the user assigned to the visit; null when unassigned.'),
@@ -55,7 +53,6 @@ const SavedTime = z.union([z.string(), z.date()]);
  */
 export const CreatedEventTypeSchema = z.object({
     id:                 z.string().describe('Event type id.'),
-    tenantId:           z.string().describe('Id of the company the event type belongs to.'),
     name:               z.string().describe('Display name of the event type.'),
     slug:               z.string().describe('Stable lowercase identifier of the event type, unique within the company.'),
     defaultDurationMin: z.number().optional().describe('Length in minutes a new visit of this type is given by default.'),
@@ -70,7 +67,6 @@ export const CreatedEventTypeSchema = z.object({
 /** The visit a create answers with: the row as stored, so columns the database fills by default are absent. */
 export const CreatedInspectionEventSchema = z.object({
     id:                z.string().describe('Visit id.'),
-    tenantId:          z.string().describe('Id of the company the visit belongs to.'),
     inspectionId:      z.string().describe('Id of the inspection the visit belongs to.'),
     eventTypeId:       z.string().describe('Id of the event type this visit is an instance of.'),
     inspectorId:       z.string().nullable().optional().describe('Id of the user assigned to the visit; absent when unassigned.'),

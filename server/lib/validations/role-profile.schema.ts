@@ -34,12 +34,9 @@ export const AddPersonSchema = z.object({
     roleProfileId: z.string().min(1).describe('Id of the tenant-owned role profile this contact will occupy on the inspection.'),
 }).strict();
 
-// Response shape for GET/POST /api/role-profiles rows. `tenantId` is included
-// for parity with sibling entity schemas (e.g. ContractorTypeSchema); it never
-// reflects anything other than the caller's own JWT-scoped tenant.
+// Response shape for GET/POST /api/role-profiles rows. The company id is not part of it: the caller's session supplies it.
 export const RoleProfileSchema = z.object({
     id: z.string().describe('Role profile id.'),
-    tenantId: z.string().describe('Owning tenant.'),
     key: z.string().describe('Stable machine-readable key, unique per tenant.'),
     label: z.string().describe('Tenant-editable display label, e.g. "Buyer\'s Agent".'),
     kind: z.enum(ROLE_KINDS).describe('Capability class the role derives from (client, agent, or other).'),

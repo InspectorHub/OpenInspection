@@ -9,6 +9,7 @@
  * (label/templates) but never deactivated or deleted — PeopleService throws
  * Errors.Conflict, mapped to 409 by the global onError handler.
  */
+import { withoutCompanyId } from '../lib/response-projection';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
@@ -102,13 +103,13 @@ const app = createApiRouter();
 app.openapi(listRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const data = await c.var.services.people.listProfiles(tenantId);
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: data.map((row) => withoutCompanyId(row)) }, 200);
 });
 app.openapi(createRoute_, async (c) => {
     const tenantId = c.get('tenantId');
     const input = c.req.valid('json');
     const data = await c.var.services.people.createProfile(tenantId, input);
-    return c.json({ success: true as const, data }, 201);
+    return c.json({ success: true as const, data: withoutCompanyId(data) }, 201);
 });
 app.openapi(updateRoute, async (c) => {
     const tenantId = c.get('tenantId');

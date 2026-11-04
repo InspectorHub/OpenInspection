@@ -16,6 +16,10 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // Explicit ceilings instead of vitest's 5 s / 10 s defaults, which are tight when several heavy
+    // processes share the machine (see vitest.api.config.ts). A hung promise still fails at the ceiling.
+    testTimeout: 20_000,
+    hookTimeout: 30_000,
     // Node by default; a file that needs a browser declares it with a
     // `// @vitest-environment happy-dom` docblock — the same shape
     // vitest.api.config.ts already uses, so both suites read the same way.

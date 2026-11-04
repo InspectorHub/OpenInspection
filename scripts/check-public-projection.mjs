@@ -41,6 +41,7 @@ import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { detectPublicProjection } from './lib/public-projection-detect.mjs';
+import { makeImportReader } from './lib/public-projection-imports.mjs';
 import {
     PAGE_PATHS, moduleFile, parseMounts, publicMounts, publicPathModules, readOpenPaths, readPathConstants,
 } from './lib/public-projection-mounts.mjs';
@@ -185,7 +186,7 @@ function main() {
     for (const path of files) {
         let src;
         try { src = readFileSync(join(ROOT, path), 'utf8'); } catch { unreadable += 1; continue; }
-        const r = detectPublicProjection(src, path);
+        const r = detectPublicProjection(src, path, { readImport: makeImportReader(ROOT, path) });
         sites += r.sites;
         if (r.sites === 0 && /\.(?:openapi|get|post|put|patch|delete)\(/.test(src) && !(DELEGATES[path] && files.includes(DELEGATES[path]))) silent.push(path);
         if (r.violations.length) found.set(path, r.violations);

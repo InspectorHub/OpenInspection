@@ -42,7 +42,7 @@ export const TestSendMessageTemplateSchema = z.object({
 }).strip();
 
 export const MessageTemplateSchema = z.object({
-    id: z.string(), tenantId: z.string(), name: z.string(),
+    id: z.string(), name: z.string(),
     channel: ChannelSchema, subject: z.string().nullable(), body: z.string(),
     variables: z.array(z.string()), isSeeded: z.boolean(),
     locale: z.string(),
