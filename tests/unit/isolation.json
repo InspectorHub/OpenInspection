@@ -741,6 +741,7 @@
     "tests/unit/report-style/profile-distinctness.spec.ts",
     "tests/unit/report-style/profiles.spec.ts",
     "tests/unit/report-style/resolve.spec.ts",
+    "tests/unit/reports/client-pdf-target.spec.ts",
     "tests/unit/reports/company-slug.spec.ts",
     "tests/unit/reports/correction-amendment.spec.ts",
     "tests/unit/reports/cost-item-schema.spec.ts",

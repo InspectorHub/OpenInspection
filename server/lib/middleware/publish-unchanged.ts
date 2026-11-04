@@ -3,6 +3,8 @@ import { and, desc, eq } from 'drizzle-orm';
 import { reportVersions } from '../db/schema';
 import { PublishInspectionSchema } from '../validations/inspection.schema';
 import { getDrizzle } from '../route-helpers';
+import { relockUnchangedReport } from '../inspection/report-lock';
+import { setCollabDocLocks } from '../collab/doc-lock-notify';
 import { resolveTenantSlug } from '../url';
 import { REPORT_STATUS } from '../status/report-status';
 import type { HonoConfig } from '../../types/hono';
@@ -41,6 +43,10 @@ export async function answerUnchangedPublish(c: Context<HonoConfig>, next: Next)
     const id = c.req.param('id') ?? '';
     // A comparison that cannot be made is never a reason to refuse a publish: publish as usual.
     if (!await isUnchanged(c, id, body.data.reportId, body.data.summary).catch(() => false)) return next();
-    const reportUrl = `/report/${await resolveTenantSlug(c, c.get('tenantId'))}/${id}`;
+    // A report that was being edited again and came back identical is published again: no new version, but the lock returns.
+    const tenantId = c.get('tenantId');
+    await relockUnchangedReport(getDrizzle(c), tenantId, id, body.data.reportId);
+    await setCollabDocLocks(c.env, getDrizzle(c), tenantId, id, true, body.data.reportId ? { reportId: body.data.reportId } : { primary: true });
+    const reportUrl = `/report/${await resolveTenantSlug(c, tenantId)}/${id}`;
     return c.json({ success: true as const, data: { reportUrl, reportStatus: REPORT_STATUS.PUBLISHED, isnSync: null } }, 200);
 }

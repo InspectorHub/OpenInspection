@@ -1,5 +1,5 @@
 import { eq, and } from 'drizzle-orm';
-import { inspections } from '../../lib/db/schema';
+import { inspections, reports } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { fireAutomation } from './shared';
 import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
@@ -113,8 +113,31 @@ export class InspectionStatusService extends InspectionSubService {
     }
 
     /**
-     * Unpublishes a published report, reverting it to in_progress for editing.
-     * Transitions: reportStatus published → in_progress.
+     * "Edit and republish": a published report becomes editable again WITHOUT being withdrawn.
+     *
+     * The report goes back to `in_progress` and keeps `published_at`, which is exactly the "editing" state of
+     * `lib/inspection/report-lock`: content writes are accepted again, and clients keep reading the latest
+     * published version until the next publish creates the following one. The order's `report_status` stays
+     * `published` (a report is out), no link expires, nothing is sent. Returns the report's id.
+     */
+    async reopenReport(inspectionId: string, tenantId: string, reportId?: string): Promise<string> {
+        const { db } = await this.fetchForStatusChange(tenantId, inspectionId);
+        const row = await db.select({ id: reports.id, status: reports.status, publishedAt: reports.publishedAt }).from(reports)
+            .where(and(eq(reports.tenantId, tenantId), eq(reports.inspectionId, inspectionId),
+                reportId ? eq(reports.id, reportId) : eq(reports.kind, 'primary'))).get();
+        if (!row) throw Errors.NotFound('Report not found');
+        // Already being edited again: the same answer, so a double tap or a retried request is harmless.
+        if (row.status !== REPORT_STATUS.PUBLISHED && row.publishedAt) return row.id;
+        if (row.status !== REPORT_STATUS.PUBLISHED) throw Errors.BadRequest('Only a published report can be edited again.');
+        await db.update(reports).set({ status: REPORT_STATUS.IN_PROGRESS })
+            .where(and(eq(reports.id, row.id), eq(reports.tenantId, tenantId)));
+        return row.id;
+    }
+
+    /**
+     * RETRACTS a published report: withdrawn from clients, back to a draft. The caller also expires the links.
+     * Transitions: reportStatus published → in_progress, and every report of the inspection to a draft
+     * (`in_progress`, `published_at` cleared), which is what tells "withdrawn" from "editing again".
      */
     async unpublishReport(inspectionId: string, tenantId: string): Promise<void> {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, inspectionId);
@@ -125,6 +148,8 @@ export class InspectionStatusService extends InspectionSubService {
         await db.update(inspections)
             .set({ reportStatus: REPORT_STATUS.IN_PROGRESS })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+        await db.update(reports).set({ status: REPORT_STATUS.IN_PROGRESS, publishedAt: null })
+            .where(and(eq(reports.inspectionId, inspectionId), eq(reports.tenantId, tenantId)));
     }
 
     /**

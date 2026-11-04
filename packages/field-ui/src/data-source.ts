@@ -183,6 +183,7 @@ export interface ResultsDocHandle {
   doc: Y.Doc;
   persistenceSynced: Promise<void>;
   synced: () => boolean;
+  locked?: () => boolean; // true once the server closed the socket because the report is published (no reconnect follows)
   destroy(): void;
 }
 

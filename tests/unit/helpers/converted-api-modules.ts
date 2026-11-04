@@ -696,6 +696,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/inspections/report-reopen.ts',
+        tuple: 'reportReopenRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/report-reopen');
+            return { app: m.default, configs: m.reportReopenRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/inspections/report-translation.ts',
         tuple: 'reportTranslationRouteConfigs',
         load: async () => {

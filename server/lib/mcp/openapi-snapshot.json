@@ -7495,6 +7495,41 @@
     "description": "Creates a non-seeded copy of the template with \" (Copy)\" appended to its name."
   },
   {
+    "operationId": "editPublishedReportAgain",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/edit-again",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "description": "Which report to open for editing. Absent: the inspection's primary report."
+          }
+        }
+      }
+    },
+    "summary": "Edit a published report again (Edit and republish)",
+    "description": "Lifts the publish lock on one report so its content can be changed again: until then every content write answers 409 REPORT_PUBLISHED. The report is NOT withdrawn: no client link expires, nothing is sent, and clients keep reading the latest published version until a new publish freezes the next one. Use the unpublish route to withdraw a report instead. Calling it on a report that is already being edited again answers the same 200. An inspection with no report row (not yet backfilled) answers 404, as the collaborative editor does. Requires the publish capability, like publishing. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+  },
+  {
     "operationId": "emailRepairRequestShare",
     "method": "POST",
     "pathTemplate": "/api/public/repair-request/share/{shareToken}/email",
@@ -21111,8 +21146,8 @@
       ],
       "body": null
     },
-    "summary": "Unpublish a published report",
-    "description": "Transitions reportStatus from published → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+    "summary": "Retract (unpublish) a published report",
+    "description": "Retracts a published report: it is withdrawn from clients and goes back to a draft (reportStatus published → in_progress, every report of the inspection back to a draft), and every client and agent link to the inspection expires at once. To keep working on a report WITHOUT withdrawing it, use the edit-again route instead. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "unreadCountMessage",

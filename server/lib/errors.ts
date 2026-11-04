@@ -77,6 +77,11 @@ export enum ErrorCode {
     // client, and replaying the create would bring the deleted inspection back. Nothing was written.
     // `details.inspectionId` names it. Distinct from ID_CONFLICT: picking another id is not the answer.
     INSPECTION_ID_DELETED = 'INSPECTION_ID_DELETED',
+    // A write to report content (findings, notes, photos, units, ...) reached a report that is PUBLISHED (409). The
+    // published copy is what clients read and it may not change silently: the inspector chooses "Edit and
+    // republish" first. Nothing was written, so a client that holds the edit (an offline phone) keeps it and asks
+    // the person. `details.inspectionId` names the inspection. Distinct from CONFLICT so that 409 can be told apart.
+    REPORT_PUBLISHED = 'REPORT_PUBLISHED',
     // An offline package would create an inspection that an earlier import of the
     // same package already created and that has since been deleted. Importing it
     // again would bring the deleted inspection back, so the whole package is
@@ -163,6 +168,9 @@ export const Errors = {
     Validation: (details: unknown) => new AppError(400, ErrorCode.VALIDATION_ERROR, 'Validation failed', details),
     PayloadTooLarge: (msg: string) => new AppError(413, ErrorCode.BAD_REQUEST, msg),
     Conflict: (msg: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, msg, details),
+    // `inspectionIds` is set when several were refused at once (an offline package); `inspectionId` is the first.
+    ReportPublished: (inspectionId: string, inspectionIds: readonly string[] = [inspectionId]) =>
+        new AppError(409, ErrorCode.REPORT_PUBLISHED, 'Report is published. Update and republish?', { inspectionId, inspectionIds }),
     UnprocessableEntity: (msg: string, details?: unknown) =>
         new AppError(422, ErrorCode.UNPROCESSABLE_ENTITY, msg, details),
     RateLimited: (msg: string = 'Too many attempts. Please try again later.') => new AppError(429, ErrorCode.RATE_LIMITED, msg),

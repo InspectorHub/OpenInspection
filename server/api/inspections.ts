@@ -33,6 +33,7 @@ import mediaUploadUrlRoutes, { mediaUploadUrlRouteConfigs } from './inspections/
 import mediaStudioRoutes, { mediaStudioRouteConfigs } from './inspections/media-studio';
 import publishRoutes, { publishRouteConfigs } from './inspections/publish';
 import reportGateRoutes, { reportGateRouteConfigs } from './inspections/report-gate';
+import reportReopenRoutes, { reportReopenRouteConfigs } from './inspections/report-reopen';
 import reportTranslationRoutes, { reportTranslationRouteConfigs } from './inspections/report-translation';
 import reportDeliveryRoutes, { reportDeliveryRouteConfigs, reportMovedRoutes } from './inspections/report-delivery';
 import sendSmsRoutes, { sendSmsRouteConfigs } from './inspections/send-sms';
@@ -70,6 +71,7 @@ inspectionsRoutes.route('/', mediaUploadUrlRoutes);
 inspectionsRoutes.route('/', mediaStudioRoutes);
 inspectionsRoutes.route('/', publishRoutes);
 inspectionsRoutes.route('/', reportGateRoutes);
+inspectionsRoutes.route('/', reportReopenRoutes);
 inspectionsRoutes.route('/', reportTranslationRoutes);
 inspectionsRoutes.route('/', reportDeliveryRoutes);
 // The retired HTML report route (410 MOVED), a router of its own: see report-delivery.ts.
@@ -131,6 +133,7 @@ export const inspectionsRouteParts = [
     mounted('/', mediaStudioRoutes, mediaStudioRouteConfigs),
     mounted('/', publishRoutes, publishRouteConfigs),
     mounted('/', reportGateRoutes, reportGateRouteConfigs),
+    mounted('/', reportReopenRoutes, reportReopenRouteConfigs),
     mounted('/', reportTranslationRoutes, reportTranslationRouteConfigs),
     mounted('/', reportDeliveryRoutes, reportDeliveryRouteConfigs),
     legacyMounted('/', reportMovedRoutes),

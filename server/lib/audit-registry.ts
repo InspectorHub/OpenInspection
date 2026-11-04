@@ -167,6 +167,8 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.published': { family: 'inspection', label: 'audit_action_inspection_published', meta: { reportId: 'id' }, status: { kind: 'live' } },
     'inspection.rating_system.switch': { family: 'inspection', label: 'audit_action_inspection_rating_system_switch', meta: { mode: 'name', ratingSystemId: 'id' }, status: { kind: 'live' } },
     'inspection.report_narrative.update': { family: 'inspection', label: 'audit_action_inspection_report_narrative_update', meta: { cleared: 'flag', length: 'count', reportId: 'id' }, status: { kind: 'live' } },
+    'inspection.report_reopened': { family: 'inspection', label: 'audit_action_inspection_report_reopened', meta: { reportId: 'id' }, status: { kind: 'live' } },
+    'inspection.report_retracted': { family: 'inspection', label: 'audit_action_inspection_report_retracted', meta: {}, status: { kind: 'live' } },
     'inspection.report_relocked': { family: 'inspection', label: 'audit_action_inspection_report_relocked', meta: {}, status: { kind: 'live' } },
     'inspection.report_unlocked': { family: 'inspection', label: 'audit_action_inspection_report_unlocked', meta: { alreadyUnlocked: 'flag', reason: 'reason' }, status: { kind: 'live' } },
     'inspection.report_translation_regenerated': { family: 'inspection', label: 'audit_action_inspection_report_translation_regenerated', meta: { locale: 'name', reportId: 'id', segmentCount: 'count' }, status: { kind: 'live' } },

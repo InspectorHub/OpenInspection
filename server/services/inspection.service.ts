@@ -653,6 +653,10 @@ export class InspectionService {
         return this.status.unpublishReport(inspectionId, tenantId);
     }
 
+    async reopenReport(inspectionId: string, tenantId: string, reportId?: string): Promise<string> {
+        return this.status.reopenReport(inspectionId, tenantId, reportId);
+    }
+
     async markPaymentReceived(tenantId: string, inspectionId: string): Promise<void> {
         return this.status.markPaymentReceived(tenantId, inspectionId);
     }

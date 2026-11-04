@@ -8435,6 +8435,125 @@
         }
       }
     },
+    "/api/inspections/{id}/edit-again": {
+      "post": {
+        "tags": [
+          "inspections"
+        ],
+        "summary": "Edit a published report again (Edit and republish)",
+        "operationId": "editPublishedReportAgain",
+        "description": "Lifts the publish lock on one report so its content can be changed again: until then every content write answers 409 REPORT_PUBLISHED. The report is NOT withdrawn: no client link expires, nothing is sent, and clients keep reading the latest published version until a new publish freezes the next one. Use the unpublish route to withdraw a report instead. Calling it on a report that is already being edited again answers the same 200. An inspection with no report row (not yet backfilled) answers 404, as the collaborative editor does. Requires the publish capability, like publishing. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.",
+        "x-capability": "publish",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Inspection id"
+            },
+            "required": true,
+            "description": "Inspection id",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reportId": {
+                    "type": "string",
+                    "description": "Which report to open for editing. Absent: the inspection's primary report."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The report is open for editing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "True when the request succeeded."
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "reportId": {
+                          "type": "string",
+                          "description": "The report that is open for editing."
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "editing"
+                          ],
+                          "description": "The report is being edited; clients still see its latest published version."
+                        }
+                      },
+                      "required": [
+                        "reportId",
+                        "state"
+                      ],
+                      "description": "Response payload"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Error message",
+                          "description": "Human-readable description of the error."
+                        },
+                        "code": {
+                          "type": "string",
+                          "example": "ERROR_CODE",
+                          "description": "Stable machine-readable error code."
+                        },
+                        "details": {
+                          "nullable": true,
+                          "description": "Optional structured context for the error, such as per-field validation failures."
+                        }
+                      },
+                      "required": [
+                        "message",
+                        "code"
+                      ],
+                      "description": "Error detail; present only when the request failed."
+                    },
+                    "meta": {
+                      "nullable": true,
+                      "description": "Optional response metadata, such as pagination information."
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The report is not published, so there is nothing to unlock"
+          },
+          "403": {
+            "description": "Missing publish capability, or not on this inspection"
+          },
+          "404": {
+            "description": "No such report on this inspection"
+          }
+        }
+      }
+    },
     "/api/inspections/{id}/inspector-signature": {
       "post": {
         "tags": [

@@ -130,6 +130,7 @@ export const webCollabConnector: CollabConnector = {
             },
             persistenceSynced,
             synced: () => handle.synced,
+            locked: () => handle.locked === true,
             destroy,
         };
     },

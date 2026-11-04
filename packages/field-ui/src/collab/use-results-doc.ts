@@ -61,7 +61,7 @@ export function useResultsDoc(inspectionId: string | null, onSynced?: () => void
         let live: ReturnType<typeof collab.connect> | null = null;
         let closed = false;
         const snapshot = (): ResultsDocHandle | null =>
-            live === null ? null : { doc: live.doc, persistenceSynced: persisted, synced: live.synced() };
+            live === null ? null : { doc: live.doc, persistenceSynced: persisted, synced: live.synced(), locked: live.locked?.() ?? false };
         const publish = (): void => {
             if (closed) return;
             const next = snapshot();

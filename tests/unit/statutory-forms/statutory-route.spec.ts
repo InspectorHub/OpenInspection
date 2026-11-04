@@ -7,6 +7,7 @@
  * below (cross-tenant, unpublished, undeclared) are exactly the kind that would
  * pass for a route with no guard at all.
  */
+import { eq } from 'drizzle-orm';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -135,6 +136,8 @@ const FORM = 'yy_flat_form';
 const REVISION = 'Rev. 04/26';
 
 let db: BetterSQLite3Database<typeof schema>;
+/** "Edit and republish": the report is open for editing again (not `published`), but its published version is still the one clients read. */
+const reopen = (reportId: string) => db.update(schema.reports).set({ status: 'in_progress' }).where(eq(schema.reports.id, reportId));
 let flat: { bytes: Uint8Array };
 
 const DECLARATION = {
@@ -364,6 +367,13 @@ describe('GET /:id/statutory-form.pdf', () => {
         expect(res.headers.get('Content-Type')).toBe('application/pdf');
     });
 
+    it('still produces the form while the report is being edited again: the version clients read exists', async () => {
+        await reopen('rep-good');
+        const res = await get(GOOD);
+        expect(res.status).toBe(200);
+        expect(res.headers.get('Content-Type')).toBe('application/pdf');
+    });
+
     it('serves it inline, named for the form and revision only', async () => {
         // No tenant id and no client name in the filename: it is a header that
         // travels into download folders and mail clients.
@@ -526,6 +536,11 @@ describe('GET /:id/statutory-form (the offer)', () => {
     });
 
     it('POSITIVE CONTROL — and for a bare calendar day', async () => {
+        expect((await offer(GOOD)).body.data.available).toBe(true);
+    });
+
+    it('still offers the form while the report is being edited again', async () => {
+        await reopen('rep-good');
         expect((await offer(GOOD)).body.data.available).toBe(true);
     });
 

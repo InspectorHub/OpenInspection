@@ -38,6 +38,10 @@ export type AuditAction =
     // said to hold, and the reason for that is worth keeping.
     | 'inspection.report_unlocked'
     | 'inspection.report_relocked'
+    // A published report reopened for editing (clients keep the last published version), and a
+    // report withdrawn from clients. Both change who can see or edit client-facing content.
+    | 'inspection.report_reopened'
+    | 'inspection.report_retracted'
     // The courtesy translation of one report, replaced or taken down. Audited
     // because regenerating spends money on a workspace's behalf and removing
     // takes something away from a client who was already sent it — and because

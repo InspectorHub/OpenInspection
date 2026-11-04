@@ -18,6 +18,9 @@ import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.s
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
+import { isOfflineImportReplay } from '../../lib/request-scope';
+import { changedFrozenFields } from '../../lib/report-freeze';
+import { assertReportContentWritable } from '../../lib/inspection/report-lock';
 import { findPatchRefusal } from './patch-guards';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
@@ -229,6 +232,10 @@ const coreRoutes = createApiRouter()
         // Money fields need `inspectionFees`, but only a CHANGE is refused: the settings
         // form forwards its whole form, price included. Before anything else runs.
         await guardMoneyWrite(c, body, inspection as Record<string, unknown>);
+
+        // The columns the published report shows are its content: changing one needs "Edit and republish" first. An offline
+        // import replays its queued writes through here after refusing the whole package for a published inspection.
+        if (!isOfflineImportReplay(c.env) && changedFrozenFields(body, inspection).length > 0) await assertReportContentWritable(db, tenantId, id);
 
         // Every soft reference this patch can dangle, plus the two status moves
         // it may not make: INTO `cancelled` (#78) and OUT of it (#81). Both live
