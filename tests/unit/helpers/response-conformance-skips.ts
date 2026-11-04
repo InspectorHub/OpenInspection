@@ -33,6 +33,7 @@ export const NOT_COVERED: Record<string, string> = {
     'POST /api/inspections/{id}/inspector-signature': BINDING,
     'PATCH /api/inspections/{id}/template-snapshot': NO_BODY,
     'POST /api/inspections/{id}/publish': BINDING,
+    'POST /api/inspections/{id}/edit-again': 'needs a PUBLISHED report on the inspection, which would refuse (409 REPORT_PUBLISHED) the content writes this suite sends to the same inspection; its response shape is pinned by tests/unit/reports/report-edit-again.spec.ts',
     'PATCH /api/inspections/{id}/statutory-details': NO_BODY,
     'POST /api/inspections/{id}/statutory-form/instances': NO_BODY,
     'POST /api/inspections/{id}/compliance/signoff': NO_BODY,

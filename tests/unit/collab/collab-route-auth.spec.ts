@@ -15,6 +15,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import collabRoutes from '../../../server/api/inspections/collab';
 import type { HonoConfig } from '../../../server/types/hono';
+import { createTestDb, setupSchema } from '../db';
+import { toD1Binding } from '../helpers/d1-binding';
+import * as schema from '../../../server/lib/db/schema';
 
 // ── Mock DO namespace helpers ─────────────────────────────────────────────────
 
@@ -76,6 +79,8 @@ interface BuildAppOptions {
         tenantId?: string;
     } | 'not_found';
     doNamespace?: ReturnType<typeof makeMockDoNamespace>;
+    /** The database the route reads the report's state from; default: an empty one. */
+    binding?: D1Database;
     /** Who the roster says works this inspection. */
     roster?: { lead: string | null; helpers?: string[] };
 }
@@ -92,6 +97,7 @@ function buildApp(opts: BuildAppOptions = {}) {
         },
         doNamespace,
         roster,
+        binding,
     } = opts;
 
     const mockDo = doNamespace ?? makeMockDoNamespace();
@@ -137,7 +143,7 @@ function buildApp(opts: BuildAppOptions = {}) {
     // Simulate what the global JWT middleware + DI middleware set.
     app.use('*', async (c, next) => {
         // Set env bindings before any handler sees it (mirrors repair-builder harness).
-        c.env = { INSPECTION_DOC: mockDo, DB: {} } as unknown as HonoConfig['Bindings'];
+        c.env = { INSPECTION_DOC: mockDo, DB: binding ?? await emptyDb() } as unknown as HonoConfig['Bindings'];
         if (tenantId !== null)  c.set('tenantId', tenantId);
         if (userId   !== null)  c.set('user', { sub: userId } as never);
         if (userRole)           c.set('userRole', userRole as never);
@@ -151,6 +157,13 @@ function buildApp(opts: BuildAppOptions = {}) {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+/** The socket route reads the report's state from D1 (a published report's socket is closed with 4409); an empty database says "not published". */
+async function emptyDb(): Promise<D1Database> {
+    const fixture = createTestDb();
+    await setupSchema(fixture.sqlite);
+    return toD1Binding(fixture.sqlite);
+}
 
 describe('collab WS route — auth gate', () => {
 
@@ -415,5 +428,34 @@ describe('collab WS route — auth gate', () => {
             { headers: { Upgrade: 'websocket' } },
         );
         expect(res.status).toBe(501);
+    });
+    describe('(r) a published report', () => {
+        async function stateDb(status: 'published' | 'in_progress', publishedAt: Date | null, orderStatus: 'published' | 'in_progress' = 'published') {
+            const fixture = createTestDb();
+            await setupSchema(fixture.sqlite);
+            await fixture.db.insert(schema.tenants).values({ id: 't1', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
+            await fixture.db.insert(schema.inspections).values({ id: 'insp1', tenantId: 't1', propertyAddress: '1 Main', date: '2026-06-01', reportStatus: orderStatus, createdAt: new Date() } as never);
+            await fixture.db.insert(schema.reports).values({ id: 'rpt-insp1', tenantId: 't1', inspectionId: 'insp1', kind: 'primary', title: 'R', status, publishedAt, createdAt: new Date() });
+            return toD1Binding(fixture.sqlite);
+        }
+        const upgrade = async (binding: D1Database) => {
+            const mockDo = makeMockDoNamespace();
+            const { app } = buildApp({ doNamespace: mockDo, binding });
+            await app.request('/api/inspections/insp1/collab/ws', { headers: { Upgrade: 'websocket' } });
+            return (mockDo.stubFetch.mock.calls[0][0] as Request).headers.get('x-report-locked');
+        };
+
+        it('tells the document so (x-report-locked: 1) and still forwards the upgrade, so the socket can be closed with a readable code', async () => {
+            expect(await upgrade(await stateDb('published', new Date()))).toBe('1');
+        });
+
+        it('says 0 for a report an older retract left published when its order is back in draft', async () => {
+            expect(await upgrade(await stateDb('published', new Date(), 'in_progress'))).toBe('0');
+        });
+
+        it('says 0 while the report is a draft or is being edited again (control)', async () => {
+            expect(await upgrade(await stateDb('in_progress', null))).toBe('0');
+            expect(await upgrade(await stateDb('in_progress', new Date()))).toBe('0');
+        });
     });
 });

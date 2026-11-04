@@ -11,6 +11,7 @@ import { enforceTenantActive } from './lib/middleware/tenant-status-guard';
 import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
 import { registerReportAuthoringGuard } from './lib/inspection/report-authoring-guard';
+import { registerPublishedReportLockGuard } from './lib/inspection/report-lock-guard';
 import { registerInspectionScopeGuards } from './lib/middleware/inspection-scope';
 import { tenantRouter } from './features/tenant-routing';
 import { diMiddleware } from './lib/middleware/di';
@@ -292,6 +293,8 @@ app.use('/api/*', touchLastActiveMiddleware);
 // Ahead of the report-authoring guard and every router: a refusal for an inspection the caller cannot see must come before any capability refusal.
 registerInspectionScopeGuards(app);
 registerReportAuthoringGuard(app);
+// Right after the capability guard: a published report's content is not written until "Edit and republish".
+registerPublishedReportLockGuard(app);
 
 // API Routes
 

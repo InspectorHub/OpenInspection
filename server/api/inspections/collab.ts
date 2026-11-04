@@ -39,6 +39,7 @@ import { tenantConfigs } from '../../lib/db/schema';
 import { parseReinspectionStatuses } from '@core/field-ui/shared/reinspection-status';
 import { forwardCollabImport } from '../../lib/collab/import-route';
 import { authorizeCollab, collabStub } from '../../lib/collab/authorize';
+import { isReportContentLocked } from '../../lib/inspection/report-lock';
 import { mayEditReports } from '../../lib/inspection/report-authoring-guard';
 import {
     collabFollowupRoute, collabRestoreRoute, collabRestructureRoute, collabSnapshotCaptureRoute, collabSnapshotGetRoute, collabSnapshotListRoute,
@@ -274,6 +275,9 @@ collabRoutes.get('/:id/collab/ws', async (c) => {
                 'x-inspection-id': auth.inspectionId,
                 'x-report-id':     auth.reportId,
                 'x-user-id':       auth.userId,
+                // D1's answer for a published report: the document closes the socket with 4409 (inspection-doc-lock).
+                'x-report-checked-at': String(Date.now()),
+                'x-report-locked': (await isReportContentLocked(getDrizzle(c), auth.tenantId, auth.inspectionId, auth.reportId)) ? '1' : '0',
                 ...(c.req.query('ack') === '1' ? { 'x-collab-ack': '1' } : {}),
             },
         });

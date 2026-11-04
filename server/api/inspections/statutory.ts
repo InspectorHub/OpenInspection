@@ -49,7 +49,7 @@
  * form whose report has since been corrected.
  */
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, desc } from 'drizzle-orm';
+import { and, eq, desc, isNotNull } from 'drizzle-orm';
 import { createApiRouter } from '../../lib/openapi-router';
 import { deliverableHeaders } from '../../lib/deliverable-headers';
 import { produceStatutoryForm } from '../../services/statutory/produce.service';
@@ -102,7 +102,8 @@ const published = await db.select()
     .where(and(
         eq(schema.reports.inspectionId, id),
         eq(schema.reports.tenantId, tenantId),
-        eq(schema.reports.status, 'published'),
+        // A report that went out and is being edited again still has the version clients read: `published_at` is the record.
+        isNotNull(schema.reports.publishedAt),
     ))
     .orderBy(desc(schema.reports.publishedAt))
     .get();
@@ -250,7 +251,8 @@ app.openapi(statutoryOfferRoute, async (c) => {
         .where(and(
             eq(schema.reports.inspectionId, id),
             eq(schema.reports.tenantId, tenantId),
-            eq(schema.reports.status, 'published'),
+            // A report that went out and is being edited again still has the version clients read: `published_at` is the record.
+            isNotNull(schema.reports.publishedAt),
         ))
         .orderBy(desc(schema.reports.publishedAt))
         .get();

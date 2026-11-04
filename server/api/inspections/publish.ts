@@ -29,6 +29,7 @@ import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { translateOnPublishForRequest } from '../../lib/translation/on-publish';
 import { SnapshotTooLargeError } from '../../lib/report-snapshot-build';
+import { setCollabDocLocks } from '../../lib/collab/doc-lock-notify';
 import { Errors } from '../../lib/errors';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
@@ -165,7 +166,7 @@ const unpublishReportRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/unpublish',
     tags: ['inspections'],
-    summary: 'Unpublish a published report',
+    summary: 'Retract (unpublish) a published report',
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish'), guardActOnJob] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection id') }),
@@ -179,7 +180,7 @@ const unpublishReportRoute = createRoute(withMcpMetadata({
         403: { description: 'Missing publish capability' },
     },
     operationId: 'unpublishReport',
-    description: 'Transitions reportStatus from published → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.',
+    description: 'Retracts a published report: it is withdrawn from clients and goes back to a draft (reportStatus published → in_progress, every report of the inspection back to a draft), and every client and agent link to the inspection expires at once. To keep working on a report WITHOUT withdrawing it, use the edit-again route instead. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.',
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -380,6 +381,8 @@ publishRoutes.openapi(publishRoute, async (c) => {
         }
     }
     const result = await service.publishInspection(id, tenantId, publishOptions);
+    // The published report takes no edits: open sockets of its document are closed with 4409 (inspection-doc-lock).
+    await setCollabDocLocks(c.env, getDrizzle(c), tenantId, id, true, body.reportId ? { reportId: body.reportId } : { primary: true });
 
     // A verified person vouches for the report emails this publish queued, delayed ones included.
     await stampIfHumanVerified(c.get('humanVerified'), getDrizzle(c), tenantId, id);
@@ -536,6 +539,8 @@ publishRoutes.openapi(unpublishReportRoute, async (c) => {
     // report the inspector has withdrawn. Expire all of this inspection's
     // access tokens immediately.
     await c.var.services.portalAccess.setExpiryForInspection(tenantId, id, Date.now());
+    await setCollabDocLocks(c.env, getDrizzle(c), tenantId, id, false, { allReportsOf: true });
+    auditFromContext(c, 'inspection.report_retracted', 'inspection', { entityId: id });
     return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.IN_PROGRESS } }, 200);
 });
 

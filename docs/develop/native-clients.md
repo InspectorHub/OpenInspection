@@ -452,6 +452,68 @@ when the document changed since the last ack; a snapshot over 64 KiB is skipped.
 included, is stored. It does not mean the edit reached other clients or the D1
 projection. A socket opened without `ack=1` receives no such frame.
 
+### Published reports take no edits
+
+Once a report is published, clients read its frozen version and its content may not change silently. A write to a
+published report's content is refused with `409` `REPORT_PUBLISHED` and the message `Report is published. Update and
+republish?`. Nothing is written. The error's `details` carry `inspectionId` (and `inspectionIds` when several were
+refused at once).
+
+A report is **published** while its `reports.status` is `published`. The inspector lifts the lock with
+`POST /api/inspections/{id}/edit-again` (body `{}`, or `{ "reportId": "…" }` for a report other than the primary one;
+it needs the same capability as publishing). The report is then **editing**: its content accepts writes again, the
+order stays published, no client link expires, and clients keep reading the latest published version until the next
+publish freezes the following one. A report that was never published, or was retracted (`POST
+/api/inspections/{id}/unpublish`, which also expires every client link), is a **draft** and is not locked. A publish with
+nothing changed since the latest version restores the lock without creating a version.
+
+What the lock covers is every route that writes report content: results, items, notes, photos, videos and annotations,
+units, the cover, the template snapshot, rating system and template upgrade, compliance and statutory inputs, cost
+items, narratives, translations, property facts, the inspector signature, and a change to any inspection column the
+report shows (`PATCH /api/inspections/{id}` with a changed address, date, property facts, cover and similar columns). A
+field sent back unchanged is not a change. It does **not** cover the actions around a published report: resending or
+forwarding it, payment, agreement signing, retracting it, people on the job, scheduling, services, messages and
+documents.
+
+What a client must do:
+
+- **Offline package (`POST /api/client/import`).** A package that names a published inspection is refused whole with
+  `409` `REPORT_PUBLISHED`; `details.inspectionIds` lists every published inspection in it. Nothing is applied and nothing
+  is recorded as applied, so the device still holds every edit. Treat it as the first kind of refusal in "Splitting a
+  package that one inspection keeps refusing": keep the named inspections on the device, send the rest, and ask the
+  person whether to update and republish. If they confirm, call `edit-again` and send the same package again, which now
+  applies; if they decline, discard the local edits. Queued writes inside an accepted package are not checked a second
+  time.
+- **Single writes (field sync routes, the editor's item and media routes).** The same `409`. Keep the edit and prompt the
+  person in the same way.
+- **The collaborative socket.** The Yjs protocol has no error frame, so the document answers with the WebSocket close
+  code **`4409`** and the reason **`REPORT_PUBLISHED`**. The socket is closed straight after it opens when the report is
+  published, and sockets that were already open when the report was published are closed with the same code. A client
+  that is closed this way has not had its pending edits acknowledged (see the ack frame above): it keeps them in its local
+  document, does not retry the socket until the person has chosen, and treats `4409` as final rather than as a dropped
+  connection. After `edit-again` the same local document syncs normally. Reading is not affected: a published report still
+  loads, and `GET` routes keep working.
+- **Tickets.** `POST /api/inspections/{id}/collab/ticket` answers `409` `REPORT_PUBLISHED` for a published report, so a
+  client learns before it opens a socket.
+
+An update that reached the document through a socket that was open at the instant of publishing, and could not be told
+in time, is merged into the document as before. Clients read the frozen version, so it is not visible to them, and the
+edit is kept for the next publish.
+
+Two windows are open by design. Edits accepted between the moment a report is marked published and the moment its
+document is told (a fraction of a second) merge into the live results but not into the frozen version, while the phone is
+told they are saved; clients are unaffected, and the next republish includes them. And the order the lock is read in is
+covered by a timestamp: a document that was locked after the route last read the report's state keeps its lock.
+
+Two writers are outside the lock on purpose. The administrative finding-key migration rewrites live results across every
+inspection, published ones included, to rename keys; it changes how findings are addressed, not what they say, and clients
+keep reading the frozen version. And the portal's `cmd.report.correct` is itself an explicit amendment: it changes the
+named field and publishes a new signed version, so it does not need the lock lifted first.
+
+On the web, the editor does not use a collab ticket (the session cookie authenticates its socket). When the socket is closed
+with `4409` the connection stops reconnecting and reports `locked`; the page's results come from the loader, so a published
+report still loads and reads as before.
+
 ---
 
 ## 8. Signed media uploads
@@ -804,8 +866,8 @@ A refusal about one inspection refuses the whole package, so a single bad entry
 can hold up every other inspection in it. The error names the inspection:
 `details.inspectionId` on a `403` (the importer cannot edit it) and a `404` (it
 does not exist and the package does not create it), on a `400` for an inspection
-exported from a different report, on `409` `PACKAGE_INSPECTION_DELETED` (which
-also lists `details.inspectionIds`), and on a failure while its results or photos
+exported from a different report, on `409` `PACKAGE_INSPECTION_DELETED` and `409`
+`REPORT_PUBLISHED` (both of which also list `details.inspectionIds`), and on a failure while its results or photos
 were being applied. A client that gets one of these should write the inspection
 named into a package of its own, send the rest as a package without it, and keep
 the named one on the device for the person to resolve.

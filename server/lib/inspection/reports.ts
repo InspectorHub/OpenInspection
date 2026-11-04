@@ -13,6 +13,7 @@ import { Errors } from '../errors';
 import { logger } from '../logger';
 import { safeISODate } from '../date';
 import { REPORT_STATUS, isReportPublished } from '../status/report-status';
+import { reportEditState } from './report-lock';
 
 /**
  * Every deliverable on one order, in the order a person would read them.
@@ -209,10 +210,14 @@ export async function setReportNarrative(
 export type ReportDeleteBlock = 'primary' | 'published';
 
 export function reportDeleteBlock(
-    report: Pick<typeof reports.$inferSelect, 'kind' | 'status'>,
+    report: Pick<typeof reports.$inferSelect, 'kind' | 'status' | 'publishedAt'>,
+    /** Signed versions the report owns: deleting the report deletes them, and with them the chain a client verifies against. */
+    versionCount: number,
 ): ReportDeleteBlock | null {
     if (report.kind === 'primary') return 'primary';
-    if (isReportPublished(report.status)) return 'published';
+    // Published, being edited again, or RETRACTED after going out: a signed version exists in each case, and a retract
+    // clears `published_at`, so the versions themselves are the record that cannot be deleted.
+    if (isReportPublished(report.status) || report.publishedAt || versionCount > 0) return 'published';
     return null;
 }
 
@@ -223,6 +228,8 @@ export interface ReportListItem {
     title: string;
     status: string;
     publishedAt: string | null;
+    /** True when a published report is open for editing again (clients still read its latest published version). */
+    editingAgain: boolean;
     /** Published versions this report owns — part of what a delete would destroy. */
     versionCount: number;
     /** True when its document has been written into: the "information you already filled out". */
@@ -287,13 +294,14 @@ export async function listReportsForHub(
     );
 
     return rows.map((r) => {
-        const blocked = reportDeleteBlock(r);
+        const blocked = reportDeleteBlock(r, versionCounts.get(r.id) ?? 0);
         return {
             id: r.id,
             kind: r.kind,
             title: r.title,
             status: r.status,
             publishedAt: safeISODate(r.publishedAt) ?? null,
+            editingAgain: reportEditState(r) === 'editing',
             versionCount: versionCounts.get(r.id) ?? 0,
             hasContent: written.has(r.id),
             hasNarrative: (r.inspectorNarrative ?? '').trim().length > 0,
@@ -331,7 +339,9 @@ export async function deleteReport(
         .get();
     if (!row) throw Errors.NotFound('Report not found');
 
-    const blocked = reportDeleteBlock(row);
+    const owned = await db.select({ n: sql<number>`count(*)` }).from(reportVersions)
+        .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.reportId, reportId))).get();
+    const blocked = reportDeleteBlock(row, Number(owned?.n ?? 0));
     if (blocked === 'primary') {
         throw Errors.Conflict(
             'The primary report cannot be deleted. Every order keeps one, and without it the order cannot be edited at all.',

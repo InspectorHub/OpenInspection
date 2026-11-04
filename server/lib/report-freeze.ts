@@ -24,7 +24,7 @@ import type { Snapshot } from './version-diff';
  */
 const FROZEN_INSPECTION_FIELDS = [
     'propertyAddress', 'addressStreet', 'addressCity', 'addressState', 'addressZip', 'addressCounty', 'county', 'unit',
-    'date', 'closingDate',
+    'date',
     'yearBuilt', 'sqft', 'foundationType', 'bedrooms', 'bathrooms', 'lotSize', 'propertyFacts',
     'coverPhotoId', 'coverCrop', 'coverImageKey',
     'propertyType', 'commercialSubtype', 'reportTier', 'unitInspectionMode',
@@ -32,6 +32,36 @@ const FROZEN_INSPECTION_FIELDS = [
     'pcaNarrative', 'deviations', 'samplingDeclaration',
     'reportPhotoMode', 'reportPhotoColumns', 'profileOverride', 'badgeLayoutOverride',
 ] as const;
+
+/** JSON with object keys sorted, so two objects holding the same data compare equal whatever order they were built in. */
+function canonical(value: unknown): string {
+    if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+    if (value !== null && typeof value === 'object') {
+        const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== undefined).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+        return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`;
+    }
+    return JSON.stringify(value ?? null);
+}
+
+/**
+ * What a column holds, for comparison: null, undefined and '' are the same "nothing" (a form that forwards its whole state
+ * sends '' for an empty field), the inspection `date` is compared by its DAY (a calendar sends a bare YYYY-MM-DD where the row
+ * may hold a full ISO instant), and objects compare by content, not key order.
+ */
+function comparable(key: string, v: unknown): string {
+    const value = v === undefined || v === '' ? null : v;
+    return key === 'date' && typeof value === 'string' ? canonical(value.slice(0, 10)) : canonical(value);
+}
+
+/**
+ * The report-content columns a PATCH body would CHANGE on this inspection. Only a change counts: the settings form
+ * forwards its whole state, so a field sent back unchanged is not an edit.
+ */
+export function changedFrozenFields(body: object, current: object): string[] {
+    const patch = body as Record<string, unknown>;
+    const row = current as Record<string, unknown>;
+    return FROZEN_INSPECTION_FIELDS.filter((key) => key in patch && comparable(key, patch[key]) !== comparable(key, row[key]));
+}
 
 /** The inspection row with its content columns taken from the snapshot; the order's current state stays live. */
 export function freezeInspection<T extends object>(live: T, pinned: Snapshot | null): T {

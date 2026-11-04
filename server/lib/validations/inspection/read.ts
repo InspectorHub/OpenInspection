@@ -219,6 +219,7 @@ export const InspectionHubSchema = z.object({
     title:  z.string().describe('Report title, snapshotted from the service line that produced it'),
     status: z.string().describe('in_progress | published'),
     publishedAt: z.string().nullable().describe('ISO instant THIS deliverable went out; null while unpublished'),
+    editingAgain: z.boolean().describe('True when a published report is open for editing again ("Edit and republish"): clients still read its latest published version, and its content accepts edits. False while it is published (locked) or a draft.'),
     versionCount: z.number().describe('Signed versions this report owns — part of what deleting it would destroy'),
     hasContent: z.boolean().describe('Whether its document has been written into ("information you already filled out")'),
     hasNarrative: z.boolean().describe("Whether the inspector has written the report-level narrative (reports.inspector_narrative). The FLAG, not the prose — the text is unbounded free text and comes from GET /{id}/reports/{reportId}/narrative."),

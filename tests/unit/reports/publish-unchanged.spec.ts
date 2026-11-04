@@ -157,3 +157,33 @@ describe('publish with nothing changed since the latest version', () => {
         expect(publishInspection).toHaveBeenCalledTimes(2);
     });
 });
+
+describe('republishing a report that was being edited again', () => {
+    const reportOf = async (id: string) => (await db.select().from(schema.reports).where(eq(schema.reports.inspectionId, id)).get())!;
+
+    beforeEach(async () => {
+        await db.insert(schema.reports).values({
+            id: 'rep-a', tenantId: T, inspectionId: A, kind: 'primary', title: 'Report', status: 'in_progress', createdAt: new Date(),
+        });
+    });
+
+    it('with nothing changed makes no new version but puts the lock back', async () => {
+        await publish(A);
+        // "Edit and republish" opened the report; the inspector changed nothing and publishes again.
+        await db.update(schema.reports).set({ status: 'in_progress', publishedAt: new Date() }).where(eq(schema.reports.id, 'rep-a'));
+        const again = await publish(A);
+        expect(again.status).toBe(200);
+        expect(await versions(A)).toHaveLength(1);
+        expect(publishInspection).toHaveBeenCalledTimes(1);
+        expect((await reportOf(A)).status).toBe('published');
+    });
+
+    it('(control) with a change it is a real publish and makes the next version', async () => {
+        await publish(A);
+        await db.update(schema.reports).set({ status: 'in_progress', publishedAt: new Date() }).where(eq(schema.reports.id, 'rep-a'));
+        await setResults(A, { i1: { rating: 'defect' } });
+        await publish(A);
+        expect(await versions(A)).toHaveLength(2);
+        expect(publishInspection).toHaveBeenCalledTimes(2);
+    });
+});

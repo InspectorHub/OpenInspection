@@ -32,6 +32,11 @@ class FakeSocket extends EventTarget {
     }
     send(data: Uint8Array): void { this.sent.push(data); }
     close(): void { this.readyState = 3; }
+    /** The server ends the socket with a close code, the way the results document does for a published report. */
+    closeFromServer(code: number): void {
+        this.readyState = 3;
+        this.dispatchEvent(Object.assign(new Event('close'), { code }));
+    }
     push(frame: Uint8Array): void {
         const buf = frame.buffer.slice(frame.byteOffset, frame.byteOffset + frame.byteLength) as ArrayBuffer;
         this.dispatchEvent(new MessageEvent('message', { data: buf }));
@@ -197,3 +202,47 @@ describe('connectResultsDoc host contract', () => {
         expect(unsubscribe).toHaveBeenCalledTimes(1);
     });
 });
+describe('a report that is published', () => {
+    async function connected() {
+        FakeSocket.instances = [];
+        vi.useFakeTimers();
+        const host = makeHost();
+        let online: () => void = () => undefined;
+        const changes: boolean[] = [];
+        const conn = connectResultsDoc('insp-lock', {
+            WebSocketImpl: WS,
+            persistence: host.persistence,
+            wsUrl: host.wsUrl,
+            subscribeOnline: (cb) => { online = cb; return () => undefined; },
+            onChange: (h) => changes.push(h.locked === true),
+        });
+        host.release();
+        await vi.advanceTimersByTimeAsync(10);
+        expect(FakeSocket.instances).toHaveLength(1);
+        return { ...conn, online: () => online(), changes };
+    }
+
+    it('stops reconnecting when the socket is closed with 4409, and says it is locked', async () => {
+        const { handle, destroy, online, changes } = await connected();
+        FakeSocket.instances[0]!.closeFromServer(4409);
+        await vi.advanceTimersByTimeAsync(120_000);
+        online();                                            // even a "network is back" signal does not reopen it
+        await vi.advanceTimersByTimeAsync(120_000);
+        expect(FakeSocket.instances).toHaveLength(1);
+        expect(handle.locked).toBe(true);
+        expect(changes.at(-1)).toBe(true);
+        destroy();
+        vi.useRealTimers();
+    });
+
+    it('(control) any other close still reconnects', async () => {
+        const { handle, destroy } = await connected();
+        FakeSocket.instances[0]!.closeFromServer(1006);
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(FakeSocket.instances.length).toBeGreaterThan(1);
+        expect(handle.locked).toBeUndefined();
+        destroy();
+        vi.useRealTimers();
+    });
+});
+
