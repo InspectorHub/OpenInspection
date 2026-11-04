@@ -95,8 +95,10 @@ const signupRoute = createRoute(withMcpMetadata({
         + "company that already holds this email as an agent contact, and signs the new agent in with a 24-hour "
         + "session cookie. Refused with 400 when the bot challenge is missing or fails, when the deployment has "
         + "published no agent terms, when shownContentHash no longer matches the terms in force, or when "
-        + "termsAccepted is not true. An email that already has an account returns 409. Not idempotent: a repeat "
-        + "with the same email is a 409.",
+        + "termsAccepted is not true. An email that already has an account (of any kind, agent or company staff) returns 409. "
+        + "That answer is a known, accepted account-existence signal: it comes only after the rate limit, the bot challenge and the terms "
+        + "checks, it says nothing more than that the address has an account, and a sign-up form cannot avoid it without sending the new "
+        + "agent a confirmation email instead. Not idempotent: a repeat with the same email is a 409.",
     request: {
         body: { content: { 'application/json': { schema: SignupBodySchema.describe('The new agent\'s details and their acceptance of the agent terms') } } },
     },

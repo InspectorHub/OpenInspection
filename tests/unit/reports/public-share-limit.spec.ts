@@ -17,6 +17,7 @@ describe('POST /api/public/inspections/:id/share-token', () => {
     let limiterKeys: string[];
     let allow: boolean;
     let minted: number;
+    let mintedValue: string;
 
     const post = async (query = ''): Promise<Response> => {
         const exec = makeExecutionContext({ label: 'public-share-limit' });
@@ -35,10 +36,11 @@ describe('POST /api/public/inspections/:id/share-token', () => {
         limiterKeys = [];
         allow = true;
         minted = 0;
+        mintedValue = '';
         (h.env as unknown as { RATE_LIMITER: unknown }).RATE_LIMITER = { limit: async ({ key }: { key: string }) => { limiterKeys.push(key); return { success: allow }; } };
         const kv = h.env.TENANT_CACHE as unknown as { put: (k: string, ...rest: unknown[]) => Promise<void> };
         const put = kv.put.bind(kv);
-        kv.put = async (k, ...rest) => { if (k.startsWith('agent_view_token:')) minted += 1; return put(k, ...rest); };
+        kv.put = async (k, ...rest) => { if (k.startsWith('agent_view_token:')) { minted += 1; mintedValue = String(rest[0]); } return put(k, ...rest); };
     });
     afterEach(() => h.close());
 
@@ -47,6 +49,12 @@ describe('POST /api/public/inspections/:id/share-token', () => {
         expect(res.status).toBe(200);
         expect(limiterKeys).toContain(`share-token:${INSPECTION_ID}`);
         expect(minted).toBe(1);
+    });
+
+    it('a link minted from a client portal token is view-only (role client), never an agent link', async () => {
+        const res = await post(`?token=${token}`);
+        expect(res.status).toBe(200);
+        expect(mintedValue).toBe(`${INSPECTION_ID}:${TENANT_ID}:client`);
     });
 
     it('refuses with 429 and mints nothing when the limiter says stop', async () => {

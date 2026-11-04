@@ -140,6 +140,7 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
         const resolveAgentViewToken = vi.fn().mockResolvedValue({
             inspectionId: 'insp1',
             tenantId:     't2',
+            role:         'agent',
         });
         const listMine = vi.fn().mockResolvedValue([]);
 
@@ -158,6 +159,19 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
             kind: 'agent',
             ref: expect.stringMatching(/^legacy-share:[0-9a-f]{64}$/),
         });
+    });
+
+    it('refuses a view-only (client role) share link: it may not take the agent seat', async () => {
+        const resolveAgentViewToken = vi.fn().mockResolvedValue({ inspectionId: 'insp1', tenantId: 't2', role: 'client' });
+        const listMine = vi.fn().mockResolvedValue([]);
+        const { app } = buildApp({
+            services: makeServices({ resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken, listMine }),
+            reportStatus: 'published',
+            enableCustomerRepairExport: true,
+        });
+        const res = await app.request('/api/public/repair-builder/t2/insp1/source?token=kvtok');
+        expect(res.status).not.toBe(200);
+        expect(listMine).not.toHaveBeenCalled();
     });
 
     it('403 NOT_PUBLISHED for owner-preview on an unpublished (in_progress) report', async () => {

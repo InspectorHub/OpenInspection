@@ -2,6 +2,7 @@ import { Form, useActionData, useLoaderData, useNavigation, redirect } from "rea
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/join";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeJoinSchema, makePasswordHint } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
@@ -64,6 +65,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply();
   }
   const { name, password } = submission.value;
+  // A form posted from another site is refused before anything is spent or any session is created (login CSRF).
+  if (isCrossSitePost(request)) return submission.reply({ formErrors: [m.auth_join_error_accept_failed()] });
 
   try {
     const api = createApi(context);

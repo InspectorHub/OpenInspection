@@ -192,11 +192,11 @@ const updateServiceDiscountCodeRoute = createRoute(withMcpMetadata({
 const listServiceDiscountCodesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/discount-codes',
     tags: ["services"], summary: "List service discount codes",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('inspectionFees')] as const,
     responses: { 200: { content: { 'application/json': { schema: DiscountCodeListResponseSchema } }, description: 'OK' } },
     operationId: "listServiceDiscountCodes",
-    description: "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
-}, { scopes: ['read'], tier: 'extended' }));
+    description: "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owners, managers and inspectors who hold the inspection-fees capability; without it the answer is 403."
+}, { scopes: ['read'], tier: 'extended', capability: 'inspectionFees' }));
 
 const createServiceDiscountCodesRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/discount-codes',

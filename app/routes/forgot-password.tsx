@@ -2,6 +2,7 @@ import { Form, useActionData, useNavigation, redirect } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/forgot-password";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeForgotPasswordSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
@@ -33,6 +34,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply();
   }
   const { email } = submission.value;
+  // A form posted from another site sends no reset email; it gets the same confirmation as any other request.
+  if (isCrossSitePost(request)) return { sent: true, email };
 
   try {
     const api = createApi(context);

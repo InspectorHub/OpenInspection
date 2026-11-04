@@ -1428,7 +1428,7 @@
       }
     },
     "summary": "Create agent for current tenant",
-    "description": "Self-serve signup for a real-estate agent. Public: no session is needed. Creates an agent account that belongs to no single company, records acceptance of the agent terms currently in force (version, content hash, time, IP and country are taken from the server, never from the caller), links the account to every company that already holds this email as an agent contact, and signs the new agent in with a 24-hour session cookie. Refused with 400 when the bot challenge is missing or fails, when the deployment has published no agent terms, when shownContentHash no longer matches the terms in force, or when termsAccepted is not true. An email that already has an account returns 409. Not idempotent: a repeat with the same email is a 409."
+    "description": "Self-serve signup for a real-estate agent. Public: no session is needed. Creates an agent account that belongs to no single company, records acceptance of the agent terms currently in force (version, content hash, time, IP and country are taken from the server, never from the caller), links the account to every company that already holds this email as an agent contact, and signs the new agent in with a 24-hour session cookie. Refused with 400 when the bot challenge is missing or fails, when the deployment has published no agent terms, when shownContentHash no longer matches the terms in force, or when termsAccepted is not true. An email that already has an account (of any kind, agent or company staff) returns 409. That answer is a known, accepted account-existence signal: it comes only after the rate limit, the bot challenge and the terms checks, it says nothing more than that the address has an account, and a sign-up form cannot avoid it without sending the new agent a confirmation email instead. Not idempotent: a repeat with the same email is a 409."
   },
   {
     "operationId": "createAgentConciergeBook",
@@ -13341,7 +13341,7 @@
       "body": null
     },
     "summary": "List service discount codes",
-    "description": "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
+    "description": "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owners, managers and inspectors who hold the inspection-fees capability; without it the answer is 403."
   },
   {
     "operationId": "listServiceInspectorsBulk",

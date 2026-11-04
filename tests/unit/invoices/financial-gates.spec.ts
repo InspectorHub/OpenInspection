@@ -72,6 +72,8 @@ const FEES_CASES: Case[] = [
     ['POST', '/api/inspections/i1/services', { serviceId: 'svc1' }],
     ['PATCH', '/api/inspections/i1/services/l1', { priceOverrideCents: 100 }],
     ['DELETE', '/api/inspections/i1/services/l1'],
+    ['GET', '/api/services/discount-codes'],
+    ['POST', '/api/services/discount/validate', { code: 'SAVE', subtotal: 1000 }],
 ];
 
 const call = (app: OpenAPIHono<HonoConfig>, [method, path, body]: Case) =>
