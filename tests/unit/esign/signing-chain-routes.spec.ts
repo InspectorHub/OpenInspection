@@ -243,6 +243,32 @@ describe('the signing door and the audit chain', () => {
         expect(await eventRows('signer.signed')).toHaveLength(2);
     });
 
+    it('a take-over with the SAME drawing writes a new signed row naming the new time, so the newest row names what is stored', async () => {
+        expect((await view(caseyToken)).status).toBe(200);
+        expect((await sign(caseyToken, SIG)).status).toBe(200);
+        const first = (await signerRow('casey@client.test'))!;
+        // A crash after the append and before the confirm: the signer is `signing` again, with its first row already in the chain.
+        await h.db.update(schema.agreementSigners).set({ status: 'signing', signedAt: new Date(Date.now() - 10 * 60_000) }).where(eq(schema.agreementSigners.id, first.id));
+        expect((await sign(caseyToken, SIG)).status).toBe(200);
+        const row = (await signerRow('casey@client.test'))!;
+        const rows = (await eventRows('signer.signed')).map((r) => JSON.parse(r.payloadJson) as { signerId: string; tsMs: number; signatureImageHash: string });
+        expect(rows).toHaveLength(2);
+        expect(rows[1]!.tsMs).toBe(row.signedAt!.getTime());
+        expect(rows[1]!.signatureImageHash).toBe(await imageHash(SIG));
+    });
+
+    it('an undecodable drawing is refused with 400 before anything is claimed or recorded', async () => {
+        expect((await view(caseyToken)).status).toBe(200);
+        for (const bad of ['%%% not base64 %%%', 'data:image/png;base64,']) {
+            const res = await sign(caseyToken, bad);
+            expect(res.status, bad).toBe(400);
+        }
+        const row = await signerRow('casey@client.test');
+        expect(row?.status).not.toBe('signing');
+        expect(row?.signatureBase64 ?? null).toBeNull();
+        expect(await eventRows('signer.signed')).toHaveLength(0);
+    });
+
     it('a decline after a signature is refused (409) and records nothing; a repeat decline is 200 and records nothing more', async () => {
         expect((await view(caseyToken)).status).toBe(200);
         expect((await sign(caseyToken)).status).toBe(200);

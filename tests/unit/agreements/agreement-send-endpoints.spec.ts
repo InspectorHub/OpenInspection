@@ -309,6 +309,49 @@ describe('signer endpoints', () => {
         expect(res.status).toBe(409);
     });
 
+    describe('a signer whose signature is being recorded', () => {
+        const STALE = 120_000;
+        async function setUp(ageMs: number) {
+            const requestId = await sendTwo();
+            const signers = await db.select().from(schema.agreementSigners)
+                .where(eq(schema.agreementSigners.requestId, requestId)).orderBy(asc(schema.agreementSigners.createdAt)).all();
+            await db.update(schema.agreementSigners).set({ status: 'signing', signatureBase64: 'data:image/png;base64,aGVsbG8=', signedAt: new Date(Date.now() - ageMs) })
+                .where(eq(schema.agreementSigners.id, signers[0]!.id));
+            return { requestId, signerId: signers[0]!.id };
+        }
+        const remind = (requestId: string, signerId: string) =>
+            buildApp().request(`/api/admin/agreements/requests/${requestId}/signers/${signerId}/remind`, { method: 'POST' }, ENV, EXEC);
+        const resend = () => buildApp().request('/api/admin/agreements/send', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agreementId: AGR_ID, clientEmail: 'jane@test.com', inspectionId: INSP_ID, completionPolicy: 'all',
+                signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }, { name: 'John', email: 'john@test.com', role: 'co_client' }],
+            }),
+        }, ENV, EXEC);
+
+        it('a live one cannot be reminded (409) and is not re-sent to; the list shows it as signing', async () => {
+            const { requestId, signerId } = await setUp(5_000);
+            expect((await remind(requestId, signerId)).status).toBe(409);
+            emailSend.mockClear();
+            expect((await resend()).status).toBe(200);
+            expect(emailSend.mock.calls.map((c) => c[0])).toEqual(['john@test.com']);
+            const list = await (await buildApp().request(`/api/admin/agreements/requests/${requestId}/signers`, {}, ENV, EXEC)).json() as { data: Array<{ id: string; status: string; signedAt: number | null }> };
+            expect(list.data.find((s) => s.id === signerId)).toMatchObject({ status: 'signing', signedAt: null });
+        });
+
+        it('a stale one is awaiting again: it can be reminded, is re-sent to, and the list shows it as viewed', async () => {
+            const { requestId, signerId } = await setUp(STALE + 5_000);
+            emailSend.mockClear();
+            expect((await remind(requestId, signerId)).status).toBe(200);
+            expect(emailSend).toHaveBeenCalledTimes(1);
+            emailSend.mockClear();
+            expect((await resend()).status).toBe(200);
+            expect(emailSend.mock.calls.map((c) => c[0]).sort()).toEqual(['jane@test.com', 'john@test.com']);
+            const list = await (await buildApp().request(`/api/admin/agreements/requests/${requestId}/signers`, {}, ENV, EXEC)).json() as { data: Array<{ id: string; status: string }> };
+            expect(list.data.find((s) => s.id === signerId)?.status).toBe('viewed');
+        });
+    });
+
     it('cross-tenant signers request -> 404 (tenant scope)', async () => {
         const requestId = await sendTwo();
         // build an app whose tenant differs

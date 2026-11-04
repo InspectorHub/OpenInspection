@@ -119,6 +119,26 @@ describe('the in-person signing door and the audit chain', () => {
         finish.mockRestore();
     });
 
+    it('an undecodable drawing is refused with 400 before anything is claimed or appended', async () => {
+        const append = vi.fn().mockResolvedValue({ id: 'a', hash: 'h' });
+        const { app } = buildApp(db, { auditAppend: append });
+        const { requestId, signers } = await createTwoSignerEnvelope(db);
+        for (const bad of ['%%% not base64 %%%', 'data:image/png;base64,']) {
+            expect((await sign(app, { signatureBase64: bad, signerId: signers[0]!.id })).status, bad).toBe(400);
+        }
+        expect(signedCalls(append)).toHaveLength(0);
+        expect((await signerRows(requestId)).find((s) => s.id === signers[0]!.id)!.signatureBase64 ?? null).toBeNull();
+    });
+
+    it('records the claim time in the match so a take-over with the same drawing is not collapsed into the older row', async () => {
+        const append = vi.fn().mockResolvedValue({ id: 'a', hash: 'h' });
+        const { app } = buildApp(db, { auditAppend: append });
+        const { signers } = await createTwoSignerEnvelope(db);
+        await sign(app, { signatureBase64: SIG, signerId: signers[0]!.id });
+        const options = signedCalls(append)[0]![4] as { dedupe?: { match?: Record<string, unknown> } };
+        expect(Object.keys(options.dedupe?.match ?? {}).sort()).toEqual(['signatureImageHash', 'tsMs']);
+    });
+
     it('a repeat for a signer who already signed adds nothing; a signer who declined cannot sign', async () => {
         const append = vi.fn().mockResolvedValue({ id: 'a', hash: 'h' });
         const { app } = buildApp(db, { auditAppend: append });

@@ -94,6 +94,21 @@ describe('who sees the drawn signatures on the render pages', () => {
         }
     });
 
+    it('every 404 of both pages carries the same no-store and noindex headers', async () => {
+        await db.insert(schema.agreementRequests).values({
+            id: OTHER_REQ, tenantId: TENANT, inspectionId: INSP, agreementId: AGR, clientEmail: 'x@client.test', clientName: 'X', status: 'sent', createdAt: new Date(),
+        } as never);
+        for (const path of [
+            '/agreement-render/acme/00000000-0000-0000-0000-0000000000ff', `/agreement-render/acme/${OTHER_REQ}`,
+            '/cert-render/00000000-0000-0000-0000-0000000000ff', `/cert-render/${OTHER_REQ}`,
+        ]) {
+            const res = await render(path);
+            expect(res.status, path).toBe(404);
+            expect(res.headers.get('cache-control'), path).toBe('no-store');
+            expect(res.headers.get('x-robots-tag'), path).toBe('noindex');
+        }
+    });
+
     it('the render URL the sign-completion workflow fetches carries a token that opens the drawings', async () => {
         const fetched: string[] = [];
         vi.stubGlobal('fetch', vi.fn(async (url: string) => { fetched.push(url); return new Response('<html></html>', { status: 200 }); }));

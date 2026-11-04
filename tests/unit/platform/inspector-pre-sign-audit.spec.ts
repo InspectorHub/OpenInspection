@@ -53,14 +53,14 @@ describe('the inspector pre-sign and its audit row', () => {
         }, { DB: {}, JWT_SECRET: 'a-secret-long-enough-for-the-keys' } as never);
     }
 
-    it('succeeds and keeps the countersignature when the audit append throws, and logs the failure with ids only', async () => {
+    it('succeeds and keeps the countersignature when the audit append throws, and raises an alert with ids only', async () => {
         vi.spyOn(AuditLogService.prototype, 'append').mockRejectedValue(new Error('Failed query: insert into "esign_audit_logs"\nparams: owner@example.test'));
-        const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+        const alert = vi.spyOn(logger, 'alert').mockImplementation(() => undefined);
         const res = await call();
         expect(res.status).toBe(200);
         const row = await db.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, ENV_ID)).get();
         expect(row?.inspectorSignatureBase64).toBe(SIGNATURE);
-        const logged = error.mock.calls.find((c) => c[0] === 'audit.append.inspector-signed.failed');
+        const logged = alert.mock.calls.find((c) => c[0] === 'audit_append_inspector_signed_failed');
         expect(logged).toBeTruthy();
         expect(JSON.stringify(logged)).toContain(ENV_ID);
         expect(JSON.stringify(logged)).not.toContain('owner@example.test');
@@ -68,8 +68,8 @@ describe('the inspector pre-sign and its audit row', () => {
 
     it('control: when the append works the call succeeds and nothing is logged as a failure', async () => {
         vi.spyOn(AuditLogService.prototype, 'append').mockResolvedValue({ id: 'a', hash: 'h' });
-        const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+        const alert = vi.spyOn(logger, 'alert').mockImplementation(() => undefined);
         expect((await call()).status).toBe(200);
-        expect(error.mock.calls.some((c) => c[0] === 'audit.append.inspector-signed.failed')).toBe(false);
+        expect(alert.mock.calls.some((c) => c[0] === 'audit_append_inspector_signed_failed')).toBe(false);
     });
 });

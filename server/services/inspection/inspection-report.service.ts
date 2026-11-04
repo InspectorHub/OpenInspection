@@ -75,7 +75,7 @@ export function defectDrivesSummary(
  */
 export class InspectionReportService extends InspectionSubService {
     /**
-     * `encryptionSecret` is only consumed to construct a scoped
+     * `signing` (the secret and its earlier ones) is only consumed to construct a scoped
      * `ComplianceService` (Phase M) for full_pca reports — every other method
      * on this service is unaffected. Optional so existing positional
      * construction call sites (and unit tests that build this service
@@ -89,7 +89,7 @@ export class InspectionReportService extends InspectionSubService {
         sdb?: ScopedDB,
         kv?: KVNamespace,
         images?: ImagesBinding,
-        private readonly encryptionSecret?: string, private readonly previousSecrets: readonly string[] = [],
+        private readonly signing?: import('../../lib/signing-key-secrets').SigningSecrets,
     ) {
         super(db, r2, sdb, kv, images);
     }
@@ -764,7 +764,7 @@ export class InspectionReportService extends InspectionSubService {
         let documentReview: Awaited<ReturnType<ComplianceService['getCompliance']>>['documentReview'] = [];
         let relianceText: typeof RELIANCE_TEMPLATES = { ...RELIANCE_TEMPLATES };
         if (isFullPca) {
-            const compliance = new ComplianceService(this.db, this.encryptionSecret ?? '', this.previousSecrets);
+            const compliance = new ComplianceService(this.db, this.signing?.current ?? '', this.signing?.previous ?? []);
             const c = await compliance.getCompliance(tenantId, inspectionId);
             const deviations = (inspection as { deviations?: Deviation[] | null }).deviations ?? [];
             // `signedAt` is a drizzle `timestamp_ms` column — reads yield Date

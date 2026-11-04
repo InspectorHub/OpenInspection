@@ -22,6 +22,19 @@ export interface SignedOpts {
     languageDisclosureVersion: number | null;
 }
 
+/** How long a `signing` row is treated as a request still in flight. A later claim (or decline, remind, resend) treats an older one as stale. */
+export const STALE_SIGNING_MS = 120_000;
+
+/** A signer whose signature is being recorded right now: status `signing` and a claim younger than the stale window. */
+export function isLiveSigning(s: { status: string; signedAt?: Date | null }, now: number = Date.now()): boolean {
+    return s.status === 'signing' && !!s.signedAt && now - s.signedAt.getTime() < STALE_SIGNING_MS;
+}
+
+/** The status shown outside the claim machinery: a signature being recorded reads as `signing`, a stale `signing` row as awaiting (viewed). */
+export function displaySignerStatus(s: { status: string; signedAt?: Date | null }): string {
+    return s.status === 'signing' && !isLiveSigning(s) ? 'viewed' : s.status;
+}
+
 export interface ResolvedSigner {
     signer: typeof agreementSigners.$inferSelect;
     envelope: typeof agreementRequests.$inferSelect;

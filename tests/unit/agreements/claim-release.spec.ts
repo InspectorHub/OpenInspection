@@ -135,6 +135,44 @@ describe('claimSignedBySigner and release', () => {
         expect((await row())!.status).toBe('expired');
     });
 
+    const expireEnvelope = () => db.update(schema.agreementRequests).set({ status: 'expired' });
+
+    it('an expired envelope cannot be signed: not on the normal path, and not by taking over a crashed signing', async () => {
+        await db.update(schema.agreementSigners).set({ status: 'viewed' }).where(eq(schema.agreementSigners.id, signerId));
+        await expireEnvelope();
+        const before = (await row())!;
+        await expect(svc.claimSignedBySigner(token, A, OPTS(Date.now()))).rejects.toMatchObject({ status: 409 });
+        expect(await row()).toEqual(before);
+
+        // A crash left a `signing` row; the envelope expired afterwards (the cron skips `signing`); the retry comes after the window.
+        await db.update(schema.agreementSigners).set({ status: 'signing', signatureBase64: A, signedAt: new Date(Date.now() - STALE_SIGNING_MS - 5000) }).where(eq(schema.agreementSigners.id, signerId));
+        const orphan = (await row())!;
+        await expect(svc.claimSignedBySigner(token, B, OPTS(Date.now()))).rejects.toMatchObject({ status: 409 });
+        expect(await row()).toEqual(orphan);
+        expect((await row())!.status).not.toBe('signed');
+    });
+
+    it('an envelope that expires between the claim and the confirm is not signed: the confirm answers 409 and the signer is put back', async () => {
+        await db.update(schema.agreementSigners).set({ status: 'viewed' }).where(eq(schema.agreementSigners.id, signerId));
+        const claim = await svc.claimSignedBySigner(token, A, OPTS(Date.now()));
+        if (claim.kind !== 'claimed') throw new Error('not claimed');
+        await expireEnvelope();
+        await expect(claim.confirm()).rejects.toMatchObject({ status: 409 });
+        const after = (await row())!;
+        expect(after.status).toBe('expired');
+        expect(after.signatureBase64 ?? null).toBeNull();
+    });
+
+    it('a signing that is still live cannot be declined (409); a stale one can, and only the decline machinery writes the row', async () => {
+        await svc.claimSignedBySigner(token, A, OPTS(Date.now()));
+        await expect(svc.markDeclinedBySigner(token, 'no')).rejects.toMatchObject({ status: 409 });
+        expect((await row())!.status).toBe('signing');
+        await db.update(schema.agreementSigners).set({ signedAt: new Date(Date.now() - STALE_SIGNING_MS - 5000) }).where(eq(schema.agreementSigners.id, signerId));
+        const declined = await svc.markDeclinedBySigner(token, 'no');
+        expect(declined.declinedNow).toBe(true);
+        expect((await row())!.status).toBe('declined');
+    });
+
     it('the log lines of a refused signing carry identifiers only: no email, address or browser, even when the driver error carries them', async () => {
         const claim = await svc.claimSignedBySigner(token, A, OPTS(1_800_000_000_000));
         if (claim.kind !== 'claimed') throw new Error('not claimed');

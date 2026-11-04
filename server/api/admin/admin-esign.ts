@@ -19,6 +19,7 @@ import { Errors, AppError } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { agreements as agreementsTable, agreementRequests as agreementRequestsTable } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
+import { isLiveSigning, displaySignerStatus } from '../../services/agreement/base';
 
 
 // --- Spec 5H — Signing Requests admin views ---
@@ -284,13 +285,12 @@ app.openapi(listSignersRoute, async (c) => {
         .get();
     if (!env) throw Errors.NotFound('Signing request not found');
     const signers = await svc.listSigners(tenantId, requestId);
-    // Map to the safe row shape — NEVER include tokenHash / tokenEnc.
-    const data = signers.map((s: typeof schema.agreementSigners.$inferSelect) => ({
+    const data = signers.map((s: typeof schema.agreementSigners.$inferSelect) => ({ // safe row shape: NEVER tokenHash / tokenEnc
         id: s.id,
         name: s.name,
         email: s.email,
         role: s.role,
-        status: s.status,
+        status: displaySignerStatus(s),
         channel: s.channel ?? null,
         signedAt: s.signedAt && s.status !== 'signing' ? s.signedAt.getTime() : null,
         viewedAt: s.viewedAt ? s.viewedAt.getTime() : null,
@@ -325,12 +325,12 @@ app.openapi(remindSignerRoute, async (c) => {
     const { requestId, signerId } = c.req.valid('param');
     const svc = c.var.services.agreement;
     const db = drizzle(c.env.DB, { schema });
-    // Tenant scope + load the signer row (need status + lastRemindedAt + inspectionId).
     const row = await db.select({
         id: schema.agreementSigners.id,
         name: schema.agreementSigners.name,
         email: schema.agreementSigners.email,
         status: schema.agreementSigners.status,
+        signedAt: schema.agreementSigners.signedAt,
         lastRemindedAt: schema.agreementSigners.lastRemindedAt,
         inspectionId: schema.agreementRequests.inspectionId,
     })
@@ -343,8 +343,8 @@ app.openapi(remindSignerRoute, async (c) => {
         ))
         .get();
     if (!row) throw Errors.NotFound('Signer not found');
-    // Terminal signers can't be reminded.
-    if (['signed', 'signing', 'declined', 'expired'].includes(row.status)) {
+    // Not a terminal signer, nor one whose signature is being recorded right now (a stale `signing` row can be reminded).
+    if (['signed', 'declined', 'expired'].includes(row.status) || isLiveSigning(row)) {
         throw Errors.Conflict('Signer is no longer awaiting signature');
     }
     // Rate limit: at most once per hour, measured against lastRemindedAt.

@@ -98,14 +98,14 @@ describe('signing key wrapping and rotation', () => {
     it('the re-wrap pass brings a tenant that never signed after the rotation under the new secret, so the old one can be removed', async () => {
         const created = await svc(OLD).ensureKeypair(TENANT);
         const report = await svc(NEW, [OLD]).rewrapAll(1);
-        expect(report).toEqual({ rewrapped: 1, alreadyCurrent: 0, remaining: 0 });
+        expect(report).toEqual({ rewrapped: 1, alreadyCurrent: 0, remaining: 0, done: true });
         // The previous secret is gone: the tenant still signs, with the same key.
         const after = await svc(NEW).ensureKeypair(TENANT);
         expect(after.fingerprint).toBe(created.fingerprint);
         const sig = await crypto.subtle.sign('Ed25519', after.privateKey, new Uint8Array([9]));
         expect(await crypto.subtle.verify('Ed25519', created.publicKey, sig, new Uint8Array([9]))).toBe(true);
         // Idempotent, and nothing but the wrapping moved.
-        expect(await svc(NEW, [OLD]).rewrapAll(1)).toEqual({ rewrapped: 0, alreadyCurrent: 1, remaining: 0 });
+        expect(await svc(NEW, [OLD]).rewrapAll(1)).toEqual({ rewrapped: 0, alreadyCurrent: 1, remaining: 0, done: true });
     });
 
     it('the pass reports the keys it could not bring over, in chunks, and leaves them as they were', async () => {
@@ -115,9 +115,20 @@ describe('signing key wrapping and rotation', () => {
         await svc('third-secret-third-secret-9999').ensureKeypair(other);
         const before = await db.select().from(schema.signingKeys).all();
         const report = await svc(NEW, [OLD]).rewrapAll(1);
-        expect(report).toEqual({ rewrapped: 1, alreadyCurrent: 0, remaining: 1 });
+        expect(report).toEqual({ rewrapped: 1, alreadyCurrent: 0, remaining: 1, done: false });
         const unopened = (await db.select().from(schema.signingKeys).where(eq(schema.signingKeys.tenantId, other)).all())[0]!;
         expect(unopened.privateKeyEnc).toBe(before.find((r) => r.tenantId === other)!.privateKeyEnc);
+    });
+
+    it('a call writes at most `limit` keys and says how many are left; running it again finishes, and only then is it done', async () => {
+        const ids = ['00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000003'];
+        for (const id of ids) await db.insert(schema.tenants).values({ id, slug: `t-${id.slice(-1)}`, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
+        for (const id of [TENANT, ...ids]) await svc(OLD).ensureKeypair(id);
+        const first = await svc(NEW, [OLD]).rewrapAll(2, 2);
+        expect(first).toEqual({ rewrapped: 2, alreadyCurrent: 0, remaining: 1, done: false });
+        const second = await svc(NEW, [OLD]).rewrapAll(2, 2);
+        expect(second).toEqual({ rewrapped: 1, alreadyCurrent: 2, remaining: 0, done: true });
+        for (const id of [TENANT, ...ids]) expect((await svc(NEW).ensureKeypair(id)).fingerprint).toBeTruthy();
     });
 
     it('a re-wrap that does not open back to the same bytes is not written, and raises an alert', async () => {
