@@ -6,9 +6,9 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 164,
+    "files": 165,
     "dollarMethods": 599,
-    "apiWorker": 9
+    "apiWorker": 11
   },
   "fanOut": {
     "app/lib/access.server.ts": {
@@ -150,6 +150,10 @@
     "app/routes/agent/login.tsx": {
       "dollarMethods": 2,
       "apiWorker": 0
+    },
+    "app/routes/agent/magic-login.tsx": {
+      "dollarMethods": 0,
+      "apiWorker": 2
     },
     "app/routes/agent/repair-items.tsx": {
       "dollarMethods": 5,
