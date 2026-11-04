@@ -126,6 +126,8 @@ test.describe('Subsystem D — units, republish, version diff', () => {
 
         // v1 → add a unit → v2, so the diff has exactly one real change to show.
         await apiPost(page, `/api/inspections/${id}/publish`, {});
+        // A published report takes no content writes until it is opened for editing again.
+        await apiPost(page, `/api/inspections/${id}/edit-again`, {});
         await apiPost(page, `/api/inspections/${id}/units`, {
             name: 'Unit 101', parentUnitId: null, kind: 'unit', type: 'unit',
         });

@@ -18,6 +18,8 @@ export interface ReportRow {
     title: string;
     status: string;
     publishedAt: string | null;
+    /** A published report open for editing again; clients still read its latest published version. */
+    editingAgain: boolean;
     versionCount: number;
     hasContent: boolean;
     /**
