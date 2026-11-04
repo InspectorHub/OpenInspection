@@ -21,8 +21,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import adminRoutes from '../../../server/api/admin';
 import { AgreementService } from '../../../server/services/agreement.service';
@@ -48,7 +48,7 @@ function buildApp() {
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
     const services = {
-        agreement: new AgreementService({} as D1Database, { jwtSecret: 'test-secret' }),
+        agreement: new AgreementService(testD1.binding, { jwtSecret: 'test-secret' }),
         email: { sendAgreementRequest: emailSend },
         auditLog: { append: auditAppend, verifyChain: vi.fn(async () => ({ valid: true })) },
     } as unknown as HonoConfig['Variables']['services'];
@@ -66,7 +66,7 @@ function buildApp() {
     return app;
 }
 
-const ENV = { DB: {}, JWT_SECRET: 'test-secret', APP_BASE_URL: 'https://app.test' };
+const ENV = { DB: testD1.binding, JWT_SECRET: 'test-secret', APP_BASE_URL: 'https://app.test' };
 // Settled at teardown by the helper. `void` attached a catch but nothing that
 // could await the work, so it ran on past the end of the file.
 const EXEC = makeExecutionContext().ctx;
@@ -95,7 +95,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     emailSend = vi.fn(async () => {});
     auditAppend = vi.fn(async () => {});
 

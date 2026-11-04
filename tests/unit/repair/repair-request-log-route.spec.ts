@@ -23,8 +23,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import inspectionRepairRequestRoutes from '../../../server/api/inspections/repair-requests';
 import { AppError } from '../../../server/lib/errors';
@@ -35,7 +35,7 @@ const TENANT = 't-repairlog-1';
 const USER = 'u-repairlog-1';
 const INSP = 'i-repairlog-1';
 
-const ENV = { DB: {} } as never;
+const ENV = { DB: testD1.binding } as never;
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --
 // it only removes any way to await it, which is how a run with every test
 // passing could still exit 1 on an unhandled teardown rejection.
@@ -84,7 +84,7 @@ async function callLog(opts: {
     const fixture = createTestDb();
     const db = fixture.db as BetterSQLite3Database<typeof schema>;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({ id: TENANT, slug: 't-repairlog', createdAt: new Date() });
     if (inspectionExists) {

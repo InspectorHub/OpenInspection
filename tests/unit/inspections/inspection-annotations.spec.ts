@@ -7,9 +7,9 @@ import { ScopedDB } from '../../../server/lib/db/scoped';
 import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/first
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = '00000000-0000-0000-0000-0000000000cc';
 const INSPECTION_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
@@ -38,12 +38,11 @@ describe('saveAnnotation', () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(testDb);
+    testD1.use(testDb);
     r2 = makeFakeR2();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sdb = new ScopedDB(testDb as any, TENANT);
-    svc = new InspectionService({} as D1Database, r2.bucket, sdb);
+    svc = new InspectionService(testD1.binding, r2.bucket, sdb);
 
     await testDb.insert(schema.tenants).values({
       id: TENANT, slug: 'acme-ann', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

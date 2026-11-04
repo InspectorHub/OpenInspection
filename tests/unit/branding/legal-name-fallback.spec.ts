@@ -14,7 +14,8 @@ import { createTestDb, setupSchema } from '../db';
 import { BrandingService } from '../../../server/services/branding.service';
 import { persistWizardLegalName } from '../../../server/lib/sms/persist-legal-name';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -26,11 +27,10 @@ describe('getBrand legalName', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         // Same construction as tests/unit/branding/tenant-config-write-allowlist.spec.ts.
         branding = new BrandingService(
-            {} as D1Database,
+            testD1.binding,
             undefined,
             { put: vi.fn().mockResolvedValue(undefined) } as unknown as R2Bucket,
         );
@@ -71,13 +71,13 @@ describe('getBrand legalName', () => {
     // has, AND a correction made there does not have to be made twice.
     it('a value stored by the SMS wizard is what Settings shows next', async () => {
         await seedConfig({ companyName: 'Acme Home Inspections', legalName: null });
-        await persistWizardLegalName({} as D1Database, TENANT, 'Acme Holdings LLC');
+        await persistWizardLegalName(testD1.binding, TENANT, 'Acme Holdings LLC');
         expect((await branding.getBrand(TENANT)).legalName).toBe('Acme Holdings LLC');
     });
 
     it('the wizard never writes blank over a stored legal name', async () => {
         await seedConfig({ companyName: 'Acme Home Inspections', legalName: 'Acme Holdings LLC' });
-        await persistWizardLegalName({} as D1Database, TENANT, '   ');
+        await persistWizardLegalName(testD1.binding, TENANT, '   ');
         expect((await branding.getBrand(TENANT)).legalName).toBe('Acme Holdings LLC');
     });
 });

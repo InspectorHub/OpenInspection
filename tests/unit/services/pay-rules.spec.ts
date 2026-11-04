@@ -24,7 +24,7 @@
  *      A `percent` rule carrying one is ambiguous, so it is refused rather than
  *      silently ignored — which is what a single loose object would have done.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
@@ -42,8 +42,8 @@ import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import { servicesRoutes } from '../../../server/api/services';
@@ -53,7 +53,7 @@ const T = 't1';
 const SVC = 'svc-home';
 const INSP = 'i1';
 const LINE = 'line1';
-const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
+const FAKE_ENV = { DB: testD1.binding } as HonoConfig['Bindings'];
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --
 // it only removes any way to await it, which is how a run with every test
 // passing could still exit 1 on an unhandled teardown rejection.
@@ -62,7 +62,7 @@ const CTX = makeExecutionContext().ctx;
 let db: DrizzleD1Database;
 
 function buildApp(role: 'owner' | 'manager' | 'inspector' = 'manager') {
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => {
         if (err instanceof AppError) {
@@ -75,7 +75,7 @@ function buildApp(role: 'owner' | 'manager' | 'inspector' = 'manager') {
         c.set('userRole', role);
         c.set('user', { sub: 'mgr', role, tenantId: T });
         c.set('sdb', { getById: async () => ({ permissionOverrides: null }) } as unknown as HonoConfig['Variables']['sdb']);
-        c.set('services', { service: new ServiceService({} as D1Database) } as unknown as HonoConfig['Variables']['services']);
+        c.set('services', { service: new ServiceService(testD1.binding) } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
     app.route('/api/services', servicesRoutes);

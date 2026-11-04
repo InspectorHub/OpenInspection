@@ -14,7 +14,7 @@
  * carries is the value the row holds, a value outside the vocabulary is refused
  * rather than stored, and a request that says nothing still stores nothing.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { ScopedDB } from '../../../server/lib/db/scoped';
@@ -31,8 +31,8 @@ import { buildPcaReportBlock } from '../../../server/lib/pca-report-block';
 import { resolveBuildingProfile } from '../../../server/lib/building-profile';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000p1';
 
@@ -43,8 +43,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(testDb);
+    testD1.use(testDb);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sdb = new ScopedDB(testDb as any, TENANT);
 
@@ -54,7 +53,7 @@ beforeEach(async () => {
     });
     await seedRoleProfiles(asD1Db(testDb), TENANT, new Date());
 
-    inspectionSvc = new InspectionService({} as D1Database, undefined, sdb);
+    inspectionSvc = new InspectionService(testD1.binding, undefined, sdb);
 });
 
 /** Create one inspection and hand back the row that was actually stored. */

@@ -11,16 +11,15 @@
  * carries a multipart harness and an R2 double that nothing here needs, and one
  * file holding both crosses the 400-line cap.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
-
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import migrationIntakeRoutes from '../../../server/api/migration-intake';
 import { STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
 
@@ -50,7 +49,7 @@ function appFor(role: string, tenantId = TENANT) {
 }
 
 function get(path: string, role = 'owner', tenantId = TENANT) {
-    return appFor(role, tenantId).request(path, { method: 'GET' }, { DB: {}, PHOTOS: {} });
+    return appFor(role, tenantId).request(path, { method: 'GET' }, { DB: testD1.binding, PHOTOS: {} });
 }
 
 describe('GET /api/imports', () => {
@@ -68,8 +67,7 @@ describe('GET /api/imports', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         for (const id of [TENANT, OTHER]) {
             await db.insert(schema.tenants).values({
                 id, slug: id.slice(0, 8), status: 'active', deploymentMode: 'shared',
@@ -132,8 +130,7 @@ describe('GET /api/imports/{batchId}', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         for (const id of [TENANT, OTHER]) {
             await db.insert(schema.tenants).values({
                 id, slug: id.slice(0, 8), status: 'active', deploymentMode: 'shared',

@@ -19,8 +19,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import invoiceRoutes from '../../../server/api/invoices';
 import { InvoiceService } from '../../../server/services/invoice.service';
@@ -52,9 +52,9 @@ function buildApp() {
         c.set('user', { sub: USER_ID } as never);
         c.set('requestedTenantSlug', SLUG as never);
         c.set('services', {
-            invoice: new InvoiceService({} as D1Database),
-            people: new PeopleService({ DB: {} as D1Database }),
-            portalAccess: new PortalAccessService({} as D1Database, { jwtSecret: JWT_SECRET }),
+            invoice: new InvoiceService(testD1.binding),
+            people: new PeopleService({ DB: testD1.binding }),
+            portalAccess: new PortalAccessService(testD1.binding, { jwtSecret: JWT_SECRET }),
             email: { sendInvoiceRequest } as never,
             qbo: { upsertInvoice: vi.fn() } as never,
         } as never);
@@ -72,7 +72,7 @@ function buildApp() {
     return app;
 }
 
-const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET } as never;
+const ENV = { DB: testD1.binding, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET } as never;
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --
 // it only removes any way to await it, which is how a run with every test
 // passing could still exit 1 on an unhandled teardown rejection.
@@ -95,7 +95,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     sendInvoiceRequest = vi.fn().mockResolvedValue(undefined);
 
     await db.insert(schema.tenants).values({
@@ -114,7 +114,7 @@ beforeEach(async () => {
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
     }
-    const people = new PeopleService({ DB: {} as D1Database });
+    const people = new PeopleService({ DB: testD1.binding });
     await people.addPerson(TENANT, INSP_ID, CLIENT, roleProfileId('client'));
     await people.addPerson(TENANT, INSP_ID_2, CLIENT, roleProfileId('client'));
 });

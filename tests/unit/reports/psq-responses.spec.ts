@@ -12,15 +12,15 @@
 // upsert then read; compliance-routes.spec.ts: the decline -> Deviations
 // side-effect). What was untested is the storage-level invariants those two
 // rest on, which is what this file pins.
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ComplianceService } from '../../../server/services/compliance/pca-compliance.service';
 import { PCA_INSPECTION_ID } from '../../seed-fixtures';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('pre-survey questionnaire (ASTM E2018 §8.5)', () => {
     let svc: ComplianceService;
@@ -30,13 +30,12 @@ describe('pre-survey questionnaire (ASTM E2018 §8.5)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values([
             { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: 't2', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        svc = new ComplianceService({} as D1Database, 'test-encryption-secret-32-bytes-long!!', []);
+        svc = new ComplianceService(testD1.binding, 'test-encryption-secret-32-bytes-long!!', []);
     });
 
     it('an inspection nobody sent a questionnaire for reads as null, not as an empty exhibit', async () => {

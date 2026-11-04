@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { AgreementService } from '../../../server/services/agreement.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { TENANT_A, INSP_ID, AGR_ID, seedBase } from '../helpers/agreement-signers-setup';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT_B = '00000000-0000-0000-0000-000000000002';
 
@@ -19,8 +19,8 @@ describe('AgreementService — getSignerLink cross-tenant isolation', () => {
         db = fixture.db;
         await setupSchema(fixture.sqlite);
         await seedBase(db);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-        svc = new AgreementService({} as D1Database, { jwtSecret: 'test-secret' });
+        testD1.use(db);
+        svc = new AgreementService(testD1.binding, { jwtSecret: 'test-secret' });
     });
 
     it('foreign-tenant cannot retrieve signer token (same requestId + signerId, wrong tenantId)', async () => {

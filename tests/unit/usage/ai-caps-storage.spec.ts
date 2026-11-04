@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createTestDb, setupSchema, toRawD1 } from '../db';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { createTestDb, setupSchema } from '../db';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const fakeD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import {
     AI_CAPS_CONFIG_KEY,
     narrowAiTierCaps,
@@ -34,8 +34,8 @@ describe('AI cap storage', () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        (mockDrizzle as never as { mockReturnValue: (v: unknown) => void }).mockReturnValue(testDb);
-        testD1 = toRawD1(setup.sqlite);
+        fakeD1.use(testDb);
+        testD1 = fakeD1.binding;
         await testDb.insert(schema.tenants).values({
             id: T, slug: 'caps-co', tier: 'pro', status: 'active', createdAt: new Date(),
         });

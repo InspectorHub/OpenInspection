@@ -3,15 +3,15 @@
  * Resolved key must be annotatedKey || croppedKey || key; originalKey stays the
  * raw source key regardless.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/first
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = '00000000-0000-0000-0000-0000000000cc';
 const INSPECTION_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
@@ -32,9 +32,8 @@ describe('getReportData photo precedence (annotatedKey || croppedKey || key)', (
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new InspectionService({} as D1Database);
+        testD1.use(testDb);
+        svc = new InspectionService(testD1.binding);
 
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme-prec', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

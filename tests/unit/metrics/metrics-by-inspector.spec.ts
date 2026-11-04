@@ -20,13 +20,13 @@
  * deliverable, nullable), not `report_versions.published_at` (NOT NULL, fires
  * per version and per amendment); START is `MAX(inspection_events.completed_at)`.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import metricsRoutes from '../../../server/api/metrics';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -55,7 +55,7 @@ function buildApp(role: UserRole = 'owner', actor = 'owner-1', overrides: Record
     return app;
 }
 
-const ENV = { DB: {} } as never;
+const ENV = { DB: testD1.binding } as never;
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --
 // it only removes any way to await it, which is how a run with every test
 // passing could still exit 1 on an unhandled teardown rejection.
@@ -135,7 +135,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'acme', status: 'active',

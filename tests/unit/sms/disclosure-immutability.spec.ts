@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { sha256Hex } from '../../../server/lib/sha256';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
 import { AutomationService } from '../../../server/services/automation.service';
 
@@ -19,8 +19,8 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-    svc = new SmsConsentService({} as D1Database);
+    testD1.use(db);
+    svc = new SmsConsentService(testD1.binding);
 });
 
 const versionRow = (version: number) => db.select().from(schema.smsDisclosureVersions)
@@ -81,7 +81,7 @@ describe('disclosure versions are immutable and hashed', () => {
         // The disclosure ledger has more than one writer. A hash that only the
         // publish path computes leaves the seeded row — the one nearly every
         // deployment actually consents against — carrying nothing.
-        const automation = new AutomationService({} as D1Database);
+        const automation = new AutomationService(testD1.binding);
         await automation.ensureSmsDisclosureV1();
         const row = await versionRow(1);
         expect(row?.contentHash).toMatch(/^[0-9a-f]{64}$/);
@@ -89,7 +89,7 @@ describe('disclosure versions are immutable and hashed', () => {
     });
 
     it('seeding twice still leaves exactly one version', async () => {
-        const automation = new AutomationService({} as D1Database);
+        const automation = new AutomationService(testD1.binding);
         await automation.ensureSmsDisclosureV1();
         await automation.ensureSmsDisclosureV1();
         expect(await db.select().from(schema.smsDisclosureVersions)).toHaveLength(1);
@@ -97,7 +97,7 @@ describe('disclosure versions are immutable and hashed', () => {
 
     it('seeding never overwrites a tenant-published later version', async () => {
         const v = await svc.publishDisclosure('a wording someone chose deliberately');
-        const automation = new AutomationService({} as D1Database);
+        const automation = new AutomationService(testD1.binding);
         await automation.ensureSmsDisclosureV1();
         const all = await db.select().from(schema.smsDisclosureVersions);
         expect(all).toHaveLength(1);

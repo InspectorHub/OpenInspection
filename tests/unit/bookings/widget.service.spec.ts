@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { WidgetService } from '../../../server/services/widget.service';
 import { createTestDb, setupSchema } from '../db';
 import { tenants, tenantConfigs, auditLogs } from '../../../server/lib/db/schema';
@@ -6,8 +6,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -19,10 +19,8 @@ describe('WidgetService.isOriginAllowed', () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        svc = new WidgetService({} as any);
+        testD1.use(testDb);
+        svc = new WidgetService(testD1.binding);
 
         await testDb.insert(tenants).values({
             id: TENANT_ID, slug: 't', status: 'active',
@@ -51,10 +49,8 @@ describe('WidgetService.isOriginAllowed', () => {
     it('returns false when allowlist is empty/null', async () => {
         const setup2 = createTestDb();
         await setupSchema(setup2.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(setup2.db);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const svc2 = new WidgetService({} as any);
+        testD1.use(setup2.db);
+        const svc2 = new WidgetService(testD1.binding);
         const otherTenant = '00000000-0000-0000-0000-000000000002';
         await setup2.db.insert(tenants).values({
             id: otherTenant, slug: 't2', status: 'active',
@@ -81,10 +77,8 @@ describe('WidgetService.recordEvent', () => {
     it('writes an audit_logs row with widget.{event} action', async () => {
         const setup = createTestDb();
         await setupSchema(setup.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(setup.db);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const svc = new WidgetService({} as any);
+        testD1.use(setup.db);
+        const svc = new WidgetService(testD1.binding);
 
         await setup.db.insert(tenants).values({
             id: TENANT_ID, slug: 't', status: 'active',

@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { applyInspectorPreSign } from '../../../server/services/agreement.service';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -41,11 +41,11 @@ describe('applyInspectorPreSign', () => {
       id: REQ_ID, tenantId: TENANT, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'c@x', status: 'pending', createdAt: new Date(),
     });
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
   });
 
   it('persists inspector signature + userId + signedAt', async () => {
-    await applyInspectorPreSign({} as D1Database, TENANT, REQ_ID, USER_ID, SIG);
+    await applyInspectorPreSign(testD1.binding, TENANT, REQ_ID, USER_ID, SIG);
     const row = await db.select().from(schema.agreementRequests).get();
     expect(row!.inspectorSignatureBase64).toBe(SIG);
     expect(row!.inspectorUserId).toBe(USER_ID);
@@ -55,13 +55,13 @@ describe('applyInspectorPreSign', () => {
   it('throws when envelope is not in pending status', async () => {
     await db.update(schema.agreementRequests).set({ status: 'sent' });
     await expect(
-      applyInspectorPreSign({} as D1Database, TENANT, REQ_ID, USER_ID, SIG)
+      applyInspectorPreSign(testD1.binding, TENANT, REQ_ID, USER_ID, SIG)
     ).rejects.toThrow(/can only pre-sign while status is pending/i);
   });
 
   it('refuses cross-tenant access (envelope not found)', async () => {
     await expect(
-      applyInspectorPreSign({} as D1Database, '00000000-0000-0000-0000-000000000099', REQ_ID, USER_ID, SIG)
+      applyInspectorPreSign(testD1.binding, '00000000-0000-0000-0000-000000000099', REQ_ID, USER_ID, SIG)
     ).rejects.toThrow(/not found/i);
   });
 });

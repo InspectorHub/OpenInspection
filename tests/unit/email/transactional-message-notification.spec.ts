@@ -32,8 +32,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // mock it the same way quota-threshold-notice.spec.ts does so both the static
 // PeopleService import and the dynamic import resolve to the same in-memory
 // SQLite Drizzle instance.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSPECTOR = '00000000-0000-0000-0000-0000000000a1';
@@ -52,8 +52,7 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -82,11 +81,11 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
             id: 'insp-1', tenantId: TENANT, inspectorId: INSPECTOR, propertyAddress: '1 Main St',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, 'insp-1', CLIENT_CONTACT, roleProfileId('client'));
 
         await svc.sendMessageNotification('client', 'insp-1', { body: 'Hello there' }, {
-            db: {} as D1Database, baseUrl: 'https://app.acme.test',
+            db: testD1.binding, baseUrl: 'https://app.acme.test',
         });
 
         expect(sent).toHaveLength(1);
@@ -102,11 +101,11 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
             id: 'insp-2', tenantId: TENANT, inspectorId: INSPECTOR, propertyAddress: '2 Oak Ave',
             date: '2026-06-01', status: 'confirmed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, 'insp-2', CLIENT_CONTACT, roleProfileId('client'));
 
         await svc.sendMessageNotification('inspector', 'insp-2', { body: 'Hello there' }, {
-            db: {} as D1Database, baseUrl: 'https://app.acme.test',
+            db: testD1.binding, baseUrl: 'https://app.acme.test',
         });
 
         expect(sent).toHaveLength(1);
@@ -122,7 +121,7 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
         // No inspection_people client row — simulates post-erasure state.
 
         await svc.sendMessageNotification('client', 'insp-erased', { body: 'Hello there' }, {
-            db: {} as D1Database, baseUrl: 'https://app.acme.test',
+            db: testD1.binding, baseUrl: 'https://app.acme.test',
         });
 
         expect(sent).toHaveLength(0);
@@ -135,7 +134,7 @@ describe('TransactionalEmailMixin.sendMessageNotification — client sourcing (T
         });
 
         await svc.sendMessageNotification('inspector', 'insp-erased-2', { body: 'Hello there' }, {
-            db: {} as D1Database, baseUrl: 'https://app.acme.test',
+            db: testD1.binding, baseUrl: 'https://app.acme.test',
         });
 
         expect(sent).toHaveLength(1);

@@ -3,8 +3,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import {
   ClientDocumentService, ALLOWED_EXTENSIONS, CAD_EXTENSIONS, MAX_BYTES, MAX_FILES, PayloadTooLargeError,
 } from '../../../server/services/client-document.service';
@@ -51,12 +51,13 @@ describe('ClientDocumentService', () => {
   let n = 0;
 
   beforeEach(async () => {
+    n = 0; // each test counts ids from 1, whatever order the tests ran in
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     bucket = fakeBucket();
-    svc = new ClientDocumentService({} as D1Database, bucket as unknown as R2Bucket,
+    svc = new ClientDocumentService(testD1.binding, bucket as unknown as R2Bucket,
       () => `id-${++n}`, () => 1000);
   });
 

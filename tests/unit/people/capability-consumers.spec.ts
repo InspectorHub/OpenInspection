@@ -5,14 +5,14 @@
  * a role whose receivesReport was WITHDRAWN by override must actually stop
  * receiving, everywhere the bit is consulted.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { PeopleService } from '../../../server/services/people.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T = 't-capcon-1';
 const INSP = 'i-capcon-1';
@@ -24,7 +24,7 @@ describe('capability consumers honour per-profile overrides', () => {
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({ id: T, slug: 't-capcon', createdAt: new Date() });
         await db.insert(schema.inspections).values({
@@ -49,19 +49,19 @@ describe('capability consumers honour per-profile overrides', () => {
     });
 
     it('roleProfileIdsWithCapability omits the withdrawn profile', async () => {
-        const ids = await new PeopleService({ DB: {} as D1Database }).roleProfileIdsWithCapability(T, 'receivesReport');
+        const ids = await new PeopleService({ DB: testD1.binding }).roleProfileIdsWithCapability(T, 'receivesReport');
         expect(ids).toContain('crp-normal');
         expect(ids).not.toContain('crp-muted');
     });
 
     it('roleKeysWithCapability omits the withdrawn key too', async () => {
-        const keys = await new PeopleService({ DB: {} as D1Database }).roleKeysWithCapability(T, 'receivesReport');
+        const keys = await new PeopleService({ DB: testD1.binding }).roleKeysWithCapability(T, 'receivesReport');
         expect(keys).toContain('buyer_agent');
         expect(keys).not.toContain('muted_agent');
     });
 
     it('listPeople carries the overrides so downstream filters can resolve them', async () => {
-        const people = await new PeopleService({ DB: {} as D1Database }).listPeople(T, INSP);
+        const people = await new PeopleService({ DB: testD1.binding }).listPeople(T, INSP);
         const muted = people.find(p => p.contactId === 'ct-muted');
         expect(muted).toBeTruthy();
         // The row itself stays listed (the person IS on the inspection); what

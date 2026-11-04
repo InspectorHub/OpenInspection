@@ -19,10 +19,9 @@ import { AppError } from '../../../server/lib/errors';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-// Imported AFTER the mock is registered.
 // eslint-disable-next-line import/order
 import messageTemplateRoutes from '../../../server/api/message-templates';
 import * as resolveTwilioModule from '../../../server/lib/sms/resolve-twilio';
@@ -31,7 +30,7 @@ import { makeExecutionContext } from '../helpers/exec-ctx';
 
 const TENANT = '00000000-0000-0000-0000-0000000000f3';
 const FAKE_ENV = {
-    DB: {},
+    DB: testD1.binding,
     JWT_SECRET: 'test-secret',
     TWILIO_AUTH_TOKEN: 'platform-auth-token',
 } as unknown as HonoConfig['Bindings'];
@@ -61,7 +60,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS
         await next();
     });
     app.route('/api/message-templates', messageTemplateRoutes);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     return app;
 }
 
@@ -97,7 +96,7 @@ beforeEach(async () => {
     db = fx.db as BetterSQLite3Database<typeof schema>;
     sqlite = fx.sqlite;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await seedTenant(db, TENANT);
 });
 
@@ -222,7 +221,7 @@ describe('POST /api/message-templates/test-send (SMS) — free-tier pre-flight +
             tenantId: TENANT, smsMode: 'own', updatedAt: new Date(),
         } as never);
         await setTier('free');
-        await new MeteringService(db as unknown as D1Database).record(TENANT, 'sms', '2026-06', 50);
+        await new MeteringService(testD1.binding).record(TENANT, 'sms', '2026-06', 50);
         const record = vi.spyOn(MeteringService.prototype, 'record');
         const { sendMessage } = stubResolvedProvider('SM_own_1');
 
@@ -250,7 +249,7 @@ describe('POST /api/message-templates/test-send (SMS) — free-tier pre-flight +
     });
 
     it('standalone profile (hasUsageQuota=false) → cap never enforced even at 50', async () => {
-        await new MeteringService(db as unknown as D1Database).record(TENANT, 'sms', '2026-06', 50);
+        await new MeteringService(testD1.binding).record(TENANT, 'sms', '2026-06', 50);
         const { sendMessage } = stubResolvedProvider('SM_standalone_1');
 
         const app = buildApp(db, STANDALONE_PROFILE);

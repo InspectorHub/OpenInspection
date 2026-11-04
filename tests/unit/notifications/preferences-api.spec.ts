@@ -7,7 +7,7 @@
  * boundary makes the guarantee TRUE, and this makes the screen HONEST. A page
  * that accepts a change and then ignores it is worse than one that says no.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -15,8 +15,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import notificationPreferenceRoutes from '../../../server/api/notification-preferences';
@@ -60,15 +60,14 @@ const put = (app: OpenAPIHono<HonoConfig>, body: unknown) =>
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
-    }, { DB: {} });
+    }, { DB: testD1.binding });
 
 beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db as BetterSQLite3Database<typeof schema>;
     sqlite = fx.sqlite;
     await setupSchema(fx.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
 });
 afterEach(() => sqlite.close());
 
@@ -139,7 +138,7 @@ describe('PUT /api/notification-preferences', () => {
 
 describe('GET /api/notification-preferences', () => {
     const get = (app: OpenAPIHono<HonoConfig>) =>
-        app.request('/api/notification-preferences', {}, { DB: {} });
+        app.request('/api/notification-preferences', {}, { DB: testD1.binding });
 
     it('reports a mute this reader holds as off', async () => {
         const app = buildApp();

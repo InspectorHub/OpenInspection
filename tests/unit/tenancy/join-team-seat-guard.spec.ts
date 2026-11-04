@@ -26,9 +26,9 @@ import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { withBatch } from '../helpers/d1-binding';
 import { AuthService } from '../../../server/services/auth.service';
 import { SEAT_QUOTA_UNENFORCED } from '../../../server/features/seat-quota';
@@ -47,7 +47,7 @@ describe('joinTeam seat guard', () => {
         testDb = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(withBatch(testDb, sqlite));
+        testD1.use(withBatch(testDb, sqlite));
 
         await testDb.insert(tenants).values({ id: 't1', slug: 'test', maxUsers: 2, createdAt: new Date() });
         await testDb.insert(tenantConfigs).values({ tenantId: 't1', companyName: 'Test Tenant', updatedAt: new Date() });
@@ -58,7 +58,7 @@ describe('joinTeam seat guard', () => {
         await legal.recordPublish({ tenantId: 't1', doc: 'terms', body: 'Terms.', timezone: 'UTC' });
         await legal.recordPublish({ tenantId: 't1', doc: 'privacy', body: 'Privacy.', timezone: 'UTC' });
 
-        auth = new AuthService({} as any);
+        auth = new AuthService(testD1.binding);
     });
 
     afterEach(() => {

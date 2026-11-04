@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -125,8 +125,8 @@ describe('resolveComplianceProvider', () => {
 
 it('syncOwnStatus upserts the latest toll-free status', async () => {
     const fx = createTestDb(); await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
-    const svc = new MessagingComplianceService({} as D1Database);
+    testD1.use(fx.db);
+    const svc = new MessagingComplianceService(testD1.binding);
     const fakeClient = { tollfree: { list: async () => [{ sid: 'HH1', status: 'TWILIO_APPROVED', phoneNumber: 'PN1' }] }, brands: { list: async () => [] } };
     await svc.syncOwnStatus('t1', { sid: 'AC1', token: 't' }, fakeClient as never);
     const got = await svc.getStatus('t1');
@@ -137,8 +137,8 @@ it('syncOwnStatus upserts the latest toll-free status', async () => {
 describe('MessagingComplianceService', () => {
     it('returns null when tenant has no row', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
-        const svc = new MessagingComplianceService({} as D1Database);
+        testD1.use(fx.db);
+        const svc = new MessagingComplianceService(testD1.binding);
         const got = await svc.getStatus('no-such-tenant');
         expect(got).toBeNull();
         fx.sqlite.close();
@@ -146,8 +146,8 @@ describe('MessagingComplianceService', () => {
 
     it('maps TWILIO_REJECTED to rejected', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
-        const svc = new MessagingComplianceService({} as D1Database);
+        testD1.use(fx.db);
+        const svc = new MessagingComplianceService(testD1.binding);
         const fakeClient = { tollfree: { list: async () => [{ sid: 'HH2', status: 'TWILIO_REJECTED', phoneNumber: 'PN2' }] }, brands: { list: async () => [] } };
         await svc.syncOwnStatus('t2', { sid: 'AC2', token: 't' }, fakeClient as never);
         const got = await svc.getStatus('t2');
@@ -157,8 +157,8 @@ describe('MessagingComplianceService', () => {
 
     it('maps unknown Twilio status to tfv_pending', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
-        const svc = new MessagingComplianceService({} as D1Database);
+        testD1.use(fx.db);
+        const svc = new MessagingComplianceService(testD1.binding);
         const fakeClient = { tollfree: { list: async () => [{ sid: 'HH3', status: 'IN_REVIEW', phoneNumber: 'PN3' }] }, brands: { list: async () => [] } };
         await svc.syncOwnStatus('t3', { sid: 'AC3', token: 't' }, fakeClient as never);
         const got = await svc.getStatus('t3');
@@ -168,8 +168,8 @@ describe('MessagingComplianceService', () => {
 
     it('returns not_started when tollfree list is empty', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
-        const svc = new MessagingComplianceService({} as D1Database);
+        testD1.use(fx.db);
+        const svc = new MessagingComplianceService(testD1.binding);
         const fakeClient = { tollfree: { list: async () => [] }, brands: { list: async () => [] } };
         await svc.syncOwnStatus('t4', { sid: 'AC4', token: 't' }, fakeClient as never);
         const got = await svc.getStatus('t4');
@@ -179,8 +179,8 @@ describe('MessagingComplianceService', () => {
 
     it('upsert is idempotent — second sync overwrites status', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
-        const svc = new MessagingComplianceService({} as D1Database);
+        testD1.use(fx.db);
+        const svc = new MessagingComplianceService(testD1.binding);
         const clientPending = { tollfree: { list: async () => [{ sid: 'HH5', status: 'IN_REVIEW', phoneNumber: 'PN5' }] }, brands: { list: async () => [] } };
         const clientApproved = { tollfree: { list: async () => [{ sid: 'HH5', status: 'TWILIO_APPROVED', phoneNumber: 'PN5' }] }, brands: { list: async () => [] } };
         await svc.syncOwnStatus('t5', { sid: 'AC5', token: 't' }, clientPending as never);
@@ -192,8 +192,8 @@ describe('MessagingComplianceService', () => {
 
     it('degrades gracefully when Twilio throws — returns not_started', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
-        const svc = new MessagingComplianceService({} as D1Database);
+        testD1.use(fx.db);
+        const svc = new MessagingComplianceService(testD1.binding);
         const errorClient = { tollfree: { list: async () => { throw new Error('network'); } }, brands: { list: async () => [] } };
         await svc.syncOwnStatus('t6', { sid: 'AC6', token: 't' }, errorClient as never);
         const got = await svc.getStatus('t6');
@@ -216,10 +216,10 @@ describe('MessagingComplianceService', () => {
 describe('MessagingComplianceService.provision — delegates + persists (smoke)', () => {
     it('sp10dlc: delegates to the injected provider and persists its returned SIDs/status', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
+        testD1.use(fx.db);
         const calls: string[] = [];
         const provider = fakeProvider(calls);
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.provision(
             'p1',
             { legalName: 'Acme Inspections', address: '1 Main, TX', repName: 'Bob' },
@@ -255,7 +255,7 @@ describe('applyComplianceCallback — change detection', () => {
         db = fx.db as BetterSQLite3Database<typeof schema>;
         sqlite = fx.sqlite;
         await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
     });
 
     afterEach(() => sqlite.close());
@@ -273,7 +273,7 @@ describe('applyComplianceCallback — change detection', () => {
 
     it('returns changed=true + new status when campaign TWILIO_APPROVED transitions from campaign_pending', async () => {
         await seedRow('t-chg-1', 'campaign_pending');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.applyComplianceCallback('t-chg-1', {
             entity: 'campaign',
             rawStatus: 'TWILIO_APPROVED',
@@ -289,7 +289,7 @@ describe('applyComplianceCallback — change detection', () => {
         // If the row is already campaign_pending and a brand intermediate callback
         // comes in that does not change complianceStatus, changed must be false.
         await seedRow('t-chg-2', 'brand_pending');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         // brand TWILIO_APPROVED from brand_pending → stays brand_pending
         const result = await svc.applyComplianceCallback('t-chg-2', {
             entity: 'brand',
@@ -304,7 +304,7 @@ describe('applyComplianceCallback — change detection', () => {
 
     it('returns changed=true + rejectionReason when campaign REJECTED transitions from campaign_pending', async () => {
         await seedRow('t-chg-3', 'campaign_pending');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.applyComplianceCallback('t-chg-3', {
             entity: 'campaign',
             rawStatus: 'REJECTED',
@@ -317,7 +317,7 @@ describe('applyComplianceCallback — change detection', () => {
     });
 
     it('returns changed=false + sentinel status when no row exists for tenant', async () => {
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.applyComplianceCallback('no-such-tenant', {
             entity: 'campaign',
             rawStatus: 'TWILIO_APPROVED',
@@ -334,7 +334,7 @@ describe('applyComplianceCallback — change detection', () => {
         // guards the Telnyx path, whose raw statuses are non-terminal under the
         // current callback vocabulary.
         await seedRow('t-nr-1', 'approved');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.applyComplianceCallback('t-nr-1', {
             entity: 'campaign',
             rawStatus: 'IN_PROGRESS',
@@ -347,7 +347,7 @@ describe('applyComplianceCallback — change detection', () => {
 
     it('no-regress: a non-terminal TFV callback never downgrades an approved row', async () => {
         await seedRow('t-nr-2', 'approved');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.applyComplianceCallback('t-nr-2', {
             entity: 'tfv',
             rawStatus: 'In Progress',
@@ -372,7 +372,7 @@ describe('syncManagedStatus — change detection', () => {
         db = fx.db as BetterSQLite3Database<typeof schema>;
         sqlite = fx.sqlite;
         await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
     });
 
     afterEach(() => sqlite.close());
@@ -394,7 +394,7 @@ describe('syncManagedStatus — change detection', () => {
 
     it('returns changed=true when TFV poll transitions status from tfv_pending to approved', async () => {
         await seedRow('t-sc-1', 'tfv_pending', 'PENDING_REVIEW');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.syncManagedStatus('t-sc-1', approvedTfvProvider());
         expect(result.changed).toBe(true);
         expect(result.complianceStatus).toBe('approved');
@@ -402,14 +402,14 @@ describe('syncManagedStatus — change detection', () => {
 
     it('returns changed=false when TFV poll finds no entries (no status change)', async () => {
         await seedRow('t-sc-2', 'tfv_pending', 'PENDING_REVIEW');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.syncManagedStatus('t-sc-2', noChangeTfvProvider());
         expect(result.changed).toBe(false);
         expect(result.complianceStatus).toBe('tfv_pending');
     });
 
     it('returns changed=false when no row exists for tenant', async () => {
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.syncManagedStatus('no-row', approvedTfvProvider());
         expect(result.changed).toBe(false);
     });
@@ -466,10 +466,10 @@ async function buildWebhookApp(
     });
 
     app.route('/webhooks', smsWebhookRoutes);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(database);
+    testD1.use(database);
 
     const env: HonoConfig['Bindings'] = {
-        DB: {},
+        DB: testD1.binding,
         APP_BASE_URL: APP_BASE_URL_WH,
         JWT_SECRET: 'test-secret',
         TWILIO_COMPLIANCE_WEBHOOK_TOKEN: COMPLIANCE_TOKEN_WH,
@@ -512,7 +512,7 @@ describe('compliance-status webhook → outbox emit (Task 11)', () => {
         db = fx.db as BetterSQLite3Database<typeof schema>;
         sqlite = fx.sqlite;
         await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         // Seed the tenant used by webhook tests.
         await db.insert(schema.tenants).values({
@@ -640,7 +640,7 @@ describe('applyComplianceCallback — brand approval never regresses status', ()
         db = fx.db as BetterSQLite3Database<typeof schema>;
         sqlite = fx.sqlite;
         await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
     });
 
     afterEach(() => sqlite.close());
@@ -655,7 +655,7 @@ describe('applyComplianceCallback — brand approval never regresses status', ()
 
     it('does NOT regress campaign_pending → brand_pending on a late brand TWILIO_APPROVED', async () => {
         await seedRow('t-reg-1', 'campaign_pending');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.applyComplianceCallback('t-reg-1', {
             entity: 'brand', rawStatus: 'TWILIO_APPROVED', rejectionReason: null, entitySid: 'BN_LATE',
         });
@@ -669,7 +669,7 @@ describe('applyComplianceCallback — brand approval never regresses status', ()
 
     it('does NOT regress approved → brand_pending on a redelivered brand TWILIO_APPROVED', async () => {
         await seedRow('t-reg-2', 'approved');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.applyComplianceCallback('t-reg-2', {
             entity: 'brand', rawStatus: 'TWILIO_APPROVED', rejectionReason: null, entitySid: 'BN_DUP',
         });
@@ -679,7 +679,7 @@ describe('applyComplianceCallback — brand approval never regresses status', ()
 
     it('still advances brand_pending on first brand approval (no false guard)', async () => {
         await seedRow('t-reg-3', 'profile_pending');
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.applyComplianceCallback('t-reg-3', {
             entity: 'brand', rawStatus: 'TWILIO_APPROVED', rejectionReason: null, entitySid: 'BN_FIRST',
         });
@@ -703,7 +703,7 @@ describe('syncManagedStatus — brand poll never regresses campaign_pending', ()
         db = fx.db as BetterSQLite3Database<typeof schema>;
         sqlite = fx.sqlite;
         await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
     });
 
     afterEach(() => sqlite.close());
@@ -716,7 +716,7 @@ describe('syncManagedStatus — brand poll never regresses campaign_pending', ()
             brandSid: 'BN_X', brandStatus: 'PENDING', createdAt: now, updatedAt: now,
         } as never);
         const approvedBrandProvider = fakeProvider([], { brands: [{ sid: 'BN_X', status: 'TWILIO_APPROVED' }] });
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         const result = await svc.syncManagedStatus('t-cron-reg', approvedBrandProvider);
         expect(result.changed).toBe(false);
         expect(result.complianceStatus).toBe('campaign_pending');
@@ -750,7 +750,7 @@ function recordingProvider(id: ComplianceProviderId, seen: string[]): Compliance
 describe('sweepManagedStatuses — excludes own-mode tenants (C1)', () => {
     it('does not touch an own-mode row while sweeping managed rows', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
+        testD1.use(fx.db);
         const now = new Date();
         // own-mode tenant: BYO Twilio, non-terminal, tfvStatus set (TFV poll path).
         await fx.db.insert(schema.messagingCompliance).values({
@@ -767,7 +767,7 @@ describe('sweepManagedStatuses — excludes own-mode tenants (C1)', () => {
         // returns approved. If the own row were (incorrectly) included, it would
         // flip to approved too.
         const isvProvider = fakeProvider([], { tfvs: [{ sid: 'HV_ISV', status: 'TWILIO_APPROVED' }] });
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         await svc.sweepManagedStatuses(
             { TWILIO_ACCOUNT_SID: 'AC_ISV', TWILIO_API_KEY_SID: 'SK_ISV', TWILIO_API_KEY_SECRET: 'secret' },
             undefined,
@@ -785,7 +785,7 @@ describe('sweepManagedStatuses — excludes own-mode tenants (C1)', () => {
 
     it('builds the provider PER ROW by row.provider (mixed twilio + telnyx fleet)', async () => {
         const fx = createTestDb(); await setupSchema(fx.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
+        testD1.use(fx.db);
         const now = new Date();
         // One managed row per carrier — both non-terminal.
         await fx.db.insert(schema.messagingCompliance).values({
@@ -799,7 +799,7 @@ describe('sweepManagedStatuses — excludes own-mode tenants (C1)', () => {
 
         const seen: string[] = [];
         const builtFor: ComplianceProviderId[] = [];
-        const svc = new MessagingComplianceService({} as D1Database);
+        const svc = new MessagingComplianceService(testD1.binding);
         await svc.sweepManagedStatuses(
             { TWILIO_ACCOUNT_SID: 'AC', TWILIO_API_KEY_SID: 'SK', TWILIO_API_KEY_SECRET: 's', TELNYX_API_KEY: 'KEY' },
             undefined,

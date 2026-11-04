@@ -10,8 +10,8 @@ import { PortalService } from '../../../server/services/portal.service';
 import { PeopleService } from '../../../server/services/people.service';
 import portalRoutes from '../../../server/api/portal';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { hashToken } from '../../../server/lib/token-hash';
 
 // Spec 3 Task 6, Part A — GET /api/portal/:tenant/exchange must NEVER mint a
@@ -47,7 +47,7 @@ describe('GET /api/portal/:tenant/exchange — agent tokens never mint a client 
     }
 
     function buildApp() {
-        const portalSvc = new PortalService({} as D1Database, { getSectionProgress: async () => { throw new Error('unused in this suite'); } });
+        const portalSvc = new PortalService(testD1.binding, { getSectionProgress: async () => { throw new Error('unused in this suite'); } });
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             c.set('tenantId', TENANT);
@@ -56,7 +56,7 @@ describe('GET /api/portal/:tenant/exchange — agent tokens never mint a client 
                 portal: portalSvc,
                 email: { sendEmail: vi.fn() },
                 portalAccess: makePortalAccessStub(),
-                people: new PeopleService({ DB: {} as D1Database }),
+                people: new PeopleService({ DB: testD1.binding }),
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
@@ -84,7 +84,7 @@ describe('GET /api/portal/:tenant/exchange — agent tokens never mint a client 
         testDb = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme-exchange-agent', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

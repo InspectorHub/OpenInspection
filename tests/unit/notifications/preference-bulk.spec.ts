@@ -6,12 +6,11 @@
  * that a bulk change cannot reach cells the single-cell route would refuse, and
  * that `reset` is not a synonym for `enable`.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 // eslint-disable-next-line import/order
 import { applyBulk } from '../../../server/lib/notifications/preference-write';

@@ -3,7 +3,7 @@
  * never be made, the inspector on a job. Each exclusion is paired with a control
  * showing the same call still admits an inspector, manager and owner.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
@@ -13,8 +13,8 @@ import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import { isFieldRole } from '../../../server/lib/auth/roles';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import { setServiceInspectors } from '../../../server/services/service/qualification';
@@ -42,7 +42,7 @@ describe('field roles', () => {
     db = setup.db;
     sqlite = setup.sqlite;
     await setupSchema(setup.sqlite);
-    vi.mocked(mockDrizzle).mockReturnValue(db as never);
+    testD1.use(db);
     await db.insert(schema.tenants).values({
       id: T, slug: 'acme', tier: 'free', status: 'active', maxUsers: 10, deploymentMode: 'shared', createdAt: new Date(),
     } as never);
@@ -69,12 +69,12 @@ describe('field roles', () => {
   });
 
   it('leaves staff out of the bookable set with no qualification rows', async () => {
-    const ids = await new BookingService({} as D1Database).getQualifiedInspectorIds(T, []);
+    const ids = await new BookingService(testD1.binding).getQualifiedInspectorIds(T, []);
     expect([...ids].sort()).toEqual([ID.inspector, ID.manager, ID.owner].sort());
   });
 
   it('keeps staff out of the public inspector list, and keeps the inspector (control)', async () => {
-    const list = await new BookingService({} as D1Database).listInspectors(T);
+    const list = await new BookingService(testD1.binding).listInspectors(T);
     expect(list.map((r) => r.id)).toEqual([ID.inspector]);
   });
 
@@ -96,7 +96,7 @@ describe('field roles', () => {
       get: (k: string) => ({ tenantId: T, userRole, user: { sub } } as Record<string, unknown>)[k],
       set: () => undefined,
       var: { services: { contact: { assertEmailsNotHidden: async () => undefined } } },
-      env: { DB: {} },
+      env: { DB: testD1.binding },
     }) as never;
     const body = { propertyAddress: '1 Main St', date: '2026-06-22' } as never;
 
@@ -133,7 +133,7 @@ describe('field roles', () => {
     };
 
     it('lists the field roles and not staff', async () => {
-      const res = await app().request('/api/inspections/inspectors', {}, { DB: {} } as HonoConfig['Bindings']);
+      const res = await app().request('/api/inspections/inspectors', {}, { DB: testD1.binding } as HonoConfig['Bindings']);
       expect(res.status).toBe(200);
       const body = await res.json() as { data: Array<{ role: string }> };
       expect(body.data.map((r) => r.role).sort()).toEqual(['inspector', 'manager', 'owner']);

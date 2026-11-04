@@ -21,10 +21,9 @@ import * as schema from '../../../server/lib/db/schema';
  * bookings-company-endpoints.spec.ts).
  */
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-// Import admin routes AFTER the mock is set up.
 // eslint-disable-next-line import/order
 import adminRoutes from '../../../server/api/admin';
 import { LegalVersionService } from '../../../server/services/legal-version.service';
@@ -66,11 +65,11 @@ function buildApp(
         await next();
     });
     app.route('/api/admin', adminRoutes);
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
     return app;
 }
 
-const ENV = { DB: {}, JWT_SECRET: 'x' } as unknown as HonoConfig['Bindings'];
+const ENV = { DB: testD1.binding, JWT_SECRET: 'x' } as unknown as HonoConfig['Bindings'];
 
 /** Minimal ExecutionContext stub — auditFromContext reads c.executionCtx. */
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --

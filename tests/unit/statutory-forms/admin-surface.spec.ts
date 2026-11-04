@@ -18,14 +18,14 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import statutoryAdminRoutes from '../../../server/portal/statutory-admin.routes';
 import { browseCatalogue } from '../../../server/services/marketplace/catalogue-browse';
 import { signM2mHeader, M2M_HEADER } from '../../../server/lib/m2m-auth';
 
 const FAKE_PEM = `-----BEGIN PRIVATE KEY-----\n${btoa('test-m2m-shared-key-material-0123456789')}\n-----END PRIVATE KEY-----`;
-const ENV = { DB: {}, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
+const ENV = { DB: testD1.binding, JWT_CURRENT_KID: 'v1', JWT_PRIVATE_KEY_V1: FAKE_PEM } as Record<string, unknown>;
 
 const FORM = 'yy_flat_form';
 const REVISION = 'Rev. 04/26';
@@ -53,7 +53,7 @@ beforeEach(async () => {
     db = fx.db;
     sqlite = fx.sqlite;
     await setupSchema(sqlite);
-    vi.mocked(mockDrizzle).mockReturnValue(db as never);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values([
         { id: 't1', slug: 'one', createdAt: now },

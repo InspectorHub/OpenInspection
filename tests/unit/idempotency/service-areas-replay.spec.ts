@@ -17,14 +17,14 @@
  * either way (the write is genuinely replace-by-value, so even an unguarded
  * retry converges).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import adminRoutes from '../../../server/api/admin';
 import { idempotencyMiddleware } from '../../../server/lib/middleware/idempotency';
@@ -58,7 +58,7 @@ function buildApp() {
     return app;
 }
 
-const ENV = { DB: {}, JWT_SECRET: 'test-secret' };
+const ENV = { DB: testD1.binding, JWT_SECRET: 'test-secret' };
 // Settled at teardown by the helper. `void` attached a catch but nothing that
 // could await the work, so it ran on past the end of the file.
 const EXEC = makeExecutionContext().ctx;
@@ -82,7 +82,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'a', status: 'active',

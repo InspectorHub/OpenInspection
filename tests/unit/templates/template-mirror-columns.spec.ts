@@ -3,15 +3,15 @@
  * server-derived from schema.propertyType / commercialSubtype on every save,
  * so the row columns and the schema JSON can never disagree.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { TemplateService, deriveTemplateMirrorColumns } from '../../../server/services/template.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -49,10 +49,8 @@ describe('TemplateService mirror-column persistence', () => {
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        svc = new TemplateService({} as any);
+        testD1.use(testDb);
+        svc = new TemplateService(testD1.binding);
     });
 
     it('createTemplate writes property_type + commercial_subtype for a commercial template', async () => {

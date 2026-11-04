@@ -23,7 +23,7 @@
  * that says whose money it is. The defect was never the number — it was two
  * different facts sharing one word.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ContactService } from '../../../server/services/contact.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -32,8 +32,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -48,10 +48,9 @@ describe('F67 — per-contact revenue is attributed to the billed party only', (
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new ContactService({} as D1Database);
-        people = new PeopleService({ DB: {} as D1Database });
+        testD1.use(testDb);
+        svc = new ContactService(testD1.binding);
+        people = new PeopleService({ DB: testD1.binding });
 
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared',

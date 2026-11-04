@@ -24,9 +24,9 @@ describe('PhotoCropSchema', () => {
   });
 });
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/first
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = '00000000-0000-0000-0000-0000000000bb';
 const INSPECTION_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -58,12 +58,11 @@ describe('saveCroppedItemPhoto', () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(testDb);
+    testD1.use(testDb);
     r2 = makeFakeR2();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sdb = new ScopedDB(testDb as any, TENANT);
-    svc = new InspectionService({} as D1Database, r2.bucket, sdb);
+    svc = new InspectionService(testD1.binding, r2.bucket, sdb);
 
     await testDb.insert(schema.tenants).values({
       id: TENANT, slug: 'acme-crop', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

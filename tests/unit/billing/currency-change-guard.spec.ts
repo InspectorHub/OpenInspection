@@ -6,14 +6,15 @@
  * Covers the pure predicate `needsCurrencyChangeConfirm` and the real-DB
  * `InvoiceService.countInvoices` it consumes.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { needsCurrencyChangeConfirm } from '../../../server/lib/currency-guard';
 import { InvoiceService } from '../../../server/services/invoice.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('needsCurrencyChangeConfirm', () => {
     it('blocks: currency changes, invoices exist, not confirmed', () => {
@@ -47,9 +48,8 @@ describe('InvoiceService.countInvoices', () => {
         testDb = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new InvoiceService({} as D1Database);
+        testD1.use(testDb);
+        svc = new InvoiceService(testD1.binding);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'co', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

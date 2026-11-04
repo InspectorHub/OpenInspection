@@ -7,11 +7,11 @@
  * in-product way back. The invariant ("exactly one primary client") is now held
  * up by an atomic swap instead of by refusing to move.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { isSoleClient } from '../../../server/lib/people/primary-client';
@@ -33,9 +33,8 @@ describe('PeopleService.makePrimary', () => {
             { id: 'c2', tenantId: 't1', type: 'client', name: 'Buyer Two', email: 'b2@x.com', createdAt: new Date(1) },
             { id: 'c3', tenantId: 't1', type: 'agent', name: 'Agent', email: 'a@x.com', createdAt: new Date(1) },
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new PeopleService({} as never);
+        testD1.use(db);
+        svc = new PeopleService({ DB: testD1.binding });
     });
 
     async function rowFor(contactId: string) {
@@ -110,9 +109,8 @@ describe('addPerson with the primary role when one already exists', () => {
             { id: 'c1', tenantId: 't1', type: 'client', name: 'Buyer One', email: 'b1@x.com', createdAt: new Date(1) },
             { id: 'c2', tenantId: 't1', type: 'client', name: 'Buyer Two', email: 'b2@x.com', createdAt: new Date(1) },
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new PeopleService({} as never);
+        testD1.use(db);
+        svc = new PeopleService({ DB: testD1.binding });
     });
 
     it('hands the seat over instead of dead-ending on a 409', async () => {

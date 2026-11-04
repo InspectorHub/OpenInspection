@@ -11,7 +11,7 @@
  * inspection_people populated, so this fails against the old implementation
  * (which reads only inspections.client_name and would render "Client: ").
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -20,8 +20,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { AppEnv } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import icsRoutes from '../../../server/api/ics';
 import { asD1Db } from '../helpers/test-db';
@@ -55,8 +55,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme-ics', status: 'active',
@@ -77,7 +76,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
             date: tomorrowStr(), status: 'confirmed', paymentStatus: 'unpaid',
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP, CLIENT, roleProfileId('client'));
 
         app = new Hono<{ Bindings: AppEnv }>();
@@ -85,7 +84,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
     });
 
     it('embeds the primary client\'s name in the VEVENT DESCRIPTION', async () => {
-        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {}, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: testD1.binding, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
         expect(res.status).toBe(200);
         const body = await res.text();
         expect(body).toContain('BEGIN:VEVENT');
@@ -97,7 +96,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
     });
 
     it('publishes neither the inspection id nor a link to the record: the UID is a keyed hash and the URL names no id', async () => {
-        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {}, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: testD1.binding, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
         const body = await res.text();
         expect(body).not.toContain(INSP);
         expect(body).toMatch(/UID:[0-9a-f]{32}@openinspection/);
@@ -113,7 +112,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             });
         }
-        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {}, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: testD1.binding, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
         const body = await res.text();
         expect(body).toContain('SUMMARY:1 Main St');
         expect(body).not.toContain('insp-far-ahead Road');
@@ -121,7 +120,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
     });
 
     it('answers 404 rather than publish raw ids when the deployment has no secret', async () => {
-        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {} } as unknown as AppEnv, makeExecCtx());
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: testD1.binding } as unknown as AppEnv, makeExecCtx());
         expect(res.status).toBe(404);
     });
 
@@ -129,7 +128,7 @@ describe('GET /api/ics/:token — primary-client sourcing (Task 9c)', () => {
         const { eq } = await import('drizzle-orm');
         await db.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, INSP));
 
-        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: {}, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
+        const res = await app.request(`/api/ics/${TOKEN}`, {}, { DB: testD1.binding, JWT_SECRET: 'ics-test-secret-ics-test-secret-12' } as unknown as AppEnv, makeExecCtx());
         expect(res.status).toBe(200);
         const body = await res.text();
         expect(body).toContain('DESCRIPTION:Client: ');

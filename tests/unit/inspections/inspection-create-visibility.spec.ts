@@ -5,7 +5,7 @@
  * and a client-generated id may
  * not take the name of a route.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -21,8 +21,8 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { RESERVED_INSPECTION_SEGMENTS } from '../../../server/lib/middleware/inspection-scope';
 import { ALL_INSPECTIONS, type InspectionScope } from '../../../server/lib/inspection/visibility';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000dd';
 const U = { me: 'u-me', lead: 'u-lead', other: 'u-other' } as const;
@@ -35,7 +35,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    vi.mocked(mockDrizzle).mockReturnValue(db as never);
+    testD1.use(db);
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'cv', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
@@ -44,7 +44,7 @@ beforeEach(async () => {
             id, tenantId: TENANT, email: `${id}@x.test`, passwordHash: 'h', role: 'inspector', createdAt: new Date(),
         })) as never,
     );
-    svc = new InspectionService({} as D1Database, undefined, new ScopedDB(db as never, TENANT));
+    svc = new InspectionService(testD1.binding, undefined, new ScopedDB(db as never, TENANT));
 });
 
 const wizard = (extra: Partial<CreateInspectionFromWizardInput> = {}): CreateInspectionFromWizardInput => ({
@@ -116,7 +116,7 @@ describe('the plain create keeps a restricted creator on the roster', () => {
             await next();
         });
         app.post('/resolve', async (c) => c.json(await resolveCreateInput(c, input as never)));
-        const res = await app.request('/resolve', { method: 'POST' }, { DB: {} } as never);
+        const res = await app.request('/resolve', { method: 'POST' }, { DB: testD1.binding } as never);
         const text = await res.text();
         expect(res.status, text).toBe(200);
         return JSON.parse(text) as { inspectorId?: string; creatorOnRosterId?: string };

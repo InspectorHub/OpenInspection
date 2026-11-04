@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
 import { tenants, users, services, serviceInspectors } from '../../../server/lib/db/schema';
@@ -19,8 +19,8 @@ import * as schema from '../../../server/lib/db/schema';
  * feeds the read face.
  */
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // Import AFTER mock is set up.
 // eslint-disable-next-line import/order
@@ -38,7 +38,7 @@ const U2 = 'uuuuuuuu-0000-0000-0000-000000000002';
 const U_AGENT = 'uuuuuuuu-0000-0000-0000-000000000099';
 const S_FOREIGN = 'ssssssss-1111-0000-0000-000000000001'; // belongs to T2
 
-const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
+const FAKE_ENV = { DB: testD1.binding } as HonoConfig['Bindings'];
 
 function buildApp(
     db: BetterSQLite3Database<typeof schema>,
@@ -69,7 +69,7 @@ function buildApp(
     });
 
     app.route('/', servicesRoutes);
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
     return app;
 }
 
@@ -82,7 +82,7 @@ describe('GET / PUT /:id/inspectors (Task 11, Track G)', () => {
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         // Seed tenant T1 and tenant T2.
         await db.insert(tenants).values([
@@ -267,7 +267,7 @@ describe('GET / PUT /:id/inspectors (Task 11, Track G)', () => {
 
         // BookingService reads directly from the same DB.
         const bookingService = new BookingService(FAKE_ENV.DB as D1Database);
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         const qualified = await bookingService.getQualifiedInspectorIds(T1, [S1]);
         expect(qualified).toEqual([U2]);
         expect(qualified).not.toContain(U1);

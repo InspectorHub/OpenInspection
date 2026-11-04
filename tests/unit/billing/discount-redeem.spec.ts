@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ServiceService } from '../../../server/services/service.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
@@ -6,8 +6,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T1 = 'aaaaaaaa-0000-0000-0000-000000000001';
 const DC_ID = 'dddddddd-0000-0000-0000-000000000001';
@@ -30,8 +30,7 @@ describe('discount redemption — redeemDiscountCode + createInspection gate', (
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         sdb = new ScopedDB(db as any, T1);
 
@@ -63,7 +62,7 @@ describe('discount redemption — redeemDiscountCode + createInspection gate', (
     it('(a) redeemDiscountCode returns true when uses_count < max_uses', async () => {
         await seedCode({ usesCount: 0, maxUses: 1 });
 
-        const svc = new ServiceService({} as D1Database);
+        const svc = new ServiceService(testD1.binding);
         const result = await svc.redeemDiscountCode(T1, DC_ID);
 
         expect(result).toBe(true);
@@ -76,7 +75,7 @@ describe('discount redemption — redeemDiscountCode + createInspection gate', (
     it('(b) redeemDiscountCode returns false when at cap (uses_count >= max_uses)', async () => {
         await seedCode({ usesCount: 1, maxUses: 1 });
 
-        const svc = new ServiceService({} as D1Database);
+        const svc = new ServiceService(testD1.binding);
         const result = await svc.redeemDiscountCode(T1, DC_ID);
 
         expect(result).toBe(false);
@@ -89,7 +88,7 @@ describe('discount redemption — redeemDiscountCode + createInspection gate', (
     it('(c) createInspection with capped code creates inspection without discount', async () => {
         await seedCode({ usesCount: 1, maxUses: 1 });
 
-        const insSvc = new InspectionService({} as D1Database, undefined, sdb);
+        const insSvc = new InspectionService(testD1.binding, undefined, sdb);
         const created = await insSvc.createInspection(T1, {
             propertyAddress: '10 Oak Ave',
             clientName: 'Test Client',
@@ -116,7 +115,7 @@ describe('discount redemption — redeemDiscountCode + createInspection gate', (
     it('(d) createInspection with under-cap code retains discount and increments uses_count', async () => {
         await seedCode({ usesCount: 0, maxUses: 5 });
 
-        const insSvc = new InspectionService({} as D1Database, undefined, sdb);
+        const insSvc = new InspectionService(testD1.binding, undefined, sdb);
         const created = await insSvc.createInspection(T1, {
             propertyAddress: '20 Elm St',
             clientName: 'Test Client',

@@ -29,7 +29,8 @@ import {
     DESTRUCTION_RECORD_GENERATION, STORES_MEASURED, isCertifiableAtCurrentScope,
 } from '../../../server/lib/compliance/destruction-scope';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER = '00000000-0000-0000-0000-0000000000ff';
@@ -72,8 +73,7 @@ describe('TenantPurgeService — Durable Objects', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         for (const id of [TENANT, OTHER]) {
             await testDb.insert(schema.tenants).values({
@@ -111,7 +111,7 @@ describe('TenantPurgeService — Durable Objects', () => {
 
     it('collects report ids BEFORE the cascade and purges one DO per report', async () => {
         const calls: string[] = [];
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: stubNamespace((n) => calls.push(n)),
             TENANT_PRESENCE: stubNamespace((n) => calls.push(n)),
         });
@@ -125,7 +125,7 @@ describe('TenantPurgeService — Durable Objects', () => {
 
     it('never names another tenant\'s report', async () => {
         const calls: string[] = [];
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: stubNamespace((n) => calls.push(n)),
             TENANT_PRESENCE: stubNamespace((n) => calls.push(n)),
         });
@@ -135,7 +135,7 @@ describe('TenantPurgeService — Durable Objects', () => {
     });
 
     it('marks the destruction incomplete when a DO purge fails, and does not report success', async () => {
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: stubNamespace(() => {}, false),
             TENANT_PRESENCE: stubNamespace(() => {}),
         });
@@ -153,7 +153,7 @@ describe('TenantPurgeService — Durable Objects', () => {
             idFromName: (name: string) => ({ name }) as unknown as DurableObjectId,
             get: () => ({ fetch: async () => { throw new Error('unreachable'); } }) as unknown as DurableObjectStub,
         } as unknown as DurableObjectNamespace;
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: throwing, TENANT_PRESENCE: throwing,
         });
 
@@ -163,7 +163,7 @@ describe('TenantPurgeService — Durable Objects', () => {
     });
 
     it('records the outcome on the ROW, not only in the return value', async () => {
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: stubNamespace(() => {}, false),
             TENANT_PRESENCE: stubNamespace(() => {}),
         });
@@ -189,7 +189,7 @@ describe('TenantPurgeService — Durable Objects', () => {
     });
 
     it('a fully successful purge writes a certifiable record', async () => {
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: stubNamespace(() => {}),
             TENANT_PRESENCE: stubNamespace(() => {}),
         });
@@ -211,7 +211,7 @@ describe('TenantPurgeService — Durable Objects', () => {
         // every standalone purge cry wolf, and an alarm that always fires is
         // read as noise by the second week.
         const calls: string[] = [];
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             TENANT_PRESENCE: stubNamespace((n) => calls.push(n)),
         });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -7,8 +7,8 @@ import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const SLUG = 'acme';
@@ -36,10 +36,9 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new InspectionService({} as D1Database);
-        people = new PeopleService({ DB: {} as D1Database });
+        testD1.use(testDb);
+        svc = new InspectionService(testD1.binding);
+        people = new PeopleService({ DB: testD1.binding });
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: SLUG, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },

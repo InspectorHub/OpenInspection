@@ -6,7 +6,7 @@
  * who may see the whole team's day, and a test that called the handler directly
  * would answer 200 for everybody.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -18,8 +18,8 @@ import { AppError } from '../../../server/lib/errors';
 import { INSPECTION_STATUS } from '../../../server/lib/status/inspection-status';
 import { REPORT_STATUS } from '../../../server/lib/status/report-status';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import calendarRoutes from '../../../server/api/calendar';
@@ -31,7 +31,7 @@ const ADAM = '00000000-0000-0000-0000-0000000000b2';
 const DAY = '2026-06-01';
 const START_MS = Date.UTC(2026, 5, 1, 9, 0, 0);
 
-const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
+const FAKE_ENV = { DB: testD1.binding } as HonoConfig['Bindings'];
 
 interface BoardPayload {
     date: string;
@@ -49,7 +49,7 @@ function buildApp(
     role: UserRole,
     overrides: Record<string, boolean> | null = null,
 ) {
-    (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     const app = new OpenAPIHono<HonoConfig>();
 
     app.onError((err, c) => {

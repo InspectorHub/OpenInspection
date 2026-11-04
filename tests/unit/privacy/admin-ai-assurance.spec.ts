@@ -20,8 +20,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import adminRoutes from '../../../server/api/admin';
 import { AppError } from '../../../server/lib/errors';
 
@@ -63,12 +63,12 @@ describe('GET /api/admin/compliance/ai-assurance', () => {
             await next();
         });
         app.route('/api/admin', adminRoutes);
-        return { app: withErrorHandler(app), env: { DB: {}, JWT_SECRET: 'x' } };
+        return { app: withErrorHandler(app), env: { DB: testD1.binding, JWT_SECRET: 'x' } };
     }
 
     beforeEach(async () => {
         const s = createTestDb(); testDb = s.db; sqlite = s.sqlite; await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.aiCallProvenance).values([
             { id: 'call-mine',   tenantId: TENANT, capability: 'assist', provider: 'gemini', mode: 'byo', model: 'm-1', promptVersion: 'professional-comment.v1', createdAt: new Date(2_000) },
             { id: 'call-theirs', tenantId: OTHER,  capability: 'assist', provider: 'gemini', mode: 'byo', model: 'm-9', promptVersion: 'professional-comment.v1', createdAt: new Date(3_000) },

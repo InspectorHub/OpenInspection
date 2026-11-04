@@ -25,8 +25,8 @@ import { asD1DrizzleReturn } from '../helpers/test-db';
 import { withBatch } from '../helpers/d1-binding';
 import type { EntityCounts, MigrationBundleV1 } from '../../../server/lib/migration-intake/bundle';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 import { MigrationReportService } from '../../../server/services/migration-intake/report.service';
 import { limitsFor } from '../../../server/lib/migration-intake/limits';
@@ -90,7 +90,7 @@ function fakeBucket(text: string | null) {
 type FakeBucket = ReturnType<typeof fakeBucket>;
 
 function reportOver(bucket: FakeBucket) {
-    return new MigrationReportService({} as D1Database, bucket as unknown as R2Bucket);
+    return new MigrationReportService(testD1.binding, bucket as unknown as R2Bucket);
 }
 
 describe('the report carries what the later steps have to ask about', () => {
@@ -105,12 +105,12 @@ describe('the report carries what the later steps have to ask about', () => {
         await setupSchema(sqlite);
         // Staging batches its writes, and better-sqlite3 is the one Drizzle
         // driver with no `batch()` — see helpers/d1-binding.ts.
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(withBatch(db, sqlite)));
+        testD1.use(asD1DrizzleReturn(withBatch(db, sqlite)));
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared',
             tier: 'free', maxUsers: 12, createdAt: new Date(),
         });
-        stage = new MigrationStageService({} as D1Database);
+        stage = new MigrationStageService(testD1.binding);
     });
 
     afterEach(() => {

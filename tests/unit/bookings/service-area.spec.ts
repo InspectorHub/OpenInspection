@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { BookingService } from '../../../server/services/booking.service';
 import {
@@ -11,8 +11,8 @@ import {
     zipMatchesPrefix,
 } from '../../../server/lib/booking/eligibility';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const MONDAY = '2026-06-08';
 const areas = (entries: Array<[string, string[]]>) => new Map(entries);
@@ -81,8 +81,8 @@ describe('getTenantSlots applies the ZIP filter before the slot union', () => {
         const setup = createTestDb();
         db = setup.db; sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new BookingService({} as any);
+        testD1.use(db);
+        svc = new BookingService(testD1.binding);
 
         await db.insert(tenants).values({ id: 't1', slug: 'acme', createdAt: new Date() });
         await db.insert(users).values([

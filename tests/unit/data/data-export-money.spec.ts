@@ -3,7 +3,7 @@
  * price column is absent (header and cells), not blanked, and the rows are the
  * same rows.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -13,8 +13,8 @@ import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import dataRoutes from '../../../server/api/data';
 // eslint-disable-next-line import/order
@@ -27,7 +27,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
@@ -41,14 +41,14 @@ beforeEach(async () => {
 
 describe('DataService.exportInspectionsCSV includeMoney', () => {
     it('includes price_cents by default and by request (positive control)', async () => {
-        const svc = new DataService({} as D1Database);
+        const svc = new DataService(testD1.binding);
         for (const csv of [await svc.exportInspectionsCSV(T), await svc.exportInspectionsCSV(T, true)]) {
             expect(csv.split('\n')[0]).toContain('price_cents');
             expect(csv).toContain('45000');
         }
     });
     it('omits the price column and every price cell when includeMoney is false, keeping all rows', async () => {
-        const svc = new DataService({} as D1Database);
+        const svc = new DataService(testD1.binding);
         const withMoney = (await svc.exportInspectionsCSV(T, true)).split('\n');
         const without = (await svc.exportInspectionsCSV(T, false)).split('\n');
         expect(without[0]).not.toContain('price_cents');
@@ -74,7 +74,7 @@ function buildApp(role: UserRole, overrides: Record<string, boolean> | null) {
     return app;
 }
 const exportAs = (role: UserRole, overrides: Record<string, boolean> | null) =>
-    buildApp(role, overrides).request('/api/data/export/inspections', {}, { DB: {} } as HonoConfig['Bindings']);
+    buildApp(role, overrides).request('/api/data/export/inspections', {}, { DB: testD1.binding } as HonoConfig['Bindings']);
 
 describe('GET /api/data/export/inspections', () => {
     it('manager with companyFinance: price column present', async () => {
@@ -108,7 +108,7 @@ describe('GET /api/admin/export (full JSON export)', () => {
             await next();
         });
         app.route('/api/admin', adminDataRoutes);
-        const res = await app.request('/api/admin/export', {}, { DB: {} } as HonoConfig['Bindings']);
+        const res = await app.request('/api/admin/export', {}, { DB: testD1.binding } as HonoConfig['Bindings']);
         expect(res.status).toBe(200);
         return res.text();
     };

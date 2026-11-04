@@ -13,15 +13,15 @@
  * behaviour that already holds, so a future change to how defects reference the
  * library breaks a spec rather than a signature.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createHash } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import adminRoutes from '../../../server/api/admin';
 import { AppError } from '../../../server/lib/errors';
@@ -57,7 +57,7 @@ async function deleteComment(id: string): Promise<number> {
     const res = await buildApp().request(
         `/api/admin/comments/${id}`,
         { method: 'DELETE' },
-        { DB: {} },
+        { DB: testD1.binding },
     );
     return res.status;
 }
@@ -104,7 +104,7 @@ describe('DELETE /api/admin/comments/:id — isolation from delivered work (#291
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
         await seed();
     });
 
@@ -139,7 +139,7 @@ describe('DELETE /api/admin/comments/:id — isolation from delivered work (#291
     it('refuses to delete a comment belonging to another tenant', async () => {
         const other = buildApp('00000000-0000-0000-0000-0000000000ff', 'u2');
         const res = await other.request(
-            `/api/admin/comments/${COMMENT_ID}`, { method: 'DELETE' }, { DB: {} },
+            `/api/admin/comments/${COMMENT_ID}`, { method: 'DELETE' }, { DB: testD1.binding },
         );
         expect(res.status).toBe(404);
         const still = await db.select().from(schema.comments)

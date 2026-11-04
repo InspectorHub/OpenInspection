@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema, toRawD1 } from '../db';
 
 // Same mocking pattern as tests/unit/usage/plan-quota.spec.ts: the guard's
 // `drizzle(d1)` calls (tier lookup, MeteringService) resolve to the in-memory
 // SQLite Drizzle instance, while its raw `db.prepare(...).bind(...).run()` path
 // runs against `toRawD1` over the same underlying sqlite.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const fakeD1 = lazyD1();
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
 import { MeteringService } from '../../../server/services/metering.service';
 import { FREE_TIER_CAPS } from '../../../server/features/plan-quota/policy';
@@ -177,9 +177,8 @@ describe('PlanQuotaGuard.consumeInspection counts rows, not creates', () => {
         const fixture = createTestDb();
         await setupSchema(fixture.sqlite);
         sqlite = fixture.sqlite;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(fixture.db);
-        testD1 = toRawD1(sqlite);
+        fakeD1.use(fixture.db);
+        testD1 = fakeD1.binding;
         sqlite.prepare(
             `INSERT INTO tenants (id, slug, tier, created_at) VALUES (?, ?, 'free', ?)`,
         ).run('t1', 'acme', Date.now());

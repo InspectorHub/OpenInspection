@@ -5,13 +5,13 @@
  * numbers only ever drifted upward with every lost race.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createTestDb, setupSchema, toRawD1 } from '../db';
+import { createTestDb, setupSchema } from '../db';
 import { tenants } from '../../../server/lib/db/schema';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const fakeD1 = lazyD1();
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
 import { MeteringService } from '../../../server/services/metering.service';
 import { retractLostBooking } from '../../../server/services/booking/fulfill-booking';
@@ -24,9 +24,8 @@ describe('retractLostBooking', () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        testD1 = toRawD1(setup.sqlite);
+        fakeD1.use(testDb);
+        testD1 = fakeD1.binding;
         await testDb.insert(tenants).values({ id: 't-pro', slug: 't-pro', tier: 'pro', createdAt: new Date() });
     });
 

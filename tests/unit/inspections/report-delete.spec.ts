@@ -13,7 +13,7 @@
  * published report has been delivered and its signed versions are what let a
  * client verify the document they hold.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -21,7 +21,6 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { deleteReport, listReportsForHub, reportDeleteBlock } from '../../../server/lib/inspection/reports';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 const INSPECTION = 'insp-delete';

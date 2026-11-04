@@ -42,8 +42,8 @@ import type {
 } from '../../../server/lib/migration-intake/bundle';
 import type { TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 import { MigrationApplyService } from '../../../server/services/migration-intake/apply.service';
 import { limitsFor } from '../../../server/lib/migration-intake/limits';
@@ -116,12 +116,12 @@ describe('apply re-checks conflicts against the live data', () => {
         await setupSchema(sqlite);
         // The staging step batches its writes, and better-sqlite3 is the one
         // Drizzle driver with no `batch()` — see helpers/d1-binding.ts.
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(withBatch(db, sqlite)));
+        testD1.use(asD1DrizzleReturn(withBatch(db, sqlite)));
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        stage = new MigrationStageService({} as D1Database);
-        apply = new MigrationApplyService({} as D1Database);
+        stage = new MigrationStageService(testD1.binding);
+        apply = new MigrationApplyService(testD1.binding);
     });
 
     afterEach(() => {

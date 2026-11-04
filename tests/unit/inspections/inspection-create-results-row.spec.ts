@@ -11,7 +11,7 @@
  * but the invariant is asserted here, at the point the inspection is created,
  * because that is where it can be guaranteed rather than repaired.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { ScopedDB } from '../../../server/lib/db/scoped';
@@ -21,8 +21,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000cc';
 
@@ -33,8 +33,7 @@ beforeEach(async () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(testDb);
+    testD1.use(testDb);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sdb = new ScopedDB(testDb as any, TENANT);
 
@@ -44,7 +43,7 @@ beforeEach(async () => {
     });
     await seedRoleProfiles(asD1Db(testDb), TENANT, new Date());
 
-    inspectionSvc = new InspectionService({} as D1Database, undefined, sdb);
+    inspectionSvc = new InspectionService(testD1.binding, undefined, sdb);
 });
 
 describe('createInspection — results row', () => {

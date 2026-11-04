@@ -14,7 +14,7 @@
  * company name -> slug -> platform, and the slug rung is what keeps the
  * platform name genuinely last.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -25,7 +25,8 @@ import { createTestDb, setupSchema } from '../db';
 // than inlined. `api/sms.ts` imports it at both TCPA-adjacent surfaces.
 import { resolveSmsBrand } from '../../../server/lib/sms/brand-name';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -36,8 +37,7 @@ describe('sms company name source', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         await testDb.insert(tenants).values({
             id: TENANT, slug: 'acme',

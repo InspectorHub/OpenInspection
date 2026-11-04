@@ -17,7 +17,6 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { CREDENTIAL_MARKER_TTL_S } from '../../../server/lib/auth/credential-marker';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const TENANT_B = '00000000-0000-0000-0000-000000000002';

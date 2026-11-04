@@ -8,7 +8,7 @@
  * implementation (which reads only the legacy columns and falls back to an
  * empty-email 'Client' signer).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { AgreementService } from '../../../server/services/agreement.service';
 import { PeopleService } from '../../../server/services/people.service';
@@ -18,8 +18,8 @@ import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const CLIENT = 'contact-client-1';
@@ -36,7 +36,7 @@ describe('AgreementService.findOrCreate — default signer resolves via primary-
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -59,11 +59,11 @@ describe('AgreementService.findOrCreate — default signer resolves via primary-
             agreementRequired: true, paymentRequired: false, createdAt: new Date(),
         });
 
-        svc = new AgreementService({} as D1Database, { jwtSecret: 'test-secret' });
+        svc = new AgreementService(testD1.binding, { jwtSecret: 'test-secret' });
     });
 
     it('no opts.signers — synthesizes the default client signer from the primary-client join', async () => {
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_ID, CLIENT, roleProfileId('client'));
 
         const r = await svc.findOrCreate(TENANT, INSP_ID);
@@ -81,7 +81,7 @@ describe('AgreementService.findOrCreate — default signer resolves via primary-
     });
 
     it('opts.signers[0].email still takes precedence over the primary client', async () => {
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_ID, CLIENT, roleProfileId('client'));
 
         const r = await svc.findOrCreate(TENANT, INSP_ID, {

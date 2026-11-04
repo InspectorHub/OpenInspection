@@ -32,8 +32,8 @@ import type {
 import type { IntakeMapping } from '../../../server/lib/migration-intake/adapters/registry';
 import { intakeBucket } from '../helpers/migration-intake-routes-harness';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 import { MigrationRepairService } from '../../../server/services/migration-intake/repair.service';
 import { limitsFor } from '../../../server/lib/migration-intake/limits';
@@ -131,11 +131,11 @@ describe('MigrationRepairService', () => {
         await setupSchema(sqlite);
         // Both services batch their writes, and better-sqlite3 is the one
         // Drizzle driver with no `batch()` — see helpers/d1-binding.ts.
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(withBatch(db, sqlite)));
+        testD1.use(asD1DrizzleReturn(withBatch(db, sqlite)));
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        stage = new MigrationStageService({} as D1Database);
+        stage = new MigrationStageService(testD1.binding);
     });
 
     afterEach(() => {
@@ -144,7 +144,7 @@ describe('MigrationRepairService', () => {
     });
 
     function svc(bucket = bucketWith({ [KEY]: CSV })) {
-        return new MigrationRepairService({} as D1Database, bucket as unknown as R2Bucket);
+        return new MigrationRepairService(testD1.binding, bucket as unknown as R2Bucket);
     }
 
     async function stagedRun(over: { sourceKey?: string | null } = {}) {

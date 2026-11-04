@@ -13,7 +13,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -70,11 +71,10 @@ describe('TenantPurgeService.purge', () => {
     });
 
     it('deletes tenant rows and returns counts', async () => {
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const r2 = makeR2([{ key: `tenants/${TENANT}/p1.jpg`, size: 100 }]);
         const kv = makeKv();
-        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        const svc = new TenantPurgeService(testD1.binding, r2.bucket, kv.ns);
 
         const result = await svc.purge(TENANT);
 
@@ -86,14 +86,13 @@ describe('TenantPurgeService.purge', () => {
     });
 
     it('writes a durable destruction record that survives the purge', async () => {
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const r2 = makeR2([
             { key: `tenants/${TENANT}/p1.jpg`, size: 100 },
             { key: `tenants/${TENANT}/p2.jpg`, size: 250 },
         ]);
         const kv = makeKv();
-        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        const svc = new TenantPurgeService(testD1.binding, r2.bucket, kv.ns);
 
         await svc.purge(TENANT);
 
@@ -116,8 +115,7 @@ describe('TenantPurgeService.purge', () => {
         // this one table by name. Written after the cascade that exclusion was
         // untested by construction; written before, it is load-bearing, so this
         // asserts the surviving row is the SAME row that was opened.
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         const seen: string[] = [];
         const r2 = makeR2([]);
@@ -133,7 +131,7 @@ describe('TenantPurgeService.purge', () => {
             },
         } as unknown as R2Bucket;
 
-        await new TenantPurgeService({} as D1Database, bucket, makeKv().ns).purge(TENANT);
+        await new TenantPurgeService(testD1.binding, bucket, makeKv().ns).purge(TENANT);
 
         // Exactly one row existed mid-purge, it was 'started', and it is the row
         // that ends up 'completed' — not a second row written at the end.
@@ -151,12 +149,11 @@ describe('TenantPurgeService.purge', () => {
         // The failure the two-phase write exists for. R2 throwing aborts the
         // purge after the D1 rows are already gone — the exact window in which
         // the old write-it-last code destroyed a tenant and recorded nothing.
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const bucket = { list: async () => { throw new Error('R2 unavailable'); } } as unknown as R2Bucket;
 
         await expect(
-            new TenantPurgeService({} as D1Database, bucket, makeKv().ns).purge(TENANT),
+            new TenantPurgeService(testD1.binding, bucket, makeKv().ns).purge(TENANT),
         ).rejects.toThrow(/R2 unavailable/);
 
         const records = await testDb.select().from(schema.tenantDestructionRecords).all();
@@ -176,8 +173,7 @@ describe('TenantPurgeService.purge', () => {
     });
 
     it('cascades agreement_signers (PII) so no orphaned signer rows survive', async () => {
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         // Seed an agreement template + envelope + signer (PII) under the tenant.
         await testDb.insert(schema.agreements).values({
             id: 'agr-1', tenantId: TENANT, name: 'Std', content: 'text', version: 1, createdAt: new Date(),
@@ -194,7 +190,7 @@ describe('TenantPurgeService.purge', () => {
 
         const r2 = makeR2([]);
         const kv = makeKv();
-        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        const svc = new TenantPurgeService(testD1.binding, r2.bucket, kv.ns);
         await svc.purge(TENANT);
 
         const signers = await testDb.select().from(schema.agreementSigners).all();
@@ -202,8 +198,7 @@ describe('TenantPurgeService.purge', () => {
     });
 
     it('erasure_log rows for the tenant are deleted on whole-tenant purge', async () => {
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         // Seed an erasure_log row scoped to the tenant (subject_email is PII).
         await testDb.insert(schema.erasureLog).values({
             id: 'elog-1',
@@ -221,7 +216,7 @@ describe('TenantPurgeService.purge', () => {
 
         const r2 = makeR2([]);
         const kv = makeKv();
-        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        const svc = new TenantPurgeService(testD1.binding, r2.bucket, kv.ns);
         await svc.purge(TENANT);
 
         const remaining = await testDb.select().from(schema.erasureLog).all();
@@ -229,8 +224,7 @@ describe('TenantPurgeService.purge', () => {
     });
 
     it('purges client_uploads rows AND their R2 objects (uploads/ prefix)', async () => {
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const docKey = `uploads/${TENANT}/i-1/doc-1-prior-report.pdf`;
         await testDb.insert(schema.clientUploads).values({
             id: 'doc-1', tenantId: TENANT, inspectionId: 'i-1',
@@ -246,7 +240,7 @@ describe('TenantPurgeService.purge', () => {
             { key: docKey, size: 1234 },
         ]);
         const kv = makeKv();
-        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        const svc = new TenantPurgeService(testD1.binding, r2.bucket, kv.ns);
         await svc.purge(TENANT);
 
         // (a) rows gone
@@ -257,8 +251,7 @@ describe('TenantPurgeService.purge', () => {
     });
 
     it('purges R2 objects stored under the unified {tenantId}/ root (new convention)', async () => {
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         // Seed objects that follow the unified R2 key convention: bare tenantId root.
         const photoKey = `${TENANT}/inspections/i-1/photos/m-1.jpg`;
         const docKey   = `${TENANT}/inspections/i-1/documents/doc-1-file.pdf`;
@@ -267,7 +260,7 @@ describe('TenantPurgeService.purge', () => {
             { key: docKey,   size: 2048 },
         ]);
         const kv = makeKv();
-        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        const svc = new TenantPurgeService(testD1.binding, r2.bucket, kv.ns);
 
         const result = await svc.purge(TENANT);
 
@@ -279,11 +272,10 @@ describe('TenantPurgeService.purge', () => {
     });
 
     it('destruction record is non-personal (no email/name/address columns)', async () => {
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const r2 = makeR2([]);
         const kv = makeKv();
-        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        const svc = new TenantPurgeService(testD1.binding, r2.bucket, kv.ns);
         await svc.purge(TENANT);
 
         const cols = sqlite.prepare(`PRAGMA table_info('tenant_destruction_records')`).all() as { name: string }[];
@@ -294,8 +286,7 @@ describe('TenantPurgeService.purge', () => {
     });
 
     it('purges previously-uncovered tenant tables (invoices, messages, access tokens)', async () => {
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.invoices).values({
             id: 'inv-1', tenantId: TENANT, inspectionId: 'i-1', amountCents: 5000,
             lineItems: [{ description: 'Inspection', amountCents: 5000 }], createdAt: new Date(),
@@ -309,7 +300,7 @@ describe('TenantPurgeService.purge', () => {
             role: 'client', createdAt: new Date(),
         } as never);
 
-        const svc = new TenantPurgeService({} as D1Database, makeR2([]).bucket, makeKv().ns);
+        const svc = new TenantPurgeService(testD1.binding, makeR2([]).bucket, makeKv().ns);
         await svc.purge(TENANT);
 
         expect(await testDb.select().from(schema.invoices).all()).toHaveLength(0);

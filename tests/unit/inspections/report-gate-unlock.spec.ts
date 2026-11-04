@@ -12,14 +12,14 @@
  * would put a service dimension on `agreement_requests`, a signed-evidence table
  * with a retention rule, to solve what one override solves.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { InspectionStatusService } from '../../../server/services/inspection/inspection-status.service';
 
 const TENANT = 'tenant-gate-1';
@@ -40,8 +40,7 @@ describe('report gate unlock', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 't', createdAt: new Date(),
@@ -52,7 +51,7 @@ describe('report gate unlock', () => {
             agreementRequired: true, paymentRequired: true,
         } as never);
 
-        svc = new InspectionStatusService({} as never);
+        svc = new InspectionStatusService(testD1.binding);
     });
 
     afterEach(() => { sqlite.close(); });

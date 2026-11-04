@@ -14,8 +14,8 @@ import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AutomationService } from '../../../server/services/automation.service';
 import { AUTOMATION_SEEDS } from '../../../server/data/automation-seeds';
 import { interpolate } from '../../../server/services/automation/shared';
@@ -32,7 +32,7 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     // Seed tenant first (FK ordering: tenant must exist before inspection).
     await db.insert(schema.tenants).values({
@@ -59,10 +59,10 @@ describe('SP2 delivery characterization — Report Ready output unchanged after 
             id: 'contact-chartest-1', tenantId: T, type: 'client', name: 'Jane',
             email: 'client@example.com', createdAt: new Date(),
         } as never);
-        await new PeopleService({ DB: {} as D1Database }).addPerson(T, inspId, 'contact-chartest-1', roleProfileId('client'));
+        await new PeopleService({ DB: testD1.binding }).addPerson(T, inspId, 'contact-chartest-1', roleProfileId('client'));
 
         // Construct service — the vi.mock above redirects drizzle(d1) to in-memory db.
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
 
         // ensureSeeds inserts AUTOMATION_SEEDS rules AND (as the Task 5 hook) calls
         // backfillAutomationTemplates so every rule gets an emailTemplateId pointing

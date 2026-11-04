@@ -16,15 +16,15 @@
  * conversation, not an inspection lifecycle event, and it has no inspection to
  * hang a rule on.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { and, eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AutomationService } from '../../../server/services/automation.service';
 import { AUTOMATION_SEEDS } from '../../../server/data/automation-seeds';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -37,7 +37,7 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme-b3', status: 'active',
@@ -81,7 +81,7 @@ describe('staff alerts as rules (B3)', () => {
     });
 
     it('a triggered event notifies the office through the rule, with no direct call left', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         await svc.trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
             companyName: 'Acme',
@@ -96,7 +96,7 @@ describe('staff alerts as rules (B3)', () => {
     });
 
     it('the staff notice reads from its template, not from a literal', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         await svc.trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
             companyName: 'Acme',
@@ -111,7 +111,7 @@ describe('staff alerts as rules (B3)', () => {
     });
 
     it('an office that turns the rule off stops getting the alert', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         await svc.ensureSeeds(T);
         await db.update(schema.automations)
             .set({ active: false })
@@ -127,7 +127,7 @@ describe('staff alerts as rules (B3)', () => {
     });
 
     it('does not create an email template for an in-app-only rule', async () => {
-        await new AutomationService({} as D1Database).ensureSeeds(T);
+        await new AutomationService(testD1.binding).ensureSeeds(T);
         const staffRules = await db.select().from(schema.automations)
             .where(and(eq(schema.automations.tenantId, T), eq(schema.automations.recipientKind, 'staff')));
         expect(staffRules.length).toBeGreaterThan(0);

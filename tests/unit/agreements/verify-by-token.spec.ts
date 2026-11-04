@@ -11,8 +11,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 import { buildOpenApiDocument } from '../../../server/lib/openapi/build-document';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import publicVerifyRoutes from '../../../server/api/public/verify';
 
@@ -30,14 +30,14 @@ describe('GET /api/public/verify-by-token/{token}', () => {
         app.route('/api/public', publicVerifyRoutes);
         return app;
     }
-    const env = { DB: {} } as HonoConfig['Bindings'];
+    const env = { DB: testD1.binding } as HonoConfig['Bindings'];
 
     beforeEach(async () => {
         const fixture = createTestDb();
         db = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
         } as never);

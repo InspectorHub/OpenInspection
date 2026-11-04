@@ -5,10 +5,10 @@ import { TemplateSchemaV2Schema } from '../../../server/lib/validations/template
 import { MarketplaceService } from '../../../server/services/marketplace.service';
 import { marketplaceLibraries, tenantLibraryImports } from '../../../server/lib/db/schema/marketplace';
 import * as schema from '../../../server/lib/db/schema';
-import { createTestDb, setupSchema, toRawD1 } from '../db';
+import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -70,9 +70,8 @@ describe('importing a kind=statutory catalogue entry', () => {
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new MarketplaceService(toRawD1(sqlite), TENANT);
+        testD1.use(testDb);
+        svc = new MarketplaceService(testD1.binding, TENANT);
     });
 
     afterEach(() => { sqlite.close(); vi.clearAllMocks(); });

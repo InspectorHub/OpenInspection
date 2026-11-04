@@ -24,8 +24,8 @@ import { asD1DrizzleReturn } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { EmailService } from '../../../server/services/email.service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { MigrationAssistanceService } from '../../../server/services/migration-intake/assistance.service';
 import type { EmailServiceEnv } from '../../../server/lib/email/build-email-service';
 import {
@@ -41,7 +41,7 @@ type TestDb = BetterSQLite3Database<typeof schema>;
 type Sent = { method: string; to: string[] };
 
 /** An env that is structurally an `EmailServiceEnv` and reaches no provider. */
-const ENV = { DB: {} as D1Database } as unknown as EmailServiceEnv;
+const ENV = { DB: testD1.binding } as unknown as EmailServiceEnv;
 
 /**
  * A stand-in for the tenant's email service with ONE method per outcome.
@@ -95,7 +95,7 @@ describe('MigrationAssistanceService — who gets told', () => {
         db = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(asD1DrizzleReturn(db));
         sent = [];
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -168,7 +168,7 @@ describe('MigrationAssistanceService.remindExpiring', () => {
         db = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(asD1DrizzleReturn(db));
         sent = [];
         email = fakeEmail(sent);
         await db.insert(schema.tenants).values({

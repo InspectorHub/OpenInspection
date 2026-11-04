@@ -9,7 +9,7 @@
  * of database statements does not grow with the number of services, and the
  * same role and capability gates apply as on the per-service routes.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -20,14 +20,14 @@ import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import { servicesRoutes } from '../../../server/api/services';
 
 const T = 't1';
 const OTHER = 't2';
-const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
+const FAKE_ENV = { DB: testD1.binding } as HonoConfig['Bindings'];
 
 let db: DrizzleD1Database;
 let selects = 0;
@@ -44,7 +44,7 @@ function buildApp(role: 'owner' | 'manager' | 'inspector' = 'manager', overrides
             return Reflect.get(target, prop, receiver);
         },
     }) as DrizzleD1Database;
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(counting);
+    testD1.use(counting);
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => {
         if (err instanceof AppError) {
@@ -57,7 +57,7 @@ function buildApp(role: 'owner' | 'manager' | 'inspector' = 'manager', overrides
         c.set('userRole', role);
         c.set('user', { sub: 'mgr', role, tenantId: T });
         c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as unknown as HonoConfig['Variables']['sdb']);
-        c.set('services', { service: new ServiceService({} as D1Database) } as unknown as HonoConfig['Variables']['services']);
+        c.set('services', { service: new ServiceService(testD1.binding) } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
     app.route('/', servicesRoutes);

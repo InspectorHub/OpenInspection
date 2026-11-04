@@ -12,10 +12,10 @@
  * "The request contains none of the reliance text" is satisfied by a pipeline
  * that sends nothing at all.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { AIService } from '../../../server/services/ai.service';
@@ -73,7 +73,7 @@ beforeEach(async () => {
     const created = createTestDb();
     await setupSchema(created.sqlite);
     db = created.db;
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'gen-tenant', status: 'active',
@@ -111,14 +111,14 @@ beforeEach(async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    inspection = new InspectionService({} as D1Database);
-    translations = new ReportTranslationService({} as D1Database);
+    inspection = new InspectionService(testD1.binding);
+    translations = new ReportTranslationService(testD1.binding);
 });
 
 /** A service wired to a recorder that replies with `spanCount` segments. */
 function aiWith(recorder: RecordingAiProvider): AIService {
     return new AIService(
-        {} as D1Database, 'test-key', 'saas', undefined,
+        testD1.binding, 'test-key', 'saas', undefined,
         OWN_CONFIRMED_KEY, PROVENANCE, undefined, recorder,
     );
 }
@@ -140,7 +140,7 @@ describe('what the provider is asked for', () => {
 
         const recorder = new RecordingAiProvider([replyFor(expected.length)]);
         await generateCourtesyTranslation(
-            { db: {} as D1Database, ai: aiWith(recorder), inspection, translations },
+            { db: testD1.binding, ai: aiWith(recorder), inspection, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, reportId: REPORT, locale: 'es-419' },
         );
 
@@ -164,7 +164,7 @@ describe('what the provider is asked for', () => {
         const count = await spanCount();
         const recorder = new RecordingAiProvider([replyFor(count)]);
         await generateCourtesyTranslation(
-            { db: {} as D1Database, ai: aiWith(recorder), inspection, translations },
+            { db: testD1.binding, ai: aiWith(recorder), inspection, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, reportId: REPORT, locale: 'es-419' },
         );
         const prompt = recorder.requests[0]!.prompt;
@@ -182,7 +182,7 @@ describe('what the provider is asked for', () => {
         const count = await spanCount();
         const recorder = new RecordingAiProvider([replyFor(count)]);
         await generateCourtesyTranslation(
-            { db: {} as D1Database, ai: aiWith(recorder), inspection, translations },
+            { db: testD1.binding, ai: aiWith(recorder), inspection, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, reportId: REPORT, locale: 'es-419' },
         );
         expect(recorder.requests[0]!.prompt).not.toContain('4 Generation Lane');
@@ -194,7 +194,7 @@ describe('what gets stored', () => {
         const count = await spanCount();
         const recorder = new RecordingAiProvider([replyFor(count)]);
         const result = await generateCourtesyTranslation(
-            { db: {} as D1Database, ai: aiWith(recorder), inspection, translations },
+            { db: testD1.binding, ai: aiWith(recorder), inspection, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, reportId: REPORT, locale: 'es-419' },
         );
 
@@ -223,7 +223,7 @@ describe('what gets stored', () => {
         const count = await spanCount();
         const recorder = new RecordingAiProvider([replyFor(count - 1)]);
         await expect(generateCourtesyTranslation(
-            { db: {} as D1Database, ai: aiWith(recorder), inspection, translations },
+            { db: testD1.binding, ai: aiWith(recorder), inspection, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, reportId: REPORT, locale: 'es-419' },
         )).rejects.toThrow();
 
@@ -236,7 +236,7 @@ describe('what gets stored', () => {
 
     it('replaces rather than accumulates on regeneration', async () => {
         const count = await spanCount();
-        const deps = { db: {} as D1Database, inspection, translations };
+        const deps = { db: testD1.binding, inspection, translations };
         await generateCourtesyTranslation(
             { ...deps, ai: aiWith(new RecordingAiProvider([replyFor(count)])) },
             { tenantId: TENANT, inspectionId: INSPECTION, reportId: REPORT, locale: 'es-419' },
@@ -261,11 +261,11 @@ describe('credential refusals', () => {
         // workspace's own key, which bills them for something they were told
         // was covered.
         const noAdapter = new AIService(
-            {} as D1Database, '', 'saas', undefined,
+            testD1.binding, '', 'saas', undefined,
             { source: 'managed', tenantKeyAttested: false }, PROVENANCE, undefined, undefined,
         );
         await expect(generateCourtesyTranslation(
-            { db: {} as D1Database, ai: noAdapter, inspection, translations },
+            { db: testD1.binding, ai: noAdapter, inspection, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, reportId: REPORT, locale: 'es-419' },
         )).rejects.toThrow();
         expect(await translations.read(TENANT, REPORT, 'es-419')).toBeNull();
@@ -276,12 +276,12 @@ describe('removal', () => {
     it('removes a stored row, and says so; a second call says there was nothing', async () => {
         const count = await spanCount();
         await generateCourtesyTranslation(
-            { db: {} as D1Database, ai: aiWith(new RecordingAiProvider([replyFor(count)])), inspection, translations },
+            { db: testD1.binding, ai: aiWith(new RecordingAiProvider([replyFor(count)])), inspection, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, reportId: REPORT, locale: 'es-419' },
         );
 
         const first = await removeCourtesyTranslation(
-            { db: {} as D1Database, translations },
+            { db: testD1.binding, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, locale: 'es-419' },
         );
         expect(first).toEqual({ reportId: REPORT, removed: true });
@@ -289,7 +289,7 @@ describe('removal', () => {
         // "There was nothing to remove" is not an error and must not be
         // reported as success at doing something.
         const second = await removeCourtesyTranslation(
-            { db: {} as D1Database, translations },
+            { db: testD1.binding, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, locale: 'es-419' },
         );
         expect(second).toEqual({ reportId: REPORT, removed: false });
@@ -300,7 +300,7 @@ describe('the primary report is the default deliverable', () => {
     it('resolves it when no report id is given', async () => {
         const count = await spanCount();
         const result = await generateCourtesyTranslation(
-            { db: {} as D1Database, ai: aiWith(new RecordingAiProvider([replyFor(count)])), inspection, translations },
+            { db: testD1.binding, ai: aiWith(new RecordingAiProvider([replyFor(count)])), inspection, translations },
             { tenantId: TENANT, inspectionId: INSPECTION, locale: 'es-419' },
         );
         expect(result.reportId).toBe(REPORT);

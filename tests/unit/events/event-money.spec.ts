@@ -4,7 +4,7 @@
  * refused. Covers both mounts of the event-type catalogue: the admin settings
  * router (OpenAPI) and the plain events router.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -15,20 +15,20 @@ import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import adminSettingsRoutes from '../../../server/api/admin/admin-settings';
 // eslint-disable-next-line import/order
 import eventsRoutes from '../../../server/api/events';
 
 const T = '00000000-0000-0000-0000-000000000001';
-const ENV = { DB: {} } as HonoConfig['Bindings'];
+const ENV = { DB: testD1.binding } as HonoConfig['Bindings'];
 const MONEY_KEY = /"(price|[A-Za-z]*Cents)"\s*:/;
 let db: BetterSQLite3Database<typeof schema>;
 
 function buildApp(role: UserRole, overrides: Record<string, boolean> | null = null) {
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => (err instanceof AppError
         ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
@@ -38,7 +38,7 @@ function buildApp(role: UserRole, overrides: Record<string, boolean> | null = nu
         c.set('userRole', role);
         c.set('user', { sub: 'actor', role, tenantId: T });
         c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as unknown as HonoConfig['Variables']['sdb']);
-        c.set('services', { event: new EventService({} as D1Database) } as unknown as HonoConfig['Variables']['services']);
+        c.set('services', { event: new EventService(testD1.binding) } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
     app.route('/api/admin', adminSettingsRoutes);
@@ -54,7 +54,7 @@ beforeEach(async () => {
     const fix = createTestDb();
     db = fix.db;
     await setupSchema(fix.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     const now = new Date();
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now,

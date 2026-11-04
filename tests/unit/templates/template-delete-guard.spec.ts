@@ -7,13 +7,13 @@
  * unguarded path would fail at the foreign key with a message naming neither
  * the table nor the row.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { TemplateService } from '../../../server/services/template.service';
 
 const TENANT = 'tenant-tpl-guard';
@@ -30,8 +30,7 @@ describe('deleteTemplate — the service catalogue reference', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 't', createdAt: new Date(),
         });
@@ -39,7 +38,7 @@ describe('deleteTemplate — the service catalogue reference', () => {
             id: TEMPLATE_ID, tenantId: TENANT, name: 'Sewer Scope Inspection',
             version: 1, schema: JSON.stringify({ sections: [] }), createdAt: new Date(),
         } as never);
-        svc = new TemplateService({} as never);
+        svc = new TemplateService(testD1.binding);
     });
 
     afterEach(() => { sqlite.close(); });

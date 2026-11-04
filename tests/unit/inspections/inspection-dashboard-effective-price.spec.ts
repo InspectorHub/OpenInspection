@@ -15,14 +15,15 @@
  * fixture below sets `price: 0` and puts the real money somewhere higher up the
  * chain, so nothing here can pass by accident if the cache is read again.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionAnalyticsService } from '../../../server/services/inspection/inspection-analytics.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000f1';
 const facadeStub = {} as unknown as import('../../../server/services/inspection.service').InspectionService;
@@ -41,9 +42,8 @@ describe('dashboard rows — P-4 effective price (IA-131)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new InspectionAnalyticsService({} as D1Database, undefined, undefined, undefined, undefined, facadeStub);
+        testD1.use(testDb);
+        svc = new InspectionAnalyticsService(testD1.binding, undefined, undefined, undefined, undefined, facadeStub);
 
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'priceco',

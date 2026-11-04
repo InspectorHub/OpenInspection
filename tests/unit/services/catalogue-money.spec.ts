@@ -3,13 +3,12 @@
  * new-inspection wizard prices a line from it); writing it needs `companyFinance`.
  * Holding the wrong one of the two changes nothing.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 // eslint-disable-next-line import/order
 import { servicesRoutes } from '../../../server/api/services';
 

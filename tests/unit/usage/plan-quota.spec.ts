@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema, toRawD1 } from '../db';
 import { tenants } from '../../../server/lib/db/schema';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -10,9 +10,9 @@ import * as schema from '../../../server/lib/db/schema';
 // raw `db.prepare(...).bind(...).run()` path bypasses this mock entirely —
 // it runs against `testD1`, a thin D1Database-shaped adapter over the same
 // underlying sqlite (see toRawD1 in ./db).
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const fakeD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
 import { MeteringService } from '../../../server/services/metering.service';
 
@@ -26,8 +26,8 @@ describe('PlanQuotaGuard', () => {
         testDb = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(testDb);
-        testD1 = toRawD1(sqlite);
+        fakeD1.use(testDb);
+        testD1 = fakeD1.binding;
     });
 
     /** The row the caller inserts right after a successful consume. The gate

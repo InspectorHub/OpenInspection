@@ -1,15 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../server/lib/db/schema';
 import calendarBlockRoutes from '../../../server/api/calendar-blocks';
 import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: vi.fn(),
-}));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000aa';
 const INSPECTOR = 'user-inspector-1';
@@ -33,7 +31,7 @@ function buildApp(
     app.route('/api/calendar', calendarBlockRoutes);
     return {
         app,
-        env: { DB: {} as D1Database },
+        env: { DB: testD1.binding },
         testDb,
     };
 }
@@ -55,8 +53,7 @@ describe('calendar blocks API', () => {
         testDb = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         await testDb.insert(schema.tenants).values({
             id: TENANT,

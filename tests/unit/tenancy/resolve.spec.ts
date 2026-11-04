@@ -6,16 +6,15 @@
  * only the fields resolveVideoBackend reads. Assert the resolved `provider`
  * for each row of the decision table.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-// Import resolver AFTER the mock is wired so it picks up the mock.
 import { resolveVideoBackend } from '../../../server/services/video/resolve';
 import { getDeploymentProfile } from '../../../server/lib/deployment-profile';
 import type { AppEnv } from '../../../server/types/hono';
@@ -42,7 +41,7 @@ function mockCtx(opts: {
     };
     const env: Partial<AppEnv> = {
         APP_MODE: opts.mode as AppEnv['APP_MODE'],
-        DB: {} as D1Database,
+        DB: testD1.binding,
         PHOTOS: {} as R2Bucket,
         JWT_SECRET: 'test-secret-32-chars-xxxxxxxxxxxx',
         APP_BASE_URL: 'https://test.example.com',
@@ -88,7 +87,7 @@ beforeEach(async () => {
     await setupSchema(fixture.sqlite);
 
     // Wire the drizzle mock so calls inside resolveVideoBackend use testDb.
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+    testD1.use(testDb);
 });
 
 // ── Seed helpers ──────────────────────────────────────────────────────────────

@@ -31,8 +31,8 @@ import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AutomationService } from '../../../server/services/automation.service';
 import type { EmailService } from '../../../server/services/email.service';
 
@@ -52,7 +52,7 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme-in-app', status: 'active',
@@ -93,7 +93,7 @@ describe('in_app channel (B1)', () => {
         const ruleId = await insertRule('auto-in-app-1');
         const logId = await insertLog({ automationId: ruleId });
 
-        await new AutomationService({} as D1Database).flush(noEmail, 'Acme', 'https://app.example.com');
+        await new AutomationService(testD1.binding).flush(noEmail, 'Acme', 'https://app.example.com');
 
         const row = await readLog(logId);
         expect(row.status).toBe('sent');
@@ -105,7 +105,7 @@ describe('in_app channel (B1)', () => {
         // dropped by the inner join and left pending forever with no error.
         const logId = await insertLog({ automationId: null });
 
-        await new AutomationService({} as D1Database).flush(noEmail, 'Acme', 'https://app.example.com');
+        await new AutomationService(testD1.binding).flush(noEmail, 'Acme', 'https://app.example.com');
 
         expect((await readLog(logId)).status).toBe('sent');
     });
@@ -119,7 +119,7 @@ describe('in_app channel (B1)', () => {
             consumeEmail: vi.fn(),
             consumeSms: vi.fn(),
         };
-        await new AutomationService({} as D1Database).flush(
+        await new AutomationService(testD1.binding).flush(
             noEmail, 'Acme', 'https://app.example.com', undefined, 50, undefined,
             quotaGuard as never,
         );
@@ -136,7 +136,7 @@ describe('in_app channel (B1)', () => {
             .where(eq(schema.automations.id, ruleId));
         const logId = await insertLog({ automationId: ruleId });
 
-        await new AutomationService({} as D1Database).flush(noEmail, 'Acme', 'https://app.example.com');
+        await new AutomationService(testD1.binding).flush(noEmail, 'Acme', 'https://app.example.com');
 
         const row = await readLog(logId);
         expect(row.status).toBe('skipped');
@@ -166,7 +166,7 @@ describe('in_app channel (B1)', () => {
         const ruleId = await insertRule('auto-in-app-4');
         const logId = await insertLog({ automationId: ruleId, sendAt: new Date(Date.now() + 3_600_000) });
 
-        await new AutomationService({} as D1Database).flush(noEmail, 'Acme', 'https://app.example.com');
+        await new AutomationService(testD1.binding).flush(noEmail, 'Acme', 'https://app.example.com');
 
         expect((await readLog(logId)).status).toBe('pending');
     });

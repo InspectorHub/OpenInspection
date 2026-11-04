@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -12,10 +12,9 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
  * secret into tenant_configs.secrets_enc via sealSecrets, then drive
  * POST /webhooks/email/:provider/:tenant with synthetic signed payloads.
  */
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-// Imported AFTER the mock is registered.
 // eslint-disable-next-line import/order
 import { smsWebhookRoutes } from '../../../server/api/sms';
 import { sealSecrets } from '../../../server/lib/config-crypto';
@@ -25,7 +24,7 @@ const TENANT = '00000000-0000-0000-0000-000000000001';
 const FIXED_NOW = 1_700_000_000_000; // ms — pins the anti-replay clock
 
 const FAKE_ENV = {
-    DB: {},
+    DB: testD1.binding,
     JWT_SECRET: 'test-secret',
     TENANT_CACHE: { get: async () => null, put: async () => {}, delete: async () => {} },
     WEBHOOK_NOW_MS: FIXED_NOW,
@@ -49,7 +48,7 @@ function buildApp(database: BetterSQLite3Database<typeof schema>) {
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
     app.route('/webhooks', smsWebhookRoutes);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(database);
+    testD1.use(database);
     return app;
 }
 
@@ -113,7 +112,7 @@ beforeEach(async () => {
     db = fx.db as BetterSQLite3Database<typeof schema>;
     sqlite = fx.sqlite;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await seedTenant(db, TENANT, 'acme');
 });
 

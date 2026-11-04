@@ -8,15 +8,15 @@
  * document (Spec B §1: report surfaces snapshot at publish; live surfaces read
  * current state).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ReportVersionService } from '../../../server/services/report-version.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000099';
 const INSPECTION = '11111111-1111-1111-1111-111111111111';
@@ -49,10 +49,9 @@ describe('snapshotOnPublish — credentials and appearance', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seed(db);
-        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []);
+        svc = new ReportVersionService(testD1.binding, 'test-encryption-secret-key', []);
 
         for (const [id, name] of [[LEAD, 'Dana Lead'], [HELPER, 'Sam Helper']] as const) {
             await db.insert(schema.users).values({
@@ -202,10 +201,9 @@ describe('snapshot growth vs. already-signed versions', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seed(db);
-        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []);
+        svc = new ReportVersionService(testD1.binding, 'test-encryption-secret-key', []);
     });
 
     it('still verifies a snapshot written in the pre-credentials shape', async () => {
@@ -222,7 +220,7 @@ describe('snapshot growth vs. already-signed versions', () => {
         const { SigningKeyService, base64UrlEncode } =
             await import('../../../server/services/signing-key.service');
         const legacyHash = await sha256Hex(legacyJson);
-        const { privateKey } = await new SigningKeyService({} as D1Database, 'test-encryption-secret-key')
+        const { privateKey } = await new SigningKeyService(testD1.binding, 'test-encryption-secret-key')
             .ensureKeypair(TENANT);
         const sig = base64UrlEncode(new Uint8Array(await crypto.subtle.sign(
             { name: 'Ed25519' }, privateKey, new TextEncoder().encode(legacyHash),

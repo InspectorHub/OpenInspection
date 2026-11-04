@@ -6,15 +6,15 @@
  * the LEGACY column NULL and only inspection_people populated, so it fails
  * against the pre-rewrite implementation.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { PeopleService } from '../../../server/services/people.service';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import agentRoutes from '../../../server/api/agent';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -49,7 +49,7 @@ function buildApp(userRole: string) {
     return app;
 }
 
-const ENV = { DB: {} } as never;
+const ENV = { DB: testD1.binding } as never;
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --
 // it only removes any way to await it, which is how a run with every test
 // passing could still exit 1 on an unhandled teardown rejection.
@@ -60,7 +60,7 @@ describe('GET /api/agent/my-reports — buyer_agent via inspection_people (Task 
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -78,7 +78,7 @@ describe('GET /api/agent/my-reports — buyer_agent via inspection_people (Task 
     });
 
     it('legacy referredByAgentId NULL, buyer_agent inspection_people row present — my-reports resolves it (own agentId)', async () => {
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_1, AGENT_CONTACT, roleProfileId('buyer_agent'));
 
         const res = await buildApp('manager').request('/api/agent/my-reports', {}, ENV, CTX);
@@ -88,7 +88,7 @@ describe('GET /api/agent/my-reports — buyer_agent via inspection_people (Task 
     });
 
     it('excludes an inspection whose buyer_agent is a different contact', async () => {
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_2, OTHER_CONTACT, roleProfileId('buyer_agent'));
 
         const res = await buildApp('manager').request('/api/agent/my-reports', {}, ENV, CTX);
@@ -98,7 +98,7 @@ describe('GET /api/agent/my-reports — buyer_agent via inspection_people (Task 
     });
 
     it('?agentId= override resolves that agent\'s inspection via inspection_people', async () => {
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_2, OTHER_CONTACT, roleProfileId('buyer_agent'));
 
         const res = await buildApp('manager').request(`/api/agent/my-reports?agentId=${OTHER_CONTACT}`, {}, ENV, CTX);
@@ -113,7 +113,7 @@ describe('GET /api/agent/leaderboard — buyer_agent via inspection_people (Task
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -156,7 +156,7 @@ describe('GET /api/agent/my-reports — role admission', () => {
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

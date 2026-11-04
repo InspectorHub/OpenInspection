@@ -10,8 +10,8 @@ import { PeopleService } from '../../../server/services/people.service';
 
 const roleProfileId = (tenantId: string, key: string) => `crp_${tenantId}_${key}`;
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { asD1Db } from '../helpers/test-db';
 
 const T1 = '00000000-0000-0000-0000-000000000001';
@@ -85,8 +85,8 @@ describe('AgentService.listReferrals — A2', () => {
         // must ALSO get the matching inspection_people row, or the
         // post-rewrite queries (which read inspection_people, not the
         // legacy column) will no longer see it as referred.
-        const people = new PeopleService({ DB: {} as D1Database });
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        const people = new PeopleService({ DB: testD1.binding });
+        testD1.use(testDb);
         await people.addPerson(T1, 'i-1', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
         await people.addPerson(T1, 'i-2', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
         await people.addPerson(T2, 'i-3', 'jane-c2', roleProfileId(T2, 'buyer_agent'));
@@ -97,7 +97,7 @@ describe('AgentService.listReferrals — A2', () => {
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService({} as D1Database);
+        svc = new AgentService(testD1.binding);
     });
 
     it('returns inspections from all tenants the agent has active links with', async () => {
@@ -148,7 +148,7 @@ describe('AgentService.listReferrals — A2', () => {
         await testDb.insert(schema.inspections).values({
             id: 'i-people-only', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '77 Birch', date: '2026-06-06', status: 'requested', paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, 'i-people-only', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
 
         const refs = await svc.listReferrals(AGENT_USER, { limit: 50 });
@@ -174,7 +174,7 @@ describe('AgentService.listReferrals — A2', () => {
             id: 'i-erased', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '5 Cedar', date: '2026-06-07', status: 'requested',
             paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, 'i-erased', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
         // No client inspection_people row is added — simulates post-erasure state.
 
@@ -220,11 +220,11 @@ describe('AgentService.listInspectors — A2', () => {
         await testDb.update(schema.contacts).set({ agentUserId: AGENT_USER, agentLinkedAt: new Date() }).where(eq(schema.contacts.id, 'jane-c1'));
         await testDb.update(schema.contacts).set({ agentUserId: AGENT_USER, agentLinkedAt: new Date() }).where(eq(schema.contacts.id, 'jane-c2'));
 
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService({} as D1Database);
+        svc = new AgentService(testD1.binding);
     });
 
     it('returns one row per active link with inspector contact info', async () => {
@@ -292,11 +292,11 @@ describe('AgentService.revokeLink — A2', () => {
             agentUserId: AGENT_USER, agentLinkedAt: new Date(), createdAt: new Date(),
         });
 
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService({} as D1Database);
+        svc = new AgentService(testD1.binding);
     });
 
     it('stamps agentRevokedAt without archiving the contact', async () => {
@@ -331,11 +331,11 @@ describe('AgentService.updateProfile — A2', () => {
             id: AGENT_USER, tenantId: null, email: 'jane@realty.com', role: 'agent', name: 'Jane', createdAt: new Date(), passwordHash: 'h',
         });
 
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService({} as D1Database);
+        svc = new AgentService(testD1.binding);
     });
 
     it('persists the profile fields it is given', async () => {

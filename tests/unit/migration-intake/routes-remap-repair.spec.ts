@@ -12,16 +12,14 @@
  * response code and the same row count, so the rows themselves are read back
  * rather than the status alone.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import { withBatch } from '../helpers/d1-binding';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
-import {
+import { intakeD1 as testD1,
     OTHER,
     TENANT,
     contactsBundle,
@@ -53,8 +51,7 @@ describe('editing an import run over HTTP', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(withBatch(db, fix.sqlite));
+        testD1.use(withBatch(db, fix.sqlite));
         store = new Map();
         await seedIntakeTenant(db);
         await seedIntakeTenant(db, OTHER);
@@ -198,8 +195,7 @@ describe('the tenant that owns the run reaches it', () => {
         // fixture cannot quietly stop staging anything at all.
         const fix = createTestDb();
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(withBatch(fix.db, fix.sqlite));
+        testD1.use(withBatch(fix.db, fix.sqlite));
         const store = new Map<string, Uint8Array>();
         await seedIntakeTenant(fix.db);
         const run = await stageIntakeRun(fix.db, store, {

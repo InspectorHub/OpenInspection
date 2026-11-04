@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { TeamService } from '../../../server/services/team.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 /**
  * F66 layer 1 — `getMembers` must PROJECT `users.last_active_at`.
@@ -31,8 +31,7 @@ describe('TeamService.getMembers — last_active_at reaches the response', () =>
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
@@ -46,7 +45,7 @@ describe('TeamService.getMembers — last_active_at reaches the response', () =>
                 role: 'inspector', passwordHash: 'x', createdAt: new Date(),
             },
         ]);
-        svc = new TeamService({} as D1Database);
+        svc = new TeamService(testD1.binding);
     });
 
     it('carries the stored timestamp for a member who has been active', async () => {

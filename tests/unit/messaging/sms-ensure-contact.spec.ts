@@ -13,15 +13,15 @@
  * denormalized client column, is gone); inspection_people is the sole
  * source of truth with no cache to keep in sync.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { ensureClientContact } from '../../../server/lib/sms/ensure-client-contact';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -37,7 +37,7 @@ beforeEach(async () => {
     db = fx.db as BetterSQLite3Database<typeof schema>;
     sqlite = fx.sqlite;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -69,7 +69,7 @@ describe('ensureClientContact (Task 9b — primary-client join; Task 13 — pure
             contactId: CLIENT, roleProfileId: roleProfileId('client'), createdAt: new Date(),
         } as never);
 
-        const result = await ensureClientContact({} as D1Database, TENANT, id);
+        const result = await ensureClientContact(testD1.binding, TENANT, id);
         expect(result).toBe(CLIENT);
     });
 
@@ -83,8 +83,8 @@ describe('ensureClientContact (Task 9b — primary-client join; Task 13 — pure
             { id: `ip_${id2}_client`, tenantId: TENANT, inspectionId: id2, contactId: CLIENT, roleProfileId: roleProfileId('client'), createdAt: new Date() },
         ] as never);
 
-        const c1 = await ensureClientContact({} as D1Database, TENANT, id1);
-        const c2 = await ensureClientContact({} as D1Database, TENANT, id2);
+        const c1 = await ensureClientContact(testD1.binding, TENANT, id1);
+        const c2 = await ensureClientContact(testD1.binding, TENANT, id2);
 
         expect(c1).toBe(CLIENT);
         expect(c2).toBe(CLIENT);
@@ -93,12 +93,12 @@ describe('ensureClientContact (Task 9b — primary-client join; Task 13 — pure
     it('no primary client at all — null', async () => {
         const id = crypto.randomUUID();
         await seedInspection(id);
-        const result = await ensureClientContact({} as D1Database, TENANT, id);
+        const result = await ensureClientContact(testD1.binding, TENANT, id);
         expect(result).toBeNull();
     });
 
     it('unknown inspection id — null (degenerate)', async () => {
-        const result = await ensureClientContact({} as D1Database, TENANT, 'no-such-inspection');
+        const result = await ensureClientContact(testD1.binding, TENANT, 'no-such-inspection');
         expect(result).toBeNull();
     });
 });

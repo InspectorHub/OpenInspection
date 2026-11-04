@@ -10,7 +10,7 @@
  * implementation (which reads only the legacy columns and would render no
  * agentName).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionAnalyticsService } from '../../../server/services/inspection/inspection-analytics.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -20,7 +20,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000009c3';
 const LISTING_AGENT = 'contact-listing-agent-9c3';
@@ -45,10 +46,9 @@ describe('InspectionAnalyticsService.getDashboardBuckets — agent attribution v
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         svc = new InspectionAnalyticsService(
-            {} as D1Database,
+            testD1.binding,
             undefined,
             undefined,
             undefined,
@@ -86,7 +86,7 @@ describe('InspectionAnalyticsService.getDashboardBuckets — agent attribution v
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },
         ]);
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_LISTING, LISTING_AGENT, roleProfileId('listing_agent'));
         await people.addPerson(TENANT, INSP_BUYER, BUYER_AGENT, roleProfileId('buyer_agent'));
     });

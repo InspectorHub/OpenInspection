@@ -8,12 +8,11 @@
  *     appear.
  * Every restriction is paired with a control that goes through.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import calendarItemsRoutes from '../../../server/api/calendar-items';
@@ -25,7 +24,8 @@ import { visibleInspectionsCondition } from '../../../server/lib/inspection/visi
 import { seedVisibilityFixture, TENANT, USERS, INSP, VISIBLE_TO_A } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 type Role = 'owner' | 'manager' | 'inspector';
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -37,7 +37,7 @@ describe('calendar surfaces honour the scope', () => {
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; sqlite = f.sqlite;
         await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         const now = new Date();
         await db.insert(schema.eventTypes).values({ id: 'et-1', tenantId: TENANT, name: 'Radon', slug: 'radon', createdAt: now });
         // A visit on a hidden inspection that NAMES inspA, and one on a visible inspection.
@@ -76,7 +76,7 @@ describe('calendar surfaces honour the scope', () => {
         return app;
     }
     const get = async (app: OpenAPIHono<HonoConfig>, p: string) => {
-        const res = await app.request(p, {}, { DB: {} } as never);
+        const res = await app.request(p, {}, { DB: testD1.binding } as never);
         return { status: res.status, body: await res.json() as { data?: any } }; // eslint-disable-line @typescript-eslint/no-explicit-any
     };
     const grant = (userId: string, overrides: Record<string, boolean>) =>

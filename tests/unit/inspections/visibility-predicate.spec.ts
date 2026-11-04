@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq, inArray } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
@@ -9,7 +9,6 @@ import {
     type InspectionScope,
 } from '../../../server/lib/inspection/visibility';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 describe('visibility predicate', () => {
     let db: ReturnType<typeof createTestDb>['db'];

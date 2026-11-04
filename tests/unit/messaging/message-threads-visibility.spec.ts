@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1Db, asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asD1Db, asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { MessageService } from '../../../server/services/message.service';
@@ -15,7 +14,8 @@ import { ALL_INSPECTIONS, type InspectionScope } from '../../../server/lib/inspe
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const rp = (key: string) => `crp_${TENANT}_${key}`;
 const A: InspectionScope = { kind: 'assigned', userId: USERS.inspA };
@@ -29,12 +29,12 @@ describe('message threads honour the scope', () => {
     let svc: MessageService;
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values(['c-both', 'c-other-only', 'c-new'].map(id => ({
             id, tenantId: TENANT, type: 'client' as const, name: `Name ${id}`, email: `${id}@example.test`, createdAt: new Date(),
         })));
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP.own, 'c-both', rp('client'));
         await people.addPerson(TENANT, INSP.other, 'c-both', rp('buyer_agent'));
         await people.addPerson(TENANT, INSP.other, 'c-other-only', rp('client'));
@@ -48,7 +48,7 @@ describe('message threads honour the scope', () => {
             msg('m-outreach-a', null, 'c-both', 'inspector', 1500, USERS.inspA),
             msg('m-other-only', INSP.other, 'c-other-only', 'client', 4000),
         ]);
-        svc = new MessageService({} as D1Database);
+        svc = new MessageService(testD1.binding);
     });
 
     it('threads: only conversations with something visible, summarised over the visible rows', async () => {
@@ -98,7 +98,7 @@ describe('message threads honour the scope', () => {
             return app;
         }
         const call = async (userId: string, role: 'owner' | 'manager' | 'inspector', p: string, init?: RequestInit) => {
-            const res = await build(userId, role).request(p, init, { DB: {} });
+            const res = await build(userId, role).request(p, init, { DB: testD1.binding });
             return { status: res.status, body: await res.json() as { data?: unknown } };
         };
 

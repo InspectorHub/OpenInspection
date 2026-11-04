@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { MessageTemplateService } from '../../../server/services/message-template.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -7,8 +7,8 @@ import Database from 'better-sqlite3';
 
 // The service calls drizzle(this.db) from 'drizzle-orm/d1'; tests run on
 // better-sqlite3, so mock the d1 drizzle to return the in-memory db.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T1 = 'tenant-1';
 const T2 = 'tenant-2';
@@ -23,8 +23,8 @@ describe('MessageTemplateService', () => {
         testDb = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new MessageTemplateService({} as D1Database); // {} db is never used — the mock returns testDb
+        testD1.use(testDb);
+        svc = new MessageTemplateService(testD1.binding); // {} db is never used — the mock returns testDb
     });
 
     it('creates and lists tenant-scoped templates', async () => {

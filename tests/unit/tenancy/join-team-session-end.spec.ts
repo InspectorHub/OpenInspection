@@ -11,9 +11,9 @@ import { users, tenantInvites, tenants, tenantConfigs } from '../../../server/li
 import * as schema from '../../../server/lib/db/schema';
 import { MockKV } from '../mocks';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { withBatch } from '../helpers/d1-binding';
 import { AuthService } from '../../../server/services/auth.service';
 import { SEAT_QUOTA_UNENFORCED } from '../../../server/features/seat-quota';
@@ -31,7 +31,7 @@ describe('joinTeam records why a native session ended', () => {
         testDb = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(setup.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(withBatch(testDb, setup.sqlite));
+        testD1.use(withBatch(testDb, setup.sqlite));
         await testDb.insert(tenants).values({ id: 't1', slug: 'test', createdAt: new Date() });
         await testDb.insert(tenantConfigs).values({ tenantId: 't1', companyName: 'Test Tenant', updatedAt: new Date() });
         const legal = new LegalVersionService(testDb as never);
@@ -68,7 +68,7 @@ describe('joinTeam records why a native session ended', () => {
     it('marks the native grant of a re-invited member member_removed', async () => {
         await invite(true);
         const oauth = oauthWith([['g-native', 'native']]);
-        await join(new AuthService({} as D1Database, kv as unknown as KVNamespace, undefined, oauth));
+        await join(new AuthService(testD1.binding, kv as unknown as KVNamespace, undefined, oauth));
         expect(oauth.revokeGrant).toHaveBeenCalledWith('g-native', MEMBER);
         expect(markers()).toEqual([['native-end:g-native', 'member_removed']]);
     });
@@ -76,7 +76,7 @@ describe('joinTeam records why a native session ended', () => {
     it('CONTROL: an MCP grant is revoked but not marked', async () => {
         await invite(true);
         const oauth = oauthWith([['g-mcp', 'mcp']]);
-        await join(new AuthService({} as D1Database, kv as unknown as KVNamespace, undefined, oauth));
+        await join(new AuthService(testD1.binding, kv as unknown as KVNamespace, undefined, oauth));
         expect(oauth.revokeGrant).toHaveBeenCalledWith('g-mcp', MEMBER);
         expect(markers()).toEqual([]);
     });
@@ -84,7 +84,7 @@ describe('joinTeam records why a native session ended', () => {
     it('CONTROL: a fresh join with no earlier row revokes nothing and writes no marker', async () => {
         await invite(false);
         const oauth = oauthWith([['g-native', 'native']]);
-        await join(new AuthService({} as D1Database, kv as unknown as KVNamespace, undefined, oauth));
+        await join(new AuthService(testD1.binding, kv as unknown as KVNamespace, undefined, oauth));
         expect(oauth.revokeGrant).not.toHaveBeenCalled();
         expect(markers()).toEqual([]);
     });
@@ -93,7 +93,7 @@ describe('joinTeam records why a native session ended', () => {
         await invite(true);
         const oauth = oauthWith([['g-native', 'native']]);
         const failing = { put: vi.fn(async () => { throw new Error('kv down'); }), get: vi.fn(async () => null) } as unknown as KVNamespace;
-        const user = await join(new AuthService({} as D1Database, failing, undefined, oauth));
+        const user = await join(new AuthService(testD1.binding, failing, undefined, oauth));
         expect(user.id).toBe(MEMBER);
         expect(oauth.revokeGrant).toHaveBeenCalledWith('g-native', MEMBER);
     });

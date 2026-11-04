@@ -7,7 +7,7 @@
  * and must never touch finished work: a completed or published inspection keeps
  * the inspector it was done by, because that is the record.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq, inArray } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
 import { createTestDb, setupSchema } from '../db';
@@ -15,8 +15,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { AppError } from '../../../server/lib/errors';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { d1For, lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const OTHER_TENANT = '22222222-2222-2222-2222-2222222222b2';
@@ -81,10 +81,9 @@ describe('TeamService.removeMember and the removed member\'s inspections', () =>
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seed(db);
-        svc = new TeamService({} as D1Database);
+        svc = new TeamService(testD1.binding);
     });
 
     it('refuses with a typed 409 carrying the count, and changes nothing', async () => {
@@ -171,27 +170,23 @@ describe('TeamService.removeMember and the removed member\'s inspections', () =>
     });
 
     describe('atomicity on a driver that batches', () => {
-        /** A db whose `batch` is a real transaction and fails after `failAfter` statements. */
+        /** A D1 binding whose `batch` is a real transaction and fails after `failAfter` statements. */
         function batchingDb(failAfter: number | null) {
             const batchSizes: number[] = [];
-            const stub = new Proxy(db, {
-                get(target, prop, recv) {
-                    if (prop === 'batch') {
-                        return (writes: Array<{ run: () => unknown }>) => {
-                            batchSizes.push(writes.length);
-                            fixture.sqlite.transaction(() => {
-                                writes.forEach((w, i) => {
-                                    if (failAfter !== null && i === failAfter) throw new Error('statement failed midway');
-                                    w.run();
-                                });
-                            })();
-                            return Promise.resolve([]);
-                        };
-                    }
-                    const v = Reflect.get(target, prop, recv);
-                    return typeof v === 'function' ? v.bind(target) : v;
+            const real = d1For(db);
+            const stub = {
+                prepare: (sql: string) => real.prepare(sql),
+                batch: (writes: Array<{ execSync: () => unknown }>) => {
+                    batchSizes.push(writes.length);
+                    fixture.sqlite.transaction(() => {
+                        writes.forEach((w, i) => {
+                            if (failAfter !== null && i === failAfter) throw new Error('statement failed midway');
+                            w.execSync();
+                        });
+                    })();
+                    return Promise.resolve([]);
                 },
-            });
+            } as unknown as D1Database;
             return { stub, batchSizes };
         }
         const snapshot = async (d: Db) => JSON.stringify({
@@ -209,10 +204,8 @@ describe('TeamService.removeMember and the removed member\'s inspections', () =>
 
         it('a statement that fails midway changes nothing: no inspection moved, leaver not removed', async () => {
             const { stub } = batchingDb(2);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (mockDrizzle as any).mockReturnValue(stub);
             const before = await snapshot(db);
-            await expect(new TeamService({} as D1Database).removeMember(TENANT, LEAVER, OWNER, 'owner', { reassignTo: HEIR }))
+            await expect(new TeamService(stub).removeMember(TENANT, LEAVER, OWNER, 'owner', { reassignTo: HEIR }))
                 .rejects.toThrow(/failed midway/);
             expect(await snapshot(db)).toBe(before);
             expect(await removed(db, LEAVER)).toBe(false);
@@ -220,10 +213,8 @@ describe('TeamService.removeMember and the removed member\'s inspections', () =>
 
         it('control: with no failure the same batch applies everything, in ONE batch call', async () => {
             const { stub, batchSizes } = batchingDb(null);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (mockDrizzle as any).mockReturnValue(stub);
             const before = await snapshot(db);
-            await new TeamService({} as D1Database).removeMember(TENANT, LEAVER, OWNER, 'owner', { reassignTo: HEIR });
+            await new TeamService(stub).removeMember(TENANT, LEAVER, OWNER, 'owner', { reassignTo: HEIR });
             expect(batchSizes).toHaveLength(1);
             expect(batchSizes[0]).toBeGreaterThan(3); // reassignment writes plus the soft-delete
             expect(await snapshot(db)).not.toBe(before);

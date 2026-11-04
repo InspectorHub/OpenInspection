@@ -18,14 +18,15 @@
  * So the assertion that matters is not "adding twice is safe" — it always was.
  * It is that the second call is DISTINGUISHABLE from the first.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq, and } from 'drizzle-orm';
 import { PeopleService } from '../../../server/services/people.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000d3';
 const INSPECTION = 'i-people-idem';
@@ -40,9 +41,8 @@ describe('PeopleService.addPerson — reports whether a seat was created', () =>
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new PeopleService({ DB: {} as D1Database });
+        testD1.use(testDb);
+        svc = new PeopleService({ DB: testD1.binding });
 
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'peopleco',

@@ -35,8 +35,8 @@ import type {
 } from '../../../server/lib/migration-intake/bundle';
 import type { TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 import { limitsFor } from '../../../server/lib/migration-intake/limits';
 import { SAAS_PROFILE } from '../../../server/lib/deployment-profile';
@@ -132,14 +132,14 @@ describe('MigrationRevertService.revert', () => {
         await setupSchema(sqlite);
         // The staging step batches its writes, and better-sqlite3 is the one
         // Drizzle driver with no `batch()` — see helpers/d1-binding.ts.
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(withBatch(db, sqlite)));
+        testD1.use(asD1DrizzleReturn(withBatch(db, sqlite)));
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared',
             tier: 'free', maxUsers: 12, createdAt: new Date(),
         });
-        stage = new MigrationStageService({} as D1Database);
-        apply = new MigrationApplyService({} as D1Database);
-        revert = new MigrationRevertService({} as D1Database);
+        stage = new MigrationStageService(testD1.binding);
+        apply = new MigrationApplyService(testD1.binding);
+        revert = new MigrationRevertService(testD1.binding);
     });
 
     afterEach(() => {
@@ -518,14 +518,14 @@ describe('MigrationRevertService.revert', () => {
         expect(await db.select().from(schema.tenantInvites).all()).toHaveLength(1);
         // Held BEFORE the undo — otherwise "zero seats used" is just the state
         // an empty workspace was already in.
-        expect((await getSeatUsage(TENANT, {} as D1Database)).used).toBe(1);
+        expect((await getSeatUsage(TENANT, testD1.binding)).used).toBe(1);
 
         const result = await revert.revert({ tenantId: TENANT, batchId: staged.batchId });
         expect(result).toMatchObject({ status: 'reverted', reverted: 1 });
         expect(await db.select().from(schema.tenantInvites).all()).toEqual([]);
         // The seat comes back with the row, because usage counts outstanding
         // invitations rather than accepted ones.
-        expect((await getSeatUsage(TENANT, {} as D1Database)).used).toBe(0);
+        expect((await getSeatUsage(TENANT, testD1.binding)).used).toBe(0);
     });
 
     it('cannot cancel an invite somebody already accepted, and says where to go instead', async () => {

@@ -23,8 +23,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { actorOf, OWNER_ACTOR } from '../helpers/grant-actor';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const OWNER = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1';
@@ -40,8 +40,7 @@ describe('member update follow-ups', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values([
             { id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
@@ -63,7 +62,7 @@ describe('member update follow-ups', () => {
 
         it('logs the failure and still completes the update', async () => {
             const spy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
-            const svc = new TeamService({} as D1Database, outboxThatFails());
+            const svc = new TeamService(testD1.binding, outboxThatFails());
             const result = await svc.updateMember({ ...asOwner, userId: INSPECTOR, role: 'staff' });
             expect(result.role).toBe('staff');
             expect((await stored(INSPECTOR))?.role).toBe('staff');
@@ -75,7 +74,7 @@ describe('member update follow-ups', () => {
         it('CONTROL - a working outbox is appended to and nothing is logged', async () => {
             const spy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
             const append = vi.fn().mockResolvedValue(undefined);
-            const svc = new TeamService({} as D1Database, { append } as unknown as UserSyncOutbox);
+            const svc = new TeamService(testD1.binding, { append } as unknown as UserSyncOutbox);
             await svc.updateMember({ ...asOwner, userId: INSPECTOR, role: 'staff' });
             expect(append).toHaveBeenCalledWith(expect.objectContaining({ type: 'user.role_changed' }));
             expect(spy).not.toHaveBeenCalled();
@@ -85,13 +84,13 @@ describe('member update follow-ups', () => {
 
     describe('what effectively changed', () => {
         it('names the capabilities that moved', async () => {
-            const svc = new TeamService({} as D1Database);
+            const svc = new TeamService(testD1.binding);
             const r = await svc.updateMember({ ...asOwner, userId: INSPECTOR, permissionOverrides: { companyFinance: true } });
             expect(r).toMatchObject({ changed: true, roleChanged: false, capabilitiesChanged: ['companyFinance'] });
         });
 
         it('a role move reports the capabilities the new template changes', async () => {
-            const svc = new TeamService({} as D1Database);
+            const svc = new TeamService(testD1.binding);
             const r = await svc.updateMember({ ...asOwner, userId: INSPECTOR, role: 'manager' });
             expect(r.changed).toBe(true);
             expect(r.roleChanged).toBe(true);
@@ -99,7 +98,7 @@ describe('member update follow-ups', () => {
         });
 
         it('writes nothing and never calls beforeWrite when nothing changed', async () => {
-            const svc = new TeamService({} as D1Database);
+            const svc = new TeamService(testD1.binding);
             const beforeWrite = vi.fn().mockResolvedValue(undefined);
             // `publish` is already on for an inspector: restating it is not a change.
             const same = await svc.updateMember({ ...asOwner, userId: INSPECTOR, role: 'inspector', permissionOverrides: { publish: true }, beforeWrite });
@@ -115,7 +114,7 @@ describe('member update follow-ups', () => {
     describe('overrides and the self-edit rule', () => {
         it('an update that omits permissionOverrides leaves stored overrides alone', async () => {
             await db.update(schema.users).set({ permissionOverrides: { companyFinance: true } }).where(eq(schema.users.id, INSPECTOR));
-            const svc = new TeamService({} as D1Database);
+            const svc = new TeamService(testD1.binding);
             const r = await svc.updateMember({ ...asOwner, userId: INSPECTOR, role: 'staff' });
             expect(r.permissionOverrides).toEqual({ companyFinance: true });
             expect((await stored(INSPECTOR))?.o).toEqual({ companyFinance: true });
@@ -126,7 +125,7 @@ describe('member update follow-ups', () => {
 
         it('a manager saving their own row with the overrides omitted is not a permission change', async () => {
             await db.update(schema.users).set({ permissionOverrides: { publish: false } }).where(eq(schema.users.id, MANAGER));
-            const svc = new TeamService({} as D1Database);
+            const svc = new TeamService(testD1.binding);
             const self = { tenantId: TENANT, userId: MANAGER, requesterId: MANAGER, requesterRole: 'manager' as const, requesterCapabilities: getCapabilities('manager', { publish: false }) };
             const r = await svc.updateMember(self);
             expect(r.changed).toBe(false);
@@ -138,7 +137,7 @@ describe('member update follow-ups', () => {
 
         it('compares effective access: clearing a stored override that restates the template is not a change', async () => {
             await db.update(schema.users).set({ permissionOverrides: { publish: true } }).where(eq(schema.users.id, MANAGER));
-            const svc = new TeamService({} as D1Database);
+            const svc = new TeamService(testD1.binding);
             const self = { tenantId: TENANT, userId: MANAGER, requesterId: MANAGER, requesterRole: 'manager' as const, requesterCapabilities: MANAGER_CAPS };
             await expect(svc.updateMember({ ...self, permissionOverrides: {} })).resolves.toMatchObject({ changed: false });
             expect(sameEffective({ role: 'manager', overrides: { publish: true } }, { role: 'manager', overrides: null })).toBe(true);
@@ -148,7 +147,7 @@ describe('member update follow-ups', () => {
 
     describe('ordering', () => {
         it('the ceiling refuses before the caller-supplied seat check runs', async () => {
-            const svc = new TeamService({} as D1Database);
+            const svc = new TeamService(testD1.binding);
             const beforeWrite = vi.fn().mockResolvedValue(undefined);
             const manager = { tenantId: TENANT, userId: INSPECTOR, requesterId: MANAGER, requesterRole: 'manager' as const, requesterCapabilities: NO_FINANCE_CAPS, role: 'manager' as const, beforeWrite };
             await expect(svc.updateMember(manager)).rejects.toMatchObject({ code: 'CAPABILITY_CEILING' });
@@ -169,7 +168,7 @@ describe('member update follow-ups', () => {
 
         it('a row refused by the ceiling writes a user.grant_refused entry', async () => {
             const actor = { ...actorOf('manager'), userId: MANAGER };
-            await expect(applyMemberRow({} as D1Database, { tenantId: TENANT, actor }, memberRow('owner'), []))
+            await expect(applyMemberRow(testD1.binding, { tenantId: TENANT, actor }, memberRow('owner'), []))
                 .rejects.toMatchObject({ code: 'ROLE_CEILING' });
             const rows = await refusals();
             expect(rows).toHaveLength(1);
@@ -178,9 +177,9 @@ describe('member update follow-ups', () => {
         });
 
         it('CONTROL - an allowed row and an unrelated failure write no refusal entry', async () => {
-            const ok = await applyMemberRow({} as D1Database, { tenantId: TENANT, actor: { ...OWNER_ACTOR, userId: OWNER } }, memberRow('owner'), []);
+            const ok = await applyMemberRow(testD1.binding, { tenantId: TENANT, actor: { ...OWNER_ACTOR, userId: OWNER } }, memberRow('owner'), []);
             expect(ok.kind).toBe('applied');
-            await expect(applyMemberRow({} as D1Database, { tenantId: TENANT, actor: OWNER_ACTOR }, memberRow('not-a-role'), []))
+            await expect(applyMemberRow(testD1.binding, { tenantId: TENANT, actor: OWNER_ACTOR }, memberRow('not-a-role'), []))
                 .rejects.toThrow();
             expect(await refusals()).toHaveLength(0);
         });

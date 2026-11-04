@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../server/lib/db/schema';
 import { listCalendarItems } from '../../../server/services/calendar-items.service';
 import { createTestDb, setupSchema } from '../db';
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 /**
  * A removed member is soft-deleted, and what they left in the date overrides
@@ -27,8 +27,7 @@ describe('calendar feed and removed members', () => {
         db = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         const now = new Date();
         await db.insert(schema.tenants).values([
             { id: TENANT, slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },
@@ -49,7 +48,7 @@ describe('calendar feed and removed members', () => {
     afterEach(() => sqlite.close());
 
     const busyIds = async () =>
-        (await listCalendarItems({} as D1Database, TENANT, { start: '2026-08-01', end: '2026-08-09' }, ALL_INSPECTIONS))
+        (await listCalendarItems(testD1.binding, TENANT, { start: '2026-08-01', end: '2026-08-09' }, ALL_INSPECTIONS))
             .filter((i) => i.kind === 'external_busy').map((i) => i.id).sort();
 
     it('shows the busy blocks of current members and hides those of a removed member, synced or not', async () => {

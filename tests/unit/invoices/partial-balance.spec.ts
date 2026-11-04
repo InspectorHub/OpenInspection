@@ -23,9 +23,9 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { InvoiceService } from '../../../server/services/invoice.service';
 import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 import { withInvoiceSync } from '../../../server/services/qbo/invoice-sync';
@@ -46,10 +46,10 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
-    qbo = new TestQBOService({} as D1Database, 'cid', 'csec', 'whsec', 'secret32chars_aaaaaaaaaaaaaaaa');
-    invoiceSvc = new InvoiceService({} as D1Database);
+    qbo = new TestQBOService(testD1.binding, 'cid', 'csec', 'whsec', 'secret32chars_aaaaaaaaaaaaaaaa');
+    invoiceSvc = new InvoiceService(testD1.binding);
 
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'acme', status: 'active',

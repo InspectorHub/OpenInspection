@@ -19,8 +19,8 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { signPortalSession } from '../../../server/lib/portal-session';
 import portalNoticeRoutes from '../../../server/api/portal/notices';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000c3';
 const OTHER_TENANT = '00000000-0000-0000-0000-0000000000c4';
@@ -42,7 +42,7 @@ describe('client portal Notices routes', () => {
         return app;
     }
 
-    const reqEnv = () => ({ JWT_SECRET: SECRET, DB: {} as D1Database } as unknown as HonoConfig['Bindings']);
+    const reqEnv = () => ({ JWT_SECRET: SECRET, DB: testD1.binding } as unknown as HonoConfig['Bindings']);
 
     async function sessionCookie(email: string) {
         const sess = await signPortalSession(SECRET, email);
@@ -54,7 +54,7 @@ describe('client portal Notices routes', () => {
         testDb = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         const now = new Date();
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: SLUG, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: now },

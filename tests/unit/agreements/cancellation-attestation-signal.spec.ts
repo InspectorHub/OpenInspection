@@ -28,8 +28,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import adminRoutes from '../../../server/api/admin';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -49,7 +49,7 @@ let db: BetterSQLite3Database<typeof schema>;
 let branding: BrandingService;
 let app: OpenAPIHono<HonoConfig>;
 
-const ENV = { DB: {}, JWT_SECRET: 'test-secret' };
+const ENV = { DB: testD1.binding, JWT_SECRET: 'test-secret' };
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --
 // it only removes any way to await it, which is how a run with every test
 // passing could still exit 1 on an unhandled teardown rejection.
@@ -64,7 +64,7 @@ function buildApp() {
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
     const services = {
-        agreement: new AgreementService({} as D1Database, { jwtSecret: 'test-secret' }),
+        agreement: new AgreementService(testD1.binding, { jwtSecret: 'test-secret' }),
         branding,
         auditLog: { append: vi.fn(async () => {}) },
     } as unknown as HonoConfig['Variables']['services'];
@@ -83,8 +83,8 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-    branding = new BrandingService({} as D1Database);
+    testD1.use(db);
+    branding = new BrandingService(testD1.binding);
     app = buildApp();
 
     await db.insert(schema.tenants).values({

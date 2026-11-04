@@ -24,7 +24,8 @@ import { UpdateBrandingSchema } from '../../../server/lib/validations/admin.sche
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -37,11 +38,10 @@ describe('BrandingService — tenant-config write allowlist', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         r2Put = vi.fn().mockResolvedValue(undefined);
         branding = new BrandingService(
-            {} as D1Database,
+            testD1.binding,
             undefined,
             { put: r2Put } as unknown as R2Bucket,
         );
@@ -129,7 +129,7 @@ describe('BrandingService — tenant-config write allowlist', () => {
     });
 
     it('does not block the cancellation attestation triple', async () => {
-        const agreementSvc = new AgreementService({} as D1Database);
+        const agreementSvc = new AgreementService(testD1.binding);
         const created = await agreementSvc.createAgreement(TENANT, 'Residential', '<p>Cancel 24h ahead.</p>');
         await branding.attestCancellationClause(TENANT, created.id);
         expect((await row())?.cancellationClauseAgreementId).toBe(created.id);

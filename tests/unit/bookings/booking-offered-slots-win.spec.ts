@@ -8,7 +8,7 @@
  * will have (`windowMin`), so for every slot it offers, booking that slot wins. The
  * customer sees correspondingly fewer slots around existing inspections and time off.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { BookingService } from '../../../server/services/booking.service';
 import { tenants, users, inspections, inspectionInspectors, inspectionRequests, calendarBlocks, availabilityOverrides } from '../../../server/lib/db/schema';
@@ -16,8 +16,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { buildTenantSlotMap, type SlotOverrideRow, type SlotBlockRow, type SlotBusyRow } from '../../../server/lib/booking/tenant-slot-map';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = 'aaaaaaaa-0000-0000-0000-0000000000b3';
 const DAY = '2027-03-09';
@@ -38,9 +38,8 @@ describe('every offered slot is a slot the arbitration accepts', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new BookingService({} as D1Database);
+        testD1.use(db);
+        svc = new BookingService(testD1.binding);
         await db.insert(tenants).values({ id: TENANT, slug: 'ov3', tier: 'free', status: 'active', maxUsers: 5, deploymentMode: 'shared', createdAt: new Date() } as never);
         await db.insert(users).values({ id: INSPECTOR, tenantId: TENANT, email: 'i@x.test', passwordHash: 'h', role: 'inspector', name: 'Solo', createdAt: new Date() });
     });

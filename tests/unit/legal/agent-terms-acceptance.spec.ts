@@ -16,7 +16,7 @@
  * Breaking the projection would stop an agent who HAS accepted at the door, and
  * a suite that only checked the new table would not notice.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -32,7 +32,8 @@ import { agentTermsRoutes } from '../../../server/api/agent/terms';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const AGENT = '00000000-0000-0000-0000-0000000000a1';
 const OTHER_AGENT = '00000000-0000-0000-0000-0000000000a2';
@@ -201,8 +202,7 @@ describe('GET /api/agent/terms/history', () => {
         db = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
         for (const [id, email] of [[AGENT, 'a1@example.com'], [OTHER_AGENT, 'a2@example.com']]) {
             await db.insert(users).values({
                 id, tenantId: null, email, name: 'Agent', role: 'agent',
@@ -226,7 +226,7 @@ describe('GET /api/agent/terms/history', () => {
             ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
             : c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500)));
         app.use('*', async (c, next) => {
-            c.env = { DB: {} } as unknown as HonoConfig['Bindings'];
+            c.env = { DB: testD1.binding } as unknown as HonoConfig['Bindings'];
             if (signedInAs) c.set('agentUserId', signedInAs);
             await next();
         });

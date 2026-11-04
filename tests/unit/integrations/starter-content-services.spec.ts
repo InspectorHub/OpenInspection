@@ -9,14 +9,14 @@
  * produces and the event-type slugs it implies, so three artefacts that used to
  * describe the same thing separately now line up by construction.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { seedStarterContent } from '../../../server/services/starter-content.service';
 import { STARTER_SERVICES } from '../../../server/services/starter-content/fixtures/services';
 import { EVENT_TYPES } from '../../../server/services/starter-content/fixtures/event-types';
@@ -38,8 +38,7 @@ describe('seedStarterContent — service catalogue', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values({
             id: tenantId, slug: 't', createdAt: new Date(),
         });
@@ -49,13 +48,13 @@ describe('seedStarterContent — service catalogue', () => {
 
     it('seeds a catalogue where there was none', async () => {
         expect(await listServices()).toHaveLength(0);
-        const result = await seedStarterContent({} as never, tenantId);
+        const result = await seedStarterContent(testD1.binding, tenantId);
         expect(result.servicesSeeded).toBe(STARTER_SERVICES.length);
         expect(await listServices()).toHaveLength(STARTER_SERVICES.length);
     });
 
     it('links every seeded service to a template that exists', async () => {
-        await seedStarterContent({} as never, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const templateIds = new Set(
             (await db.select().from(schema.templates).where(eq(schema.templates.tenantId, tenantId)).all())
                 .map(t => t.id),
@@ -67,7 +66,7 @@ describe('seedStarterContent — service catalogue', () => {
     });
 
     it('links radon to both of its visits, in order', async () => {
-        await seedStarterContent({} as never, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const radon = await findService('Radon Testing');
         // Drop-off before pickup: a pickup proposed first is a nonsense visit
         // sequence, and the order is the only thing carrying that meaning.
@@ -77,7 +76,7 @@ describe('seedStarterContent — service catalogue', () => {
     it('every referenced event-type slug is actually seeded', async () => {
         // The failure this catches: a service pointing at a slug that only
         // existed in the other, manually-triggered seed list.
-        await seedStarterContent({} as never, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const seededSlugs = new Set(
             (await db.select().from(schema.eventTypes).where(eq(schema.eventTypes.tenantId, tenantId)).all())
                 .map(e => e.slug),
@@ -91,18 +90,18 @@ describe('seedStarterContent — service catalogue', () => {
         // services.price is NOT NULL and inspection_services.price_snapshot
         // copies it, so "seed the entry without a price" was never available.
         // These are editable starting numbers, not placeholders.
-        for (const s of await (async () => { await seedStarterContent({} as never, tenantId); return listServices(); })()) {
+        for (const s of await (async () => { await seedStarterContent(testD1.binding, tenantId); return listServices(); })()) {
             expect(typeof s.price).toBe('number');
             expect(s.price).toBeGreaterThan(0);
         }
     });
 
     it('is idempotent and never resurrects a service the tenant renamed', async () => {
-        await seedStarterContent({} as never, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         await db.update(schema.services).set({ name: 'Our Sewer Scope' })
             .where(and(eq(schema.services.tenantId, tenantId), eq(schema.services.name, 'Sewer Scope')));
 
-        const second = await seedStarterContent({} as never, tenantId);
+        const second = await seedStarterContent(testD1.binding, tenantId);
 
         // Re-seeding must not hand them back a second "Sewer Scope" beside the
         // one they renamed.
@@ -112,7 +111,7 @@ describe('seedStarterContent — service catalogue', () => {
     });
 
     it('seeds one event type per fixture entry and no duplicate sewer scope', async () => {
-        await seedStarterContent({} as never, tenantId);
+        await seedStarterContent(testD1.binding, tenantId);
         const slugs = (await db.select().from(schema.eventTypes)
             .where(eq(schema.eventTypes.tenantId, tenantId)).all()).map(e => e.slug).sort();
 

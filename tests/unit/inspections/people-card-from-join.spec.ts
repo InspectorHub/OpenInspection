@@ -6,7 +6,7 @@
  * and only inspection_people rows populated, so it fails against the old
  * implementation (which reads only the legacy columns).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionCoreService } from '../../../server/services/inspection/inspection-core.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
@@ -16,8 +16,8 @@ import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T1 = 't1';
 const CLIENT = 'contact-client';
@@ -35,8 +35,7 @@ describe('InspectionCoreService.getPeopleCard / getRecipientList — read from i
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values([
             { id: T1, slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
@@ -65,7 +64,7 @@ describe('InspectionCoreService.getPeopleCard / getRecipientList — read from i
             createdAt:         new Date(),
         });
 
-        people = new PeopleService({ DB: {} as D1Database });
+        people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, INSP, CLIENT,       roleProfileId('client'));
         await people.addPerson(T1, INSP, BUYER_AGENT,  roleProfileId('buyer_agent'));
         await people.addPerson(T1, INSP, LISTING_AGENT, roleProfileId('listing_agent'));
@@ -74,7 +73,7 @@ describe('InspectionCoreService.getPeopleCard / getRecipientList — read from i
     function makeSvc() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sdb = new ScopedDB(db as any, T1);
-        return new InspectionCoreService({} as D1Database, undefined, sdb);
+        return new InspectionCoreService(testD1.binding, undefined, sdb);
     }
 
     it('getPeopleCard sources client/buyerAgents/listingAgents from inspection_people', async () => {

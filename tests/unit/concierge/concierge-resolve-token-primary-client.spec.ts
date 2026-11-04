@@ -11,7 +11,7 @@
  * so this fails against the old implementation (which reads only
  * insp.clientName/insp.clientEmail off the inspections row).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ConciergeService } from '../../../server/services/concierge.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -20,8 +20,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { EmailService } from '../../../server/services/email.service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { asD1Db } from '../helpers/test-db';
 import { hashToken } from '../../../server/lib/token-hash';
 
@@ -39,8 +39,7 @@ describe('ConciergeService.resolveToken — primary-client sourcing (Task 9c)', 
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: T1, slug: 'acme-resolve', status: 'active',
@@ -59,7 +58,7 @@ describe('ConciergeService.resolveToken — primary-client sourcing (Task 9c)', 
             date: '2026-06-15', status: 'scheduled', paymentStatus: 'unpaid', price: 0,
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, INSP, CLIENT, roleProfileId('client'));
 
         await db.insert(schema.conciergeConfirmTokens).values({
@@ -75,7 +74,7 @@ describe('ConciergeService.resolveToken — primary-client sourcing (Task 9c)', 
             createdAt: new Date(),
         });
 
-        svc = new ConciergeService({} as D1Database, async () => ({} as unknown as EmailService), 'https://acme.example.com');
+        svc = new ConciergeService(testD1.binding, async () => ({} as unknown as EmailService), 'https://acme.example.com');
     });
 
     it('resolves inspection.clientName/.clientEmail from the inspection_people primary-client join', async () => {

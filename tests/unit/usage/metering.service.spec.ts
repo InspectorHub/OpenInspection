@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { drizzle } from 'drizzle-orm/d1';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { MeteringService, maybeMetering } from '../../../server/services/metering.service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('MeteringService', () => {
   let svc: MeteringService;
   beforeEach(async () => {
     const s = createTestDb();
     await setupSchema(s.sqlite);
-    (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(s.db);
-    svc = new MeteringService({} as any); // db arg unused — drizzle() is mocked to return the test db
+    testD1.use(s.db);
+    svc = new MeteringService(testD1.binding); // db arg unused — drizzle() is mocked to return the test db
   });
   it('record() inserts then increments the same bucket', async () => {
     await svc.record('t1', 'sms', '2026-06');
@@ -33,7 +33,7 @@ describe('MeteringService', () => {
   // it used to declare an APP_MODE it never read, which is how a reader
   // concluded the mode mattered here (OI #308 Task 7).
   it('maybeMetering builds a service from the DB alone, with no mode input', () => {
-    expect(maybeMetering({ DB: {} as any })).toBeInstanceOf(MeteringService);
+    expect(maybeMetering({ DB: testD1.binding })).toBeInstanceOf(MeteringService);
   });
 });
 
@@ -42,8 +42,8 @@ describe('MeteringService.lifetimeTotal', () => {
   beforeEach(async () => {
     const s = createTestDb();
     await setupSchema(s.sqlite);
-    (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(s.db);
-    svc = new MeteringService({} as any); // db arg unused — drizzle() is mocked to return the test db
+    testD1.use(s.db);
+    svc = new MeteringService(testD1.binding); // db arg unused — drizzle() is mocked to return the test db
   });
 
   it('sums a metric across all period rows for one tenant', async () => {

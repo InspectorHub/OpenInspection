@@ -17,8 +17,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { EmailService } from '../../../server/services/email.service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { asD1Db } from '../helpers/test-db';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -36,7 +36,7 @@ describe('ConciergeService.approveByInspector — primary-client resolution (Tas
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -57,11 +57,11 @@ describe('ConciergeService.approveByInspector — primary-client resolution (Tas
             createdAt: new Date(),
         });
 
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_ID, CLIENT, roleProfileId('client'));
 
         stubEmail = { sendConciergeClientConfirm: vi.fn().mockResolvedValue(undefined) };
-        svc = new ConciergeService({} as D1Database, async () => stubEmail as unknown as EmailService, 'https://acme.example.com');
+        svc = new ConciergeService(testD1.binding, async () => stubEmail as unknown as EmailService, 'https://acme.example.com');
     });
 
     it('mints the client-confirm token and emails the primary client resolved via PeopleService', async () => {

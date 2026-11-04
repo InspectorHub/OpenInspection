@@ -14,13 +14,13 @@
  * class id the boundary gates on is derived from the same trigger that rendered
  * the body, so a method cannot render one notification and be gated as another.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createTestDb, setupSchema, toRawD1 } from '../db';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import { EmailService } from '../../../server/services/email.service';
@@ -44,9 +44,8 @@ beforeEach(async () => {
     db = fx.db as BetterSQLite3Database<typeof schema>;
     sqlite = fx.sqlite;
     await setupSchema(fx.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(db);
-    rawDb = toRawD1(fx.sqlite);
+    testD1.use(db);
+    rawDb = testD1.binding;
     sent = [];
 
     await db.insert(schema.tenants).values({

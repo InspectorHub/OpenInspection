@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { asD1Db } from '../helpers/test-db';
@@ -6,8 +6,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { and, eq } from 'drizzle-orm';
 import { backfillAutomationTemplates } from '../../../server/services/message-template-backfill';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AutomationService } from '../../../server/services/automation.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
@@ -17,7 +17,7 @@ let db: BetterSQLite3Database<typeof schema>;
 beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db; await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -30,7 +30,7 @@ beforeEach(async () => {
 
 describe('Track L seeds', () => {
     it('touchpoint seeds default to email-only channels; disclosure v1 seeded', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         await svc.ensureSeeds(TENANT);
         const booking = await db.select().from(schema.automations)
             .where(and(eq(schema.automations.tenantId, TENANT), eq(schema.automations.name, 'Booking Confirmation'))).get();
@@ -47,7 +47,7 @@ describe('Track L seeds', () => {
     // automation-flush-sms.spec.ts's "resolves the referenced sms template
     // body" pattern).
     it('once SMS channel is enabled, the backfilled message_templates body carries the TCPA "Reply STOP" disclosure', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         await svc.ensureSeeds(TENANT);
         const booking = await db.select().from(schema.automations)
             .where(and(eq(schema.automations.tenantId, TENANT), eq(schema.automations.name, 'Booking Confirmation'))).get();
@@ -57,7 +57,7 @@ describe('Track L seeds', () => {
         await db.update(schema.automations)
             .set({ channels: JSON.stringify(['email', 'sms']) })
             .where(eq(schema.automations.id, booking!.id));
-        await backfillAutomationTemplates({} as D1Database, TENANT);
+        await backfillAutomationTemplates(testD1.binding, TENANT);
 
         const updated = await db.select().from(schema.automations)
             .where(eq(schema.automations.id, booking!.id)).get();
@@ -69,7 +69,7 @@ describe('Track L seeds', () => {
         expect(tmpl?.body).toMatch(/Reply STOP/);
     });
     it('is idempotent (second ensureSeeds adds no duplicate disclosure)', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         await svc.ensureSeeds(TENANT);
         await svc.ensureSeeds(TENANT);
         const discs = await db.select().from(schema.smsDisclosureVersions).all();

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { ContactService } from '../../../server/services/contact.service';
 import { listReferrals } from '../../../server/services/agent/referral';
@@ -6,8 +6,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T = '11111111-1111-1111-1111-1111111111c1';
 const INSP = '99999999-9999-9999-9999-999999999c91';
@@ -40,20 +40,19 @@ describe('archive is not revoke', () => {
     const fix = createTestDb();
     db = fix.db;
     await setupSchema(fix.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
     await seed(db);
   });
 
   it('the agent still sees the referral after the contact is archived', async () => {
-    const before = await listReferrals({} as D1Database, AGENT_USER, { limit: 50 });
+    const before = await listReferrals(testD1.binding, AGENT_USER, { limit: 50 });
     expect(before.map((r) => r.id)).toContain(INSP);
 
-    await new ContactService({} as D1Database).deleteContact(AGENT_CONTACT, T); // archives (referenced)
+    await new ContactService(testD1.binding).deleteContact(AGENT_CONTACT, T); // archives (referenced)
     const contact = await db.select().from(schema.contacts).where(eq(schema.contacts.id, AGENT_CONTACT)).get();
     expect(contact?.archivedAt).toBeTruthy(); // confirm it archived, not hard-deleted
 
-    const after = await listReferrals({} as D1Database, AGENT_USER, { limit: 50 });
+    const after = await listReferrals(testD1.binding, AGENT_USER, { limit: 50 });
     expect(after.map((r) => r.id)).toContain(INSP); // still visible — archive did not revoke access
   });
 
@@ -65,7 +64,7 @@ describe('archive is not revoke', () => {
       .set({ agentRevokedAt: new Date() })
       .where(eq(schema.contacts.id, AGENT_CONTACT));
 
-    const after = await listReferrals({} as D1Database, AGENT_USER, { limit: 50 });
+    const after = await listReferrals(testD1.binding, AGENT_USER, { limit: 50 });
     expect(after.map((r) => r.id)).not.toContain(INSP);
   });
 

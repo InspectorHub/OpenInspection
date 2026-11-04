@@ -6,7 +6,7 @@
  * an explicit `true` beats a default of `false`, and changing the default never reaches an invite or
  * a member that already exists.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { OpenAPIHono } from '@hono/zod-openapi';
@@ -18,8 +18,8 @@ import { seedVisibilityFixture, TENANT, USERS } from '../helpers/visibility-fixt
 import { withNewInspectorDefault, inspectionScopeOf } from '../../../server/lib/team/new-inspector-default';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const RESTRICTED = { viewAllInspections: false };
 
@@ -31,8 +31,7 @@ describe('inviting an inspector under the company default', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seedVisibilityFixture(db);
         await db.insert(schema.tenantConfigs).values({ tenantId: TENANT, updatedAt: new Date() });
     });

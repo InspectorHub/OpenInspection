@@ -140,6 +140,14 @@ tests/
   passes the rules but fails or flakes when shared goes under `forcedIsolated` with a
   reason, and stays there). A new spec is isolated until the generator lists it, so
   nothing breaks by default.
+- **Do not mock `drizzle-orm/d1` to inject the test database.** A module mock keeps the spec in
+  `api-isolated`. Give the code under test a real binding instead: `tests/unit/helpers/d1-binding.ts`
+  has `d1For(db)` (a `D1Database` over the database `createTestDb()` returned), `lazyD1()` (a binding
+  you create before the database exists and point with `use(db)` in `beforeEach`; `useBinding` takes a
+  wrapper you built, for example one that counts statements or fails one) and `toD1Binding(sqlite)`.
+  Production code then builds its own drizzle D1 handle from it, so a spec exercises the same driver
+  path as the Worker (including `batch()` and the way drizzle wraps a driver error in `.cause`).
+  Assert on database state or on the statements that reached the binding, not on a mock's call shape.
 - **CI re-runs the shared project shuffled** (`npm run test:unit:shared-shuffled`, same
   `--shard=N/4` flag, applied to the shared project alone, so a file can sit on a different shard
   number than in the main run). The seed is printed at the START of the run. To replay a failure:

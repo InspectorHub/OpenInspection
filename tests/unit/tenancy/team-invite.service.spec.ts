@@ -5,15 +5,15 @@
  * role onto the tenant_invites row.
  */
 import { OWNER_ACTOR } from '../helpers/grant-actor';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
 const ADMIN = '11111111-1111-1111-1111-1111111111c1';
@@ -37,10 +37,9 @@ describe('TeamService.createInvite — canonical roles', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await seedTenant(testDb);
-        svc = new TeamService({} as D1Database);
+        svc = new TeamService(testD1.binding);
     });
 
     it('creates an inspector invite', async () => {
