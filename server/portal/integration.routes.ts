@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, isNotNull } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { HonoConfig } from '../types/hono';
 import type { TenantUpdateParams } from '../lib/integration';
 import { TenantStatusBodySchema, SeedStarterContentBodySchema } from '../lib/validations/admin.schema';
@@ -10,10 +10,8 @@ import { SsoHandoffSchema } from '../lib/validations/sso-handoff.schema';
 import { logger } from '../lib/logger';
 import { tenantConfigs, tenants } from '../lib/db/schema';
 import { tenantDisplayName } from '../lib/tenant-display-name';
-import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
-import { SigningKeyService } from '../services/signing-key.service';
+import { secretsReencryptHandler } from './secrets-reencrypt-handler';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
-import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
 import { requireServiceBinding } from './service-binding-guard';
 import { aiProvisioningHandler } from './ai-provisioning';
@@ -412,46 +410,8 @@ api.post('/sync-redrive', requireServiceBinding, async (c) => {
     }
 });
 
-/**
- * POST /api/platform/secrets/reencrypt — JWT_SECRET rotation: tenant secrets AND every active e-sign key. SaaS-only (unmounted in
- * standalone). Idempotent; `signingKeys.remaining` must be 0 before JWT_SECRET_PREVIOUS is removed. SOP: docs/saas-ops/jwt-secret-rotation-sop.md.
- */
-api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
-    try {
-    const db = drizzle(c.env.DB);
-    const report = await reencryptAllTenantSecrets({
-        listRows: async () => {
-            const rows = await db
-                .select({ tenantId: tenantConfigs.tenantId, blob: tenantConfigs.secretsEnc, dekEnc: tenantConfigs.dekEnc })
-                .from(tenantConfigs)
-                .where(isNotNull(tenantConfigs.secretsEnc))
-                .all();
-            return rows.map(r => ({ tenantId: r.tenantId, blob: r.blob as string, dekEnc: r.dekEnc ?? null }));
-        },
-        updateRow: async (tenantId, patch) => {
-            await db.update(tenantConfigs)
-                .set({
-                    ...(patch.blob !== undefined ? { secretsEnc: patch.blob } : {}),
-                    ...(patch.dekEnc !== undefined ? { dekEnc: patch.dekEnc } : {}),
-                    updatedAt: new Date(),
-                })
-                .where(eq(tenantConfigs.tenantId, tenantId));
-        },
-        bustCache: async (tenantId) => {
-            await c.env.TENANT_CACHE?.delete(secretsCacheKey(tenantId)).catch(() => {});
-        },
-    }, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS);
-    const signingKeys = await SigningKeyService.fromEnv(c.env.DB, c.env).rewrapAll();
-    logger.info('secrets reencrypt completed', {
-        migrated: report.migrated, rewrapped: report.rewrapped, alreadyCurrent: report.alreadyCurrent, failed: report.failed.length,
-        signingKeysRewrapped: signingKeys.rewrapped, signingKeysRemaining: signingKeys.remaining,
-    });
-    return c.json({ success: true, data: { ...report, signingKeys } });
-    } catch (error: unknown) {
-        logger.error('secrets reencrypt failed', {}, error instanceof Error ? error : undefined);
-        return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
-    }
-});
+/** POST /api/platform/secrets/reencrypt — handler and the bounded-run contract in ./secrets-reencrypt-handler.ts. */
+api.post('/secrets/reencrypt', requireServiceBinding, secretsReencryptHandler);
 
 /**
  * GET /api/platform/usage

@@ -150,8 +150,7 @@ export const automationFlushJob: CronJob = {
                 new InspectionService(
                     env.DB, env.PHOTOS,
                     /* sdb */ undefined, env.TENANT_CACHE, /* IMAGES */ undefined, /* quota */ undefined,
-                    env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET,
-                    signingKeySecrets(env).previous,
+                    signingKeySecrets(env),
                 ).getReportContentHash(inspectionId, tenantId),
             renderHost: appHostForRender,
             renderSecret: env.JWT_SECRET,

@@ -164,18 +164,19 @@ export class SigningKeyService {
     }
 
     /**
-     * Re-wrap EVERY active key that is still under an earlier secret, in chunks of `chunk` rows, so the earlier secret can be removed
-     * without stranding a tenant that has not signed since the secret changed. Retired keys are not touched: they never sign again.
+     * Re-wrap the active keys that are still under an earlier secret, so the earlier secret can be removed without stranding a tenant that
+     * has not signed since the secret changed. Retired keys are not touched: they never sign again.
      *
-     * `remaining` is the number the operator needs before deleting JWT_SECRET_PREVIOUS: active keys that are STILL not under the current
-     * secret afterwards (re-wrap failed, or no configured secret opens them). Zero means the previous secret is no longer needed.
-     * Idempotent; only the wrapping of a private key changes, never a public key, fingerprint or signature.
+     * BOUNDED PER CALL for the Free plan's subrequest cap: at most `limit` keys are written per call, and the scan reads `pageSize` rows
+     * per query. A call that hit the limit says so: `remaining` counts active keys still not under the current secret (deferred by the
+     * limit, failed, or opened by no configured secret) and `done` is `remaining === 0`. Run it again until `done`; only then is the
+     * previous secret no longer needed. Idempotent; only the wrapping of a private key changes, never a public key, fingerprint or signature.
      */
-    async rewrapAll(chunk = 25): Promise<{ rewrapped: number; alreadyCurrent: number; remaining: number }> {
+    async rewrapAll(limit = 25, pageSize = 100): Promise<{ rewrapped: number; alreadyCurrent: number; remaining: number; done: boolean }> {
         const db = this.getDrizzle();
         const report = { rewrapped: 0, alreadyCurrent: 0, remaining: 0 };
-        for (let offset = 0; ; offset += chunk) {
-            const rows = await db.select().from(signingKeys).where(isNull(signingKeys.retiredAt)).orderBy(signingKeys.id).limit(chunk).offset(offset).all();
+        for (let offset = 0; ; offset += pageSize) {
+            const rows = await db.select().from(signingKeys).where(isNull(signingKeys.retiredAt)).orderBy(signingKeys.id).limit(pageSize).offset(offset).all();
             for (const row of rows) {
                 const iv = base64UrlDecode(row.privateKeyIv) as unknown as ArrayBuffer;
                 const wrapped = base64UrlDecode(row.privateKeyEnc) as unknown as ArrayBuffer;
@@ -183,8 +184,9 @@ export class SigningKeyService {
                 for (const [index, secret] of [this.encryptionSecret, ...this.previousSecrets].entries()) {
                     let bytes: ArrayBuffer;
                     try { bytes = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await this.deriveAesKey(secret), wrapped); } catch { continue; }
-                    // 'raced' means another writer converted it first: it is under the current secret now.
-                    outcome = index === 0 ? 'current' : (await this.rewrap(row, bytes)) === 'failed' ? 'unresolved' : 'rewrapped';
+                    // 'raced' means another writer converted it first: it is under the current secret now. Past the limit it is only counted.
+                    if (index === 0) outcome = 'current';
+                    else if (report.rewrapped < limit) outcome = (await this.rewrap(row, bytes)) === 'failed' ? 'unresolved' : 'rewrapped';
                     break;
                 }
                 if (outcome === 'current') report.alreadyCurrent += 1;
@@ -194,7 +196,7 @@ export class SigningKeyService {
                     logger.warn('signing-key.rewrap.remaining', { tenantId: row.tenantId, fingerprint: row.fingerprint });
                 }
             }
-            if (rows.length < chunk) return report;
+            if (rows.length < pageSize) return { ...report, done: report.remaining === 0 };
         }
     }
 

@@ -186,6 +186,10 @@ export async function runRetentionSweep(
     // throws on the first oversized batch would then never purge anything again. What is left past the per-run cap is simply due on the
     // next run (the `purged_at IS NULL` filter picks it up), oldest first (the query orders them). A chunk whose bucket delete fails is logged
     // (envelope ids only), left unmarked and skipped, so one persistently failing object cannot hold up the rest of the backlog every day.
+    // ACCEPTED: a chunk whose bucket delete keeps failing is skipped unmarked, so its envelopes stay due and, being the oldest, fill the
+    // front of this batch every run. With more than SWEEP_MAX_ENVELOPES_PER_RUN of them the sweep would stop progressing; that takes ten or
+    // more persistently failing chunks, and it is visible: `failedChunks` in the summary and the `retention.sweep.chunk.failed` error
+    // (envelope ids) every run. An operator then clears the cause (a bad object, a bucket permission) and the next run catches up.
     const batch = dueEnvelopes.slice(0, SWEEP_MAX_ENVELOPES_PER_RUN);
     let purgedArtefacts = 0;
     let purgedSigners = 0;

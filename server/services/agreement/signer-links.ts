@@ -45,7 +45,7 @@ export function SignerLinksMixin<TBase extends Constructor<AgreementServiceBase>
             const plaintext = mintToken();
             await db.update(agreementSigners)
                 .set({ tokenHash: await hashToken(plaintext), tokenEnc: await sealToken(plaintext, signer.tenantId, this.secrets.jwtSecret) })
-                .where(eq(agreementSigners.id, signerId));
+                .where(and(eq(agreementSigners.id, signerId), eq(agreementSigners.tenantId, tenantId)));
             return plaintext;
         }
 

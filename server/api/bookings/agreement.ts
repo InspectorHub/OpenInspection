@@ -11,6 +11,7 @@ import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { signingIntentProblem } from '../../lib/esign/signing-intent';
 import { presentationRowsOf, PRESENTATION_DEDUPE_WINDOW_MS } from '../../lib/esign/signer-presentations';
+import { drawingHash, DrawingSchema } from '../../lib/esign/drawing';
 import { refuseUnrecordedSignature, errorSummary, publicSignerStatus, resumeConfirmedSigning } from '../../lib/esign/claim-failure';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
@@ -138,7 +139,7 @@ const signAgreementRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        signatureBase64: z.string().min(1).max(500_000).describe('The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail'),
+                        signatureBase64: DrawingSchema.describe('The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail'),
                         onBehalfOf: z.string().max(200).optional().describe('Client name an authorized agent is signing on behalf of'),
                         onBehalfDisclaimer: z.string().max(2000).optional().describe('Authorized-agent disclaimer text shown at sign time'),
                     }).describe('The signature and, when signing for someone else, who for'),
@@ -158,7 +159,7 @@ const signAgreementRoute = createRoute(withMcpMetadata({
         503: { description: 'The signing record could not be written; the signature was not stored. Retry.' },
     },
     operationId: "createBookingAgreementsSign",
-    description: "Record a remote signature for one signer of an agreement, identified by the token in their personal signing link. Public: the token is the only credential. The signature is refused with 400 unless the signing audit trail already shows this signer was presented this exact agreement text, which happens when they open it through the get-agreement route. It also writes a signer.signed entry to that trail with IP, country, user agent and a hash of the signature image, stores the signature, and fires the per-signature automation trigger. When this signature completes the envelope under its completion policy, the completion pipeline runs exactly once (audit entry, verification token, completion workflow, admin notification, completion automation and confirmation email). The signer is also emailed a receipt with a verification link, except when their signature completed the envelope and they are the envelope's client, who gets the completion email instead. A signer who declined or whose request expired gets 409, and an unknown token gets 404. Repeating the call for a signer who already signed answers 200 and changes nothing: the stored signature is kept, no further audit entry is written and the receipt is not sent again. If the audit entry cannot be written the signature is refused with 503 and nothing is stored, so the signer can retry.",
+    description: "Record a remote signature for one signer of an agreement, identified by the token in their personal signing link. Public: the token is the only credential. The signature is refused with 400 unless the signing audit trail already shows this signer was presented this exact agreement text, which happens when they open it through the get-agreement route. It also writes a signer.signed entry to that trail with IP, country, user agent and a hash of the signature image, stores the signature, and fires the per-signature automation trigger. When this signature completes the envelope under its completion policy, the completion pipeline runs exactly once (audit entry, verification token, completion workflow, admin notification, completion automation and confirmation email). The signer is also emailed a receipt with a verification link, except when their signature completed the envelope and they are the envelope's client, who gets the completion email instead. The drawing must be valid base64 image data, otherwise 400. A signer who declined or whose request has expired (the signature is not accepted on an expired envelope) gets 409, and so does a signer whose signature is still being recorded by another request: the answer is then to try again in a moment, and nothing is written. An unknown token gets 404. Repeating the call for a signer whose signing was confirmed answers 200: the stored signature is kept, no further audit entry is written and the receipt is not sent again, but if an earlier attempt stopped before the envelope was rolled forward, the repeat completes it, once. If the audit entry cannot be written the signature is refused with 503 and nothing is stored, so the signer can retry.",
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -186,7 +187,7 @@ const declineAgreementRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "declineBooking",
-    description: "Decline an agreement as one signer, identified by the token in their personal signing link. Public: the token is the only credential. Marks that signer declined, writes a signer.declined entry (with reason, IP, country and user agent) to the signing audit trail, and recomputes the envelope status under its completion policy. The agreement-declined automation fires only when the whole envelope ends up declined. A signer who already signed or whose request expired gets 409; declining again after a decline succeeds without further change to the signer's status. 404 for an unknown token."
+    description: "Decline an agreement as one signer, identified by the token in their personal signing link. Public: the token is the only credential. Marks that signer declined, writes a signer.declined entry (with reason, IP, country and user agent) to the signing audit trail, and recomputes the envelope status under its completion policy. The agreement-declined automation fires only when the whole envelope ends up declined. A signer who already signed or whose request expired gets 409, and so does a signer whose signature is still being recorded (a recording that stopped for more than two minutes no longer blocks a decline); declining again after a decline succeeds without further change to the signer's status. 404 for an unknown token."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const agreementRoutes = createApiRouter()
@@ -440,20 +441,8 @@ const agreementRoutes = createApiRouter()
         const country = c.req.header('cf-ipcountry') || null;
         const tsMs = Date.now();
 
-        // Hash the signature image for cert reference (full image stored in DB).
-        const sigBytes = (() => {
-            try {
-                const b64 = signatureBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-                const bin = atob(b64);
-                const out = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-                return out;
-            } catch { return new Uint8Array(); }
-        })();
-        const sigHash = sigBytes.length > 0
-            ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', sigBytes)))
-                .map((b) => b.toString(16).padStart(2, '0')).join('')
-            : null;
+        // The hash of the drawing the audit row names (the full image is stored on the signer row).
+        const sigHash = await drawingHash(signatureBase64);
         // The state is decided FIRST (see claimSignedBySigner for the invariant and the one crash window); a request that lost writes nothing.
         const claim = await svc.claimSignedBySigner(token, signatureBase64, {
             signedAtMs: tsMs, channel: 'remote', ipAddress: ip, userAgent: ua,
@@ -473,10 +462,10 @@ const agreementRoutes = createApiRouter()
                 onBehalfOf: onBehalfOf ?? null,
                 country,
                 ip,
-                signatureImageHash: sigHash ? `sha256:${sigHash}` : null,
+                signatureImageHash: sigHash,
                 tsMs,
                 ua,
-            }, { dedupe: { signerId: signer.id, match: { signatureImageHash: sigHash ? `sha256:${sigHash}` : null } } });
+            }, sigHash ? { dedupe: { signerId: signer.id, match: { signatureImageHash: sigHash, tsMs } } } : {});
         } catch (e) {
             await refuseUnrecordedSignature(claim, { tenantId: envelope.tenantId, requestId: envelope.id, signerId: signer.id }, e);
         }

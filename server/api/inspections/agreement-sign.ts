@@ -21,6 +21,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { PRESENTATION_DEDUPE_WINDOW_MS } from '../../lib/esign/signer-presentations';
+import { drawingHash, DrawingSchema } from '../../lib/esign/drawing';
 import { refuseUnrecordedSignature, resumeConfirmedSigning, errorSummary } from '../../lib/esign/claim-failure';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { Errors } from '../../lib/errors';
@@ -64,7 +65,7 @@ const signInspectionRoute = createRoute(withMcpMetadata({
         }) } }, description: 'No agreement template is configured' },
     },
     operationId: 'signInspectionAgreementInPerson', summary: 'Record an in-person agreement signature',
-    description: 'Records a signature drawn on the inspector device for the inspection agreement, on the signing envelope so it carries the content snapshot, the audit chain and a receipt. The JSON body is {signatureBase64, signerId?, onBehalfOf?, onBehalfDisclaimer?}: signatureBase64 is the signature image as a data URL or raw base64, signerId defaults to the first signer who has not finished, and onBehalfOf and onBehalfDisclaimer name the party an authorized agent signs for. A body that is not valid answers 400. Signing again once the signer or the envelope has signed answers 200 with alreadySigned. Owner, manager or inspector only.',
+    description: 'Records a signature drawn on the inspector device for the inspection agreement, on the signing envelope so it carries the content snapshot, the audit chain and a receipt. The JSON body is {signatureBase64, signerId?, onBehalfOf?, onBehalfDisclaimer?}: signatureBase64 is the signature image as a data URL or raw base64, signerId defaults to the first signer who has not finished, and onBehalfOf and onBehalfDisclaimer name the party an authorized agent signs for. A body that is not valid, or a drawing that is not valid base64 image data, answers 400. A signer who declined, or whose envelope has expired, answers 409, and so does a signer whose signature is still being recorded by another request (try again in a moment; nothing is written). Signing again once that signing was confirmed answers 200 with alreadySigned; if an earlier attempt stopped before the envelope was rolled forward, the repeat completes it, once. Owner, manager or inspector only.',
 }, { scopes: [], tier: 'excluded' }));
 
 const agreementSignRoutes = createApiRouter();
@@ -82,7 +83,7 @@ agreementSignRoutes.openapi(signInspectionRoute, async (c) => {
 
         const raw = await c.req.json();
         const parsed = z.object({
-            signatureBase64: z.string().min(1).max(500_000).describe('Base64-encoded signature image (data URL or raw base64) drawn by the signer on-site.'),
+            signatureBase64: DrawingSchema.describe('Base64-encoded signature image (data URL or raw base64) drawn by the signer on-site.'),
             signerId: z.string().max(100).optional().describe('Target signer within the envelope; defaults to the first non-terminal signer.'),
             onBehalfOf: z.string().max(200).optional().describe('Name of the party an authorized agent signs for.'),
             onBehalfDisclaimer: z.string().max(2000).optional().describe('Disclaimer the authorized agent attests to when signing on behalf of another.'),
@@ -161,20 +162,8 @@ agreementSignRoutes.openapi(signInspectionRoute, async (c) => {
         const country = c.req.header('cf-ipcountry') || null;
         const tsMs = Date.now();
 
-        // Hash the signature image for cert reference.
-        const sigBytes = (() => {
-            try {
-                const b64 = body.signatureBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-                const bin = atob(b64);
-                const out = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-                return out;
-            } catch { return new Uint8Array(); }
-        })();
-        const sigHash = sigBytes.length > 0
-            ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', sigBytes)))
-                .map((b) => b.toString(16).padStart(2, '0')).join('')
-            : null;
+        // The hash of the drawing the audit row names (the full image is stored on the signer row).
+        const sigHash = await drawingHash(body.signatureBase64);
         // The state is decided FIRST, by one conditional update (see claimSignedBySigner), so a lost race writes nothing; the attested
         // presentation and the signature are appended after it, in that order.
         const claim = await svc.claimSignedBySigner(plaintext, body.signatureBase64, {
@@ -236,10 +225,10 @@ agreementSignRoutes.openapi(signInspectionRoute, async (c) => {
                 onBehalfOf: body.onBehalfOf ?? null,
                 country,
                 ip,
-                signatureImageHash: sigHash ? `sha256:${sigHash}` : null,
+                signatureImageHash: sigHash,
                 tsMs,
                 ua,
-            }, { dedupe: { signerId: signer.id, match: { signatureImageHash: sigHash ? `sha256:${sigHash}` : null } } });
+            }, sigHash ? { dedupe: { signerId: signer.id, match: { signatureImageHash: sigHash, tsMs } } } : {});
         } catch (e) {
             await refuseUnrecordedSignature(claim, { tenantId: envelope.tenantId, requestId: envelope.id, signerId: signer.id }, e);
         }

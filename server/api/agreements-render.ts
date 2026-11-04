@@ -82,12 +82,9 @@ function signatureImgHtml(sig: string, alt: string, escapeHtml: (s: string) => s
 
 /** What stands where a drawn signature would be, for a request that did not carry a valid render token. */
 const SIGNATURE_ON_FILE = `<div class="meta">[signature on file]</div>`;
-/** Headers for both render pages: they name people and are not for caches or search indexes. */
-const RENDER_HEADERS = {
-  'Content-Type': 'text/html; charset=utf-8',
-  'Cache-Control': 'no-store',
-  'X-Robots-Tag': 'noindex',
-} as const;
+/** Headers for both render pages, 404s included: they name people and are not for caches or search indexes. */
+const RENDER_HEADERS = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } as const;
+const notFound = () => new Response('Not Found', { status: 404, headers: { ...RENDER_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' } });
 
 /** Human-readable label for a signer role. */
 const roleLabel = (role: string | null | undefined): string => {
@@ -211,7 +208,7 @@ export async function agreementRenderHandler(
   const reqRow = await db.select().from(schema.agreementRequests)
     .where(eq(schema.agreementRequests.id, requestId)).get();
   if (!reqRow || reqRow.status !== 'signed') {
-    return new Response('Not Found', { status: 404 });
+    return notFound();
   }
   // The unguessable `requestId` (UUIDv4) is the access credential for the document, as for /m2m/cert-render/:id and /verify/:id. PUBLIC
   // (`/m2m/` is unauthenticated); the verify page's document link redirects here and, without a render token, shows no drawn signatures.
@@ -220,7 +217,7 @@ export async function agreementRenderHandler(
   void tenantSlug;
   const agreement = await db.select().from(schema.agreements)
     .where(eq(schema.agreements.id, reqRow.agreementId)).get();
-  if (!agreement) return new Response('Not Found', { status: 404 });
+  if (!agreement) return notFound();
 
   // Track I-a — "what was signed" comes from the pinned content snapshot, never
   // the live template. The service handles snapshot ?? live-template fallback
@@ -245,7 +242,7 @@ export async function agreementRenderHandler(
     // envelope's `status` onto a row it creates without its signature, so this
     // is reachable — and a signed agreement drawn with an empty signature block
     // is worse than one that is not served.
-    return new Response('Not Found', { status: 404 });
+    return notFound();
   }
   const signerCellsHtml = signedSigners.map((s) => signerCellHtml(s, escapeHtml, withImages)).join('');
 
@@ -300,7 +297,7 @@ export async function certRenderHandler(
   const reqRow = await db.select().from(schema.agreementRequests)
     .where(eq(schema.agreementRequests.id, requestId)).get();
   if (!reqRow || reqRow.status !== 'signed') {
-    return new Response('Not Found', { status: 404 });
+    return notFound();
   }
   const auditRows = await db.select().from(schema.esignAuditLogs)
     .where(and(

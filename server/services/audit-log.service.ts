@@ -40,7 +40,7 @@ export type AuditEvent =
  * with A, because the chain's last word about that signer would then no longer be the last thing recorded.
  */
 export interface AppendOptions {
-    dedupe?: { signerId: string; match?: Record<string, string | null>; windowMs?: number };
+    dedupe?: { signerId: string; match?: Record<string, string | number | null>; windowMs?: number };
 }
 
 /** How many times an append retries after losing its position to another writer, before it gives up and says so. */

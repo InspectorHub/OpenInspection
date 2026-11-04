@@ -149,7 +149,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `contact_id` | text |  |  |  | → contacts.id (app-layer, optional) |
 | `token_hash` | text | UQ |  |  | SHA-256 hex; NULL on backfilled rows until first link build |
 | `token_enc` | text |  |  |  | 't1:iv:cipher' sealed plaintext (config-crypto sealToken) |
-| `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired, delivery_failed` | `delivery_failed` marks a signer whose email was rejected at the provider level (transient failure or unclassified error). |
+| `status` | text | NN | `'pending'` | `pending, sent, viewed, signing, signed, declined, expired, delivery_fa…` | `delivery_failed` marks a signer whose email was rejected at the provider level (transient failure or unclassified error). **[more]** |
 | `signature_base64` | text |  |  |  | The drawn signature image. Bare base64 OR a full `data:` URL — both are accepted, and agreements-render prefixes the bare form when composing the signed PDF. |
 | `signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |

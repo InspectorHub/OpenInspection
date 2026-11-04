@@ -436,7 +436,7 @@ export async function handleWordExportBatch(env: WordExportConsumerEnv, batch: M
 
             const inspectionService = new InspectionService(
                 env.DB, env.PHOTOS, undefined, env.TENANT_CACHE, env.IMAGES, undefined,
-                env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET, signingKeySecrets(env).previous,
+                signingKeySecrets(env),
             );
             // Identity makePhotoUrl: photoAppendix entries carry the raw R2 key, so this consumer can PHOTOS.get it.
             const reportData = await inspectionService.getReportData(job.inspectionId, job.tenantId, (key) => key);

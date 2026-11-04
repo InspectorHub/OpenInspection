@@ -27,8 +27,7 @@ export interface SignerRow {
     lastRemindedAt?: number | null;
 }
 
-// `signing` is not final, but a signature is being recorded for it right now: there is nothing to remind it of.
-const TERMINAL: ReadonlySet<string> = new Set(["signing", "signed", "declined", "expired"]);
+const TERMINAL: ReadonlySet<string> = new Set(["signed", "declined", "expired"]);
 
 /** A signer in a terminal state can no longer be reminded or re-signed. */
 export function isTerminal(status: string): boolean {
@@ -75,6 +74,9 @@ export function remindState(
     signer: Pick<SignerRow, "status" | "lastRemindedAt">,
     nowMs: number,
 ): { canRemind: boolean; reason: string | null } {
+    if (signer.status === "signing") {
+        return { canRemind: false, reason: m.agreement_signers_remind_signing() };
+    }
     if (isTerminal(signer.status)) {
         return { canRemind: false, reason: m.agreement_signers_remind_terminal() };
     }

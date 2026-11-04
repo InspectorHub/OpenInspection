@@ -241,7 +241,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     }));
                     break;
                 case 'inspection':
-                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET, signingKeySecrets(c.env).previous);
+                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), signingKeySecrets(c.env));
                     // This middleware is the only layer holding `c.env`, so it is
                     // the only place the request scope can enter the service tree.
                     // Without it PeopleService.listPeople cannot memoise and the
@@ -252,7 +252,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     // PortalService depends on InspectionService — resolve it via the
                     // proxy target the same way auditLog resolves signingKey.
                     if (!target.inspection) {
-                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET, signingKeySecrets(c.env).previous);
+                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), signingKeySecrets(c.env));
                         target.inspection.setRequestEnv(c.env);
                     }
                     target.portal = new PortalService(c.env.DB, target.inspection);

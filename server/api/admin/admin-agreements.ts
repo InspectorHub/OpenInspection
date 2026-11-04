@@ -31,6 +31,7 @@ import { errorSummary } from '../../lib/esign/claim-failure';
 import { AuditLogService } from '../../services/audit-log.service';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { emailSignersTheirLinks } from '../../lib/agreement-send';
+import { displaySignerStatus } from '../../services/agreement/base';
 
 
 /**
@@ -330,7 +331,7 @@ app.openapi(sendAgreementRoute, async (c) => {
         data: {
             requestId: env.requestId,
             signers: signerRows.map((s: typeof schema.agreementSigners.$inferSelect) => ({
-                id: s.id, name: s.name, email: s.email, role: s.role, status: s.status,
+                id: s.id, name: s.name, email: s.email, role: s.role, status: displaySignerStatus(s),
             })),
         },
     }, 200);
@@ -362,7 +363,8 @@ app.openapi(inspectorSignRoute, async (c) => {
             tsMs: Date.now(),
         });
     } catch (e) {
-        logger.error('audit.append.inspector-signed.failed', { tenantId, requestId: id, error: errorSummary(e) });
+        // The company's countersignature is stored and cannot be signed again, so its missing audit row is an alert, not a retry.
+        logger.alert('audit_append_inspector_signed_failed', 'The inspector countersignature was stored but its audit row could not be written.', { tenantId, requestId: id, error: errorSummary(e) });
     }
     return c.json({ success: true as const }, 200);
 });
