@@ -242,23 +242,23 @@ const agreementRoutes = createApiRouter()
         const signers = await svc.listSigners(envelope.tenantId, envelope.id);
         const signedCount = signers.filter((s) => s.status === 'signed').length;
 
-        return c.json({ // projection-allow: the signer's own envelope: the agreement text they are asked to sign and their own status
+        return c.json({
             success: true as const,
             data: {
                 status: envelope.status as EnvelopeStatus,
-                envelopeId: envelope.id,
+                envelopeId: envelope.id, // projection-allow: the envelope id: the signer reached this page with the signer token, which is the capability
                 clientName: envelope.clientName ?? null,
-                agreementName: agreementRow?.name ?? 'Agreement',
-                agreementContent: snapshot.content,
+                agreementName: agreementRow?.name ?? 'Agreement', // projection-allow: the agreement name the signer is asked to sign, shown on the signing page
+                agreementContent: snapshot.content, // projection-allow: the agreement text the signer is asked to sign: the signer token is the capability and the signing page shows the text by design
                 signer: {
                     name: signer.name,
                     role: signer.role as SignerRole,
                     // Re-read this signer's status post-view (markViewedBySigner may
                     // have flipped it from sent → viewed).
-                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as EnvelopeStatus,
+                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as EnvelopeStatus, // projection-allow: the signer's own signing status, one of the envelope status strings
                 },
                 progress: { signed: signedCount, total: signers.length },
-                completionPolicy: envelope.completionPolicy as 'all' | 'one',
+                completionPolicy: envelope.completionPolicy as 'all' | 'one', // projection-allow: the completion policy, either all or one
             },
         }, 200);
     })
@@ -359,25 +359,25 @@ const agreementRoutes = createApiRouter()
             }
         }
 
-        return c.json({ // projection-allow: the signer's own status, the agreement hash and the portal link token issued to this signer
+        return c.json({
             success: true as const,
             data: {
                 signer: {
                     name: signer.name,
                     role: signer.role as SignerRole,
-                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as EnvelopeStatus,
+                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as EnvelopeStatus, // projection-allow: the signer's own signing status, one of the envelope status strings
                 },
                 agreement: {
                     name: agreementRow?.name ?? 'Agreement',
                     content: snapshot.content,
-                    contentHash: snapshot.hash,
+                    contentHash: snapshot.hash, // projection-allow: the hash of the agreement text the signer signed, shown on the signing confirmation
                 },
                 envelope: {
                     status: envelope.status as EnvelopeStatus,
-                    completionPolicy: envelope.completionPolicy as 'all' | 'one',
+                    completionPolicy: envelope.completionPolicy as 'all' | 'one', // projection-allow: the completion policy, either all or one
                     progress: { signed: signedCount, total: signers.length },
                 },
-                invoice: invoiceRow && invoiceStatus
+                invoice: invoiceRow && invoiceStatus // projection-allow: a literal of the invoice id, amounts, currency and status written on the next line, or null
                     ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, amountPaidCents: invoiceRow.amountPaidCents ?? null, currency: invoiceRow.currency, status: invoiceStatus }
                     : null,
                 payment: {
@@ -392,7 +392,7 @@ const agreementRoutes = createApiRouter()
                     companyName: branding?.companyName ?? 'OpenInspection',
                     primaryColor: branding?.primaryColor ?? null,
                 },
-                portalToken,
+                portalToken, // projection-allow: the portal link token (string or null): minted only for client and co-client signers, null for an agent signer, and returned to that signer
             },
         }, 200);
     })

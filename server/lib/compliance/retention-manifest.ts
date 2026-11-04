@@ -56,6 +56,7 @@ import {
     AUDIT_LOG_ANONYMIZE_MONTHS,
     DEDUP_LOG_RETENTION_DAYS,
     DEAD_LETTER_RETENTION_DAYS,
+    VERIFY_EXPORT_ATTEMPT_RETENTION_DAYS,
     SYNC_OUTBOX_RETENTION_DAYS,
     IDEMPOTENCY_REPLAY_RETENTION_DAYS,
     DESTRUCTION_RECORD_RETENTION_MONTHS,
@@ -99,6 +100,15 @@ export const RETENTION_MANIFEST: RetentionRule[] = [
         purpose: 'Replay-protection ledger for the portal to core command seam. Same purpose and same retry horizon as the webhook ledger, so deliberately the same number.',
         legalHold: 'not_applicable',
         legalHoldNote: 'An event id, a command type and the instant it was processed. Same reasoning as the webhook ledger: nothing here is evidence of anything except that a duplicate was rejected, and the command it deduplicated is preserved by the tables that actually applied it.',
+    },
+    {
+        table: 'verify_export_attempts',
+        timestampColumn: 'window_ends_at',
+        window: { unit: 'days', value: VERIFY_EXPORT_ATTEMPT_RETENTION_DAYS },
+        action: 'delete',
+        purpose: 'Attempt counters of the signed audit export knowledge check. A counter matters only while its window (15 minutes or an hour) is open; a request replaces an ended window itself, so this removes the counters nobody came back to. The key holds a keyed hash of a network prefix and an envelope id, never an address.',
+        legalHold: 'not_applicable',
+        legalHoldNote: 'A counter key and a count: nothing here is evidence of anything except how many attempts were made in a window that has ended.',
     },
     {
         table: 'parked_cmd_events',

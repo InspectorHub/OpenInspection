@@ -28,6 +28,7 @@ import {
 } from '../lib/validations/correction.schema';
 import { ReportVersionService } from './report-version.service';
 import { logger } from '../lib/logger';
+import { postalOrNull } from '../lib/validations/postal-code';
 
 export interface CorrectionResult {
     /** The version the correction published. Always >= 2. */
@@ -50,7 +51,8 @@ export async function correctReport(
     // The two conditions below are REFUSALS, not faults: neither changes on a
     // second attempt, so a caller that cannot see this code still has to be able
     // to tell them from a transient failure. See `CorrectionRefusedError`.
-    const value = parsed.to.trim();
+    // A postal code that is only a placeholder ('-', ' ') is no postal code: it clears the field, as it does on every other write path.
+    const value = parsed.field === 'addressZip' ? (postalOrNull(parsed.to) ?? '') : parsed.to.trim();
     if (!value && correctionRequiresValue(parsed.field)) {
         throw new CorrectionRefusedError(`A correction may not leave ${parsed.field} empty.`);
     }

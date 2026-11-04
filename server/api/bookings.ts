@@ -270,7 +270,7 @@ bookingsRoutes.openapi(getTenantSlotsRoute, async (c) => {
     return c.json({
         success: true,
         data: {
-            slots,
+            slots, // projection-allow: slots are literals of a time and an availability flag built just above; the public booking page offers them by design
             ...(all.holidayAdvisory ? { holidayAdvisory: all.holidayAdvisory } : {}),
             // IA-26 keeps inspector identities server-side, but "nobody
             // serves your area" is about the CLIENT's property, not about

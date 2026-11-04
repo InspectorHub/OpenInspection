@@ -22,6 +22,7 @@
     "vite.config.ts",
     "packages/field-ui/src/components/media-studio/react-konva.ssr-stub.tsx",
     "server/lib/compliance/retention-policy.ts",
+    "server/lib/legal/non-translatable-out-of-scope.ts",
     "**/*.test.{ts,tsx}",
     "**/*.spec.{ts,tsx}",
     "tests/**/*.ts",

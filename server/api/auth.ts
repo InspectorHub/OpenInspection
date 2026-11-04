@@ -373,9 +373,9 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
         }, keyring);
         // Intentionally NOT a Set-Cookie — challenge tokens travel JSON-only so a stolen
         // session cookie alone never permits 2FA bypass.
-        return c.json({ // projection-allow: the nested value is the second-factor challenge token minted for this caller
+        return c.json({
             success: true,
-            data: { requires2fa: true, challengeToken }
+            data: { requires2fa: true, challengeToken } // projection-allow: the second-factor challenge token (signed, five minutes) for the caller who just passed the password step; it travels in JSON only
         }, 200);
     }
 
@@ -401,7 +401,7 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
     const isBff = c.req.header('x-token-relay') === '1';
     return c.json({
         success: true,
-        data: { redirect: '/inspections', ...(isBff ? { token } : {}) }
+        data: { redirect: '/inspections', ...(isBff ? { token } : {}) } // projection-allow: the session token, returned only to a caller that sends x-token-relay: 1 (the in-process login page); the documented login exception
     }, 200);
 });
 coreAuthRoutes.openapi(changePasswordRoute, async (c) => {

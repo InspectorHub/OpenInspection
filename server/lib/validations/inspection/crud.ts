@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { postalOrNull } from '../postal-code';
 import { createApiResponseSchema, SuccessResponseSchema } from '../shared.schema';
 import { INSPECTION_STATUSES } from '../../status/inspection-status';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
@@ -86,7 +87,8 @@ export const CreateInspectionSchema = z.object({
     addressStreet:  z.string().max(200).optional().nullable().describe('Street line of the geocoded address.'),
     addressCity:    z.string().max(100).optional().nullable().describe('City of the geocoded address.'),
     addressState:   z.string().max(10).optional().nullable().describe('State or region code of the geocoded address.'),
-    addressZip:     z.string().max(20).optional().nullable().describe('Postal code of the geocoded address.'),
+    // Trimmed; a placeholder (nothing but punctuation or a single character, such as "-" or " ") is read as no postal code (null), never refused, so a queued write from an older client still applies.
+    addressZip:     z.string().max(20).optional().nullable().transform(postalOrNull).describe('Postal code of the geocoded address.'),
     addressCounty:  z.string().max(100).optional().nullable().describe('County of the geocoded address.'),
     addressLat:     z.number().min(-90).max(90).optional().nullable().describe('Latitude of the geocoded address, from -90 to 90.'),
     addressLng:     z.number().min(-180).max(180).optional().nullable().describe('Longitude of the geocoded address, from -180 to 180.'),

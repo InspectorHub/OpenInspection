@@ -39,7 +39,7 @@ import { interpolate } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
 import { hubPayLink } from '../../lib/inspection/hub-pay-url';
 import { moneyView } from '../../lib/auth/money-access';
-import { toInspectionRecord } from './patch-revision-report';
+import { toInspectionRecord } from '../../lib/response-projection';
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
     method: 'post',

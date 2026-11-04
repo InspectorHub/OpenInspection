@@ -3,8 +3,7 @@
  * inspection (which also reads the template snapshot as an object). Both return a copy and keep every other key.
  */
 import { describe, it, expect } from 'vitest';
-import { withoutCompanyId } from '../../../server/lib/response-projection';
-import { toInspectionRecord, templateRecord } from '../../../server/api/inspections/patch-revision-report';
+import { withoutCompanyId, toInspectionRecord, templateRecord } from '../../../server/lib/response-projection';
 
 describe('withoutCompanyId', () => {
     it('drops the company id, keeps every other key, and leaves the row it was given as it was', () => {

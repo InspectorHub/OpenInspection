@@ -12,6 +12,7 @@
  *
  * `scripts/check-public-projection.mjs` reports a public route that answers with a bare row or service result.
  */
+import { parseSnapshot } from '../services/inspection/shared';
 
 /** The picked subset of `T`; the type `projectFields` returns. */
 type Projected<T extends object, K extends keyof T> = Pick<T, K>;
@@ -32,4 +33,26 @@ export function projectFields<T extends object, K extends keyof T>(source: T, ke
 export function withoutCompanyId<T extends object>(row: T): Omit<T, 'tenantId'> {
     // Every entry but the company id is kept, so the result is the row without that one key.
     return Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'tenantId')) as Omit<T, 'tenantId'>;
+}
+
+/**
+ * The inspection row as a response states it: the template snapshot as an object (or null when the stored value is not a
+ * readable one), and without the company id.
+ *
+ * The editor's own saves write the snapshot as a JSON-encoded string into a JSON column, so such a row reads back as a string.
+ * Normalised here, on read, so the client sees one shape; the stored value is left as it is. The company id is the caller's own
+ * session fact, not a property of the inspection a client reads, so the row leaves without it.
+ */
+export function toInspectionRecord<T extends object>(inspection: T): Omit<T, 'templateSnapshot' | 'tenantId'> & { templateSnapshot: { sections: unknown[] } | null } {
+    // `T extends object`, not a weak type with the key optional: the short Inspection DTO a replayed create answers with does not name the key,
+    // but the row behind it carries it at run time.
+    const stored: unknown = 'templateSnapshot' in inspection ? inspection.templateSnapshot : undefined;
+    const record: Record<string, unknown> = { ...inspection, templateSnapshot: parseSnapshot(stored) };
+    delete record['tenantId'];
+    return record as Omit<T, 'templateSnapshot' | 'tenantId'> & { templateSnapshot: { sections: unknown[] } | null };
+}
+
+/** The template row a staff payload carries beside the inspection, without the company id; absent or null stays as it was. */
+export function templateRecord<T extends object>(template: T | null | undefined): Omit<T, 'tenantId'> | null | undefined {
+    return template ? withoutCompanyId(template) : template;
 }

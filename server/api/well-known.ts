@@ -25,12 +25,12 @@ wellKnownRoutes.get('/openinspection/tenant-keys/:slug', async (c) => {
     const signing = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
     const pub = await signing.getPublicKey(tenant.id);
     if (!pub) return c.json({ error: 'no signing key for tenant' }, 404);
-    return c.json( // projection-allow: the tenant public signing key: slug, algorithm, PEM and fingerprint, public by design
+    return c.json(
         {
-            tenantSlug: slug,
+            tenantSlug: slug, // projection-allow: the tenant slug the public key is published under
             algorithm: 'Ed25519',
-            publicKeyPem: pub.pem,
-            keyFingerprint: pub.fingerprint,
+            publicKeyPem: pub.pem, // projection-allow: the tenant public signing key (PEM): public by design, anyone verifies a signature with it
+            keyFingerprint: pub.fingerprint, // projection-allow: the fingerprint of that public key
             retrievedAt: new Date().toISOString(),
         },
         200,

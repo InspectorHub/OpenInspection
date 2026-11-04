@@ -142,6 +142,8 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
   const needsTurnstile = !!data.siteKey;
   const turnstileRef = useRef<HTMLDivElement>(null);
   const [turnstileToken, setTurnstileToken] = useState("");
+  // Bumped after each submit that spent a token, so the challenge is rendered again.
+  const [turnstileRound, setTurnstileRound] = useState(0);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifyUnavailable, setVerifyUnavailable] = useState(false);
 
@@ -149,11 +151,20 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
     data.siteKey || null,
     turnstileRef,
     // The main wizard passes its step here so the widget re-renders when the
-    // host element remounts. This form is one screen and never remounts it.
-    0,
-    setTurnstileToken,
+    // host element remounts. This form is one screen and never remounts it; the
+    // round changes after a submit spent the token.
+    turnstileRound,
+    (token) => {
+      // A new token ends whatever the last one left on screen: the expiry message and the could-not-load message.
+      setTurnstileToken(token);
+      setVerifyError(null);
+      setVerifyUnavailable(false);
+    },
     {
       onLoadFailed: () => setVerifyUnavailable(true),
+      // A token that sat unused too long is no longer good: drop it and say what to do.
+      onExpired: () => { setTurnstileToken(""); setVerifyError(m.booking_verify_required()); },
+      onError: () => { setTurnstileToken(""); setVerifyUnavailable(true); },
       // The embed's palette is the HOST site's `?style=`, not the visitor's.
       // It does reach `<html data-color-scheme>`, but from an effect in
       // EmbedWizard — a parent, whose effect runs after this child's — so
@@ -185,6 +196,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
     setStatus(null);
 
     const fd = new FormData(e.currentTarget);
+    let succeeded = false;
     try {
       // Omit inspectorId when empty so the server auto-assigns.
       const inspectorId = fd.get("inspectorId") || "";
@@ -221,6 +233,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && (json as Record<string, unknown>).success) {
+        succeeded = true;
         setStatus({ text: m.booking_embed_status_success(), ok: true });
         // Notify parent iframe
         window.parent?.postMessage(
@@ -235,6 +248,12 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
       setStatus({ text: m.booking_embed_status_network_error(), ok: false });
     } finally {
       setSubmitting(false);
+      // A challenge token is good for one request, whatever the answer was: drop it. After a refusal the challenge is rendered again
+      // for the next attempt; after a booking nothing more is asked of this visitor, and the challenge is hidden instead.
+      if (turnstileToken) {
+        setTurnstileToken("");
+        if (!succeeded) setTurnstileRound((n) => n + 1);
+      }
     }
   }
 
@@ -327,7 +346,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
         {m.booking_privacy_shared_notice({ name: data.inspectorName })}
         {privacyUrl && <> {m.booking_privacy_see_our()} <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">{m.booking_link_privacy_policy()}</a>.</>}
       </p>
-      {needsTurnstile && (
+      {needsTurnstile && !status?.ok && (
         <div className="mb-3 flex justify-center">
           <div ref={turnstileRef} />
         </div>

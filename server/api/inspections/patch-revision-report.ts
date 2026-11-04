@@ -19,7 +19,6 @@
  * no statutory form -- which is nearly all of them -- and for a patch that did
  * not touch the date at all.
  */
-import { withoutCompanyId } from '../../lib/response-projection';
 import { revisionStatusForInspection, type RevisionStatus } from '../../lib/statutory/revision-status';
 import type { StatutoryFormVersion } from '../../lib/statutory/form-registry';
 import { parseSnapshot } from '../../services/inspection/shared';
@@ -64,26 +63,4 @@ export function revisionStatusField(
         ...(versions === undefined ? {} : { versions }),
     });
     return status === null ? {} : { revisionStatus: status };
-}
-
-/**
- * The inspection row as a response states it: the template snapshot as an object (or null when the stored value is not a
- * readable one), and without the company id.
- *
- * The editor's own saves write the snapshot as a JSON-encoded string into a JSON column, so such a row reads back as a string.
- * Normalised here, on read, so the client sees one shape; the stored value is left as it is. The company id is the caller's own
- * session fact, not a property of the inspection a client reads, so the row leaves without it.
- */
-export function toInspectionRecord<T extends object>(inspection: T): Omit<T, 'templateSnapshot' | 'tenantId'> & { templateSnapshot: { sections: unknown[] } | null } {
-    // `T extends object`, not a weak type with the key optional: the short Inspection DTO a replayed create answers with does not name the key,
-    // but the row behind it carries it at run time.
-    const stored: unknown = 'templateSnapshot' in inspection ? inspection.templateSnapshot : undefined;
-    const record: Record<string, unknown> = { ...inspection, templateSnapshot: parseSnapshot(stored) };
-    delete record['tenantId'];
-    return record as Omit<T, 'templateSnapshot' | 'tenantId'> & { templateSnapshot: { sections: unknown[] } | null };
-}
-
-/** The template row a staff payload carries beside the inspection, without the company id; absent or null stays as it was. */
-export function templateRecord<T extends object>(template: T | null | undefined): Omit<T, 'tenantId'> | null | undefined {
-    return template ? withoutCompanyId(template) : template;
 }

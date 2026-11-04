@@ -9,9 +9,9 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 115 |
-| Columns | 1313 |
-| Indexes (excluding primary keys) | 187 |
+| Tables | 116 |
+| Columns | 1316 |
+| Indexes (excluding primary keys) | 188 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 619 (47%) |
 
@@ -19,12 +19,12 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
 a tenant, which is the only reason to be missing it:
 
-`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
+`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants` · `verify_export_attempts`
 
-That is 13 of 115. If a table you just added appears here,
+That is 14 of 116. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 218 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 219 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -2999,6 +2999,24 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - **UNIQUE** `uq_users_tenant_email` (tenant_id, email) — partial, `WHERE deleted_at IS NULL`
 - **UNIQUE** `idx_users_slug_per_tenant` (tenant_id, slug)
 - `idx_users_email` (email)
+
+---
+
+## `verify_export_attempts`
+
+<sub>server/lib/db/schema/verify-export-attempts.ts · 3 columns · primary key `key`</sub>
+
+> Attempt counters for the signed audit export of an envelope (POST /api/public/verify/:envelopeId/export).
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `key` | text | PK NN |  |  |  |
+| `attempts` | integer | NN |  |  | *An integer value.* |
+| `window_ends_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- `idx_verify_export_attempts_ends` (window_ends_at)
 
 ---
 

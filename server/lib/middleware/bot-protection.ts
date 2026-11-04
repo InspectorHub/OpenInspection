@@ -71,6 +71,16 @@ export function resolveTurnstile(env: TurnstileEnv): TurnstilePolicy {
     return { enforced: false, secret: '', usingTestKey: false };
 }
 
+/**
+ * True when a real secret is configured but the page is still handed Cloudflare's always-pass TEST site key: every token that widget
+ * issues is rejected by the real secret, so every challenge fails. The secret is not in the repository, so this can only be seen at
+ * runtime; a caller logs it.
+ */
+export function turnstileKeysMismatched(env: TurnstileEnv & { TURNSTILE_SITE_KEY?: string }): boolean {
+    const policy = resolveTurnstile(env);
+    return policy.enforced && !policy.usingTestKey && resolveTurnstileSiteKey(env) === TURNSTILE_TEST_SITE_KEY;
+}
+
 /** The site key the browser needs, matched to whatever `resolveTurnstile` will verify against. */
 export function resolveTurnstileSiteKey(
     env: TurnstileEnv & { TURNSTILE_SITE_KEY?: string },
@@ -100,12 +110,13 @@ export async function verifyTurnstile(token: string, secretKey: string): Promise
 const SITEVERIFY_TIMEOUT_MS = 5000;
 
 /** The one siteverify request. `idempotencyKey` makes a retry of the same check return the same answer. */
-function postSiteverify(token: string, secretKey: string, idempotencyKey?: string, timeoutMs?: number): Promise<Response> {
+function postSiteverify(token: string, secretKey: string, idempotencyKey?: string, timeoutMs?: number, remoteIp?: string): Promise<Response> {
     if (!secretKey) throw new Error('TURNSTILE_SECRET_KEY is not configured');
     const body = new FormData();
     body.append('secret', secretKey);
     body.append('response', token);
     if (idempotencyKey) body.append('idempotency_key', idempotencyKey);
+    if (remoteIp) body.append('remoteip', remoteIp);
     return fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
         method: 'POST',
         body,
@@ -125,9 +136,10 @@ export async function verifyTurnstileOutcome(
     token: string,
     secretKey: string,
     idempotencyKey?: string,
+    options?: { remoteIp?: string; timeoutMs?: number },
 ): Promise<'yes' | 'no' | 'error'> {
     try {
-        const res = await postSiteverify(token, secretKey, idempotencyKey, SITEVERIFY_TIMEOUT_MS);
+        const res = await postSiteverify(token, secretKey, idempotencyKey, options?.timeoutMs ?? SITEVERIFY_TIMEOUT_MS, options?.remoteIp);
         if (res.status === 429 || res.status >= 500) return 'error';
         if (!res.ok) return 'no';
         return ((await res.json()) as { success: boolean }).success ? 'yes' : 'no';

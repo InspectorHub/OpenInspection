@@ -19,6 +19,7 @@ import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { signPortalSession } from '../../../server/lib/portal-session';
 import { createApiRouter } from '../../../server/lib/openapi-router';
+import { logger } from '../../../server/lib/logger';
 import { clientMessageRoutes, inspectorMessageRoutes } from '../../../server/api/messages';
 import { CLIENT_MESSAGE_FIELD_LISTS } from '../../../server/lib/client-message-view';
 
@@ -391,6 +392,22 @@ describe('client message routes (resolveClientActor-gated)', () => {
             expect((await up2.json<{ data: { type: string } }>()).data.type).toBe('image/png');
         });
 
+        it('answers a staff send with a repeated or a missing attachment with the same neutral text, and accepts it named once', async () => {
+            const { app, inspectionId } = await seed();
+            await testDb.insert(schema.users).values({ id: INSPECTOR_USER, tenantId: TENANT, email: 'ivan@x.com', passwordHash: 'h', role: 'inspector', name: 'Ivan', createdAt: new Date() });
+            await testDb.update(schema.inspections).set({ inspectorId: INSPECTOR_USER }).where(eq(schema.inspections.id, inspectionId));
+            const base = `/api/inspections/${inspectionId}/messages`;
+            const up = await app.request(`${base}/upload`, { method: 'POST', body: uploadForm() }, reqEnv());
+            const real = (await up.json<{ data: { id: string; key: string } }>()).data;
+            const twice = await send(app, base, [real, real]);
+            expect(twice.status).toBe(400);
+            expect(await twice.json()).toEqual({ error: 'Check the attachments and try again.' });
+            const missing = await send(app, base, [{ ...real, key: `${real.key}-gone` }]);
+            expect(missing.status).toBe(400);
+            expect(await missing.json()).toEqual({ error: 'Check the attachments and try again.' });
+            expect((await send(app, base, [real])).status).toBe(201);
+        });
+
         it('refuses a send that names the same upload twice, and accepts it named once', async () => {
             const { app, inspectionId, clientToken } = await seed();
             const base = `/api/public/inspections/${inspectionId}/messages`;
@@ -401,10 +418,11 @@ describe('client message routes (resolveClientActor-gated)', () => {
         });
 
         describe('when storage cannot be read', () => {
-            const failing = (method: 'head' | 'get'): R2Bucket => ({
+            const failing = (method: 'head' | 'get' | 'put'): R2Bucket => ({
                 ...PHOTOS,
                 head: PHOTOS.head.bind(PHOTOS),
                 get: PHOTOS.get.bind(PHOTOS),
+                put: PHOTOS.put.bind(PHOTOS),
                 [method]: async () => { throw new Error('R2 is down'); },
             }) as unknown as R2Bucket;
 
@@ -422,6 +440,30 @@ describe('client message routes (resolveClientActor-gated)', () => {
                 // Controls: the same send succeeds with a healthy bucket, and an absent object is the sender's 400.
                 expect((await post(PHOTOS, [real])).status).toBe(201);
                 expect((await post(PHOTOS, [descriptor(`${TENANT}/messages/${inspectionId}/never-stored.png`, 'never-stored')])).status).toBe(400);
+            });
+
+            it('logs the storage error as the cause of a 503 and does not send it to the caller', async () => {
+                const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+                try {
+                    const { app, inspectionId, clientToken } = await seed();
+                    const base = `/api/public/inspections/${inspectionId}/messages`;
+                    const up = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv());
+                    const real = (await up.json<{ data: { id: string; key: string } }>()).data;
+                    const sent = await app.request(`${base}?token=${clientToken}`, {
+                        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body: 'files', attachments: [real] }),
+                    }, reqEnv(failing('head')));
+                    expect(sent.status).toBe(503);
+                    expect(await sent.text()).not.toContain('R2 is down');
+                    expect(warn).toHaveBeenCalledWith('message attachment storage failed', { op: 'head', cause: 'R2 is down' });
+                    // A write that fails is the same 503 on the client upload route, with the cause logged.
+                    const refused = await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv(failing('put')));
+                    expect(refused.status).toBe(503);
+                    expect(warn).toHaveBeenCalledWith('message attachment storage failed', { op: 'put', cause: 'R2 is down' });
+                    // Control: a healthy bucket stores it.
+                    expect((await app.request(`${base}/upload?token=${clientToken}`, { method: 'POST', body: uploadForm() }, reqEnv())).status).toBe(200);
+                } finally {
+                    warn.mockRestore();
+                }
             });
 
             it('answers a staff send with an AppError 503 and a client download with 503 in the route error shape', async () => {

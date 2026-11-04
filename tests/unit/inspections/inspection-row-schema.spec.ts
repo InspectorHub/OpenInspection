@@ -68,7 +68,7 @@ describe('the documented inspection record keys', () => {
             expect(field.safeParse(undefined).success).toBe(true);
             expect(field.safeParse(5).success).toBe(false);
             for (const value of INSPECTION_PROPERTY_TYPES) expect(field.description, value).toContain(value);
-            expect(field.description).toContain('before the lists were unified');
+            expect(field.description).toContain('older rows');
         }
         expect(row.description).toBe(report.description);
     });

@@ -166,7 +166,7 @@ export const ReportDataFullSchema = ReportDataResponseSchema.extend({
   propertyFacts: z.record(z.string(), z.unknown()).nullable().optional().describe('The Property Facts values (year built, size, foundation and the like), or null.'),
   reportTier: z.string().nullable().optional().describe('Report tier of a commercial inspection (light_commercial or full_pca), or null.'),
   costTables: OPAQUE('The cost tables of a commercial report, or null.'),
-  propertyType: z.string().nullable().optional().describe('What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified.'),
+  propertyType: z.string().nullable().optional().describe('What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows.'),
   commercialSubtype: z.string().nullable().optional().describe('Commercial property subtype, or null.'),
   buildingProfile: z.array(z.unknown()).optional().describe('Building profile rows of a commercial report.'),
   pcaReport: OPAQUE('The property condition report block of a commercial inspection, or null.'),

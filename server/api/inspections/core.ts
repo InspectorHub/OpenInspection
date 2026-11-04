@@ -25,7 +25,8 @@ import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
-import { patchRevisionReport, revisionStatusField, toInspectionRecord, templateRecord } from './patch-revision-report';
+import { patchRevisionReport, revisionStatusField } from './patch-revision-report';
+import { toInspectionRecord, templateRecord } from '../../lib/response-projection';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
 import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
@@ -183,7 +184,6 @@ const createFromWizardRoute = createRoute(withMcpMetadata({
     operationId: "createInspectionWizard",
     description: "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector, unless their role cannot inspect (staff), in which case the inspection starts unassigned unless team mode names a lead; a named lead or helper must be a member who can inspect (400 otherwise). The scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles; staff get 403."
 }, { scopes: ['write'], tier: 'extended' }));
-
 
 const coreRoutes = createApiRouter()
     .openapi(getInspectionRoute, async (c) => {

@@ -13,6 +13,7 @@
 import { Errors } from './errors';
 import { detectMime } from './file-validation';
 import { r2Keys } from './r2-keys';
+import { logger } from './logger';
 
 const ATTACHMENT_ID = /^[A-Za-z0-9-]{1,64}$/;
 const EXTENSION = /^[a-z0-9]{1,8}$/;
@@ -28,8 +29,11 @@ const wellFormed = (text: string): string => text.replace(/[\ud800-\udbff](?![\u
 /** A name that is safe to keep and to send: well formed, and at most MAX_NAME code points. */
 const cleanName = (name: string): string => truncateName(wellFormed(name), MAX_NAME);
 
-/** R2 failed on a call the caller cannot influence; the object is neither missing nor refused. */
-const storageUnavailable = () => Errors.ServiceUnavailable('Attachment storage is unavailable. Try again shortly.');
+/** R2 failed on a call the caller cannot influence; the object is neither missing nor refused. The cause is logged, not sent. */
+function storageUnavailable(op: 'put' | 'head' | 'get', cause: unknown) {
+    logger.warn('message attachment storage failed', { op, cause: cause instanceof Error ? cause.message : String(cause) });
+    return Errors.ServiceUnavailable('Attachment storage is unavailable. Try again shortly.');
+}
 
 interface AttachmentDescriptor { id: string; key: string; name: string; size: number; type: string; uploadedAt: number }
 
@@ -53,12 +57,13 @@ export async function storeAttachment(
     // sniffed one; the one case with none, a .heic file, is stored as image/heic and not as whatever the client declared.
     const type = detected ?? 'image/heic';
     const name = cleanName(file.name);
-    await photos.put(key, buf, { httpMetadata: { contentType: type }, customMetadata: { originalName: name } });
+    await photos.put(key, buf, { httpMetadata: { contentType: type }, customMetadata: { originalName: name } })
+        .catch((cause) => { throw storageUnavailable('put', cause); });
     return { id, key, name, size: file.size, type, uploadedAt: Date.now() };
 }
 
 /** True when every posted descriptor names the key the upload route would have produced for this company and inspection. */
-export function attachmentsAreOwn(attachments: ReadonlyArray<{ id: string; key: string }>, tenantId: string, inspectionId: string): boolean {
+function attachmentsAreOwn(attachments: ReadonlyArray<{ id: string; key: string }>, tenantId: string, inspectionId: string): boolean {
     return attachments.every((attachment) => {
         if (!ATTACHMENT_ID.test(attachment.id)) return false;
         const ext = attachment.key.slice(attachment.key.lastIndexOf('.') + 1);
@@ -84,7 +89,7 @@ export async function verifyAttachments(
     if (new Set(posted.map((attachment) => attachment.id)).size !== posted.length) return null;
     const out: StoredAttachment[] = [];
     for (const attachment of posted) {
-        const head = await photos.head(attachment.key).catch(() => { throw storageUnavailable(); });
+        const head = await photos.head(attachment.key).catch((cause) => { throw storageUnavailable('head', cause); });
         if (!head) return null;
         out.push({
             id: attachment.id,
@@ -99,7 +104,7 @@ export async function verifyAttachments(
 }
 
 /** True when a stored attachment key sits in this company's message folder; a download is refused for any other key. */
-export function attachmentKeyIsServable(key: string, tenantId: string): boolean {
+function attachmentKeyIsServable(key: string, tenantId: string): boolean {
     return key.startsWith(`${tenantId}/messages/`) && !key.split('/').some((segment) => segment === '' || segment === '.' || segment === '..');
 }
 
@@ -118,7 +123,7 @@ function dispositionFor(name: string): string {
  */
 export async function serveAttachment(photos: R2Bucket | undefined, att: { key: string; name: string }, tenantId: string): Promise<Response | null> {
     if (!photos || !attachmentKeyIsServable(att.key, tenantId)) return null;
-    const obj = await photos.get(att.key).catch(() => { throw storageUnavailable(); });
+    const obj = await photos.get(att.key).catch((cause) => { throw storageUnavailable('get', cause); });
     if (!obj) return null;
     const headers = new Headers();
     headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');

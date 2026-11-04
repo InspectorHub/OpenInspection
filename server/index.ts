@@ -35,6 +35,7 @@ import { loadVerifyData } from './lib/verify-data';
 
 import coreAuthRoutes, { ssoRootRoutes } from './api/auth';
 import testHooksRoutes from './api/test-hooks';
+import { verifyExportRoutes } from './api/public/verify-export';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
 import integrationsAiRoutes from './api/integrations-ai';
@@ -138,7 +139,7 @@ const app = new OpenAPIHono<HonoConfig>({
             success: false,
             error: {
                 code: 'VALIDATION_ERROR',
-                message: summary || 'Validation failed',
+                message: summary || 'Validation failed', // projection-allow: the validation summary: issue paths and messages joined into a string
                 fields,
             },
         }, 400);
@@ -158,10 +159,10 @@ app.use('*', requestLog);
 app.get('/status', (c) => c.json({
     status: 'ok',
     app: 'openinspection-core',
-    version: BUILD.version,
-    commit: BUILD.shortCommit,
-    branch: BUILD.branch,
-    buildTime: BUILD.buildTime,
+    version: BUILD.version, // projection-allow: the build version, a constant
+    commit: BUILD.shortCommit, // projection-allow: the build commit, a constant
+    branch: BUILD.branch, // projection-allow: the build branch, a constant
+    buildTime: BUILD.buildTime, // projection-allow: the build time, a constant
     timestamp: new Date().toISOString(),
 }));
 
@@ -529,7 +530,7 @@ app.get('/doc', async (c) => {
     await checkRateLimit(c, 'openapi-doc');
     openApiDocument ??= (await import('./lib/openapi/build-document')).buildOpenApiDocument(app, OPENAPI_CONFIG);
     c.header('Cache-Control', 'public, max-age=3600');
-    return c.json(openApiDocument);
+    return c.json(openApiDocument); // projection-allow: the generated OpenAPI document, which describes the API and holds no rows
 });
 
 // Swagger UI moved to a React Router route (GET /ui -> app/routes/docs.tsx) so hono
@@ -649,27 +650,7 @@ app.get('/api/public/verify/:envelopeId/document', async (c) => {
     return c.redirect(agreementRenderPath(data.tenantSlug, data.reqRow.id), 302);
 });
 
-app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
-    const envelopeId = c.req.param('envelopeId') as string;
-    const data = await loadVerifyData(c, envelopeId);
-    if (!data) return c.json({ error: 'Not found' }, 404);
-    const payload = {
-        envelopeId,
-        algorithm: 'Ed25519',
-        publicKeyPem: data.pubKey?.pem ?? null,
-        keyFingerprint: data.pubKey?.fingerprint ?? null,
-        events: data.auditRows.map((r) => ({
-            id: r.id, event: r.event, createdAt: r.createdAt,
-            payloadJson: r.payloadJson, prevHash: r.prevHash,
-            hash: r.hash, signature: r.signature, keyFingerprint: r.keyFingerprint,
-        })),
-        chainValid: data.verify.valid,
-        exportedAt: new Date().toISOString(),
-    };
-    c.header('Content-Type', 'application/json');
-    c.header('Content-Disposition', `attachment; filename="audit-${envelopeId.slice(0, 8)}.json"`);
-    return c.body(JSON.stringify(payload, null, 2));
-});
+app.route('/api/public', verifyExportRoutes);
 
 app.get('/', (c) => c.redirect('/inspections'));
 

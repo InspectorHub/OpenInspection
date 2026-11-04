@@ -8,6 +8,7 @@
  *  - unprojected-response: a value of the response (the `data`, any other property, a spread, or the whole argument)
  *    is a bare variable, a property of one, or the result of a call that is not a known projection.
  *  - allow-without-reason: a `projection-allow:` marker with no reason, or a short one.
+ *  - unused-projection-allow: a marker that covers no finding on its line or the next.
  *
  * RESPONSE FORMS, with the context named by the handler's first parameter (not a fixed `c`):
  *    ctx.json(x) | sendSuccess(ctx, x) | respondRelativizedJson(ctx, x, tenantId) | Response.json(x) | new Response(JSON.stringify(x)) | ctx.body|text(JSON.stringify(x)).
@@ -28,9 +29,10 @@
  * A name declared more than once, as a parameter, or through a destructuring pattern is never followed, and a `let` or a
  * property assigned after the declaration is not seen: the check reads the declaration, not the data flow.
  *
- * An intentional exception is a comment `// projection-allow: <reason>` at the end of the line a response call starts on, or on the
- * line above it. It exempts that call only: a marker above a multi-line statement covers the call on its first line, and covers a later
- * call of the statement only when the reason says `both` or `all`. The reason is mandatory (at least 10 characters).
+ * An intentional exception is a comment `// projection-allow: <reason>`. A trailing one (code before it on its line) covers findings that
+ * START on its own line, however long the value is; a comment-only one covers findings that start on the NEXT line. Nothing else: not a later
+ * line of the same call, not the line after a trailing marker, not past a blank line. Markers are read from comments, never from text inside
+ * a string or template. The reason is mandatory (at least 10 characters), and a marker that covers no finding is reported (unused-projection-allow).
  *
  * Limits: a projector is trusted by name only when imported from a projection module (PROJECTION_MODULE) or not imported at all; a same-file
  * function is judged by what it returns. A schema `.parse(` counts unless the schema in the same file is `z.any()`, `.passthrough()` or loose.
@@ -38,6 +40,8 @@
  * It does not prove a response safe: a field list can still name a column that should not be named. It finds the response with no list.
  */
 import ts from 'typescript';
+import { isContainerName } from './public-projection-containers.mjs';
+import { collectDeclarations, resolveConst, returnedExpressions, unwrap } from './public-projection-scope.mjs';
 
 export const MIN_REASON = 10;
 const ALLOW_RE = /projection-allow:(.*)/;
@@ -58,123 +62,14 @@ const PRIMITIVE_OPERATORS = new Set([
     ts.SyntaxKind.GreaterThanEqualsToken, ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsToken,
     ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.InstanceOfKeyword, ts.SyntaxKind.InKeyword,
 ]);
-/** A helper that takes the request context and a value and answers with it; its name is the only hint the check has. */
-const RESPONSE_HELPER_NAME = /^(json|send|respond|reply|render|ok|success)/i;
+/** Helpers that take the request context and something else and do not answer with it: they read the database, set or read a cookie, log or audit. */
+const NON_RESPONSE_HELPERS = /^(getDrizzle|setCookie|getCookie|deleteCookie|logger|audit\w*|log[A-Z]\w*)$/;
 const KNOWN_RESPONSE_HELPERS = new Set(['sendSuccess', 'sendError', 'respondRelativizedJson']);
 const OPEN_SCHEMA = /\bz\.any\(|\.passthrough\(|\.loose\(|z\.looseObject\(|z\.unknown\(/;
 /** By convention a function named `project<Something>` builds its result from a field list. */
 const PROJECT_NAME = /^project[A-Z]\w*$/;
 const MAX_DEPTH = 4;
 const CONTEXT_METHODS = new Set(['json', 'body', 'text']);
-
-function unwrap(expr) {
-    let e = expr;
-    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e) || ts.isNonNullExpression(e) || ts.isAwaitExpression(e)
-        || ts.isSatisfiesExpression(e) || ts.isTypeAssertionExpression(e)) e = e.expression;
-    return e;
-}
-
-/** Names bound by a binding name (identifier or pattern). */
-function boundNames(name, out) {
-    if (ts.isIdentifier(name)) out.push(name.text);
-    else for (const el of name.elements) if (ts.isBindingElement(el)) boundNames(el.name, out);
-}
-
-/** Names declared exactly once as `const x = <init>`, mapped to the initializer; plus functions declared once. */
-function collectDeclarations(sf) {
-    const counts = new Map();
-    const consts = new Map();
-    const functions = new Map();
-    const imports = new Map();
-    const bump = (name, by = 1) => counts.set(name, (counts.get(name) ?? 0) + by);
-    const visit = (node) => {
-        if (ts.isImportDeclaration(node) && node.importClause && ts.isStringLiteral(node.moduleSpecifier)) {
-            const from = node.moduleSpecifier.text;
-            const clause = node.importClause;
-            if (clause.name) imports.set(clause.name.text, from);
-            if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) for (const el of clause.namedBindings.elements) imports.set(el.name.text, from);
-        }
-        if (ts.isVariableDeclaration(node)) {
-            if (ts.isIdentifier(node.name)) {
-                bump(node.name.text);
-                const isConst = ts.isVariableDeclarationList(node.parent) && (node.parent.flags & ts.NodeFlags.Const) !== 0;
-                const init = node.initializer && unwrap(node.initializer);
-                if (isConst && init) {
-                    if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) functions.set(node.name.text, init);
-                    else consts.set(node.name.text, init);
-                }
-            } else {
-                const names = [];
-                boundNames(node.name, names);
-                for (const n of names) bump(n, 2);
-            }
-        } else if (ts.isParameter(node)) {
-            const names = [];
-            boundNames(node.name, names);
-            for (const n of names) bump(n, 2);
-        } else if (ts.isFunctionDeclaration(node) && node.name) {
-            bump(node.name.text);
-            functions.set(node.name.text, node);
-        }
-        ts.forEachChild(node, visit);
-    };
-    visit(sf);
-    const once = (m) => new Map([...m].filter(([name]) => counts.get(name) === 1));
-    return { consts: once(consts), functions: once(functions), imports };
-}
-
-/** Names a parameter list binds. */
-function parameterNames(fn) {
-    const out = [];
-    for (const p of fn.parameters ?? []) boundNames(p.name, out);
-    return out;
-}
-
-/**
- * The initializer of the `const` that an identifier use refers to, by lexical scope: the nearest enclosing block that declares
- * the name wins; a parameter or a destructuring pattern of that name stops the search (not followed).
- */
-function resolveConst(ident) {
-    const name = ident.text;
-    for (let n = ident.parent; n; n = n.parent) {
-        if (ts.isFunctionLike(n) && parameterNames(n).includes(name)) return undefined;
-        const statements = ts.isBlock(n) || ts.isSourceFile(n) || ts.isModuleBlock(n) ? n.statements : ts.isCaseClause(n) ? n.statements : null;
-        if (!statements) continue;
-        let found;
-        let hits = 0;
-        for (const st of statements) {
-            if (!ts.isVariableStatement(st)) continue;
-            const isConst = (st.declarationList.flags & ts.NodeFlags.Const) !== 0;
-            for (const d of st.declarationList.declarations) {
-                if (ts.isIdentifier(d.name)) {
-                    if (d.name.text !== name) continue;
-                    hits += 1;
-                    found = isConst && d.initializer ? unwrap(d.initializer) : undefined;
-                } else {
-                    const names = [];
-                    boundNames(d.name, names);
-                    if (names.includes(name)) { hits += 1; found = undefined; }
-                }
-            }
-        }
-        if (hits > 0) return hits === 1 ? found : undefined;
-    }
-    return undefined;
-}
-
-/** Return expressions of a function-like (the body itself for an expression-bodied arrow). */
-function returnedExpressions(fn) {
-    if (!fn.body) return [];
-    if (!ts.isBlock(fn.body)) return [fn.body];
-    const out = [];
-    const visit = (node) => {
-        if (ts.isFunctionLike(node) && node !== fn) return;
-        if (ts.isReturnStatement(node) && node.expression) out.push(node.expression);
-        ts.forEachChild(node, visit);
-    };
-    visit(fn.body);
-    return out;
-}
 
 /** True when the expression is visibly built from a field list (or is a primitive). */
 function isProjected(expr, decl, depth) {
@@ -188,9 +83,7 @@ function isProjected(expr, decl, depth) {
         const init = resolveConst(e);
         return init !== undefined && isProjected(init, decl, depth + 1);
     }
-    if (ts.isObjectLiteralExpression(e)) {
-        return e.properties.every((p) => !ts.isSpreadAssignment(p) || isProjected(p.expression, decl, depth + 1));
-    }
+    if (ts.isObjectLiteralExpression(e)) return e.properties.every((p) => isProjectedProperty(p, decl, depth + 1));
     if (ts.isArrayLiteralExpression(e)) return e.elements.every((el) => !ts.isSpreadElement(el) && isProjected(el, decl, depth + 1));
     if (ts.isConditionalExpression(e)) return isProjected(e.whenTrue, decl, depth + 1) && isProjected(e.whenFalse, decl, depth + 1);
     if (ts.isBinaryExpression(e)) {
@@ -203,6 +96,15 @@ function isProjected(expr, decl, depth) {
     if (ts.isCallExpression(e)) return isProjectedCall(e, decl, depth);
     if (ts.isPropertyAccessExpression(e)) return e.name.text === 'length';
     return false;
+}
+
+/** One property of an object literal reached as a value: a spread, a value or a shorthand name must itself be field-list built, or a field picked by name. */
+function isProjectedProperty(p, decl, depth) {
+    if (ts.isSpreadAssignment(p)) return isProjected(p.expression, decl, depth);
+    if (ts.isShorthandPropertyAssignment(p)) return isProjected(p.name, decl, depth);
+    if (!ts.isPropertyAssignment(p)) return false;
+    const key = ts.isIdentifier(p.name) || ts.isStringLiteral(p.name) ? p.name.text : null;
+    return isProjected(p.initializer, decl, depth) || isFieldPick(p.initializer, key, decl);
 }
 
 function isProjectedCall(e, decl, depth) {
@@ -245,41 +147,51 @@ function isProjectedCall(e, decl, depth) {
     return false;
 }
 
-function leadingText(src, node) {
-    const ranges = ts.getLeadingCommentRanges(src, node.getFullStart()) ?? [];
-    return ranges.map((r) => src.slice(r.pos, r.end)).join('\n');
+/**
+ * Every `projection-allow:` marker in a file, read from the comments the TypeScript parser finds (so text inside a string or template
+ * literal is never a marker), by 1-based line: `{ line, trailing, reason }`. `trailing` means code precedes the comment on its line.
+ */
+function readMarkers(sf, src) {
+    const seen = new Map();
+    const note = (ranges) => {
+        for (const r of ranges ?? []) {
+            if (r.kind !== ts.SyntaxKind.SingleLineCommentTrivia || seen.has(r.pos)) continue;
+            const m = ALLOW_RE.exec(src.slice(r.pos, r.end));
+            if (!m) continue;
+            const line = sf.getLineAndCharacterOfPosition(r.pos).line + 1;
+            const lineStart = sf.getPositionOfLineAndCharacter(line - 1, 0);
+            seen.set(r.pos, { line, trailing: src.slice(lineStart, r.pos).trim() !== '', reason: m[1].trim() });
+        }
+    };
+    const walk = (node) => {
+        note(ts.getLeadingCommentRanges(src, node.getFullStart()));
+        note(ts.getTrailingCommentRanges(src, node.getEnd()));
+        for (const child of node.getChildren(sf)) walk(child);
+    };
+    walk(sf);
+    return [...seen.values()];
 }
 
 /**
- * The `projection-allow:` marker that covers `node`: one at the end of the line the call starts on, or on the line above it. A marker
- * above a statement that spans several lines covers the call on its first line; a call further down the statement needs its own, unless
- * the reason says it covers `both` (or `all`) of them. The statement ends at the nearest enclosing function body.
+ * The marker that covers a finding starting on a given line (1-based). A trailing marker covers findings that START on its own line (a
+ * value that starts there is covered however many lines it runs over); a comment-only marker covers findings that start on the NEXT line.
+ * Nothing else is covered: not a later line of the same call, and not the line after a trailing marker or after a blank line.
  */
-function allowComment(src, sf, node) {
-    let stmt = node;
-    while (stmt.parent && !ts.isBlock(stmt.parent) && !ts.isSourceFile(stmt.parent) && !ts.isCaseClause(stmt.parent) && !ts.isFunctionLike(stmt.parent)) stmt = stmt.parent;
-    const lines = src.split('\n');
-    const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
-    const above = line > 0 ? lines[line - 1].trim() : '';
-    const same = lines[line].includes('//') ? lines[line].slice(lines[line].indexOf('//')) : '';
-    const near = ALLOW_RE.exec(`${above.startsWith('//') ? above : ''}\n${same}`);
-    if (near) return { present: true, reason: near[1].trim() };
-    const wide = ALLOW_RE.exec(leadingText(src, stmt));
-    if (wide) {
-        const reason = wide[1].trim();
-        const stmtLine = sf.getLineAndCharacterOfPosition(stmt.getStart(sf)).line;
-        if (stmtLine === line || /\b(both|all)\b/i.test(reason)) return { present: true, reason };
-    }
-    return { present: false, reason: '' };
+function markerFor(markers, line) {
+    const own = markers.find((m) => m.trailing && m.line === line);
+    if (own) return { present: true, at: own.line, reason: own.reason };
+    const above = markers.find((m) => !m.trailing && m.line === line - 1);
+    return above ? { present: true, at: above.line, reason: above.reason } : { present: false, at: 0, reason: '' };
 }
 
 /** The values of one object literal that must be field-list built: every property value and spread, with the key each sits under. */
 function literalParts(e, labelPrefix) {
     const parts = [];
+    const nested = labelPrefix !== '';
     for (const p of e.properties) {
-        if (ts.isSpreadAssignment(p)) parts.push({ label: `${labelPrefix}spread`, key: null, expr: p.expression });
-        else if (ts.isPropertyAssignment(p)) parts.push({ label: `${labelPrefix}${p.name.getText()}`, key: ts.isIdentifier(p.name) || ts.isStringLiteral(p.name) ? p.name.text : null, expr: p.initializer });
-        else if (ts.isShorthandPropertyAssignment(p)) parts.push({ label: `${labelPrefix}${p.name.text}`, key: null, expr: p.name });
+        if (ts.isSpreadAssignment(p)) parts.push({ label: `${labelPrefix}spread`, key: null, nested, expr: p.expression });
+        else if (ts.isPropertyAssignment(p)) parts.push({ label: `${labelPrefix}${p.name.getText()}`, key: ts.isIdentifier(p.name) || ts.isStringLiteral(p.name) ? p.name.text : null, nested, expr: p.initializer });
+        else if (ts.isShorthandPropertyAssignment(p)) parts.push({ label: `${labelPrefix}${p.name.text}`, key: null, nested, expr: p.name });
     }
     return parts;
 }
@@ -294,7 +206,7 @@ function collectParts(e, prefix, out) {
             for (const el of inner.elements) {
                 const item = ts.isSpreadElement(el) ? el.expression : unwrap(el);
                 if (!ts.isSpreadElement(el) && ts.isObjectLiteralExpression(item)) collectParts(item, `${part.label}[].`, out);
-                else out.push({ label: `${part.label}[]`, key: null, expr: item });
+                else out.push({ label: `${part.label}[]`, key: null, nested: true, expr: item });
             }
         } else {
             out.push(part);
@@ -304,7 +216,10 @@ function collectParts(e, prefix, out) {
 
 /**
  * A property copied under its own name (`id: row.id`, `name: row.name ?? null`) is a field being picked by name, which is what a field
- * list is. A property taken under another name (`item: row.inner`) or a whole value (`item: row`) is not.
+ * list is. It counts only for a property nested inside a literal (never a top-level key of the response, such as `data: r.data`), and only
+ * when the receiver is a plain identifier: not a call, an await, a parenthesised expression or another property access, and the member is
+ * not one of the container names above (nor ends in Row, Rows, Data or List), unless it is `.length`. A property taken
+ * under another name (`item: row.inner`) or a whole value (`item: row`) is not a pick.
  */
 function isFieldPick(expr, key, decl) {
     if (key === null) return false;
@@ -312,13 +227,14 @@ function isFieldPick(expr, key, decl) {
     if (ts.isBinaryExpression(e) && (e.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken || e.operatorToken.kind === ts.SyntaxKind.BarBarToken)) {
         return isFieldPick(e.left, key, decl) && isProjected(e.right, decl, 1);
     }
-    return ts.isPropertyAccessExpression(e) && e.name.text === key;
+    if (!ts.isPropertyAccessExpression(e) || !ts.isIdentifier(e.expression) || e.name.text !== key) return false;
+    return !isContainerName(key);
 }
 
 /** The values of one response argument that must be field-list built, at any depth of the literal. */
 function checkedParts(arg) {
     const e = unwrap(arg);
-    if (!ts.isObjectLiteralExpression(e)) return [{ label: 'response', key: null, expr: e }];
+    if (!ts.isObjectLiteralExpression(e)) return [{ label: 'response', key: null, nested: false, expr: e }];
     const parts = [];
     collectParts(e, '', parts);
     return parts;
@@ -350,13 +266,27 @@ function responseSite(node, contexts) {
     return null;
 }
 
-/** The name of a helper call that looks like it answers with its second argument but is not one of the known response forms, or null. */
+/** True when the call's value is what the enclosing function returns: `return f(c, x)`, `return await f(c, x)` or an expression-bodied arrow. */
+function isReturned(node) {
+    let n = node;
+    while (n.parent && (ts.isParenthesizedExpression(n.parent) || ts.isAwaitExpression(n.parent) || ts.isAsExpression(n.parent) || ts.isNonNullExpression(n.parent))) n = n.parent;
+    return n.parent !== undefined && (ts.isReturnStatement(n.parent) || (ts.isArrowFunction(n.parent) && n.parent.body === n));
+}
+
+/**
+ * A call that hands the request context and at least one more value to a function that is neither a known response form nor declared in
+ * this file, and whose value the handler returns: what such a function answers with is not looked into here. Helpers that only read or
+ * write the request (not answer it) are listed in NON_RESPONSE_HELPERS. A helper whose value is stored first and returned later is not seen.
+ * Returns the helper's name, or null.
+ */
 function unknownResponseHelper(node, contexts, decl) {
     if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression) || node.arguments.length < 2) return null;
     const name = node.expression.text;
     const first = node.arguments[0];
     if (!ts.isIdentifier(first) || !contexts.has(first.text) || KNOWN_RESPONSE_HELPERS.has(name) || decl.functions.has(name)) return null;
-    return RESPONSE_HELPER_NAME.test(name) ? name : null;
+    // A projection of a value whose name happens to be a function's first parameter is not a response.
+    if (PROJECTORS.has(name) || PROJECT_NAME.test(name) || PRIMITIVE_BARE.has(name)) return null;
+    return NON_RESPONSE_HELPERS.test(name) || !isReturned(node) ? null : name;
 }
 
 export function detectPublicProjection(src, path = 'route.ts') {
@@ -365,6 +295,12 @@ export function detectPublicProjection(src, path = 'route.ts') {
     const violations = [];
     let sites = 0;
     const lineOf = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
+    const markers = readMarkers(sf, src);
+    const used = new Set();
+    // A marker anywhere in the file needs a real reason, whether or not a finding sits under it.
+    for (const m of markers) {
+        if (m.reason.length < MIN_REASON) violations.push({ line: m.line, rule: 'allow-without-reason', message: `projection-allow needs a reason of at least ${MIN_REASON} characters` });
+    }
     // The handler's context is its first parameter; `c` and `ctx` stay recognised for helpers that take it by those names.
     const visit = (node, contexts) => {
         let here = contexts;
@@ -372,28 +308,33 @@ export function detectPublicProjection(src, path = 'route.ts') {
             here = new Set([...contexts, node.parameters[0].name.text]);
         }
         const helper = unknownResponseHelper(node, here, decl);
-        if (helper && !allowComment(src, sf, node).present) {
+        const helperMarker = helper ? markerFor(markers, lineOf(node)) : null;
+        if (helperMarker?.present) used.add(helperMarker.at);
+        if (helper && !helperMarker?.present) {
             violations.push({ line: lineOf(node), rule: 'unknown-response-helper', message: `${helper} receives the request context and a value, and its response is not looked into` });
         }
         const site = responseSite(node, here);
         if (site) {
             sites += 1;
-            const allow = allowComment(src, sf, node);
-            if (allow.present && allow.reason.length < MIN_REASON) {
-                violations.push({ line: lineOf(node), rule: 'allow-without-reason', message: `projection-allow needs a reason of at least ${MIN_REASON} characters` });
-            } else if (!allow.present) {
-                for (const arg of site.content) {
-                    for (const part of checkedParts(arg)) {
-                        if (!isProjected(part.expr, decl, 0) && !isFieldPick(part.expr, part.key, decl)) {
-                            const what = part.label === 'response' ? 'this response' : `the ${part.label} of this response`;
-                            violations.push({ line: lineOf(part.expr), rule: 'unprojected-response', message: `${what} is not built from a field list: ${part.expr.getText(sf).slice(0, 60)}` });
-                        }
-                    }
+            for (const arg of site.content) {
+                for (const part of checkedParts(arg)) {
+                    // A pick by name is a field list only inside a literal: the top-level keys of the response are not picks.
+                    if (isProjected(part.expr, decl, 0) || (part.nested && isFieldPick(part.expr, part.key, decl))) continue;
+                    const marker = markerFor(markers, lineOf(part.expr));
+                    if (marker.present) { used.add(marker.at); continue; }
+                    const what = part.label === 'response' ? 'this response' : `the ${part.label} of this response`;
+                    violations.push({ line: lineOf(part.expr), rule: 'unprojected-response', message: `${what} is not built from a field list: ${part.expr.getText(sf).slice(0, 60)}` });
                 }
             }
         }
         ts.forEachChild(node, (child) => visit(child, here));
     };
     visit(sf, new Set(['c', 'ctx']));
+    // A marker that excuses nothing is a claim with nothing under it, and would excuse a later change on its line.
+    for (const m of markers) {
+        if (!used.has(m.line) && m.reason.length >= MIN_REASON) {
+            violations.push({ line: m.line, rule: 'unused-projection-allow', message: 'this projection-allow covers no finding that starts on its own line (trailing) or on the next line (comment-only); remove it or move it to the line it excuses' });
+        }
+    }
     return { sites, violations };
 }

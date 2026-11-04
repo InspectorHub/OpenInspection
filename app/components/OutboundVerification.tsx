@@ -197,10 +197,12 @@ function VerifyDialog({
     widgetRef,
     step,
     (token) => {
+      setLoadFailed(false);
       setHumanToken(token);
       onDone(true);
     },
-    { onLoadFailed: () => setLoadFailed(true) },
+    // The dialog hands the token over the moment it is solved, so there is nothing to expire here; a widget error reads as a failed load.
+    { onLoadFailed: () => setLoadFailed(true), onError: () => setLoadFailed(true) },
   );
 
   return (

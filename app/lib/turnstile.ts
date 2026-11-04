@@ -10,8 +10,11 @@ declare global {
           sitekey: string;
           theme: "light" | "dark" | "auto";
           callback: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
         },
-      ) => void;
+      ) => string | undefined | void;
+      remove?: (widgetId: string) => void;
     };
   }
 }
@@ -72,6 +75,10 @@ export function useTurnstileWidget(
      * whose whole job is to take a booking, so the caller needs to say so.
      */
     onLoadFailed?: () => void;
+    /** Called when a solved token ran out before it was used; the widget then asks the visitor again. */
+    onExpired?: () => void;
+    /** Called when the widget itself reports an error (it could not reach the challenge service or could not run). */
+    onError?: () => void;
     /**
      * Force the widget's palette instead of reading it off the page.
      *
@@ -97,21 +104,28 @@ export function useTurnstileWidget(
       s.onerror = () => options?.onLoadFailed?.();
       document.head.appendChild(s);
     }
-    window.onTurnstileLoad = () => {
-      if (turnstileRef.current && window.turnstile) {
-        window.turnstile.render(turnstileRef.current, {
-          sitekey: siteKey,
-          theme: widgetTheme(options?.theme),
-          callback: (token: string) => onToken(token),
-        });
-      }
-    };
-    if (window.turnstile && turnstileRef.current) {
-      window.turnstile.render(turnstileRef.current, {
+    // The id of the widget this run rendered, so the cleanup removes exactly that one when the effect runs again or the host unmounts.
+    let widgetId: string | undefined;
+    const renderWidget = () => {
+      if (!turnstileRef.current || !window.turnstile || widgetId !== undefined) return;
+      const id = window.turnstile.render(turnstileRef.current, {
         sitekey: siteKey,
         theme: widgetTheme(options?.theme),
         callback: (token: string) => onToken(token),
+        ...(options?.onExpired ? { "expired-callback": options.onExpired } : {}),
+        ...(options?.onError ? { "error-callback": options.onError } : {}),
       });
-    }
+      if (typeof id === "string") widgetId = id;
+    };
+    window.onTurnstileLoad = renderWidget;
+    renderWidget();
+    return () => {
+      if (widgetId === undefined) return;
+      try {
+        window.turnstile?.remove?.(widgetId);
+      } catch {
+        // The host element may already be gone; there is nothing left to remove.
+      }
+    };
   }, [siteKey, step]);
 }

@@ -37,9 +37,9 @@
  * document to point at.
  *
  * A rule added AFTER that review does not inherit it. The status does NOT
- * regress to `interim` when one arrives — that would misdescribe the seventeen
+ * regress to `interim` when one arrives — that would misdescribe the rules
  * that were reviewed — it gains a numbered condition naming the new rule and
- * what about it still needs review. See condition 6.
+ * what about it still needs review. See conditions 6 and 8.
  *
  * The gate does not care what any of these fields say: it only cares that the
  * rules cannot change without this header changing with them.
@@ -125,7 +125,8 @@ export interface RetentionPolicyHeader {
  *         summary (portal — built, pending the ToS publish)
  *   5. ❌ approval/version registration completed before the new ToS publishes
  *   6. ❌ `migration_batches` — added 2026-08-19, NOT REVIEWED. The review
- *         covered the seventeen rules that existed then; this one came
+ *         covered the seventeen rules that existed then (a historical count:
+ *         the manifest has grown since); this one came
  *         after and has had no external review. It is named here rather than
  *         left to be inferred from a date, because `approved_with_conditions`
  *         at the top of this header would otherwise read as covering it. What
@@ -170,10 +171,21 @@ export interface RetentionPolicyHeader {
  *         and no gate that will go red on its own. This list is the only thing
  *         tracking it.
  *
- * Entries 6 and 7 are why the status did not move back to `interim`. Seventeen
- * of nineteen rules genuinely are approved-with-conditions and reverting would
- * destroy the provenance in `approvedBy`; but "approved with conditions" is only
- * honest here because one of the conditions now says which rule is not.
+ *   8. ❌ `verify_export_attempts` — added at `.10`, NOT REVIEWED, on the same
+ *         footing as entry 6. It holds attempt counters for the signed audit
+ *         export's knowledge check: a key built from an envelope id and a keyed
+ *         hash of the caller's network (an IPv4 address, or the /64 prefix of
+ *         an IPv6 address; never the address), a count, and the end of the
+ *         window. No name, email or other personal data is stored. It is
+ *         deleted a day after a window ended, and `legalHold` is
+ *         `not_applicable`. What needs review: whether a keyed network hash
+ *         beside an envelope id is personal data in any reading, and whether a
+ *         day is the right margin. An in-house assessment does not close this.
+ *
+ * Entries 6, 7 and 8 are why the status did not move back to `interim`. The rules those entries do
+ * not name genuinely are approved-with-conditions, and reverting would destroy the provenance in
+ * `approvedBy`; but "approved with conditions" is only honest here because one of the conditions
+ * now says which rule is not.
  *
  * ⚠️ WHAT `.8` CHANGED, AND WHY THE DIGEST DID NOT MOVE WITH IT.
  * Two defects were found by reading the executors against the catalogue, and
@@ -211,11 +223,12 @@ export interface RetentionPolicyHeader {
  * every production store is covered.
  */
 export const RETENTION_POLICY: RetentionPolicyHeader = {
-    version: '2026-09-11.9',
+    version: '2026-09-11.10',
     status: 'approved_with_conditions',
     effectiveAt: '2026-08-08',
-    // The document named below remains what approved the seventeen rules it
-    // saw. It does NOT cover `migration_batches` — see condition 6 above.
+    // The document named below remains what approved the rules it saw (seventeen
+    // at the time, a historical count). It does NOT cover `migration_batches` or
+    // `verify_export_attempts` — see conditions 6 and 8 above.
     // `approvedAt` is left at its own date rather than moved forward, because
     // moving it would date an approval to a day nobody approved anything, and
     // `.5` changed only the unreviewed rule, and `.6` adds no rule at all: it
@@ -229,8 +242,8 @@ export const RETENTION_POLICY: RetentionPolicyHeader = {
     // production deletes: a stored courtesy translation is a derived copy of
     // report text, and it now has a period of its own rather than inheriting
     // one by accident. `approvedBy`/`approvedAt` still do not move, for the
-    // reason given above — the external review saw seventeen rules and this is
-    // not one of them. **A reviewer reading this header must be able to tell
+    // reason given above — the external review saw only the rules that existed
+    // then (seventeen, a historical count) and this is not one of them. **A reviewer reading this header must be able to tell
     // which rules were approved from which were added afterwards, and the
     // version suffix is the only thing carrying that.**
     //
@@ -245,11 +258,15 @@ export const RETENTION_POLICY: RetentionPolicyHeader = {
     // operational state removed by the upload sweep and by tenant purge. Nothing
     // production deletes on a calendar window has changed; the approver does not move.
     //
+    // `.10` adds a rule for `verify_export_attempts`, the attempt counters of the signed audit export's
+    // knowledge check: deleted a day after the counter's window ended, keyed by a keyed hash of a network
+    // prefix (never an address). The approver does not move; the assessment behind it is unchanged.
+    //
     // ⚠️ The value is deliberately an opaque identifier rather than a filename.
     // What it names is held outside this repository, which is a PUBLIC one, and
     // the mapping from the identifier to the document belongs wherever that
     // document is kept. A reader here should be able to tell that a review
     // happened and on what date, and no more than that.
     supersedes: '2026-08-19.7',
-    rulesDigest: 'c86392b6870b55e83c48c984b135be8cd1b8806298113ba31076d98d71459566',
+    rulesDigest: '365cc1f1660a47702fdb62cabeae20900688b962419ee535990f1d367c11d20b',
 };

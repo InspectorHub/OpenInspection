@@ -310,13 +310,13 @@ app.openapi(shareViewRoute, async (c) => {
     // Share routes use the RR's own inspectionId (already validated by runShareGate).
     const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.inspectionId, request.id);
 
-    return c.json({ // projection-allow: the nested value is the credit total, a number
+    return c.json({
         success: true as const,
         data: {
-            propertyAddress,
+            propertyAddress, // projection-allow: the property address of the repair list, shown to the holder of the share or builder token
             customIntro: request.customIntro,
             items: items.map(projectRepairShareLine),
-            creditTotal,
+            creditTotal, // projection-allow: the total of credits applied to this request, a number
         },
     }, 200);
 });

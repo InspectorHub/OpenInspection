@@ -14201,7 +14201,7 @@
               "propertyType": {
                 "type": "string",
                 "nullable": true,
-                "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified."
+                "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows."
               },
               "commercialSubtype": {
                 "type": "string",
@@ -15533,7 +15533,7 @@
                   "propertyType": {
                     "type": "string",
                     "nullable": true,
-                    "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified."
+                    "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows."
                   },
                   "commercialSubtype": {
                     "type": "string",
@@ -16061,7 +16061,7 @@
               "propertyType": {
                 "type": "string",
                 "nullable": true,
-                "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified."
+                "description": "What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows."
               },
               "commercialSubtype": {
                 "type": "string",

@@ -549,13 +549,13 @@ smsAdminRoutes.openapi(complianceRoute, async (c) => {
 
     const stored = await complianceSvc.getStatus(tenantId);
     const managedRow = await getManagedSubRow(db, tenantId);
-    return c.json({ // projection-allow: a signed-in admin route of this module: the company's own SMS mode and compliance state
+    return c.json({
         success: true as const,
         data: {
-            mode,
+            mode, // projection-allow: the company's own SMS mode, one of four fixed values, read by an owner or manager
             complianceStatus: stored?.complianceStatus ?? null,
             rejectionReason: stored?.rejectionReason ?? null,
-            tollfree,
+            tollfree, // projection-allow: the provider records of the company own toll-free verification, each read as verification sid, status and phone-number sid; GET /sms/compliance is guarded by requireRole owner or manager, and records are read only in own mode
             customerProfileStatus: managedRow?.customerProfileStatus ?? null,
             brandStatus: managedRow?.brandStatus ?? null,
             campaignStatus: managedRow?.campaignStatus ?? null,
@@ -647,10 +647,10 @@ smsAdminRoutes.openapi(complianceProvisionRoute, async (c) => {
     try { cfgRow = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get(); }
     catch { cfgRow = undefined; }
     const mode = (cfgRow?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'managed_dedicated';
-    return c.json({ // projection-allow: a signed-in admin route of this module: the company's own SMS mode and compliance state
+    return c.json({
         success: true as const,
         data: {
-            mode,
+            mode, // projection-allow: the company's own SMS mode, one of four fixed values, read by an owner or manager
             complianceStatus: stored?.complianceStatus ?? null,
             rejectionReason: stored?.rejectionReason ?? null,
             tollfree: [],
@@ -748,10 +748,10 @@ smsAdminRoutes.openapi(complianceResubmitRoute, async (c) => {
 
     auditFromContext(c, 'sms.compliance.resubmit', 'tenant', { metadata: { channel } });
 
-    return c.json({ // projection-allow: a signed-in admin route of this module: the company's own SMS mode and compliance state
+    return c.json({
         success: true as const,
         data: {
-            mode,
+            mode, // projection-allow: the company's own SMS mode, one of four fixed values, read by an owner or manager
             complianceStatus: stored?.complianceStatus ?? null,
             rejectionReason: stored?.rejectionReason ?? null,
             tollfree: [],

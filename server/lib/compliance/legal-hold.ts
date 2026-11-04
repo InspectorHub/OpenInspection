@@ -14,7 +14,7 @@
  * night is recoverable; a sweep that ran during a preservation order is not.
  *
  * ── Why the set is loaded once, not per rule ────────────────────────────────
- * Eighteen rules run in one tick. Re-reading per rule would let a hold placed
+ * Every rule runs in one tick. Re-reading per rule would let a hold placed
  * mid-sweep apply to some tables and not others, producing a tenant whose data
  * is half preserved — the worst outcome to have to explain. One read at the top
  * makes the whole tick consistent with a single instant.

@@ -88,6 +88,7 @@ const sendRoute = createRoute(withMcpMetadata({
     responses: {
         201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('Whether the request succeeded.'), data: z.any().describe('The created message row.') }).describe('Created message.') } }, description: 'Created' },
         401: { description: 'Unauthorized' },
+        503: { description: 'Attachment storage could not be read' },
     },
     operationId: 'createMessageInspection',
     summary: 'Send a message to a client (inspector)',
@@ -106,6 +107,7 @@ const uploadRoute = createRoute(withMcpMetadata({
             success: z.boolean().describe('Whether the request succeeded.'),
             data: AttachmentSchema.describe('The stored attachment descriptor.'),
         }) } }, description: 'OK' },
+        503: { description: 'Attachment storage could not be written' },
     },
     operationId: 'uploadMessageInspection',
     summary: 'Upload a message attachment (inspector)',
@@ -125,6 +127,7 @@ const attachmentRoute = createRoute(withMcpMetadata({
     responses: {
         200: { content: { 'application/octet-stream': { schema: z.any() } }, description: 'Attachment bytes' },
         404: { description: 'Not found' },
+        503: { description: 'Attachment storage could not be read' },
     },
     operationId: 'downloadMessageAttachmentInspection',
     summary: 'Download a message attachment (inspector)',
@@ -176,7 +179,7 @@ inspectorMessageRoutes.openapi(sendRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const { body, attachments, contactId } = c.req.valid('json');
     const stored = await verifyAttachments(c.env.PHOTOS, attachments ?? [], tenantId, inspectionId);
-    if (!stored) throw Errors.BadRequest('Attachment does not belong to this inspection.');
+    if (!stored) throw Errors.BadRequest('Check the attachments and try again.');
     const jwtUser = c.get('user');
     const svc = c.var.services.message;
     // Which thread this reply belongs to: the named contact's (compose
@@ -341,8 +344,8 @@ clientMessageRoutes.post('/inspections/:id/messages/upload', async (c) => {
         const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, actor.tenantId, inspectionId);
         return c.json({ success: true, data }, 200); // projection-allow: the descriptor of the file just uploaded; the sender posts it back with its key, which the send route validates
     } catch (err) {
-        const status = (err as { status?: number })?.status;
-        return c.json({ error: 'Upload rejected.' }, status === 400 ? 400 : 400);
+        if (err instanceof AppError && err.status === 503) return c.json({ error: 'Attachment storage is unavailable.' }, 503);
+        return c.json({ error: 'Upload rejected.' }, 400);
     }
 });
 

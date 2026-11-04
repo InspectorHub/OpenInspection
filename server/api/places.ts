@@ -152,7 +152,7 @@ if (c.env.TENANT_CACHE) {
     await c.env.TENANT_CACHE.put(cacheKey, JSON.stringify({ results }), { expirationTtl: 60 * 60 });
 }
 
-return c.json({ success: true, data: results, meta: { cached: false } }, 200);
+return c.json({ success: true, data: results, meta: { cached: false } }, 200); // projection-allow: address suggestions, each a literal of place id, description and two text parts
 });
 app.openapi(detailsRoute, async (c) => {
 const apiKey = c.env.GOOGLE_PLACES_API_KEY;

@@ -132,7 +132,7 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         if (!file) return c.json({ error: 'file field required' }, 400);
 
         const stored = await storeVideoUpload(c.env, claims, file, MAX_FORM_VIDEO_BYTES);
-        if (!stored.ok) return c.json(stored.status === 413 ? FORM_TOO_LARGE : { error: stored.error }, stored.status);
+        if (!stored.ok) return c.json(stored.status === 413 ? FORM_TOO_LARGE : { error: stored.error }, stored.status); // projection-allow: a refusal body: the constant too-large answer (error code and limits) or the upload's error message
         return c.json({ success: true, data: { mediaId: stored.mediaId, r2Key: stored.r2Key } }, 200);
     })
     .route('/uploads/video/chunked', videoChunkedRoutes);

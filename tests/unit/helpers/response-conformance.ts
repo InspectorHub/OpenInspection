@@ -10,6 +10,8 @@ import { app } from '../../../server/index';
 import { NATIVE_SCOPE, type NativeProps } from '../../../server/lib/auth/native-token';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import * as schema from '../../../server/lib/db/schema';
+import { eq } from 'drizzle-orm';
+import { isMoneyField } from '../../../server/lib/auth/money-redaction';
 import { makeExecutionContext } from './exec-ctx';
 import { createHarness, INSPECTOR_ID, OWNER_ID, TENANT_ID, type Harness } from './tenant-email-harness';
 import { compareToSchema, declaredObjectArrays } from './response-shape';
@@ -239,4 +241,59 @@ export function checkConformance(observed: readonly Observation[], entries: read
         for (const k of keys) if (!seenKeys.get(id)?.has(k)) problems.push(`stale entry (declared now or no longer returned): ${id} ${k}`);
     }
     return problems;
+}
+
+/** The reads that carry money, which a caller without the fees capability must receive without any money key. */
+export const MONEY_READS: readonly string[] = [B, `${B}/report-data`, '/api/inspections', `${B}/cost-items`];
+
+export interface MoneyObservation {
+    method: string; path: string; status: number;
+    /** Every key anywhere in the body that the money naming rule matches (`*Cents`, price, discountAmount, priceOverride, priceSnapshot). */
+    moneyKeys: string[];
+    missingRequired: string[]; typeMismatch: string[];
+    /** The body's top-level keys, so a caller can see the pass read a real body. */
+    bodyKeys: number;
+}
+
+function collectMoneyKeys(value: unknown, out: Set<string>): void {
+    if (Array.isArray(value)) { for (const v of value) collectMoneyKeys(v, out); return; }
+    if (value === null || typeof value !== 'object' || value instanceof Date) return;
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+        if (isMoneyField(key)) out.add(key);
+        collectMoneyKeys(v, out);
+    }
+}
+
+/**
+ * Requests the money-bearing reads once as the company owner and once as an inspector whose inspection-fees capability is switched off,
+ * and reports, per read, the status, the shape problems against the schema and every money key found in the body.
+ */
+export async function observeMoneyReads(as: 'owner' | 'inspector-without-fees'): Promise<MoneyObservation[]> {
+    const h = await createHarness('standalone');
+    try {
+        await seed(h);
+        const inspector = as === 'inspector-without-fees';
+        if (inspector) await h.db.update(schema.users).set({ permissionOverrides: { inspectionFees: false } }).where(eq(schema.users.id, INSPECTOR_ID));
+        const keyring = await buildKeyring(h.env as unknown as Record<string, string | undefined>);
+        const now = Math.floor(Date.now() / 1000);
+        const jwt = await signJwt({ sub: inspector ? INSPECTOR_ID : OWNER_ID, 'custom:tenantId': TENANT_ID, 'custom:userRole': inspector ? 'inspector' : 'owner', iat: now, exp: now + 3600 }, keyring);
+        const out: MoneyObservation[] = [];
+        for (const path of MONEY_READS) {
+            const exec = makeExecutionContext({ label: 'response-conformance-money' });
+            const res = await app.request(fill(path, { id: INSPECTION_ID }), { method: 'GET', headers: { authorization: `Bearer ${jwt}` } }, h.env, exec.ctx);
+            await exec.settle();
+            let body: unknown = null;
+            try { body = JSON.parse(await res.text()); } catch { body = null; }
+            const schemaNode = responseSchema('get', path, 200);
+            const problems = res.status === 200 && schemaNode !== undefined ? compareToSchema(body, schemaNode, contract.components?.schemas ?? {}) : null;
+            const found = new Set<string>();
+            collectMoneyKeys(body, found);
+            out.push({
+                method: 'get', path, status: res.status, moneyKeys: [...found].sort(),
+                missingRequired: problems?.missingRequired ?? [], typeMismatch: problems?.typeMismatch ?? [],
+                bodyKeys: body !== null && typeof body === 'object' ? Object.keys(body).length : 0,
+            });
+        }
+        return out;
+    } finally { h.close(); }
 }

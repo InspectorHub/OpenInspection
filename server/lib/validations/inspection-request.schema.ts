@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { postalOrNull } from './postal-code';
 import { createApiResponseSchema } from './shared.schema';
 
 /**
@@ -24,7 +25,7 @@ export const CreateInspectionRequestSchema = z.object({
     propertyAddress: z.string().min(5).max(500).openapi({ example: '123 Main St, Anytown, ST' }).describe('Address of the property to inspect, 5-500 characters. Every inspection in the request shares it'),
     propertyCity:    z.string().max(100).optional().nullable().describe('Property city, up to 100 characters'),
     propertyState:   z.string().max(10).optional().nullable().describe('Property state or region, up to 10 characters'),
-    propertyZip:     z.string().max(20).optional().nullable().describe('Property postal code, up to 20 characters'),
+    propertyZip:     z.string().max(20).optional().nullable().transform(postalOrNull).describe('Property postal code, up to 20 characters'),
     scheduledAt:     z.string().min(1).openapi({ example: '2026-06-15T09:00:00Z' }).describe('Scheduled date and time as an ISO 8601 timestamp (for example 2026-06-15T09:00:00Z). Every inspection in the request takes this value as its date'),
     notes:           z.string().max(2000).optional().nullable().describe('Notes about the request as a whole, up to 2000 characters'),
     inspectorId:     z.string().trim().min(1).optional().describe('Id of the inspector (a user in this company) assigned to every inspection in the request; omit to leave them unassigned'),
@@ -38,7 +39,7 @@ export const UpdateInspectionRequestSchema = z.object({
     propertyAddress: z.string().min(5).max(500).optional().describe('New property address, 5-500 characters'),
     propertyCity:    z.string().max(100).optional().nullable().describe('New property city, up to 100 characters; null clears it'),
     propertyState:   z.string().max(10).optional().nullable().describe('New property state or region, up to 10 characters; null clears it'),
-    propertyZip:     z.string().max(20).optional().nullable().describe('New property postal code, up to 20 characters; null clears it'),
+    propertyZip:     z.string().max(20).optional().nullable().transform(postalOrNull).describe('New property postal code, up to 20 characters; null clears it'),
     scheduledAt:     z.string().min(1).optional().describe('New scheduled date and time as an ISO 8601 timestamp. Applies to the request record only; inspections already created keep their own dates'),
     notes:           z.string().max(2000).optional().nullable().describe('New notes for the request, up to 2000 characters; null clears them'),
     status:          z.enum(['pending', 'confirmed', 'in_progress', 'completed', 'cancelled']).optional().describe('New request status: pending, confirmed, in_progress, completed or cancelled. Changes the request record only, not its inspections'),

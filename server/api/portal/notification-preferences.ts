@@ -202,10 +202,9 @@ const portalNotificationPreferenceRoutes = router
         }
         const disclosure = await new SmsConsentService(c.env.DB).currentDisclosure();
         const smsConsent = await readSmsConsent(db, tenantId, 'client', asContacts(contactIds), disclosure);
-        // projection-allow: buildScreenModel returns the two lists the screen states (id, label, channels)
         return c.json({
             success: true as const,
-            data: { ...buildScreenModel('client', chosen), smsConsent: projectSmsConsent(smsConsent) },
+            data: { ...buildScreenModel('client', chosen), smsConsent: projectSmsConsent(smsConsent) }, // projection-allow: the screen model: two lists of id, label and channels built by buildScreenModel
         }, 200);
     })
     .openapi(saveRoute, async (c) => {

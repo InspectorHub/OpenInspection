@@ -31,7 +31,7 @@ export const INSPECTION_ROW_FIELDS = {
     addressGeocodedAt: when('When the address was geocoded'),
     unit: z.string().nullable().optional().describe('Suite or unit designation of the inspected property, or null.'),
     county: z.string().nullable().optional().describe('County as the Property Facts strip edits it, or null.'),
-    propertyType: z.string().nullable().optional().describe('What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may exist on rows written before the lists were unified.'),
+    propertyType: z.string().nullable().optional().describe('What kind of property was inspected: single_family, multi_unit or commercial, or null when it was never classified. Other values may be present on older rows.'),
     commercialSubtype: z.string().nullable().optional().describe('Commercial property subtype, or null. Only meaningful when the property type is commercial.'),
     yearBuilt: z.number().int().nullable().optional().describe('Year the property was built, or null.'),
     sqft: z.number().int().nullable().optional().describe('Floor area in square feet, or null.'),

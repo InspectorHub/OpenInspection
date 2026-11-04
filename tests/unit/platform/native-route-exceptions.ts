@@ -26,7 +26,7 @@ export interface NativeRouteException {
     reason: string;
 }
 
-export const MAX_ENTRIES = 83;
+export const MAX_ENTRIES = 84;
 
 export const NATIVE_ROUTE_EXCEPTIONS: readonly NativeRouteException[] = [
     { key: 'GET /api/inspections/{id}/collab/ws', category: 'websocket', reason: 'WebSocket upgrade for the collaborative editor; answers 426 to a plain request' },
@@ -56,7 +56,8 @@ export const NATIVE_ROUTE_EXCEPTIONS: readonly NativeRouteException[] = [
     { key: 'GET /api/data/export/contacts', category: 'binary-or-stream', reason: 'CSV download (text/csv attachment), not a JSON response' },
     { key: 'GET /api/data/export/members', category: 'binary-or-stream', reason: 'CSV download (text/csv attachment), not a JSON response' },
     { key: 'GET /api/public/verify/{envelopeId}/public-key', category: 'binary-or-stream', reason: 'PEM file download (application/x-pem-file attachment)' },
-    { key: 'GET /api/public/verify/{envelopeId}/audit-trail', category: 'binary-or-stream', reason: 'JSON served as a file attachment for the offline verifier' },
+    { key: 'POST /api/public/verify/{envelopeId}/export', category: 'binary-or-stream', reason: 'JSON served as a file attachment for the offline verifier, released after a knowledge check' },
+    { key: 'GET /api/public/verify/{envelopeId}/audit-trail', category: 'binary-or-stream', reason: 'Answers 403 verification_required; the export moved to the POST route' },
     { key: 'POST /api/platform/tenants/{slug}/data-export', category: 'binary-or-stream', reason: 'Control-plane route; answers a ZIP stream with a manifest header' },
     { key: 'GET /api/platform/migration-runs/{batchId}/source', category: 'binary-or-stream', reason: 'Control-plane route; streams the uploaded import file' },
     { key: 'POST /api/inspections/{id}/media/video/r2-upload', category: 'multipart-upload', reason: 'Multipart video upload gated by a signed token' },

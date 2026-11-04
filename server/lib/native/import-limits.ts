@@ -30,7 +30,7 @@
  *
  * Queued writes dominate. Default maximum: 70 + 8*22 + 20*20 + 50*3 = 796
  * estimated subrequests, and the spec measures the largest default package
- * under 800 (787 measured). That leaves about a fifth of the Free ceiling free for what the
+ * under 800 (792 measured). That leaves about a fifth of the Free ceiling free for what the
  * estimate averages away (a queued write that touches more rows costs more).
  *
  * What these defaults do NOT claim. They are sized from the subrequest count only.

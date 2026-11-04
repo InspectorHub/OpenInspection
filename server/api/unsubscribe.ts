@@ -171,13 +171,13 @@ app.openapi(resolveRoute, async (c) => {
     const cfg = await db.select({ companyName: tenantConfigs.companyName })
         .from(tenantConfigs).where(eq(tenantConfigs.tenantId, grant.tenantId)).get();
 
-    return c.json({ // projection-allow: the nested value is a boolean: whether the class is muted
+    return c.json({
         success: true as const,
         data: {
             companyName: cfg?.companyName ?? 'this company',
             label: cls.label,
-            classId: cls.id,
-            muted: await isPreferenceMuted(db, grant.tenantId, cls.id, 'email', subjects),
+            classId: cls.id, // projection-allow: the preference class id the unsubscribe link names
+            muted: await isPreferenceMuted(db, grant.tenantId, cls.id, 'email', subjects), // projection-allow: a boolean: whether the link holder's own class is muted
         },
     }, 200);
 });

@@ -81,6 +81,7 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 | [`develop/integration-adapters.md`](develop/integration-adapters.md) | Writing code that talks to somebody else's API — shape, credentials, failure recording, contract tests |
 | [`develop/integration-sources.md`](develop/integration-sources.md) | Whose credentials a service runs on — the `provided` / `own` source model, the resolver, and what a company that never chose keeps |
 | [`develop/native-clients.md`](develop/native-clients.md) | Server side of the native app: the `NATIVE_CLIENT_ENABLED` switch, OAuth `native` scope, version handshake, signed uploads, offline package import and limits, and the add-only contract |
+| [`develop/dependency-policy.md`](develop/dependency-policy.md) | How dependency alerts that cannot be fixed within declared ranges are handled, and the open minimatch alert with its watch |
 | [`develop/design-system.md`](develop/design-system.md) | Tokens, `packages/shared-ui`, dark mode, the `lint:ds` gate |
 | [`develop/logo-design.md`](develop/logo-design.md) | Logo construction and brand asset spec |
 | [`develop/conventions/route-metadata.md`](develop/conventions/route-metadata.md) | Metadata every `createRoute()` must declare, and the gate that enforces it |

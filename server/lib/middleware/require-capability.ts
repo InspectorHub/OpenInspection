@@ -10,7 +10,7 @@ import {
 } from '../auth/capabilities';
 import { isRole } from '../auth/roles';
 import { users } from '../db/schema';
-import { memoOnce } from '../request-scope';
+import { capsOverridesKey, memoOnce } from '../request-scope';
 import type { HonoConfig } from '../../types/hono';
 
 /**
@@ -42,7 +42,7 @@ const resolveOverridesFromDb: OverrideResolver = async (c) => {
     // three under one scope. Keyed by user id, so an admin editing SOMEONE
     // ELSE's overrides shares no entry with their own.
     const tenantId = c.get('tenantId') ?? '-';
-    const row = await memoOnce(c.env, `caps-overrides:${tenantId}:${userId}`, async () =>
+    const row = await memoOnce(c.env, capsOverridesKey(tenantId, userId), async () =>
         // getById is tenant-scoped (users has a tenantId column) and fail-closed.
         await sdb.getById(users, userId));
     // permission_overrides is drizzle { mode: 'json' } → may be an object,

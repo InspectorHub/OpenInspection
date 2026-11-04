@@ -8,20 +8,26 @@
  * scripts/lib/public-projection-detect.mjs; the helper is server/lib/response-projection.ts; the note for developers is
  * docs/develop/public-response-projection.md.
  *
- * WHICH MODULES. PUBLIC_MODULES below is data, kept by hand, and so is OUT_OF_SCOPE (a module that sits on or beside a path
- * the session middleware leaves open and is deliberately not scanned, with the reason). Two checks read the code instead
- * of the lists: every `.route('/api/public...', X)` mount in server/index.ts must resolve to a scanned module, and every
- * path or prefix that server/lib/auth/public-paths.ts leaves unauthenticated must resolve, through the mounts in
- * server/index.ts and server/portal/integration.module.ts, to modules that are scanned or listed in OUT_OF_SCOPE. The
- * scope is the MODULE: a module that holds public and signed-in routes together is scanned whole.
+ * WHICH MODULES. PUBLIC_MODULES below is data, kept by hand, and so are OUT_OF_SCOPE (a module reached by a path the session
+ * middleware leaves open that is deliberately not scanned, with the reason) and PAGE_PATHS (open paths outside /api that no
+ * mount answers: pages, or handlers written inline in server/index.ts, which is scanned). Checks that read the code instead:
+ * every `.route('/api/public...', X)` mount in server/index.ts must resolve to a scanned module; every path or prefix that
+ * server/lib/auth/public-paths.ts leaves open is read in any quote style (the count of `startsWith(` calls and `path ===`
+ * comparisons must equal the number read) and must resolve, through the mounts in server/index.ts and
+ * server/portal/integration.module.ts, to modules that are scanned or in OUT_OF_SCOPE, or, outside /api, be listed in PAGE_PATHS;
+ * a module mounted at the root is held to the same rule. What this cannot see: a route added to a module that is not mounted
+ * under a path it reads, a mount written in a form `parseMounts` does not parse (it stops on those), and paths opened by
+ * code other than public-paths.ts. The scope is the MODULE: a module that holds public and signed-in routes is scanned whole.
  *
  * Fail-closed checks: a glob that matches no file; a listed module with no response-producing call although it registers
- * routes; a mount whose module is not in the set; a mount the reader cannot resolve; an unauthenticated /api path with no
- * mount; an OUT_OF_SCOPE entry that is gone or is also scanned; zero modules or responses.
+ * routes; a mount whose module is not in the set; a mount or open path the reader cannot resolve; an open literal outside /api that
+ * is neither mounted nor in PAGE_PATHS; an OUT_OF_SCOPE or PAGE_PATHS entry that no open path reaches, that is gone, or that is
+ * also scanned; zero modules or responses.
  *
- * Existing findings are frozen per file in scripts/public-projection-baseline.json ({ path: count }; the count is per
- * file, so a fix and a new finding in the same file net out) and may only shrink: `--write-baseline` lowers it and refuses to raise it (it creates the file when there is none). An intentional
- * exception is `// projection-allow: <reason>` above the statement; the reason is mandatory.
+ * Existing findings are frozen per file in scripts/public-projection-baseline.json ({ path: count }; the count is per file, so a
+ * fix and a new finding in the same file net out) and may only shrink: `--write-baseline` lowers it and refuses to raise it (it
+ * creates the file when there is none). An intentional exception is `// projection-allow: <reason>` as a trailing comment (it covers findings that start on its own line)
+ * or as a comment-only line (it covers findings that start on the next line); the reason is mandatory, and a marker that excuses nothing is itself a finding.
  *
  * Prints BOTH numbers on every run (responses scanned, findings, against the baseline), and fails when it scanned nothing,
  * when its listing disagrees with an independent count, or when the detector misses a planted control.
@@ -32,9 +38,14 @@
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { dirname, join, posix } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { detectPublicProjection } from './lib/public-projection-detect.mjs';
+import {
+    PAGE_PATHS, moduleFile, parseMounts, publicMounts, publicPathModules, readOpenPaths, readPathConstants,
+} from './lib/public-projection-mounts.mjs';
+
+export { PAGE_PATHS, moduleFile, parseMounts, publicMounts, publicPathModules, readOpenPaths, readPathConstants };
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = 'scripts/public-projection-baseline.json';
@@ -71,6 +82,8 @@ export const PUBLIC_MODULES = [
     ':(glob)server/api/qbo-oauth.ts',
     // `GET /api/client/compat` answers without a session; the rest of the module needs a native session.
     ':(glob)server/api/client.ts',
+    // The composition file also answers a few unauthenticated routes inline (status, the signed-envelope proof routes, the signing page).
+    ':(glob)server/index.ts',
     // The create-booking handler returns what this service builds with the request context.
     ':(glob)server/services/booking/fulfill-booking.ts',
 ];
@@ -83,14 +96,10 @@ export const OUT_OF_SCOPE = {
     'server/api/agent.ts': 'every route needs an agent session',
     'server/api/agent/terms.ts': 'every route needs an agent session',
     'server/api/agent/notices.ts': 'every route needs an agent session',
-    'server/api/agent/photo.ts': 'every route needs an agent session',
-    'server/api/availability.ts': 'every route needs a session',
-    'server/api/inspection-requests.ts': 'every route needs a session',
-    'server/api/calendar/oauth.ts': 'a signed-in inspector; the answers are a fixed status landing page, a redirect or an error message',
-    'server/api/csp-report.ts': 'answers 204 with no body',
     'server/api/stripe-webhook.ts': 'the provider signs the call; the answers are an acknowledgement or an error message',
+    'server/api/qbo.ts': 'mounted beside the QuickBooks OAuth callback; only the exact callback path is open and that route is in qbo-oauth.ts (scanned), the rest of this module needs a session',
     'server/api/qbo-webhook.ts': 'the provider signs the call; the answers are an acknowledgement or an error message',
-    'server/api/test-hooks.ts': 'answers 404 unless the end-to-end email sink flag is set, which no deployment sets',
+    'server/api/test-hooks.ts': 'answers 404 unless the end-to-end email sink flag is set, which only the end-to-end configuration sets',
     'server/features/setup-wizard/index.ts': 'answers a fixed text; the wizard is a page, not an API',
     'server/portal/integration.routes.ts': 'the portal signs the call (service-binding HMAC); no anonymous caller',
     'server/portal/statutory-admin.routes.ts': 'the portal signs the call (service-binding HMAC); no anonymous caller',
@@ -117,6 +126,26 @@ export const CONTROLS = [
     { name: 'a stringified row given to c.newResponse is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const row = await db.get(); return c.newResponse(JSON.stringify(row)); });' },
     { name: 'a helper of the same file that is named like a projector is inspected', expect: 'unprojected-response', src: 'function projectThing(x) { return x; }\napp.get("/x", async (c) => { const row = await db.get(); return c.json({ data: projectThing(row) }, 200); });' },
     { name: 'a response helper the gate does not know is flagged', expect: 'unknown-response-helper', src: 'app.get("/x", async (c) => { const row = await db.get(); return jsonOk(c, row); });' },
+    { name: 'a whole value copied under its own name at the top level is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: row.data }, 200); });' },
+    { name: 'a whole value copied under its own name through an optional chain is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: row?.data }, 200); });' },
+    { name: 'a property of a parenthesised await copied under its own name is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: { total: (await svc.get()).total } }, 200); });' },
+    { name: 'a row inside a conditional is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: row ? { item: row } : null }, 200); });' },
+    { name: 'a row in the callback of a map is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: rows.map((r) => ({ id: r.id, whole: r })) }, 200); });' },
+    { name: 'a row returned by a function of the same file is flagged', expect: 'unprojected-response', src: ['function view(r) { return { item: r }; }', 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: view(row) }, 200); });'].join(NL) },
+    { name: 'a helper that answers with a value it is given is flagged', expect: 'unknown-response-helper', src: 'app.get("/x", async (c) => { const row = await db.get(); return fail(c, row); });' },
+    { name: 'a conditional of picked fields passes', expect: null, src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: row ? { id: row.id, name: row.name } : null }, 200); });' },
+    { name: 'a map of picked fields passes', expect: null, src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: rows.map((r) => ({ id: r.id, name: r.name })) }, 200); });' },
+    { name: 'a container member copied under its own name is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: { items: row.items } }, 200); });' },
+    { name: 'a member ending in Row copied under its own name is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: { userRow: row.userRow } }, 200); });' },
+    { name: 'a JSON column copied under its own name is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const config = await db.get(); return c.json({ data: { depositPolicy: config?.depositPolicy ?? null } }, 200); });' },
+    { name: 'a JSON column copied under its own name from a plain identifier is flagged', expect: 'unprojected-response', src: 'app.get("/x", async (c) => { const s = await db.get(); return c.json({ data: { lineItems: s.lineItems } }, 200); });' },
+    { name: 'a scalar member copied under its own name passes', expect: null, src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ data: { id: row.id, label: row.label } }, 200); });' },
+    { name: 'a marker on the first line of a multi-line response does not excuse a row on a later line', expect: 'unprojected-response', src: ['app.get("/x", async (c) => { const row = await db.get();', '  return c.json({ // projection-allow: a flag written on this line only', '    ok: flag(),', '    data: row,', '  }, 200); });'].join(NL) },
+    { name: 'a marker on the line of the value excuses that value and no other', expect: 'unprojected-response', src: ['app.get("/x", async (c) => { const row = await db.get();', '  return c.json({', '    ok: flag(), // projection-allow: a boolean flag', '    data: row,', '  }, 200); });'].join(NL) },
+    { name: 'a blank line between a comment-only marker and the value leaves the value flagged', expect: 'unprojected-response', src: ['app.get("/x", async (c) => { const row = await db.get();', '  // projection-allow: a comment-only marker covers the next line only', '', '  return c.json({ data: row }, 200); });'].join(NL) },
+    { name: 'a trailing marker does not cover the line after it', expect: 'unprojected-response', src: ['app.get("/x", async (c) => { const row = await db.get(); flag(); // projection-allow: a trailing marker covers its own line only', '  return c.json({ data: row }, 200); });'].join(NL) },
+    { name: 'text in a template literal that looks like a marker excuses nothing', expect: 'unprojected-response', src: ['app.get("/x", async (c) => { const row = await db.get(); const note = `', '// projection-allow: this is text inside a template literal, not a comment', '`;', '  return c.json({ data: row, note }, 200); });'].join(NL) },
+    { name: 'a marker that excuses nothing is flagged', expect: 'unused-projection-allow', src: ['app.get("/x", async (c) => { const row = await db.get();', '  // projection-allow: nothing on the next line needs it', '  return c.json({ data: { id: row.id } }, 200); });'].join(NL) },
     { name: 'a projected row passes', expect: null, src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ success: true, data: projectFields(row, FIELDS) }, 200); });' },
     { name: 'a variable declared from a projection passes', expect: null, src: 'app.get("/x", async (c) => { const row = await db.get(); const view = projectFields(row, FIELDS); return c.json({ success: true, data: view }, 200); });' },
     { name: 'an object literal of listed fields passes', expect: null, src: 'app.get("/x", async (c) => { const row = await db.get(); return c.json({ success: true, data: { id: row.id, name: row.name } }, 200); });' },
@@ -136,91 +165,6 @@ export function missedControls(detect = detectPublicProjection, controls = CONTR
         const rules = detect(c.src, 'control.ts').violations.map((v) => v.rule);
         return c.expect === null ? rules.length > 0 : !rules.includes(c.expect);
     }).map((c) => c.name);
-}
-
-const stripLineComments = (src) => src.split('\n').map((l) => l.replace(/(^|[^:'"`\w])\/\/.*$/, '$1')).join('\n');
-
-/**
- * Every `.route(path, Module)` mount in one file, found from its own text. The identifier is resolved through the
- * relative import that names it; `Module()` (a factory call) reads as the module that exports the factory. A call the
- * reader cannot parse is reported in `problems`, never skipped.
- */
-export function parseMounts(src, file = 'server/index.ts') {
-    const text = stripLineComments(src);
-    const imports = new Map();
-    for (const m of text.matchAll(/import\s+(?:type\s+)?(?:(\w+)(?:\s*,\s*)?)?(?:\{([^}]*)\})?\s*from\s*['"](\.[^'"]*)['"]/g)) {
-        const target = posix.normalize(posix.join(posix.dirname(file), m[3]));
-        if (m[1]) imports.set(m[1], target);
-        for (const part of (m[2] ?? '').split(',')) {
-            const name = part.trim().split(/\s+as\s+/).pop();
-            if (name) imports.set(name, target);
-        }
-    }
-    const mounts = [];
-    const problems = [];
-    const read = new Set();
-    for (const m of text.matchAll(/\.route\(\s*(?:(['"`])([^'"`]*)\1|(\w+))\s*,\s*(\w+)\s*(?:\(\s*\))?\s*\)/g)) {
-        read.add(m.index);
-        mounts.push({ path: m[2] ?? null, pathName: m[3] ?? null, name: m[4], target: imports.get(m[4]) ?? null });
-    }
-    for (const m of text.matchAll(/\.route\(/g)) {
-        if (!read.has(m.index)) problems.push(`${file}: a .route( call the reader could not parse: ${text.slice(m.index, m.index + 120).split('\n')[0].trim()}`);
-    }
-    return { mounts, problems };
-}
-
-/**
- * The modules that server/index.ts mounts under `/api/public`. Throws when a mount cannot be read: a `.route(` call that
- * does not parse, an identifier that is not a relative import, or one that is not under ./api/. A mount skipped in
- * silence is a module that is never scanned.
- */
-export function publicMounts(indexSrc, file = 'server/index.ts') {
-    const { mounts, problems } = parseMounts(indexSrc, file);
-    const ours = mounts.filter((m) => m.path !== null && m.path.startsWith('/api/public'));
-    const bad = problems.filter((p) => p.includes('api/public'));
-    for (const m of ours) {
-        if (m.target === null) bad.push(`${m.path} is mounted from ${m.name}, which is not a relative import`);
-        else if (!m.target.startsWith('server/api/')) bad.push(`${m.path} is mounted from ${m.name} (${m.target}), which is not under ./api/`);
-    }
-    if (bad.length) throw new Error(`cannot read the /api/public mounts: ${bad.join('; ')}`);
-    return ours.map((m) => ({ name: m.name, target: m.target }));
-}
-
-/** The module file a mount target names: `<t>.ts` or `<t>/index.ts`. */
-export const moduleFile = (target, present) => [`${target}.ts`, `${target}/index.ts`].find((f) => present(f)) ?? null;
-
-/**
- * Every path or prefix that public-paths.ts leaves outside the session middleware, resolved to the modules that answer
- * it: the mounts at, or under, the prefix; failing that, the mounts at the longest enclosing mount (the root and `/api`
- * do not count as enclosing, they would claim everything). An /api literal that resolves to nothing is returned in
- * `unresolved`; any other unmatched literal is a page of the server-rendered app.
- */
-export function publicPathModules(publicPathsSrc, mounts) {
-    const text = stripLineComments(publicPathsSrc);
-    const literals = [
-        ...[...text.matchAll(/startsWith\('([^']+)'\)/g)].map((m) => ({ path: m[1], prefix: true })),
-        ...[...text.matchAll(/path === '([^']+)'/g)].map((m) => ({ path: m[1], prefix: false })),
-    ];
-    const lit = mounts.filter((m) => m.path !== null);
-    const unresolved = [];
-    const modules = new Map();
-    for (const { path, prefix } of literals) {
-        // `startsWith('/api/')` there is the guard that keeps an /api path from being taken for a static asset; it opens nothing.
-        if (path === '/api/') continue;
-        const p = path.replace(/\/$/, '');
-        let hit = lit.filter((m) => m.path === p || (prefix && m.path.startsWith(`${p}/`)));
-        if (hit.length === 0) {
-            const container = lit.filter((m) => m.path !== '/' && m.path !== '/api' && p.startsWith(`${m.path}/`))
-                .sort((a, b) => b.path.length - a.path.length)[0];
-            if (container) hit = lit.filter((m) => m.path === container.path);
-        }
-        if (hit.length === 0) {
-            if (p.startsWith('/api/')) unresolved.push(path);
-            continue;
-        }
-        for (const m of hit) modules.set(`${m.path} ${m.name}`, { via: path, mount: m });
-    }
-    return { unresolved, modules: [...modules.values()] };
 }
 
 function main() {
@@ -260,15 +204,28 @@ function main() {
         mountProblems.push(...r.problems.filter((p) => !p.includes('/api/public')));
         return r.mounts;
     });
-    const open = publicPathModules(read('server/lib/auth/public-paths.ts'), allMounts);
+    // A mount or an open path written with a named constant (the QuickBooks mount and callback) is resolved through the constants file.
+    const constants = readPathConstants(read('server/lib/qbo-oauth-paths.ts'));
+    for (const m of allMounts) {
+        if (m.path === null && m.pathName !== null) {
+            if (constants[m.pathName] === undefined) mountProblems.push(`the mount path ${m.pathName} of ${m.name} does not resolve to a string`);
+            else m.path = constants[m.pathName];
+        }
+    }
+    const open = publicPathModules(read('server/lib/auth/public-paths.ts'), allMounts, { constants });
     const outOfScope = new Set(Object.keys(OUT_OF_SCOPE));
     const uncovered = [];
-    for (const { via, mount } of open.modules) {
+    const reached = new Set();
+    for (const { via, mount } of [...open.modules, ...open.rootModules]) {
         const file = mount.target ? moduleFile(mount.target, present) : null;
         if (file === null) uncovered.push(`${via} -> ${mount.path} ${mount.name} (module not found)`);
-        else if (!files.includes(file) && !outOfScope.has(file)) uncovered.push(`${via} -> ${file}`);
+        else {
+            reached.add(file);
+            if (!files.includes(file) && !outOfScope.has(file)) uncovered.push(`${via} -> ${file}`);
+        }
     }
-    const staleScope = [...outOfScope].filter((f) => !present(f) || files.includes(f));
+    // An OUT_OF_SCOPE entry must exist, must not also be scanned, and must be reached by an open path or a root mount; otherwise it justifies nothing.
+    const staleScope = [...outOfScope].filter((f) => !present(f) || files.includes(f) || !reached.has(f));
 
     if (process.argv.includes('--write-baseline')) {
         const raised = baseline === null ? [] : Object.keys(counts).filter((p) => counts[p] > (baseline[p] ?? 0));
@@ -299,10 +256,13 @@ function main() {
     if (mounts.length === 0) { console.error(`${TAG} found no \`.route('/api/public', ...)\` mount in server/index.ts; the mount check is blind.`); failed = true; }
     if (unlisted.length) { console.error(`${TAG} mounted under /api/public but not in PUBLIC_MODULES: ${unlisted.map((m) => `${m.name} (${m.target})`).join(', ')}.`); failed = true; }
     if (mountProblems.length) { console.error(`${TAG} ${mountProblems.join('; ')}`); failed = true; }
+    if (open.problems.length) { console.error(`${TAG} ${open.problems.join('; ')}.`); failed = true; }
+    if (open.unlistedPages.length) { console.error(`${TAG} open path(s) outside /api that no mount answers and PAGE_PATHS does not list: ${open.unlistedPages.join(', ')}.`); failed = true; }
+    if (open.stalePages.length) { console.error(`${TAG} PAGE_PATHS entr(ies) that public-paths.ts no longer opens: ${open.stalePages.join(', ')}.`); failed = true; }
     if (open.modules.length === 0) { console.error(`${TAG} no unauthenticated path in server/lib/auth/public-paths.ts resolved to a mount; the path check is blind.`); failed = true; }
     if (open.unresolved.length) { console.error(`${TAG} unauthenticated /api path(s) with no mount to resolve them: ${open.unresolved.join(', ')}.`); failed = true; }
     if (uncovered.length) { console.error(`${TAG} reachable without a session but neither in PUBLIC_MODULES nor in OUT_OF_SCOPE: ${uncovered.join('; ')}.`); failed = true; }
-    if (staleScope.length) { console.error(`${TAG} OUT_OF_SCOPE entr(ies) that are gone or are also scanned: ${staleScope.join(', ')}.`); failed = true; }
+    if (staleScope.length) { console.error(`${TAG} OUT_OF_SCOPE entr(ies) that are gone, are also scanned, or that no open path reaches: ${staleScope.join(', ')}.`); failed = true; }
     if (baseline === null) { console.error(`${TAG} ${BASELINE} is missing. Create it with: node scripts/check-public-projection.mjs --write-baseline`); failed = true; }
     if (files.length !== counted.size) { console.error(`${TAG} the glob engine and the second matcher disagree (${files.length} vs ${counted.size} modules).`); failed = true; }
     if (unreadable > 0) { console.error(`${TAG} ${unreadable} module(s) could not be read.`); failed = true; }

@@ -134,6 +134,19 @@ describe('applyReportCorrection — the applier behind cmd.report.correct', () =
             .toBe('superseded');
     });
 
+    it('corrects a postal code to a real value as given, and a placeholder clears it instead of storing it', async () => {
+        const stored = async () => (await db.select({ zip: schema.inspections.addressZip }).from(schema.inspections)
+            .where(eq(schema.inspections.id, INSPECTION)).get())?.zip;
+        await apply({ field: 'addressZip', to: ' 78701 ' });
+        expect(await stored()).toBe('78701');
+        // Control: a placeholder is read as none (null), exactly as on every other write path.
+        await apply({ field: 'addressZip', to: '-' });
+        expect(await stored()).toBeNull();
+        // And an ordinary address correction is still taken verbatim.
+        await apply({ field: 'propertyAddress', to: '-' });
+        expect((await db.select({ a: schema.inspections.propertyAddress }).from(schema.inspections).where(eq(schema.inspections.id, INSPECTION)).get())?.a).toBe('-');
+    });
+
     it('refuses an inspection this tenant does not hold, and publishes nothing', async () => {
         const reply = await apply({ tenantId: OTHER_TEN });
         expect(reply.outcome).toBe('refused');
