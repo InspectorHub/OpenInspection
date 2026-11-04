@@ -6,8 +6,8 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 165,
-    "dollarMethods": 599,
+    "files": 166,
+    "dollarMethods": 600,
     "apiWorker": 11
   },
   "fanOut": {
@@ -204,6 +204,10 @@
       "apiWorker": 0
     },
     "app/routes/forgot-password.tsx": {
+      "dollarMethods": 1,
+      "apiWorker": 0
+    },
+    "app/routes/inspection-edit/action-edit-again.server.ts": {
       "dollarMethods": 1,
       "apiWorker": 0
     },

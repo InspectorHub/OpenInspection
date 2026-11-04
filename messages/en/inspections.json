@@ -165,8 +165,8 @@
   "inspections_hub_report_published": "Report published.",
   "inspections_hub_report_published_on": "Report published {date}.",
   "inspections_hub_publish_ok": "Report published. Delivery follows this company's report-published automation rules; use Send report to email someone they do not cover.",
-  "inspections_hub_report_unpublishing": "Unpublishing…",
-  "inspections_hub_report_unpublish": "Unpublish",
+  "inspections_hub_report_unpublishing": "Retracting…",
+  "inspections_hub_report_unpublish": "Retract report",
   "inspections_hub_report_submitted": "Report submitted for review.",
   "inspections_hub_report_ready": "All required fields are complete.",
   "inspections_hub_report_blockers": "{count} item(s) still need attention.",
@@ -378,5 +378,11 @@
   "inspections_hub_delete_error": "The inspection could not be deleted. Try again.",
   "inspections_list_delete_failed": "These inspections could not be deleted and are still in the list:",
   "inspections_list_delete_failed_item": "{address}: {reason}",
-  "inspections_list_delete_too_many": "Delete at most {max} inspections at a time."
+  "inspections_list_delete_too_many": "Delete at most {max} inspections at a time.",
+  "inspections_published_state_label": "Published v{version}, unpublished edits",
+  "inspections_hub_retract_title": "Retract this report?",
+  "inspections_hub_retract_body": "This withdraws the report from your clients and expires every link they were sent. To change the report while clients keep seeing the last published version, open the editor and choose Edit and republish instead.",
+  "inspections_hub_retract_cancel": "Keep it published",
+  "inspections_hub_retract_confirm": "Retract and expire links",
+  "inspections_hub_reports_unpublished_edits": "Unpublished edits"
 }

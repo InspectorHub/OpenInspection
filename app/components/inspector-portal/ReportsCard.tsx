@@ -21,6 +21,8 @@ export interface ReportRow {
     /** A published report open for editing again; clients still read its latest published version. */
     editingAgain: boolean;
     versionCount: number;
+    /** The "vN" a reader means: the highest signed version number (version numbers have gaps across reports). */
+    latestVersionNumber: number | null;
     hasContent: boolean;
     /**
      * Whether the inspector has written the report-level narrative — the FLAG,
@@ -123,6 +125,7 @@ export function ReportsCard({
                                                 ? m.inspections_hub_reports_status_published()
                                                 : m.inspections_hub_reports_status_in_progress()}
                                         </Pill>
+                                        {report.editingAgain && <Pill tone="warning">{m.inspections_hub_reports_unpublished_edits()}</Pill>}
                                     </span>
                                     <TranslationState
                                         report={report}

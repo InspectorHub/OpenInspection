@@ -261,12 +261,22 @@ export const BulkInspectionSchema = z.object({
 /**
  * Response Schemas
  */
-export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionSchema)).openapi('InspectionListResponse');
+/** One row of GET /api/inspections: the inspection header plus where its report stands (flat, so a client compares one object). */
+const InspectionListEntrySchema = z.object({
+    ...InspectionSchema.shape,
+    publishedVersionNumber: z.number().int().nullable().describe('The version of the report clients read, or null while clients see none (never published, or retracted).'),
+    editingAgain: z.boolean().describe('True while a published report is open for "Edit and republish": clients still read publishedVersionNumber and the inspector has unpublished edits.'),
+}).openapi('InspectionListEntry');
+
+export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionListEntrySchema)).openapi('InspectionListResponse');
 
 /** Response of GET /api/inspections/{id}. Inline-shaped (unnamed): the record is expanded in place, with the two computed keys a single read adds. */
 export const GetInspectionResponseSchema = createApiResponseSchema(z.object({
     inspection: InspectionRecordSchema.extend(INSPECTION_COMPUTED_FIELDS).describe('The inspection record.'),
     template: z.unknown().openapi({ description: 'The associated template schema' }),
+    publishedVersionNumber: z.number().int().nullable().describe('The version of the primary report that clients read, or null while clients see none (never published, or retracted).'),
+    editingAgain: z.boolean().describe('True while the published primary report is open for "Edit and republish": clients still read publishedVersionNumber and the inspector has unpublished edits.'),
+    contentLocked: z.boolean().describe('True when a write to the primary report content is refused (409 REPORT_PUBLISHED): the report and the order are both published. The editor opens read-only exactly then.'),
     primaryReportId: z.string().nullable().describe('Id of the primary report of this inspection, or null when it has none yet. A native device writes it into the manifest of an exported package; the importer refuses a package for an existing inspection whose report id differs from this one. The key is always present on a server that supports it; a missing key means an older server.'),
     revisionStatus: RevisionStatusSchema.optional().describe('How the inspection date sits against the statutory form revision its template produces. Present only for an inspection whose template declares a statutory form and names its revision; absent means there is nothing to say, never that nobody looked. It changes with the date and with the current time, so a cached copy can show an earlier answer.'),
 }));

@@ -198,5 +198,14 @@
   "editor_pane_no_items_title": "This section has no items yet",
   "editor_pane_no_items_desc": "Add the first one with “+ Add item” in the item list.",
   "editor_human_check_unavailable": "This app cannot verify that you are a person, so nothing was sent. Contact support.",
-  "editor_template_applied_reopen": "The template was applied. Close and reopen this inspection to see it."
+  "editor_template_applied_reopen": "The template was applied. Close and reopen this inspection to see it.",
+  "editor_publish_banner_published": "Published as version {version}. It cannot change until you choose Edit and republish.",
+  "editor_publish_banner_published_no_version": "Published. It cannot change until you choose Edit and republish.",
+  "editor_publish_banner_edit": "Edit and republish",
+  "editor_publish_banner_editing": "Editing again. Clients still see version {version} until you publish the update.",
+  "editor_publish_banner_editing_no_version": "Editing again. Clients still see the last published version until you publish the update.",
+  "editor_publish_banner_publish_update": "Publish update",
+  "editor_publish_banner_locked": "This report was published from another device or tab, so edits here would be refused. Reload to see where it stands.",
+  "editor_publish_banner_reload": "Reload",
+  "editor_publish_banner_error": "Could not open the report for editing. Please try again."
 }

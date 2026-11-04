@@ -5848,6 +5848,19 @@
                           "nullable": true,
                           "description": "The associated template schema"
                         },
+                        "publishedVersionNumber": {
+                          "type": "integer",
+                          "nullable": true,
+                          "description": "The version of the primary report that clients read, or null while clients see none (never published, or retracted)."
+                        },
+                        "editingAgain": {
+                          "type": "boolean",
+                          "description": "True while the published primary report is open for \"Edit and republish\": clients still read publishedVersionNumber and the inspector has unpublished edits."
+                        },
+                        "contentLocked": {
+                          "type": "boolean",
+                          "description": "True when a write to the primary report content is refused (409 REPORT_PUBLISHED): the report and the order are both published. The editor opens read-only exactly then."
+                        },
                         "primaryReportId": {
                           "type": "string",
                           "nullable": true,
@@ -5987,6 +6000,9 @@
                       },
                       "required": [
                         "inspection",
+                        "publishedVersionNumber",
+                        "editingAgain",
+                        "contentLocked",
                         "primaryReportId"
                       ],
                       "description": "Response payload"
@@ -14204,6 +14220,94 @@
           "createdAt"
         ]
       },
+      "InspectionListEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Inspection id."
+          },
+          "propertyAddress": {
+            "type": "string",
+            "example": "123 Main St, Anytown",
+            "description": "Street address of the inspected property."
+          },
+          "clientName": {
+            "type": "string",
+            "nullable": true,
+            "example": "John Doe",
+            "description": "Name of the primary client, or null when none is recorded."
+          },
+          "clientEmail": {
+            "type": "string",
+            "nullable": true,
+            "format": "email",
+            "example": "john@example.com",
+            "description": "Email address of the primary client, or null when none is recorded."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "requested",
+              "scheduled",
+              "confirmed",
+              "completed",
+              "cancelled"
+            ],
+            "example": "requested",
+            "description": "Lifecycle status of the inspection."
+          },
+          "date": {
+            "type": "string",
+            "example": "2024-03-20",
+            "description": "Scheduled inspection date."
+          },
+          "inspectorId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440001",
+            "description": "Assigned inspector (users.id)."
+          },
+          "templateId": {
+            "type": "string",
+            "nullable": true,
+            "minLength": 1,
+            "example": "550e8400-e29b-41d4-a716-446655440002",
+            "description": "Id of the template the inspection is built from, or null when none is attached."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-03-20T10:00:00Z",
+            "description": "When the inspection record was created (ISO 8601)."
+          },
+          "publishedVersionNumber": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The version of the report clients read, or null while clients see none (never published, or retracted)."
+          },
+          "editingAgain": {
+            "type": "boolean",
+            "description": "True while a published report is open for \"Edit and republish\": clients still read publishedVersionNumber and the inspector has unpublished edits."
+          }
+        },
+        "required": [
+          "id",
+          "propertyAddress",
+          "clientName",
+          "clientEmail",
+          "status",
+          "date",
+          "inspectorId",
+          "templateId",
+          "createdAt",
+          "publishedVersionNumber",
+          "editingAgain"
+        ]
+      },
       "InspectionListResponse": {
         "type": "object",
         "properties": {
@@ -14215,7 +14319,7 @@
           "data": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Inspection"
+              "$ref": "#/components/schemas/InspectionListEntry"
             },
             "description": "Response payload"
           },

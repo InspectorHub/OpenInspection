@@ -40,6 +40,16 @@ export function reportEditState(report: { status: string; publishedAt: Date | nu
 }
 
 /**
+ * The lock rule as a pure predicate, so that everything which needs to know (the write guards, and the editor deciding
+ * whether to open read-only) answers from one place. `status` is null/undefined when the order has no report row at all:
+ * then the order's own status is the only record there is.
+ */
+export function isContentLocked(row: { status?: string | null; publishedAt?: Date | null; orderStatus: string | null | undefined }): boolean {
+    if (row.status == null) return isReportPublished(row.orderStatus);
+    return reportEditState({ status: row.status, publishedAt: row.publishedAt }) === 'published' && isReportPublished(row.orderStatus);
+}
+
+/**
  * True when a write to this report's content must be refused.
  *
  * Both records must say "published": the report's own row AND the order's `report_status`. Retract used to reset only the
@@ -62,7 +72,7 @@ export async function isReportContentLocked(
             eq(reports.inspectionId, inspectionId),
             reportId ? eq(reports.id, reportId) : eq(reports.kind, 'primary'),
         )).get();
-    if (row) return reportEditState(row) === 'published' && isReportPublished(row.orderStatus);
+    if (row) return isContentLocked(row);
     // No report row to ask: the order's own status is the only record there is.
     const insp = await db.select({ reportStatus: inspections.reportStatus }).from(inspections)
         .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).get();
@@ -92,8 +102,9 @@ export async function lockedInspectionIds(
     const rows = await db.select({ id: reports.id, status: reports.status, orderStatus: inspections.reportStatus }).from(reports)
         .innerJoin(inspections, and(eq(inspections.id, reports.inspectionId), eq(inspections.tenantId, reports.tenantId)))
         .where(and(eq(reports.tenantId, tenantId), inArray(reports.id, targets.map((t) => t.reportId)))).all();
-    // Same rule as `isReportContentLocked`: the report AND its order must both say published.
-    const published = new Set(rows.filter((r) => isReportPublished(r.status) && isReportPublished(r.orderStatus)).map((r) => r.id));
+    // Same rule as `isReportContentLocked`: the report AND its order must both say published (`publishedAt` does not
+    // change that answer, which only reads `status`).
+    const published = new Set(rows.filter((r) => isContentLocked({ status: r.status, orderStatus: r.orderStatus })).map((r) => r.id));
     return targets.filter((t) => published.has(t.reportId)).map((t) => t.inspectionId);
 }
 

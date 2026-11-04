@@ -82,7 +82,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000007",
@@ -206,7 +208,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000109",
@@ -288,7 +292,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000124",
@@ -370,7 +376,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000139",
@@ -452,7 +460,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000154",
@@ -534,7 +544,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000103",
@@ -616,7 +628,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000118",
@@ -698,7 +712,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000133",
@@ -780,7 +796,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000148",
@@ -862,7 +880,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000112",
@@ -944,7 +964,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000127",
@@ -1026,7 +1048,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000142",
@@ -1108,7 +1132,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000002",
@@ -1232,7 +1258,9 @@
     },
     "agentName": "Bob Buyer",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "today": [
@@ -1358,7 +1386,9 @@
     },
     "agentName": "Bob Buyer",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "thisWeek": [
@@ -1484,7 +1514,9 @@
     },
     "agentName": "Lisa Listing",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000005",
@@ -1566,7 +1598,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "later": [
@@ -1650,7 +1684,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000124",
@@ -1732,7 +1768,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000139",
@@ -1814,7 +1852,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000154",
@@ -1896,7 +1936,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000103",
@@ -1978,7 +2020,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000118",
@@ -2060,7 +2104,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000133",
@@ -2142,7 +2188,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000148",
@@ -2224,7 +2272,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000112",
@@ -2306,7 +2356,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000127",
@@ -2388,7 +2440,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000142",
@@ -2470,7 +2524,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000106",
@@ -2552,7 +2608,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000121",
@@ -2634,7 +2692,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000136",
@@ -2716,7 +2776,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000151",
@@ -2798,7 +2860,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000100",
@@ -2880,7 +2944,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000115",
@@ -2962,7 +3028,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000130",
@@ -3044,7 +3112,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000145",
@@ -3126,7 +3196,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "laterTotal": 19,
@@ -3253,7 +3325,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "cancelled": [
@@ -3337,7 +3411,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000006",
@@ -3419,7 +3495,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "defectAggregate": {

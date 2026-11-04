@@ -306,6 +306,37 @@ describe('editor loader — nextPublishIsAmendment', () => {
     });
 });
 
+describe('editor loader - reportState (read-only after publish)', () => {
+    // The two derived fields sit beside `inspection` in the detail payload's data, not inside it.
+    const withState = (reportStatus: string, derived: Record<string, unknown> = {}) => {
+        inspectionGet.mockResolvedValue(json({
+            inspection: { id: 'insp-1', date: '2026-05-01', templateSnapshot: SNAPSHOT, reportStatus },
+            ...derived,
+        }));
+        return loadAll();
+    };
+
+    it('a published report opens read-only and names the version clients read', async () => {
+        const data = await withState('published', { publishedVersionNumber: 3, editingAgain: false, contentLocked: true });
+        expect(data.reportState).toEqual({ publishedVersionNumber: 3, editingAgain: false, readOnly: true });
+    });
+
+    it('editing again is writable, and still names the version clients read', async () => {
+        const data = await withState('published', { publishedVersionNumber: 3, editingAgain: true, contentLocked: false });
+        expect(data.reportState).toEqual({ publishedVersionNumber: 3, editingAgain: true, readOnly: false });
+    });
+
+    it('an order published over a primary report the server does not lock is writable (the server rule decides, not the order status)', async () => {
+        const data = await withState('published', { publishedVersionNumber: 3, editingAgain: false, contentLocked: false });
+        expect(data.reportState).toEqual({ publishedVersionNumber: 3, editingAgain: false, readOnly: false });
+    });
+
+    it('(control) a draft is writable with no version', async () => {
+        const data = await withState('in_progress');
+        expect(data.reportState).toEqual({ publishedVersionNumber: null, editingAgain: false, readOnly: false });
+    });
+});
+
 describe('loader — the human check for a new company', () => {
     it('passes the open cooling window and the site key through, so the editor can ask for the check', async () => {
         sessionContextBody = { outboundCoolingWindow: { unlockAtMs: 1_800_000_000_000, turnstileSiteKey: 'site-key-1' } };

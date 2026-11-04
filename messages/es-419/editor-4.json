@@ -198,5 +198,14 @@
   "editor_pane_no_items_title": "Esta sección aún no tiene elementos",
   "editor_pane_no_items_desc": "Agregue el primero con «+ Agregar elemento» en la lista de elementos.",
   "editor_human_check_unavailable": "Esta aplicación no puede verificar que usted es una persona, por lo que no se envió nada. Comuníquese con soporte.",
-  "editor_template_applied_reopen": "Se aplicó la plantilla. Cierre y vuelva a abrir esta inspección para verla."
+  "editor_template_applied_reopen": "Se aplicó la plantilla. Cierre y vuelva a abrir esta inspección para verla.",
+  "editor_publish_banner_published": "Publicado como versión {version}. No puede cambiar hasta que elija Editar y volver a publicar.",
+  "editor_publish_banner_published_no_version": "Publicado. No puede cambiar hasta que elija Editar y volver a publicar.",
+  "editor_publish_banner_edit": "Editar y volver a publicar",
+  "editor_publish_banner_editing": "Editando de nuevo. Los clientes siguen viendo la versión {version} hasta que publique la actualización.",
+  "editor_publish_banner_editing_no_version": "Editando de nuevo. Los clientes siguen viendo la última versión publicada hasta que publique la actualización.",
+  "editor_publish_banner_publish_update": "Publicar actualización",
+  "editor_publish_banner_locked": "Este informe se publicó desde otro dispositivo o pestaña, por lo que aquí se rechazarían los cambios. Recargue para ver su estado.",
+  "editor_publish_banner_reload": "Recargar",
+  "editor_publish_banner_error": "No se pudo abrir el informe para editarlo. Inténtelo de nuevo."
 }

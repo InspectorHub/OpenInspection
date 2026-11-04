@@ -62,11 +62,11 @@ describe("hub verbs by role, from the server's capability table", () => {
         expect(await verbsFor("staff", OPEN, OPEN_VERBS)).toEqual(["Cancel inspection", "Edit schedule"]);
     });
 
-    it("a published report: Unpublish follows the publish capability, which staff never hold", async () => {
+    it("a published report: Retract follows the publish capability, which staff never hold", async () => {
         for (const role of ["owner", "inspector", "staff"] as const) {
-            const wantsUnpublish = getCapabilities(role, null).publish;
-            const present = await verbsFor(role, PUBLISHED, ["Unpublish"]);
-            expect(present.includes("Unpublish"), role).toBe(wantsUnpublish);
+            const wantsRetract = getCapabilities(role, null).publish;
+            const present = await verbsFor(role, PUBLISHED, ["Retract report"]);
+            expect(present.includes("Retract report"), role).toBe(wantsRetract);
         }
         expect(getCapabilities("staff", null).publish).toBe(false);
         expect(getCapabilities("owner", null).publish).toBe(true);

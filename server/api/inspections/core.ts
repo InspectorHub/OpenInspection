@@ -37,6 +37,7 @@ import { assertCanCreate, fireQuotaThresholdNotice, recordCreateAudit, resolveCr
 import { isFieldRole } from '../../lib/auth/roles';
 import { resolveInspectionScope } from '../../lib/inspection/visibility';
 import { resolvePrimaryReportId } from '../../lib/inspection/reports';
+import { loadPublishedStateWithLock } from '../../lib/inspection/published-state';
 
 /**
  * GET /api/inspections/:id
@@ -195,11 +196,12 @@ const coreRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const result = await service.getInspection(id, tenantId);
         const primaryReportId = await resolvePrimaryReportId(getDrizzle(c), tenantId, id);
+        const published = await loadPublishedStateWithLock(getDrizzle(c), tenantId, id);
         return c.json({
             success: true,
             // Only the inspection row is projected: `template` is customer-authored
             // schema JSON and may legitimately contain a field called `price`.
-            data: { ...result, inspection: await moneyView(c, toInspectionRecord(result.inspection), 'inspectionFees'), template: templateRecord(result.template), primaryReportId, ...revisionStatusField(result.inspection) },
+            data: { ...result, inspection: await moneyView(c, toInspectionRecord(result.inspection), 'inspectionFees'), template: templateRecord(result.template), primaryReportId, ...published, ...revisionStatusField(result.inspection) },
         }, 200);
     })
     .openapi(deleteInspectionRoute, async (c) => {

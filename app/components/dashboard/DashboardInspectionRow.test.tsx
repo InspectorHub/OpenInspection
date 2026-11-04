@@ -15,6 +15,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, act, fireEvent, cleanup } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
+import { m } from "~/paraglide/messages";
 import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
 import type { Inspection } from "~/lib/dashboard-schema";
 
@@ -314,5 +315,42 @@ describe("DashboardInspectionRow - completing asks first", () => {
     choose(container, "confirmed");
     expect(send).toHaveBeenCalledWith("i-1", "confirmed");
     expect(screen.queryByText("Finish fieldwork?")).toBeNull();
+  });
+});
+
+describe("DashboardInspectionRow - published state label", () => {
+  function renderState(extra: Record<string, unknown>) {
+    const Stub = createRoutesStub([
+      {
+        path: "/",
+        Component: () => (
+          <DashboardInspectionRow
+            insp={{ ...INSPECTION, status: "completed", reportStatus: "published", ...extra } as Inspection}
+            tenantSlug={null}
+            selectedIds={new Set<string>()}
+            isColumnVisible={() => true}
+            toggleSelect={() => {}}
+            transitionStatus={() => {}}
+            timeZone="UTC"
+            reportView
+          />
+        ),
+      },
+    ]);
+    return render(<Stub initialEntries={["/"]} />);
+  }
+
+  it("shows 'Published vN, unpublished edits' for a report being edited again", async () => {
+    const { findByTestId } = renderState({ publishedVersionNumber: 3, editingAgain: true });
+    const label = await findByTestId("row-published-editing");
+    expect(label.textContent).toBe(m.inspections_published_state_label({ version: 3 }));
+    expect(label.textContent).toContain("v3");
+  });
+
+  it("CONTROL - a published report with no unpublished edits shows no such label", async () => {
+    const { queryByTestId, container } = renderState({ publishedVersionNumber: 3, editingAgain: false });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(queryByTestId("row-published-editing")).toBeNull();
+    expect(container.textContent).not.toContain("unpublished edits");
   });
 });

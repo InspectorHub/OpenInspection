@@ -381,6 +381,7 @@
     "tests/unit/inspections/property-facts-schema.spec.ts",
     "tests/unit/inspections/property-facts.spec.ts",
     "tests/unit/inspections/publish-readiness.spec.ts",
+    "tests/unit/inspections/published-state.spec.ts",
     "tests/unit/inspections/referred-by.spec.ts",
     "tests/unit/inspections/reinspection-create.spec.ts",
     "tests/unit/inspections/reinspection-status.spec.ts",

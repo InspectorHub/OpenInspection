@@ -7,6 +7,7 @@ import { unwrapResultsResponse } from "~/lib/results";
 import { mapPool } from "~/lib/map-pool";
 import { handleStatutoryIntent } from "./action-statutory.server";
 import { handleFollowupIntent } from "./action-followup.server";
+import { handleEditAgainIntent } from "./action-edit-again.server";
 import { writeKeyFor } from "./action-idempotency.server";
 import { attempt, refusalMessage } from "./action-errors.server";
 
@@ -33,6 +34,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // #119 — a re-inspection's follow-up verdict; see action-followup.server.ts.
  const followup = await handleFollowupIntent(String(intent ?? ""), formData, api, params.id);
  if (followup) return followup;
+
+ const editAgain = await handleEditAgainIntent(String(intent ?? ""), api, params.id);
+ if (editAgain) return editAgain;
 
  if (intent === "complete") {
  // Advisory order-lifecycle move; decoupled from publishing, never a gate.
