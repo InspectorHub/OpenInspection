@@ -85,7 +85,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000008",
@@ -170,7 +172,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000007",
@@ -297,7 +301,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000104",
@@ -382,7 +388,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000109",
@@ -467,7 +475,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000114",
@@ -552,7 +562,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000119",
@@ -637,7 +649,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000124",
@@ -722,7 +736,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000129",
@@ -807,7 +823,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000134",
@@ -892,7 +910,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000139",
@@ -977,7 +997,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000144",
@@ -1062,7 +1084,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000149",
@@ -1147,7 +1171,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000154",
@@ -1232,7 +1258,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000103",
@@ -1317,7 +1345,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000108",
@@ -1402,7 +1432,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000113",
@@ -1487,7 +1519,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000118",
@@ -1572,7 +1606,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000123",
@@ -1657,7 +1693,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000128",
@@ -1742,7 +1780,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000133",
@@ -1827,7 +1867,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000138",
@@ -1912,7 +1954,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000143",
@@ -1997,7 +2041,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000148",
@@ -2082,7 +2128,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000153",
@@ -2167,7 +2215,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000102",
@@ -2252,7 +2302,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000107",
@@ -2337,7 +2389,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000112",
@@ -2422,7 +2476,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000117",
@@ -2507,7 +2563,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000122",
@@ -2592,7 +2650,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000127",
@@ -2677,7 +2737,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000132",
@@ -2762,7 +2824,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000137",
@@ -2847,7 +2911,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000142",
@@ -2932,7 +2998,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000147",
@@ -3017,7 +3085,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000152",
@@ -3102,7 +3172,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000010",
@@ -3187,7 +3259,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000001",
@@ -3314,7 +3388,9 @@
     },
     "agentName": "Lisa Listing",
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000002",
@@ -3441,7 +3517,9 @@
     },
     "agentName": "Bob Buyer",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000013",
@@ -3526,7 +3604,9 @@
     },
     "agentName": null,
     "inspectorName": null,
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000014",
@@ -3611,7 +3691,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "today": [
@@ -3740,7 +3822,9 @@
     },
     "agentName": "Lisa Listing",
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000002",
@@ -3867,7 +3951,9 @@
     },
     "agentName": "Bob Buyer",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "thisWeek": [
@@ -3996,7 +4082,9 @@
     },
     "agentName": "Lisa Listing",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000005",
@@ -4081,7 +4169,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000013",
@@ -4166,7 +4256,9 @@
     },
     "agentName": null,
     "inspectorName": null,
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000014",
@@ -4251,7 +4343,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "later": [
@@ -4338,7 +4432,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000109",
@@ -4423,7 +4519,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000114",
@@ -4508,7 +4606,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000119",
@@ -4593,7 +4693,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000124",
@@ -4678,7 +4780,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000129",
@@ -4763,7 +4867,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000134",
@@ -4848,7 +4954,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000139",
@@ -4933,7 +5041,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000144",
@@ -5018,7 +5128,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000149",
@@ -5103,7 +5215,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000154",
@@ -5188,7 +5302,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000103",
@@ -5273,7 +5389,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000108",
@@ -5358,7 +5476,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000113",
@@ -5443,7 +5563,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000118",
@@ -5528,7 +5650,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000123",
@@ -5613,7 +5737,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000128",
@@ -5698,7 +5824,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000133",
@@ -5783,7 +5911,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000138",
@@ -5868,7 +5998,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000143",
@@ -5953,7 +6085,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000148",
@@ -6038,7 +6172,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000153",
@@ -6123,7 +6259,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000102",
@@ -6208,7 +6346,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000107",
@@ -6293,7 +6433,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000112",
@@ -6378,7 +6520,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000117",
@@ -6463,7 +6607,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000122",
@@ -6548,7 +6694,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000127",
@@ -6633,7 +6781,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000132",
@@ -6718,7 +6868,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000137",
@@ -6803,7 +6955,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000142",
@@ -6888,7 +7042,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000147",
@@ -6973,7 +7129,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000152",
@@ -7058,7 +7216,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000101",
@@ -7143,7 +7303,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000106",
@@ -7228,7 +7390,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000111",
@@ -7313,7 +7477,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000116",
@@ -7398,7 +7564,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000121",
@@ -7483,7 +7651,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000126",
@@ -7568,7 +7738,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000131",
@@ -7653,7 +7825,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000136",
@@ -7738,7 +7912,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000141",
@@ -7823,7 +7999,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000146",
@@ -7908,7 +8086,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000151",
@@ -7993,7 +8173,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000100",
@@ -8078,7 +8260,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000105",
@@ -8163,7 +8347,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000110",
@@ -8248,7 +8434,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000115",
@@ -8333,7 +8521,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000120",
@@ -8418,7 +8608,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000125",
@@ -8503,7 +8695,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "laterTotal": 55,
@@ -8591,7 +8785,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000007",
@@ -8718,7 +8914,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "cancelled": [
@@ -8805,7 +9003,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000003",
@@ -8890,7 +9090,9 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000006",
@@ -8975,7 +9177,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "defectAggregate": {

@@ -134,7 +134,12 @@ export function DashboardInspectionRow({
             </Pill>
           )}
           {/* report-state badge (Published/to_review tabs) */}
-          {reportView && insp.reportStatus && REPORT_STATE_TONE[insp.reportStatus] && (
+          {insp.editingAgain === true && typeof insp.publishedVersionNumber === "number" && (
+            <span data-testid="row-published-editing">
+              <Pill tone="warning">{m.inspections_published_state_label({ version: insp.publishedVersionNumber })}</Pill>
+            </span>
+          )}
+          {reportView && insp.reportStatus && REPORT_STATE_TONE[insp.reportStatus] && !(insp.editingAgain === true && typeof insp.publishedVersionNumber === "number") && (
             <Pill tone={REPORT_STATE_TONE[insp.reportStatus]}>
               {reportStateLabel(insp.reportStatus)}
             </Pill>

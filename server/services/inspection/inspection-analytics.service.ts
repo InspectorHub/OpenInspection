@@ -11,6 +11,7 @@ import { visibleInspectionsCondition, type InspectionScope } from '../../lib/ins
 import { chunkIds } from '../../lib/id-chunks';
 import { readDashboardInputs } from './dashboard-reads';
 import { InspectionSubService } from './base';
+import { loadPublishedStates, NOT_PUBLISHED } from '../../lib/inspection/published-state';
 import { loadPinnedSnapshot } from '../../lib/report-snapshot';
 import { resolveRenderedReportId } from './report-grain';
 import type { InspectionService } from '../inspection.service';
@@ -562,7 +563,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
         // The second group of reads: everything that needs the inspection set. Defect counts take the
         // template snapshots from `all` instead of reading them again.
         const snapshotById = new Map<string, unknown>(all.map(i => [i.id as string, i.templateSnapshot]));
-        const [statsMap, agentRoleChunks, inspectorChunks] = await Promise.all([
+        const [statsMap, agentRoleChunks, inspectorChunks, publishedStates] = await Promise.all([
             this.getDefectStatsBatch(tenantId, uniqueIds, snapshotById),
             Promise.all(chunkIds(uniqueIds).map((chunk) => db.select({
                 inspectionId: inspectionPeople.inspectionId,
@@ -588,6 +589,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 .select({ id: users.id, name: users.name, email: users.email })
                 .from(users)
                 .where(and(eq(users.tenantId, tenantId), inArray(users.id, chunk))))),
+            // Where each rendered report stands (derived): ONE bounded read in the same wave, no extra round trip depth.
+            loadPublishedStates(db, tenantId, uniqueIds),
         ]);
         for (const r of agentRoleChunks.flat()) {
             if (!r.contactName) continue;
@@ -647,6 +650,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
             inspectorName:  string | null;
             requestId:      string | null;
             siblingCount:   number | null;
+            publishedVersionNumber: number | null;
+            editingAgain:   boolean;
         }> =>
             rows.map(r => {
                 const id = r.id as string;
@@ -670,6 +675,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                     // null, not 1: an inspection in no request has no sibling group.
                     requestId:    reqId ?? null,
                     siblingCount: reqId ? siblingCount : null,
+                    ...(publishedStates.get(id) ?? NOT_PUBLISHED),
                 };
             });
 

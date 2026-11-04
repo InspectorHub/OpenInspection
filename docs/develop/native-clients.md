@@ -467,6 +467,20 @@ publish freezes the following one. A report that was never published, or was ret
 /api/inspections/{id}/unpublish`, which also expires every client link), is a **draft** and is not locked. A publish with
 nothing changed since the latest version restores the lock without creating a version.
 
+Where a report stands is also readable without probing for the `409`. `GET /api/inspections/{id}`, each row of
+`GET /api/inspections` and each dashboard row carry `publishedVersionNumber` (the version clients read, or `null` while
+none is out, including after a retract) and `editingAgain` (`true` while a published report is open for editing again).
+Both are derived from the primary report on every read and are never stored; there is no extra status value. A client
+that shows "Published v3, unpublished edits" is combining exactly these two fields.
+
+A published order whose primary report has no row yet counts as published (the row is created on demand by
+`edit-again`): it reports the order's latest version number and `editingAgain: false`. `GET /api/inspections/{id}` also
+returns `contentLocked`, the write guard's own answer for the primary report (the report and the order are both
+published); a client that opens a report read-only should use it rather than infer it from the order status. In the hub
+payload each report carries `latestVersionNumber`, the same number as `publishedVersionNumber` for the primary report.
+Version numbers are monotonic per order, so with several reports they have gaps, and `versionCount` is not the "vN" a
+reader means.
+
 What the lock covers is every route that writes report content: results, items, notes, photos, videos and annotations,
 units, the cover, the template snapshot, rating system and template upgrade, compliance and statutory inputs, cost
 items, narratives, translations, property facts, the inspector signature, and a change to any inspection column the

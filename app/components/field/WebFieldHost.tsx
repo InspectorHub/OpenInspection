@@ -5,6 +5,7 @@ import type { EditorData, FieldHostSlots } from "@core/field-ui/data-source";
 import { useEnsureHuman } from "~/components/OutboundVerification";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { WebUnsavedGuard } from "~/components/field/WebUnsavedGuard";
+import { ReportPublishBanner } from "~/components/editor/ReportPublishBanner";
 import { pdfActionLabel, usePdfExport } from "~/hooks/usePdfExport";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import type { loader } from "~/routes/inspection-edit/loader.server";
@@ -105,6 +106,11 @@ export function WebFieldHost({ editor, children }: WebFieldHostProps) {
             // The same check `EditorHumanCheck` mounts around the editor; read through a ref so the slot keeps its identity.
             ensureHuman: () => ensureHumanRef.current(),
             renderUnsavedGuard: ({ atRisk }) => <WebUnsavedGuard atRisk={atRisk} />,
+            // Read through the ref at call time, so a fresh loader payload (after "Edit and republish") changes the banner without a new slot.
+            renderPublishBanner: ({ openPublish, locked }) => {
+                const state = editorRef.current?.reportState;
+                return state ? <ReportPublishBanner {...state} locked={locked} openPublish={openPublish} /> : null;
+            },
             // Remembered per device so the next load can render this band on the server (editor-layout-cookie.ts).
             onLayoutObserved: (layout) => rememberEditorLayout(layout),
         }),

@@ -109,7 +109,7 @@ function originalQualityEnabled(): boolean {
  * slots, so any host (web route, native shell) mounts it the same way. `data` must follow the host's
  * revalidation: units, publish state and the rest are read from it on every render.
  */
-function FieldEditorInner({ data }: { data: EditorData }) {
+function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked }: { data: EditorData; pageReadOnly: boolean; liveWhenReadOnly: boolean; onServerLocked: (locked: boolean) => void }) {
  const dataSource = useFieldDataSource();
  const readOnly = useReadOnly();
  const slots = useFieldSlots();
@@ -213,7 +213,9 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  // drain callback, but the drain (useMediaDrain) needs the live doc that
  // useResultsDoc returns. The ref is filled right after useMediaDrain below.
  const drainRef = useRef<() => void>(() => {});
- const collab = useResultsDoc(String(data.inspection.id), () => drainRef.current());
+ // A host whose read-only page is a published report opts out of the live socket (`liveWhenReadOnly`): the server accepts it and
+ // closes it on every open. The key makes read-only <-> editable a NEW connection, so a lock seen on the old one is not inherited.
+ const collab = useResultsDoc(String(data.inspection.id), () => drainRef.current(), liveWhenReadOnly || !pageReadOnly, pageReadOnly ? "read-only" : "editable");
  // Read-only: the document is still read, projected and synced, but no write helper is ever handed it. A Yjs map `set`
  // does not pass through `doc.transact`, so withholding the document is the one guard that cannot be bypassed.
  const writeDoc = readOnly ? null : collab?.doc ?? null;
@@ -656,6 +658,10 @@ function FieldEditorInner({ data }: { data: EditorData }) {
     <div className="mb-4"><RevisionBanner status={data.revisionStatus}
       inspectionDate={String(state.inspection.date ?? "").slice(0, 10)} /></div>
   ) : null;
+  // The host's publish-state banner (published / editing again / published elsewhere), ahead of the revision banner.
+  const serverLocked = collab?.locked === true;
+  useEffect(() => { if (serverLocked) onServerLocked(true); }, [serverLocked, onServerLocked]);
+  const topBannersEl = <>{slots.renderPublishBanner?.({ openPublish: () => void handlePublishClick(), locked: serverLocked })}{revisionBannerEl}</>;
  const structure = useStructureEdit({
   inspectionId: String(state.inspection.id), rawSnapshot: data.templateSnapshot,
   collabEditing: fieldSession.collabEditing,
@@ -1981,7 +1987,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  status={saveStatusEl}
  />
  <main className="p-4">
- {revisionBannerEl}
+ {topBannersEl}
  {/* `activeView === "property"` is checked FIRST, exactly as the desktop
      tree checks it, and for the reason the two must agree: choosing
      "Inspection Details" leaves whichever item was open still open, so
@@ -2033,7 +2039,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
  }
  sectionTitle={state.currentSection?.title ?? ""}
  list={itemListEl}
- main={<>{revisionBannerEl}{state.activeView === "property" ? propertyOverviewEl : itemEditorEl}</>}
+ main={<>{topBannersEl}{state.activeView === "property" ? propertyOverviewEl : itemEditorEl}</>}
  emptyTemplate={emptyTemplateEl}
  batchBar={batchBarEl}
  tools={toolsDockEl}
@@ -2112,7 +2118,7 @@ function FieldEditorInner({ data }: { data: EditorData }) {
   </div>
  )}
  <main className="flex-1 overflow-y-auto p-6">
- {revisionBannerEl}
+ {topBannersEl}
  {state.activeView === "property" ? propertyOverviewEl : itemEditorEl}
  </main>
  </div>
@@ -2167,6 +2173,10 @@ function FieldEditorInner({ data }: { data: EditorData }) {
 }
 
 /** The inspection editor page. `readOnly` shows it for reading only: nothing in it can write, and the write controls are not offered. */
-export function FieldEditor({ data, readOnly = false }: { data: EditorData; readOnly?: boolean }) {
- return <ReadOnlyScope readOnly={readOnly}><FieldEditorInner data={data} /></ReadOnlyScope>;
+export function FieldEditor({ data, readOnly = false, liveWhenReadOnly = true }: { data: EditorData; readOnly?: boolean; liveWhenReadOnly?: boolean }) {
+ // The live document can close because the report was published from another tab or device: from then on the editor is read-only too.
+ const [serverLocked, setServerLocked] = useState(false);
+ // The latch describes a connection, and the page changing between read-only and editable replaces that connection.
+ useEffect(() => { setServerLocked(false); }, [readOnly]);
+ return <ReadOnlyScope readOnly={readOnly || serverLocked}><FieldEditorInner data={data} pageReadOnly={readOnly} liveWhenReadOnly={liveWhenReadOnly} onServerLocked={setServerLocked} /></ReadOnlyScope>;
 }

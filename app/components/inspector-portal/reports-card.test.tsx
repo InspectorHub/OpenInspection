@@ -21,17 +21,17 @@ import { ReportsCard, type ReportRow } from "~/components/inspector-portal/Repor
 
 const PRIMARY: ReportRow = {
     id: "rep-primary", kind: "primary", title: "Inspection Report", status: "in_progress",
-    publishedAt: null, editingAgain: false, versionCount: 0, hasContent: false, hasNarrative: false,
+    publishedAt: null, editingAgain: false, versionCount: 0, latestVersionNumber: null, hasContent: false, hasNarrative: false,
     canDelete: false, deleteBlockedReason: "primary",
 };
 const SEWER: ReportRow = {
     id: "rep-sewer", kind: "ancillary", title: "Sewer Scope", status: "in_progress",
-    publishedAt: null, editingAgain: false, versionCount: 0, hasContent: true, hasNarrative: true,
+    publishedAt: null, editingAgain: false, versionCount: 0, latestVersionNumber: null, hasContent: true, hasNarrative: true,
     canDelete: true, deleteBlockedReason: null,
 };
 const RADON: ReportRow = {
     id: "rep-radon", kind: "ancillary", title: "Radon Testing", status: "published",
-    publishedAt: "2026-08-03T12:00:00.000Z", editingAgain: false, versionCount: 1, hasContent: false, hasNarrative: false,
+    publishedAt: "2026-08-03T12:00:00.000Z", editingAgain: false, versionCount: 1, latestVersionNumber: 1, hasContent: false, hasNarrative: false,
     canDelete: false, deleteBlockedReason: "published",
 };
 
@@ -166,5 +166,22 @@ describe("ReportsCard", () => {
         renderCard([]);
         expect(screen.queryByTestId("hub-reports-list")).toBeNull();
         expect(screen.getByText(/No reports on this order yet/)).toBeTruthy();
+    });
+});
+
+/**
+ * A published report that is open for "Edit and republish" says so on its row: clients still read the last published
+ * version, and the inspector has edits nobody has seen. The flag is the server's; the card only shows it.
+ */
+describe("unpublished-edits indicator", () => {
+    it("flags a published report that is being edited again", () => {
+        renderCard([{ ...RADON, status: "in_progress", editingAgain: true }]);
+        expect(screen.getByText("Unpublished edits")).toBeTruthy();
+    });
+
+    // POSITIVE CONTROL: an unconditional badge would pass the case above.
+    it("stays quiet for a published report nobody is editing", () => {
+        renderCard([RADON]);
+        expect(screen.queryByText("Unpublished edits")).toBeNull();
     });
 });

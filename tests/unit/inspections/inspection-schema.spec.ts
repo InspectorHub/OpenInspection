@@ -87,7 +87,7 @@ describe('GetInspectionResponseSchema declares the editor fields the row carries
         inspectorId: null, templateId: null, createdAt: '2026-06-01T10:00:00.000Z',
     };
     const parse = (extra: Record<string, unknown>) => GetInspectionResponseSchema.parse({
-        success: true, data: { inspection: { ...inspection, ...extra }, template: null, primaryReportId: null },
+        success: true, data: { inspection: { ...inspection, ...extra }, template: null, publishedVersionNumber: null, editingAgain: false, contentLocked: false, primaryReportId: null },
     }).data.inspection as Record<string, unknown>;
 
     it('keeps coverPhotoId, propertyFacts and pcaNarrative', () => {

@@ -8,12 +8,13 @@
  */
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { inspectionResults, reports, reportVersions } from '../db/schema';
+import { inspectionResults, inspections, reports, reportVersions } from '../db/schema';
 import { Errors } from '../errors';
 import { logger } from '../logger';
 import { safeISODate } from '../date';
 import { REPORT_STATUS, isReportPublished } from '../status/report-status';
 import { reportEditState } from './report-lock';
+import { latestVersionSql } from './published-state';
 
 /**
  * Every deliverable on one order, in the order a person would read them.
@@ -232,6 +233,11 @@ export interface ReportListItem {
     editingAgain: boolean;
     /** Published versions this report owns — part of what a delete would destroy. */
     versionCount: number;
+    /**
+     * The highest version number this report has signed, or null. Version numbers are monotonic per inspection, so
+     * with several reports they have gaps: this is the number a reader means by "vN", not `versionCount`.
+     */
+    latestVersionNumber: number | null;
     /** True when its document has been written into: the "information you already filled out". */
     hasContent: boolean;
     /**
@@ -275,6 +281,11 @@ export async function listReportsForHub(
         .groupBy(reportVersions.reportId)
         .all();
     const versionCounts = new Map(versionRows.map((v) => [v.reportId, Number(v.count)]));
+    // The latest number comes from the same definition the list and the dashboard use (`latestVersionSql`), one read.
+    const latestRows = await db.select({ id: reports.id, latest: latestVersionSql() }).from(reports)
+        .innerJoin(inspections, and(eq(inspections.id, reports.inspectionId), eq(inspections.tenantId, reports.tenantId)))
+        .where(and(eq(reports.tenantId, tenantId), inArray(reports.id, ids))).all();
+    const latestNumbers = new Map(latestRows.map((r) => [r.id, r.latest == null ? null : Number(r.latest)]));
 
     // `data` is the projected findings map, small next to `ydoc_state`; its
     // emptiness is what "you already filled this out" actually means.
@@ -303,6 +314,7 @@ export async function listReportsForHub(
             publishedAt: safeISODate(r.publishedAt) ?? null,
             editingAgain: reportEditState(r) === 'editing',
             versionCount: versionCounts.get(r.id) ?? 0,
+            latestVersionNumber: latestNumbers.get(r.id) ?? null,
             hasContent: written.has(r.id),
             hasNarrative: (r.inspectorNarrative ?? '').trim().length > 0,
             canDelete: blocked === null,

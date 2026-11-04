@@ -17,6 +17,7 @@ import {
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { RetractReportControl } from "~/components/inspector-portal/RetractReportControl";
 import { PageHeader, Card, Pill, Button, Modal, buttonClasses, pendingProps, PENDING_CLASS, useActionLatch } from "@core/shared-ui";
 import { useSubmitLatch } from "~/hooks/useSubmitLatch";
 import DocumentsSection, {
@@ -748,11 +749,9 @@ export default function InspectionHubPage() {
   // Submit / return / unpublish — dedicated fetchers (B-17: never share).
   const submitReport = useFetcher<typeof action>();
   const returnReport = useFetcher<typeof action>();
-  const unpublishReport = useFetcher<typeof action>();
   const submittingReport = submitReport.state !== "idle";
   const returningReport = returnReport.state !== "idle";
-  const unpublishingReport = unpublishReport.state !== "idle";
-  const latchSubmit = useSubmitLatch(submitReport.state), latchReturn = useSubmitLatch(returnReport.state), latchUnpublish = useSubmitLatch(unpublishReport.state);
+  const latchSubmit = useSubmitLatch(submitReport.state), latchReturn = useSubmitLatch(returnReport.state);
 
   // Create-re-inspection modal — its own dedicated fetcher (B-17). Only
   // published baselines can re-inspect. Unlike the other modals it does NOT
@@ -787,6 +786,9 @@ export default function InspectionHubPage() {
 
   // Shipped-to-client: gates the header "View report" link and the card body.
   const reportShipped = isReportShipped(hub);
+  // A published report open for "Edit and republish": clients still read its latest version (its version count is that number).
+  const primaryReport = hub.reports?.find((r) => r.kind === "primary");
+  const primaryEditingAgain = reportShipped && primaryReport?.editingAgain === true;
 
   // When the report was last published. The Report card states this instead of
   // claiming a delivery nothing here records.
@@ -1027,6 +1029,11 @@ export default function InspectionHubPage() {
                   nothing here does. "Delivered to the client" was false for any
                   inspector who left the notify boxes unticked, and the Send
                   report button below is the tell. */}
+              {primaryEditingAgain && (
+                <p className="mb-2" data-testid="hub-published-editing">
+                  <Pill tone="warning">{m.inspections_published_state_label({ version: primaryReport?.latestVersionNumber ?? 0 })}</Pill>
+                </p>
+              )}
               <p className="text-[12px] text-ih-fg-3 mb-3">
                 {publishedAt
                   ? m.inspections_hub_report_published_on({
@@ -1074,18 +1081,7 @@ export default function InspectionHubPage() {
                 >
                   {m.inspections_hub_report_repair_log()}
                 </Link>
-                {reportActionList.includes('unpublish') && (
-                  <unpublishReport.Form method="post" onSubmit={latchUnpublish()}>
-                    <input type="hidden" name="intent" value="unpublish" />
-                    <button
-                      type="submit"
-                      {...pendingProps(unpublishingReport)}
-                      className={`px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60 ${PENDING_CLASS}`}
-                    >
-                      {unpublishingReport ? m.inspections_hub_report_unpublishing() : m.inspections_hub_report_unpublish()}
-                    </button>
-                  </unpublishReport.Form>
-                )}
+                {reportActionList.includes('unpublish') && <RetractReportControl />}
               </div>
             </>
           ) : (

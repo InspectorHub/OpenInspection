@@ -59,7 +59,7 @@ export default function InspectionEditRoute() {
  const data = useMemo(() => editorDataFromLoader(loaderData), [loaderData]);
  return (
  <EditorHumanCheck coolingWindow={data.outboundCoolingWindow}>
- <InspectionFieldHost><FieldEditor data={data} /></InspectionFieldHost>
+ <InspectionFieldHost><FieldEditor data={data} readOnly={loaderData.reportState.readOnly} liveWhenReadOnly={false} /></InspectionFieldHost>
  </EditorHumanCheck>
  );
 }

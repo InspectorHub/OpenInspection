@@ -310,13 +310,5 @@
   "packages/field-ui/src/decode-image.ts#DecodeImageOptions.keepOriginal": {
     "kind": "invisible-read",
     "reason": "The byte budget field-ui hands to the host's image decoder when the keep-original setting is on. It is filled here and read only by the decoder a host supplies through `media.decodeImage`, which lives in the native client repository, so no consumer exists in this tree. Dropping it would leave the host unable to learn the limit."
-  },
-  "server/lib/inspection/reports.ts#ReportListItem.editingAgain": {
-    "kind": "deferred",
-    "reason": "Added with the server-side publish lock (a published report refuses content writes until the inspector chooses Edit and republish). The editor banner and the order page label that read it are the next change in the same series; this entry is removed there. Until then it is on the wire so the contract and its mirror spec already state it."
-  },
-  "app/components/inspector-portal/ReportsCard.tsx#ReportRow.editingAgain": {
-    "kind": "deferred",
-    "reason": "The app-side mirror of ReportListItem.editingAgain (pinned by hub-report-row-mirror.spec). The order page badge and the editor banner that read it are the next change in the same series; this entry is removed there."
   }
 }
