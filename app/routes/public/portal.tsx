@@ -11,6 +11,7 @@
  */
 import { Form, useLoaderData, useActionData, useNavigation } from "react-router";
 import type { Route } from "./+types/portal";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
@@ -83,6 +84,8 @@ export async function action({ params, request, context }: Route.ActionArgs) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim();
   if (!email) return { sent: false as const };
+  // A form posted from another site sends no email; it gets the same confirmation as any other request.
+  if (isCrossSitePost(request)) return { sent: true as const };
 
   const api = createApi(context);
   try {

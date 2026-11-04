@@ -4,8 +4,8 @@
  * (Android), so every call to the API is cross-origin.
  *
  * Every grant for a native origin is paired with the same request from another
- * origin, which must keep today's behaviour (reflected origin, baseline header
- * lists) and must NOT pick up the native-only headers.
+ * origin, which gets no CORS headers (the origin is never reflected) and must NOT
+ * pick up the native-only headers.
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { app } from '../../../server/index';
@@ -86,17 +86,100 @@ describe('CORS for native app origins (real app)', () => {
     });
   }
 
-  it('keeps the existing behaviour for any other origin: reflected, baseline headers, no native extras', async () => {
+  it('never reflects an arbitrary origin: no Allow-Origin, no credentials, Vary: Origin', async () => {
     const pre = await preflight(OTHER_ORIGIN);
-    expect(pre.status).toBeLessThan(300);
-    expect(pre.headers.get('Access-Control-Allow-Origin')).toBe(OTHER_ORIGIN);
-    expect(pre.headers.get('Access-Control-Allow-Credentials')).toBe('true');
-    expect(csv(pre.headers.get('Access-Control-Allow-Headers'))).toEqual(['content-type', 'authorization', 'x-csrf-token', 'x-token-relay']);
+    expect(pre.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    expect(pre.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+    expect(pre.headers.get('Vary')).toContain('Origin');
 
     const res = await send('/api/client/compat?platform=ios', { headers: { Origin: OTHER_ORIGIN } });
     expect(res.status).toBe(200);
-    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(OTHER_ORIGIN);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+    expect(res.headers.get('Access-Control-Expose-Headers')).toBeNull();
+    expect(res.headers.get('Vary')).toContain('Origin');
+  });
+
+  it('gives the deployment own origin credentials, with a full preflight', async () => {
+    const own = 'http://localhost';
+    const pre = await preflight(own);
+    expect(pre.status).toBe(204);
+    expect(pre.headers.get('Access-Control-Allow-Origin')).toBe(own);
+    expect(pre.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+    expect(csv(pre.headers.get('Access-Control-Allow-Headers'))).toEqual(['content-type', 'authorization', 'x-csrf-token', 'x-token-relay']);
+    expect(csv(pre.headers.get('Access-Control-Allow-Methods'))).toContain('patch');
+    expect(pre.headers.get('Vary')).toContain('Origin');
+
+    const res = await send('/api/client/compat?platform=ios', { headers: { Origin: own } });
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(own);
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
     expect(csv(res.headers.get('Access-Control-Expose-Headers'))).toEqual(['set-cookie']);
+  });
+
+  it('gives credentials to an origin on CORS_ALLOWED_ORIGINS and to nobody else', async () => {
+    h ??= await createHarness('standalone');
+    const env = { ...h.env, CORS_ALLOWED_ORIGINS: 'https://admin.example.com, not a url, https://other-admin.example.com/' } as typeof h.env;
+    const exec = makeExecutionContext({ label: 'cors-allow' });
+    const call = async (origin: string, method = 'GET') => {
+      const res = await app.request('/api/client/compat?platform=ios', { method, headers: { Origin: origin, 'Access-Control-Request-Method': 'GET' } }, env, exec.ctx);
+      await exec.settle();
+      return res;
+    };
+    for (const origin of ['https://admin.example.com', 'https://other-admin.example.com']) {
+      const res = await call(origin);
+      expect(res.headers.get('Access-Control-Allow-Origin'), origin).toBe(origin);
+      expect(res.headers.get('Access-Control-Allow-Credentials'), origin).toBe('true');
+      expect((await call(origin, 'OPTIONS')).headers.get('Access-Control-Allow-Credentials'), origin).toBe('true');
+    }
+    for (const origin of ['https://admin.example.com.evil.example', 'http://admin.example.com', 'https://evil.example']) {
+      const res = await call(origin);
+      expect(res.headers.get('Access-Control-Allow-Origin'), origin).toBeNull();
+      expect(res.headers.get('Access-Control-Allow-Credentials'), origin).toBeNull();
+    }
+  });
+
+  it('allows the Vite dev origin only on a loopback host', async () => {
+    const dev = 'http://localhost:5173';
+    expect((await send('/api/client/compat?platform=ios', { headers: { Origin: dev } })).headers.get('Access-Control-Allow-Origin')).toBe(dev);
+    h ??= await createHarness('standalone');
+    const exec = makeExecutionContext({ label: 'cors-prod-host' });
+    const res = await app.request('https://app.example.com/api/client/compat?platform=ios', { headers: { Origin: dev } }, h.env, exec.ctx);
+    await exec.settle();
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
+
+  it('answers the public widget routes for any origin with a wildcard and never credentials', async () => {
+    for (const path of ['/api/public/widget/event', '/api/public/book', '/api/public/slots']) {
+      const pre = await send(path, {
+        method: 'OPTIONS',
+        headers: { Origin: OTHER_ORIGIN, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' },
+      });
+      expect(pre.status, path).toBeLessThan(300);
+      expect(pre.headers.get('Access-Control-Allow-Origin'), path).toBe('*');
+      expect(pre.headers.get('Access-Control-Allow-Credentials'), path).toBeNull();
+      expect(csv(pre.headers.get('Access-Control-Allow-Headers')), path).toContain('content-type');
+    }
+    const res = await send('/api/public/widget/event', {
+      method: 'POST',
+      headers: { Origin: OTHER_ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ event: 'view' }),
+    });
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+  });
+
+  it('never pairs a wildcard with credentials on any route or origin', async () => {
+    const paths = ['/api/client/compat?platform=ios', '/api/public/widget/event', '/api/public/book', '/api/inspections'];
+    for (const path of paths) {
+      for (const origin of [OTHER_ORIGIN, 'http://localhost', 'capacitor://localhost']) {
+        for (const method of ['GET', 'OPTIONS']) {
+          const res = await send(path, { method, headers: { Origin: origin, 'Access-Control-Request-Method': 'GET' } });
+          if (res.headers.get('Access-Control-Allow-Origin') === '*') {
+            expect(res.headers.get('Access-Control-Allow-Credentials'), `${method} ${path} ${origin}`).toBeNull();
+          }
+        }
+      }
+    }
   });
 
   it('adds no CORS headers when the request has no Origin', async () => {

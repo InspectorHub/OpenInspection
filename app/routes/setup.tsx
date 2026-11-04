@@ -2,6 +2,7 @@ import { Form, useActionData, useNavigation, redirect, useLoaderData } from "rea
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/setup";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeSetupSchema } from "~/lib/forms/auth.schema";
@@ -40,6 +41,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply();
   }
   const { workspaceName, adminName, email, password, setupCode } = submission.value;
+  // A form posted from another site is refused before anything is spent or any session is created (login CSRF).
+  if (isCrossSitePost(request)) return submission.reply({ formErrors: [m.auth_setup_error_failed()] });
 
   try {
     const api = createApi(context);

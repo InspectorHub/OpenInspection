@@ -2,6 +2,7 @@ import { Form, Link, useActionData, useNavigation } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/login";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { createApi } from "~/lib/api-client.server";
 import { createSessionWithToken } from "~/lib/session.server";
 import { makeAgentLoginSchema, makeAgentLoginLinkSchema } from "~/lib/forms/auth.schema";
@@ -39,6 +40,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     // named apart from the password form's so the two inputs on this one page
     // cannot be confused, while the API keeps its single `{ email }` contract.
     const { linkEmail } = submission.value;
+    // A form posted from another site sends no sign-in email; it gets the same confirmation as any other request.
+    if (isCrossSitePost(request)) return { sent: true as const };
 
     try {
       const api = createApi(context);
@@ -58,6 +61,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply();
   }
   const { email, password } = submission.value;
+  // A form posted from another site is refused before anything is spent or any session is created (login CSRF).
+  if (isCrossSitePost(request)) return submission.reply({ formErrors: [m.auth_agent_login_error_invalid()] });
 
   try {
     const api = createApi(context);

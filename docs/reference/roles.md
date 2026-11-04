@@ -379,6 +379,16 @@ Two more sit outside that layout on purpose: `/agent-accept-terms`, which the
 layout's own loader redirects a gated agent to, and `/agent-logout`, which ends
 the session on the agent sign-in page rather than the staff one.
 
+#### What agent sign-up reveals
+
+`POST /api/agent-signup` answers `409` ("An account with this email already exists") when the address already has an account
+of any kind, agent or company staff; the answer does not say which. A visitor can therefore learn that an address has an
+account. This is accepted and kept on purpose: the form has to tell a person why their sign-up failed, and hiding it would
+mean sending a confirmation email for every attempt. What limits it: the answer comes only after the per-caller rate limit, the
+bot challenge and the terms checks have passed, so it cannot be probed in bulk, and it reveals nothing beyond "this address has
+an account" (no role, no company, no sign-in hint). Sign-in and the password and link requests do not reveal it: they answer the
+same whether or not the account exists.
+
 > There are more role-shaped enums in this codebase than these two (assignment
 > is `lead`/`helper`, agreement signers are `client`/`co_client`/`agent`/`other`,
 > and so on). Before assuming a role means what its name suggests, find the enum

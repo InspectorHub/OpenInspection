@@ -348,9 +348,18 @@ exactly those two origins the API answers with:
 - **no `Access-Control-Allow-Credentials`** and no `Set-Cookie` exposure.
 
 The convention is **Bearer only, no credentials**: the app never relies on a
-cookie, so the browser is never asked to send one cross-origin. Every other
-origin keeps the baseline policy unchanged. Other origins cannot opt in; the
-list is fixed in `server/lib/native/cors-origins.ts`.
+cookie, so the browser is never asked to send one cross-origin. Other origins cannot opt in to these headers; the
+list is fixed in `server/lib/native/cors-origins.ts`. The Windows shell is served from
+`https://localhost` too, so it is covered by the same entry.
+
+For every other origin the API never reflects the caller's origin. Only this
+deployment's own origin, `APP_BASE_URL`, and the origins listed in the optional
+`CORS_ALLOWED_ORIGINS` setting (comma-separated) get `Access-Control-Allow-Origin`
+with `Access-Control-Allow-Credentials: true`; anyone else gets no CORS headers.
+Responses that depend on the Origin carry `Vary: Origin`. The public booking widget
+routes (`/api/public/widget`, `/api/public/book`, and the booking lookups under
+`/api/public`) answer any origin with `Access-Control-Allow-Origin: *` and never with credentials.
+On a loopback host (`localhost`, `127.0.0.1`) the Vite dev origins on port 5173 are also allowed.
 
 ---
 

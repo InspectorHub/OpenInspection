@@ -29,6 +29,7 @@ deferred.
 | [`operate/sms-compliance.md`](operate/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
 | [`operate/rotate-jwt-keyring.md`](operate/rotate-jwt-keyring.md) | Rotating the ES256 JWT keyring without invalidating live sessions |
 | [`operate/security-headers.md`](operate/security-headers.md) | Response security headers on pages and the API, the report-only CSP, reading `csp_report` log lines, tightening to enforcement |
+| [`operate/legacy-share-tokens.md`](operate/legacy-share-tokens.md) | The 30-day report link token: what it can do, its roles, and when the bridge will be removed |
 
 ## Using the product
 

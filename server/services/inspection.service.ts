@@ -27,7 +27,7 @@ import {
     type PropertyFactFoundation,
     type CannedCommentLike,
 } from './inspection/shared';
-import { InspectionSharingService } from './inspection/inspection-sharing.service';
+import { InspectionSharingService, type AgentViewTokenRole } from './inspection/inspection-sharing.service';
 import { InspectionAnalyticsService } from './inspection/inspection-analytics.service';
 import { InspectionStatusService } from './inspection/inspection-status.service';
 import { InspectionAnnotationsService } from './inspection/inspection-annotations.service';
@@ -703,14 +703,14 @@ export class InspectionService {
      * Generates a 30-day shareable agent view token stored in KV.
      * The token grants read-only access to the report without requiring login.
      */
-    async generateAgentViewToken(tenantId: string, inspectionId: string): Promise<string> {
-        return this.sharing.generateAgentViewToken(tenantId, inspectionId);
+    async generateAgentViewToken(tenantId: string, inspectionId: string, role: AgentViewTokenRole = 'agent'): Promise<string> {
+        return this.sharing.generateAgentViewToken(tenantId, inspectionId, role);
     }
 
     /**
      * Resolves an agent view token from KV.
      */
-    async resolveAgentViewToken(token: string): Promise<{ inspectionId: string; tenantId: string } | null> {
+    async resolveAgentViewToken(token: string): Promise<{ inspectionId: string; tenantId: string; role: AgentViewTokenRole } | null> {
         return this.sharing.resolveAgentViewToken(token);
     }
 
