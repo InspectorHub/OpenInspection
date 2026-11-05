@@ -53,6 +53,7 @@ function megabytes(bytes: number): string {
  * the exact count is always shown.
  */
 function describeSize(bytes: number): string {
+    // i18n-lint-ok: text for the platform operator inside a command-consumer error; no viewer locale exists here, and a fixed grouping keeps this sentence identical to the sender's
     return `${bytes.toLocaleString('en-US')} bytes (${megabytes(bytes)} MB)`;
 }
 
