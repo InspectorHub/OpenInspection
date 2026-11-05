@@ -7,6 +7,7 @@
  * none of which the live set knows about.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -97,6 +98,62 @@ describe('sweepOrphanedMedia - current photo layout', () => {
         const gone = late.delete.mock.calls.map((c) => c[0]);
         for (const kept of [VIDEO, DOCUMENT, AGREEMENT, EXPORT]) expect(gone).not.toContain(kept);
         expect(await recorded()).not.toEqual(expect.arrayContaining([VIDEO]));
+    });
+
+    it('keeps the cropped file of a photo that was cropped and then annotated', async () => {
+        const original = `${PHOTOS}both.jpg`;
+        const cropped = `${PHOTOS}both.cropped.jpg`;
+        const annotated = `${PHOTOS}both.annotated.png`;
+        await db.update(schema.inspectionResults)
+            .set({ data: { 'sec:item': { photos: [{ key: original, croppedKey: cropped, annotatedKey: annotated }] } } })
+            .where(eq(schema.inspectionResults.inspectionId, I));
+        const listing = { [PHOTOS]: [original, cropped, annotated] };
+        await sweep(makeR2(listing), NOW);
+        const late = makeR2(listing);
+        await sweep(late, NOW + ORPHAN_GRACE_MS * 2);
+        // Control: the sweep listed the folder and ran, so an empty delete list is the live set and not a sweep that did nothing.
+        expect(late.list.mock.calls.some((c) => (c[0] as { prefix?: string }).prefix === PHOTOS)).toBe(true);
+        expect(late.delete).not.toHaveBeenCalled();
+        expect(await recorded()).toEqual([]);
+    });
+
+    describe('call budget', () => {
+        const IDS = ['i2', 'i3', 'i4', 'i5', 'i6'];
+        beforeEach(async () => {
+            await db.insert(schema.inspections).values(IDS.map((id) => ({
+                id, tenantId: T, propertyAddress: `${id} Main St`, date: '2026-11-01', createdAt: new Date(NOW),
+            })));
+        });
+
+        it('stops after the inspection that reaches the budget, hands back where to resume, and covers every inspection exactly once', async () => {
+            const r2 = makeR2({});
+            const examined: string[] = [];
+            let cursor: string | null = null;
+            let passes = 0;
+            do {
+                const before = r2.list.mock.calls.length;
+                const out: { nextCursor: string | null } = await sweepOrphanedMedia(testD1.binding, r2 as unknown as R2Bucket, NOW, {
+                    limit: 100, afterInspectionId: cursor, callBudget: 8,
+                });
+                for (const c of r2.list.mock.calls.slice(before)) {
+                    const prefix = (c[0] as { prefix: string }).prefix;
+                    const m = /^t1\/(i\d)\/$/.exec(prefix);
+                    if (m) examined.push(m[1]!);
+                }
+                cursor = out.nextCursor;
+                passes++;
+            } while (cursor !== null && passes < 20);
+            expect(passes, 'a budget of 8 cannot cover six inspections in one pass').toBeGreaterThan(1);
+            expect(cursor).toBeNull();
+            expect([...examined].sort()).toEqual(['i1', ...IDS].sort());
+        });
+
+        it('always examines at least one inspection, even with a budget that is already spent', async () => {
+            const r2 = makeR2({});
+            const out = await sweepOrphanedMedia(testD1.binding, r2 as unknown as R2Bucket, NOW, { limit: 100, afterInspectionId: null, callBudget: 1 });
+            expect(out.nextCursor).toBe('i1');
+            expect(r2.list.mock.calls.some((c) => (c[0] as { prefix?: string }).prefix === `${T}/i1/`)).toBe(true);
+        });
     });
 
     it('still reaches a photo of the older layout through the older prefix', async () => {

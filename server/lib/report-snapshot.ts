@@ -190,7 +190,8 @@ const FILE_KEY_FIELDS = new Set(['key', 'annotatedKey', 'croppedKey', 'posterKey
 /** Most versions of one inspection read at once; an inspection has a handful. */
 const MAX_VERSIONS_SCANNED = 200;
 
-function collectFileKeys(node: unknown, into: Set<string>): void {
+/** Every stored-file key a results document names (original, annotated, cropped, video, poster), added to `into`. */
+export function collectFileKeys(node: unknown, into: Set<string>): void {
     if (Array.isArray(node)) { for (const item of node) collectFileKeys(item, into); return; }
     if (node === null || typeof node !== 'object') return;
     for (const [name, value] of Object.entries(node)) {

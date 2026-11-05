@@ -4,7 +4,7 @@ import { inspections, inspectionResults, inspectionMediaPool, orphanedMedia } fr
 import { inspectionMessages } from '../db/schema/message';
 import { r2Keys } from '../r2-keys';
 import { collectAttachedPhotos } from './collect-attached';
-import { loadFrozenFileKeys } from '../report-snapshot';
+import { collectFileKeys, loadFrozenFileKeys } from '../report-snapshot';
 import { computeOrphans, ORPHAN_GRACE_MS } from './orphan-gc';
 import { logger } from '../logger';
 
@@ -13,7 +13,16 @@ export interface OrphanSweepOptions {
   limit: number;
   /** Resume point: the last inspection id of the previous batch, or null to start. */
   afterInspectionId: string | null;
+  /**
+   * Most storage and database calls one pass may spend, counted as they are made. A Worker invocation on the Free plan may make
+   * 50 in all, so the pass stops after the inspection that reaches this figure and hands back the cursor, instead of
+   * failing partway and starting from the same inspection on the next tick. At least one inspection is always examined.
+   */
+  callBudget?: number;
 }
+
+/** Leaves headroom under the 50 calls a Free-plan invocation may make. */
+export const ORPHAN_SWEEP_CALL_BUDGET = 36;
 
 export interface OrphanSweepResult {
   /** R2 objects deleted this batch. */
@@ -62,8 +71,15 @@ export async function sweepOrphanedMedia(
     .all();
   const hasMore = rows.length > opts.limit;
   const page = hasMore ? rows.slice(0, opts.limit) : rows;
+  const budget = opts.callBudget ?? ORPHAN_SWEEP_CALL_BUDGET;
+  let calls = 1; // the page read above
+  let lastExamined: string | null = null;
+  let stoppedEarly = false;
 
   for (const insp of page) {
+    // Stop BEFORE an inspection that would not fit, never in the middle of one.
+    if (lastExamined !== null && calls >= budget) { stoppedEarly = true; break; }
+    lastExamined = insp.id;
     const prefix = `${insp.tenantId}/${insp.id}/`;
 
     // R2 FIRST, and the order is load-bearing. When the prefix holds nothing,
@@ -84,6 +100,7 @@ export async function sweepOrphanedMedia(
       let pageCursor: string | undefined = undefined;
       do {
         const list: R2Objects = await r2.list({ prefix: listPrefix, limit: 1000, ...(pageCursor ? { cursor: pageCursor } : {}) });
+        calls++;
         for (const o of list.objects) if (!o.key.startsWith(`${prefix}reports/`)) objectKeys.push(o.key);
         pageCursor = list.truncated ? list.cursor : undefined;
       } while (pageCursor);
@@ -96,6 +113,7 @@ export async function sweepOrphanedMedia(
     let cursor: string | undefined = undefined;
     do {
       const list: R2Objects = await r2.list({ prefix: attachmentPrefix, limit: 1000, ...(cursor ? { cursor } : {}) });
+      calls++;
       for (const o of list.objects) attachmentKeys.push(o.key);
       cursor = list.truncated ? list.cursor : undefined;
     } while (cursor);
@@ -103,6 +121,7 @@ export async function sweepOrphanedMedia(
 
     const live = new Set<string>();
     if (attachmentKeys.length > 0) {
+      calls++;
       const sent = await db
         .select({ attachments: inspectionMessages.attachments })
         .from(inspectionMessages)
@@ -111,6 +130,7 @@ export async function sweepOrphanedMedia(
       for (const m of sent) for (const a of m.attachments ?? []) live.add(a.key);
     }
     if (objectKeys.length > 0) {
+      calls += 3; // the results row, the published versions, the media pool
       const resultRow = await db
         .select()
         .from(inspectionResults)
@@ -125,6 +145,9 @@ export async function sweepOrphanedMedia(
         live.add(p.key);
         live.add(p.originalKey);
       }
+      // The same walker the published versions use: every original, annotated, cropped, video and poster key the document names.
+      // A photo that was cropped and then annotated names all three, and only the displayed one comes out of the list above.
+      collectFileKeys(data, live);
       if (insp.coverImageKey) live.add(insp.coverImageKey);
       if (insp.coverPhotoId) live.add(insp.coverPhotoId);
       // Files a PUBLISHED version shows are live however the working copy has changed since: the client's page and
@@ -143,6 +166,7 @@ export async function sweepOrphanedMedia(
       for (const r of pool) live.add(r.r2Key);
     }
 
+    calls++;
     const seenRows = await db
       .select()
       .from(orphanedMedia)
@@ -153,6 +177,7 @@ export async function sweepOrphanedMedia(
     );
 
     const plan = computeOrphans(live, allKeys, seen, now, ORPHAN_GRACE_MS);
+    calls += plan.toRecord.length + plan.toClear.length + plan.toDelete.length * 2;
     for (const key of plan.toRecord) {
       await db.insert(orphanedMedia).values({
         id: crypto.randomUUID(),
@@ -172,5 +197,7 @@ export async function sweepOrphanedMedia(
     }
   }
 
+  // Stopped for the budget: resume after the last inspection examined. Otherwise the batch ended where the table did, or at the limit.
+  if (stoppedEarly && lastExamined !== null) return { reaped, nextCursor: lastExamined };
   return { reaped, nextCursor: hasMore && page.length > 0 ? page[page.length - 1]!.id : null };
 }
