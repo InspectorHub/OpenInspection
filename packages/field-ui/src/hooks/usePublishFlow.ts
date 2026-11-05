@@ -33,6 +33,8 @@ export interface PublishFlow {
   publish(markComplete: boolean, extras: PublishExtras, autoSign: boolean): Promise<void>;
   /** True while a publish is out. */
   publishing: boolean;
+  /** After a publish the server answered as unchanged: the version still current. Null for a real publish or before any. */
+  unchangedSinceVersion: number | null;
   /** The sentence the dialog shows when the last publish was refused, or null. */
   publishError: string | null;
   clearPublishError(): void;
@@ -61,12 +63,14 @@ export function usePublishFlow(inspectionId: string, options: PublishFlowOptions
   const completeCmd = useFieldCommand(inspectionId);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [finishError, setFinishError] = useState<string | null>(null);
+  const [unchangedSinceVersion, setUnchangedSinceVersion] = useState<number | null>(null);
   const clearPublishError = useCallback(() => setPublishError(null), []);
 
   async function publish(markComplete: boolean, extras: PublishExtras, autoSign: boolean): Promise<void> {
     if (publishCmd.isBusy()) return;
     if (!(await options.confirmHuman())) return;
     setPublishError(null);
+    setUnchangedSinceVersion(null);
     if (markComplete && !publishCmd.isBusy()) options.onMarkedComplete();
     // The auto-sign choice rides ALONG WITH the publish, never beside it: the handler re-reads the
     // inspection to decide whether to sign, so a separate write could land after that read and publish unsigned.
@@ -80,6 +84,8 @@ export function usePublishFlow(inspectionId: string, options: PublishFlowOptions
     if (isIgnored(result)) return;
     if (result.ok) {
       setPublishError(null);
+      // Set in the same batch as the dialog closing, so the receipt that opens as it closes already knows.
+      setUnchangedSinceVersion(result.data?.unchangedSinceVersion ?? null);
       options.onPublished();
       dataSource.reload();
     } else {
@@ -104,6 +110,7 @@ export function usePublishFlow(inspectionId: string, options: PublishFlowOptions
   return {
     publish,
     publishing: publishCmd.busy,
+    unchangedSinceVersion,
     publishError,
     clearPublishError,
     finishFieldwork,

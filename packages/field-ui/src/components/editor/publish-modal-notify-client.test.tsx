@@ -37,6 +37,7 @@ function props(over: Partial<PublishModalProps> = {}): PublishModalProps {
     autoSign: false,
     onAutoSignToggle: vi.fn(),
     isAmendment: true,
+    noticeChoice: true,
     ...over,
   };
 }
@@ -51,7 +52,7 @@ describe("PublishModal - notify the client on republish", () => {
   });
 
   it("is NOT offered on a first publish", () => {
-    render(<PM {...props({ isAmendment: false })} />);
+    render(<PM {...props({ isAmendment: false, noticeChoice: false })} />);
     expect(screen.queryByLabelText(m.editor_publish_notify_client())).toBeNull();
   });
 
@@ -83,6 +84,43 @@ describe("PublishModal - notify the client on republish", () => {
     expect(onPublish).toHaveBeenLastCalledWith(true, { notifyClient: true });
   });
 
+  it("is NOT offered for a republish after a retract: it has earlier versions (the dialog still asks what changed) but the server will not honour a choice", () => {
+    const onPublish = vi.fn();
+    render(<PM {...props({ onPublish, isAmendment: true, noticeChoice: false })} />);
+    expect(screen.queryByLabelText(m.editor_publish_notify_client())).toBeNull();
+    expect(screen.getByText(/What changed in this amendment\?/)).toBeTruthy();
+    // The dialog makes no promise about notices beyond the first-publish sentence.
+    expect(screen.getByText(m.report_publish_body_delivery())).toBeTruthy();
+    expect(screen.queryByText(m.report_publish_body_delivery_amendment())).toBeNull();
+    fireEvent.click(publishBtn());
+    expect(onPublish).toHaveBeenCalledWith(false, {});
+  });
+
+  it("receipt after a retract-republish claims nothing about notices the server did not decide", async () => {
+    const view = render(<PM {...props({ isAmendment: true, noticeChoice: false })} />);
+    fireEvent.click(publishBtn());
+    view.rerender(<PM {...props({ isAmendment: true, noticeChoice: false, isSubmitting: true })} />);
+    view.rerender(<PM {...props({ isAmendment: true, noticeChoice: false, open: false, isSubmitting: false })} />);
+    await screen.findByText(m.report_publish_receipt_nothing_sent());
+    const text = document.body.textContent ?? "";
+    expect(text).toContain(m.report_publish_body_delivery());
+    expect(text).not.toContain(m.report_publish_receipt_amendment_not_notified());
+    expect(text).not.toContain(m.report_publish_receipt_amendment_notified());
+  });
+
+  it("receipt when the server found nothing changed: says nothing was published and no notices were sent, whatever was ticked", async () => {
+    const view = render(<PM {...props()} />);
+    fireEvent.click(notifyBox());
+    fireEvent.click(publishBtn());
+    view.rerender(<PM {...props({ isSubmitting: true })} />);
+    view.rerender(<PM {...props({ open: false, isSubmitting: false, unchangedSinceVersion: 3 })} />);
+    await screen.findByText(m.report_publish_receipt_nothing_sent());
+    const text = document.body.textContent ?? "";
+    expect(text).toContain(m.report_publish_receipt_unchanged({ version: 3 }));
+    expect(text).not.toContain(m.report_publish_receipt_amendment_notified());
+    expect(text).not.toContain(m.report_publish_receipt_amendment_not_notified());
+  });
+
   it("is unchecked again the next time the dialog opens", () => {
     const view = render(<PM {...props()} />);
     fireEvent.click(notifyBox());
@@ -96,7 +134,7 @@ describe("PublishModal - notify the client on republish", () => {
     const onPublish = vi.fn();
     const view = render(<PM {...props({ onPublish })} />);
     fireEvent.click(notifyBox());
-    view.rerender(<PM {...props({ onPublish, isAmendment: false })} />);
+    view.rerender(<PM {...props({ onPublish, isAmendment: false, noticeChoice: false })} />);
     fireEvent.click(publishBtn());
     expect(onPublish).toHaveBeenLastCalledWith(false, {});
   });
@@ -135,12 +173,12 @@ describe("PublishModal - notify the client on republish", () => {
   });
 
   it("(control) a first publish keeps the original sentence, in the dialog and in the receipt", async () => {
-    const view = render(<PM {...props({ isAmendment: false })} />);
+    const view = render(<PM {...props({ isAmendment: false, noticeChoice: false })} />);
     expect(screen.getByText(m.report_publish_body_delivery())).toBeTruthy();
     fireEvent.click(publishBtn());
-    // The order now reads as published, so the dialog is an amendment by the time the receipt shows.
-    view.rerender(<PM {...props({ isAmendment: false, isSubmitting: true })} />);
-    view.rerender(<PM {...props({ isAmendment: true, open: false, isSubmitting: false })} />);
+    // The order now reads as published and reopened-looking by the time the receipt shows; the receipt keeps to what was submitted.
+    view.rerender(<PM {...props({ isAmendment: false, noticeChoice: false, isSubmitting: true })} />);
+    view.rerender(<PM {...props({ isAmendment: true, noticeChoice: true, open: false, isSubmitting: false })} />);
     expect(await screen.findAllByText(m.report_publish_body_delivery())).toHaveLength(1);
   });
 

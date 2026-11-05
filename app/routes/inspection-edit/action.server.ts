@@ -70,7 +70,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // AppError body ({ error: { code, message } }) and carry the message back
  // so the publish modal can show it inline.
  if (!res.ok) return { ok: false as const, intent: "publish", error: await refusalMessage(res, "Couldn't publish the report. Please try again.") };
- return { ok: true as const, intent: "publish" };
+ // Nothing changed since the latest version: the server answered with that version and published nothing. Say so.
+ const answer = await res.json().catch(() => null) as { data?: { unchangedSinceVersion?: unknown } } | null;
+ const since = answer?.data?.unchangedSinceVersion;
+ return { ok: true as const, intent: "publish", ...(typeof since === "number" ? { unchangedSinceVersion: since } : {}) };
  }
 
  // B-22 follow-up (C-12 class): the settings sheet's "Save changes" used to

@@ -146,6 +146,11 @@ export interface CommandDataMap {
    * channel for the "auto-fill not configured" hint; do not parse `error` for it.
    */
   'autofill-property-facts': { facts: Record<string, unknown> | null; reason: AutofillReason | null };
+  /**
+   * `unchangedSinceVersion` is the version still current when the server found nothing changed and so published nothing
+   * (no new version, no notices); null for a real publish.
+   */
+  'publish': { unchangedSinceVersion: number | null };
   /** The composite-keyed slice for the editor to merge. */
   'load-scope': { scope: string; results: ResultMap };
   /** `coverUrl` is null when the upload response carried none. */

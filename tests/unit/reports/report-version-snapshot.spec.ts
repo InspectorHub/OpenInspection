@@ -138,8 +138,8 @@ describe('snapshotOnPublish — credentials and appearance', () => {
         // An empty `inspectors` on a v2 row means "held none"; a missing one on
         // a v1 row means "this predates the feature". Identical as JSON,
         // opposite as a claim on a cover page.
-        // 3 adds the rating system and the commercial parts a client's frozen report reads.
-        expect((await snapshotOf()).schemaVersion).toBe(3);
+        // 3 adds the rating system and the commercial parts a client frozen report reads; 4 adds the presentation (categories, time zone).
+        expect((await snapshotOf()).schemaVersion).toBe(4);
     });
 
     describe('the version insert after the status flip', () => {

@@ -48,6 +48,7 @@ export function editorDataFromLoader(d: EditorLoaderData): EditorData {
         relianceText: d.relianceText,
         commercialPresets: d.commercialPresets,
         nextPublishIsAmendment: d.nextPublishIsAmendment,
+        reopenedForEditing: d.reportState.editingAgain,
         outboundCoolingWindow: d.outboundCoolingWindow,
         resultId: d.resultId,
         initialLayout: d.initialLayout,

@@ -17,10 +17,32 @@ import type { HonoConfig } from '../../types/hono';
  * `summary` is the one that version carries. A translation request is never a duplicate. The
  * answer is the normal publish shape for the existing version, and none of the publish work runs:
  * no status change, automation, audit row, translation, PDF, notification or ISN sync (`isnSync`
- * is null because none was attempted). A version frozen before its snapshot matched this shape
+ * is null because none was attempted), plus `unchangedSinceVersion`: the version still current, which is how a caller tells this answer from a real publish. A version frozen before its snapshot matched this shape
  * simply does not match, so the next publish is a real one.
  */
-async function isUnchanged(c: Context<HonoConfig>, id: string, reportIdInBody: string | undefined, summary: string | undefined): Promise<boolean> {
+/**
+ * Whether what a publish would freeze now is what the stored version froze. Exact, with one allowance: a version written
+ * before the `presentation` part existed (no such part) is compared without `presentation` and `schemaVersion`, so that
+ * the step from version 3 to 4 is not by itself a change. A stored version that HAS the part compares exactly, so a
+ * settings change after it still counts.
+ */
+function sameSnapshot(stored: string, fresh: string): boolean {
+    if (stored === fresh) return true;
+    try {
+        const old = JSON.parse(stored) as Record<string, unknown>;
+        if ('presentation' in old) return false;
+        const now = JSON.parse(fresh) as Record<string, unknown>;
+        delete old.schemaVersion;
+        delete now.schemaVersion;
+        delete now.presentation;
+        return JSON.stringify(old) === JSON.stringify(now);
+    } catch {
+        return false;
+    }
+}
+
+/** The version number the report still stands at when nothing changed, or null when a publish would change something. */
+async function unchangedSinceVersion(c: Context<HonoConfig>, id: string, reportIdInBody: string | undefined, summary: string | undefined): Promise<number | null> {
     const tenantId = c.get('tenantId');
     const versions = c.var.services.reportVersion;
     const db = getDrizzle(c);
@@ -33,8 +55,8 @@ async function isUnchanged(c: Context<HonoConfig>, id: string, reportIdInBody: s
         .orderBy(desc(reportVersions.versionNumber))
         .limit(1)
         .get();
-    if (!latest || latest.summary !== (summary ?? null)) return false;
-    return latest.snapshotJson === await versions.buildSnapshotForCheck(tenantId, id, reportId);
+    if (!latest || latest.summary !== (summary ?? null)) return null;
+    return sameSnapshot(latest.snapshotJson, await versions.buildSnapshotForCheck(tenantId, id, reportId)) ? latest.versionNumber : null;
 }
 
 export async function answerUnchangedPublish(c: Context<HonoConfig>, next: Next) {
@@ -42,11 +64,12 @@ export async function answerUnchangedPublish(c: Context<HonoConfig>, next: Next)
     if (!body.success || body.data.translateTo) return next();
     const id = c.req.param('id') ?? '';
     // A comparison that cannot be made is never a reason to refuse a publish: publish as usual.
-    if (!await isUnchanged(c, id, body.data.reportId, body.data.summary).catch(() => false)) return next();
+    const since = await unchangedSinceVersion(c, id, body.data.reportId, body.data.summary).catch(() => null);
+    if (since === null) return next();
     // A report that was being edited again and came back identical is published again: no new version, but the lock returns.
     const tenantId = c.get('tenantId');
     await relockUnchangedReport(getDrizzle(c), tenantId, id, body.data.reportId);
     await setCollabDocLocks(c.env, getDrizzle(c), tenantId, id, true, body.data.reportId ? { reportId: body.data.reportId } : { primary: true });
     const reportUrl = `/report/${await resolveTenantSlug(c, tenantId)}/${id}`;
-    return c.json({ success: true as const, data: { reportUrl, reportStatus: REPORT_STATUS.PUBLISHED, isnSync: null } }, 200);
+    return c.json({ success: true as const, data: { reportUrl, reportStatus: REPORT_STATUS.PUBLISHED, isnSync: null, unchangedSinceVersion: since } }, 200);
 }

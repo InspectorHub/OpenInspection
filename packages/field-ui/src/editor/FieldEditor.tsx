@@ -1731,6 +1731,7 @@ function FieldEditorInner({ data, pageReadOnly, liveWhenReadOnly, onServerLocked
  status={state.inspection.status as string}
  publishError={publishFlow.publishError} isSubmitting={publishFlow.publishing}
  isAmendment={data.nextPublishIsAmendment}
+ noticeChoice={data.reopenedForEditing === true} unchangedSinceVersion={publishFlow.unchangedSinceVersion}
  coolingUnlockAtMs={data.outboundCoolingWindow?.unlockAtMs ?? null}
  onClose={() => { publishFlow.clearPublishError(); state.setShowPublishModal(false); }}
  onPublish={(markComplete, extras) => { void publishFlow.publish(markComplete, extras, autoSign); }}
