@@ -74,7 +74,7 @@ export async function releaseDeliveredBundle(
         await exportsBucket.delete(data.bundleRef.key);
     } catch (err) {
         logger.warn('[cmd] delivered bundle object not deleted', {
-            tenantId: data.tenantId, batchId: data.batchId, key: data.bundleRef.key,
+            tenantId: data.tenantId, batchId: data.batchId,
             error: err instanceof Error ? err.message : String(err),
         });
     }

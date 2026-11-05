@@ -13,6 +13,7 @@ import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { applyCmdEnvelope } from '../../server/portal/cmd-consumer';
 import { deliveryKey, type DeliveryBucket } from '../../server/lib/migration-intake/bundle-delivery';
+import { releaseDeliveredBundle } from '../../server/portal/apply-migration-commands';
 import type { CmdEnvelope } from '../../server/lib/sync-events/cmd-envelope';
 import {
     MIGRATION_BATCHES_TEST_DDL, MIGRATION_ROWS_TEST_DDL, AUDIT_LOGS_TEST_DDL,
@@ -91,12 +92,12 @@ async function seedSchema(): Promise<void> {
     await b.DB.exec(AUDIT_LOGS_TEST_DDL);
 }
 
-async function seedWaitingTemplateRun(): Promise<void> {
+async function seedWaitingTemplateRun(batchId = BATCH): Promise<void> {
     await b.DB.prepare(
         'INSERT INTO migration_batches (id, tenant_id, created_by, intent, vendor, adapter_name, adapter_version, manifest, status, created_at, source_key, expires_at, upload_authorized_by, upload_authorized_at, upload_authorization_version, staff_access_authorized_by, staff_access_authorized_at, staff_access_authorization_version)'
         + ' VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).bind(
-        BATCH, TENANT, 'u1', 'templates.create', 'csv_generic', 'none', '0',
+        batchId, TENANT, 'u1', 'templates.create', 'csv_generic', 'none', '0',
         JSON.stringify({ warnings: [] }), 'needs_assistance', Date.now(),
         `tenants/${TENANT}/migration/x.xlsx`, Date.now() + 86_400_000,
         'u1', Date.now(), 'v1', 'u1', Date.now(), 'v1',
@@ -114,6 +115,18 @@ async function clearAll(): Promise<void> {
 async function rowCount(): Promise<number> {
     const r = await b.DB.prepare('SELECT count(*) AS n FROM migration_rows WHERE batch_id = ?').bind(BATCH).first<{ n: number }>();
     return r?.n ?? 0;
+}
+
+async function markerCount(): Promise<number> {
+    return (await b.DB.prepare('SELECT count(*) AS n FROM processed_cmd_events').first<{ n: number }>())?.n ?? 0;
+}
+
+async function replyCount(): Promise<number> {
+    return (await b.DB.prepare('SELECT count(*) AS n FROM sync_outbox').first<{ n: number }>())?.n ?? 0;
+}
+
+async function statusOf(batchId = BATCH): Promise<string | undefined> {
+    return (await b.DB.prepare('SELECT status FROM migration_batches WHERE id = ?').bind(batchId).first<{ status: string }>())?.status;
 }
 
 async function objectExists(key: string): Promise<boolean> {
@@ -275,6 +288,12 @@ describe('cmd.migration.deliver by reference, end to end', { timeout: 60_000 }, 
         expect(await rowCount()).toBe(1);
         expect(calls.get).toBe(readsBefore);
         expect(await objectExists(ref.key)).toBe(false);
+        // The refused attempt left no marker (so the queue may retry it into the
+        // same refusal until it dead-letters), emitted no reply, and did not
+        // touch the run, which stays staged from the first attempt.
+        expect(await markerCount()).toBe(0);
+        expect(await replyCount()).toBe(0);
+        expect(await statusOf()).toBe('staged');
     });
 
     it('POSITIVE CONTROL — with nothing failing, the object is deleted only after the reply is written', async () => {
@@ -304,6 +323,128 @@ describe('cmd.migration.deliver by reference, end to end', { timeout: 60_000 }, 
         expect(calls).toEqual({ get: 0, delete: 1 });
         expect(await objectExists(ref.key)).toBe(false);
         expect(await rowCount()).toBe(0);
+        // Refused: no marker left behind, no reply sent, the run's status as it was.
+        expect(await markerCount()).toBe(0);
+        expect(await replyCount()).toBe(0);
+        expect(await statusOf()).toBe(status);
+    });
+
+    it('POSITIVE CONTROL for the refusals above — a waiting run leaves a marker, a reply and a staged status', async () => {
+        await seedWaitingTemplateRun();
+        const ref = await stage(buildSyntheticTemplateBundle({ targetBytes: 20_000 }));
+        const { bucket } = spyBucket();
+        const queue = { send: async () => {} } as unknown as Queue<never>;
+        await applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), queue, { exports: bucket as unknown as R2Bucket });
+        expect(await markerCount()).toBe(1);
+        expect(await replyCount()).toBe(1);
+        expect(await statusOf()).toBe('staged');
+    });
+
+    it('a stale sequence number does not drop a migration delivery: it applies and releases its object', async () => {
+        // Migration commands are exempt from the stale guard (see isSubjectCmd in
+        // the consumer), so a stale command carrying a reference is never
+        // "dropped with its object left behind": it is applied like any other.
+        await seedWaitingTemplateRun();
+        await b.DB.prepare('UPDATE tenants SET applied_cmd_seq = 99 WHERE id = ?').bind(TENANT).run();
+        const ref = await stage(buildSyntheticTemplateBundle({ targetBytes: 20_000 }));
+        const { bucket } = spyBucket();
+        const queue = { send: async () => {} } as unknown as Queue<never>;
+        expect(await applyCmdEnvelope(b.DB, undefined, { ...envelope({ bundleRef: ref }), tenantseq: 1 }, queue, { exports: bucket as unknown as R2Bucket }))
+            .toBe('applied');
+        expect(await rowCount()).toBe(1);
+        expect(await objectExists(ref.key)).toBe(false);
+        expect(await markerCount()).toBe(1);
+        expect(await replyCount()).toBe(1);
+        // CONTROL: the counter was not moved backwards by the stale command.
+        const seq = await b.DB.prepare('SELECT applied_cmd_seq AS s FROM tenants WHERE id = ?').bind(TENANT).first<{ s: number }>();
+        expect(seq?.s).toBe(99);
+    });
+
+    it('an already-processed command is a duplicate: its object is left alone, nothing is staged or sent', async () => {
+        await seedWaitingTemplateRun();
+        const ref = await stage(buildSyntheticTemplateBundle({ targetBytes: 20_000 }));
+        const { bucket } = spyBucket();
+        const queue = { send: async () => {} } as unknown as Queue<never>;
+        const buckets = { exports: bucket as unknown as R2Bucket };
+        expect(await applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), queue, buckets)).toBe('applied');
+        // The first run released its object. Put the same bytes back so the
+        // duplicate has something that a wrong implementation could delete.
+        expect(await objectExists(ref.key)).toBe(false);
+        await b.EXPORTS_BUCKET.put(ref.key, new TextEncoder().encode('sentinel'));
+        const repliesAfterFirst = await replyCount();
+
+        expect(await applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), queue, buckets)).toBe('duplicate');
+
+        expect(await objectExists(ref.key)).toBe(true);
+        expect(await rowCount()).toBe(1);
+        expect(await markerCount()).toBe(1);
+        expect(await replyCount()).toBe(repliesAfterFirst);
+    });
+
+    it('a throw before staging on the post-apply path leaves the object for the retry; the retry then releases it', async () => {
+        await seedWaitingTemplateRun();
+        const good = buildSyntheticTemplateBundle({ targetBytes: 20_000 });
+        const ref = await stage(good);
+        // Corrupt the stored bytes: same key and size, different content.
+        const bad = new Uint8Array(ref.bytes).fill(32);
+        await b.EXPORTS_BUCKET.put(ref.key, bad);
+        const { bucket, calls } = spyBucket();
+        const buckets = { exports: bucket as unknown as R2Bucket };
+
+        await expect(applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), undefined, buckets))
+            .rejects.toThrow(/object content does not match the declared hash/);
+        expect(calls.delete).toBe(0);
+        expect(await objectExists(ref.key)).toBe(true);
+        expect(await rowCount()).toBe(0);
+        expect(await markerCount()).toBe(0);
+        expect(await replyCount()).toBe(0);
+        expect(await statusOf()).toBe('needs_assistance');
+
+        // CONTROL: the sender repairs the object; the retry stages and releases.
+        await stage(good);
+        expect(await applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), undefined, buckets)).toBe('applied');
+        expect(await objectExists(ref.key)).toBe(false);
+        expect(await rowCount()).toBe(1);
+    });
+
+    it('releasing with no exports bucket bound does not throw; with one bound it deletes', async () => {
+        const ref = await stage(buildSyntheticTemplateBundle({ targetBytes: 20_000 }));
+        const data = { tenantId: TENANT, batchId: BATCH, bundleRef: ref };
+        await expect(releaseDeliveredBundle(data, undefined)).resolves.toBeUndefined();
+        expect(await objectExists(ref.key)).toBe(true);
+        const { bucket } = spyBucket();
+        await releaseDeliveredBundle(data, bucket);
+        expect(await objectExists(ref.key)).toBe(false);
+    });
+
+    it('an inline delivery with no exports bucket bound still applies (nothing to release)', async () => {
+        await seedWaitingTemplateRun();
+        const bundle = buildSyntheticTemplateBundle({ targetBytes: 20_000 });
+        expect(await applyCmdEnvelope(b.DB, undefined, envelope({ bundle }))).toBe('applied');
+        expect(await rowCount()).toBe(1);
+    });
+
+    it.each([
+        ['batch id', { batchId: 'batch/x', tenantId: TENANT }],
+        ['tenant id', { batchId: BATCH, tenantId: 'tenant/x' }],
+    ])('a slash in the %s reaching the not-waiting path is refused before any bucket call', async (_label, ids) => {
+        // Seed a declined run whose ids contain a slash, so the command gets
+        // past the run lookup and reaches the ownership check.
+        await b.DB.prepare('INSERT OR IGNORE INTO tenants (id, slug, created_at) VALUES (?, ?, ?)').bind(ids.tenantId, `s-${ids.tenantId.replace('/', '-')}`, Date.now()).run();
+        await b.DB.prepare(
+            'INSERT INTO migration_batches (id, tenant_id, created_by, intent, vendor, adapter_name, adapter_version, manifest, status, created_at, staff_access_authorized_by, staff_access_authorized_at, staff_access_authorization_version)'
+            + " VALUES (?, ?, 'u1', 'templates.create', 'csv_generic', 'none', '0', '{}', 'declined', ?, 'u1', ?, 'v1')",
+        ).bind(ids.batchId, ids.tenantId, Date.now(), Date.now()).run();
+        const key = `migration-deliveries/${ids.tenantId}/${ids.batchId}/${'a'.repeat(64)}.json`;
+        await b.EXPORTS_BUCKET.put(key, new TextEncoder().encode('x'));
+        const { bucket, calls } = spyBucket();
+        const command = envelope({ ...ids, bundleRef: { key, bytes: 1, sha256: 'a'.repeat(64) } });
+
+        await expect(applyCmdEnvelope(b.DB, undefined, command, undefined, { exports: bucket as unknown as R2Bucket }))
+            .rejects.toThrow(/may not contain a slash/);
+
+        expect(calls).toEqual({ get: 0, delete: 0 });
+        expect(await objectExists(key)).toBe(true);
     });
 
     it('a foreign reference on a run that is no longer waiting is refused by ownership and its object is NOT deleted', async () => {
