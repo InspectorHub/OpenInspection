@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.8.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.7.0...field-ui-v0.8.0) (2026-11-05)
+
+
+### Features
+
+* **editor:** open published reports read-only and add edit-and-republish ([12e687f](https://github.com/InspectorHub/OpenInspection/commit/12e687f3037d2c96a1653450d919359967cfa074))
+* **publish:** let the inspector choose whether to send the report-updated notices on republish ([867c836](https://github.com/InspectorHub/OpenInspection/commit/867c83685c74983b3ea4174ff9af5c467c50aefd))
+* **reports:** refuse content writes to a published report and add edit-again ([df6f5c8](https://github.com/InspectorHub/OpenInspection/commit/df6f5c8a4b073cfbc14fdafbece9fc93bc39275a))
+
+
+### Bug Fixes
+
+* **api:** whole-branch review follow-ups ([5c451d5](https://github.com/InspectorHub/OpenInspection/commit/5c451d5cf551a93fa9452f3902a459ebe73b5664))
+* **editor:** do not advance to the next item after the editor has unmounted ([2d097d3](https://github.com/InspectorHub/OpenInspection/commit/2d097d3e700f6b41a7e42b3bcd47abb4990a9330))
+* **inspections:** one property type vocabulary, and document the captured item value ([64bf256](https://github.com/InspectorHub/OpenInspection/commit/64bf256535555718ad3e1650a75cbc8bfd4a3db0))
+* **publish:** make the notice choice and receipt match what the server does, and freeze category colours and time zone ([d27222b](https://github.com/InspectorHub/OpenInspection/commit/d27222befd92f5aa0b66c92a5e072db1b2083360))
+* **publish:** make the unchanged-publish receipt honest, and compare snapshots without key order ([50a46ce](https://github.com/InspectorHub/OpenInspection/commit/50a46ce6350fd9168d45662e47746902ce26c8bc))
+* **reports:** freeze published reports and build public responses from field lists ([654cf74](https://github.com/InspectorHub/OpenInspection/commit/654cf749ecbeb3dba3174d2814f95108a8991a8f))
+
 ## [0.7.0](https://github.com/InspectorHub/OpenInspection/compare/field-ui-v0.6.2...field-ui-v0.7.0) (2026-11-02)
 
 
