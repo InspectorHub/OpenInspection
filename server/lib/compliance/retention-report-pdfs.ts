@@ -12,8 +12,8 @@
  * `now` from the context and computes its own cutoffs instead of using the one
  * the sweep precomputed from the manifest.
  */
-import { inArray } from 'drizzle-orm';
-import { reportPdfs, tenantConfigs } from '../db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
+import { reportPdfs, reportVersions, tenantConfigs } from '../db/schema';
 import { changeCount, subtractMonthsMs } from './db-row-utils';
 import { resolveReportPdfRetentionYears } from './report-pdf-retention';
 import type { Executor } from './retention-executor-context';
@@ -37,6 +37,7 @@ export const reportPdfsExecutor: Executor = async (rawDb, _cutoff, ctx) => {
     const rows = await db.select({
         id: reportPdfs.id,
         tenantId: reportPdfs.tenantId,
+        inspectionId: reportPdfs.inspectionId,
         r2Key: reportPdfs.r2Key,
         renderedAt: reportPdfs.renderedAt,
     }).from(reportPdfs).all();
@@ -53,8 +54,8 @@ export const reportPdfsExecutor: Executor = async (rawDb, _cutoff, ctx) => {
         ]),
     );
 
-    const doomed: { id: string; r2Key: string }[] = [];
-    for (const r of rows as { id: string; tenantId: string; r2Key: string; renderedAt: Date | number }[]) {
+    let doomed: { id: string; tenantId: string; inspectionId: string; r2Key: string }[] = [];
+    for (const r of rows as { id: string; tenantId: string; inspectionId: string; r2Key: string; renderedAt: Date | number }[]) {
         // A tenant with no config row gets the disclosed default, NOT
         // indefinite. Reading a missing row as 0 would silently convert
         // every silent tenant to the opposite of the stated default.
@@ -67,8 +68,32 @@ export const reportPdfsExecutor: Executor = async (rawDb, _cutoff, ctx) => {
         if (ctx.heldTenantIds.has(r.tenantId)) continue;
         const cutoff = subtractMonthsMs(ctx.now, years * 12);
         const rendered = r.renderedAt instanceof Date ? r.renderedAt.getTime() : Number(r.renderedAt);
-        if (rendered < cutoff) doomed.push({ id: r.id, r2Key: r.r2Key });
+        if (rendered < cutoff) doomed.push({ id: r.id, tenantId: r.tenantId, inspectionId: r.inspectionId, r2Key: r.r2Key });
     }
+    if (doomed.length === 0) return 0;
+
+    // A PDF of a published report is never destroyed by this window, whatever the tenant chose: the client was given that report, and
+    // the file is what they download. "Published" here is any inspection that has a version on record, so the unversioned renders
+    // taken of it afterwards are kept too. Only the PDFs of reports that were never published expire. Looked up per tenant and in
+    // small groups, because D1 caps the number of bound values in one statement.
+    const published = new Set<string>();
+    const byTenantInspections = new Map<string, Set<string>>();
+    for (const d of doomed) {
+        const set = byTenantInspections.get(d.tenantId) ?? new Set<string>();
+        set.add(d.inspectionId);
+        byTenantInspections.set(d.tenantId, set);
+    }
+    for (const [tenantId, inspectionSet] of byTenantInspections) {
+        const ids = [...inspectionSet];
+        for (let i = 0; i < ids.length; i += 40) {
+            const versioned = await db.select({ inspectionId: reportVersions.inspectionId })
+                .from(reportVersions)
+                .where(and(eq(reportVersions.tenantId, tenantId), inArray(reportVersions.inspectionId, ids.slice(i, i + 40))))
+                .all();
+            for (const v of versioned as { inspectionId: string }[]) published.add(`${tenantId}/${v.inspectionId}`);
+        }
+    }
+    doomed = doomed.filter((d) => !published.has(`${d.tenantId}/${d.inspectionId}`));
     if (doomed.length === 0) return 0;
 
     // The bucket is demanded HERE, not on entry, and the difference matters:

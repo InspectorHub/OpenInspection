@@ -27,6 +27,24 @@ what is left.
 
 ---
 
+## Report PDFs of published reports are not expired
+
+**What changed.** The `report_pdfs` executor skips every PDF whose inspection has at
+least one published version on record, whatever window the tenant chose. Only the
+PDFs of reports that were never published expire under the window.
+
+**Why.** The PDF of a published report is the file the client was given and
+downloads. A window that destroyed it after the period left a published report with no
+downloadable copy, and the row that named the file kept answering "ready". The decision
+to keep them was taken by the product owner on 2026-11-05.
+
+**What did not change.** The window, the default, the zero-means-indefinite
+instruction and the manifest row are as before, so the digest in `retention-policy.ts`
+is unchanged. This is an exemption inside the executor, not a new rule. It narrows what
+the window deletes; it does not widen it.
+
+---
+
 ## 2026-09-11.10 — attempt counters for the signed audit export
 
 **What changed.** One rule was added: `verify_export_attempts`, the attempt
