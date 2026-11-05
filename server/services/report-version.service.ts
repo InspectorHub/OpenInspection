@@ -13,7 +13,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, desc } from 'drizzle-orm';
 import { reports, reportVersions, inspections, inspectionUnits, users, inspectionInspectors, templates, tenantConfigs } from '../lib/db/schema';
 import { loadLatestPublishedRef } from '../lib/report-snapshot';
-import { assertSnapshotSize, CheckBuilds, commercialSnapshotParts, retryOnce } from '../lib/report-snapshot-build';
+import { assertSnapshotSize, CheckBuilds, commercialSnapshotParts, presentationSnapshotPart, retryOnce } from '../lib/report-snapshot-build';
 import { resolveResultsRow } from './inspection/report-grain';
 import { computeDiff, SNAPSHOT_SCHEMA_VERSION, type Snapshot, type SnapshotInspector, type DiffPayload } from '../lib/version-diff';
 import { CredentialService } from './credential.service';
@@ -90,6 +90,7 @@ export class ReportVersionService {
             inspectors: await this.resolveInspectors(tenantId, inspectionId, ins),
             styleProfile: await this.resolveStyleProfile(tenantId, ins),
             ratingSystemSnapshot: (results as { ratingSystemSnapshot?: unknown } | undefined)?.ratingSystemSnapshot ?? null,
+            presentation: await presentationSnapshotPart(this.db, tenantId),
             ...(await commercialSnapshotParts(this.db, this.encryptionSecret, this.previousSecrets, tenantId, inspectionId, ins)),
         };
         return JSON.stringify(snapshot);

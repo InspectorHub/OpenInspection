@@ -195,6 +195,15 @@ describe('editor action — the revision reason travels with the publish', () =>
         });
     });
 
+    it('carries the version a publish found unchanged back to the dialog, and nothing for a real publish', async () => {
+        publishPost.mockResolvedValue(new Response(JSON.stringify({ success: true, data: { unchangedSinceVersion: 3 } }), { status: 200 }));
+        expect(await post({ intent: 'publish' })).toEqual({ ok: true, intent: 'publish', unchangedSinceVersion: 3 });
+        publishPost.mockResolvedValue(new Response(JSON.stringify({ success: true, data: { reportUrl: '/r' } }), { status: 200 }));
+        expect(await post({ intent: 'publish' })).toEqual({ ok: true, intent: 'publish' });
+        publishPost.mockResolvedValue(new Response(null, { status: 200 }));
+        expect(await post({ intent: 'publish' })).toEqual({ ok: true, intent: 'publish' });
+    });
+
     it('forwards notifyClient only when the form says "true"', async () => {
         await post({ intent: 'publish', notifyClient: 'true' });
         expect(publishPost).toHaveBeenLastCalledWith({ param: { id: 'insp-1' }, json: { notifyClient: true } });

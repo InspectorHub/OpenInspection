@@ -120,3 +120,16 @@ export function frozenCompliance<C extends { reportSignoffs: unknown[]; psq: unk
         documentReview: c.documentReview.map((r) => reviveDates(r)),
     } as unknown as C;
 }
+
+/**
+ * The defect categories and the time zone the version was rendered under, or null when the snapshot predates them
+ * (version 3 and earlier): the reader then uses the live values, for exactly these two.
+ */
+export function frozenPresentation(pinned: Snapshot | null): NonNullable<Snapshot['presentation']> | null {
+    const p = pinned?.presentation;
+    if (!p || !Array.isArray(p.defectCategories) || typeof p.timeZone !== 'string' || p.timeZone === '') return null;
+    // A damaged entry would throw where the report reads `cat.name`; a damaged part is not half-applied, the live values are used.
+    const sound = p.defectCategories.every((c) => c !== null && typeof c === 'object'
+        && typeof c.id === 'string' && typeof c.name === 'string' && typeof c.color === 'string' && typeof c.drivesSummary === 'boolean');
+    return sound ? p : null;
+}

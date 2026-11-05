@@ -5,7 +5,7 @@ import { primaryLicenseOf } from '../../lib/credentials/primary';
 import { pinnedLead } from '../../lib/version-diff';
 import { loadPinnedSnapshot, reportVersionScope } from '../../lib/report-snapshot';
 import { logger } from '../../lib/logger';
-import { freezeInspection, freezeResultsRow, freezeUnitRows, frozenCompliance, frozenCostItems, frozenCostYear } from '../../lib/report-freeze';
+import { freezeInspection, freezeResultsRow, freezeUnitRows, frozenCompliance, frozenCostItems, frozenCostYear, frozenPresentation } from '../../lib/report-freeze';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
 import { resolveTenantTimeZone } from '../../lib/tz';
@@ -142,10 +142,8 @@ export class InspectionReportService extends InspectionSubService {
         // A snapshot written before a part was added to it lacks that part and the live value is used for
         // exactly that part.
         //
-        // WHAT STAYS LIVE, by design: the order's current state (status, payment, gate), and the company's own
-        // presentation and access settings the report is rendered under (defect categories and colours, time zone,
-        // the repair-export switch). None of those is the inspector's finding. The reserve-schedule assumptions are NOT
-        // in this list: they change the cost opinion's numbers, so a commercial version freezes them.
+        // WHAT STAYS LIVE: the order's current state (status, payment, gate) and the repair-export switch (an access
+        // switch, not part of the document). Defect categories and the time zone are frozen from version 4; older reads are live.
         //
         // The report id is resolved first: version numbers run per report, so "version 1" is only a row once
         // the report is known.
@@ -293,7 +291,8 @@ export class InspectionReportService extends InspectionSubService {
         // looked up per-defect below with no N+1 query. Keyed by BOTH name
         // and id: seed template JSON stores category NAMES ("safety"), while
         // a template authored after Plan-4 may store a defect_categories.id.
-        const defectCategories = await new DefectCategoryService(this.db).listOrDefaults(tenantId);
+        const frozenLook = frozenPresentation(pinned); // categories and zone as published (version 4+); older versions read them live
+        const defectCategories = frozenLook?.defectCategories ?? await new DefectCategoryService(this.db).listOrDefaults(tenantId);
         const categoryColorByKey = new Map<string, string>();
         for (const cat of defectCategories) {
             categoryColorByKey.set(cat.name, cat.color);
@@ -567,10 +566,11 @@ export class InspectionReportService extends InspectionSubService {
             // tenant_configs row missing — defaults apply.
         }
         // The reserve schedule's assumptions are part of the cost opinion a version published, so they are read from
-        // the version. (The company's other settings, time zone and the repair-export switch, stay live on purpose.)
+        // the version, and so is the time zone. The repair-export switch stays live on purpose: it is an access switch.
         if (pinned?.reserve) {
             ({ reserveScheduleEnabled, reserveTermYears, inflationRateBps } = pinned.reserve);
         }
+        if (frozenLook) reportTimeZone = frozenLook.timeZone;
         // Report Style Presets (Plan 1a) — three-tier resolution + field-level tweaks.
         const insp = inspection as { profileOverride?: string | null; badgeLayoutOverride?: string | null; reportPhotoColumns?: number | null };
         // Same rule as the badges: a pinned version keeps the appearance it was

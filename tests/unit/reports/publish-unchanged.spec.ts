@@ -98,7 +98,10 @@ describe('publish with nothing changed since the latest version', () => {
         expect(first.status).toBe(200);
         const second = await publish(A);
         expect(second.status).toBe(200);
-        expect(Object.keys(second.body.data).sort()).toEqual(Object.keys(first.body.data).sort());
+        // The normal shape, plus the one key that says nothing was published: the version that is still current.
+        expect(Object.keys(second.body.data).sort()).toEqual([...Object.keys(first.body.data), 'unchangedSinceVersion'].sort());
+        expect(first.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(second.body.data.unchangedSinceVersion).toBe(1);
         expect(second.body.data).toMatchObject({ reportUrl: first.body.data.reportUrl, reportStatus: 'published' });
         expect(await versions(A)).toHaveLength(1);
         expect(publishInspection).toHaveBeenCalledTimes(1);
@@ -185,5 +188,46 @@ describe('republishing a report that was being edited again', () => {
         await publish(A);
         expect(await versions(A)).toHaveLength(2);
         expect(publishInspection).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('the step from snapshot version 3 to 4 is not by itself a change', () => {
+    /** Rewrites the stored latest version as an older (version 3) snapshot: no `presentation`, schemaVersion 3. */
+    async function downgradeStoredToV3(id: string) {
+        const [row] = await versions(id);
+        const old = JSON.parse(row.snapshotJson) as Record<string, unknown>;
+        delete old.presentation;
+        old.schemaVersion = 3;
+        await db.update(schema.reportVersions).set({ snapshotJson: JSON.stringify(old) }).where(eq(schema.reportVersions.id, row.id));
+    }
+
+    it('a stored version 3 with identical content answers as unchanged (no spurious version)', async () => {
+        await publish(A);
+        await downgradeStoredToV3(A);
+        const second = await publish(A);
+        expect(second.body.data.unchangedSinceVersion).toBe(1);
+        expect(await versions(A)).toHaveLength(1);
+        expect(publishInspection).toHaveBeenCalledTimes(1);
+    });
+
+    it('(control) a stored version 3 with a content edit is still a real publish', async () => {
+        await publish(A);
+        await downgradeStoredToV3(A);
+        await db.update(schema.reports).set({ status: 'in_progress', publishedAt: new Date() }).where(eq(schema.reports.id, 'rep-a'));
+        await setResults(A, { i1: { rating: 'defect' } });
+        const second = await publish(A);
+        expect(second.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(await versions(A)).toHaveLength(2);
+    });
+
+    it('(control) a stored version 4 followed by a settings change is a real publish', async () => {
+        await db.insert(schema.defectCategories).values({ id: 'cat-s', tenantId: T, name: 'safety', color: '#ef4444', drivesSummary: true, sortOrder: 1, isSeed: true, createdAt: new Date() });
+        await publish(A);
+        expect(JSON.parse((await versions(A))[0].snapshotJson)).toHaveProperty('presentation');
+        await db.update(schema.reports).set({ status: 'in_progress', publishedAt: new Date() }).where(eq(schema.reports.id, 'rep-a'));
+        await db.update(schema.defectCategories).set({ color: '#00aa55' }).where(eq(schema.defectCategories.id, 'cat-s'));
+        const second = await publish(A);
+        expect(second.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(await versions(A)).toHaveLength(2);
     });
 });

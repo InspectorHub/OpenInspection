@@ -9,7 +9,9 @@ import { CostItemService } from '../services/cost-item.service';
 import { ComplianceService } from '../services/compliance/pca-compliance.service';
 import { resolveReportTier } from './report-tier';
 import { MAX_SNAPSHOT_BYTES, snapshotByteLength } from './report-snapshot';
-import type { Snapshot } from './version-diff';
+import type { Snapshot, SnapshotPresentation } from './version-diff';
+import { DefectCategoryService } from '../services/inspection/defect-category.service';
+import { resolveTenantTimeZone } from './tz';
 import { logger } from './logger';
 
 /** The snapshot of a publish is larger than one stored row may be. Not retryable: the report itself has to shrink. */
@@ -110,4 +112,20 @@ export async function commercialSnapshotParts(
         })) as NonNullable<Snapshot['compliance']>;
     }
     return parts;
+}
+
+/**
+ * The company's presentation settings as they are at publish: the defect categories (colour, and whether each drives
+ * the Summary) and the report time zone. Read the same way the live report reads them, so a pinned read and a live read
+ * of an unchanged company agree. The repair-export switch is deliberately NOT here: it is an access switch and stays live.
+ */
+export async function presentationSnapshotPart(d1: D1Database, tenantId: string): Promise<SnapshotPresentation> {
+    const [categories, cfg] = await Promise.all([
+        new DefectCategoryService(d1).listOrDefaults(tenantId),
+        drizzle(d1).select({ defaultTimezone: tenantConfigs.defaultTimezone }).from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get(),
+    ]);
+    return {
+        defectCategories: categories.map((c) => ({ id: c.id, name: c.name, color: c.color, drivesSummary: c.drivesSummary })),
+        timeZone: resolveTenantTimeZone(cfg?.defaultTimezone),
+    };
 }
