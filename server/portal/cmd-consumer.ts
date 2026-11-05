@@ -188,6 +188,10 @@ export async function applyCmdEnvelope(
             replyType === 'reply.tenant.updated'
                 ? { result: 'applied', ...(replyExtra ?? {}) }
                 : (replyExtra ?? {}));
+        // Only now: an earlier failure rolls the marker back and the redelivery needs the object.
+        if (env.type === 'io.inspectorhub.cmd.migration.deliver') {
+            await (await import('./apply-migration-commands')).releaseDeliveredFor(env, buckets?.exports);
+        }
         return 'applied';
     } catch (err) {
         await db.delete(processedCmdEvents).where(eq(processedCmdEvents.eventId, env.id)).catch(() => {});
@@ -376,7 +380,7 @@ async function applyKnownCmd(
             // offboarding appliers are — a standalone deployment never reaches
             // this line and should not carry the module.
             const { applyMigrationCommand } = await import('./apply-migration-commands');
-            return applyMigrationCommand(dbBinding, env, emailEnv);
+            return applyMigrationCommand(dbBinding, env, emailEnv, buckets?.exports);
         }
         case 'io.inspectorhub.cmd.tenant.sync_quota': {
             const data = cmdSyncQuotaDataSchema.parse(env.data);

@@ -5,6 +5,13 @@ import { writeAuditRow } from '../lib/audit';
 import { logger } from '../lib/logger';
 import { limitsFor } from '../lib/migration-intake/limits';
 import { SAAS_PROFILE } from '../lib/deployment-profile';
+import {
+    assertBundleRefOwned,
+    readBundleRef,
+    type DeliveryBucket,
+} from '../lib/migration-intake/bundle-delivery';
+import { MIGRATION_BATCH_STATUS } from '../lib/status/migration-batch-status';
+import { Errors } from '../lib/errors';
 import { MigrationStageService } from '../services/migration-intake/stage.service';
 import { MigrationAssistanceService } from '../services/migration-intake/assistance.service';
 import { assertStaffAccessAuthorized } from '../services/migration-intake/staff-access';
@@ -43,6 +50,41 @@ import type { EmailServiceEnv } from '../lib/email/build-email-service';
  * retry becomes a dead command the console shows. A silent skip would leave the
  * sender believing it landed.
  */
+
+/**
+ * Removes the object a delivered reference pointed at. Never throws.
+ *
+ * Called by the consumer only after the WHOLE apply has succeeded (rows staged,
+ * audit row written, sequence advanced, reply emitted), because a failure at any
+ * earlier point rolls the dedup marker back and the redelivered command must
+ * still find its object. Also called when the run is found no longer waiting.
+ *
+ * Best effort: the rows are already staged. A survivor is collected by an expiry
+ * rule on the `migration-deliveries/` prefix of the exports bucket, which is an
+ * operational backstop configured in the bucket. Nothing in this repository
+ * creates or verifies it.
+ */
+export async function releaseDeliveredBundle(
+    data: { tenantId: string; batchId: string; bundleRef?: { key: string; bytes: number; sha256: string } | undefined },
+    exportsBucket: DeliveryBucket | undefined,
+): Promise<void> {
+    if (!data.bundleRef || !exportsBucket) return;
+    try {
+        assertBundleRefOwned(data.tenantId, data.batchId, data.bundleRef);
+        await exportsBucket.delete(data.bundleRef.key);
+    } catch (err) {
+        logger.warn('[cmd] delivered bundle object not deleted', {
+            tenantId: data.tenantId, batchId: data.batchId,
+            error: err instanceof Error ? err.message : String(err),
+        });
+    }
+}
+
+/** `releaseDeliveredBundle` for a deliver envelope, as the consumer calls it. */
+export async function releaseDeliveredFor(env: CmdEnvelope, exportsBucket: DeliveryBucket | undefined): Promise<void> {
+    const parsed = cmdMigrationDeliverDataSchema.safeParse(env.data);
+    if (parsed.success) await releaseDeliveredBundle(parsed.data, exportsBucket);
+}
 
 /** The `replyto` handle these commands use — `import:<batchId>`. */
 export function migrationReplyTo(batchId: string): string {
@@ -94,17 +136,34 @@ export async function applyMigrationCommand(
     dbBinding: D1Database,
     env: CmdEnvelope,
     emailEnv?: EmailServiceEnv,
+    exportsBucket?: DeliveryBucket,
 ): Promise<Record<string, unknown> | undefined> {
     switch (env.type) {
         case 'io.inspectorhub.cmd.migration.deliver': {
             const data = cmdMigrationDeliverDataSchema.parse(env.data);
             // Before anything is parsed: a run nobody authorised a person to read
             // does not receive what a person produced from reading it.
-            assertStaffAccessAuthorized(await loadBatch(dbBinding, data.tenantId, data.batchId));
+            const batch = await loadBatch(dbBinding, data.tenantId, data.batchId);
+            assertStaffAccessAuthorized(batch);
+            if (data.bundleRef && batch.status !== MIGRATION_BATCH_STATUS.NEEDS_ASSISTANCE) {
+                // The run is no longer waiting (declined, expired, or already
+                // staged), so the object can never be used. Ownership first, so a
+                // reference into another run's prefix is refused and left alone;
+                // then the object is removed instead of stranded, and the object
+                // is never read.
+                assertBundleRefOwned(data.tenantId, data.batchId, data.bundleRef);
+                await releaseDeliveredBundle(data, exportsBucket);
+                throw Errors.Conflict('This import is not waiting for a converted file.');
+            }
+            // A reference is resolved only after the authorisation above: the
+            // object is read on behalf of a run that is allowed to receive it.
+            const bundle = data.bundleRef
+                ? await readBundleRef(exportsBucket, data.tenantId, data.batchId, data.bundleRef)
+                : data.bundle;
             const result = await new MigrationStageService(dbBinding).stageIntoBatch({
                 tenantId: data.tenantId,
                 batchId: data.batchId,
-                bundle: data.bundle,
+                bundle,
                 // The deployment's own ceiling. A command arriving from the
                 // operator's console is still bound by what this deployment will
                 // stage, and reading it from the payload would let the sender
@@ -121,7 +180,8 @@ export async function applyMigrationCommand(
                 action: 'migration.delivered',
                 entityType: 'migration_batch',
                 entityId: data.batchId,
-                metadata: { rows: result.rows.length },
+                // `viaRef` records the route, never the object's key or content.
+                metadata: { rows: result.rows.length, ...(data.bundleRef && { viaRef: true }) },
             });
             return { batchId: data.batchId, rows: result.rows.length };
         }

@@ -161,15 +161,15 @@
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
       },
       "lifecycle_owner": "engine",
-      "data_categories": ["subject_data_export", "tenant_offboarding_archive"],
+      "data_categories": ["subject_data_export", "tenant_offboarding_archive", "migration_delivery_bundle"],
       "subjects": ["end_client", "agent", "staff"],
-      "purpose": "Where a completed data export or offboarding archive is written for portal to hand to the requester. A single object here can hold everything the other stores hold about one person.",
+      "purpose": "Where a completed data export or offboarding archive is written for portal to hand to the requester, and where a converted import bundle too large for a queue message is staged until the engine has read it. A single object here can hold everything the other stores hold about one person.",
       "retention_rule": "none",
-      "deletion_mechanism": "none",
+      "deletion_mechanism": "partial",
       "export_mechanism": "not-applicable",
       "tenant_scope": "per-tenant",
       "evidence_level": "E2",
-      "note": "The highest-concentration store in the registry and the one with no clock: an export bundles a subject's whole record into one object and nothing expires it. Absent from standalone entirely — the offboarding command path is SaaS-only."
+      "note": "The highest-concentration store in the registry and the one with no clock: an export bundles a subject's whole record into one object and nothing expires it. Absent from standalone entirely — the offboarding command path is SaaS-only. `migration_delivery_bundle` is the one category here with a lifecycle: a converted import bundle lives under `migration-deliveries/{tenantId}/{batchId}/` and the command consumer deletes the object only after the WHOLE apply has succeeded (rows staged, audit row written, sequence advanced, reply emitted), best effort. It also deletes an owned object when the run is found no longer waiting. On every other exit the object is removed ONLY by a bucket lifecycle rule configured outside the code: a command that is dropped, refused, dead-lettered or fails permanently leaves its object where it is, and a failed delete does too. Configuring an expiry rule on the `migration-deliveries/` prefix is therefore a precondition for a sender to start writing such objects; this entry cannot prove the rule exists. The bundle is the operator's own import content and, for a contacts import, third-party personal data. That is why deletion_mechanism reads partial and not none: the other two categories still have no deletion path at all."
     },
 
     // ── Durable Objects ─────────────────────────────────────────────────────

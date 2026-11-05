@@ -223,7 +223,7 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     // workspace commits to opening it, and until this seam there was no row
     // anywhere that could name them rather than the workspace's own admin.
     'migration.acknowledged': { family: 'migration_batch', label: 'audit_action_migration_acknowledged', meta: {}, status: { kind: 'live' } },
-    'migration.delivered': { family: 'migration_batch', label: 'audit_action_migration_delivered', meta: { byEntity: 'count', rows: 'count' }, status: { kind: 'live' } },
+    'migration.delivered': { family: 'migration_batch', label: 'audit_action_migration_delivered', meta: { byEntity: 'count', rows: 'count', viaRef: 'flag' }, status: { kind: 'live' } },
     // No metadata, for the same reason `migration.row_repaired` carries none,
     // and one step further: the reason a file could not be converted is free
     // text about somebody else's export, and `auditFromContext` redacts

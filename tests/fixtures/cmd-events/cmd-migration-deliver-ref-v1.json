@@ -1,0 +1,20 @@
+{
+  "specversion": "1.0",
+  "id": "c2e3f4a5-6b7c-4d8e-9fa0-1b2c3d4e5f60",
+  "type": "io.inspectorhub.cmd.migration.deliver",
+  "source": "portal",
+  "time": "2026-11-05T10:00:00.000Z",
+  "dataschema": "cmd-migration-deliver/v1",
+  "tenantseq": 1,
+  "replyto": "import:fixture-batch-1",
+  "data": {
+    "tenantId": "fixture-tenant-5",
+    "batchId": "fixture-batch-1",
+    "bundleRef": {
+      "key": "migration-deliveries/fixture-tenant-5/fixture-batch-1/d8e869775b85e036797f44b910a04cad2e03afb4913827660cd3550797572e80.json",
+      "bytes": 425,
+      "sha256": "d8e869775b85e036797f44b910a04cad2e03afb4913827660cd3550797572e80"
+    },
+    "actor": { "platformAdminId": "fixture-admin-1", "email": "ops@example.test" }
+  }
+}
