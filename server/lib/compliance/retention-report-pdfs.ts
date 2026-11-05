@@ -108,10 +108,17 @@ export const reportPdfsExecutor: Executor = async (rawDb, _cutoff, ctx) => {
         );
     }
 
-    // Objects first. A throw here leaves every row intact.
-    await bucket.delete(doomed.map((d) => d.r2Key));
-    const res = await db.delete(reportPdfs)
-        .where(inArray(reportPdfs.id, doomed.map((d) => d.id)))
-        .run();
-    return changeCount(res);
+    // Objects first. A throw here leaves every row intact. A queued render that never produced a file is a placeholder row with an
+    // empty key: it names no object, so it is not handed to storage (an empty key is not a key). Storage takes at most 1000 keys
+    // per call and D1 caps the values bound in one statement, so both deletes go in groups.
+    const withFiles = doomed.filter((d) => d.r2Key !== '');
+    for (let i = 0; i < withFiles.length; i += 500) await bucket.delete(withFiles.slice(i, i + 500).map((d) => d.r2Key));
+    let removed = 0;
+    for (let i = 0; i < doomed.length; i += 50) {
+        const res = await db.delete(reportPdfs)
+            .where(inArray(reportPdfs.id, doomed.slice(i, i + 50).map((d) => d.id)))
+            .run();
+        removed += changeCount(res);
+    }
+    return removed;
 };

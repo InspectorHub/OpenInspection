@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, isNull, desc } from 'drizzle-orm';
+import { eq, and, isNull, desc, isNotNull } from 'drizzle-orm';
 import { reportPdfs, tenantConfigs } from '../lib/db/schema';
 import type { ReportPdf } from '../lib/db/schema';
 import { generatePdfWithTocPages } from '../lib/pdf';
@@ -274,7 +274,15 @@ export class ReportPdfService {
             eq(reportPdfs.tenantId, tenantId),
             isNull(reportPdfs.versionNumber),
         )).all();
+        // A file is named by its content hash, so a transient row and a versioned row for the same content share one object. The
+        // file of a versioned (published) row is never deleted here, only the transient row that also points at it.
+        const keptKeys = new Set((await db.select({ key: reportPdfs.r2Key }).from(reportPdfs).where(and(
+            eq(reportPdfs.inspectionId, inspectionId),
+            eq(reportPdfs.tenantId, tenantId),
+            isNotNull(reportPdfs.versionNumber),
+        )).all()).map((r) => r.key));
         for (const r of rows) {
+            if (r.r2Key === '' || keptKeys.has(r.r2Key)) continue;
             try { if (this.r2) await this.r2.delete(r.r2Key); } catch { /* non-fatal */ }
         }
         await db.delete(reportPdfs).where(and(

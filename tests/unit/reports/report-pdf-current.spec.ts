@@ -261,4 +261,25 @@ describe('ReportPdfService.purgeTransientPdfs', () => {
         const remaining = await testDb.select().from(schema.reportPdfs).all();
         expect(remaining).toHaveLength(0);
     });
+
+    it('keeps the file a versioned row also names, and only drops the transient row that shares it', async () => {
+        const shared = `${TENANT_A}/${INSP_1}/reports/full-${HASH_V1}.pdf`;
+        const own = `${TENANT_A}/${INSP_1}/reports/full-${HASH_DRAFT}.pdf`;
+        const base = { tenantId: TENANT_A, inspectionId: INSP_1, type: 'full' as const, renderedAt: new Date(), sourceVersion: 1, sizeBytes: 512, status: 'ready' as const };
+        await testDb.insert(schema.reportPdfs).values([
+            { ...base, id: crypto.randomUUID(), r2Key: shared, versionNumber: 1, contentHash: HASH_V1 },
+            { ...base, id: crypto.randomUUID(), r2Key: shared, versionNumber: null, contentHash: HASH_V1 },
+            { ...base, id: crypto.randomUUID(), r2Key: own, versionNumber: null, contentHash: HASH_DRAFT },
+        ]);
+
+        await svc.purgeTransientPdfs(INSP_1, TENANT_A);
+
+        // Control: the purge ran and removed a file that nothing versioned names.
+        expect(deletedKeys).toEqual([own]);
+        expect(deletedKeys).not.toContain(shared);
+        const left = await testDb.select().from(schema.reportPdfs).all();
+        expect(left).toHaveLength(1);
+        expect(left[0]!.versionNumber).toBe(1);
+        expect(left[0]!.r2Key).toBe(shared);
+    });
 });
