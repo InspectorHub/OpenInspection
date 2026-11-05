@@ -108,17 +108,21 @@ describe("PublishModal - notify the client on republish", () => {
     expect(text).not.toContain(m.report_publish_receipt_amendment_notified());
   });
 
-  it("receipt when the server found nothing changed: says nothing was published and no notices were sent, whatever was ticked", async () => {
+  it("receipt when the server found nothing changed: only the unchanged sentence, whatever was ticked", async () => {
     const view = render(<PM {...props()} />);
     fireEvent.click(notifyBox());
     fireEvent.click(publishBtn());
     view.rerender(<PM {...props({ isSubmitting: true })} />);
     view.rerender(<PM {...props({ open: false, isSubmitting: false, unchangedSinceVersion: 3 })} />);
-    await screen.findByText(m.report_publish_receipt_nothing_sent());
+    await screen.findByText(m.report_publish_receipt_unchanged({ version: 3 }));
+    expect(screen.getByText(m.report_publish_receipt_title_unchanged())).toBeTruthy();
+    expect(screen.queryByText(m.report_publish_receipt_title())).toBeNull();
     const text = document.body.textContent ?? "";
-    expect(text).toContain(m.report_publish_receipt_unchanged({ version: 3 }));
+    // The sentences that say a new version was recorded and that nothing was emailed would contradict it.
+    expect(text).not.toContain(m.report_publish_receipt_nothing_sent());
     expect(text).not.toContain(m.report_publish_receipt_amendment_notified());
     expect(text).not.toContain(m.report_publish_receipt_amendment_not_notified());
+    expect(text).not.toContain(m.report_publish_body_delivery());
   });
 
   it("is unchecked again the next time the dialog opens", () => {

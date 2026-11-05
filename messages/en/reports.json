@@ -331,5 +331,6 @@
   "report_publish_body_delivery_amendment": "It does not send the report itself. The report-updated notices (to the client and to anyone else your automations tell) go out only if you tick the box below — to put the report in someone's inbox now, send it from the inspection.",
   "report_publish_receipt_amendment_notified": "The report-updated notices were queued. They go out through your automations on the next delivery pass.",
   "report_publish_receipt_amendment_not_notified": "No report-updated notices were sent for this update.",
-  "report_publish_receipt_unchanged": "Nothing changed since version {version}, so nothing was published and no notices were sent."
+  "report_publish_receipt_unchanged": "Nothing changed since version {version}, so nothing was published and no notices were sent.",
+  "report_publish_receipt_title_unchanged": "Nothing to publish"
 }
