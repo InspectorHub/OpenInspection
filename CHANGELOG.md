@@ -26,6 +26,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.
 * The unreachable `feature-disabled` page and its translation strings.
 
+## [2.5.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.4.0...openinspection-v2.5.0) (2026-11-05)
+
+
+### Features
+
+* **agreements:** require a second factor for the signed-record export, plus follow-up hardening ([8bfae82](https://github.com/InspectorHub/OpenInspection/commit/8bfae82233738aa9602ddd2d04ba9dd0019a6158))
+* **api:** build public responses from field lists, with a gate ([b34f6f4](https://github.com/InspectorHub/OpenInspection/commit/b34f6f4ad314f053f6594061aaaac16bbd56604c))
+* **api:** company-relative keys for agents, and no company id in staff rows ([221ba7b](https://github.com/InspectorHub/OpenInspection/commit/221ba7b39123d62056d6474feaef136f32d26974))
+* **contract:** document the inspection row and the staff report-data keys ([b52ee64](https://github.com/InspectorHub/OpenInspection/commit/b52ee649fd557f4677b98e3c41bee1bd0696c227))
+* **editor:** open published reports read-only and add edit-and-republish ([12e687f](https://github.com/InspectorHub/OpenInspection/commit/12e687f3037d2c96a1653450d919359967cfa074))
+* **publish:** let the inspector choose whether to send the report-updated notices on republish ([867c836](https://github.com/InspectorHub/OpenInspection/commit/867c83685c74983b3ea4174ff9af5c467c50aefd))
+* **reports:** refuse content writes to a published report and add edit-again ([df6f5c8](https://github.com/InspectorHub/OpenInspection/commit/df6f5c8a4b073cfbc14fdafbece9fc93bc39275a))
+* **reports:** report links carry company-relative photo keys ([30c6dc6](https://github.com/InspectorHub/OpenInspection/commit/30c6dc61d0605cbc5b0c676b9a5f7aa166b89a08))
+* **reports:** serve clients the published version, findings and units included ([06428c6](https://github.com/InspectorHub/OpenInspection/commit/06428c6f5c52e4e6a403a45167b956e466b3c2a5))
+
+
+### Bug Fixes
+
+* **api:** keep response headers on raw responses and register the new report routes ([11927dd](https://github.com/InspectorHub/OpenInspection/commit/11927dd8baefb65c4fe535055b9aebb2eaf71e04))
+* **api:** whole-branch review follow-ups ([5c451d5](https://github.com/InspectorHub/OpenInspection/commit/5c451d5cf551a93fa9452f3902a459ebe73b5664))
+* **auth:** classify money fields from the table definition ([174a1be](https://github.com/InspectorHub/OpenInspection/commit/174a1bec575186da2badfca93e797471883964c6))
+* **contract:** publish the staff report payload as a flat object ([4aa79b5](https://github.com/InspectorHub/OpenInspection/commit/4aa79b5def33849baf597078dd788da8f7c7b690))
+* **esign:** make the audit chain, signing and verification consistent ([633feb0](https://github.com/InspectorHub/OpenInspection/commit/633feb038a7daa8dbff096a38937cf198e269bf9))
+* **esign:** refuse signing on an expired envelope and bound the key re-wrap ([177f852](https://github.com/InspectorHub/OpenInspection/commit/177f852c1654c0b798d3ce6c90ebb03b158e37ab))
+* **inspections:** one property type vocabulary, and document the captured item value ([64bf256](https://github.com/InspectorHub/OpenInspection/commit/64bf256535555718ad3e1650a75cbc8bfd4a3db0))
+* **media:** keep the cropped file of an annotated photo, and bound each sweep pass by a call budget ([010287a](https://github.com/InspectorHub/OpenInspection/commit/010287af2782a2f8418249b7ae01cb5fc67a294b))
+* **media:** keep the sweep call budget private to the module ([ed3b803](https://github.com/InspectorHub/OpenInspection/commit/ed3b80341d23d09373175b411869242e867dc89c))
+* **media:** let the orphan sweep read the photos folder of the current storage layout ([de987ea](https://github.com/InspectorHub/OpenInspection/commit/de987ea5e6028a1e0032bc80c792526a9af485bd))
+* **publish:** make the notice choice and receipt match what the server does, and freeze category colours and time zone ([d27222b](https://github.com/InspectorHub/OpenInspection/commit/d27222befd92f5aa0b66c92a5e072db1b2083360))
+* **publish:** make the unchanged-publish receipt honest, and compare snapshots without key order ([50a46ce](https://github.com/InspectorHub/OpenInspection/commit/50a46ce6350fd9168d45662e47746902ce26c8bc))
+* **reports:** build the report link response from lists of fields ([9741577](https://github.com/InspectorHub/OpenInspection/commit/9741577585c252175c0376cd1381b2ee0f285019))
+* **reports:** decide "nothing changed" from what the live document holds, and keep edit-again honest for older reports ([b063ec4](https://github.com/InspectorHub/OpenInspection/commit/b063ec4727c91ccecd060b6a31430436b302657f))
+* **reports:** freeze published reports and build public responses from field lists ([654cf74](https://github.com/InspectorHub/OpenInspection/commit/654cf749ecbeb3dba3174d2814f95108a8991a8f))
+* **reports:** keep shared PDF files, and make the retention rule robust to placeholder rows and large batches ([7ad2280](https://github.com/InspectorHub/OpenInspection/commit/7ad22803acecf505d08fb1e17a0374232a0fa2e2))
+* **reports:** let edit-again reopen a published order that has no report row ([12727da](https://github.com/InspectorHub/OpenInspection/commit/12727da346a53044876d93223dad59bdcd7cee0b))
+* **reports:** mirror editingAgain in the app row, and let the units e2e reopen a published report ([056e037](https://github.com/InspectorHub/OpenInspection/commit/056e0370fd6c4d6a2821efa64ebcae185c732784))
+* **reports:** put report video behind the report gates, pin the PDF, and bound media and share work ([61f4c91](https://github.com/InspectorHub/OpenInspection/commit/61f4c9170f7427aa1fa9d8049065206ec9958d81))
+* **reports:** re-render a stored report PDF whose file is missing instead of answering 404 for good ([97c5e7a](https://github.com/InspectorHub/OpenInspection/commit/97c5e7a52c8403f1698ab9883e44d188eec1cfa7))
+* **retention:** never destroy the PDF of a published report ([08369c8](https://github.com/InspectorHub/OpenInspection/commit/08369c893b39fcdbfaee42fb27530cfac2ea2668))
+* **security:** close the report takeover chain and harden the public doors ([76f6633](https://github.com/InspectorHub/OpenInspection/commit/76f663312ace268660f8a9cf808b4764886fd1c1))
+* **security:** refuse cross-site posts on every public action, restrict CORS, gate the discount-code list ([b06422d](https://github.com/InspectorHub/OpenInspection/commit/b06422d8d1370a2cf46d83237bf9c8edc2d286dd))
+* **tooling:** the private-review gate no longer scans other worktrees ([312093c](https://github.com/InspectorHub/OpenInspection/commit/312093c26a70a4b10c11889dfe16ab61ff92214b))
+
+
+### Performance Improvements
+
+* **reports:** rewrite report-link photo keys on the serialized body ([ef6e352](https://github.com/InspectorHub/OpenInspection/commit/ef6e352d9ff5604be38131284b74e71c6682624b))
+
 ## [2.4.0](https://github.com/InspectorHub/OpenInspection/compare/openinspection-v2.3.0...openinspection-v2.4.0) (2026-11-02)
 
 
