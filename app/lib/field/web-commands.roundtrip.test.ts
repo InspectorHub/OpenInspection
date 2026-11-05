@@ -68,6 +68,13 @@ describe("encoder agrees with the real editor action", () => {
         expect(publishPost).toHaveBeenCalledWith({ param: { id: "insp-1" }, json: { summary: "Rev 2" } });
     });
 
+    it("publish carries notifyClient through the form to the publish body, and omits it when absent", async () => {
+        expect(await roundTrip({ type: "publish", notifyClient: true })).toEqual({ ok: true });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: "insp-1" }, json: { notifyClient: true } });
+        expect(await roundTrip({ type: "publish", notifyClient: false })).toEqual({ ok: true });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: "insp-1" }, json: {} });
+    });
+
     it("publish without optional fields does not touch the stored flag", async () => {
         expect(await roundTrip({ type: "publish" })).toEqual({ ok: true });
         expect(completePost).not.toHaveBeenCalled();

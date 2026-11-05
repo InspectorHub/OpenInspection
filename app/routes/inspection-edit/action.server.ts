@@ -8,6 +8,7 @@ import { mapPool } from "~/lib/map-pool";
 import { handleStatutoryIntent } from "./action-statutory.server";
 import { handleFollowupIntent } from "./action-followup.server";
 import { handleEditAgainIntent } from "./action-edit-again.server";
+import { publishBody } from "./action-publish-body.server";
 import { writeKeyFor } from "./action-idempotency.server";
 import { attempt, refusalMessage } from "./action-errors.server";
 
@@ -61,11 +62,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  const saved = await attempt(() => api.inspections[":id"].$patch({ param: { id: params.id }, json: { autoSignOnPublish: autoSign === "true" } }));
  if (!saved?.ok) return { ok: false as const, intent: "publish", error: await refusalMessage(saved ?? new Response(null), "Couldn't save the signing preference, so the report was not published.") };
  }
- // The revision reason, when the dialog collected one. Blank or absent sends
- // nothing, so the stored reason stays NULL rather than becoming an empty
- // string that the amendment trail would render as a reason someone wrote.
- const summary = String(formData.get("summary") ?? "").trim();
- const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: { ...(summary ? { summary } : {}) } });
+ const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: publishBody(formData) });
  // Publish has meaningful precondition failures (e.g. "Inspection must be
  // completed before publishing the report.") that the inspector MUST see —
  // returning a bare { ok:false } here routed the publish through the generic

@@ -146,14 +146,9 @@ describe("PublishModal — the revision reason", () => {
     expect(onPublish).toHaveBeenLastCalledWith(false, {});
   });
 
-  it("offers no notify switches, because the service ignores them", () => {
-    // Deliberate absence, asserted so nobody re-adds them from the endpoint's
-    // schema: `publishInspection` reads only the report id out of those options,
-    // so a switch would change nothing about who is told while the publish audit
-    // entry recorded the flag as given. The dialog's only checkbox is auto-sign.
-    const { container } = render(<PM {...props()} />);
-    const boxes = container.querySelectorAll('input[type="checkbox"]');
-    expect(boxes).toHaveLength(1);
+  it("a first publish has auto-sign as its only checkbox (the notify choice is for revisions; see publish-modal-notify-client.test.tsx)", () => {
+    const { container } = render(<PM {...props({ isAmendment: false })} />);
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
     expect(container.textContent).toContain("Auto-sign");
   });
 });

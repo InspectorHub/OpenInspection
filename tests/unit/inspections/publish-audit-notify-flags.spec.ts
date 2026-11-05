@@ -1,27 +1,14 @@
 /**
- * F79 — the publish audit entry must not claim to know who was notified.
+ * The publish audit entry says WHAT was published and, for an amendment, the publisher's notify choice.
  *
- * `POST /api/inspections/:id/publish` used to copy `notifyClient` /
- * `notifyAgent` straight out of the request body into the `inspection.published`
- * audit metadata. Nothing read those flags: `publishInspection` takes them in its
- * options type and never looks at them, and who actually receives the report is
- * decided by the workspace's `report.published` automation rules. So a publish
- * marked "notify nobody" was RECORDED as having notified nobody while every rule
- * fired and the mail went out — the audit row said the opposite of what happened,
- * and the audit row is the artefact someone later reads to answer "who was told,
- * and when".
+ * History (F79): `POST /api/inspections/:id/publish` once copied `notifyClient` / `notifyAgent` out of the body into the
+ * `inspection.published` audit metadata while nothing honoured them, so a publish marked "notify nobody" was recorded as
+ * such while every rule fired. The fix removed the flags. `notifyClient` is back with a narrower meaning that the publish
+ * service DOES honour: on an amendment it decides whether the report-updated rules fire. So the row records it for an
+ * amendment only, and never records it for a first publish, where it changes nothing. `notifyAgent` is still not a field.
  *
- * The fix is subtraction: the flags are gone from the request schema, from the
- * service options, and from this row. An audit field that is always a guess is
- * worse than an absent one.
- *
- * ASSERTED AS KEY ABSENCE, not as a falsy value. `metadata.notifyClient ===
- * false` passes both for "the key is gone" and for "the key is still written and
- * happened to be false", which is the defect. Only `in` separates them.
- *
- * PAIRED WITH A POSITIVE CONTROL: the row must still be written, and must still
- * carry `reportId`. Without that, a handler that stopped auditing altogether —
- * or a harness whose route never ran — would pass every negative assertion here.
+ * ASSERTED AS KEY ABSENCE where absence is the claim (`in`, not a falsy value), PAIRED WITH A POSITIVE CONTROL: the row
+ * must still be written and carry `reportId`, or a handler that stopped auditing would pass every negative assertion.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { makeExecutionContext } from '../helpers/exec-ctx';
@@ -58,6 +45,7 @@ const EXEC_CTX = makeExecutionContext().ctx;
  * in its own try/catch, and `isPipelineEnabled: false` keeps the headless-render
  * branch out of the way.
  */
+const publishInspection = vi.fn();
 function buildApp() {
     const app = new OpenAPIHono<HonoConfig>();
     app.use('*', async (c, next) => {
@@ -66,9 +54,7 @@ function buildApp() {
         c.set('user', { sub: USER_ID } as never);
         c.set('services', {
             inspection: {
-                publishInspection: vi.fn().mockResolvedValue({
-                    reportUrl: `/report/acme/${INSP_ID}`, reportStatus: 'published',
-                }),
+                publishInspection,
             },
             reportVersion: {
                 assertSnapshotFits: vi.fn().mockResolvedValue(undefined),
@@ -104,45 +90,49 @@ function publishedMetadata(): Record<string, unknown> {
     return opts.metadata ?? {};
 }
 
-describe('F79 — publish audit metadata carries no notify flags', () => {
-    beforeEach(() => { auditSpy.mockClear(); });
+describe('publish audit metadata and the notify choice', () => {
+    beforeEach(() => {
+        auditSpy.mockClear();
+        publishInspection.mockReset().mockResolvedValue({ reportUrl: `/report/acme/${INSP_ID}`, reportStatus: 'published', amendment: false });
+    });
 
-    // POSITIVE CONTROL. Everything below is an absence assertion; this is the
-    // one that proves the route ran and the row is still being written.
+    // POSITIVE CONTROL. Most of what follows is an absence assertion; this proves the route ran and the row is written.
     it('still records the publish, naming the deliverable', async () => {
         const res = await publish({ reportId: 'report-1' });
         expect(res.status).toBe(200);
         expect(publishedMetadata().reportId).toBe('report-1');
     });
 
-    it('omits notifyClient / notifyAgent entirely', async () => {
-        await publish({ reportId: 'report-1' });
+    it('a first publish records no notify choice, even when the caller posts one (it changes nothing there)', async () => {
+        await publish({ reportId: 'report-1', notifyClient: true, notifyAgent: true });
         const metadata = publishedMetadata();
+        expect(metadata.amendment).toBe(false);
         expect('notifyClient' in metadata).toBe(false);
         expect('notifyAgent' in metadata).toBe(false);
     });
 
-    // The interesting case, and the one the old row got exactly backwards: a
-    // caller that still posts the flags must not have them echoed into the
-    // record, because the record would then state a delivery decision nothing
-    // in the service honoured.
-    it('ignores the flags even when a caller still posts them', async () => {
-        const res = await publish({ reportId: 'report-1', notifyClient: false, notifyAgent: false });
-        expect(res.status).toBe(200);
+    it.each([[true], [false]])('an amendment records the choice it was given (notifyClient %s)', async (choice) => {
+        publishInspection.mockResolvedValue({ reportUrl: 'u', reportStatus: 'published', amendment: true });
+        await publish({ reportId: 'report-1', notifyClient: choice });
         const metadata = publishedMetadata();
-        expect('notifyClient' in metadata).toBe(false);
+        expect(metadata.amendment).toBe(true);
+        expect(metadata.notifyClient).toBe(choice);
         expect('notifyAgent' in metadata).toBe(false);
     });
 
-    /**
-     * The registry is the authority on what a row carries — `lint:audit-registry`
-     * walks it against the call sites in both directions — so it is asserted
-     * against here rather than against a literal this spec chose for itself.
-     */
-    it('does not declare the flags in the audit registry', () => {
+    it('the choice reaches the service, defaults to false, and the internal amendment flag stays out of the response', async () => {
+        publishInspection.mockResolvedValue({ reportUrl: 'u', reportStatus: 'published', amendment: true });
+        const omitted = await publish({});
+        expect(publishInspection.mock.calls.at(-1)![2]).toMatchObject({ notifyClient: false });
+        const asked = await publish({ notifyClient: true });
+        expect(publishInspection.mock.calls.at(-1)![2]).toMatchObject({ notifyClient: true });
+        expect(omitted.body.data as object).not.toHaveProperty('amendment');
+        expect(asked.body.data as object).toMatchObject({ reportUrl: 'u' });
+    });
+
+    it('the audit registry declares exactly what the row can carry', () => {
         const meta = AUDIT_REGISTRY['inspection.published'].meta;
-        expect(Object.keys(meta)).toContain('reportId');
-        expect('notifyClient' in meta).toBe(false);
+        expect(Object.keys(meta).sort()).toEqual(['amendment', 'notifyClient', 'reportId']);
         expect('notifyAgent' in meta).toBe(false);
     });
 });

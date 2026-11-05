@@ -233,5 +233,6 @@
   "editor_savetpl_body_new": "Crea una plantilla nueva a partir de la estructura actual de esta inspección. Queda disponible para inspecciones futuras; esta inspección no cambia.",
   "editor_savetpl_body_back": "Sobrescribe la plantilla de origen con la estructura actual de esta inspección. Las inspecciones futuras creadas a partir de ella adoptan el cambio; los informes ya publicados conservan su instantánea congelada.",
   "editor_savetpl_name_label": "Nombre de la plantilla",
-  "editor_savetpl_name_placeholder": "Plantilla personalizada"
+  "editor_savetpl_name_placeholder": "Plantilla personalizada",
+  "editor_publish_notify_client": "Enviar los avisos de informe actualizado"
 }

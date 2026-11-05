@@ -40,6 +40,11 @@ describe("encodeCommand golden FormData", () => {
     const enc = (cmd: FieldCommand) => snapshot(encodeCommand(cmd).form);
     const SNAP = "{\"schemaVersion\":2,\"sections\":[]}";
 
+    it("encodes notifyClient as a flag string, and leaves it out when absent", () => {
+        expect(enc({ type: "publish", notifyClient: true })).toEqual([["intent", "publish"], ["notifyClient", "true"]]);
+        expect(enc({ type: "publish" })).toEqual([["intent", "publish"]]);
+    });
+
     it("encodes each sample to the action field names and strings", () => {
         const golden: Record<keyof typeof SAMPLES, Array<[string, string]>> = {
             complete: [["intent", "complete"]],
