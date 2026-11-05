@@ -97,7 +97,7 @@ export function assertBundleRefOwned(tenantId: string, batchId: string, ref: Bun
  * Refuses a size over the ceiling, naming both numbers. `subject` says whose
  * size it is, so the declared size and the stored size read differently.
  */
-export function assertBundleSizeWithin(bytes: number, subject = 'This bundle'): void {
+function assertBundleSizeWithin(bytes: number, subject = 'This bundle'): void {
     if (bytes <= BUNDLE_MAX_BYTES) return;
     throw Errors.BadRequest(
         `${subject} is ${describeSize(bytes)} and the limit is ${describeSize(BUNDLE_MAX_BYTES)}.`,
