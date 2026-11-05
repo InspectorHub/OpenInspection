@@ -5,6 +5,7 @@ import { writeAuditRow } from '../lib/audit';
 import { logger } from '../lib/logger';
 import { limitsFor } from '../lib/migration-intake/limits';
 import { SAAS_PROFILE } from '../lib/deployment-profile';
+import { readBundleRef, type DeliveryBucket } from '../lib/migration-intake/bundle-delivery';
 import { MigrationStageService } from '../services/migration-intake/stage.service';
 import { MigrationAssistanceService } from '../services/migration-intake/assistance.service';
 import { assertStaffAccessAuthorized } from '../services/migration-intake/staff-access';
@@ -94,6 +95,7 @@ export async function applyMigrationCommand(
     dbBinding: D1Database,
     env: CmdEnvelope,
     emailEnv?: EmailServiceEnv,
+    exportsBucket?: DeliveryBucket,
 ): Promise<Record<string, unknown> | undefined> {
     switch (env.type) {
         case 'io.inspectorhub.cmd.migration.deliver': {
@@ -101,10 +103,15 @@ export async function applyMigrationCommand(
             // Before anything is parsed: a run nobody authorised a person to read
             // does not receive what a person produced from reading it.
             assertStaffAccessAuthorized(await loadBatch(dbBinding, data.tenantId, data.batchId));
+            // A reference is resolved only after the authorisation above: the
+            // object is read on behalf of a run that is allowed to receive it.
+            const bundle = data.bundleRef
+                ? await readBundleRef(exportsBucket, data.tenantId, data.batchId, data.bundleRef)
+                : data.bundle;
             const result = await new MigrationStageService(dbBinding).stageIntoBatch({
                 tenantId: data.tenantId,
                 batchId: data.batchId,
-                bundle: data.bundle,
+                bundle,
                 // The deployment's own ceiling. A command arriving from the
                 // operator's console is still bound by what this deployment will
                 // stage, and reading it from the payload would let the sender
@@ -121,8 +128,20 @@ export async function applyMigrationCommand(
                 action: 'migration.delivered',
                 entityType: 'migration_batch',
                 entityId: data.batchId,
-                metadata: { rows: result.rows.length },
+                // `viaRef` records the route, never the object's key or content.
+                metadata: { rows: result.rows.length, ...(data.bundleRef && { viaRef: true }) },
             });
+            // Last, so that a failure above leaves the object in place for the
+            // retry. Best effort: the rows are already staged, and an object that
+            // survives is removed by the bucket's expiry rule for this prefix.
+            if (data.bundleRef && exportsBucket) {
+                await exportsBucket.delete(data.bundleRef.key).catch((err: unknown) => {
+                    logger.warn('[cmd] delivered bundle object not deleted', {
+                        tenantId: data.tenantId, batchId: data.batchId, key: data.bundleRef?.key,
+                        error: err instanceof Error ? err.message : String(err),
+                    });
+                });
+            }
             return { batchId: data.batchId, rows: result.rows.length };
         }
         case 'io.inspectorhub.cmd.migration.decline': {

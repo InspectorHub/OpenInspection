@@ -292,71 +292,13 @@ export const cmdReportCorrectDataSchema = z.object({
     reason: z.string().min(1).max(500),
 }).strict();
 
-/**
- * WHO AT THE DEPLOYMENT OPERATOR is acting, travelling with the command.
- *
- * REQUIRED on all three migration commands, and that is the difference between
- * them and every other command on this seam. The others are unattended —
- * provisioning, a seat reconciliation, a cron pass — and giving those a stand-in
- * actor would make a scheduled job indistinguishable in the audit trail from a
- * person opening a customer's workspace. These three are the opposite: each one
- * is a person acting on somebody else's file, and a row that could not name them
- * would name the workspace's own administrator instead, which is the state this
- * whole seam exists to end.
- *
- * ⚠️ NOT A USER ID OF OURS. `platformAdminId` is the sender's own identifier for
- * its staff and resolves to nothing in this database, which is why it lands in
- * `audit_logs.platform_actor_id` and never in `user_id`. Putting it in `user_id`
- * would make it indistinguishable from a workspace member id.
- */
-const cmdPlatformActorSchema = z.object({
-    platformAdminId: z.string().min(1),
-    email: z.string().min(1),
-});
-
-/**
- * Deliver a converted bundle into a run that has been waiting for one.
- *
- * `.strict()`, like the subject commands: the bundle is somebody else's contact
- * data, so a field this build does not recognise means the sender believes
- * something happens here that does not. `bundle` itself is an open record — it
- * is validated in full by the bundle parser inside the applier, which produces a
- * far better message than a mirrored copy of that schema would.
- *
- * The INTENT is deliberately absent. What the workspace asked for was settled
- * when they opened the run, and a delivery allowed to restate it would be
- * allowed to widen it.
- */
-export const cmdMigrationDeliverDataSchema = z.object({
-    tenantId: z.string().min(1),
-    batchId: z.string().min(1),
-    bundle: z.record(z.string(), z.unknown()),
-    actor: cmdPlatformActorSchema,
-}).strict();
-
-/**
- * Hand a waiting run back, unconverted, with the reason on the run.
- *
- * `reason` is required and non-empty for the reason the route's own version is:
- * a run left alone reaches `expired`, which says the clock ran out, and
- * `abandoned` says the workspace stopped. Neither is true of a file a person
- * read and could not convert, and a refusal with no stated ground is
- * indistinguishable from one nobody looked at.
- */
-export const cmdMigrationDeclineDataSchema = z.object({
-    tenantId: z.string().min(1),
-    batchId: z.string().min(1),
-    reason: z.string().min(1).max(500),
-    actor: cmdPlatformActorSchema,
-}).strict();
-
-/** Say, to the person waiting, that their file has been picked up. Moves
- *  nothing: acknowledging a file is not converting it. */
-export const cmdMigrationAcknowledgeDataSchema = z.object({
-    tenantId: z.string().min(1),
-    batchId: z.string().min(1),
-    actor: cmdPlatformActorSchema,
-}).strict();
+// The three assisted-import commands live in their own module; re-exported so
+// every importer keeps one address for the command payload schemas.
+export {
+    cmdMigrationDeliverDataSchema,
+    cmdMigrationDeclineDataSchema,
+    cmdMigrationAcknowledgeDataSchema,
+} from './cmd-migration-schemas';
 
 export function parseCmdEnvelope(json: unknown): CmdEnvelope | null {
     let candidate: unknown = json;

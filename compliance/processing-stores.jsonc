@@ -161,15 +161,15 @@
         "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
       },
       "lifecycle_owner": "engine",
-      "data_categories": ["subject_data_export", "tenant_offboarding_archive"],
+      "data_categories": ["subject_data_export", "tenant_offboarding_archive", "migration_delivery_bundle"],
       "subjects": ["end_client", "agent", "staff"],
-      "purpose": "Where a completed data export or offboarding archive is written for portal to hand to the requester. A single object here can hold everything the other stores hold about one person.",
+      "purpose": "Where a completed data export or offboarding archive is written for portal to hand to the requester, and where a converted import bundle too large for a queue message is staged until the engine has read it. A single object here can hold everything the other stores hold about one person.",
       "retention_rule": "none",
-      "deletion_mechanism": "none",
+      "deletion_mechanism": "partial",
       "export_mechanism": "not-applicable",
       "tenant_scope": "per-tenant",
       "evidence_level": "E2",
-      "note": "The highest-concentration store in the registry and the one with no clock: an export bundles a subject's whole record into one object and nothing expires it. Absent from standalone entirely — the offboarding command path is SaaS-only."
+      "note": "The highest-concentration store in the registry and the one with no clock: an export bundles a subject's whole record into one object and nothing expires it. Absent from standalone entirely — the offboarding command path is SaaS-only. `migration_delivery_bundle` is the one category here with a lifecycle: a converted import bundle lives under `migration-deliveries/{tenantId}/{batchId}/` and the engine deletes the object once the rows are staged (best effort, after the delivery audit row is written). The backstop is a bucket lifecycle rule on that prefix, which is configured in the bucket, not in code, so this entry cannot prove it exists; it covers an object whose delivery never completed or whose deletion failed. The bundle is the operator's own import content and, for a contacts import, third-party personal data. That is why deletion_mechanism reads partial and not none: the other two categories still have no deletion path at all."
     },
 
     // ── Durable Objects ─────────────────────────────────────────────────────

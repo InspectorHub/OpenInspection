@@ -376,7 +376,7 @@ async function applyKnownCmd(
             // offboarding appliers are — a standalone deployment never reaches
             // this line and should not carry the module.
             const { applyMigrationCommand } = await import('./apply-migration-commands');
-            return applyMigrationCommand(dbBinding, env, emailEnv);
+            return applyMigrationCommand(dbBinding, env, emailEnv, buckets?.exports);
         }
         case 'io.inspectorhub.cmd.tenant.sync_quota': {
             const data = cmdSyncQuotaDataSchema.parse(env.data);
