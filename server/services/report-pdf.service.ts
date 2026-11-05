@@ -248,7 +248,10 @@ export class ReportPdfService {
         opts: { reportUrl: string; contentHash: string; versionNumber: number | null; footer?: ReportPdfFooterOpts },
     ): Promise<ReportPdf> {
         const cached = await this.getPdfRecordByContentHash(inspectionId, tenantId, type, opts.contentHash);
-        if (cached) return cached;   // identical content already rendered — reuse, no Browser Rendering
+        // A row is only a cache hit while the file it names is still in storage. A row can outlive its file (production holds
+        // `ready` rows whose objects are gone), and serving it would answer 404 for good, since nothing else rewrites the row.
+        // One HEAD per request; a missing file falls through to a fresh render, which replaces the stale row.
+        if (cached && (!this.r2 || await this.r2.head(cached.r2Key))) return cached;   // identical content already rendered — reuse, no Browser Rendering
         return this.renderAndStore(inspectionId, tenantId, type, {
             reportUrl: opts.reportUrl,
             sourceVersion: Date.now(),

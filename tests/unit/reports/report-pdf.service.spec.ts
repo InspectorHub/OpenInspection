@@ -43,6 +43,8 @@ describe('ReportPdfService', () => {
         await seed(testDb);
         svc = new ReportPdfService({} as D1Database, mockBrowser, mockR2);
         vi.clearAllMocks();
+        // By default every stored file is still in the bucket; a spec that needs a missing one replaces `head`.
+        (mockR2 as unknown as { head: unknown }).head = vi.fn(async () => ({ key: 'present' }));
         // The service always renders through generatePdfWithTocPages (it
         // self-short-circuits to a single pass when there are no anchors).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -233,6 +235,41 @@ describe('ReportPdfService', () => {
             // Content-addressed R2 key must incorporate the hash.
             expect(rec.r2Key).toContain(HASH_H2);
             expect(rec.r2Key).toMatch(/full-.*\.pdf$/);
+        });
+
+        it('(d) a ready row whose file is gone from storage is not a cache hit: it renders again and replaces the row', async () => {
+            const first = await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL, sourceVersion: 100, versionNumber: 1, contentHash: HASH_H1,
+            });
+            vi.clearAllMocks();
+            (generatePdfWithTocPages as unknown as { mockResolvedValue: (v: unknown) => void }).mockResolvedValue(new ArrayBuffer(2048));
+            const head = vi.fn(async () => null);
+            (mockR2 as unknown as { head: unknown }).head = head;
+            (mockR2 as unknown as { put: unknown }).put = vi.fn(async () => undefined);
+
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', { reportUrl: REPORT_URL, contentHash: HASH_H1, versionNumber: 1 });
+
+            expect(head).toHaveBeenCalledWith(first.r2Key);
+            expect(generatePdfWithTocPages).toHaveBeenCalledTimes(1);
+            expect((mockR2 as unknown as { put: ReturnType<typeof vi.fn> }).put).toHaveBeenCalledTimes(1);
+            expect(rec.id).not.toBe(first.id);
+            // The stale row is replaced, not duplicated.
+            expect(await testDb.select().from(schema.reportPdfs)).toHaveLength(1);
+        });
+
+        it('(e) a ready row whose file is present is still a cache hit and costs one HEAD, no render', async () => {
+            const first = await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+                reportUrl: REPORT_URL, sourceVersion: 100, versionNumber: 1, contentHash: HASH_H1,
+            });
+            vi.clearAllMocks();
+            const head = vi.fn(async () => ({ key: first.r2Key }));
+            (mockR2 as unknown as { head: unknown }).head = head;
+
+            const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', { reportUrl: REPORT_URL, contentHash: HASH_H1, versionNumber: 1 });
+
+            expect(head).toHaveBeenCalledTimes(1);
+            expect(generatePdfWithTocPages).not.toHaveBeenCalled();
+            expect(rec.id).toBe(first.id);
         });
 
         it('(c) cold miss — no row at all → renders once', async () => {
