@@ -12,7 +12,6 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { applyCmdEnvelope } from '../../server/portal/cmd-consumer';
-import { applyMigrationCommand } from '../../server/portal/apply-migration-commands';
 import { deliveryKey, type DeliveryBucket } from '../../server/lib/migration-intake/bundle-delivery';
 import type { CmdEnvelope } from '../../server/lib/sync-events/cmd-envelope';
 import {
@@ -239,33 +238,84 @@ describe('cmd.migration.deliver by reference, end to end', { timeout: 60_000 }, 
         expect(await objectExists(ref.key)).toBe(true);
     });
 
-    it('replaying a delivered command without the dedup marker stages nothing twice (object deleted)', async () => {
+    it('a failure after staging leaves the object in place and rolls the marker back; the redelivery stages nothing twice', async () => {
+        await seedWaitingTemplateRun();
+        const ref = await stage(buildSyntheticTemplateBundle({ targetBytes: 20_000 }));
+        const { bucket, calls } = spyBucket();
+        const buckets = { exports: bucket as unknown as R2Bucket };
+        // The consumer advances the tenant's sequence AFTER the rows are staged.
+        // A trigger makes that step fail, which is the post-staging failure
+        // that rolls the dedup marker back.
+        // The advance only touches a row whose counter is behind the command.
+        await b.DB.prepare('UPDATE tenants SET applied_cmd_seq = 0 WHERE id = ?').bind(TENANT).run();
+        await b.DB.exec("CREATE TRIGGER fail_seq_advance BEFORE UPDATE ON tenants BEGIN SELECT RAISE(ABORT, 'seq advance refused'); END;");
+        let failure: unknown;
+        try {
+            failure = await applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), undefined, buckets)
+                .then(() => undefined, (e: unknown) => e);
+        } finally {
+            await b.DB.exec('DROP TRIGGER fail_seq_advance;');
+        }
+        // The failure is the sequence update's, and the trigger is its cause.
+        expect(String((failure as Error | undefined)?.message)).toMatch(/update "tenants" set "applied_cmd_seq"/);
+        expect(String((failure as { cause?: { message?: string } } | undefined)?.cause?.message)).toMatch(/seq advance refused/);
+        // The delivery landed, the marker is gone so the queue will redeliver,
+        // and the object is still there for that redelivery.
+        expect(await rowCount()).toBe(1);
+        expect((await b.DB.prepare('SELECT count(*) AS n FROM processed_cmd_events').first<{ n: number }>())?.n).toBe(0);
+        expect(await objectExists(ref.key)).toBe(true);
+        expect(calls.delete).toBe(0);
+
+        // Redelivery: the run is no longer waiting, so it is refused by name,
+        // nothing is staged twice, and the now-useless object is removed
+        // without having been read.
+        const readsBefore = calls.get;
+        await expect(applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), undefined, buckets))
+            .rejects.toThrow(/This import is not waiting for a converted file/);
+        expect(await rowCount()).toBe(1);
+        expect(calls.get).toBe(readsBefore);
+        expect(await objectExists(ref.key)).toBe(false);
+    });
+
+    it('POSITIVE CONTROL — with nothing failing, the object is deleted only after the reply is written', async () => {
         await seedWaitingTemplateRun();
         const ref = await stage(buildSyntheticTemplateBundle({ targetBytes: 20_000 }));
         const { bucket } = spyBucket();
-        const command = envelope({ bundleRef: ref });
-
-        await applyMigrationCommand(b.DB, command, undefined, bucket);
-        expect(await rowCount()).toBe(1);
-
-        // The window where the first apply landed but its marker did not: the
-        // object is already gone, so the replay fails rather than staging again.
-        await expect(applyMigrationCommand(b.DB, command, undefined, bucket)).rejects.toThrow();
-        expect(await rowCount()).toBe(1);
+        const queue = { send: async () => {} } as unknown as Queue<never>;
+        expect(await applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), queue, { exports: bucket as unknown as R2Bucket })).toBe('applied');
+        const reply = await b.DB.prepare("SELECT count(*) AS n FROM sync_outbox WHERE event_type = 'reply.migration.delivered'").first<{ n: number }>();
+        expect(reply?.n).toBe(1);
+        expect(await objectExists(ref.key)).toBe(false);
     });
 
-    it('replaying a delivered command without the dedup marker stages nothing twice (object survived)', async () => {
+    it.each([
+        ['declined', 'declined'],
+        ['expired', 'expired'],
+        ['already staged', 'staged'],
+    ])('a run that is %s: the command is refused by name, the object is removed unread', async (_label, status) => {
         await seedWaitingTemplateRun();
+        await b.DB.prepare('UPDATE migration_batches SET status = ? WHERE id = ?').bind(status, BATCH).run();
         const ref = await stage(buildSyntheticTemplateBundle({ targetBytes: 20_000 }));
-        const { bucket } = spyBucket({ failDelete: true });
-        const command = envelope({ bundleRef: ref });
+        const { bucket, calls } = spyBucket();
 
-        await applyMigrationCommand(b.DB, command, undefined, bucket);
-        expect(await objectExists(ref.key)).toBe(true);
+        await expect(applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: ref }), undefined, { exports: bucket as unknown as R2Bucket }))
+            .rejects.toThrow(/This import is not waiting for a converted file/);
 
-        // The object is still readable, so the refusal comes from the stager:
-        // the run is no longer waiting for a converted file.
-        await expect(applyMigrationCommand(b.DB, command, undefined, bucket)).rejects.toThrow(/not waiting/);
-        expect(await rowCount()).toBe(1);
+        expect(calls).toEqual({ get: 0, delete: 1 });
+        expect(await objectExists(ref.key)).toBe(false);
+        expect(await rowCount()).toBe(0);
+    });
+
+    it('a foreign reference on a run that is no longer waiting is refused by ownership and its object is NOT deleted', async () => {
+        await seedWaitingTemplateRun();
+        await b.DB.prepare("UPDATE migration_batches SET status = 'declined' WHERE id = ?").bind(BATCH).run();
+        const foreign = await stage(buildSyntheticTemplateBundle({ targetBytes: 20_000 }), OTHER_TENANT, BATCH);
+        const { bucket, calls } = spyBucket();
+
+        await expect(applyCmdEnvelope(b.DB, undefined, envelope({ bundleRef: foreign }), undefined, { exports: bucket as unknown as R2Bucket }))
+            .rejects.toThrow(/outside the prefix/);
+
+        expect(calls).toEqual({ get: 0, delete: 0 });
+        expect(await objectExists(foreign.key)).toBe(true);
     });
 });

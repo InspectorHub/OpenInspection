@@ -48,6 +48,15 @@ function megabytes(bytes: number): string {
 }
 
 /**
+ * "N bytes (X MB)", with the byte count grouped. The megabyte figure alone
+ * rounds a size just over the limit to the same text as the limit itself, so
+ * the exact count is always shown.
+ */
+function describeSize(bytes: number): string {
+    return `${bytes.toLocaleString('en-US')} bytes (${megabytes(bytes)} MB)`;
+}
+
+/**
  * The key prefix owned by one tenant's one run.
  *
  * Ids containing a slash are refused: with one, two different (tenant, run)
@@ -84,11 +93,14 @@ export function assertBundleRefOwned(tenantId: string, batchId: string, ref: Bun
     }
 }
 
-/** Refuses a bundle over the ceiling, naming both numbers. */
-export function assertBundleSizeWithin(bytes: number): void {
+/**
+ * Refuses a size over the ceiling, naming both numbers. `subject` says whose
+ * size it is, so the declared size and the stored size read differently.
+ */
+export function assertBundleSizeWithin(bytes: number, subject = 'This bundle'): void {
     if (bytes <= BUNDLE_MAX_BYTES) return;
     throw Errors.BadRequest(
-        `This bundle is ${megabytes(bytes)} MB and the limit is ${megabytes(BUNDLE_MAX_BYTES)} MB.`,
+        `${subject} is ${describeSize(bytes)} and the limit is ${describeSize(BUNDLE_MAX_BYTES)}.`,
     );
 }
 
@@ -116,20 +128,28 @@ export async function readBundleRef(
     const object = await bucket.get(ref.key);
     if (!object) throw new Error('bundleRef: the referenced object does not exist');
     // Checked before the body is read, so an oversized object is never pulled
-    // into memory.
-    assertBundleSizeWithin(object.size);
+    // into memory. Independent of the declared size: a stored object can
+    // disagree with what the command said about it.
+    assertBundleSizeWithin(object.size, 'The stored object');
     if (object.size !== ref.bytes) {
         throw new Error(`bundleRef: object is ${object.size} bytes, the command declared ${ref.bytes}`);
     }
     const body = await object.arrayBuffer();
     if (body.byteLength !== ref.bytes) {
-        throw new Error(`bundleRef: read ${body.byteLength} bytes, the command declared ${ref.bytes}`);
+        throw new Error(`bundleRef: body read was ${body.byteLength} bytes, the command declared ${ref.bytes}`);
     }
     if ((await sha256Hex(body)) !== ref.sha256) {
         throw new Error('bundleRef: object content does not match the declared hash');
     }
+    let text: string;
     try {
-        return JSON.parse(new TextDecoder().decode(body));
+        // Fatal: invalid UTF-8 must fail here, not become U+FFFD in staged data.
+        text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body);
+    } catch {
+        throw new Error('bundleRef: object is not valid UTF-8 text');
+    }
+    try {
+        return JSON.parse(text);
     } catch {
         throw new Error('bundleRef: object is not valid JSON');
     }

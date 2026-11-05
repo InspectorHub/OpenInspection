@@ -188,6 +188,10 @@ export async function applyCmdEnvelope(
             replyType === 'reply.tenant.updated'
                 ? { result: 'applied', ...(replyExtra ?? {}) }
                 : (replyExtra ?? {}));
+        // Only now: an earlier failure rolls the marker back and the redelivery needs the object.
+        if (env.type === 'io.inspectorhub.cmd.migration.deliver') {
+            await (await import('./apply-migration-commands')).releaseDeliveredFor(env, buckets?.exports);
+        }
         return 'applied';
     } catch (err) {
         await db.delete(processedCmdEvents).where(eq(processedCmdEvents.eventId, env.id)).catch(() => {});

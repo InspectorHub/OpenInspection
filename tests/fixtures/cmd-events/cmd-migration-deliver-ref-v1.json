@@ -11,9 +11,9 @@
     "tenantId": "fixture-tenant-5",
     "batchId": "fixture-batch-1",
     "bundleRef": {
-      "key": "migration-deliveries/fixture-tenant-5/fixture-batch-1/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.json",
-      "bytes": 150000,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      "key": "migration-deliveries/fixture-tenant-5/fixture-batch-1/d8e869775b85e036797f44b910a04cad2e03afb4913827660cd3550797572e80.json",
+      "bytes": 425,
+      "sha256": "d8e869775b85e036797f44b910a04cad2e03afb4913827660cd3550797572e80"
     },
     "actor": { "platformAdminId": "fixture-admin-1", "email": "ops@example.test" }
   }

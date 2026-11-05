@@ -88,6 +88,12 @@ describe('cmd.migration.deliver payload — bundle xor bundleRef', () => {
         expect(cmdMigrationDeliverDataSchema.safeParse(inlineFixture.data).success).toBe(true);
     });
 
+    it('the reference fixture is a true pair: size and hash of the bundle text of the inline fixture', () => {
+        const text = new TextEncoder().encode(JSON.stringify(inlineFixture.data.bundle));
+        expect(refFixture.data.bundleRef.bytes).toBe(text.byteLength);
+        expect(refFixture.data.bundleRef.sha256).toBe(sha256(text));
+    });
+
     it('the reference fixture names a key inside its own run', () => {
         const d = refFixture.data;
         expect(() => assertBundleRefOwned(d.tenantId, d.batchId, d.bundleRef)).not.toThrow();
@@ -153,10 +159,13 @@ describe('readBundleRef — the object must be what the command described', () =
         expect(get).toHaveBeenCalledTimes(1);
     });
 
-    it('throws when the stored size differs from the declared one', async () => {
+    it('throws when the stored size differs from the declared one, naming both', async () => {
         const ref = refFor(DOC_BYTES);
         const { bucket } = fakeBucket({ [ref.key]: DOC_BYTES });
-        await expect(readBundleRef(bucket, TENANT, BATCH, { ...ref, bytes: ref.bytes + 1 })).rejects.toThrow(/declared/);
+        const err = await readBundleRef(bucket, TENANT, BATCH, { ...ref, bytes: ref.bytes + 1 }).catch((e: unknown) => e);
+        expect(String(err)).toContain(`object is ${DOC_BYTES.byteLength} bytes, the command declared ${DOC_BYTES.byteLength + 1}`);
+        // The sibling branch (body read length) has different wording.
+        expect(String(err)).not.toContain('body read was');
     });
 
     it('throws when the content hash differs, with the right size', async () => {
@@ -179,14 +188,57 @@ describe('readBundleRef — the object must be what the command described', () =
     });
 });
 
+describe('readBundleRef — text must be valid UTF-8', () => {
+    it('refuses bytes that are not UTF-8 even when size and hash match', async () => {
+        const bad = new Uint8Array([0x7b, 0x22, 0xff, 0x22, 0x7d]);
+        const ref = refFor(bad);
+        const { bucket } = fakeBucket({ [ref.key]: bad });
+        await expect(readBundleRef(bucket, TENANT, BATCH, ref)).rejects.toThrow(/not valid UTF-8 text/);
+    });
+
+    it('POSITIVE CONTROL — multi-byte UTF-8 is read intact', async () => {
+        const good = new TextEncoder().encode(JSON.stringify({ note: 'café' }));
+        const ref = refFor(good);
+        const { bucket } = fakeBucket({ [ref.key]: good });
+        await expect(readBundleRef(bucket, TENANT, BATCH, ref)).resolves.toEqual({ note: 'café' });
+    });
+});
+
+describe('readBundleRef — a bucket that disagrees with itself', () => {
+    it('stored size over the ceiling while the command declares a small one: refused as the STORED size, body never read', async () => {
+        const ref = refFor(DOC_BYTES);
+        const arrayBuffer = vi.fn(async () => DOC_BYTES.buffer as ArrayBuffer);
+        const bucket: DeliveryBucket = {
+            get: async () => ({ size: BUNDLE_MAX_BYTES + 1, arrayBuffer }),
+            delete: async () => undefined,
+        };
+        const err = await readBundleRef(bucket, TENANT, BATCH, ref).catch((e: unknown) => e);
+        expect(String(err)).toContain('The stored object is 1,800,001 bytes (1.8 MB) and the limit is 1,800,000 bytes (1.8 MB).');
+        expect(arrayBuffer).not.toHaveBeenCalled();
+    });
+
+    it('stored size equal to the declared one but a body of another length: refused as the BODY length', async () => {
+        const ref = refFor(DOC_BYTES);
+        const shorter = DOC_BYTES.slice(0, DOC_BYTES.byteLength - 1);
+        const bucket: DeliveryBucket = {
+            get: async () => ({ size: ref.bytes, arrayBuffer: async () => shorter.buffer as ArrayBuffer }),
+            delete: async () => undefined,
+        };
+        const err = await readBundleRef(bucket, TENANT, BATCH, ref).catch((e: unknown) => e);
+        expect(String(err)).toContain(`body read was ${shorter.byteLength} bytes, the command declared ${ref.bytes}`);
+        expect(String(err)).not.toContain('object is');
+    });
+});
+
 describe('readBundleRef — the size ceiling names both numbers and reads nothing', () => {
     it('refuses a declared size over the limit before asking the bucket', async () => {
         const hash = sha256(DOC_BYTES);
         const ref = { key: deliveryKey(TENANT, BATCH, hash), bytes: BUNDLE_MAX_BYTES + 1, sha256: hash };
         const { bucket, get } = fakeBucket({ [ref.key]: DOC_BYTES });
         const err = await readBundleRef(bucket, TENANT, BATCH, ref).catch((e: unknown) => e);
-        expect(String(err)).toMatch(/This bundle is \d+\.\d MB and the limit is \d+\.\d MB\./);
-        expect(String(err)).toContain(`${(BUNDLE_MAX_BYTES / 1_000_000).toFixed(1)} MB`);
+        // One byte over the limit must not read as "1.8 MB and 1.8 MB": the
+        // byte counts are what tell the two numbers apart.
+        expect(String(err)).toContain('This bundle is 1,800,001 bytes (1.8 MB) and the limit is 1,800,000 bytes (1.8 MB).');
         expect(get).not.toHaveBeenCalled();
     });
 
