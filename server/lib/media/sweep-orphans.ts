@@ -22,7 +22,7 @@ export interface OrphanSweepOptions {
 }
 
 /** Leaves headroom under the 50 calls a Free-plan invocation may make. */
-export const ORPHAN_SWEEP_CALL_BUDGET = 36;
+const ORPHAN_SWEEP_CALL_BUDGET = 36;
 
 export interface OrphanSweepResult {
   /** R2 objects deleted this batch. */
