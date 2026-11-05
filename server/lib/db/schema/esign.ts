@@ -76,6 +76,11 @@ export const signingKeys = sqliteTable('signing_keys', {
  * Spec 5H — Hash-chained, Ed25519-signed audit events.
  * One chain per agreement_request. hash = SHA-256(payload_json + (prev_hash ?? '')).
  * Tampering with any row breaks the chain at that row AND invalidates the signature.
+ *
+ * ORDER IS LOAD-BEARING. Within one request, rows are read by `created_at` and then by SQLite's implicit `rowid` (this table has a
+ * TEXT primary key, so it keeps a hidden rowid). `created_at` never moves backwards inside a chain, so the rowid only breaks ties
+ * between rows written in the same millisecond. Any dump/restore, VACUUM or copy of this table must keep the rows' RELATIVE rowid order;
+ * never rely on a rowid across tables or compare rowids between databases.
  */
 export const esignAuditLogs = sqliteTable('esign_audit_logs', {
     id:             text('id').primaryKey(),

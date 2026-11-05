@@ -126,6 +126,36 @@ tests/
 - A file that needs a DOM opts in per-file with `// @vitest-environment happy-dom`
   (vitest v4 replacement for `environmentMatchGlobs`).
 - Prefer asserting **service-layer** behavior directly over reconstructing HTTP.
+- `createTestDb()` returns a database that already carries the full migrated schema
+  (it opens a serialized image built once per process), so the `await setupSchema(sqlite)`
+  that follows it is a no-op. `setupSchema` still replays the migration files for a handle
+  you created yourself with `new Database(':memory:')`.
+- **Two vitest projects.** `vitest.api.config.ts` splits the specs by `tests/unit/isolation.json`:
+  `api-shared` runs with `isolate: false` (files handled by one worker reuse its module
+  graph, which removes most of the import cost) and `api-isolated` is the historical
+  one-fresh-graph-per-file behaviour. A spec is shareable only if it has no module mock,
+  registry reset, global or env write, fake timers or `@vitest-environment` docblock and
+  reaches no module that keeps state. `npm run lint:unit-isolation` fails when a listed
+  spec breaks those rules; `npm run gen:unit-isolation` regenerates the list (a spec that
+  passes the rules but fails or flakes when shared goes under `forcedIsolated` with a
+  reason, and stays there). A new spec is isolated until the generator lists it, so
+  nothing breaks by default.
+- **Do not mock `drizzle-orm/d1` to inject the test database.** A module mock keeps the spec in
+  `api-isolated`. Give the code under test a real binding instead: `tests/unit/helpers/d1-binding.ts`
+  has `d1For(db)` (a `D1Database` over the database `createTestDb()` returned), `lazyD1()` (a binding
+  you create before the database exists and point with `use(db)` in `beforeEach`; `useBinding` takes a
+  wrapper you built, for example one that counts statements or fails one) and `toD1Binding(sqlite)`.
+  Production code then builds its own drizzle D1 handle from it, so a spec exercises the same driver
+  path as the Worker (including `batch()` and the way drizzle wraps a driver error in `.cause`).
+  Assert on database state or on the statements that reached the binding, not on a mock's call shape.
+- **CI re-runs the shared project shuffled** (`npm run test:unit:shared-shuffled`, same
+  `--shard=N/4` flag, applied to the shared project alone, so a file can sit on a different shard
+  number than in the main run). The seed is printed at the START of the run. To replay a failure:
+  `npx vitest run --config vitest.api.config.ts --project api-shared --sequence.shuffle --sequence.seed=<seed> --maxWorkers=1`
+  (plus the same `--shard=N/4`). Use one worker: with `isolate: false` which files share a
+  worker depends on scheduling, so only a single worker reproduces the order. Shuffle also
+  reorders the tests inside a file, so a failure there may be an order-dependent test within
+  one file rather than a leak between files; run that file alone with the same seed to tell.
 
 ### Every route is OpenAPI or a named exception
 
@@ -217,6 +247,15 @@ specs skip (they do not pass) when there is no connection, so a run reports
 
 **Refreshing a vendored schema** is a deliberate act, not a chore: follow
 `tests/contract/qbo/vendor/SOURCES.md`, then read what went red.
+
+### Native response conformance (`tests/unit/native/response-conformance.spec.ts`)
+
+Requests each covered native operation through the real application and walks the JSON body against the response schema in
+`contracts/native-contract.openapi.json`: a missing required key, a wrong type or a string outside an `enum` fails; an undeclared key
+must be listed in `tests/unit/helpers/undeclared-response-keys.allowlist.json` (shrink-only; CI compares its key count with the base
+branch). The helpers are `tests/unit/helpers/response-shape.ts` (the walker), `response-conformance.ts` (operations, seed, checker) and
+`response-conformance-skips.ts` (`NOT_COVERED`, `EMPTY_OK`). To shrink an entry, document the field in the schema, run
+`npm run native:contract`, and delete the key from the allow-list; see `docs/develop/native-clients.md`, section 12.
 
 ### E2E (`tests/e2e/*.spec.ts`)
 
@@ -349,7 +388,10 @@ without anyone deciding it should be. It costs `verify` the wait for the longest
 job, which is the price of the name meaning what it says.
 
 Every job that touches generated types runs `gen-version`, `i18n:compile:cached`
-and `react-router typegen` first. CodeQL runs separately (`codeql.yml`).
+and `react-router typegen` first. `npm ci`'s `prepare` step now runs the cached
+compile itself, and CI restores the generated i18n output through the
+`.github/actions/i18n-cache` action, so the explicit `i18n:compile:cached` step
+usually skips. CodeQL runs separately (`codeql.yml`).
 
 ### Native type-check (optional)
 

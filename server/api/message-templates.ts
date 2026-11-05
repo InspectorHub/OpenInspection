@@ -1,3 +1,4 @@
+import { withoutCompanyId } from '../lib/response-projection';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
@@ -95,7 +96,7 @@ app.openapi(listRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
     const { channel } = c.req.valid('query');
     const data = await new MessageTemplateService(c.env.DB).list(tenantId, channel);
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: data.map((row) => withoutCompanyId(row)) }, 200);
 });
 app.openapi(createMtRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
@@ -106,7 +107,7 @@ app.openapi(createMtRoute, async (c) => {
     if (body.variables !== undefined) createPayload.variables = body.variables;
     if (body.locale !== undefined) createPayload.locale = body.locale;
     const data = await new MessageTemplateService(c.env.DB).create(tenantId, createPayload);
-    return c.json({ success: true as const, data }, 201);
+    return c.json({ success: true as const, data: withoutCompanyId(data) }, 201);
 });
 app.openapi(updateMtRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
@@ -118,13 +119,13 @@ app.openapi(updateMtRoute, async (c) => {
     if (raw.body !== undefined) patch.body = raw.body;
     if (raw.variables !== undefined) patch.variables = raw.variables;
     const data = await new MessageTemplateService(c.env.DB).update(tenantId, id, patch);
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: withoutCompanyId(data) }, 200);
 });
 app.openapi(duplicateRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
     const { id } = c.req.valid('param');
     const data = await new MessageTemplateService(c.env.DB).duplicate(tenantId, id);
-    return c.json({ success: true as const, data }, 201);
+    return c.json({ success: true as const, data: withoutCompanyId(data) }, 201);
 });
 app.openapi(deleteRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;

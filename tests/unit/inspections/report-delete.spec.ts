@@ -13,7 +13,7 @@
  * published report has been delivered and its signed versions are what let a
  * client verify the document they hold.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -21,7 +21,6 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { deleteReport, listReportsForHub, reportDeleteBlock } from '../../../server/lib/inspection/reports';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 const INSPECTION = 'insp-delete';
@@ -97,7 +96,7 @@ describe('deleting a report', () => {
         expect(Object.keys(data)).toEqual(['item-a']);
     });
 
-    it('takes its version chain with it, leaving no orphans', async () => {
+    it('refuses a report that owns a stored version, even one that was retracted — the signed chain is the record', async () => {
         await seedReport('rep-primary', { kind: 'primary' });
         await seedReport('rep-sewer');
         await db.insert(schema.reportVersions).values({
@@ -106,9 +105,11 @@ describe('deleting a report', () => {
             createdAt: new Date(),
         } as never);
 
-        await deleteReport(asD1(), TENANT, INSPECTION, 'rep-sewer');
+        await expect(deleteReport(asD1(), TENANT, INSPECTION, 'rep-sewer'))
+            .rejects.toThrow(/published report cannot be deleted/i);
 
-        expect(await db.select().from(schema.reportVersions).all()).toHaveLength(0);
+        expect(await db.select().from(schema.reportVersions).all()).toHaveLength(1);
+        expect(await db.select().from(schema.reports).all()).toHaveLength(2);
     });
 
     it('refuses the primary report — the order would become uneditable', async () => {
@@ -188,8 +189,10 @@ describe('what the list tells the UI', () => {
     });
 
     it('is the single source of the rule — the pure predicate agrees', async () => {
-        expect(reportDeleteBlock({ kind: 'primary', status: 'in_progress' })).toBe('primary');
-        expect(reportDeleteBlock({ kind: 'ancillary', status: 'published' })).toBe('published');
-        expect(reportDeleteBlock({ kind: 'ancillary', status: 'in_progress' })).toBeNull();
+        expect(reportDeleteBlock({ kind: 'primary', status: 'in_progress', publishedAt: null }, 0)).toBe('primary');
+        expect(reportDeleteBlock({ kind: 'ancillary', status: 'published', publishedAt: null }, 0)).toBe('published');
+        expect(reportDeleteBlock({ kind: 'ancillary', status: 'in_progress', publishedAt: null }, 0)).toBeNull();
+        // A retracted or edited-again report keeps its signed versions, so any stored version blocks the delete.
+        expect(reportDeleteBlock({ kind: 'ancillary', status: 'in_progress', publishedAt: null }, 1)).toBe('published');
     });
 });

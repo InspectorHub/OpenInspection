@@ -4,6 +4,7 @@ import type { McpProps } from './build-server';
 import { resourceUrlFor } from './resource-url';
 import { logger } from '../logger';
 import { markNativeSessionEnd, withSessionEndReason } from '../auth/native-session-end';
+import { withOAuthEndpointLimits } from './endpoint-limits';
 import { mcpEnabled, nativeClientEnabled, oauthProviderEnabled } from './flag';
 import { assertCompanySlugMatches, slugFromMcpPath, stripMcpSlugPrefix } from './identity-bridge';
 import { getDeploymentProfile, type ProfileEnv } from '../deployment-profile';
@@ -22,7 +23,7 @@ type FetchFn = (req: Request, env: any, ctx: ExecutionContext) => Response | Pro
  * worker-configuration.d.ts; regenerate with `wrangler types` once OAUTH_KV is
  * confirmed provisioned to update the global Env type.
  */
-type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string; APP_BASE_URL?: string; DB?: D1Database; TENANT_CACHE?: KVNamespace } & ProfileEnv;
+type McpFlagEnv = { MCP_ENABLED?: string; NATIVE_CLIENT_ENABLED?: string; APP_BASE_URL?: string; DB?: D1Database; TENANT_CACHE?: KVNamespace; RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> }; DISABLE_RATE_LIMIT?: string } & ProfileEnv;
 
 const JSON_HEADERS = { 'content-type': 'application/json' };
 
@@ -195,5 +196,5 @@ export function buildOAuthHandler(
     };
     const provider = new OAuthProvider<any>(options); // eslint-disable-line @typescript-eslint/no-explicit-any
 
-    return { fetch: withSessionEndReason((req, e, ctx) => provider.fetch(req, e, ctx), env.TENANT_CACHE) };
+    return { fetch: withSessionEndReason(withOAuthEndpointLimits((req, e, ctx) => provider.fetch(req, e, ctx), env), env.TENANT_CACHE) };
 }

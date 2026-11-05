@@ -36,6 +36,9 @@ export const r2Keys = {
     `_platform/statutory-forms/${formId}/${encodeURIComponent(version)}.pdf`,
   inspectionPhoto: (t: string, i: string, mediaId: string, ext: string) =>
     `${t}/inspections/${i}/photos/${mediaId}.${ext}`,
+  /** The folder `inspectionPhoto` and its annotated and cropped variants write into: the part of the current layout the orphan sweep reads. */
+  inspectionPhotosPrefix: (t: string, i: string) =>
+    `${t}/inspections/${i}/photos/`,
   inspectionPhotoAnnotated: (t: string, i: string, mediaId: string) =>
     `${t}/inspections/${i}/photos/${mediaId}.annotated.png`,
   inspectionPhotoCropped: (t: string, i: string, mediaId: string) =>
@@ -72,8 +75,11 @@ export const r2Keys = {
    */
   inspectorPhotoServe: (t: string, filename: string): string | null =>
     PLAIN_ID.test(t) && PHOTO_FILENAME.test(filename) ? `${t}/inspector-photos/${filename}` : null,
-  messageAttachment: (t: string, messageId: string, attachmentId: string, ext: string) =>
-    `${t}/messages/${messageId}/${attachmentId}.${ext}`,
+  messageAttachment: (t: string, inspectionId: string, attachmentId: string, ext: string) =>
+    `${t}/messages/${inspectionId}/${attachmentId}.${ext}`,
+  /** Every attachment uploaded for one inspection's messages: the folder `messageAttachment` writes into. */
+  messageAttachmentPrefix: (t: string, inspectionId: string) =>
+    `${t}/messages/${inspectionId}/`,
   // The file an intake run was created from. Under the plain tenant prefix on
   // purpose: the tenant-level export and the tenant-level purge both walk
   // `{tenantId}/`, so an object here is reachable by both without either being

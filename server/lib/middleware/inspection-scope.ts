@@ -25,8 +25,8 @@ function inspectionScopeGuard() {
     const handler = async (c: Context<HonoConfig>, next: Next) => {
         const role = c.get('userRole');
         if (!role) {
-            // The one anonymous route in this family is the published report's video clip, allow-listed by
-            // the central access policy. Anything else without a session is refused here as well.
+            // A request with no session reaches this family only by an entry in the central access policy
+            // (or an unauthenticated prefix). Anything else without a session is refused here as well.
             const path = c.req.path;
             if (isUnauthenticatedPath(path) || matchesRule(ANONYMOUS_API_ALLOW, path)) return next();
             throw Errors.Unauthorized('No role found in context');

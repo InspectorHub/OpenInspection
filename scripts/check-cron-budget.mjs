@@ -75,6 +75,12 @@ const ALLOWED_UNBOUNDED = new Map([
         + 'an already-capped batch. Truncating it would re-record keys it had already seen '
         + 'and reset their grace window every pass, so nothing would ever be reaped.',
     ],
+    [
+        'server/lib/media/sweep-orphans.ts:inspectionMessages',
+        'Scoped to ONE inspection (inspectionId + tenantId), inside the same capped batch, and it reads only '
+        + 'the attachments column. A .limit() here would treat attachments past the limit as unreferenced '
+        + 'and queue live message attachments for deletion.',
+    ],
 ]);
 
 const errors = [];

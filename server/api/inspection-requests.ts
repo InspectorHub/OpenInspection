@@ -10,6 +10,7 @@
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
+import { withoutCompanyId } from '../lib/response-projection';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
 import { requireRole } from '../lib/middleware/rbac';
@@ -193,14 +194,14 @@ app.openapi(listRoute, async (c) => {
     // undefined. Nothing under `app/` calls this endpoint (the hono client is
     // wired in api-client.server.ts but never used), so the contract is the
     // only consumer and the handler is the side that was wrong.
-    return c.json({ success: true, data: await moneyView(c, { requests: rows, total: rows.length }, 'inspectionFees') }, 200);
+    return c.json({ success: true, data: await moneyView(c, { requests: rows.map(withoutCompanyId), total: rows.length }, 'inspectionFees') }, 200);
 });
 app.openapi(detailRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const { id } = c.req.valid('param');
     const request = await c.var.services.inspectionRequest.get(tenantId, id, await resolveInspectionScope(c));
     if (!request) throw Errors.NotFound('Inspection request not found');
-    return c.json({ success: true, data: await moneyView(c, { request }, 'inspectionFees') }, 200);
+    return c.json({ success: true, data: await moneyView(c, { request: withoutCompanyId(request) }, 'inspectionFees') }, 200);
 });
 app.openapi(byInspectionRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -209,7 +210,7 @@ app.openapi(byInspectionRoute, async (c) => {
     // For a restricted caller an inspection that is hidden and one that does not exist answer alike.
     await requireVisibleInspection(getDrizzle(c), scope, tenantId, inspectionId);
     const request = await c.var.services.inspectionRequest.getByInspectionId(tenantId, inspectionId, scope);
-    return c.json({ success: true as const, data: await moneyView(c, { request: request ?? null }, 'inspectionFees') }, 200);
+    return c.json({ success: true as const, data: await moneyView(c, { request: request ? withoutCompanyId(request) : null }, 'inspectionFees') }, 200);
 });
 app.openapi(createReqRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -240,7 +241,7 @@ app.openapi(createReqRoute, async (c) => {
     });
 
     const created = await c.var.services.inspectionRequest.create(tenantId, reqInput, subs);
-    return c.json({ success: true, data: await moneyView(c, { request: created }, 'inspectionFees') }, 201);
+    return c.json({ success: true, data: await moneyView(c, { request: withoutCompanyId(created) }, 'inspectionFees') }, 201);
 });
 app.openapi(updateReqRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -252,7 +253,7 @@ app.openapi(updateReqRoute, async (c) => {
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updated = await c.var.services.inspectionRequest.update(tenantId, id, patch as any);
-    return c.json({ success: true, data: await moneyView(c, { request: updated }, 'inspectionFees') }, 200);
+    return c.json({ success: true, data: await moneyView(c, { request: withoutCompanyId(updated) }, 'inspectionFees') }, 200);
 });
 app.openapi(addSubRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -262,7 +263,7 @@ app.openapi(addSubRoute, async (c) => {
     if (body.price !== undefined) sub.price = body.price;
     if (body.notes !== undefined) sub.notes = body.notes ?? null;
     const updated = await c.var.services.inspectionRequest.addSubInspection(tenantId, id, sub);
-    return c.json({ success: true, data: await moneyView(c, { request: updated }, 'inspectionFees') }, 200);
+    return c.json({ success: true, data: await moneyView(c, { request: withoutCompanyId(updated) }, 'inspectionFees') }, 200);
 });
 
 /** Registration order. Drives `InspectionRequestsApi`; a test pins it to what `app` really registered. */

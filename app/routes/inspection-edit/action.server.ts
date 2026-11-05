@@ -7,6 +7,8 @@ import { unwrapResultsResponse } from "~/lib/results";
 import { mapPool } from "~/lib/map-pool";
 import { handleStatutoryIntent } from "./action-statutory.server";
 import { handleFollowupIntent } from "./action-followup.server";
+import { handleEditAgainIntent } from "./action-edit-again.server";
+import { publishBody } from "./action-publish-body.server";
 import { writeKeyFor } from "./action-idempotency.server";
 import { attempt, refusalMessage } from "./action-errors.server";
 
@@ -34,6 +36,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  const followup = await handleFollowupIntent(String(intent ?? ""), formData, api, params.id);
  if (followup) return followup;
 
+ const editAgain = await handleEditAgainIntent(String(intent ?? ""), api, params.id);
+ if (editAgain) return editAgain;
+
  if (intent === "complete") {
  // Advisory order-lifecycle move; decoupled from publishing, never a gate.
  const res = await completeEndpoint();
@@ -57,11 +62,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  const saved = await attempt(() => api.inspections[":id"].$patch({ param: { id: params.id }, json: { autoSignOnPublish: autoSign === "true" } }));
  if (!saved?.ok) return { ok: false as const, intent: "publish", error: await refusalMessage(saved ?? new Response(null), "Couldn't save the signing preference, so the report was not published.") };
  }
- // The revision reason, when the dialog collected one. Blank or absent sends
- // nothing, so the stored reason stays NULL rather than becoming an empty
- // string that the amendment trail would render as a reason someone wrote.
- const summary = String(formData.get("summary") ?? "").trim();
- const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: { ...(summary ? { summary } : {}) } });
+ const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: publishBody(formData) });
  // Publish has meaningful precondition failures (e.g. "Inspection must be
  // completed before publishing the report.") that the inspector MUST see —
  // returning a bare { ok:false } here routed the publish through the generic
@@ -69,7 +70,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // AppError body ({ error: { code, message } }) and carry the message back
  // so the publish modal can show it inline.
  if (!res.ok) return { ok: false as const, intent: "publish", error: await refusalMessage(res, "Couldn't publish the report. Please try again.") };
- return { ok: true as const, intent: "publish" };
+ // Nothing changed since the latest version: the server answered with that version and published nothing. Say so.
+ const answer = await res.json().catch(() => null) as { data?: { unchangedSinceVersion?: unknown } } | null;
+ const since = answer?.data?.unchangedSinceVersion;
+ return { ok: true as const, intent: "publish", ...(typeof since === "number" ? { unchangedSinceVersion: since } : {}) };
  }
 
  // B-22 follow-up (C-12 class): the settings sheet's "Save changes" used to

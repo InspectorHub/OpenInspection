@@ -18,17 +18,15 @@
  *    asserted to carry its OWN reason, and the three reasons are asserted to be
  *    three different sentences.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { Database as SqliteDatabase } from 'better-sqlite3';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
 import { withBatch } from '../helpers/d1-binding';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { asD1DrizzleReturn } from '../helpers/test-db';
-import {
+import { intakeD1 as testD1,
     intakeRequest,
     jsonBody,
     seedIntakeTenant,
@@ -85,7 +83,7 @@ describe('an upload with three bad rows shows three rows, each with its own reas
         db = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(sqlite);
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(withBatch(db, sqlite)));
+        testD1.use(asD1DrizzleReturn(withBatch(db, sqlite)));
         store = new Map();
         opts = { store };
         await seedIntakeTenant(db);

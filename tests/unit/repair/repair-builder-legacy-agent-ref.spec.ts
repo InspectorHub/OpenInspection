@@ -46,6 +46,7 @@ async function creatorPersistedFor(token: string): Promise<Creator> {
     const resolveAgentViewToken = vi.fn().mockResolvedValue({
         inspectionId: 'insp1',
         tenantId:     't2',
+        role:         'agent',
     });
     const create = vi.fn().mockResolvedValue({ id: 'rr1', shareToken: 'tok-share' });
 

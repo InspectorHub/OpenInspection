@@ -7,14 +7,14 @@
  * plus the newly-added role-aware rules for the Buyer's Agent (active by
  * default) and Listing Agent (seeded inactive — inspector opts in).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq, and } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AutomationService } from '../../../server/services/automation.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { asD1Db } from '../helpers/test-db';
@@ -27,7 +27,7 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'acme-a5a5', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -36,7 +36,7 @@ beforeEach(async () => {
     // role profiles must be seeded first (same order as /setup and
     // seedStarterContent: role profiles, then automations).
     await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
-    svc = new AutomationService({} as D1Database);
+    svc = new AutomationService(testD1.binding);
 });
 
 // Resolve an automations row's recipient role by joining

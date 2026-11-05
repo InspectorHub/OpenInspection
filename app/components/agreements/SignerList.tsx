@@ -12,7 +12,7 @@ import { m } from "~/paraglide/messages";
  * via data-color-scheme (no hardcoded colors).
  */
 
-type SignerStatus = "pending" | "sent" | "viewed" | "signed" | "declined" | "expired" | "delivery_failed";
+type SignerStatus = "pending" | "sent" | "viewed" | "signing" | "signed" | "declined" | "expired" | "delivery_failed";
 
 export interface SignerRow {
     id: string;
@@ -41,6 +41,7 @@ export function statusChip(status: string): { tone: ChipTone; label: string; too
     switch (status) {
         case "signed":          return { tone: "sat",     label: "Signed" };
         case "viewed":          return { tone: "info",    label: "Viewed" };
+        case "signing":         return { tone: "info",    label: "Signing" };
         case "sent":            return { tone: "monitor", label: "Sent" };
         case "declined":        return { tone: "defect",  label: "Declined" };
         case "expired":         return { tone: "neutral", label: "Expired" };
@@ -73,6 +74,9 @@ export function remindState(
     signer: Pick<SignerRow, "status" | "lastRemindedAt">,
     nowMs: number,
 ): { canRemind: boolean; reason: string | null } {
+    if (signer.status === "signing") {
+        return { canRemind: false, reason: m.agreement_signers_remind_signing() };
+    }
     if (isTerminal(signer.status)) {
         return { canRemind: false, reason: m.agreement_signers_remind_terminal() };
     }

@@ -3,6 +3,7 @@ import { and, eq, asc } from 'drizzle-orm';
 import type { InferSelectModel } from 'drizzle-orm';
 import { inspectorCredentials } from '../lib/db/schema';
 import { r2Keys } from '../lib/r2-keys';
+import { svgUploadRefusal } from '../lib/media/svg-safety';
 import { Errors } from '../lib/errors';
 import { primaryLicenseOf } from '../lib/credentials/primary';
 
@@ -131,10 +132,14 @@ export class CredentialService {
     const row = await db.select().from(inspectorCredentials)
       .where(and(eq(inspectorCredentials.id, credentialId), eq(inspectorCredentials.tenantId, tenantId), eq(inspectorCredentials.userId, userId))).get();
     if (!row) throw Errors.NotFound('Credential not found');
+    const bytes = await file.arrayBuffer();
+    // Refused before the old image is purged: a rejected upload must leave the current badge in place.
+    const svgRefusal = file.type === 'image/svg+xml' ? svgUploadRefusal(bytes) : null;
+    if (svgRefusal) throw Errors.BadRequest(svgRefusal);
     if (row.imageR2Key) await this.r2.delete(row.imageR2Key); // replace = purge old
     const ext = file.type.split('/')[1] === 'svg+xml' ? 'svg' : file.type.split('/')[1];
     const key = r2Keys.credentialImage(tenantId, credentialId, crypto.randomUUID(), ext);
-    await this.r2.put(key, await file.arrayBuffer(), { httpMetadata: { contentType: file.type } });
+    await this.r2.put(key, bytes, { httpMetadata: { contentType: file.type } });
     await db.update(inspectorCredentials).set({ imageR2Key: key, updatedAt: new Date() })
       .where(and(eq(inspectorCredentials.id, credentialId), eq(inspectorCredentials.tenantId, tenantId)));
     return `/api/public/brand-asset?key=${encodeURIComponent(key)}`;

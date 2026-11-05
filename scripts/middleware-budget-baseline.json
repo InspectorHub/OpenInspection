@@ -6,9 +6,9 @@
   ],
   "globalMiddlewareUse": 12,
   "fanOutTotals": {
-    "files": 164,
-    "dollarMethods": 599,
-    "apiWorker": 9
+    "files": 166,
+    "dollarMethods": 600,
+    "apiWorker": 11
   },
   "fanOut": {
     "app/lib/access.server.ts": {
@@ -151,6 +151,10 @@
       "dollarMethods": 2,
       "apiWorker": 0
     },
+    "app/routes/agent/magic-login.tsx": {
+      "dollarMethods": 0,
+      "apiWorker": 2
+    },
     "app/routes/agent/repair-items.tsx": {
       "dollarMethods": 5,
       "apiWorker": 0
@@ -200,6 +204,10 @@
       "apiWorker": 0
     },
     "app/routes/forgot-password.tsx": {
+      "dollarMethods": 1,
+      "apiWorker": 0
+    },
+    "app/routes/inspection-edit/action-edit-again.server.ts": {
       "dollarMethods": 1,
       "apiWorker": 0
     },

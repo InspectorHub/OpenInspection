@@ -42,10 +42,6 @@ export const ANONYMOUS_API_ALLOW: readonly PathRule[] = [
     { match: '/api/auth/logout', why: 'Clears the cookie; harmless without a session' },
     { match: '/api/concierge/confirm-view', why: 'Concierge confirmation page: the magic-link token is the credential' },
     { match: '/api/calendar/callback', why: 'OAuth redirect from the calendar provider; authorized by its single-use state' },
-    {
-        match: /^\/api\/inspections\/[^/]+\/media\/video\/r2-object\/[^/]+(\/poster)?$/,
-        why: 'The published web report plays R2 clips with no session; the pool-row id (UUID) is the capability',
-    },
 ];
 
 /** What an agent principal may reach. Everything else under /api/ is staff surface. */

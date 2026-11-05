@@ -84,7 +84,7 @@ bindings — declaring them in the config is all the provisioning they need.
 | `AI_MODEL`        | Required for any AI feature — the model id every AI call uses, in the chosen backend's own naming. Through an AI gateway that is `{provider}/{model}`. There is no compiled-in default; unset means AI fails closed with a 503. A company may override it for itself. |
 | `AI_BASE_URL`     | Required for any AI feature — the root of the OpenAI-compatible API every AI call posts to. Point it at a hosted provider, at an AI gateway, or at an address on your own network running Ollama or vLLM. No compiled-in default; unset fails closed. A company may override it for itself. See [AI](../integrations/ai.md). |
 | `AI_MANAGED_API_KEY` | Optional, `saas` only — a deployment-provided AI key for tenants the deployment grants managed access to. A standalone deploy has no managed path and ignores it. |
-| `TURNSTILE_SECRET_KEY` | Optional but recommended for the public booking page. |
+| `TURNSTILE_SECRET_KEY` | Optional but recommended for the public booking page. Set the matching real `TURNSTILE_SITE_KEY` too: `wrangler.jsonc` ships the test site key, which a real secret rejects (see [Turnstile](../integrations/turnstile.md)). |
 
 Set them via `wrangler secret put SECRET_NAME` or through the Cloudflare dashboard.
 

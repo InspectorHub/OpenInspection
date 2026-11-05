@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { AgreementServiceBase } from './agreement/base';
 import { SignerStateMixin } from './agreement/signer-state';
+import { SignerLinksMixin } from './agreement/signer-links';
 import { EnvelopeLegacyMixin } from './agreement/envelope-legacy';
 import { TemplateMixin } from './agreement/template';
 
@@ -12,6 +13,7 @@ export { computeEnvelopeStatus } from './agreement/base';
  * Service to manage tenant-specific agreement templates (signatures, terms).
  *
  * Composed from focused mixins (see server/services/agreement/):
+ *   - SignerLinksMixin     — listing signers and their signing links.
  *   - SignerStateMixin     — Track I-a signer-level state machine (innermost; holds
  *                            the atomic envelope-completion + token-upgrade unit).
  *   - EnvelopeLegacyMixin  — legacy signing requests + Spec 2A envelope state machine.
@@ -19,7 +21,7 @@ export { computeEnvelopeStatus } from './agreement/base';
  * The public surface (class name, constructor injection, and every method) is
  * identical to the pre-split single-file service.
  */
-export class AgreementService extends TemplateMixin(EnvelopeLegacyMixin(SignerStateMixin(AgreementServiceBase))) {}
+export class AgreementService extends TemplateMixin(EnvelopeLegacyMixin(SignerLinksMixin(SignerStateMixin(AgreementServiceBase)))) {}
 
 /**
  * Spec 5H D1 — Inspector pre-sign.

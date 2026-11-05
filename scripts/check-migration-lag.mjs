@@ -52,7 +52,7 @@
  *   node scripts/check-migration-lag.mjs --migrations-dir <dir>
  *   node scripts/check-migration-lag.mjs --label <name>        # baseline key + display name
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -394,4 +394,4 @@ function main() {
   process.exit(d.missing.length || d.extra.length || d.staleAccepted.length ? 1 : 0);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main();

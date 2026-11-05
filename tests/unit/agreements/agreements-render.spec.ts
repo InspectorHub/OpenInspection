@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { agreementRenderHandler, certRenderHandler } from '../../../server/api/agreements-render';
 import { AGREEMENT_LANGUAGE_DISCLOSURE } from '../../../server/lib/legal/agreement-language-disclosure';
 
@@ -47,11 +47,11 @@ describe('agreement-render handler', () => {
       id: AGR_ID, tenantId: TENANT_A, name: 'Standard', content: '<p>Agreement body</p>',
       version: 1, createdAt: new Date(),
     });
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
   });
 
   it('returns 404 when requestId is unknown', async () => {
-    const res = await agreementRenderHandler({} as D1Database, 'acme', '00000000-0000-0000-0000-0000000000ff');
+    const res = await agreementRenderHandler(testD1.binding, 'acme', '00000000-0000-0000-0000-0000000000ff');
     expect(res.status).toBe(404);
   });
 
@@ -62,7 +62,7 @@ describe('agreement-render handler', () => {
       status: 'sent',
       createdAt: new Date(),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     expect(res.status).toBe(404);
   });
 
@@ -75,7 +75,7 @@ describe('agreement-render handler', () => {
       createdAt: new Date(),
     });
     await db.insert(schema.agreementSigners).values(clientSigner('iVBORw0KGgo='));
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     const body = await res.text();
@@ -99,7 +99,7 @@ describe('agreement-render handler', () => {
       signedAt: new Date(), createdAt: new Date(),
     });
     await db.insert(schema.agreementSigners).values(clientSigner('anysig', 'Jane'));
-    const res = await agreementRenderHandler({} as D1Database, 'wrongslug', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'wrongslug', REQ_ID);
     expect(res.status).toBe(200);
   });
 
@@ -111,7 +111,7 @@ describe('agreement-render handler', () => {
       signedAt: new Date(), createdAt: new Date(),
     });
     await db.insert(schema.agreementSigners).values(clientSigner('anysig', 'Jane'));
-    const res = await agreementRenderHandler({} as D1Database, '', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, '', REQ_ID);
     expect(res.status).toBe(200);
   });
 
@@ -126,7 +126,7 @@ describe('agreement-render handler', () => {
       createdAt: new Date(),
     });
     await db.insert(schema.agreementSigners).values(clientSigner('data:image/png;base64,clientsig'));
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('clientsig');
@@ -143,7 +143,7 @@ describe('agreement-render handler', () => {
       createdAt: new Date(),
     });
     await db.insert(schema.agreementSigners).values(clientSigner('data:image/png;base64,clientsig'));
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('clientsig');
@@ -167,7 +167,7 @@ describe('agreement-render handler', () => {
     await db.update(schema.agreements)
       .set({ content: '<p>Edited later — must NOT appear</p>' })
       .where(eq(schema.agreements.id, AGR_ID));
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('Snapshot at sign time');
@@ -198,7 +198,7 @@ describe('agreement-render handler', () => {
         channel: 'remote', signedAt: new Date(), createdAt: new Date(2),
       },
     ]);
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('Jane Doe');
@@ -229,7 +229,7 @@ describe('agreement-render handler', () => {
       status: 'signed', signatureBase64: 'data:image/png;base64,signersig',
       channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID, '', true);
     expect(res.status).toBe(200);
     const body = await res.text();
     expect(body).toContain('signersig');
@@ -252,7 +252,7 @@ describe('agreement-render handler', () => {
       status: 'signed', signatureBase64: null,   // self-healed row, no signature
       channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     expect(res.status).toBe(404);
   });
 
@@ -271,7 +271,7 @@ describe('agreement-render handler', () => {
       status: 'signed', signatureBase64: 'data:image/png;base64,janesig',
       channel: 'in_person', signedAt: new Date(), createdAt: new Date(1),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     const body = await res.text();
     expect(body).toContain('Signed in person');
   });
@@ -292,34 +292,58 @@ describe('agreement-render handler', () => {
       channel: 'remote', onBehalfOf: 'Jane Doe',
       signedAt: new Date(), createdAt: new Date(1),
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     const body = await res.text();
     expect(body).toContain('Signed by Agent Smith on behalf of Jane Doe');
   });
 
-  // Track I-a — signatureBase64 is interpolated into <img src="...">; a payload
-  // that breaks out of the attribute (`" onerror=...`) must be escaped, not live.
-  it('escapes a signature data URL that tries to break out of the img src attribute', async () => {
-    await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-      clientEmail: 'jane@x', clientName: 'Jane Doe',
-      status: 'signed',
-      signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
-      createdAt: new Date(),
+  // signatureBase64 arrives as text from the signer's browser and is interpolated into <img src="...">. Only a base64 PNG, JPEG, GIF
+  // or WebP data URL (or bare base64) is embedded; anything else, including a payload that tries to break out of the attribute, is
+  // never emitted at all.
+  describe('what is embedded as a signature picture', () => {
+    async function signedWith(signatureBase64: string) {
+      await db.insert(schema.agreementRequests).values({
+        id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+        clientEmail: 'jane@x', clientName: 'Jane Doe',
+        status: 'signed',
+        signedAt: new Date(), contentSnapshot: '<p>Body</p>', contentHash: 'h',
+        createdAt: new Date(),
+      });
+      await db.insert(schema.agreementSigners).values({
+        id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
+        name: '', email: 'jane@x', role: 'client',
+        status: 'signed', signatureBase64,
+        channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+      });
+      return (await agreementRenderHandler(testD1.binding, 'acme', REQ_ID, '', true)).text();
+    }
+
+    it('embeds a PNG data URL and bare base64, as before', async () => {
+      expect(await signedWith('data:image/png;base64,aGVsbG8=')).toContain('<img src="data:image/png;base64,aGVsbG8="');
     });
-    await db.insert(schema.agreementSigners).values({
-      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID,
-      name: 'Jane Doe', email: 'jane@x', role: 'client',
-      status: 'signed',
-      signatureBase64: 'data:image/png;base64,abc" onerror="x',
-      channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+
+    it('embeds nothing for a payload that breaks out of the attribute, a non-image data URL, a link or script text, and says so in the block', async () => {
+      for (const bad of [
+        'data:image/png;base64,abc" onerror="x',
+        'data:text/html;base64,PHNjcmlwdD4=',
+        'data:image/svg+xml;base64,PHN2Zy8+',
+        'javascript:alert(1)',
+        'https://evil.example/x.png',
+      ]) {
+        await db.delete(schema.agreementSigners);
+        await db.delete(schema.agreementRequests);
+        const body = await signedWith(bad);
+        expect(body, bad).not.toContain('<img src=');
+        expect(body, bad).not.toContain('onerror');
+        expect(body, bad).toContain('[signature image not available]');
+      }
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
-    const body = await res.text();
-    // The quote is escaped...
-    expect(body).toContain('&quot; onerror=&quot;x');
-    // ...and the raw attribute-injection sequence is NOT present as live markup.
-    expect(body).not.toContain('" onerror=');
+
+    it('shows a signer with no name as "Signer", never by email address', async () => {
+      const body = await signedWith('data:image/png;base64,aGVsbG8=');
+      expect(body).toContain('Signer');
+      expect(body).not.toContain('jane@x');
+    });
   });
 });
 
@@ -343,11 +367,11 @@ describe('cert-render handler', () => {
       id: AGR_ID, tenantId: TENANT_A, name: 'Standard', content: 'body',
       version: 1, createdAt: new Date(),
     });
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
   });
 
   it('returns 404 when requestId is unknown', async () => {
-    const res = await certRenderHandler({} as D1Database, '00000000-0000-0000-0000-0000000000ff');
+    const res = await certRenderHandler(testD1.binding, '00000000-0000-0000-0000-0000000000ff');
     expect(res.status).toBe(404);
   });
 
@@ -358,8 +382,24 @@ describe('cert-render handler', () => {
       status: 'sent',
       createdAt: new Date(),
     });
-    const res = await certRenderHandler({} as D1Database, REQ_ID);
+    const res = await certRenderHandler(testD1.binding, REQ_ID);
     expect(res.status).toBe(404);
+  });
+
+  it('never prints an email address: a client and a signer with no name show as "the client" / "Signer"', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
+      clientEmail: 'jane@example.test', clientName: null,
+      status: 'signed', signedAt: new Date(), createdAt: new Date(),
+    });
+    await db.insert(schema.agreementSigners).values({
+      id: 'sig-1', tenantId: TENANT_A, requestId: REQ_ID, name: '', email: 'jane@example.test', role: 'client',
+      status: 'signed', signatureBase64: 'data:image/png;base64,aGVsbG8=', channel: 'remote', signedAt: new Date(), createdAt: new Date(1),
+    });
+    const body = await (await certRenderHandler(testD1.binding, REQ_ID)).text();
+    expect(body).toContain('Signed agreement for the client');
+    expect(body).toContain('Client: Signer');
+    expect(body).not.toContain('jane@example.test');
   });
 
   it('renders certificate HTML with audit chain summary', async () => {
@@ -385,7 +425,7 @@ describe('cert-render handler', () => {
         createdAt: new Date(Date.UTC(2026, 4, 28, 10, 0, i)),
       });
     }
-    const res = await certRenderHandler({} as D1Database, REQ_ID);
+    const res = await certRenderHandler(testD1.binding, REQ_ID);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
     const body = await res.text();
@@ -476,11 +516,11 @@ describe('agreement-render handler — language disclosure', () => {
       createdAt: new Date(),
     });
     await insertSignedSigner(db, AGREEMENT_LANGUAGE_DISCLOSURE.version);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
   });
 
   it('carries the disclosure into the signed document', async () => {
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     const html = await res.text();
     expect(html).toMatch(/provided in English/i);
     expect(html).toContain('Not part of this agreement');
@@ -489,7 +529,7 @@ describe('agreement-render handler — language disclosure', () => {
   });
 
   it('places it OUTSIDE the body box', async () => {
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     const html = await res.text();
     const box = bodyBoxOf(html);
     // Prove the extractor sees the box before trusting what it does not see.
@@ -505,7 +545,7 @@ describe('agreement-render handler — language disclosure', () => {
   });
 
   it('writes nothing — the snapshot and its hash survive the render', async () => {
-    await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     const row = await db.select().from(schema.agreementRequests)
       .where(eq(schema.agreementRequests.id, REQ_ID)).get();
     expect(row!.contentSnapshot).toBe('<p>Snapshot at sign time</p>');
@@ -525,7 +565,7 @@ describe('agreement-render handler — language disclosure', () => {
   it('omits it when the signature recorded no version at all', async () => {
     await db.delete(schema.agreementSigners).where(eq(schema.agreementSigners.id, SIGNER_ID));
     await insertSignedSigner(db, null);
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     const html = await res.text();
     // The document still renders — it is only the claim that is withheld.
     expect(html).toContain('Snapshot at sign time');
@@ -536,7 +576,7 @@ describe('agreement-render handler — language disclosure', () => {
   it('omits it when the signature recorded a SUPERSEDED version', async () => {
     await db.delete(schema.agreementSigners).where(eq(schema.agreementSigners.id, SIGNER_ID));
     await insertSignedSigner(db, AGREEMENT_LANGUAGE_DISCLOSURE.version - 1);
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     const html = await res.text();
     expect(html).toContain('Snapshot at sign time');
     // Superseded copy is not archived. Printing today's words here would put a
@@ -552,7 +592,7 @@ describe('agreement-render handler — language disclosure', () => {
       signedAt: new Date(), createdAt: new Date(),
       languageDisclosureVersion: null,
     });
-    const res = await agreementRenderHandler({} as D1Database, 'acme', REQ_ID);
+    const res = await agreementRenderHandler(testD1.binding, 'acme', REQ_ID);
     const html = await res.text();
     expect(html).not.toMatch(/provided in English/i);
   });
@@ -590,12 +630,12 @@ describe('cert-render handler — language disclosure version', () => {
       status: 'signed',
       signedAt: new Date(), createdAt: new Date(),
     });
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
   });
 
   it('reports the version the signer was shown', async () => {
     await insertSignedSigner(db, AGREEMENT_LANGUAGE_DISCLOSURE.version);
-    const res = await certRenderHandler({} as D1Database, REQ_ID);
+    const res = await certRenderHandler(testD1.binding, REQ_ID);
     const html = await res.text();
     expect(html).toContain(`Language notice v${AGREEMENT_LANGUAGE_DISCLOSURE.version} displayed`);
   });
@@ -603,14 +643,14 @@ describe('cert-render handler — language disclosure version', () => {
   it('reports a version that is NOT the current one rather than suppressing it', async () => {
     const superseded = AGREEMENT_LANGUAGE_DISCLOSURE.version - 1;
     await insertSignedSigner(db, superseded);
-    const res = await certRenderHandler({} as D1Database, REQ_ID);
+    const res = await certRenderHandler(testD1.binding, REQ_ID);
     const html = await res.text();
     expect(html).toContain(`Language notice v${superseded} displayed`);
   });
 
   it('says nothing when nothing was recorded — no "v0", no "none"', async () => {
     await insertSignedSigner(db, null);
-    const res = await certRenderHandler({} as D1Database, REQ_ID);
+    const res = await certRenderHandler(testD1.binding, REQ_ID);
     const html = await res.text();
     // Prove the roster rendered before trusting the absence.
     expect(html).toContain('Jane Doe');

@@ -160,13 +160,15 @@ export const AUDIT_REGISTRY: Record<AuditAction | RetiredAuditAction, AuditActio
     'inspection.pca_narrative.update': { family: 'inspection', label: 'audit_action_inspection_pca_narrative_update', meta: { fields: 'name' }, status: { kind: 'live' } },
     'inspection.property_facts.autofill': { family: 'inspection', label: 'audit_action_inspection_property_facts_autofill', meta: { reason: 'reason', source: 'name' }, status: { kind: 'live' } },
     'inspection.property_facts.update': { family: 'inspection', label: 'audit_action_inspection_property_facts_update', meta: { fields: 'name' }, status: { kind: 'live' } },
-    // F79 — carries the deliverable and nothing about delivery. `notifyAgent` /
-    // `notifyClient` were declared here and written by the route while the publish
-    // service read neither, so the row asserted a notification decision that the
-    // `report.published` automation rules had already made differently.
-    'inspection.published': { family: 'inspection', label: 'audit_action_inspection_published', meta: { reportId: 'id' }, status: { kind: 'live' } },
+    // F79 — `notifyAgent` / `notifyClient` were once written here while the publish service read neither, so the row
+    // asserted a notification decision the automation rules had made differently. `notifyClient` is back ONLY because the
+    // service now honours it, and only on an amendment (`amendment` true): it says whether the report-updated rules (all of
+    // them, not only the client's) were allowed to fire. It is never written for a first publish, and `notifyAgent` is not a field at all.
+    'inspection.published': { family: 'inspection', label: 'audit_action_inspection_published', meta: { amendment: 'flag', notifyClient: 'flag', reportId: 'id' }, status: { kind: 'live' } },
     'inspection.rating_system.switch': { family: 'inspection', label: 'audit_action_inspection_rating_system_switch', meta: { mode: 'name', ratingSystemId: 'id' }, status: { kind: 'live' } },
     'inspection.report_narrative.update': { family: 'inspection', label: 'audit_action_inspection_report_narrative_update', meta: { cleared: 'flag', length: 'count', reportId: 'id' }, status: { kind: 'live' } },
+    'inspection.report_reopened': { family: 'inspection', label: 'audit_action_inspection_report_reopened', meta: { reportId: 'id' }, status: { kind: 'live' } },
+    'inspection.report_retracted': { family: 'inspection', label: 'audit_action_inspection_report_retracted', meta: {}, status: { kind: 'live' } },
     'inspection.report_relocked': { family: 'inspection', label: 'audit_action_inspection_report_relocked', meta: {}, status: { kind: 'live' } },
     'inspection.report_unlocked': { family: 'inspection', label: 'audit_action_inspection_report_unlocked', meta: { alreadyUnlocked: 'flag', reason: 'reason' }, status: { kind: 'live' } },
     'inspection.report_translation_regenerated': { family: 'inspection', label: 'audit_action_inspection_report_translation_regenerated', meta: { locale: 'name', reportId: 'id', segmentCount: 'count' }, status: { kind: 'live' } },

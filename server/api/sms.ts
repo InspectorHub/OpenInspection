@@ -166,7 +166,7 @@ smsPublicRoutes.openapi(optinResolveRoute, async (c) => {
         privacyUrl = links.privacyUrl;
         termsUrl = links.termsUrl;
     }
-    return c.json({ success: true as const, data: { companyName, disclosureText, privacyUrl, termsUrl } }, 200);
+    return c.json({ success: true as const, data: { companyName, disclosureText, privacyUrl, termsUrl } }, 200); // projection-allow: the nested values are the company name, the disclosure text and the two policy links of the opt-in page
 });
 smsPublicRoutes.openapi(optinConfirmRoute, async (c) => {
     const { token } = c.req.valid('json');
@@ -435,7 +435,7 @@ smsAdminRoutes.openapi(testSendRoute, async (c) => {
     if (!gate.allowed) {
         logger.info('sms.test_send: blocked', { tenantId, reason: gate.reason });
         await recordIntegrationTest(db, { tenantId, target: 'sms', provider: smsProvider, ok: false, detail: gate.reason, testedByUserId }).catch(() => {});
-        return c.json({ success: false, error: gate.reason }, 200);
+        return c.json({ success: false, error: gate.reason }, 200); // projection-allow: owner-only test send: the value is the refusal reason string
     }
     const smsMode = gate.smsMode;
 
@@ -471,7 +471,7 @@ smsAdminRoutes.openapi(testSendRoute, async (c) => {
         tenantId, target: 'sms', provider: smsProvider, ok: res.ok,
         detail: res.ok ? `Test message sent to ${normalized}.` : res.error, testedByUserId,
     }).catch(() => {});
-    return res.ok ? c.json({ success: true }, 200) : c.json({ success: false, error: res.error }, 200);
+    return res.ok ? c.json({ success: true }, 200) : c.json({ success: false, error: res.error }, 200); // projection-allow: owner-only test send: the value is the provider error string
 });
 smsAdminRoutes.openapi(consentStatusRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
@@ -489,7 +489,7 @@ smsAdminRoutes.openapi(consentStatusRoute, async (c) => {
     // Task 13).
     const contactId = await new PeopleService(c.env).contactIdForRole(tenantId, inspectionId, PRIMARY_CLIENT_KEY);
     const latest = contactId ? await new SmsConsentService(c.env.DB).getLatest(tenantId, contactId) : null;
-    return c.json({ success: true as const, data: { consent: latest ?? 'none' } }, 200);
+    return c.json({ success: true as const, data: { consent: latest ?? 'none' } }, 200); // projection-allow: the consent state of the inspection's own client contact
 });
 smsAdminRoutes.openapi(smsConfigRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
@@ -517,7 +517,7 @@ smsAdminRoutes.openapi(smsConfigRoute, async (c) => {
         TWILIO_FROM_NUMBER: c.env.TWILIO_FROM_NUMBER,
     };
     const effectiveSource = await resolveTwilioSourceForTenant(c.env, tenantId, mode, tenantBag, platformBag);
-    return c.json({ success: true as const, data: { mode, effectiveSource } }, 200);
+    return c.json({ success: true as const, data: { mode, effectiveSource } }, 200); // projection-allow: owner-only settings read: the nested values are mode strings
 });
 smsAdminRoutes.openapi(complianceRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
@@ -552,10 +552,10 @@ smsAdminRoutes.openapi(complianceRoute, async (c) => {
     return c.json({
         success: true as const,
         data: {
-            mode,
+            mode, // projection-allow: the company's own SMS mode, one of four fixed values, read by an owner or manager
             complianceStatus: stored?.complianceStatus ?? null,
             rejectionReason: stored?.rejectionReason ?? null,
-            tollfree,
+            tollfree, // projection-allow: the provider records of the company own toll-free verification, each read as verification sid, status and phone-number sid; GET /sms/compliance is guarded by requireRole owner or manager, and records are read only in own mode
             customerProfileStatus: managedRow?.customerProfileStatus ?? null,
             brandStatus: managedRow?.brandStatus ?? null,
             campaignStatus: managedRow?.campaignStatus ?? null,
@@ -650,7 +650,7 @@ smsAdminRoutes.openapi(complianceProvisionRoute, async (c) => {
     return c.json({
         success: true as const,
         data: {
-            mode,
+            mode, // projection-allow: the company's own SMS mode, one of four fixed values, read by an owner or manager
             complianceStatus: stored?.complianceStatus ?? null,
             rejectionReason: stored?.rejectionReason ?? null,
             tollfree: [],
@@ -751,7 +751,7 @@ smsAdminRoutes.openapi(complianceResubmitRoute, async (c) => {
     return c.json({
         success: true as const,
         data: {
-            mode,
+            mode, // projection-allow: the company's own SMS mode, one of four fixed values, read by an owner or manager
             complianceStatus: stored?.complianceStatus ?? null,
             rejectionReason: stored?.rejectionReason ?? null,
             tollfree: [],

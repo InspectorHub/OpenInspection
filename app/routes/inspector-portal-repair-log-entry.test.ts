@@ -71,9 +71,9 @@ describe('inspection hub — Repair Request Log entry point (#69)', () => {
         );
         expect(reportsCard).not.toContain('repairLogHref');
         expect(reportsCard).not.toContain('hub-repair-log-link');
-        // Adjacent to Unpublish — the other action that only makes sense once
+        // Adjacent to Retract — the other action that only makes sense once
         // the report is out.
         expect(at('data-testid="hub-repair-log-link"'))
-            .toBeLessThan(at('inspections_hub_report_unpublish'));
+            .toBeLessThan(at('<RetractReportControl'));
     });
 });

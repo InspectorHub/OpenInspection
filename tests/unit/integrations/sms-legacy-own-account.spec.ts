@@ -13,8 +13,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { sealSecrets } from '../../../server/lib/config-crypto';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import {
     loadProviderForTenant, loadTwilioForTenant, resolveTwilioSourceForTenant, type TwilioLoaderEnv,
@@ -46,7 +46,7 @@ beforeEach(async () => {
     const fix = createTestDb();
     db = fix.db;
     await setupSchema(fix.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(d1Shaped(db));
+    testD1.use(d1Shaped(db));
     await db.insert(schema.tenants).values({ id: T, slug: 'co', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
 });
 afterEach(() => vi.restoreAllMocks());
@@ -56,7 +56,7 @@ const PARTIAL = { TWILIO_ACCOUNT_SID: 'ACown', TWILIO_AUTH_TOKEN: 'own-tok' };
 const DEP = { TWILIO_ACCOUNT_SID: 'ACdep', TWILIO_AUTH_TOKEN: 'dep-tok', TWILIO_FROM_NUMBER: '+15559998888' };
 const API_KEY = { TWILIO_API_KEY_SID: 'SKdep', TWILIO_API_KEY_SECRET: 'sec' };
 const smsEnv = (extra: Partial<TwilioLoaderEnv> = {}): TwilioLoaderEnv =>
-    ({ DB: {} as never, TENANT_CACHE: undefined as never, JWT_SECRET, APP_MODE: 'saas', ...DEP, ...extra });
+    ({ DB: testD1.binding, TENANT_CACHE: undefined as never, JWT_SECRET, APP_MODE: 'saas', ...DEP, ...extra });
 
 async function seed(opts: { secrets?: Record<string, string>; smsMode?: 'platform' | 'own' | 'managed_shared' | 'managed_dedicated' }) {
     const sealed = opts.secrets ? await sealSecrets(opts.secrets, T, JWT_SECRET) : null;
@@ -107,7 +107,7 @@ describe('source resolver: a retired legacy mode with a complete own account', (
 // ─── The send gate ───────────────────────────────────────────────────────────
 
 describe('send gate: a retired mode with a complete own account', () => {
-    const gateEnv = (extra: object = {}) => ({ APP_MODE: 'saas', DB: {} as D1Database, JWT_SECRET, ...extra });
+    const gateEnv = (extra: object = {}) => ({ APP_MODE: 'saas', DB: testD1.binding, JWT_SECRET, ...extra });
 
     it.each(['platform', 'managed_shared'] as const)('hosted + %s + complete keys is allowed and sends as own', async (mode) => {
         await seed({ smsMode: mode, secrets: OWN });

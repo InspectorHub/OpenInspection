@@ -8,6 +8,7 @@ import { inspections, inspectionResults } from '../../lib/db/schema/inspection';
 import { inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { Errors } from '../../lib/errors';
+import { loadLatestFrozenFindings } from '../../lib/report-snapshot';
 import { logger } from '../../lib/logger';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { resolveAgentRepairAccess, effectiveRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
@@ -252,15 +253,20 @@ export async function accessToInspection(
     rawDb: D1Database,
     agentUserId: string,
     inspectionId: string,
-): Promise<{ tenantId: string } | null> {
+): Promise<{ tenantId: string; repairAccess: AgentRepairAccess } | null> {
     const db = drizzle(rawDb);
     const rows = await db
         .select({
             tenantId:      inspections.tenantId,
             referredById:  inspectionPeople.contactId,
             contactEmail:  contacts.email,
+            inspectionPrefs: tenantConfigs.inspectionPrefs,
+            roleKind:      contactRoleProfiles.kind,
+            roleOverrides: contactRoleProfiles.capabilityOverrides,
         })
         .from(inspections)
+        // A company with no config row falls back to the policy default in resolveAgentRepairAccess.
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, inspections.tenantId))
         // Buyer's-agent attribution via inspection_people — see listReferrals
         // above for why contact_role_profiles is joined before
         // inspection_people (avoids fanning out over every role).
@@ -302,8 +308,16 @@ export async function accessToInspection(
     if (rows.length === 0) return null;
 
     // IA-104 — the join already restricted rows to inspections where THIS
-    // agent is the buyer_agent, so the first row is the answer.
-    return { tenantId: rows[0]!.tenantId };
+    // agent is the buyer_agent, so the first row is the answer. The repair-list access is the same stricter-of-two answer the
+    // agent portal list states, so a route behind this check applies the policy the portal showed.
+    const r = rows[0]!;
+    return {
+        tenantId: r.tenantId,
+        repairAccess: effectiveRepairAccess(
+            resolveAgentRepairAccess(r.inspectionPrefs),
+            capabilitiesForProfile((r.roleKind ?? 'other') as RoleKind, r.roleOverrides).canAccessRepairList,
+        ),
+    };
 }
 
 /**
@@ -335,8 +349,7 @@ export async function listRecommendationsForAgent(
         })
         .from(inspections)
         .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
-        // Left join: a company with no config row falls back to the policy
-        // default in resolveAgentRepairAccess.
+        // Left join: a company with no config row falls back to the policy default in resolveAgentRepairAccess.
         .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, inspections.tenantId))
         // Buyer's-agent attribution via inspection_people — see listReferrals
         // above for why contact_role_profiles is joined before
@@ -384,16 +397,19 @@ export async function listRecommendationsForAgent(
         .where(eq(inspections.reportStatus, REPORT_STATUS.PUBLISHED))
         .all();
 
+    // The agent reads the same report the client was sent, as published, never the inspector's working copy.
+    const frozen = await loadLatestFrozenFindings(db, rows);
     // IA-104 — no post-filter; the join is the access check.
     const flat = rows.flatMap((r) => flattenInspectionToRecommendations({
         id:               r.id,
+        tenantId:         r.tenantId,
         tenantName:       r.tenantName,
         tenantSlug:       r.tenantSlug,
         repairAccess:     resolveAgentRepairAccess(r.inspectionPrefs),
         propertyAddress:  r.propertyAddress,
         date:             r.date,
-        templateSnapshot: r.templateSnapshot,
-        resultsData:      r.resultsData,
+        templateSnapshot: frozen.get(`${r.tenantId}:${r.id}`)?.templateSnapshot ?? r.templateSnapshot,
+        resultsData:      frozen.get(`${r.tenantId}:${r.id}`)?.data ?? r.resultsData,
     }));
     return groupRecommendations(flat);
 }

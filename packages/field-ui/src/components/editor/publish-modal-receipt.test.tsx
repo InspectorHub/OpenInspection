@@ -103,6 +103,26 @@ describe("PublishModal — the receipt", () => {
     expect(screen.getByText(/does not send the report itself/)).toBeTruthy();
   });
 
+  it("an UNCHANGED publish prints only the unchanged sentence: no 'final / new version' line, no 'nothing emailed' line", () => {
+    publishThen({ unchangedSinceVersion: 4 });
+    expect(screen.getByText(/Nothing changed since version 4, so nothing was published and no notices were sent/)).toBeTruthy();
+    expect(screen.queryByText(/a new version is recorded/)).toBeNull();
+    expect(screen.queryByText(/Nothing has been emailed by this step/)).toBeNull();
+    // Nothing was published, so the title says so; the next step is still offered.
+    expect(screen.getByText("Nothing to publish")).toBeTruthy();
+    expect(screen.queryByText("Report published")).toBeNull();
+    // The lone sentence carries no top margin (it is not the second paragraph of anything).
+    expect(screen.getByText(/Nothing changed since version 4/).className).not.toContain("mt-2");
+  });
+
+  it("(control) a changed publish still prints the final / nothing-emailed line", () => {
+    publishThen({ unchangedSinceVersion: null });
+    expect(screen.getByText(/a new version is recorded/)).toBeTruthy();
+    expect(screen.queryByText(/Nothing changed since version/)).toBeNull();
+    expect(screen.getByText("Report published")).toBeTruthy();
+    expect(screen.queryByText("Nothing to publish")).toBeNull();
+  });
+
   it("offers the next step as a link to this inspection's page", () => {
     const { container } = publishThen();
     const link = container.querySelector("a") as HTMLAnchorElement;

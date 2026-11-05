@@ -4,7 +4,6 @@
   "needsAttention": [
    {
     "id": "55555555-0000-4000-8000-000000000009",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "9 Fixture Road",
     "addressPlaceId": null,
@@ -86,11 +85,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000008",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "8 Fixture Road",
     "addressPlaceId": null,
@@ -172,11 +172,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000007",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "7 Fixture Road",
     "addressPlaceId": null,
@@ -300,11 +301,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000104",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "104 Fixture Road",
     "addressPlaceId": null,
@@ -386,11 +388,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000109",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "109 Fixture Road",
     "addressPlaceId": null,
@@ -472,11 +475,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000114",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "114 Fixture Road",
     "addressPlaceId": null,
@@ -558,11 +562,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000119",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "119 Fixture Road",
     "addressPlaceId": null,
@@ -644,11 +649,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000124",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "124 Fixture Road",
     "addressPlaceId": null,
@@ -730,11 +736,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000129",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "129 Fixture Road",
     "addressPlaceId": null,
@@ -816,11 +823,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000134",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "134 Fixture Road",
     "addressPlaceId": null,
@@ -902,11 +910,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000139",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "139 Fixture Road",
     "addressPlaceId": null,
@@ -988,11 +997,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000144",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "144 Fixture Road",
     "addressPlaceId": null,
@@ -1074,11 +1084,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000149",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "149 Fixture Road",
     "addressPlaceId": null,
@@ -1160,11 +1171,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000154",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "154 Fixture Road",
     "addressPlaceId": null,
@@ -1246,11 +1258,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000103",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "103 Fixture Road",
     "addressPlaceId": null,
@@ -1332,11 +1345,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000108",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "108 Fixture Road",
     "addressPlaceId": null,
@@ -1418,11 +1432,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000113",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "113 Fixture Road",
     "addressPlaceId": null,
@@ -1504,11 +1519,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000118",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "118 Fixture Road",
     "addressPlaceId": null,
@@ -1590,11 +1606,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000123",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "123 Fixture Road",
     "addressPlaceId": null,
@@ -1676,11 +1693,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000128",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "128 Fixture Road",
     "addressPlaceId": null,
@@ -1762,11 +1780,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000133",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "133 Fixture Road",
     "addressPlaceId": null,
@@ -1848,11 +1867,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000138",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "138 Fixture Road",
     "addressPlaceId": null,
@@ -1934,11 +1954,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000143",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "143 Fixture Road",
     "addressPlaceId": null,
@@ -2020,11 +2041,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000148",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "148 Fixture Road",
     "addressPlaceId": null,
@@ -2106,11 +2128,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000153",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "153 Fixture Road",
     "addressPlaceId": null,
@@ -2192,11 +2215,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000102",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "102 Fixture Road",
     "addressPlaceId": null,
@@ -2278,11 +2302,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000107",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "107 Fixture Road",
     "addressPlaceId": null,
@@ -2364,11 +2389,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000112",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "112 Fixture Road",
     "addressPlaceId": null,
@@ -2450,11 +2476,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000117",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "117 Fixture Road",
     "addressPlaceId": null,
@@ -2536,11 +2563,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000122",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "122 Fixture Road",
     "addressPlaceId": null,
@@ -2622,11 +2650,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000127",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "127 Fixture Road",
     "addressPlaceId": null,
@@ -2708,11 +2737,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000132",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "132 Fixture Road",
     "addressPlaceId": null,
@@ -2794,11 +2824,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000137",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "137 Fixture Road",
     "addressPlaceId": null,
@@ -2880,11 +2911,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000142",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "142 Fixture Road",
     "addressPlaceId": null,
@@ -2966,11 +2998,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000147",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "147 Fixture Road",
     "addressPlaceId": null,
@@ -3052,11 +3085,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000152",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "152 Fixture Road",
     "addressPlaceId": null,
@@ -3138,11 +3172,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000010",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "10 Fixture Road",
     "addressPlaceId": null,
@@ -3224,11 +3259,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000001",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "1 Fixture Road",
     "addressPlaceId": null,
@@ -3352,11 +3388,12 @@
     },
     "agentName": "Lisa Listing",
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000002",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "2 Fixture Road",
     "addressPlaceId": null,
@@ -3480,11 +3517,12 @@
     },
     "agentName": "Bob Buyer",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000013",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": null,
     "propertyAddress": "13 Fixture Road",
     "addressPlaceId": null,
@@ -3566,11 +3604,12 @@
     },
     "agentName": null,
     "inspectorName": null,
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000014",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "14 Fixture Road",
     "addressPlaceId": null,
@@ -3652,13 +3691,14 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "today": [
    {
     "id": "55555555-0000-4000-8000-000000000001",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "1 Fixture Road",
     "addressPlaceId": null,
@@ -3782,11 +3822,12 @@
     },
     "agentName": "Lisa Listing",
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000002",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "2 Fixture Road",
     "addressPlaceId": null,
@@ -3910,13 +3951,14 @@
     },
     "agentName": "Bob Buyer",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "thisWeek": [
    {
     "id": "55555555-0000-4000-8000-000000000004",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "4 Fixture Road",
     "addressPlaceId": null,
@@ -4040,11 +4082,12 @@
     },
     "agentName": "Lisa Listing",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000005",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "5 Fixture Road",
     "addressPlaceId": null,
@@ -4126,11 +4169,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000013",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": null,
     "propertyAddress": "13 Fixture Road",
     "addressPlaceId": null,
@@ -4212,11 +4256,12 @@
     },
     "agentName": null,
     "inspectorName": null,
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000014",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "14 Fixture Road",
     "addressPlaceId": null,
@@ -4298,13 +4343,14 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "later": [
    {
     "id": "55555555-0000-4000-8000-000000000104",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "104 Fixture Road",
     "addressPlaceId": null,
@@ -4386,11 +4432,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000109",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "109 Fixture Road",
     "addressPlaceId": null,
@@ -4472,11 +4519,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000114",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "114 Fixture Road",
     "addressPlaceId": null,
@@ -4558,11 +4606,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000119",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "119 Fixture Road",
     "addressPlaceId": null,
@@ -4644,11 +4693,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000124",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "124 Fixture Road",
     "addressPlaceId": null,
@@ -4730,11 +4780,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000129",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "129 Fixture Road",
     "addressPlaceId": null,
@@ -4816,11 +4867,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000134",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "134 Fixture Road",
     "addressPlaceId": null,
@@ -4902,11 +4954,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000139",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "139 Fixture Road",
     "addressPlaceId": null,
@@ -4988,11 +5041,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000144",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "144 Fixture Road",
     "addressPlaceId": null,
@@ -5074,11 +5128,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000149",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "149 Fixture Road",
     "addressPlaceId": null,
@@ -5160,11 +5215,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000154",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "154 Fixture Road",
     "addressPlaceId": null,
@@ -5246,11 +5302,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000103",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "103 Fixture Road",
     "addressPlaceId": null,
@@ -5332,11 +5389,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000108",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "108 Fixture Road",
     "addressPlaceId": null,
@@ -5418,11 +5476,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000113",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "113 Fixture Road",
     "addressPlaceId": null,
@@ -5504,11 +5563,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000118",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "118 Fixture Road",
     "addressPlaceId": null,
@@ -5590,11 +5650,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000123",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "123 Fixture Road",
     "addressPlaceId": null,
@@ -5676,11 +5737,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000128",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "128 Fixture Road",
     "addressPlaceId": null,
@@ -5762,11 +5824,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000133",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "133 Fixture Road",
     "addressPlaceId": null,
@@ -5848,11 +5911,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000138",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "138 Fixture Road",
     "addressPlaceId": null,
@@ -5934,11 +5998,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000143",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "143 Fixture Road",
     "addressPlaceId": null,
@@ -6020,11 +6085,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000148",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "148 Fixture Road",
     "addressPlaceId": null,
@@ -6106,11 +6172,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000153",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "153 Fixture Road",
     "addressPlaceId": null,
@@ -6192,11 +6259,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000102",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "102 Fixture Road",
     "addressPlaceId": null,
@@ -6278,11 +6346,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000107",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "107 Fixture Road",
     "addressPlaceId": null,
@@ -6364,11 +6433,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000112",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "112 Fixture Road",
     "addressPlaceId": null,
@@ -6450,11 +6520,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000117",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "117 Fixture Road",
     "addressPlaceId": null,
@@ -6536,11 +6607,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000122",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "122 Fixture Road",
     "addressPlaceId": null,
@@ -6622,11 +6694,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000127",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "127 Fixture Road",
     "addressPlaceId": null,
@@ -6708,11 +6781,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000132",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "132 Fixture Road",
     "addressPlaceId": null,
@@ -6794,11 +6868,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000137",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "137 Fixture Road",
     "addressPlaceId": null,
@@ -6880,11 +6955,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000142",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "142 Fixture Road",
     "addressPlaceId": null,
@@ -6966,11 +7042,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000147",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "147 Fixture Road",
     "addressPlaceId": null,
@@ -7052,11 +7129,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000152",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "152 Fixture Road",
     "addressPlaceId": null,
@@ -7138,11 +7216,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000101",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "101 Fixture Road",
     "addressPlaceId": null,
@@ -7224,11 +7303,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000106",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "106 Fixture Road",
     "addressPlaceId": null,
@@ -7310,11 +7390,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000111",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "111 Fixture Road",
     "addressPlaceId": null,
@@ -7396,11 +7477,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000116",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "116 Fixture Road",
     "addressPlaceId": null,
@@ -7482,11 +7564,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000121",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "121 Fixture Road",
     "addressPlaceId": null,
@@ -7568,11 +7651,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000126",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "126 Fixture Road",
     "addressPlaceId": null,
@@ -7654,11 +7738,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000131",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "131 Fixture Road",
     "addressPlaceId": null,
@@ -7740,11 +7825,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000136",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "136 Fixture Road",
     "addressPlaceId": null,
@@ -7826,11 +7912,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000141",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "141 Fixture Road",
     "addressPlaceId": null,
@@ -7912,11 +7999,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000146",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "146 Fixture Road",
     "addressPlaceId": null,
@@ -7998,11 +8086,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000151",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "151 Fixture Road",
     "addressPlaceId": null,
@@ -8084,11 +8173,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000100",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "100 Fixture Road",
     "addressPlaceId": null,
@@ -8170,11 +8260,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000105",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "105 Fixture Road",
     "addressPlaceId": null,
@@ -8256,11 +8347,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000110",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "110 Fixture Road",
     "addressPlaceId": null,
@@ -8342,11 +8434,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000115",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "115 Fixture Road",
     "addressPlaceId": null,
@@ -8428,11 +8521,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000120",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "120 Fixture Road",
     "addressPlaceId": null,
@@ -8514,11 +8608,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000125",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "125 Fixture Road",
     "addressPlaceId": null,
@@ -8600,14 +8695,15 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "laterTotal": 55,
   "recentReports": [
    {
     "id": "55555555-0000-4000-8000-000000000008",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "8 Fixture Road",
     "addressPlaceId": null,
@@ -8689,11 +8785,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000007",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "7 Fixture Road",
     "addressPlaceId": null,
@@ -8817,13 +8914,14 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "cancelled": [
    {
     "id": "55555555-0000-4000-8000-000000000012",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "12 Fixture Road",
     "addressPlaceId": null,
@@ -8905,11 +9003,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000003",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "3 Fixture Road",
     "addressPlaceId": null,
@@ -8991,11 +9090,12 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000006",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "6 Fixture Road",
     "addressPlaceId": null,
@@ -9077,7 +9177,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "defectAggregate": {

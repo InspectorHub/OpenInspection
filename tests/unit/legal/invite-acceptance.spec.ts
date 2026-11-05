@@ -24,14 +24,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { createTestDb, setupSchema } from '../db';
-import { withBatch } from '../helpers/d1-binding';
 import * as schema from '../../../server/lib/db/schema';
 import { users, tenants, tenantInvites, accountAcceptances } from '../../../server/lib/db/schema';
 import { LegalVersionService } from '../../../server/services/legal-version.service';
 import { INVITE_REQUIRED_DOCS } from '../../../server/services/legal/invite-acceptance';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AuthService } from '../../../server/services/auth.service';
 import { SEAT_QUOTA_UNENFORCED } from '../../../server/features/seat-quota';
 
@@ -60,13 +59,11 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         db = fix.db;
         sqlite = fix.sqlite;
         await setupSchema(fix.sqlite);
-        // The mocked factory returns a better-sqlite3 handle, which has no
-        // `batch()` — and this path now requires one, because the batch IS the
-        // invariant. See `helpers/d1-binding.ts`.
-        (mockDrizzle as unknown as { mockReturnValue: (v: unknown) => void })
-            .mockReturnValue(withBatch(db, fix.sqlite));
+        // The binding is a real D1-shaped one, so `batch()` exists and runs as one transaction,
+        // which is the invariant this path rests on. See `helpers/d1-binding.ts`.
+        testD1.use(db);
         await db.insert(tenants).values({ id: TENANT, slug: 'acme', createdAt: new Date() });
-        auth = new AuthService({} as D1Database);
+        auth = new AuthService(testD1.binding);
     });
 
     afterEach(() => {
@@ -162,7 +159,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         await publishBoth();
         await invite('tok-sync', 'sync@example.com');
         const appended: Array<{ type: string; payload: Record<string, unknown> }> = [];
-        const withOutbox = new AuthService({} as D1Database, undefined, {
+        const withOutbox = new AuthService(testD1.binding, undefined, {
             append: async (e) => { appended.push(e); return 'row-1'; },
         });
 
@@ -191,7 +188,7 @@ describe('joinTeam records the acceptance in the same write as the member row', 
         await db.update(users).set({ deletedAt: new Date() }).where(eq(users.id, first.id));
         await invite('tok-b', 'again@example.com');
         const appended: Array<{ type: string; payload: Record<string, unknown> }> = [];
-        const withOutbox = new AuthService({} as D1Database, undefined, {
+        const withOutbox = new AuthService(testD1.binding, undefined, {
             append: async (e) => { appended.push(e); return 'row-2'; },
         });
         await withOutbox.joinTeam('tok-b', 'password123', { seatQuota: SEAT_QUOTA_UNENFORCED });

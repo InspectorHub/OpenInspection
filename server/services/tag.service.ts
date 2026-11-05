@@ -16,6 +16,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm';
 import { tags, inspectionItemTagLinks } from '../lib/db/schema';
 import { tenantConfigs } from '../lib/db/schema/tenant';
 import { Errors } from '../lib/errors';
+import { isUniqueViolation } from '../lib/db/unique-violation';
 import { logger } from '../lib/logger';
 import type { CreateTagInput, UpdateTagInput, TagRecord } from '../lib/validations/tag.schema';
 
@@ -234,9 +235,9 @@ export class TagService {
                 createdAt: new Date(),
             });
         } catch (e) {
-            // PK conflict on re-link is expected — swallow.
-            const msg = e instanceof Error ? e.message.toLowerCase() : '';
-            if (!msg.includes('unique') && !msg.includes('constraint')) throw e;
+            // PK conflict on re-link is expected — swallow. Drizzle wraps the driver error, so the
+            // UNIQUE text is on `.cause`, which isUniqueViolation reads.
+            if (!isUniqueViolation(e, 'inspection_item_tag_links')) throw e;
         }
     }
 

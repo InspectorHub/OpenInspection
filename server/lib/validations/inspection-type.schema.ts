@@ -18,7 +18,6 @@ export const UpdateInspectionTypeSchema = CreateInspectionTypeSchema.partial().e
 /** A stored inspection subtype, as the list answers it. */
 export const InspectionTypeSchema = z.object({
     id:          z.string().describe('Inspection subtype id.'),
-    tenantId:    z.string().describe('Id of the company the subtype belongs to.'),
     name:        z.string().describe('Inspection subtype label.'),
     basedOn:     z.string().nullable().describe('Platform property-subtype slug this is based on; null when left blank.'),
     description: z.string().nullable().describe('Optional details about the subtype; null when none.'),
@@ -30,7 +29,6 @@ export const InspectionTypeSchema = z.object({
 /** The row a create answers with: the same fields, but the ones the caller left out are absent rather than null. */
 export const CreatedInspectionTypeSchema = z.object({
     id:          z.string().describe('Inspection subtype id.'),
-    tenantId:    z.string().describe('Id of the company the subtype belongs to.'),
     name:        z.string().describe('Inspection subtype label.'),
     basedOn:     z.string().nullable().optional().describe('Platform property-subtype slug this is based on; absent when none was given.'),
     description: z.string().nullable().optional().describe('Optional details about the subtype; absent when none was given.'),

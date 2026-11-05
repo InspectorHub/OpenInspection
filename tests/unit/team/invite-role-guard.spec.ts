@@ -22,14 +22,13 @@ import { createTestDb, setupSchema } from '../db';
 import type { HonoConfig } from '../../../server/types/hono';
 
 // An inspector invite reads the company default for new inspectors, so the route needs a database to read it from.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 beforeAll(async () => {
     const fix = createTestDb();
     await setupSchema(fix.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(fix.db);
+    testD1.use(fix.db);
 });
 
 type RequesterRole = 'owner' | 'manager';
@@ -64,7 +63,7 @@ function buildApp(requesterRole: RequesterRole) {
 }
 
 const EXECUTION_CTX = makeExecutionContext().ctx;
-const ENV = { JWT_SECRET: 'x', APP_BASE_URL: 'https://oi.test', DB: {} };
+const ENV = { JWT_SECRET: 'x', APP_BASE_URL: 'https://oi.test', DB: testD1.binding };
 
 function post(app: OpenAPIHono<HonoConfig>, path: string, role: string) {
     return app.request(path, {

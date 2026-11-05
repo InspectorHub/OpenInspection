@@ -4,6 +4,7 @@
  * state flips only after a render. Two submits dispatched in one frame must reach
  * the route action once, and a later submit after the action settles must go through.
  */
+import { m } from "~/paraglide/messages";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, cleanup, act, waitFor, screen } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
@@ -64,8 +65,19 @@ async function check(reportStatus: string, canPublishCap: boolean, intent: strin
         },
     ]);
     const { container } = render(<Stub initialEntries={["/inspections/insp1"]} />);
+    // Retract asks first: its confirm button lives in the dialog's footer, outside the form, tied to it by `form=`.
+    if (intent === "unpublish") {
+        const open = await waitFor(() => {
+            const trigger = Array.from(container.querySelectorAll("button")).find((b) => b.textContent === m.inspections_hub_report_unpublish());
+            expect(trigger).toBeTruthy();
+            return trigger!;
+        });
+        act(() => { open.click(); });
+    }
     const button = await waitFor(() => {
-        const found = container.querySelector<HTMLButtonElement>(`form:has(input[name="intent"][value="${intent}"]) button[type="submit"]`);
+        const found = intent === "unpublish"
+            ? document.querySelector<HTMLButtonElement>('button[type="submit"][form="retract-report-form"]')
+            : container.querySelector<HTMLButtonElement>(`form:has(input[name="intent"][value="${intent}"]) button[type="submit"]`);
         expect(found).not.toBeNull();
         return found!;
     });

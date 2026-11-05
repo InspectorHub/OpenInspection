@@ -72,20 +72,15 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       # server/generated/version.ts is git-ignored and produced by the build;
       # type-check imports it, so stamp it on a fresh checkout.
       - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
       - run: npm run i18n:compile:cached
-      # Same shape as the paraglide cache above, and for the same reason: the
+      # Same shape as the i18n cache (.github/actions/i18n-cache), and for the same reason: the
       # output is a pure function of the route TREE, so a key built from those
       # inputs can only restore what they produced. Five jobs need these types
       # and every one of them was paying the full ~60s generate — five runner
@@ -133,7 +128,8 @@ jobs:
   # ── Lint ─────────────────────────────────────────────────────────────────
   # eslint is type-aware here (unlike pre-commit, which sets ESLINT_FAST and
   # drops the type-information program) and is by far the slower half, so it
-  # runs apart from the sixteen lint:* gates rather than in front of them.
+  # runs apart from the conformance gates (`npm run lint:gates-full`, every entry of
+  # scripts/lib/gate-registry.mjs) rather than in front of them.
   lint-eslint:
     name: lint (eslint)
     runs-on: ubuntu-latest
@@ -143,18 +139,13 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
       - run: npm run i18n:compile:cached
-      # Same shape as the paraglide cache above, and for the same reason: the
+      # Same shape as the i18n cache (.github/actions/i18n-cache), and for the same reason: the
       # output is a pure function of the route TREE, so a key built from those
       # inputs can only restore what they produced. Five jobs need these types
       # and every one of them was paying the full ~60s generate — five runner
@@ -200,22 +191,17 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
       - run: npm run i18n:compile:cached
       # knip resolves every `./+types/*` import a route file makes, so it needs
       # the generated route types present or it reports the whole of app/routes
       # as unresolved. In the old serial job these existed only because
       # type-check had already run; nothing declared the dependency.
-      # Same shape as the paraglide cache above, and for the same reason: the
+      # Same shape as the i18n cache (.github/actions/i18n-cache), and for the same reason: the
       # output is a pure function of the route TREE, so a key built from those
       # inputs can only restore what they produced. Five jobs need these types
       # and every one of them was paying the full ~60s generate — five runner
@@ -256,22 +242,48 @@ jobs:
             tufin/oasdiff:v1.32.1@sha256:3b14fe0112e5d1bf862f91ab234a4bcd161a3f399e98f8b0b665ce70857694ac \
             breaking /base/native-contract.openapi.json /head/native-contract.openapi.json --fail-on ERR
 
+      # The list of response keys the contract does not document yet may only
+      # shrink. Keys are counted, not entries, because a key can be added inside
+      # an existing entry. Both numbers are always printed. A base branch that has
+      # no list yet is the one case that is skipped, and it says so: it is the pull
+      # request that introduces the file.
+      - name: Native response allow-list - may only shrink against the base branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -eu
+          F="tests/unit/helpers/undeclared-response-keys.allowlist.json"
+          git rev-parse --verify --quiet "origin/${BASE_REF}^{commit}" > /dev/null
+          count() { node -e 'const a=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(a.reduce((n,e)=>n+e.keys.length,0))'; }
+          HEAD_N=$(count < "$F")
+          if ! git cat-file -e "origin/${BASE_REF}:${F}" 2>/dev/null; then
+            echo "allow-list keys: base=none head=${HEAD_N} (the base branch has no list yet; nothing to compare)"
+            exit 0
+          fi
+          BASE_N=$(git show "origin/${BASE_REF}:${F}" | count)
+          echo "allow-list keys: base=${BASE_N} head=${HEAD_N}"
+          if [ "$HEAD_N" -gt "$BASE_N" ]; then
+            echo "The allow-list grew (${BASE_N} -> ${HEAD_N}); document the field in the contract instead."
+            exit 1
+          fi
+
   # ── Tests ────────────────────────────────────────────────────────────────
   # Sharded across four runners. This job was the longest in the workflow at
   # 7m22s, and the suite is import-bound rather than assertion-bound: `import`
-  # dominates `tests` because 723 spec files each rebuild the module graph in
-  # their own process.
+  # dominates `tests` because every spec file (well over a thousand now) rebuilds
+  # the module graph in its own process, except the ones listed as shareable.
   #
-  # Sharding buys the wall-clock back WITHOUT touching a single test. Each shard
-  # is an ordinary, fully isolated run of a subset — no shared state, no new
-  # failure mode. Measured locally: shard 1/4 is 181 files / 1448 tests in 148s
-  # against 422s for the whole suite.
+  # Sharding buys the wall-clock back WITHOUT touching a single test: each shard
+  # is a run of a subset of the files, with no new failure mode of its own.
   #
-  # ⚠️ The other way to attack the same term — relaxing vitest's per-file process
-  # isolation — was investigated and REJECTED, not merely skipped. 348 specs mock
-  # `drizzle-orm/d1` at module scope and share one `vi.fn()` once the registry is
-  # shared; vitest offers no per-file isolation override. The measurement that
-  # settled it is kept beside the setting it protects, in `vitest.api.config.ts`.
+  # Relaxing vitest's per-file isolation for the WHOLE suite was investigated and
+  # rejected: hundreds of specs mock `drizzle-orm/d1` at module scope and share
+  # one `vi.fn()` once the registry is shared. Isolation is therefore relaxed only
+  # for the specs listed in tests/unit/isolation.json (vitest project
+  # `api-shared`), which `npm run lint:unit-isolation` keeps free of mocks, global
+  # writes and stateful modules; every other spec stays in `api-isolated`. The
+  # shuffled second step below is the dynamic check on that list.
   #
   # `fail-fast: false` so one red shard does not hide the others' results.
   test-unit:
@@ -287,9 +299,27 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
       - run: npm run test:unit -- --shard=${{ matrix.shard }}/4
+      # The specs listed as shareable in tests/unit/isolation.json run with
+      # `isolate: false` in the step above, in whatever order the shard hands them
+      # out. Run just that project again with files and tests shuffled: a spec that
+      # only passes because of what ran before it in the same worker fails here
+      # instead of weeks later in an unrelated pull request. The seed is printed at the
+      # START of the run. Replay locally with: npx vitest run --config
+      # vitest.api.config.ts --project api-shared --sequence.shuffle
+      # --sequence.seed=<seed> --maxWorkers=1 (plus the same --shard). One worker is
+      # the faithful replay: with isolate false, which files share a worker depends on
+      # scheduling. Shuffle also reorders tests inside a file, so a failure may be an
+      # order-dependent test within one file rather than a sharing leak. The shard
+      # flag is the same, but it is applied to the shared project alone, so a file may
+      # land on a different shard number here than in the step above; the four shards
+      # together still cover every shared file exactly once.
+      - run: npm run test:unit:shared-shuffled -- --shard=${{ matrix.shard }}/4
 
   # Our outbound payloads against Intuit's own vendored schemas. No network, no
   # credentials, ~0.3s — so it is its own job rather than a tail on another,
@@ -308,7 +338,7 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run test:contract
 
   test-workers:
@@ -320,7 +350,10 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
       - run: npm run test:workers
 
@@ -345,18 +378,13 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
       - run: npm run i18n:compile:cached
-      # Same shape as the paraglide cache above, and for the same reason: the
+      # Same shape as the i18n cache (.github/actions/i18n-cache), and for the same reason: the
       # output is a pure function of the route TREE, so a key built from those
       # inputs can only restore what they produced. Five jobs need these types
       # and every one of them was paying the full ~60s generate — five runner
@@ -375,12 +403,13 @@ jobs:
     name: build + bundle size
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # No i18n-cache action here or in e2e: the vite paraglide plugin can delete the in-output stamp before a cache would be saved.
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
       - run: npm run build
       # Bundle-size gate (Workers Free 3 MiB gzipped). Reuses the build/ output
@@ -493,7 +522,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       # build (via webServer) imports server/generated/version.ts.
       - name: Generate version stamp

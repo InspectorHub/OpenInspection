@@ -48,7 +48,7 @@ const FAKE_EXEC_CTX = makeExecutionContext().ctx;
 function buildApp(db: BetterSQLite3Database<typeof schema>, role: UserRole) {
     (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(db);
     const inspectionSvc = new InspectionService({} as D1Database);
-    const complianceSvc = new ComplianceService({} as D1Database, SECRET);
+    const complianceSvc = new ComplianceService({} as D1Database, SECRET, []);
 
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => {

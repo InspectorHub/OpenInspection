@@ -4,14 +4,14 @@
  * Attribution used to be inferred from whoever held buyer_agent, which credits
  * a stranger when a past client refers the job.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import coreRoutes from '../../../server/api/inspections/core';
 import { InspectionService } from '../../../server/services/inspection.service';
@@ -25,7 +25,7 @@ const INSP = 'i-refby-1';
 
 let db: BetterSQLite3Database<typeof schema>;
 
-const ENV = { DB: {} } as never;
+const ENV = { DB: testD1.binding } as never;
 // Settled at teardown by the helper. A no-op stub still lets the promise RUN --
 // it only removes any way to await it, which is how a run with every test
 // passing could still exit 1 on an unhandled teardown rejection.
@@ -37,7 +37,7 @@ function buildApp() {
         c.set('userRole', 'owner' as never);
         c.set('tenantId', T);
         c.set('user', { sub: 'u-1', role: 'owner', tenantId: T } as never);
-        c.set('services', { inspection: new InspectionService({} as never, undefined, new ScopedDB(db as never, T)) } as never);
+        c.set('services', { inspection: new InspectionService(testD1.binding, undefined, new ScopedDB(db as never, T)) } as never);
         await next();
     });
     app.route('/api/inspections', coreRoutes);
@@ -57,7 +57,7 @@ describe('referred_by_contact_id', () => {
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values([
             { id: T, slug: 't-refby-a', createdAt: new Date() },

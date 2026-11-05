@@ -11,6 +11,7 @@ import { enforceTenantActive } from './lib/middleware/tenant-status-guard';
 import { inspectorPaletteMiddleware } from './lib/middleware/inspector-palette';
 import { touchLastActiveMiddleware } from './lib/middleware/touch-last-active';
 import { registerReportAuthoringGuard } from './lib/inspection/report-authoring-guard';
+import { registerPublishedReportLockGuard } from './lib/inspection/report-lock-guard';
 import { registerInspectionScopeGuards } from './lib/middleware/inspection-scope';
 import { tenantRouter } from './features/tenant-routing';
 import { diMiddleware } from './lib/middleware/di';
@@ -30,11 +31,12 @@ import { setupWizardRoutes } from './features/setup-wizard';
 import { jwtAuthMiddleware } from './lib/middleware/jwt-auth';
 import { agentTermsGate } from './lib/middleware/agent-terms-gate';
 import { idempotencyMiddleware } from './lib/middleware/idempotency';
-import { agreementSignPath, agreementRenderPath } from './lib/public-urls';
-import { loadVerifyData } from './lib/verify-data';
 
 import coreAuthRoutes, { ssoRootRoutes } from './api/auth';
 import testHooksRoutes from './api/test-hooks';
+import { verifyExportRoutes } from './api/public/verify-export';
+import { verifyLinkRoutes } from './api/public/verify-links';
+import { signRedirectRoutes } from './api/sign-redirect';
 import identityRoutes from './api/identity';
 import integrationsApiRoutes from './api/integrations';
 import integrationsAiRoutes from './api/integrations-ai';
@@ -138,7 +140,7 @@ const app = new OpenAPIHono<HonoConfig>({
             success: false,
             error: {
                 code: 'VALIDATION_ERROR',
-                message: summary || 'Validation failed',
+                message: summary || 'Validation failed', // projection-allow: the validation summary: issue paths and messages joined into a string
                 fields,
             },
         }, 400);
@@ -158,10 +160,10 @@ app.use('*', requestLog);
 app.get('/status', (c) => c.json({
     status: 'ok',
     app: 'openinspection-core',
-    version: BUILD.version,
-    commit: BUILD.shortCommit,
-    branch: BUILD.branch,
-    buildTime: BUILD.buildTime,
+    version: BUILD.version, // projection-allow: the build version, a constant
+    commit: BUILD.shortCommit, // projection-allow: the build commit, a constant
+    branch: BUILD.branch, // projection-allow: the build branch, a constant
+    buildTime: BUILD.buildTime, // projection-allow: the build time, a constant
     timestamp: new Date().toISOString(),
 }));
 
@@ -291,6 +293,8 @@ app.use('/api/*', touchLastActiveMiddleware);
 // Ahead of the report-authoring guard and every router: a refusal for an inspection the caller cannot see must come before any capability refusal.
 registerInspectionScopeGuards(app);
 registerReportAuthoringGuard(app);
+// Right after the capability guard: a published report's content is not written until "Edit and republish".
+registerPublishedReportLockGuard(app);
 
 // API Routes
 
@@ -309,9 +313,8 @@ const routes = app
   // Auth mounts ONCE. `GET /sso` alone also answers at the root, because portal mints that absolute URL and the browser follows it.
   .route('/api/auth', coreAuthRoutes)
   .route('/', ssoRootRoutes)
-  // Agent unified link (Spec 3 Task 2) — GET /agent/magic-login redeem. Root
-  // mount (not /api) mirrors the /sso pattern above; workers/app.ts forwards
-  // this exact path to the API app since it isn't under /api/*.
+  // Agent unified link — the GET /agent/magic-login redeem handler. The entry does NOT forward that address: it is a page, and the
+  // page's Continue action calls this handler in-process, so the handler is never reached from outside the worker.
   .route('/', agentMagicLoginRedeemRoutes)
   // Test-only hooks, fail-closed behind E2E_EMAIL_SINK (404 in prod). See test-hooks.ts.
   .route('/api/__test__', testHooksRoutes)
@@ -406,8 +409,7 @@ const routes = app
   .route('/api/admin', adminDefectCategoriesRoutes)
   .route('/api/agent', agentRoutes)
   // Agent unified link (Spec 3 Task 2) — POST /api/agent/magic-login/request.
-  // The GET /agent/magic-login redeem endpoint is mounted at root, below
-  // (not under /api — see workers/app.ts's explicit forward for that path).
+  // The GET /agent/magic-login redeem handler is mounted at root (above); it is in-process only, called by the page's action.
   .route('/api/agent', agentMagicLoginRequestRoutes)
   .route('/api/agent', agentReportContextRoutes) // Spec 3 Task 3 — POST /api/agent/report-context
   .route('/api/agent', agentNoticeRoutes) // C3 — the agent's Notices inbox
@@ -529,7 +531,7 @@ app.get('/doc', async (c) => {
     await checkRateLimit(c, 'openapi-doc');
     openApiDocument ??= (await import('./lib/openapi/build-document')).buildOpenApiDocument(app, OPENAPI_CONFIG);
     c.header('Cache-Control', 'public, max-age=3600');
-    return c.json(openApiDocument);
+    return c.json(openApiDocument); // projection-allow: the generated OpenAPI document, which describes the API and holds no rows
 });
 
 // Swagger UI moved to a React Router route (GET /ui -> app/routes/docs.tsx) so hono
@@ -554,7 +556,8 @@ app.get('/inspector/:tenant/:slug/calendar.ics', async (c) => {
     // Tenant slug from path must match what tenant-router resolved.
     // The middleware only sets resolvedTenantId on a successful match,
     // so an unresolved path tenant manifests as a 404 here.
-    if (!tenantId || c.get('requestedTenantSlug') !== tenantSlugFromPath) {
+    // No secret means no UIDs can be built: 404, not a failure partway through the feed.
+    if (!tenantId || !c.env.JWT_SECRET || c.get('requestedTenantSlug') !== tenantSlugFromPath) {
         return c.text('Not found', 404);
     }
     const ics = await c.var.services.ics.busyFeedForInspector(tenantId, slug);
@@ -574,102 +577,14 @@ app.get('/inspector/:tenant/:slug/calendar.ics', async (c) => {
 app.get('/agreement-sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
 app.get('/agreements/sign', (c) => c.redirect('/not-found?from=agreement-sign', 302));
 
-// iter-2 production bug #9 — `/sign/:id` redirect target for the
-// ReportGatePage "Sign agreement" CTA. Sprint 1 D-7 minted the URL
-// `${baseUrl}/sign/${id}` with id = inspection id, but no route was
-// registered, so the customer who hit the gate landed on a 404.
-//
-// Resolves the inspection's most recent non-terminal agreement request
-// and 302s to the canonical token-gated page `/agreements/sign/:token`.
-// When no live request exists (every row is signed / declined / expired
-// / never created), redirects to the friendly not-found page so the
-// customer at least sees branded copy instead of the bare 404.
-//
-// Public — no JWT required. tenantId resolves from the slug via
-// tenantRouter middleware (`resolvedTenantId`), the same way the public
-// `/report/:id` viewer is scoped.
-app.get('/sign/:tenant/:id', async (c) => {
-    const id = c.req.param('id') as string;
-    const tenantSlugFromPath = c.req.param('tenant');
-    const tenantId = c.get('resolvedTenantId') || c.get('tenantId');
-    // Tenant slug from path must match what tenant-router resolved.
-    // The middleware only sets resolvedTenantId on a successful match,
-    // so an unresolved path tenant manifests as a 404 here. Use the
-    // friendly not-found page to match the rest of this handler's
-    // failure modes (token miss / no live request).
-    if (!tenantId || c.get('requestedTenantSlug') !== tenantSlugFromPath) {
-        return c.redirect('/not-found?from=agreement-sign', 302);
-    }
-
-    try {
-        const pending = await c.var.services.agreement.findPendingByInspectionId(tenantId as string, id);
-        if (pending) {
-            // The signer's real tier-2 link is the ONLY thing worth redirecting
-            // to; the service is DI-constructed with the JWT secret so it can
-            // reconstruct the sealed token server-side. The old fallback to the
-            // envelope's own `token` column is gone with the plaintext lookup
-            // that resolved it — it could now only send a customer to a 404, and
-            // no link beats a broken one.
-            const signerLink = await c.var.services.agreement.getFirstOutstandingSignerLink(tenantId as string, id);
-            if (signerLink) {
-                return c.redirect(agreementSignPath(tenantSlugFromPath as string, signerLink), 302);
-            }
-        }
-    } catch (e) {
-        logger.warn('sign-redirect: lookup failed', { inspectionId: id.slice(0, 8), error: (e as Error).message });
-    }
-    return c.redirect('/not-found?from=agreement-sign', 302);
-});
+app.route('/', signRedirectRoutes);
 
 // Spec 5H P2 — Public verifier (no-auth, court-friendly). The base JSON route
-// `GET /api/public/verify/:envelopeId` is now the typed route in
-// server/api/public-report.ts; these siblings stay raw (not consumed via hc).
-// `loadVerifyData` moved to server/lib/verify-data.ts.
-app.get('/api/public/verify/:envelopeId/public-key', async (c) => {
-    const envelopeId = c.req.param('envelopeId') as string;
-    const data = await loadVerifyData(c, envelopeId);
-    if (!data || !data.pubKey) return c.text('Not found', 404);
-    c.header('Content-Type', 'application/x-pem-file');
-    c.header('Content-Disposition', `attachment; filename="pubkey-${envelopeId.slice(0, 8)}.pem"`);
-    return c.body(data.pubKeyPem);
-});
+// `GET /api/public/verify/:envelopeId` is the typed route in server/api/public/verify.ts; its key and document siblings
+// are in server/api/public/verify-links.ts.
+app.route('/api/public', verifyLinkRoutes);
 
-// Spec 5H D-patch — view the signed document.
-//
-// Redirects to the renderer, which is keyed by the envelope's requestId. It
-// used to redirect to /agreements/sign/{token} built from the envelope-level
-// `token` column, and that stopped working when envelope lookup went hash-only:
-// nothing resolves that value any more, so the reader followed a verification
-// link and landed on a 404. The rest of the codebase had already moved to the
-// requestId-keyed renderer; this route was the one that had not.
-app.get('/api/public/verify/:envelopeId/document', async (c) => {
-    const envelopeId = c.req.param('envelopeId') as string;
-    const data = await loadVerifyData(c, envelopeId);
-    if (!data) return c.text('Not found', 404);
-    return c.redirect(agreementRenderPath(data.tenantSlug, data.reqRow.id), 302);
-});
-
-app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
-    const envelopeId = c.req.param('envelopeId') as string;
-    const data = await loadVerifyData(c, envelopeId);
-    if (!data) return c.json({ error: 'Not found' }, 404);
-    const payload = {
-        envelopeId,
-        algorithm: 'Ed25519',
-        publicKeyPem: data.pubKey?.pem ?? null,
-        keyFingerprint: data.pubKey?.fingerprint ?? null,
-        events: data.auditRows.map((r) => ({
-            id: r.id, event: r.event, createdAt: r.createdAt,
-            payloadJson: r.payloadJson, prevHash: r.prevHash,
-            hash: r.hash, signature: r.signature, keyFingerprint: r.keyFingerprint,
-        })),
-        chainValid: data.verify.valid,
-        exportedAt: new Date().toISOString(),
-    };
-    c.header('Content-Type', 'application/json');
-    c.header('Content-Disposition', `attachment; filename="audit-${envelopeId.slice(0, 8)}.json"`);
-    return c.body(JSON.stringify(payload, null, 2));
-});
+app.route('/api/public', verifyExportRoutes);
 
 app.get('/', (c) => c.redirect('/inspections'));
 

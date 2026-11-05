@@ -3,12 +3,10 @@
  * see every inspection (`newInspectorsViewAll`). The default is stored on `tenant_configs`, read when an
  * invite is created, and never applied retroactively.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { BrandingService } from '../../../server/services/branding.service';
 import teamDefaultsRoutes from '../../../server/api/team-defaults';
@@ -17,7 +15,8 @@ import { AppError } from '../../../server/lib/errors';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = 'td-tenant';
 const { ctx, settle } = makeExecutionContext();
@@ -27,7 +26,7 @@ describe('/api/team/defaults', () => {
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         await db.insert(schema.tenants).values({ id: TENANT, slug: 'td', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
     });
 
@@ -40,20 +39,20 @@ describe('/api/team/defaults', () => {
             c.set('userRole', role);
             c.set('tenantId', TENANT);
             c.set('user', { sub: 'u', role, tenantId: TENANT } as never);
-            c.set('services', { branding: new BrandingService({} as D1Database) } as never);
+            c.set('services', { branding: new BrandingService(testD1.binding) } as never);
             await next();
         });
         app.route('/api/team', teamDefaultsRoutes);
         return app;
     }
     const get = async (role: 'owner' | 'manager' | 'inspector' = 'owner') => {
-        const res = await build(role).request('/api/team/defaults', {}, { DB: {} } as never);
+        const res = await build(role).request('/api/team/defaults', {}, { DB: testD1.binding } as never);
         return { status: res.status, data: (await res.json() as { data: Record<string, unknown> }).data };
     };
     const put = (role: 'owner' | 'manager' | 'inspector', body: unknown) =>
         build(role).request('/api/team/defaults', {
             method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-        }, { DB: {} } as never, ctx);
+        }, { DB: testD1.binding } as never, ctx);
     const audit = async () => {
         await settle();
         return (await db.select().from(schema.auditLogs).all()).filter((r) => r.action === 'config.tenant_config.patch');

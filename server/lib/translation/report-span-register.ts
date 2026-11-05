@@ -73,7 +73,7 @@ export const REPORT_SPAN_REGISTER: readonly ReportSpanRegisterEntry[] = [
     {
         key: 'inspection',
         disposition: 'not_text',
-        reason: 'The inspection row: identifiers, the property address, dates, status and the client and inspector names. An address rendered in another language is a different address, and a name is not translated at all. The prompt interface carries none of this by construction, and widening it is a classification change rather than a plumbing one.',
+        reason: 'The inspection row as the service builds it: identifiers, the property address, dates, status, the name of the inspector and the other columns of the row. An address rendered in another language is a different address, and a name is not translated at all. The prompt interface carries none of this by construction, and widening it is a classification change rather than a plumbing one.',
     },
     {
         key: 'styleProfile',

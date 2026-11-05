@@ -5,7 +5,7 @@
  * tenant isolation. Tests use the in-memory SQLite fixture from db.ts; the
  * fixture replays every migration so the new 0041 migration is exercised.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { InspectionRequestService } from '../../../server/services/inspection-request.service';
 import { PeopleService } from '../../../server/services/people.service';
@@ -15,8 +15,8 @@ import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const TENANT  = '00000000-0000-0000-0000-000000000001';
@@ -32,9 +32,8 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new InspectionRequestService({} as D1Database);
+        testD1.use(testDb);
+        svc = new InspectionRequestService(testD1.binding);
 
         // Seed tenants + templates so create() can validate ownership.
         await testDb.insert(schema.tenants).values([
@@ -200,7 +199,7 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
         }, [{ templateId: TPL1 }]);
         const subId = created.inspections[0].id;
 
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         const rows = await people.listPeople(TENANT, subId);
         const clientRow = rows.find(r => r.roleKey === 'client');
         expect(clientRow).toBeTruthy();

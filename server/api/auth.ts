@@ -9,6 +9,7 @@ import { logger } from '../lib/logger';
 import { getDeploymentProfile } from '../lib/deployment-profile';
 import { getBaseUrl } from '../lib/url';
 import { checkRateLimit } from '../lib/rate-limit';
+import { constantTimeEquals } from '../lib/email/webhook-crypto';
 import { requireCsrfToken } from '../lib/middleware/csrf';
 import { signJwt } from '../lib/jwt-keyring';
 import { writeAuditLog, auditFromContext } from '../lib/audit';
@@ -375,7 +376,7 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
         // session cookie alone never permits 2FA bypass.
         return c.json({
             success: true,
-            data: { requires2fa: true, challengeToken }
+            data: { requires2fa: true, challengeToken } // projection-allow: the second-factor challenge token (signed, five minutes) for the caller who just passed the password step; it travels in JSON only
         }, 200);
     }
 
@@ -401,7 +402,7 @@ coreAuthRoutes.openapi(loginRoute, async (c) => {
     const isBff = c.req.header('x-token-relay') === '1';
     return c.json({
         success: true,
-        data: { redirect: '/inspections', ...(isBff ? { token } : {}) }
+        data: { redirect: '/inspections', ...(isBff ? { token } : {}) } // projection-allow: the session token, returned only to a caller that sends x-token-relay: 1 (the in-process login page); the documented login exception
     }, 200);
 });
 coreAuthRoutes.openapi(changePasswordRoute, async (c) => {
@@ -520,6 +521,8 @@ coreAuthRoutes.openapi(resetPasswordRoute, async (c) => {
     return c.json({ success: true }, 200);
 });
 coreAuthRoutes.openapi(setupRoute, async (c) => {
+    // The setup code is a short secret an anonymous caller guesses at: counted per address before anything is read.
+    await checkRateLimit(c, 'setup');
     // 1. Safety Check: Only allow if no tenant-scoped users exist.
     // Agent Accounts A1 — global agents (tenant_id IS NULL) are unrelated to
     // first-time tenant initialization, so they must not block setup.
@@ -537,7 +540,7 @@ coreAuthRoutes.openapi(setupRoute, async (c) => {
     if (!storedCode) {
         return c.json({ success: false, error: { code: 'setup_code_unset', message: 'SETUP_CODE is not configured on this Worker. Set it as a secret and try again.' } }, 400);
     }
-    if (body.verificationCode !== storedCode) {
+    if (!body.verificationCode || !constantTimeEquals(body.verificationCode, storedCode)) {
         return c.json({ success: false, error: { code: 'invalid_code', message: 'Invalid verification code' } }, 400);
     }
 
@@ -602,11 +605,11 @@ coreAuthRoutes.openapi(inviteInfoRoute, async (c) => {
     const { token } = c.req.valid('query');
     const info = await c.var.services.auth.getInviteInfo(token);
     if (!info) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
-    return c.json({ success: true as const, data: info }, 200);
+    return c.json({ success: true as const, data: info }, 200); // projection-allow: getInviteInfo returns the two fields the invite page states (email, workspace name)
 });
 coreAuthRoutes.openapi(setupStatusRoute, async (c) => {
     const isSetUp = await c.var.services.auth.isSetUp();
-    return c.json({ success: true as const, data: { isSetUp } }, 200);
+    return c.json({ success: true as const, data: { isSetUp } }, 200); // projection-allow: the nested value is a boolean: whether first-run setup is complete
 });
 
 export const coreAuthRouteParts = [loginRoute, changePasswordRoute, joinTeamRoute, mounted('/', ssoRootRoutes, [ssoConsumeRoute] as const), forgotPasswordRoute, resetPasswordRoute, setupRoute, mounted('/', profileRoutes, profileRouteConfigs), mounted('/', totpRoutes, totpRouteConfigs), inviteInfoRoute, setupStatusRoute] as const;

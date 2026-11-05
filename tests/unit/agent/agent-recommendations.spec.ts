@@ -24,6 +24,7 @@ const snapshot = {
 function raw(resultsData: unknown): RawInspectionForRecommendations {
     return {
         id: 'insp-1',
+        tenantId: 'tenant-1',
         tenantName: 'Acme Inspections',
         tenantSlug: 'acme',
         repairAccess: 'readwrite',
@@ -82,7 +83,7 @@ const snap2 = {
     }],
 };
 const raw2 = (resultsData: unknown): RawInspectionForRecommendations =>
-    ({ id: 'i', tenantName: 'Acme Inspections', tenantSlug: 'acme', repairAccess: 'readwrite', propertyAddress: 'A', date: 'd', templateSnapshot: snap2, resultsData });
+    ({ id: 'i', tenantId: 't', tenantName: 'Acme Inspections', tenantSlug: 'acme', repairAccess: 'readwrite', propertyAddress: 'A', date: 'd', templateSnapshot: snap2, resultsData });
 
 describe('flattenInspectionToRecommendations — custom defects + tenant categories (IA-41)', () => {
     it('surfaces field-added custom defects with isCustom=true', () => {

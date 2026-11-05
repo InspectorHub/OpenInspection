@@ -498,6 +498,27 @@
       "note": "The key is `webhook-stripe:{route}:{ip}` and the window is 60 seconds, so a sender address is held for at most a minute. The subject is the calling server, not a person."
     },
     {
+      "store_type": "rate_limiter",
+      "binding": "OAUTH_TOKEN_RATE_LIMITER",
+      "modes": ["standalone", "saas"],
+      "role": {
+        "EU":    { "legal_role": "controller",   "basis": "Abuse prevention on our own inbound endpoints is our purpose, not the tenant's instruction — framework §3, platform-operational row", "determined_at": "2026-08-17", "source": "framework §3" },
+        "US_CA": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "US_CO": { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null },
+        "CA":    { "legal_role": "unclassified", "basis": null, "determined_at": null, "source": null }
+      },
+      "lifecycle_owner": "platform",
+      "data_categories": ["ip_address"],
+      "subjects": ["anonymous_visitor"],
+      "purpose": "Per-address request counting on the OAuth token endpoint.",
+      "retention_rule": "window-bounded",
+      "deletion_mechanism": "not-applicable",
+      "export_mechanism": "not-applicable",
+      "tenant_scope": "not-tenant-scoped",
+      "evidence_level": "E2",
+      "note": "The key is `oauth-token:{network}` and the window is 60 seconds, so an address is held for at most a minute. The subject is the calling client application."
+    },
+    {
       "store_type": "static_assets",
       "binding": "ASSETS",
       "modes": ["standalone", "saas"],

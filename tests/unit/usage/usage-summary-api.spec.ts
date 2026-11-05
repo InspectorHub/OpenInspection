@@ -8,9 +8,9 @@
  * In-process Hono harness (mirrors sms-api.spec.ts / plan-quota.spec.ts):
  * mock drizzle-orm/d1 -> in-memory sqlite, mount usageRoutes, drive app.request().
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { createTestDb, setupSchema, toRawD1 } from '../db';
+import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { tenants, users } from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -18,10 +18,9 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { AppError } from '../../../server/lib/errors';
 import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const fakeD1 = lazyD1();
 
-// Imported AFTER the mock is registered.
 // eslint-disable-next-line import/order
 import usageRoutes from '../../../server/api/usage';
 import { MeteringService } from '../../../server/services/metering.service';
@@ -44,7 +43,7 @@ function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS
         await next();
     });
     app.route('/api/usage', usageRoutes);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    fakeD1.use(db);
     return app;
 }
 
@@ -68,8 +67,8 @@ describe('GET /api/usage/summary', () => {
         testDb = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        testD1 = toRawD1(sqlite);
+        fakeD1.use(testDb);
+        testD1 = fakeD1.binding;
     });
 
     async function seedTenant(id: string, opts: { tier: 'free' | 'pro' | 'enterprise'; maxUsers?: number }) {

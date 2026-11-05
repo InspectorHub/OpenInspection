@@ -27,9 +27,11 @@ import {
 import { withAgreementWriteEffects } from '../../lib/agreement-write-effects';
 import { applyInspectorPreSign } from '../../services/agreement.service';
 import { SigningKeyService } from '../../services/signing-key.service';
+import { errorSummary } from '../../lib/esign/claim-failure';
 import { AuditLogService } from '../../services/audit-log.service';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { emailSignersTheirLinks } from '../../lib/agreement-send';
+import { displaySignerStatus } from '../../services/agreement/base';
 
 
 /**
@@ -295,7 +297,7 @@ app.openapi(sendAgreementRoute, async (c) => {
             tsMs: Date.now(),
         });
     } catch (e) {
-        logger.warn('audit.append.created.failed', { requestId: env.requestId, error: (e as Error).message });
+        logger.warn('audit.append.created.failed', { requestId: env.requestId, error: errorSummary(e) });
     }
 
     // Email each signer their own persistent link (per-signer token →
@@ -318,7 +320,7 @@ app.openapi(sendAgreementRoute, async (c) => {
             tsMs: Date.now(),
         });
     } catch (e) {
-        logger.warn('audit.append.sent.failed', { requestId: env.requestId, error: (e as Error).message });
+        logger.warn('audit.append.sent.failed', { requestId: env.requestId, error: errorSummary(e) });
     }
 
     auditFromContext(c, 'agreement.send', 'agreement_request', {
@@ -329,7 +331,7 @@ app.openapi(sendAgreementRoute, async (c) => {
         data: {
             requestId: env.requestId,
             signers: signerRows.map((s: typeof schema.agreementSigners.$inferSelect) => ({
-                id: s.id, name: s.name, email: s.email, role: s.role, status: s.status,
+                id: s.id, name: s.name, email: s.email, role: s.role, status: displaySignerStatus(s),
             })),
         },
     }, 200);
@@ -351,12 +353,19 @@ app.openapi(inspectorSignRoute, async (c) => {
         }
         throw e;
     }
-    const signing = new SigningKeyService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
+    const signing = SigningKeyService.fromEnv(c.env.DB, c.env);
     const auditLog = new AuditLogService(c.env.DB, signing);
-    await auditLog.append(tenantId, id, 'agreement.inspector_signed', {
-        inspectorUserId: userId,
-        tsMs: Date.now(),
-    });
+    // The countersignature is already stored, and a retry would be refused (the envelope is no longer pending), so a failed append is
+    // logged loudly rather than turned into an error the staff member cannot act on.
+    try {
+        await auditLog.append(tenantId, id, 'agreement.inspector_signed', {
+            inspectorUserId: userId,
+            tsMs: Date.now(),
+        });
+    } catch (e) {
+        // The company's countersignature is stored and cannot be signed again, so its missing audit row is an alert, not a retry.
+        logger.alert('audit_append_inspector_signed_failed', 'The inspector countersignature was stored but its audit row could not be written.', { tenantId, requestId: id, error: errorSummary(e) });
+    }
     return c.json({ success: true as const }, 200);
 });
 

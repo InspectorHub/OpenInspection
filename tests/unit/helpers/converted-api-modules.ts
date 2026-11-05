@@ -696,6 +696,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         },
     },
     {
+        file: 'server/api/inspections/report-reopen.ts',
+        tuple: 'reportReopenRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/inspections/report-reopen');
+            return { app: m.default, configs: m.reportReopenRouteConfigs };
+        },
+    },
+    {
         file: 'server/api/inspections/report-translation.ts',
         tuple: 'reportTranslationRouteConfigs',
         load: async () => {
@@ -950,6 +958,14 @@ export const CONVERTED_API_MODULES: readonly ConvertedApiModule[] = [
         load: async () => {
             const m = await import('../../../server/api/public-report');
             return { app: m.default, configs: m.publicReportRouteParts };
+        },
+    },
+    {
+        file: 'server/api/public/report-video.ts',
+        tuple: 'reportVideoRouteConfigs',
+        load: async () => {
+            const m = await import('../../../server/api/public/report-video');
+            return { app: m.default, configs: m.reportVideoRouteConfigs };
         },
     },
     {

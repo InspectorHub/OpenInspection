@@ -13,6 +13,10 @@ export interface Inspection {
   clientEmail?: string | null;
   status: string;
   reportStatus?: string;
+  /** The version clients read while the report is out; null when they see none. Derived by the server. */
+  publishedVersionNumber?: number | null;
+  /** A published report open for "Edit and republish" (clients still read `publishedVersionNumber`). */
+  editingAgain?: boolean;
   confirmedAt?: string | null;
   price?: number | null;
   paymentStatus?: string | null;

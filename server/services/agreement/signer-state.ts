@@ -1,19 +1,30 @@
-import { eq, and, inArray, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql, asc } from 'drizzle-orm';
 import { agreementRequests, agreementSigners } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
-import { logger } from '../../lib/logger';
-import { mintToken, hashToken } from '../../lib/token-hash';
+import { hashToken } from '../../lib/token-hash';
 import { isTokenRevokedOrExpired } from '../../lib/token-ttl';
-import { sealToken, openToken } from '../../lib/config-crypto';
-import { computeEnvelopeStatus, type Constructor, type ResolvedSigner } from './base';
+import { computeEnvelopeStatus, isLiveSigning, STALE_SIGNING_MS, type Constructor, type ResolvedSigner, type SignedOpts } from './base';
 import type { AgreementServiceBase } from './base';
+import { defaultSignerView, insertDefaultSigner } from './default-signer';
+
+export type { SignedOpts } from './base';
+export { STALE_SIGNING_MS };
+const MAX_CLAIM_ATTEMPTS = 3;
+const NOT_SIGNABLE = 'Agreement is no longer signable';
+const SIGNING_IN_FLIGHT = 'This signature is still being recorded. Please try again in a moment.';
+
+/** Rows a statement changed, from either driver's result shape (D1: `meta.changes`; the test driver: `changes`). */
+function rowsChanged(result: unknown): number {
+    const r = result as { changes?: number; meta?: { changes?: number } } | undefined;
+    return r?.meta?.changes ?? r?.changes ?? 0;
+}
 
 /**
  * Track I-a — signer-level state machine (envelope v2).
  *
  * CRITICAL: the atomic envelope-completion logic (the conditional `WHERE` +
  * affected-row-count check that ensures single-fire completion) in
- * `markSignedBySigner` / `markDeclinedBySigner` / `recomputeEnvelope`, and the
+ * `finishSignedBySigner` / `markDeclinedBySigner` / `recomputeEnvelope`, and the
  * legacy envelope token-upgrade path in `getSignerByPresentedToken`, are a
  * correctness unit and MUST stay co-located in this module.
  */
@@ -57,23 +68,28 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                 // token must resolve to nothing (NotFound at the route), never to a
                 // signable envelope.
                 if (isTokenRevokedOrExpired(signer, Date.now())) return null;
-                const envRows = await db.select().from(agreementRequests).where(eq(agreementRequests.id, signer.requestId)).limit(1);
+                const envRows = await db.select().from(agreementRequests).where(and(eq(agreementRequests.id, signer.requestId), eq(agreementRequests.tenantId, signer.tenantId))).limit(1);
                 if (envRows.length === 0) return null;
                 return { signer, envelope: envRows[0] };
             }
 
-            // 2) Legacy envelope-token path
+            // 2) Legacy envelope-token path (an envelope token from before signer links). It is held to the same rules as a signer link:
+            //    an expired envelope, or a first signer whose link has been revoked or has run out, resolves to nothing. (It used to
+            //    apply none of them, so a legacy token outlived every revocation and expiry that bind a signer link.) An envelope with no
+            //    signer row still gets its one default signer on first open, as before; an expired one is refused before anything is written.
             const envelope = (await db.select().from(agreementRequests)
                 .where(eq(agreementRequests.tokenHash, hash)).limit(1))[0] ?? null;
-            if (!envelope) return null;
+            if (!envelope || envelope.status === 'expired') return null;
 
-            // Load the envelope's first signer; synthesize one for weird legacy data.
             const signers = await this.loadSigners(envelope.id);
-            if (signers.length > 0) {
-                return { signer: signers[0], envelope };
+            if (signers.length === 0) {
+                // A finished record is never added to by a read: a signed or declined envelope gets an in-memory view of its default signer.
+                if (envelope.status === 'signed' || envelope.status === 'declined') return { signer: defaultSignerView(envelope), envelope };
+                return { signer: await this.synthesizeDefaultSigner(envelope), envelope };
             }
-            const created = await this.synthesizeDefaultSigner(envelope);
-            return { signer: created, envelope };
+            const first = signers[0]!;
+            if (isTokenRevokedOrExpired(first, Date.now())) return null;
+            return { signer: first, envelope };
         }
 
         /**
@@ -84,142 +100,8 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
          * the distributed link. Shared by `getSignerByPresentedToken` (public
          * resolution) and `findOrCreate` (in-app reuse) so the two stay identical.
          */
-        async synthesizeDefaultSigner(
-            envelope: typeof agreementRequests.$inferSelect,
-        ): Promise<typeof agreementSigners.$inferSelect> {
-            const db = this.getDrizzle();
-            const synthId = crypto.randomUUID();
-            const now = new Date();
-            await db.insert(agreementSigners).values({
-                id: synthId,
-                tenantId: envelope.tenantId,
-                requestId: envelope.id,
-                name: envelope.clientName || envelope.clientEmail || 'Client',
-                email: envelope.clientEmail || '',
-                role: 'client',
-                tokenHash: null,
-                tokenEnc: null,
-                status: envelope.status,
-                createdAt: now,
-            });
-            return (await db.select().from(agreementSigners).where(eq(agreementSigners.id, synthId)).limit(1))[0];
-        }
-
-        /** List all signers of an envelope (tenant-scoped), ordered by creation. */
-        async listSigners(tenantId: string, requestId: string): Promise<Array<typeof agreementSigners.$inferSelect>> {
-            return this.getDrizzle().select().from(agreementSigners)
-                .where(and(eq(agreementSigners.tenantId, tenantId), eq(agreementSigners.requestId, requestId)))
-                .orderBy(asc(agreementSigners.createdAt))
-                .all();
-        }
-
-        /**
-         * Returns the plaintext public link token for a signer. Decrypts the sealed
-         * token_enc (current → previous secret); on a backfilled row (token_enc
-         * NULL) mints a fresh token and persists tokenHash + token_enc.
-         */
-        async getSignerLink(tenantId: string, requestId: string, signerId: string): Promise<string> {
-            const db = this.getDrizzle();
-            const rows = await db.select().from(agreementSigners)
-                .where(and(eq(agreementSigners.id, signerId), eq(agreementSigners.requestId, requestId), eq(agreementSigners.tenantId, tenantId))).limit(1);
-            if (rows.length === 0) throw Errors.NotFound('Signer not found');
-            const signer = rows[0];
-            if (signer.tokenEnc) {
-                if (!this.secrets) throw Errors.Internal('Token sealing key unavailable');
-                return openToken(signer.tokenEnc, signer.tenantId, this.secrets.jwtSecret, this.secrets.jwtSecretPrevious);
-            }
-            // Backfilled row — mint now and persist.
-            if (!this.secrets) throw Errors.Internal('Token sealing key unavailable');
-            const plaintext = mintToken();
-            await db.update(agreementSigners)
-                .set({ tokenHash: await hashToken(plaintext), tokenEnc: await sealToken(plaintext, signer.tenantId, this.secrets.jwtSecret) })
-                .where(eq(agreementSigners.id, signerId));
-            return plaintext;
-        }
-
-        /**
-         * Track I-a Task 7 — server-side reconstruction of the combined-checkout
-         * link for an inspection. Finds the latest non-terminal envelope for the
-         * inspection, then its first non-terminal signer (pending / sent / viewed,
-         * ordered by creation), and returns that signer's plaintext public token.
-         * Returns null when there is no outstanding signer to route to (no envelope,
-         * or every signer is already signed / declined / expired). The plaintext is
-         * NEVER persisted — only the caller (a server-side link builder) sees it.
-         */
-        async getFirstOutstandingSignerLink(tenantId: string, inspectionId: string): Promise<string | null> {
-            const db = this.getDrizzle();
-            const envelope = await db.select().from(agreementRequests)
-                .where(and(
-                    eq(agreementRequests.tenantId, tenantId),
-                    eq(agreementRequests.inspectionId, inspectionId),
-                    inArray(agreementRequests.status, ['pending', 'sent', 'viewed']),
-                ))
-                .orderBy(desc(agreementRequests.createdAt))
-                .limit(1)
-                .get();
-            if (!envelope) return null;
-
-            const outstanding = await db.select().from(agreementSigners)
-                .where(and(
-                    eq(agreementSigners.requestId, envelope.id),
-                    inArray(agreementSigners.status, ['pending', 'sent', 'viewed']),
-                ))
-                .orderBy(asc(agreementSigners.createdAt))
-                .limit(1)
-                .get();
-            if (!outstanding) return null;
-
-            try {
-                return await this.getSignerLink(tenantId, envelope.id, outstanding.id);
-            } catch (e) {
-                logger.warn('AgreementService.getFirstOutstandingSignerLink failed', {
-                    tenantId, inspectionId, requestId: envelope.id, error: e instanceof Error ? e.message : String(e),
-                });
-                return null;
-            }
-        }
-
-        /**
-         * Returns the plaintext public link token for the signer of the LATEST
-         * envelope of (tenantId, inspectionId) whose email matches `email`
-         * case-insensitively. Used by the unified client-portal Hub to inline the
-         * agreement section for the authenticated recipient.
-         *
-         * SECURITY: returns ONLY the token of the signer whose email matches the
-         * caller's verified email. It NEVER falls back to "the first signer" — handing
-         * back a non-matching signer's token would let a recipient sign AS someone
-         * else. Returns null when there is no envelope, no email-matched signer, or
-         * the token cannot be reconstructed. The matched envelope may be in ANY status
-         * (including signed/declined) so a completed agreement is still viewable.
-         */
-        async getSignerLinkByEmail(tenantId: string, inspectionId: string, email: string): Promise<string | null> {
-            const target = (email || '').trim().toLowerCase();
-            if (!target) return null;
-            const db = this.getDrizzle();
-            try {
-                const envelope = await db.select().from(agreementRequests)
-                    .where(and(
-                        eq(agreementRequests.tenantId, tenantId),
-                        eq(agreementRequests.inspectionId, inspectionId),
-                    ))
-                    .orderBy(desc(agreementRequests.createdAt))
-                    .limit(1)
-                    .get();
-                if (!envelope) return null;
-
-                const signers = await db.select().from(agreementSigners)
-                    .where(eq(agreementSigners.requestId, envelope.id))
-                    .all();
-                const signer = signers.find((s) => (s.email || '').trim().toLowerCase() === target);
-                if (!signer) return null;
-
-                return await this.getSignerLink(tenantId, envelope.id, signer.id);
-            } catch (e) {
-                logger.warn('AgreementService.getSignerLinkByEmail failed', {
-                    tenantId, inspectionId, error: e instanceof Error ? e.message : String(e),
-                });
-                return null;
-            }
+        async synthesizeDefaultSigner(envelope: typeof agreementRequests.$inferSelect): Promise<typeof agreementSigners.$inferSelect> {
+            return insertDefaultSigner(this.getDrizzle(), envelope);
         }
 
         /**
@@ -236,66 +118,161 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
             if (signer.status === 'pending' || signer.status === 'sent') {
                 await db.update(agreementSigners)
                     .set({ status: 'viewed', viewedAt: new Date() })
-                    .where(and(eq(agreementSigners.id, signer.id), inArray(agreementSigners.status, ['pending', 'sent'])));
+                    .where(and(eq(agreementSigners.id, signer.id), eq(agreementSigners.tenantId, signer.tenantId), inArray(agreementSigners.status, ['pending', 'sent'])));
                 await this.recomputeEnvelope(envelope);
             }
             return { tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, agreementId: envelope.agreementId, signerId: signer.id };
         }
 
         /**
-         * Records a signer signature and rolls the envelope aggregate forward.
-         * Mirrors legacy guards per SIGNER status: declined/expired → Conflict;
-         * already-signed → idempotent (completedNow=false).
+         * Claims the signing for a signer: ONE conditional update that moves the signer from a live status to `signing` (NOT to `signed`)
+         * and stores the drawing, time, address and browser. The order of a signing is
+         *
+         *   claim (live -> signing)  ->  append `signer.signed`  ->  `confirm` (signing -> signed)  ->  `finishSignedBySigner`.
+         *
+         * `signing` is not terminal and is never counted as signed (envelope aggregate, progress counters, renders, verifier roster), so
+         * another signer's finish cannot complete the envelope on a signature whose audit row does not exist yet.
+         *
+         * The claim's WHERE pins the status that was read AND requires that the owning envelope is not expired (claim, take-over and
+         * `confirm` alike; the expiry cron skips `signing` rows and nothing here makes it write them). On a miss the row is read again and
+         * decided: already signed (`already_signed`), signing and recent (409 retry in a moment), signing and older than `STALE_SIGNING_MS`
+         * (taken over), declined, expired or an expired envelope (409), or merely moved to another live status (claim again).
+         *
+         * INVARIANT: the newest `signer.signed` audit row of a signer names the drawing and time that are stored. A lost race leaves no
+         * row, because only the winner appends; if the append fails, `release` puts the signer back and the signing is refused. The
+         * append is deduplicated by drawing hash AND claim time, so a take-over with the same drawing writes a new row naming the new time.
+         *
+         * TAKE-OVER: a process that dies between the claim and the confirm leaves a signer in `signing`. After `STALE_SIGNING_MS` the next
+         * claim takes the row over, and the signer may also be reminded, re-sent to, or decline (a crash must not take away the right to
+         * decline; the chain then shows an orphan `signer.signed` row followed by `signer.declined`, which is what happened). A LIVE
+         * `signing` row answers claim and decline with 409. The earlier drawing is overwritten, never recorded; if its append had
+         * committed, that row stays in the chain.
+         *
+         * REMAINING WINDOWS, all omissions and none a false record: (1) a process that dies after the claim and before the confirm leaves a
+         * signer in `signing` until the take-over window passes; nothing is written afterwards. (2) If the append's INSERT commits but the
+         * call reports an error, `release` reverts the signer while an orphan `signer.signed` row exists; a retry writes a newer row naming
+         * what it stores, otherwise the orphan stays and cannot be repaired because a signing record is never rewritten. (3) If `confirm`
+         * itself reports an error after the append, the signer may stay in `signing` with its row present; the take-over resolves it.
+         * (4) ACCEPTED: a first request that stalls for more than the window and appends after a take-over would add a row for its older
+         * drawing; Workers requests do not stall that long, and its confirm answers 409 because the claim is no longer its own.
+         *
+         * `release` exists ONLY on a `claimed` result. It reverts a row only while it still has status `signing` AND this claim's drawing
+         * AND time, setting back exactly the eleven columns the claim set (status, signature, signed time, channel, address, browser,
+         * on-behalf name and disclaimer, language-disclosure version, attribution basis and time), and touches no other column. If the
+         * envelope expired meanwhile, a signer put back to pending, sent or viewed is expired with it, as the expiry cron would have done.
          */
-        async markSignedBySigner(presented: string, signatureBase64: string, opts: {
-            signedAtMs: number; channel: 'remote' | 'in_person'; ipAddress?: string | null; userAgent?: string | null;
-            onBehalfOf?: string | null; onBehalfDisclaimer?: string | null;
-            /**
-             * Which language-disclosure version this signer was SHOWN, or null
-             * when the platform did not draw the screen and so cannot say.
-             * REQUIRED and never defaulted here: only the caller knows what
-             * reached a screen, and an optional field would let a future sign
-             * surface record silence that reads like a pre-feature signature.
-             */
-            languageDisclosureVersion: number | null;
-        }): Promise<{ tenantId: string; inspectionId: string; requestId: string; signerId: string; envelopeCompletedNow: boolean; envelopeStatus: string }> {
+        async claimSignedBySigner(presented: string, signatureBase64: string, opts: SignedOpts): Promise<
+            | { kind: 'claimed'; signer: typeof agreementSigners.$inferSelect; envelope: typeof agreementRequests.$inferSelect; release: () => Promise<void>; confirm: () => Promise<void> }
+            | { kind: 'already_signed'; signer: typeof agreementSigners.$inferSelect; envelope: typeof agreementRequests.$inferSelect }
+        > {
             const db = this.getDrizzle();
             const resolved = await this.getSignerByPresentedToken(presented);
             if (!resolved) throw Errors.NotFound('Agreement request not found');
-            const { signer, envelope } = resolved;
-            if (signer.status === 'declined' || signer.status === 'expired') {
-                throw Errors.Conflict('Agreement is no longer signable');
-            }
-            if (signer.status === 'signed') {
-                return {
-                    tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, requestId: envelope.id,
-                    signerId: signer.id, envelopeCompletedNow: false, envelopeStatus: envelope.status,
-                };
-            }
-            await db.update(agreementSigners)
-                .set({
-                    status: 'signed',
-                    signatureBase64,
-                    signedAt: new Date(opts.signedAtMs),
-                    channel: opts.channel,
-                    ipAddress: opts.ipAddress ?? null,
-                    userAgent: opts.userAgent ?? null,
-                    onBehalfOf: opts.onBehalfOf ?? null,
-                    onBehalfDisclaimer: opts.onBehalfDisclaimer ?? null,
-                    languageDisclosureVersion: opts.languageDisclosureVersion,
-                    // This row is the signing event, not a later reading of one.
-                    // Stated rather than left NULL so that a NULL basis anywhere
-                    // reads as "not recorded" and never as "captured, probably" —
-                    // the distinction that must stay legible between a
-                    // signature we watched arrive and one a migration attributed.
-                    attributionBasis: 'signing_event',
-                    attributedAt: new Date(opts.signedAtMs),
-                })
-                .where(and(
-                    eq(agreementSigners.id, signer.id),
-                    sql`${agreementSigners.status} NOT IN ('signed','declined','expired')`,
-                ));
+            const { envelope } = resolved;
+            let signer = resolved.signer;
+            const signedAt = new Date(opts.signedAtMs);
+            const envelopeNotExpired = sql`${agreementSigners.requestId} NOT IN (SELECT id FROM ${agreementRequests} WHERE ${agreementRequests.status} = 'expired')`;
 
+            for (let attempt = 0; attempt < MAX_CLAIM_ATTEMPTS; attempt += 1) {
+                if (signer.status === 'declined' || signer.status === 'expired') throw Errors.Conflict(NOT_SIGNABLE);
+                if (signer.status === 'signed') return { kind: 'already_signed', signer, envelope };
+                const takeover = signer.status === 'signing';
+                if (isLiveSigning(signer)) throw Errors.Conflict(SIGNING_IN_FLIGHT);
+
+                const claimedFrom = signer;
+                const res: unknown = await db.update(agreementSigners)
+                    .set({
+                        status: 'signing',
+                        signatureBase64,
+                        signedAt,
+                        channel: opts.channel,
+                        ipAddress: opts.ipAddress ?? null,
+                        userAgent: opts.userAgent ?? null,
+                        onBehalfOf: opts.onBehalfOf ?? null,
+                        onBehalfDisclaimer: opts.onBehalfDisclaimer ?? null,
+                        languageDisclosureVersion: opts.languageDisclosureVersion,
+                        // This row is the signing event itself: stated, never NULL, so a NULL basis anywhere reads as "not recorded".
+                        attributionBasis: 'signing_event',
+                        attributedAt: signedAt,
+                    })
+                    .where(and(
+                        eq(agreementSigners.id, claimedFrom.id), eq(agreementSigners.tenantId, claimedFrom.tenantId),
+                        eq(agreementSigners.status, claimedFrom.status),
+                        // A take-over also pins the claim time it judged stale, so two takers cannot both win.
+                        takeover && claimedFrom.signedAt ? eq(agreementSigners.signedAt, claimedFrom.signedAt) : sql`1 = 1`,
+                        envelopeNotExpired,
+                    ));
+                if (rowsChanged(res) > 0) {
+                    const sameClaim = and(
+                        eq(agreementSigners.id, claimedFrom.id), eq(agreementSigners.tenantId, claimedFrom.tenantId),
+                        eq(agreementSigners.status, 'signing'),
+                        eq(agreementSigners.signatureBase64, signatureBase64),
+                        eq(agreementSigners.signedAt, signedAt),
+                    );
+                    const confirm = async (): Promise<void> => {
+                        const flipped: unknown = await db.update(agreementSigners).set({ status: 'signed' }).where(and(sameClaim, envelopeNotExpired));
+                        if (rowsChanged(flipped) > 0) return;
+                        // Not flipped: the envelope expired since the claim (put the signer back and say so), or the claim is no longer ours.
+                        if (await this.envelopeIsExpired(envelope)) { await release(); throw Errors.Conflict(NOT_SIGNABLE); }
+                        throw Errors.Conflict(SIGNING_IN_FLIGHT);
+                    };
+                    const release = async (): Promise<void> => {
+                        await db.update(agreementSigners)
+                            .set({
+                                status: claimedFrom.status,
+                                signatureBase64: claimedFrom.signatureBase64 ?? null,
+                                signedAt: claimedFrom.signedAt ?? null,
+                                channel: claimedFrom.channel ?? null,
+                                ipAddress: claimedFrom.ipAddress ?? null,
+                                userAgent: claimedFrom.userAgent ?? null,
+                                onBehalfOf: claimedFrom.onBehalfOf ?? null,
+                                onBehalfDisclaimer: claimedFrom.onBehalfDisclaimer ?? null,
+                                languageDisclosureVersion: claimedFrom.languageDisclosureVersion ?? null,
+                                attributionBasis: claimedFrom.attributionBasis ?? null,
+                                attributedAt: claimedFrom.attributedAt ?? null,
+                            })
+                            .where(sameClaim);
+                        // The expiry cron skips a `signing` signer; if the envelope expired in the meantime, finish what it would have done.
+                        await db.update(agreementSigners).set({ status: 'expired' }).where(and(
+                            eq(agreementSigners.id, claimedFrom.id), eq(agreementSigners.tenantId, claimedFrom.tenantId),
+                            inArray(agreementSigners.status, ['pending', 'sent', 'viewed']),
+                            sql`${agreementSigners.requestId} IN (SELECT id FROM ${agreementRequests} WHERE ${agreementRequests.status} = 'expired')`,
+                        ));
+                    };
+                    return { kind: 'claimed', signer: claimedFrom, envelope, release, confirm };
+                }
+                // Someone moved the signer first, or the envelope expired. Decide from the rows as they are now.
+                if (await this.envelopeIsExpired(envelope)) throw Errors.Conflict(NOT_SIGNABLE);
+                const now = (await db.select().from(agreementSigners).where(and(eq(agreementSigners.id, claimedFrom.id), eq(agreementSigners.tenantId, claimedFrom.tenantId))).limit(1))[0];
+                if (!now) throw Errors.NotFound('Agreement request not found');
+                signer = now;
+            }
+            throw Errors.Conflict(SIGNING_IN_FLIGHT);
+        }
+
+        async envelopeIsExpired(envelope: typeof agreementRequests.$inferSelect): Promise<boolean> {
+            const row = (await this.getDrizzle().select({ status: agreementRequests.status }).from(agreementRequests).where(and(eq(agreementRequests.id, envelope.id), eq(agreementRequests.tenantId, envelope.tenantId), eq(agreementRequests.tenantId, envelope.tenantId))).limit(1))[0];
+            return row?.status === 'expired';
+        }
+
+        /**
+         * Rolls the envelope forward for a signer whose signing was confirmed earlier (a retry after a failed finish). The envelope is read
+         * again; a terminal one is left alone, and the single-fire completion guard in `finishSignedBySigner` means a second retry does
+         * nothing. Null when there was nothing to do.
+         */
+        async resumeConfirmedSigning(signer: typeof agreementSigners.$inferSelect, envelope: typeof agreementRequests.$inferSelect) {
+            const fresh = (await this.getDrizzle().select().from(agreementRequests).where(and(eq(agreementRequests.id, envelope.id), eq(agreementRequests.tenantId, envelope.tenantId), eq(agreementRequests.tenantId, envelope.tenantId))).limit(1))[0];
+            if (!fresh || ['signed', 'declined', 'expired'].includes(fresh.status)) return null;
+            return this.finishSignedBySigner(signer, fresh, signer.signedAt?.getTime() ?? Date.now());
+        }
+
+        /** Rolls the envelope aggregate forward after a signer's signature was claimed; completion is claimed by one writer only. */
+        async finishSignedBySigner(
+            signer: typeof agreementSigners.$inferSelect,
+            envelope: typeof agreementRequests.$inferSelect,
+            signedAtMs: number,
+        ): Promise<{ tenantId: string; inspectionId: string; requestId: string; signerId: string; envelopeCompletedNow: boolean; envelopeStatus: string }> {
+            const db = this.getDrizzle();
             const previousStatus = envelope.status;
             const signers = await this.loadSigners(envelope.id);
             const aggregate = computeEnvelopeStatus(envelope.completionPolicy, signers);
@@ -320,10 +297,10 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                 const res: unknown = await db.update(agreementRequests)
                     .set({
                         status: 'signed',
-                        signedAt: new Date(opts.signedAtMs),
+                        signedAt: new Date(signedAtMs),
                     })
                     .where(and(
-                        eq(agreementRequests.id, envelope.id),
+                        eq(agreementRequests.id, envelope.id), eq(agreementRequests.tenantId, envelope.tenantId),
                         sql`${agreementRequests.status} NOT IN ('signed','declined','expired')`,
                     ));
                 // Driver-tolerant row-count extraction: drizzle/d1 returns
@@ -339,7 +316,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                 await db.update(agreementRequests)
                     .set({ status: aggregate })
                     .where(and(
-                        eq(agreementRequests.id, envelope.id),
+                        eq(agreementRequests.id, envelope.id), eq(agreementRequests.tenantId, envelope.tenantId),
                         sql`${agreementRequests.status} NOT IN ('signed','declined','expired')`,
                     ));
             }
@@ -348,6 +325,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                 tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, requestId: envelope.id,
                 signerId: signer.id, envelopeCompletedNow, envelopeStatus: aggregate,
             };
+        
         }
 
         /**
@@ -355,7 +333,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
          * signer → Conflict; declined → idempotent. When the aggregate flips to
          * 'declined', the reason is stored on the envelope's lastError.
          */
-        async markDeclinedBySigner(presented: string, reason?: string): Promise<{ tenantId: string; inspectionId: string; requestId: string; signerId: string; envelopeStatus: string }> {
+        async markDeclinedBySigner(presented: string, reason?: string): Promise<{ tenantId: string; inspectionId: string; requestId: string; signerId: string; envelopeStatus: string; declinedNow: boolean }> {
             const db = this.getDrizzle();
             const resolved = await this.getSignerByPresentedToken(presented);
             if (!resolved) throw Errors.NotFound('Agreement request not found');
@@ -363,15 +341,27 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
             if (signer.status === 'signed' || signer.status === 'expired') {
                 throw Errors.Conflict('Agreement cannot be declined');
             }
+            if (isLiveSigning(signer)) throw Errors.Conflict(SIGNING_IN_FLIGHT);
             if (signer.status === 'declined') {
-                return { tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, requestId: envelope.id, signerId: signer.id, envelopeStatus: envelope.status };
+                return { tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, requestId: envelope.id, signerId: signer.id, envelopeStatus: envelope.status, declinedNow: false };
             }
-            await db.update(agreementSigners)
+            // One conditional update decides it: of a decline and a signature arriving together, exactly one moves the signer.
+            const moved: unknown = await db.update(agreementSigners)
                 .set({ status: 'declined' })
                 .where(and(
-                    eq(agreementSigners.id, signer.id),
-                    sql`${agreementSigners.status} NOT IN ('signed','declined','expired')`,
+                    eq(agreementSigners.id, signer.id), eq(agreementSigners.tenantId, signer.tenantId),
+                    // A stale `signing` row may decline, pinned to the claim time that was judged stale.
+                    signer.status === 'signing'
+                        ? and(eq(agreementSigners.status, 'signing'), signer.signedAt ? eq(agreementSigners.signedAt, signer.signedAt) : isNull(agreementSigners.signedAt))
+                        : sql`${agreementSigners.status} NOT IN ('signed','signing','declined','expired')`,
                 ));
+            if (rowsChanged(moved) === 0) {
+                const now = (await db.select().from(agreementSigners).where(and(eq(agreementSigners.id, signer.id), eq(agreementSigners.tenantId, signer.tenantId))).limit(1))[0];
+                if (now?.status === 'declined') {
+                    return { tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, requestId: envelope.id, signerId: signer.id, envelopeStatus: envelope.status, declinedNow: false };
+                }
+                throw Errors.Conflict('Agreement cannot be declined');
+            }
 
             const previousStatus = envelope.status;
             const signers = await this.loadSigners(envelope.id);
@@ -383,12 +373,12 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                 const patch: Partial<typeof agreementRequests.$inferInsert> = { status: aggregate };
                 if (aggregate === 'declined' && reason) patch.lastError = reason.slice(0, 500);
                 await db.update(agreementRequests).set(patch).where(and(
-                    eq(agreementRequests.id, envelope.id),
+                    eq(agreementRequests.id, envelope.id), eq(agreementRequests.tenantId, envelope.tenantId),
                     sql`${agreementRequests.status} NOT IN ('signed','declined','expired')`,
                 ));
             }
 
-            return { tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, requestId: envelope.id, signerId: signer.id, envelopeStatus: aggregate };
+            return { tenantId: envelope.tenantId, inspectionId: envelope.inspectionId, requestId: envelope.id, signerId: signer.id, envelopeStatus: aggregate, declinedNow: true };
         }
 
         /** Recompute + persist the envelope aggregate (never downgrades a terminal envelope). */
@@ -402,7 +392,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                 // another concurrent writer already drove terminal (the in-memory
                 // `envelope.status` snapshot is not authoritative under concurrency).
                 await db.update(agreementRequests).set({ status: aggregate }).where(and(
-                    eq(agreementRequests.id, envelope.id),
+                    eq(agreementRequests.id, envelope.id), eq(agreementRequests.tenantId, envelope.tenantId),
                     sql`${agreementRequests.status} NOT IN ('signed','declined','expired')`,
                 ));
             }

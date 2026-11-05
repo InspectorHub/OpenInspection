@@ -49,7 +49,7 @@ function buildApp() {
         c.set('user', { sub: USER } as never);
         c.set('services', {
             inspection: { publishInspection },
-            reportVersion: new ReportVersionService({} as D1Database, 'test-encryption-secret-key'),
+            reportVersion: new ReportVersionService({} as D1Database, 'test-encryption-secret-key', []),
             reportPdf: { purgeTransientPdfs: vi.fn().mockResolvedValue(undefined), isPipelineEnabled: vi.fn().mockResolvedValue(false) },
         } as never);
         await next();
@@ -98,7 +98,10 @@ describe('publish with nothing changed since the latest version', () => {
         expect(first.status).toBe(200);
         const second = await publish(A);
         expect(second.status).toBe(200);
-        expect(Object.keys(second.body.data).sort()).toEqual(Object.keys(first.body.data).sort());
+        // The normal shape, plus the one key that says nothing was published: the version that is still current.
+        expect(Object.keys(second.body.data).sort()).toEqual([...Object.keys(first.body.data), 'unchangedSinceVersion'].sort());
+        expect(first.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(second.body.data.unchangedSinceVersion).toBe(1);
         expect(second.body.data).toMatchObject({ reportUrl: first.body.data.reportUrl, reportStatus: 'published' });
         expect(await versions(A)).toHaveLength(1);
         expect(publishInspection).toHaveBeenCalledTimes(1);
@@ -155,5 +158,143 @@ describe('publish with nothing changed since the latest version', () => {
         expect(await versions(B)).toHaveLength(1);
         expect(await versions(A)).toHaveLength(1);
         expect(publishInspection).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('republishing a report that was being edited again', () => {
+    const reportOf = async (id: string) => (await db.select().from(schema.reports).where(eq(schema.reports.inspectionId, id)).get())!;
+
+    beforeEach(async () => {
+        await db.insert(schema.reports).values({
+            id: 'rep-a', tenantId: T, inspectionId: A, kind: 'primary', title: 'Report', status: 'in_progress', createdAt: new Date(),
+        });
+    });
+
+    it('with nothing changed makes no new version but puts the lock back', async () => {
+        await publish(A);
+        // "Edit and republish" opened the report; the inspector changed nothing and publishes again.
+        await db.update(schema.reports).set({ status: 'in_progress', publishedAt: new Date() }).where(eq(schema.reports.id, 'rep-a'));
+        const again = await publish(A);
+        expect(again.status).toBe(200);
+        expect(await versions(A)).toHaveLength(1);
+        expect(publishInspection).toHaveBeenCalledTimes(1);
+        expect((await reportOf(A)).status).toBe('published');
+    });
+
+    it('(control) with a change it is a real publish and makes the next version', async () => {
+        await publish(A);
+        await db.update(schema.reports).set({ status: 'in_progress', publishedAt: new Date() }).where(eq(schema.reports.id, 'rep-a'));
+        await setResults(A, { i1: { rating: 'defect' } });
+        await publish(A);
+        expect(await versions(A)).toHaveLength(2);
+        expect(publishInspection).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('a snapshot that differs only in object key order is unchanged', () => {
+    it('answers as unchanged when the stored copy was projected with its keys in another order', async () => {
+        await publish(A);
+        const [row] = await versions(A);
+        const stored = JSON.parse(row.snapshotJson) as Record<string, unknown>;
+        // The same report with the top-level keys reversed and the findings keys reversed: equal content, different string.
+        const reorder = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).reverse());
+        const reordered = JSON.stringify(reorder({ ...stored, data: reorder(stored.data as Record<string, unknown>) }));
+        expect(reordered).not.toBe(row.snapshotJson);
+        await db.update(schema.reportVersions).set({ snapshotJson: reordered }).where(eq(schema.reportVersions.id, row.id));
+
+        const second = await publish(A);
+        expect(second.body.data.unchangedSinceVersion).toBe(1);
+        expect(await versions(A)).toHaveLength(1);
+    });
+});
+
+describe('the step from snapshot version 3 to 4 is not by itself a change', () => {
+    /** Rewrites the stored latest version as an older (version 3) snapshot: no `presentation`, schemaVersion 3. */
+    async function downgradeStoredToV3(id: string) {
+        const [row] = await versions(id);
+        const old = JSON.parse(row.snapshotJson) as Record<string, unknown>;
+        delete old.presentation;
+        old.schemaVersion = 3;
+        await db.update(schema.reportVersions).set({ snapshotJson: JSON.stringify(old) }).where(eq(schema.reportVersions.id, row.id));
+    }
+
+    it('a stored version 3 with identical content answers as unchanged (no spurious version)', async () => {
+        await publish(A);
+        await downgradeStoredToV3(A);
+        const second = await publish(A);
+        expect(second.body.data.unchangedSinceVersion).toBe(1);
+        expect(await versions(A)).toHaveLength(1);
+        expect(publishInspection).toHaveBeenCalledTimes(1);
+    });
+
+    it('(control) a stored version 3 with a content edit is still a real publish', async () => {
+        await publish(A);
+        await downgradeStoredToV3(A);
+        await db.update(schema.reports).set({ status: 'in_progress', publishedAt: new Date() }).where(eq(schema.reports.id, 'rep-a'));
+        await setResults(A, { i1: { rating: 'defect' } });
+        const second = await publish(A);
+        expect(second.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(await versions(A)).toHaveLength(2);
+    });
+
+    it('(control) a stored version 4 followed by a settings change is a real publish', async () => {
+        await db.insert(schema.defectCategories).values({ id: 'cat-s', tenantId: T, name: 'safety', color: '#ef4444', drivesSummary: true, sortOrder: 1, isSeed: true, createdAt: new Date() });
+        await publish(A);
+        expect(JSON.parse((await versions(A))[0].snapshotJson)).toHaveProperty('presentation');
+        await db.update(schema.reports).set({ status: 'in_progress', publishedAt: new Date() }).where(eq(schema.reports.id, 'rep-a'));
+        await db.update(schema.defectCategories).set({ color: '#00aa55' }).where(eq(schema.defectCategories.id, 'cat-s'));
+        const second = await publish(A);
+        expect(second.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(await versions(A)).toHaveLength(2);
+    });
+});
+
+describe('publish asks the live document to store its edits before it decides nothing changed', () => {
+    const C = 'insp-c';
+    const REPORT_C = 'rep-c';
+
+    async function publishWithDocument(onFlush: () => Promise<void>) {
+        const calls: string[] = [];
+        const ns = {
+            idFromName: (name: string) => name,
+            get: () => ({ fetch: async (url: string) => {
+                const action = new URL(url).pathname.slice(1);
+                calls.push(action);
+                if (action === 'flush') await onFlush();
+                return new Response('{}');
+            } }),
+        };
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        const res = await buildApp().request(`/api/inspections/${C}/publish`, {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
+        }, { DB: {}, JWT_SECRET: 'test-secret', INSPECTION_DOC: ns }, EXEC);
+        return { calls, body: await res.json() as { data: Record<string, unknown> } };
+    }
+
+    beforeEach(async () => {
+        await seed(C);
+        await db.insert(schema.reports).values({ id: REPORT_C, tenantId: T, inspectionId: C, kind: 'primary', title: 'Home', status: 'in_progress', createdAt: new Date(1) });
+    });
+
+    it('a note typed in the last second is stored first, so the publish is a real one and the note reaches the client', async () => {
+        const first = await publishWithDocument(async () => undefined);
+        expect(first.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(await versions(C)).toHaveLength(1);
+
+        // The inspector typed after the first publish; the document has not yet reached the database.
+        const second = await publishWithDocument(async () => { await setResults(C, { i1: { rating: 'good', note: 'typed a moment ago' } }); });
+
+        // Control: the flush was asked for, and the answer is not "nothing changed".
+        expect(second.calls).toContain('flush');
+        expect(second.body.data).not.toHaveProperty('unchangedSinceVersion');
+        expect(await versions(C)).toHaveLength(2);
+    });
+
+    it('with nothing typed, the same flush changes nothing and the answer is still "nothing changed"', async () => {
+        await publishWithDocument(async () => undefined);
+        const again = await publishWithDocument(async () => undefined);
+        expect(again.calls).toContain('flush');
+        expect(again.body.data.unchangedSinceVersion).toBe(1);
+        expect(await versions(C)).toHaveLength(1);
     });
 });

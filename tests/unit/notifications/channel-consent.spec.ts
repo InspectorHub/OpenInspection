@@ -10,12 +10,11 @@
  * at consumers alone, which is only true if agents and staff never enter the
  * ledger as grants.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 
 // eslint-disable-next-line import/order
 import { grantSms, readSmsConsent, revokeChannel, type ConsentRecorder, type SmsConsentBlock } from '../../../server/lib/notifications/channel-consent';

@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AuditLogService } from '../../../server/services/audit-log.service';
 import { SigningKeyService } from '../../../server/services/signing-key.service';
 
@@ -33,11 +33,11 @@ describe('AuditLogService.append — partial dedup index', () => {
       id: TENANT_A, slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     // The real DB is the in-memory better-sqlite3 instance, accessed through the
     // mocked d1 drizzle() above. The D1Database arg is therefore irrelevant.
-    const signingKeys = new SigningKeyService({} as D1Database, KEY_SECRET);
-    svc = new AuditLogService({} as D1Database, signingKeys);
+    const signingKeys = new SigningKeyService(testD1.binding, KEY_SECRET);
+    svc = new AuditLogService(testD1.binding, signingKeys);
   });
 
   it('allows the SAME per-signer event twice (one evidence row per signer)', async () => {
@@ -96,7 +96,7 @@ describe('AuditLogService.append — partial dedup index', () => {
     await svc.append(TENANT_A, REQ_ID, 'request.created', { at: 1 });
     await svc.append(TENANT_A, REQ_ID, 'agreement.signed', { at: 2 });
 
-    const keys = new SigningKeyService({} as D1Database, KEY_SECRET);
+    const keys = new SigningKeyService(testD1.binding, KEY_SECRET);
     const before = (await keys.getPublicKey(TENANT_A))!.fingerprint;
     const rotation = await keys.rotateKeypair(TENANT_A);
     expect(rotation.retired).toBe(before);
@@ -110,7 +110,7 @@ describe('AuditLogService.append — partial dedup index', () => {
 
   it('signs new events with the new key and verifies a chain spanning the rotation', async () => {
     await svc.append(TENANT_A, REQ_ID, 'request.created', { at: 1 });
-    const keys = new SigningKeyService({} as D1Database, KEY_SECRET);
+    const keys = new SigningKeyService(testD1.binding, KEY_SECRET);
     await keys.rotateKeypair(TENANT_A);
     await svc.append(TENANT_A, REQ_ID, 'agreement.signed', { at: 2 });
 
@@ -137,7 +137,7 @@ describe('AuditLogService.append — partial dedup index', () => {
     // The key that sealed the row is gone from the history — the state the
     // history exists to prevent, asserted here so its handling stays honest.
     await db.delete(schema.signingKeys).where(eq(schema.signingKeys.tenantId, TENANT_A));
-    await new SigningKeyService({} as D1Database, KEY_SECRET).ensureKeypair(TENANT_A);
+    await new SigningKeyService(testD1.binding, KEY_SECRET).ensureKeypair(TENANT_A);
 
     const result = await svc.verifyChain(TENANT_A, REQ_ID);
     expect(result.valid).toBe(false);
@@ -145,7 +145,7 @@ describe('AuditLogService.append — partial dedup index', () => {
   });
 
   it('allows at most one active key per tenant', async () => {
-    const keys = new SigningKeyService({} as D1Database, KEY_SECRET);
+    const keys = new SigningKeyService(testD1.binding, KEY_SECRET);
     await keys.ensureKeypair(TENANT_A);
     // A second un-retired row for the same tenant must be refused by the PARTIAL
     // unique index. Without the `WHERE retired_at IS NULL` predicate this insert

@@ -23,7 +23,7 @@ export const SmsConsentQuerySchema = z.object({
 // Twilio inbound webhook is application/x-www-form-urlencoded; validated by signature, not zod-body.
 
 // GET /api/manager/sms/compliance — response schema.
-// `tollfree` is the raw list of TFV records from the tenant's Twilio account;
+// `tollfree` is a list of sid, status and phone-number sid read from the tenant's Twilio account (own mode only);
 // `complianceStatus` is our rolled-up gate value stored in messaging_compliance.
 // The managed sub-status fields are only populated for managed_shared / managed_dedicated tenants.
 export const SmsComplianceResponseSchema = z.object({

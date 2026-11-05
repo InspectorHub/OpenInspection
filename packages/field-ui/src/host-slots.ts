@@ -49,6 +49,13 @@ export interface FieldHostSlots {
    * small: the phone app bar shares one row with the title and the More button.
    */
   renderStatus?: () => ReactNode;
+  /**
+   * A banner about the report's publish state, shown above the findings in every layout (the web host renders "Published
+   * v3: Edit and republish" and "Editing again"). `openPublish` is the editor's own publish entry (the same dialog as
+   * the header's Publish); `locked` is true once the server closed the live document because the report was published
+   * elsewhere. Absent, or returning nothing, shows no banner.
+   */
+  renderPublishBanner?: (props: { openPublish: () => void; locked: boolean }) => ReactNode;
   /** Told which layout band the browser really shows (after mount, and on change); a host that remembers it returns it as `EditorData.initialLayout`. */
   onLayoutObserved?: (layout: 'phone' | 'tablet' | 'desktop') => void;
 }

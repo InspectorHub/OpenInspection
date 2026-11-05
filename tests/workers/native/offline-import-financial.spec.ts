@@ -196,6 +196,31 @@ describe('offline import and the inspectionFees capability', () => {
         expect(await rowOf(insp.id)).toMatchObject({ price: 77_000 });
     });
 
+    it('the same member: a price change imports while inspectionFees is held, and is refused after it is revoked, leaving the earlier price; another member who still holds it is unaffected', async () => {
+        const revoked = await addMember('inspector');
+        const other = await addMember('inspector');
+        const mine = await createInspection(revoked, '7 Original Road, Anytown');
+        const theirs = await createInspection(other, '8 Original Road, Anytown');
+        // Before: the capability is held, the queued price change is applied.
+        const before = await importUpdates(revoked, mine, [{ price: 44_000 }]);
+        expect(before.status, await before.clone().text()).toBe(200);
+        expect(((await before.json()) as ImportBody).data!.outbox).toMatchObject({ applied: 1, failed: [] });
+        expect(await rowOf(mine.id)).toMatchObject({ price: 44_000 });
+        // After: an administrator revokes it, and the next import of the same member is refused for the price (the ordinary write still applies).
+        await b.DB.prepare('UPDATE users SET permission_overrides = ? WHERE id = ?').bind(JSON.stringify({ inspectionFees: false }), revoked.id).run();
+        const afterRes = await importUpdates(revoked, mine, [{ price: 55_000 }, { propertyAddress: '9 Changed Road, Anytown' }]);
+        expect(afterRes.status, await afterRes.clone().text()).toBe(200);
+        const after = ((await afterRes.json()) as ImportBody).data!.outbox;
+        expect(after.applied).toBe(1);
+        expect(after.failed[0]).toMatchObject({ op: 'inspection.update', status: 403 });
+        expect(await rowOf(mine.id)).toEqual({ price: 44_000, address: '9 Changed Road, Anytown' });
+        // Control: a member who still holds the capability has the same price applied.
+        const allowedRes = await importUpdates(other, theirs, [{ price: 55_000 }]);
+        expect(allowedRes.status, await allowedRes.clone().text()).toBe(200);
+        expect(((await allowedRes.json()) as ImportBody).data!.outbox).toMatchObject({ applied: 1, failed: [] });
+        expect(await rowOf(theirs.id)).toMatchObject({ price: 55_000 });
+    });
+
     it('companyFinance alone does not allow it', async () => {
         const financeOnly = await addMember('inspector', { inspectionFees: false, companyFinance: true });
         const insp = await createInspection(financeOnly, '7 Original Road, Anytown');

@@ -22,8 +22,8 @@ import { createTestDb, setupSchema } from '../db';
 import { users, tenants } from '../../../server/lib/db/schema';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const USER = 'u-enrolled';
 
@@ -61,7 +61,7 @@ describe('POST /api/auth/2fa/setup — an enrolled account', () => {
         testDb = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(setup.sqlite);
-        (mockDrizzle as unknown as { mockReturnValue(v: unknown): void }).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(tenants).values({ id: 't1', slug: 'test', createdAt: new Date() });
         await testDb.insert(users).values({
             id: USER, tenantId: 't1', email: 'e@x.com', passwordHash: 'H', role: 'owner',
@@ -71,7 +71,7 @@ describe('POST /api/auth/2fa/setup — an enrolled account', () => {
     afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
 
     it('refuses with 409 and leaves the live secret untouched', async () => {
-        const res = await buildApp().request('/api/auth/2fa/setup', { method: 'POST' }, { DB: {} });
+        const res = await buildApp().request('/api/auth/2fa/setup', { method: 'POST' }, { DB: testD1.binding });
         expect(res.status).toBe(409);
         const row = await testDb.select().from(users).where(eq(users.id, USER)).get();
         expect(row?.totpEnabled).toBe(true);
@@ -79,7 +79,7 @@ describe('POST /api/auth/2fa/setup — an enrolled account', () => {
     });
 
     it('rate-limits code entry on /2fa/verify like login does', async () => {
-        const env = { DB: {}, RATE_LIMITER: { limit: async () => ({ success: false }) } };
+        const env = { DB: testD1.binding, RATE_LIMITER: { limit: async () => ({ success: false }) } };
         const res = await buildApp().request(
             '/api/auth/2fa/verify',
             { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: '000000' }) },

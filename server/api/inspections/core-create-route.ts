@@ -4,7 +4,7 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { requireRole } from '../../lib/middleware/rbac';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
-import { CreateInspectionSchema, InspectionSchema } from '../../lib/validations/inspection.schema';
+import { CreateInspectionSchema, InspectionRecordSchema } from '../../lib/validations/inspection.schema';
 
 /**
  * POST /api/inspections
@@ -30,7 +30,7 @@ export const createInspectionRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
-                        inspection: InspectionSchema.describe('The inspection that already exists under the supplied id.'),
+                        inspection: InspectionRecordSchema.describe('The inspection that already exists under the supplied id.'),
                     })),
                 },
             },
@@ -40,7 +40,7 @@ export const createInspectionRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: createApiResponseSchema(z.object({
-                        inspection: InspectionSchema.describe('The created, or already existing, inspection'),
+                        inspection: InspectionRecordSchema.describe('The created, or already existing, inspection'),
                     })),
                 },
             },

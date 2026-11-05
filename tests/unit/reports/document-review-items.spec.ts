@@ -10,7 +10,7 @@
 //
 // The rows the fixture writes for `PCA_INSPECTION_ID` (tests/seed-fixtures.ts,
 // SEED_PCA=1) were chosen to be exactly the four states this file distinguishes.
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
     documentReviewNarrativeItems,
     documentReviewStatusPhrase,
@@ -23,8 +23,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const row = (over: Partial<DocumentReviewRow> = {}): DocumentReviewRow => ({
     label: 'Certificate of Occupancy',
@@ -112,12 +112,11 @@ describe('document review — the seeded checklist is the whole catalog', () => 
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values([
             { id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        svc = new ComplianceService({} as D1Database, 'test-encryption-secret-32-bytes-long!!');
+        svc = new ComplianceService(testD1.binding, 'test-encryption-secret-32-bytes-long!!', []);
     });
 
     it('seeding writes one row per catalog entry — the catalog IS the disclosure universe', async () => {

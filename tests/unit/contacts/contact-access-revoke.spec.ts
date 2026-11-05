@@ -13,7 +13,7 @@
  * an operator revoking access after a sale falls through cares about the
  * person, not their contact type.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { ContactService } from '../../../server/services/contact.service';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
@@ -21,8 +21,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
 const T = '11111111-1111-1111-1111-111111111111';
@@ -61,10 +61,9 @@ describe('contact access (IA-100)', () => {
     const fix = createTestDb();
     db = fix.db;
     await setupSchema(fix.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
     await seed(db);
-    svc = new ContactService({} as D1Database, new PortalAccessService({} as D1Database));
+    svc = new ContactService(testD1.binding, new PortalAccessService(testD1.binding));
   });
 
   it('lists what the contact can still open, and nothing else', async () => {

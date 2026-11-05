@@ -1,6 +1,7 @@
 import type { IcsEvent } from '../../lib/ics';
 import type { SignatureUser } from '../../lib/inspector-signature';
 import type { Constructor } from './base';
+import { escapeHtml } from '../../lib/email-templates/interpolate';
 
 /**
  * Inspection-lifecycle email methods: report-ready (link + PDF variants) and
@@ -109,8 +110,8 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                 message: args.message ?? '',
             }, {
                 subject: `Repair request — ${address}`,
-                html: `<p>A repair request list for ${address} has been shared with you.</p>
-                 <p><a href="${args.shareUrl}">View repair request</a></p>`,
+                html: `<p>A repair request list for ${escapeHtml(address)} has been shared with you.</p>
+                 <p><a href="${escapeHtml(args.shareUrl)}">View repair request</a></p>`,
             });
             if (!rendered.enabled) return;
             await this.sendRendered(rendered, [to]);

@@ -5,7 +5,7 @@
  * referred_by_contact_id column. And the repair list resolves to the STRICTER
  * of tenant policy and role bit — neither can widen the other.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -14,8 +14,8 @@ import { effectiveRepairAccess } from '../../../server/lib/people/agent-repair-a
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import agentRoutes from '../../../server/api/agent';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -35,7 +35,7 @@ async function seedBase() {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme-vis', status: 'active',
@@ -72,7 +72,7 @@ describe('agent portal visibility', () => {
 
     it('shows the inspection to a LISTING agent — visibility is the capability, not the buyer_agent key', async () => {
         await seatAs('listing_agent');
-        const rows = await listReferrals({} as D1Database, AGENT_USER, { limit: 10 });
+        const rows = await listReferrals(testD1.binding, AGENT_USER, { limit: 10 });
         expect(rows.map(r => r.id)).toContain(INSP);
     });
 
@@ -83,7 +83,7 @@ describe('agent portal visibility', () => {
             .set({ capabilityOverrides: { receivesReport: true, selfRetrieveReport: true, canHaveAccount: true, showsInAgentPortal: false, canAccessRepairList: 'readwrite' } })
             .where(eq(schema.contactRoleProfiles.id, roleProfileId('buyer_agent')));
         await seatAs('buyer_agent');
-        const rows = await listReferrals({} as D1Database, AGENT_USER, { limit: 10 });
+        const rows = await listReferrals(testD1.binding, AGENT_USER, { limit: 10 });
         expect(rows.map(r => r.id)).not.toContain(INSP);
     });
 
@@ -91,7 +91,7 @@ describe('agent portal visibility', () => {
         await seatAs('listing_agent');
         // No tenant_configs row → tenant policy defaults to 'readwrite'; the
         // listing_agent role bit is 'off' and the stricter of the two wins.
-        const rows = await listReferrals({} as D1Database, AGENT_USER, { limit: 10 });
+        const rows = await listReferrals(testD1.binding, AGENT_USER, { limit: 10 });
         expect(rows[0]?.repairAccess).toBe('off');
     });
 });
@@ -127,7 +127,7 @@ describe('referral attribution', () => {
             await next();
         });
         app.route('/api/agent', agentRoutes);
-        const res = await app.request('/api/agent/leaderboard', {}, { DB: {} } as never, EXEC_CTX);
+        const res = await app.request('/api/agent/leaderboard', {}, { DB: testD1.binding } as never, EXEC_CTX);
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { leaderboard: Array<{ agentId: string; name: string | null; total: number }> } };
         expect(body.data.leaderboard).toHaveLength(1);

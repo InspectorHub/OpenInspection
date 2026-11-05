@@ -56,7 +56,7 @@ export function parseCsvLine(line: string): string[] {
 }
 
 /** One logical record, and the 1-based line of the file it STARTED on. */
-export interface CsvRecord {
+interface CsvRecord {
     text: string;
     line: number;
 }

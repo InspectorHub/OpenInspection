@@ -2,6 +2,7 @@ import { Form, Link, useActionData, useLoaderData, useNavigation } from "react-r
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/signup";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { createApi } from "~/lib/api-client.server";
 import { createSessionWithToken } from "~/lib/session.server";
 import { makeAgentSignupSchema } from "~/lib/forms/auth.schema";
@@ -85,6 +86,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply();
   }
   const { name, email, password } = submission.value;
+  // A form posted from another site is refused before anything is spent or any session is created (login CSRF).
+  if (isCrossSitePost(request)) return submission.reply({ formErrors: [m.auth_agent_signup_error_failed()] });
   const shownContentHashRaw = fd.get("shownContentHash");
   const shownContentHash = typeof shownContentHashRaw === "string"
     && /^[0-9a-f]{64}$/.test(shownContentHashRaw) ? shownContentHashRaw : "";

@@ -65,17 +65,16 @@ describe('the OpenAPI document cannot be used as a CPU lever', () => {
         expect(SRC).toMatch(/import \{[^}]*checkRateLimit[^}]*\} from '\.\/lib\/rate-limit'/);
     });
 
-    it('the shared limiter still fails OPEN without a binding, which is why the header matters', () => {
-        // Read from the limiter itself, not restated. `checkRateLimit` no-ops
-        // when `RATE_LIMITER` is absent — correct for local dev, and the reason
-        // the cache header is not redundant with it: on a deployment with no
-        // binding provisioned, the header is the only mitigation in place.
-        const limiter = readFileSync(
-            join(__dirname, '../../../server/lib/rate-limit.ts'),
-            'utf8',
-        );
-        // The default limiter is the one `checkRateLimit` falls back to, and an
-        // absent binding returns before anything is counted.
-        expect(limiter).toMatch(/:\s*c\.env\.RATE_LIMITER;\s*if \(!binding\)\s*return/);
+    it('the shared limiter still fails OPEN without a binding, which is why the header matters', async () => {
+        // Called, not grepped. An absent binding allows, whichever limiter is named; that is correct for local dev, and the reason the
+        // cache header is not redundant with the limiter: on a deployment with no binding provisioned, the header is the only
+        // mitigation in place.
+        const { withinRateLimit } = await import('../../../server/lib/rate-limit');
+        for (const name of ['RATE_LIMITER', 'QBO_WEBHOOK_RATE_LIMITER', 'STRIPE_WEBHOOK_RATE_LIMITER', 'OAUTH_TOKEN_RATE_LIMITER'] as const) {
+            expect(await withinRateLimit({}, 'doc', '203.0.113.9', name), name).toBe(true);
+        }
+        // Control: with a binding that refuses, the same call is refused, so the true above comes from the absence, not from a limiter that allows all.
+        const refusing = { RATE_LIMITER: { limit: async () => ({ success: false }) } };
+        expect(await withinRateLimit(refusing, 'doc', '203.0.113.9')).toBe(false);
     });
 });

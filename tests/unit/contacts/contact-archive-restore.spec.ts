@@ -14,7 +14,7 @@
  * re-granting someone a report are different decisions, and only one of them is
  * being asked for here.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { ContactService } from '../../../server/services/contact.service';
 import { createTestDb, setupSchema } from '../db';
@@ -22,7 +22,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
 const OTHER_TENANT = '00000000-0000-0000-0000-0000000000c2';
@@ -35,9 +36,8 @@ describe('ContactService — archive / restore round trip', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-        svc = new ContactService({} as D1Database);
+        testD1.use(db);
+        svc = new ContactService(testD1.binding);
 
         for (const [id, slug] of [[TENANT, 'c1'], [OTHER_TENANT, 'c2']] as const) {
             await db.insert(schema.tenants).values({

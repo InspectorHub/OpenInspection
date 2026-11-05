@@ -48,8 +48,8 @@ function manualConnector() {
 }
 
 let seen: ResultsDocHandle | null = null;
-function Harness({ id, onSynced }: { id: string | null; onSynced?: () => void }) {
-  seen = useResultsDoc(id, onSynced);
+function Harness({ id, onSynced, enabled }: { id: string | null; onSynced?: () => void; enabled?: boolean }) {
+  seen = useResultsDoc(id, onSynced, enabled);
   return null;
 }
 function mount(ds: FieldDataSource, ui: React.ReactElement) {
@@ -130,6 +130,23 @@ describe('useResultsDoc', () => {
     mount(sourceWith(connector), <Harness id={null} />);
     expect(connects).toHaveLength(0);
     expect(seen).toBeNull();
+  });
+
+  it('opens no connection while disabled, closes the live one when turned off, and opens a fresh one when turned back on', () => {
+    const { connector, connects } = manualConnector();
+    const ds = sourceWith(connector);
+    const view = mount(ds, <Harness id="insp-1" enabled={false} />);
+    expect(connects).toHaveLength(0);
+    expect(seen).toBeNull();
+    view.rerender(<FieldDataSourceProvider dataSource={ds}><Harness id="insp-1" enabled /></FieldDataSourceProvider>);
+    expect(connects).toHaveLength(1);
+    expect(seen).not.toBeNull();
+    view.rerender(<FieldDataSourceProvider dataSource={ds}><Harness id="insp-1" enabled={false} /></FieldDataSourceProvider>);
+    expect(connects[0].destroyed).toBe(true);
+    expect(seen).toBeNull();
+    view.rerender(<FieldDataSourceProvider dataSource={ds}><Harness id="insp-1" enabled /></FieldDataSourceProvider>);
+    expect(connects).toHaveLength(2);
+    expect(connects[1].destroyed).toBe(false);
   });
 
   it('ignores a change that arrives after unmount', () => {

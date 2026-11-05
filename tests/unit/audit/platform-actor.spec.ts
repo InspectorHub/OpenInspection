@@ -18,8 +18,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const TENANT_ADMIN = '00000000-0000-0000-0000-000000000010';
@@ -37,7 +37,7 @@ function ctxAsPlatformStaff(platformAdminId: string): Context<HonoConfig> {
 
 function fakeContext(platformActor: { platformAdminId: string; email: string } | undefined) {
     return {
-        env: { DB: {} as D1Database },
+        env: { DB: testD1.binding },
         get: (key: string) => {
             if (key === 'tenantId') return TENANT;
             if (key === 'platformActor') return platformActor;
@@ -61,8 +61,7 @@ describe('an audit row records WHICH KIND of actor produced it', () => {
             id: TENANT, slug: 'a', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -120,7 +119,7 @@ describe('an audit row records WHICH KIND of actor produced it', () => {
         // case is already in the data; a boolean would have had to file it under
         // one of the two human answers.
         writeAuditLog({
-            db: {} as D1Database,
+            db: testD1.binding,
             tenantId: TENANT,
             action: 'migration.applied',
             entityType: 'migration_batch',

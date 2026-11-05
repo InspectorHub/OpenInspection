@@ -10,13 +10,14 @@
 // so existing callers (templates page, agent submissions) keep working
 // unchanged. Created inspection redirects the wizard to /inspections/:id/edit.
 import { z } from '@hono/zod-openapi';
+import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 
 export const CreateInspectionFromWizardSchema = z.object({
     property: z.object({
         address:      z.string().min(3).max(300).describe('Street address of the property being inspected.'),
         yearBuilt:    z.number().int().min(1700).max(2100).optional().describe('Year the building was constructed; stored on the inspection when given.'),
         sqft:         z.number().int().min(100).max(50_000).optional().describe('Building floor area in square feet; stored on the inspection when given.'),
-        propertyType: z.enum(['single_family', 'condo', 'townhouse', 'multi_family', 'commercial']).optional().describe('Kind of property, stored on the inspection when given.'),
+        propertyType: z.enum(INSPECTION_PROPERTY_TYPES).optional().describe('Kind of property, stored on the inspection when given: single_family, multi_unit or commercial. The same values every other way of creating or editing an inspection accepts.'),
         commercialSubtype: z.enum(['office', 'retail', 'hospitality', 'industrial', 'institutional', 'mixed-use']).optional().describe('Further classification of a commercial property. Applied only when propertyType is commercial and ignored otherwise.'),
     }).describe('Facts about the property being inspected.'),
     services: z.array(z.string().min(1).max(64)).min(1).max(20).describe('Services requested for this inspection, by identifier. Validated but not used to create anything on this route.'),

@@ -12,6 +12,7 @@
  * and unchanged — this suite adds a dedicated opt-out case as a regression
  * guard for that seam, in addition to the new opt-in behavior.
  */
+import { verifyRenderToken } from '../../../server/lib/render-token';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
@@ -112,7 +113,7 @@ async function seedLog(opts: { ruleId: string; inspectionId: string; recipient: 
 }
 
 /** Fake reportDelivery — the four deps are plain spies/objects (real types imported for casting only). */
-function makeReportDelivery(opts: { pdfBytes?: ArrayBuffer | null } = {}) {
+function makeReportDelivery(opts: { pdfBytes?: ArrayBuffer | null; publishedVersion?: number | null } = {}) {
     const issueToken = vi.fn(async (input: { recipientEmail: string; role?: string }) => `tok-${input.recipientEmail}-${input.role}`);
     const getOrRender = vi.fn(async () => ({ id: 'rec-1', r2Key: 'k' }));
     const pdfBytes = opts.pdfBytes === undefined ? new ArrayBuffer(8) : opts.pdfBytes;
@@ -120,16 +121,16 @@ function makeReportDelivery(opts: { pdfBytes?: ArrayBuffer | null } = {}) {
         if (pdfBytes === null) return null;
         return { arrayBuffer: async () => pdfBytes } as unknown as R2ObjectBody;
     });
-    const getContentHash = vi.fn(async () => 'hash-123');
+    const resolvePdfTarget = vi.fn(async () => ({ versionNumber: opts.publishedVersion ?? null, contentHash: 'hash-123' }));
     const reportDelivery: ReportDeliveryDeps = {
         portalAccess: { issueToken } as unknown as PortalAccessService,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         reportPdf: { getOrRender, streamPdf } as any as ReportPdfService,
-        getContentHash,
+        resolvePdfTarget,
         renderHost: 'app.example.com',
         renderSecret: 'render-secret',
     };
-    return { reportDelivery, issueToken, getOrRender, streamPdf, getContentHash };
+    return { reportDelivery, issueToken, getOrRender, streamPdf, resolvePdfTarget };
 }
 
 function makeEmailSvc(opts: { pdfDelivered?: boolean; readyDelivered?: boolean } = {}) {
@@ -191,6 +192,39 @@ describe('AutomationService.flush — report.published PDF-email delivery (Spec 
         expect(sendInspectionReportPdf).toHaveBeenCalledTimes(2);
         const links = sendInspectionReportPdf.mock.calls.map((c) => c[2]);
         expect(new Set(links).size).toBe(2); // distinct tokens per recipient
+    });
+
+    it('attaches the PUBLISHED version: the render is pinned to it and cached under it', async () => {
+        const insp = 'insp-published-version';
+        await seedInspection(insp);
+        const ruleId = await seedRule({ recipientKind: 'role', recipientRoleProfileId: roleProfileId('client') });
+        await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const { reportDelivery, getOrRender } = makeReportDelivery({ publishedVersion: 3 });
+        const { emailFor } = makeEmailSvc();
+
+        await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
+
+        const opts = (getOrRender.mock.calls[0] as unknown as [string, string, string, { reportUrl: string; versionNumber: number | null }])[3];
+        expect(opts.versionNumber).toBe(3);
+        const token = decodeURIComponent(new URL(opts.reportUrl).searchParams.get('render')!);
+        expect(await verifyRenderToken(token, 'render-secret')).toMatchObject({ versionNumber: 3 });
+    });
+
+    it('a report with no frozen version is rendered live, as before', async () => {
+        const insp = 'insp-no-version';
+        await seedInspection(insp);
+        const ruleId = await seedRule({ recipientKind: 'role', recipientRoleProfileId: roleProfileId('client') });
+        await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const { reportDelivery, getOrRender } = makeReportDelivery({ publishedVersion: null });
+        const { emailFor } = makeEmailSvc();
+        await svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery);
+
+        const opts = (getOrRender.mock.calls[0] as unknown as [string, string, string, { reportUrl: string; versionNumber: number | null }])[3];
+        expect(opts.versionNumber).toBeNull();
+        const token = decodeURIComponent(new URL(opts.reportUrl).searchParams.get('render')!);
+        expect(await verifyRenderToken(token, 'render-secret')).not.toHaveProperty('versionNumber');
     });
 
     it('PDF render failure (streamPdf returns null) falls back to the text-only sendReportReady, still tokenized, never throws', async () => {

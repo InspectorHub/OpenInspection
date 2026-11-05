@@ -1,3 +1,4 @@
+import { projectSmsConsent } from '../../lib/notifications/sms-consent-view';
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { createApiRouter } from '../../lib/openapi-router';
@@ -37,8 +38,9 @@ const SmsConsentSchema = z.object({
     phone: z.string().nullable(),
     state: z.enum(['granted', 'implied', 'revoked', 'none']),
     at: z.string().nullable(),
-    capturedVia: z.enum(['booking_form', 'optin_link', 'admin']).nullable(),
-    contactIds: z.array(z.string()),
+    capturedVia: z.enum(['booking_form', 'optin_link', 'admin', 'settings_page']).nullable(),
+    mode: z.enum(['express', 'implied']).describe('express: granting needs the disclosure; implied: turning it back on is a resume.'),
+    disclosure: z.object({ version: z.number(), text: z.string() }).nullable().describe('What the reader must see before granting, and the version recorded.'),
 }).nullable().describe('Null when this reader has no SMS identity to consent with.');
 
 const ScreenResponseSchema = z.object({
@@ -202,7 +204,7 @@ const portalNotificationPreferenceRoutes = router
         const smsConsent = await readSmsConsent(db, tenantId, 'client', asContacts(contactIds), disclosure);
         return c.json({
             success: true as const,
-            data: { ...buildScreenModel('client', chosen), smsConsent },
+            data: { ...buildScreenModel('client', chosen), smsConsent: projectSmsConsent(smsConsent) }, // projection-allow: the screen model: two lists of id, label and channels built by buildScreenModel
         }, 200);
     })
     .openapi(saveRoute, async (c) => {

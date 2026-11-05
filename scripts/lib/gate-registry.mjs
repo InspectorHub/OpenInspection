@@ -223,6 +223,10 @@ export const SCRIPT_GATES = [
     // the API once per item -- rather than one keystroke. Existing violations are frozen in
     // scripts/loader-budget-baseline.json and may only shrink.
     { key: 'loaderbudget', label: 'lint:loader-budget', script: 'check-loader-budget.mjs', fix: 'npm run lint:loader-budget', rung: PUSH },
+    // A route reachable without signing in answers with a response built from a field list, not a row or a service result.
+    // PUSH for the same reason as `loaderbudget`: it parses a few dozen route modules, and the findings that matter are the sum over a
+    // branch. Existing findings are frozen in scripts/public-projection-baseline.json and may only shrink.
+    { key: 'publicprojection', label: 'lint:public-projection', script: 'check-public-projection.mjs', fix: 'npm run lint:public-projection', rung: PUSH },
     { key: 'unwired', label: 'lint:unwired', script: 'check-unwired.mjs', fix: 'npm run lint:unwired', rung: PUSH },
     // `unwired` one level down: a field, not a module. See that script's header.
     { key: 'unreadfields', label: 'lint:unread-fields', script: 'check-unread-fields.mjs', fix: 'npm run lint:unread-fields', rung: PUSH },
@@ -255,6 +259,13 @@ export const SCRIPT_GATES = [
     { key: 'providerhelpers', label: 'lint:provider-helpers', script: 'check-provider-helpers.mjs', fix: 'npm run lint:provider-helpers', rung: PUSH },
     { key: 'notificationdispatch', label: 'lint:notification-dispatch', script: 'check-notification-dispatch.mjs', fix: 'npm run lint:notification-dispatch', rung: PUSH },
     { key: 'tests', label: 'lint:tests', script: 'check-test-layout.mjs', fix: 'npm run lint:tests', rung: PUSH },
+    // Every spec listed as shareable in tests/unit/isolation.json still obeys the rules that made it
+    // shareable (no module mock, no global or env write, no timers, no module that keeps state).
+    // PUSH, not PRECOMMIT: the walk reads ~660 specs and their import closures (about 2 s), and the
+    // failure appears in a different spec from the one that caused it, so the answer matters at the
+    // point a branch is shared, not on every commit. The CI shuffled run of the shared project is the
+    // dynamic half of the same check.
+    { key: 'unitisolation', label: 'lint:unit-isolation', script: 'check-unit-isolation.mjs', fix: 'npm run lint:unit-isolation', rung: PUSH },
     // The other direction of `tests` above, and the most expensive entry in
     // this list by an order of magnitude: it spawns `playwright test --list`
     // once per playwright config (5 today, ~10-15s in total) because Playwright

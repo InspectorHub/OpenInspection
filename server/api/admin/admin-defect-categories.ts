@@ -16,6 +16,7 @@ import {
 } from '../../lib/validations/defect-category.schema';
 import { DefectCategoryService } from '../../services/inspection/defect-category.service';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { withoutCompanyId } from '../../lib/response-projection';
 
 const DefectCategoryResponse = z.object({
     success: z.literal(true).describe('Always true on success.'),
@@ -98,7 +99,7 @@ app.openapi(listDefectCategoriesRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const svc = new DefectCategoryService(c.env.DB);
     const data = await svc.ensureSeed(tenantId);
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: data.map(withoutCompanyId) }, 200);
 });
 app.openapi(createDefectCategoryRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -106,7 +107,7 @@ app.openapi(createDefectCategoryRoute, async (c) => {
     const svc = new DefectCategoryService(c.env.DB);
     const row = await svc.create(tenantId, input);
     auditFromContext(c, 'defect_category.created', 'defect_category', { entityId: row.id, metadata: { name: row.name } });
-    return c.json({ success: true as const, data: row }, 201);
+    return c.json({ success: true as const, data: withoutCompanyId(row) }, 201);
 });
 app.openapi(updateDefectCategoryRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -116,7 +117,7 @@ app.openapi(updateDefectCategoryRoute, async (c) => {
     const updated = await svc.update(tenantId, id, patch);
     if (!updated) throw Errors.NotFound('Defect category not found');
     auditFromContext(c, 'defect_category.updated', 'defect_category', { entityId: id });
-    return c.json({ success: true as const, data: updated }, 200);
+    return c.json({ success: true as const, data: withoutCompanyId(updated) }, 200);
 });
 app.openapi(deleteDefectCategoryRoute, async (c) => {
     const tenantId = c.get('tenantId');

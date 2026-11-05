@@ -31,14 +31,14 @@
  * count is the only thing that can say so. Asserting the reply alone would pass
  * against an applier that corrected the report AND reported a refusal.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { applyReportCorrection } from '../../../server/portal/apply-report-correction';
 import { ReportVersionService } from '../../../server/services/report-version.service';
@@ -74,7 +74,7 @@ describe('applyReportCorrection — the applier behind cmd.report.correct', () =
         db = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -95,14 +95,14 @@ describe('applyReportCorrection — the applier behind cmd.report.correct', () =
     const apply = (
         over: Record<string, unknown> = {},
         opts: { correctedBy?: string } = { correctedBy: AUTHORISED_BY },
-    ) => applyReportCorrection({} as D1Database, SECRET, { ...DATA, ...over }, opts);
+    ) => applyReportCorrection(testD1.binding, SECRET, { ...DATA, ...over }, opts);
 
     const versionCount = async () =>
         (await db.select().from(schema.reportVersions)
             .where(eq(schema.reportVersions.inspectionId, INSPECTION)).all()).length;
 
     it('carries the correction out and the amendment is really in the ledger', async () => {
-        await new ReportVersionService({} as D1Database, SECRET)
+        await new ReportVersionService(testD1.binding, SECRET, [])
             .snapshotOnPublish(TENANT, INSPECTION, ACTOR);
 
         const reply = await apply();
@@ -130,8 +130,21 @@ describe('applyReportCorrection — the applier behind cmd.report.correct', () =
 
         // And the deliverables served for this inspection stop calling
         // themselves current, which is what the correction is FOR.
-        expect(await resolveArtifactStatus({} as D1Database, TENANT, INSPECTION, PRODUCED_AT))
+        expect(await resolveArtifactStatus(testD1.binding, TENANT, INSPECTION, PRODUCED_AT))
             .toBe('superseded');
+    });
+
+    it('corrects a postal code to a real value as given, and a placeholder clears it instead of storing it', async () => {
+        const stored = async () => (await db.select({ zip: schema.inspections.addressZip }).from(schema.inspections)
+            .where(eq(schema.inspections.id, INSPECTION)).get())?.zip;
+        await apply({ field: 'addressZip', to: ' 78701 ' });
+        expect(await stored()).toBe('78701');
+        // Control: a placeholder is read as none (null), exactly as on every other write path.
+        await apply({ field: 'addressZip', to: '-' });
+        expect(await stored()).toBeNull();
+        // And an ordinary address correction is still taken verbatim.
+        await apply({ field: 'propertyAddress', to: '-' });
+        expect((await db.select({ a: schema.inspections.propertyAddress }).from(schema.inspections).where(eq(schema.inspections.id, INSPECTION)).get())?.a).toBe('-');
     });
 
     it('refuses an inspection this tenant does not hold, and publishes nothing', async () => {
@@ -174,4 +187,16 @@ describe('applyReportCorrection — the applier behind cmd.report.correct', () =
         await expect(apply({}, {})).rejects.toThrow(/authorising record/i);
         expect(await versionCount()).toBe(0);
     });
+
+    it('a correction after the signing secret was rotated succeeds when the earlier secret is supplied, and fails (retryably) without it', async () => {
+        const NEW_SECRET = 'rotated-encryption-secret-key-9999';
+        await new ReportVersionService(testD1.binding, SECRET, []).snapshotOnPublish(TENANT, INSPECTION, ACTOR);
+        // Without the earlier secret the stored signing key cannot be opened: the command throws, so the queue retries it.
+        await expect(applyReportCorrection(testD1.binding, NEW_SECRET, { ...DATA }, { correctedBy: AUTHORISED_BY })).rejects.toThrow(/cannot be opened/);
+        expect(await versionCount()).toBe(1);
+        const reply = await applyReportCorrection(testD1.binding, NEW_SECRET, { ...DATA }, { correctedBy: AUTHORISED_BY }, [SECRET]);
+        expect(reply).toMatchObject({ outcome: 'corrected', versionNumber: 2 });
+        expect(await versionCount()).toBe(2);
+    });
+
 });

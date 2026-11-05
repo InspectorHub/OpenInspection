@@ -5,16 +5,24 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 
-let createdAt: Date | null = null;
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: () => ({ select: () => ({ from: () => ({ where: () => ({ get: async () => (createdAt ? { createdAt } : undefined) }) }) }) }),
-}));
-
+import { createTestDb } from '../db';
+import { d1For } from '../helpers/d1-binding';
+import * as schema from '../../../server/lib/db/schema';
 import { buildOutboundCoolingWindow, COOLING_WINDOW_MS } from '../../../server/lib/email/outbound-cooling-window';
 import { ErrorCode } from '../../../server/lib/errors';
 
 const NOW = 1_800_000_000_000;
-const port = (verifier?: () => Promise<boolean>) => buildOutboundCoolingWindow({} as D1Database, 't1', () => NOW, verifier);
+
+/** A database holding company `t1`, created at `createdAt`: the one fact the cooling window reads. */
+function companyCreatedAt(createdAt: Date): D1Database {
+    const { db, sqlite } = createTestDb();
+    db.insert(schema.tenants).values({
+        id: 't1', slug: 't1', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt,
+    } as never).run();
+    return d1For(sqlite);
+}
+let createdAt: Date = new Date(NOW);
+const port = (verifier?: () => Promise<boolean>) => buildOutboundCoolingWindow(companyCreatedAt(createdAt), 't1', () => NOW, verifier);
 
 describe('cooling window with human verification', () => {
     it('refuses inside the window when the request carries no token (API / MCP callers)', async () => {
@@ -31,7 +39,7 @@ describe('cooling window with human verification', () => {
 
     it('carries the site key on the refusal, so a page without a session can show the check', async () => {
         createdAt = new Date(NOW - 60_000);
-        const p = buildOutboundCoolingWindow({} as D1Database, 't1', () => NOW, undefined, 'site-key-1');
+        const p = buildOutboundCoolingWindow(companyCreatedAt(createdAt), 't1', () => NOW, undefined, 'site-key-1');
         await expect(p.check('report-ready')).rejects.toMatchObject({ details: { turnstileSiteKey: 'site-key-1' } });
     });
 

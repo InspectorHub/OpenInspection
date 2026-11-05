@@ -15,11 +15,9 @@ import * as schema from '../../../server/lib/db/schema';
 // the harness in auth.service.spec.ts. AuthService.getDrizzle() calls
 // drizzle(this.db), so the mock returns the test db regardless of the ctor's
 // first arg.
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: vi.fn(),
-}));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = 't1';
 
@@ -35,7 +33,7 @@ describe('AuthService.findLoginUser — tenant-scoped, fail-closed row selection
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
 
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         mockKV = new MockKV();
 
         await testDb.insert(tenants).values({
@@ -65,7 +63,7 @@ describe('AuthService.findLoginUser — tenant-scoped, fail-closed row selection
             createdAt: new Date(),
         } as any);
 
-        authService = new AuthService({} as any, mockKV as any);
+        authService = new AuthService(testD1.binding, mockKV as any);
     });
 
     afterEach(() => {

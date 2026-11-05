@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
@@ -16,8 +16,8 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-    svc = new SmsConsentService({} as D1Database);
+    testD1.use(db);
+    svc = new SmsConsentService(testD1.binding);
     await svc.publishDisclosure('By providing your number you agree to receive texts.');
 });
 

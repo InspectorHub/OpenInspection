@@ -3,6 +3,7 @@ import { tenants, users } from '../tenant';
 import { INSPECTION_STATUSES } from '../../../status/inspection-status';
 import { REPORT_STATUSES } from '../../../status/report-status';
 import { CANCELLATION_REASONS } from '../../../cancellation-reason';
+import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 import { templates } from './template-rating';
 import { discountCodes } from './services';
 
@@ -145,7 +146,9 @@ export const inspections = sqliteTable('inspections', {
     // Decides what the report becomes: resolveReportTier() reads it to tell
     // commercial from residential, section applicability filters on it, and the
     // editor's Property Info preset resolves only when it is 'commercial'.
-    propertyType:        text('property_type'),
+    // Every writer validates against this list and null means unclassified. The enum is type-level only (no DDL), so a row written
+    // before the lists were unified can still hold another value: readers compare with equality and must not assume the enum.
+    propertyType:        text('property_type', { enum: [...INSPECTION_PROPERTY_TYPES] }),
     // Plain text because org-custom subtypes live alongside the platform ids.
     // Meaningful only when property_type = 'commercial': it selects the editor's
     // metadata preset (`commercial:<id>`) and gates template sections through

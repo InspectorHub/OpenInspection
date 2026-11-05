@@ -28,6 +28,9 @@ import { guardActOnJob } from './act-guard';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { translateOnPublishForRequest } from '../../lib/translation/on-publish';
+import { SnapshotTooLargeError } from '../../lib/report-snapshot-build';
+import { setCollabDocLocks } from '../../lib/collab/doc-lock-notify';
+import { Errors } from '../../lib/errors';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
 /**
@@ -163,7 +166,7 @@ const unpublishReportRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/unpublish',
     tags: ['inspections'],
-    summary: 'Unpublish a published report',
+    summary: 'Retract (unpublish) a published report',
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('publish'), guardActOnJob] as const,
     request: {
         params: z.object({ id: z.string().describe('Inspection id') }),
@@ -177,7 +180,7 @@ const unpublishReportRoute = createRoute(withMcpMetadata({
         403: { description: 'Missing publish capability' },
     },
     operationId: 'unpublishReport',
-    description: 'Transitions reportStatus from published → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.',
+    description: 'Retracts a published report: it is withdrawn from clients and goes back to a draft (reportStatus published → in_progress, every report of the inspection back to a draft), and every client and agent link to the inspection expires at once. To keep working on a report WITHOUT withdrawing it, use the edit-again route instead. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403.',
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -206,14 +209,14 @@ const publishRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: createApiResponseSchema(z.object({ reportUrl: z.string(), reportStatus: z.string(), isnSync: z.object({ ok: z.boolean(), isnReportId: z.string().optional(), error: z.string().optional() }).nullable().describe('Outcome of adding the report link to the ISN order named in Reference Number; null when ISN is not configured or the inspection has no Reference Number.') })),
+                    schema: createApiResponseSchema(z.object({ reportUrl: z.string(), reportStatus: z.string(), isnSync: z.object({ ok: z.boolean(), isnReportId: z.string().optional(), error: z.string().optional() }).nullable().describe('Outcome of adding the report link to the ISN order named in Reference Number; null when ISN is not configured or the inspection has no Reference Number.'), unchangedSinceVersion: z.number().int().optional().describe('Present only when nothing had changed since this version, so nothing was published: no new version, no notices. Absent on a real publish.') })),
                 },
             },
             description: 'Published',
         },
     },
     operationId: "publishInspection",
-    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+    description: "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules on a first publish, so any client or agent notification is decided by those rules; a first publish close to a sibling report's delivery may be coalesced into that notification. A re-publish of a report that was opened with edit-again (clients still read its last version) is an amendment: it fires the report.amended rules only when notifyClient is true (default false). The choice covers every report-updated rule, not just the client's: with false none fire (the client's, the buyer's agent's, any custom or in-app one) and the report's notified-at stamp is left untouched, so an API or MCP caller that omits notifyClient on an amendment sends no report-updated notices. The response does not say whether notices were suppressed. When the publish is answered as unchanged, unchangedSinceVersion names the version still current. A republish after a retract is a fresh delivery and is decided by the rules as a first publish is. Also applies the automatic signature if one is configured, saves a frozen version snapshot (recorded with the optional summary; a report whose frozen copy would exceed 1 MB is refused with 413 before anything is published; the snapshot write is retried once and a second failure is logged as an error without failing the publish), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
 }, { scopes: ['write'], tier: 'extended', capability: 'publish' }));
 
 /**
@@ -363,11 +366,24 @@ publishRoutes.openapi(publishRoute, async (c) => {
         requireSignature: body.requireSignature,
         requirePayment: body.requirePayment,
         sendAgreementCopy: body.sendAgreementCopy,
+        notifyClient: body.notifyClient,
         ...(body.recipients ? { recipients: body.recipients } : {}),
         ...(body.reportId ? { reportId: body.reportId } : {}),
         actor: { userId: c.get('user').sub, role: c.get('userRole') },
     };
-    const result = await service.publishInspection(id, tenantId, publishOptions);
+    // A frozen copy of the report is what clients read from now on, so a report whose copy cannot be stored
+    // is refused HERE, before anything is marked published, with the size and what to do about it.
+    if (c.get('user')?.sub) {
+        try {
+            await c.var.services.reportVersion.assertSnapshotFits(tenantId, id, body.reportId);
+        } catch (err) {
+            if (err instanceof SnapshotTooLargeError) throw Errors.PayloadTooLarge(err.message);
+            throw err;
+        }
+    }
+    const { amendment, ...result } = await service.publishInspection(id, tenantId, publishOptions);
+    // The published report takes no edits: open sockets of its document are closed with 4409 (inspection-doc-lock).
+    await setCollabDocLocks(c.env, getDrizzle(c), tenantId, id, true, body.reportId ? { reportId: body.reportId } : { primary: true });
 
     // A verified person vouches for the report emails this publish queued, delayed ones included.
     await stampIfHumanVerified(c.get('humanVerified'), getDrizzle(c), tenantId, id);
@@ -377,34 +393,24 @@ publishRoutes.openapi(publishRoute, async (c) => {
     // `return`: everything between is best-effort follow-on work, and the
     // PDF pipeline's slug/hash/footer lookups are awaited outside a try — a
     // throw there would drop the row for a publish that already happened.
-    // F79 — says WHAT was published, deliberately not WHO was told. It used to
-    // copy `notifyClient`/`notifyAgent` out of the body and nothing honoured
-    // them: delivery is the workspace's `report.published` automation rules'
-    // decision, so a publish marked "notify nobody" was RECORDED as such while
-    // every rule fired and the mail went out. An always-guessed field is worse
-    // than an absent one; who was told is in the automation logs and delivery rows.
+    // Says WHAT was published and, for an amendment, the publisher's notify choice (honoured: it decides whether the
+    // report-updated rules fire). Who was actually told is in the automation logs and delivery rows.
     auditFromContext(c, 'inspection.published', 'inspection', {
         entityId: id,
-        metadata: { reportId: body.reportId },
+        metadata: { reportId: body.reportId, amendment, ...(amendment ? { notifyClient: body.notifyClient } : {}) },
     });
 
     // #23 — the courtesy translation, when the publisher asked for one on
     // THIS publish. Never blocks: a translation that could not be produced
     // leaves the English report published and correct, which is the state
     // the feature degrades to by design. See lib/translation/on-publish.ts.
-    c.executionCtx.waitUntil(
-        translateOnPublishForRequest(c, id, body.translateTo ?? null, body.reportId),
-    );
-
-    // Design System 0520 subsystem D phase 9 — Republish snapshot.
-    // After the inspection's status flips to published, persist a frozen
-    // snapshot into report_versions so the customer-facing viewer can
-    // browse history + diff. Best-effort: failures log but do NOT block
-    // the publish response. snapshot-too-large (> 1 MB) downgrades to a
-    // warning audit entry rather than a 5xx — the report itself remains
-    // viewable through the existing /reports/:id path.
+    // Republish snapshot. After the status flips to published, persist a frozen snapshot into report_versions:
+    // it is what clients read from now on, and the history the diff viewer browses. A report too large to
+    // freeze never gets here (refused above, before the flip). The insert is retried once; a failure after
+    // that does not block the publish response (the report is already out) and is logged as an error.
     const userId = (c.get('user') as { sub?: string } | undefined)?.sub;
     let publishedVersion: number | null = null;
+    let publishedHash: string | null = null;
     if (userId) {
         try {
             // The version chain is per REPORT. Passing the id through is
@@ -414,17 +420,27 @@ publishRoutes.openapi(publishRoute, async (c) => {
                 tenantId, id, userId, body.summary, body.reportId,
             );
             publishedVersion = out.versionNumber;
+            publishedHash = out.contentHash;
             logger.info('report-version snapshot saved', {
                 inspectionId:  id,
                 versionNumber: out.versionNumber,
             });
         } catch (err) {
-            logger.warn('report-version snapshot failed (non-fatal)', {
+            // Loud on purpose: the report is already marked published, so from here on there is no frozen copy of
+            // it. Clients are served the live report until the next publish succeeds. The ids are what to look up.
+            logger.error('report-version snapshot failed after publish: the report has no frozen version', {
+                tenantId,
                 inspectionId: id,
-                error:        err instanceof Error ? err.message : String(err),
-            });
+                reportId:     body.reportId ?? null,
+            }, err instanceof Error ? err : undefined);
         }
     }
+
+    // Started once the version exists: the translation is made from the version the client will read, and a
+    // translation made from anything else would be withheld from that very report as stale.
+    c.executionCtx.waitUntil(
+        translateOnPublishForRequest(c, id, body.translateTo ?? null, body.reportId, publishedVersion),
+    );
 
     // Purge transient (versionNumber=null) cached PDFs now that a frozen version
     // exists. Subsequent everyday downloads will render fresh current content
@@ -449,11 +465,13 @@ publishRoutes.openapi(publishRoute, async (c) => {
     if (await reportPdf.isPipelineEnabled(tenantId)) {
         const tenantSlug = await resolveTenantSlug(c, tenantId);
         // renderUrl: token-bearing URL for the headless browser PDF render.
-        const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
+        // Rendered from the version this publish froze, like every later read of it.
+        const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET, publishedVersion ?? undefined);
         const sourceVersion = Date.now();
         // Content hash enables post-publish owner/client downloads to reuse this
         // render instead of triggering a second Browser Rendering call.
-        const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+        // The version's own hash, the key its download is looked up under, so the first download reuses this render.
+        const contentHash = publishedHash ?? await c.var.services.inspection.getReportContentHash(id, tenantId);
         const footer = await c.var.services.inspection.getReportPdfFooterContext(id, tenantId);
         const renderBoth = async () => {
             try {
@@ -518,6 +536,8 @@ publishRoutes.openapi(unpublishReportRoute, async (c) => {
     // report the inspector has withdrawn. Expire all of this inspection's
     // access tokens immediately.
     await c.var.services.portalAccess.setExpiryForInspection(tenantId, id, Date.now());
+    await setCollabDocLocks(c.env, getDrizzle(c), tenantId, id, false, { allReportsOf: true });
+    auditFromContext(c, 'inspection.report_retracted', 'inspection', { entityId: id });
     return c.json({ success: true as const, data: { reportStatus: REPORT_STATUS.IN_PROGRESS } }, 200);
 });
 

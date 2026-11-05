@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import * as schema from '../../../server/lib/db/schema';
 import calendarItemsRoutes from '../../../server/api/calendar-items';
 import { listCalendarItems } from '../../../server/services/calendar-items.service';
@@ -9,9 +8,8 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { createTestDb, setupSchema } from '../db';
 import { ALL_INSPECTIONS } from '../../../server/lib/inspection/visibility';
 
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: vi.fn(),
-}));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000aa';
 const OTHER_TENANT = '00000000-0000-0000-0000-0000000000bb';
@@ -32,7 +30,7 @@ function buildApp(userId: string, role: Role) {
     app.route('/api/calendar', calendarItemsRoutes);
     return {
         app,
-        env: { DB: {} as D1Database },
+        env: { DB: testD1.binding },
     };
 }
 
@@ -45,8 +43,7 @@ describe('calendar items feed', () => {
         testDb = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         const now = new Date();
         await testDb.insert(schema.tenants).values([
@@ -176,7 +173,7 @@ describe('calendar items feed', () => {
     it('returns all tenant inspections for an unfiltered team query', async () => {
         await seedInspections();
 
-        const items = await listCalendarItems({} as D1Database, TENANT, {
+        const items = await listCalendarItems(testD1.binding, TENANT, {
             start: '2026-08-01',
             end: '2026-08-05',
         }, ALL_INSPECTIONS);
@@ -204,7 +201,7 @@ describe('calendar items feed', () => {
     it('filters inspections to selected assignees through the assignment table', async () => {
         await seedInspections();
 
-        const items = await listCalendarItems({} as D1Database, TENANT, {
+        const items = await listCalendarItems(testD1.binding, TENANT, {
             start: '2026-08-01',
             end: '2026-08-05',
             userIds: [OTHER_INSPECTOR],
@@ -274,7 +271,7 @@ describe('calendar items feed', () => {
             },
         ]);
 
-        const items = await listCalendarItems({} as D1Database, TENANT, {
+        const items = await listCalendarItems(testD1.binding, TENANT, {
             start: '2026-08-01',
             end: '2026-08-05',
             userIds: [INSPECTOR],

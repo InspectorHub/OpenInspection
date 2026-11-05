@@ -40,9 +40,12 @@ export type ResultsDocHost = Pick<ConnectOptions, 'persistence' | 'wsUrl' | 'sub
  * `onSynced` (optional) is invoked each time the collab socket (re)syncs with the
  * DO — the editor passes a media-queue drain trigger. It is held in a ref so a
  * changing callback identity never re-creates the connection (the effect only
- * re-runs on `inspectionId` or a different data source).
+ * re-runs on `inspectionId`, a different data source, or `enabled` flipping: turning it back on opens a FRESH
+ * connection, which is how a report reopened for editing gets a live socket again). `connectionKey` is for a caller whose
+ * connection means something different after a change the hook cannot see (the editor's read-only state): a new key is a
+ * new connection.
  */
-export function useResultsDoc(inspectionId: string | null, onSynced?: () => void): ResultsDocHandle | null {
+export function useResultsDoc(inspectionId: string | null, onSynced?: () => void, enabled = true, connectionKey = ''): ResultsDocHandle | null {
     const { collab } = useFieldDataSource();
     const [handle, setHandle] = useState<ResultsDocHandle | null>(null);
 
@@ -51,8 +54,10 @@ export function useResultsDoc(inspectionId: string | null, onSynced?: () => void
     onSyncedRef.current = onSynced;
 
     useEffect(() => {
-        // No id → collab disabled; do not connect (hook yields null).
-        if (!inspectionId) {
+        // No id, or the caller does not want a connection (a read-only editor has nothing to sync, and a server that
+        // refuses writes answers every open with a close): do not connect, and drop any earlier handle so a stale
+        // `locked` cannot outlive the connection it described.
+        if (!inspectionId || !enabled) {
             setHandle(null);
             return;
         }
@@ -61,7 +66,7 @@ export function useResultsDoc(inspectionId: string | null, onSynced?: () => void
         let live: ReturnType<typeof collab.connect> | null = null;
         let closed = false;
         const snapshot = (): ResultsDocHandle | null =>
-            live === null ? null : { doc: live.doc, persistenceSynced: persisted, synced: live.synced() };
+            live === null ? null : { doc: live.doc, persistenceSynced: persisted, synced: live.synced(), locked: live.locked?.() ?? false };
         const publish = (): void => {
             if (closed) return;
             const next = snapshot();
@@ -90,7 +95,7 @@ export function useResultsDoc(inspectionId: string | null, onSynced?: () => void
             closed = true;
             live?.destroy();
         };
-    }, [inspectionId, collab]);
+    }, [inspectionId, collab, enabled, connectionKey]);
 
     return handle;
 }

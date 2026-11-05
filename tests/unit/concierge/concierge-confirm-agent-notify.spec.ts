@@ -17,8 +17,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { EmailService } from '../../../server/services/email.service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { asD1Db } from '../helpers/test-db';
 import { hashToken } from '../../../server/lib/token-hash';
 
@@ -37,7 +37,7 @@ describe('ConciergeService.confirmByClient — buyer_agent notify sourcing (Task
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: T1, slug: 'acme-confirm-notify', status: 'active',
@@ -57,7 +57,7 @@ describe('ConciergeService.confirmByClient — buyer_agent notify sourcing (Task
             paymentStatus: 'unpaid', price: 0, paymentRequired: false, agreementRequired: false,
             createdAt: new Date(),
         });
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(T1, INSP, AGENT_CONTACT, roleProfileId('buyer_agent'));
 
         await db.insert(schema.conciergeConfirmTokens).values({
@@ -75,7 +75,7 @@ describe('ConciergeService.confirmByClient — buyer_agent notify sourcing (Task
 
         stubEmail = { sendConciergeConfirmedToAgent: vi.fn().mockResolvedValue(undefined) };
         svc = new ConciergeService(
-            {} as D1Database,
+            testD1.binding,
             async () => stubEmail as unknown as EmailService,
             'https://acme.example.com',
         );

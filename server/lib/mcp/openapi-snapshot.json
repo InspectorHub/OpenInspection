@@ -1428,7 +1428,7 @@
       }
     },
     "summary": "Create agent for current tenant",
-    "description": "Self-serve signup for a real-estate agent. Public: no session is needed. Creates an agent account that belongs to no single company, records acceptance of the agent terms currently in force (version, content hash, time, IP and country are taken from the server, never from the caller), links the account to every company that already holds this email as an agent contact, and signs the new agent in with a 24-hour session cookie. Refused with 400 when the bot challenge is missing or fails, when the deployment has published no agent terms, when shownContentHash no longer matches the terms in force, or when termsAccepted is not true. An email that already has an account returns 409. Not idempotent: a repeat with the same email is a 409."
+    "description": "Self-serve signup for a real-estate agent. Public: no session is needed. Creates an agent account that belongs to no single company, records acceptance of the agent terms currently in force (version, content hash, time, IP and country are taken from the server, never from the caller), links the account to every company that already holds this email as an agent contact, and signs the new agent in with a 24-hour session cookie. Refused with 400 when the bot challenge is missing or fails, when the deployment has published no agent terms, when shownContentHash no longer matches the terms in force, or when termsAccepted is not true. An email that already has an account (of any kind, agent or company staff) returns 409. That answer is a known, accepted account-existence signal: it comes only after the rate limit, the bot challenge and the terms checks, it says nothing more than that the address has an account, and a sign-up form cannot avoid it without sending the new agent a confirmation email instead. Not idempotent: a repeat with the same email is a 409."
   },
   {
     "operationId": "createAgentConciergeBook",
@@ -1621,7 +1621,8 @@
           "signatureBase64": {
             "type": "string",
             "minLength": 1,
-            "description": "The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail"
+            "maxLength": 500000,
+            "description": "The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail. 1-500000 characters."
           },
           "onBehalfOf": {
             "type": "string",
@@ -1641,7 +1642,7 @@
       }
     },
     "summary": "Submit client signature (public, token-gated)",
-    "description": "Record a remote signature for one signer of an agreement, identified by the token in their personal signing link. Public: the token is the only credential. The signature is refused with 400 unless the signing audit trail already shows this signer was presented this exact agreement text, which happens when they open it through the get-agreement route. It also writes a signer.signed entry to that trail with IP, country, user agent and a hash of the signature image, stores the signature, and fires the per-signature automation trigger. When this signature completes the envelope under its completion policy, the completion pipeline runs exactly once (audit entry, verification token, completion workflow, admin notification, completion automation and confirmation email). The signer is also emailed a receipt with a verification link, except when their signature completed the envelope and they are the envelope's client, who gets the completion email instead. A signer who declined or whose request expired gets 409, and an unknown token gets 404. Repeating the call for a signer who already signed does not change the stored signature, but it can still append another audit entry and resend the receipt."
+    "description": "Record a remote signature for one signer of an agreement, identified by the token in their personal signing link. Public: the token is the only credential. The signature is refused with 400 unless the signing audit trail already shows this signer was presented this exact agreement text, which happens when they open it through the get-agreement route. It also writes a signer.signed entry to that trail with IP, country, user agent and a hash of the signature image, stores the signature, and fires the per-signature automation trigger. When this signature completes the envelope under its completion policy, the completion pipeline runs exactly once (audit entry, verification token, completion workflow, admin notification, completion automation and confirmation email). The signer is also emailed a receipt with a verification link, except when their signature completed the envelope and they are the envelope's client, who gets the completion email instead. The drawing must be valid base64 image data, otherwise 400. A signer who declined or whose request has expired (the signature is not accepted on an expired envelope) gets 409, and so does a signer whose signature is still being recorded by another request: the answer is then to try again in a moment, and nothing is written. An unknown token gets 404. Repeating the call for a signer whose signing was confirmed answers 200: the stored signature is kept, no further audit entry is written and the receipt is not sent again, but if an earlier attempt stopped before the envelope was rolled forward, the repeat completes it, once. If the audit entry cannot be written the signature is refused with 503 and nothing is stored, so the signer can retry."
   },
   {
     "operationId": "createBookingBook",
@@ -4923,15 +4924,18 @@
               "properties": {
                 "id": {
                   "type": "string",
-                  "description": "Stable attachment identifier within the message."
+                  "maxLength": 64,
+                  "description": "Stable attachment identifier within the message. Up to 64 characters."
                 },
                 "key": {
                   "type": "string",
-                  "description": "R2 object key the attachment bytes are stored under."
+                  "maxLength": 300,
+                  "description": "R2 object key the attachment bytes are stored under. Up to 300 characters."
                 },
                 "name": {
                   "type": "string",
-                  "description": "Original uploaded filename."
+                  "maxLength": 255,
+                  "description": "Original uploaded filename. Up to 255 characters."
                 },
                 "size": {
                   "type": "number",
@@ -4939,7 +4943,8 @@
                 },
                 "type": {
                   "type": "string",
-                  "description": "Detected MIME type of the attachment."
+                  "maxLength": 100,
+                  "description": "Detected MIME type of the attachment. Up to 100 characters."
                 },
                 "uploadedAt": {
                   "type": "number",
@@ -5789,9 +5794,23 @@
           "metadata": {
             "type": "object",
             "additionalProperties": {
-              "nullable": true
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true
+                }
+              ]
             },
-            "description": "Free-form details about the event, stored with it as sent. Optional."
+            "description": "Small details about the event (at most 10 keys, short text, number or boolean values), stored with it. Optional."
           }
         },
         "required": [
@@ -5904,7 +5923,7 @@
       }
     },
     "summary": "Decline agreement (public, token-gated)",
-    "description": "Decline an agreement as one signer, identified by the token in their personal signing link. Public: the token is the only credential. Marks that signer declined, writes a signer.declined entry (with reason, IP, country and user agent) to the signing audit trail, and recomputes the envelope status under its completion policy. The agreement-declined automation fires only when the whole envelope ends up declined. A signer who already signed or whose request expired gets 409; declining again after a decline succeeds without further change to the signer's status. 404 for an unknown token."
+    "description": "Decline an agreement as one signer, identified by the token in their personal signing link. Public: the token is the only credential. Marks that signer declined, writes a signer.declined entry (with reason, IP, country and user agent) to the signing audit trail, and recomputes the envelope status under its completion policy. The agreement-declined automation fires only when the whole envelope ends up declined. A signer who already signed or whose request expired gets 409, and so does a signer whose signature is still being recorded (a recording that stopped for more than two minutes no longer blocks a decline); declining again after a decline succeeds without further change to the signer's status. 404 for an unknown token."
   },
   {
     "operationId": "declineTenantImport",
@@ -7476,6 +7495,41 @@
     "description": "Creates a non-seeded copy of the template with \" (Copy)\" appended to its name."
   },
   {
+    "operationId": "editPublishedReportAgain",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/edit-again",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "description": "Which report to open for editing. Absent: the inspection's primary report."
+          }
+        }
+      }
+    },
+    "summary": "Edit a published report again (Edit and republish)",
+    "description": "Lifts the publish lock on one report so its content can be changed again: until then every content write answers 409 REPORT_PUBLISHED. The report is NOT withdrawn: no client link expires, nothing is sent, and clients keep reading the latest published version until a new publish freezes the next one. Use the unpublish route to withdraw a report instead. Calling it on a report that is already being edited again answers the same 200. An inspection with no report row (not yet backfilled) answers 404, as the collaborative editor does. Requires the publish capability, like publishing. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+  },
+  {
     "operationId": "emailRepairRequestShare",
     "method": "POST",
     "pathTemplate": "/api/public/repair-request/share/{shareToken}/email",
@@ -7505,7 +7559,8 @@
           },
           "message": {
             "type": "string",
-            "description": "Optional personal message included in the email."
+            "maxLength": 1000,
+            "description": "Optional personal message included in the email, up to 1000 characters."
           }
         },
         "required": [
@@ -7514,7 +7569,7 @@
       }
     },
     "summary": "Email a shared repair request link (publish-gated)",
-    "description": "Sends the share URL to a contractor or other recipient. Rate-limited. Report must be published."
+    "description": "Sends the share URL to a contractor or other recipient. Limited per minute and per day per share link, per recipient address and per company. Report must be published."
   },
   {
     "operationId": "exportInspectionCostItemsCsv",
@@ -9350,6 +9405,16 @@
             "type": "string",
             "description": "Inspection id."
           }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent portal access token of the recipient; without it the payload carries no signer link.",
+          "schema": {
+            "type": "string",
+            "description": "Persistent portal access token of the recipient; without it the payload carries no signer link."
+          }
         }
       ],
       "body": null
@@ -9449,10 +9514,10 @@
           "name": "key",
           "in": "query",
           "required": true,
-          "description": "R2 object key (`${tenantId}/${inspectionId}/...`).",
+          "description": "Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<id>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working.",
           "schema": {
             "type": "string",
-            "description": "R2 object key (`${tenantId}/${inspectionId}/...`)."
+            "description": "Photo key as a report response states it, relative to the company: `inspections/<inspectionId>/...` (a credential badge: `credentials/<id>/logo-...`). The full form `<companyId>/inspections/<inspectionId>/...` is also accepted, so links issued earlier keep working."
           }
         },
         {
@@ -9493,6 +9558,16 @@
           "schema": {
             "type": "string",
             "description": "Optional max width in px for an on-the-fly WebP thumbnail; omitted serves the original."
+          }
+        },
+        {
+          "name": "v",
+          "in": "query",
+          "required": false,
+          "description": "Badge render variant for a credential badge key: email | reportSignature | reportCover. Omitted or unrecognised serves the original, never an error.",
+          "schema": {
+            "type": "string",
+            "description": "Badge render variant for a credential badge key: email | reportSignature | reportCover. Omitted or unrecognised serves the original, never an error."
           }
         }
       ],
@@ -9550,6 +9625,136 @@
     },
     "summary": "Download the frozen archived PDF for a verified report version",
     "description": "Public, no-login download of the immutable archived PDF for a specific published report version. Identified by the report_versions verification token (same token as the verifier page). Rendered once on-demand and cached forever by version number."
+  },
+  {
+    "operationId": "getPublicReportVideo",
+    "method": "GET",
+    "pathTemplate": "/api/public/report/{tenant}/{id}/video/r2-object/{mediaId}",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (display only; tenant is resolved from the proof).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (display only; tenant is resolved from the proof)."
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id."
+          }
+        },
+        {
+          "name": "mediaId",
+          "in": "path",
+          "required": true,
+          "description": "Media id of an R2 video of this inspection (the pool row id).",
+          "schema": {
+            "type": "string",
+            "description": "Media id of an R2 video of this inspection (the pool row id)."
+          }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent portal access token.",
+          "schema": {
+            "type": "string",
+            "description": "Persistent portal access token."
+          }
+        },
+        {
+          "name": "render",
+          "in": "query",
+          "required": false,
+          "description": "Server-minted render token (headless PDF only).",
+          "schema": {
+            "type": "string",
+            "description": "Server-minted render token (headless PDF only)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Public token-gated report video clip",
+    "description": "Public, no-login video clip gated by the same portal token and report gates as the report photos. Supports HTTP Range. 404 when the proof is missing or the report is not published or is held back."
+  },
+  {
+    "operationId": "getPublicReportVideoPoster",
+    "method": "GET",
+    "pathTemplate": "/api/public/report/{tenant}/{id}/video/r2-object/{mediaId}/poster",
+    "scopes": [],
+    "tag": "public",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "tenant",
+          "in": "path",
+          "required": true,
+          "description": "Tenant slug (display only; tenant is resolved from the proof).",
+          "schema": {
+            "type": "string",
+            "description": "Tenant slug (display only; tenant is resolved from the proof)."
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id."
+          }
+        },
+        {
+          "name": "mediaId",
+          "in": "path",
+          "required": true,
+          "description": "Media id of an R2 video of this inspection (the pool row id).",
+          "schema": {
+            "type": "string",
+            "description": "Media id of an R2 video of this inspection (the pool row id)."
+          }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent portal access token.",
+          "schema": {
+            "type": "string",
+            "description": "Persistent portal access token."
+          }
+        },
+        {
+          "name": "render",
+          "in": "query",
+          "required": false,
+          "description": "Server-minted render token (headless PDF only).",
+          "schema": {
+            "type": "string",
+            "description": "Server-minted render token (headless PDF only)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Public token-gated report video poster",
+    "description": "Public, no-login poster image for a report video, gated exactly like the clip."
   },
   {
     "operationId": "getPublicVerify",
@@ -9888,7 +10093,7 @@
       "body": null
     },
     "summary": "Download a PDF of a shared repair request (publish-gated)",
-    "description": "Renders a PDF of the repair request share page via Browser Rendering. Report must be published."
+    "description": "Renders a PDF of the repair request share page via Browser Rendering. A stored copy is served while the content is unchanged; a new render is rate-limited per share link and per company. Report must be published."
   },
   {
     "operationId": "getRepairRequestShareView",
@@ -13302,7 +13507,7 @@
       "body": null
     },
     "summary": "List service discount codes",
-    "description": "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
+    "description": "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owners, managers and inspectors who hold the inspection-fees capability; without it the answer is 403."
   },
   {
     "operationId": "listServiceInspectorsBulk",
@@ -17903,7 +18108,7 @@
       }
     },
     "summary": "Publish inspection for current tenant",
-    "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules (report.amended when the report was published before), so any client or agent notification is decided by those rules, not by this request; a first publish close to a sibling report's delivery may be coalesced into that notification. Also applies the automatic signature if one is configured, saves a frozen version snapshot (best effort, recorded with the optional summary), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+    "description": "Publish an inspection report: sets reportStatus to published and returns the report URL. Fires the workspace's report.published automation rules on a first publish, so any client or agent notification is decided by those rules; a first publish close to a sibling report's delivery may be coalesced into that notification. A re-publish of a report that was opened with edit-again (clients still read its last version) is an amendment: it fires the report.amended rules only when notifyClient is true (default false). The choice covers every report-updated rule, not just the client's: with false none fire (the client's, the buyer's agent's, any custom or in-app one) and the report's notified-at stamp is left untouched, so an API or MCP caller that omits notifyClient on an amendment sends no report-updated notices. The response does not say whether notices were suppressed. When the publish is answered as unchanged, unchangedSinceVersion names the version still current. A republish after a retract is a fresh delivery and is decided by the rules as a first publish is. Also applies the automatic signature if one is configured, saves a frozen version snapshot (recorded with the optional summary; a report whose frozen copy would exceed 1 MB is refused with 413 before anything is published; the snapshot write is retried once and a second failure is logged as an error without failing the publish), writes an inspection.published audit entry, and in the background queues the Summary and Full PDFs (only when the PDF pipeline is enabled), produces the optional courtesy translation, and syncs the report link to an ISN connection if one exists (isnSync). The theme, requireSignature, requirePayment, recipients and sendAgreementCopy fields are accepted but not used. This call does not check publish readiness; read the readiness route first. Calling it again republishes and creates a new version, except when nothing has changed: if the results, the report status and the summary are the same as in the latest version and no translation is requested, the call answers 200 in the same shape without publishing again (no new version, automation, audit entry, translation, PDF or ISN sync; isnSync is null). Requires the publish capability on top of the owner, manager or inspector role. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "putInspectorServiceOrigin",
@@ -18020,7 +18225,7 @@
       "body": null
     },
     "summary": "Redeem a single-use agent magic-login code",
-    "description": "Public, unauthenticated endpoint for the agent unified link. Redeems the single-use code minted by POST /api/agent/magic-login/request into an agent session cookie, then redirects into the agent dashboard. A missing, expired, or already-used code redirects to a friendly recovery page instead of surfacing a raw error."
+    "description": "Public, unauthenticated endpoint for the agent unified link. Redeems the single-use code minted by POST /api/agent/magic-login/request into an agent session cookie, then redirects into the agent dashboard. Reached only in-process, by the Continue action of the page at /agent/magic-login; the worker entry does not forward that address to the API. A missing, expired, or already-used code redirects to a friendly recovery page instead of surfacing a raw error."
   },
   {
     "operationId": "refreshInspection",
@@ -19855,10 +20060,10 @@
           "name": "key",
           "in": "query",
           "required": true,
-          "description": "R2 object key (`${tenantId}/inspections/${inspectionId}/...`).",
+          "description": "Photo key as the repair items response states it, relative to the company: `inspections/${inspectionId}/...`. The full form `${companyId}/inspections/${inspectionId}/...` is also accepted.",
           "schema": {
             "type": "string",
-            "description": "R2 object key (`${tenantId}/inspections/${inspectionId}/...`)."
+            "description": "Photo key as the repair items response states it, relative to the company: `inspections/${inspectionId}/...`. The full form `${companyId}/inspections/${inspectionId}/...` is also accepted."
           }
         },
         {
@@ -20372,7 +20577,7 @@
       "body": null
     },
     "summary": "Record an in-person agreement signature",
-    "description": "Records a signature drawn on the inspector device for the inspection agreement, on the signing envelope so it carries the content snapshot, the audit chain and a receipt. The JSON body is {signatureBase64, signerId?, onBehalfOf?, onBehalfDisclaimer?}: signatureBase64 is the signature image as a data URL or raw base64, signerId defaults to the first signer who has not finished, and onBehalfOf and onBehalfDisclaimer name the party an authorized agent signs for. A body that is not valid answers 400. Signing again once the signer or the envelope has signed answers 200 with alreadySigned. Owner, manager or inspector only."
+    "description": "Records a signature drawn on the inspector device for the inspection agreement, on the signing envelope so it carries the content snapshot, the audit chain and a receipt. The JSON body is {signatureBase64, signerId?, onBehalfOf?, onBehalfDisclaimer?}: signatureBase64 is the signature image as a data URL or raw base64, signerId defaults to the first signer who has not finished, and onBehalfOf and onBehalfDisclaimer name the party an authorized agent signs for. A body that is not valid, or a drawing that is not valid base64 image data, answers 400. A signer who declined, or whose envelope has expired, answers 409, and so does a signer whose signature is still being recorded by another request (try again in a moment; nothing is written). Signing again once that signing was confirmed answers 200 with alreadySigned; if an earlier attempt stopped before the envelope was rolled forward, the repeat completes it, once. Owner, manager or inspector only."
   },
   {
     "operationId": "signInspectionCompliance",
@@ -20941,8 +21146,8 @@
       ],
       "body": null
     },
-    "summary": "Unpublish a published report",
-    "description": "Transitions reportStatus from published → in_progress. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
+    "summary": "Retract (unpublish) a published report",
+    "description": "Retracts a published report: it is withdrawn from clients and goes back to a draft (reportStatus published → in_progress, every report of the inspection back to a draft), and every client and agent link to the inspection expires at once. To keep working on a report WITHOUT withdrawing it, use the edit-again route instead. Requires publish capability. You must be on this inspection or hold the scheduleOthers permission; otherwise 403."
   },
   {
     "operationId": "unreadCountMessage",
@@ -24677,7 +24882,7 @@
     "method": "POST",
     "pathTemplate": "/api/services/discount/validate",
     "scopes": [
-      "write"
+      "read"
     ],
     "tag": "services",
     "tier": "extended",
@@ -24687,8 +24892,8 @@
         "$ref": "#/components/schemas/ValidateDiscount"
       }
     },
-    "summary": "Validate service for current tenant",
-    "description": "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors."
+    "summary": "Check a discount code against a subtotal",
+    "description": "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors who hold the inspection-fees capability."
   },
   {
     "operationId": "viewConciergeConfirm",

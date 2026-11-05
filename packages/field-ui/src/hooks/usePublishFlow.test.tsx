@@ -25,11 +25,11 @@ const flush = () =>
 /** Every `execute` parks until the test answers it. */
 function setup(confirmHuman: () => Promise<boolean> = () => Promise.resolve(true)) {
   const fake = createFakeDataSource({ data: createEmptyEditorData() });
-  const pending: Array<(r: CommandResult<undefined>) => void> = [];
+  const pending: Array<(r: CommandResult<unknown>) => void> = [];
   const cmds: FieldCommand[] = [];
   vi.spyOn(fake, 'execute').mockImplementation(((_id: string, cmd: FieldCommand) => {
     cmds.push(cmd);
-    return new Promise<CommandResult<undefined>>((resolve) => pending.push(resolve));
+    return new Promise<CommandResult<unknown>>((resolve) => pending.push(resolve));
   }) as FakeDataSource['execute']);
   const calls = { markedComplete: 0, published: 0, finished: 0 };
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -45,7 +45,7 @@ function setup(confirmHuman: () => Promise<boolean> = () => Promise.resolve(true
       }),
     { wrapper },
   );
-  return { fake, hook, calls, cmds, answer: (i: number, r: CommandResult<undefined>) => pending[i]?.(r), sent: () => pending.length };
+  return { fake, hook, calls, cmds, answer: (i: number, r: CommandResult<unknown>) => pending[i]?.(r), sent: () => pending.length };
 }
 
 describe('usePublishFlow.publish', () => {
@@ -88,6 +88,34 @@ describe('usePublishFlow.publish', () => {
     await flush();
     expect(cmds[0]).toEqual({ type: 'publish', autoSignOnPublish: true, markComplete: true, summary: 'Fixed the roof rating' });
     expect(cmds[1]).toEqual({ type: 'publish', autoSignOnPublish: false });
+  });
+
+  it('carries notifyClient only when the inspector chose it', async () => {
+    const { hook, cmds, answer } = setup();
+    act(() => { void hook.result.current.publish(false, { notifyClient: true }, false); });
+    await flush();
+    answer(0, { ok: true });
+    await flush();
+    act(() => { void hook.result.current.publish(false, {}, false); });
+    await flush();
+    expect(cmds[0]).toEqual({ type: 'publish', autoSignOnPublish: false, notifyClient: true });
+    expect('notifyClient' in cmds[1]).toBe(false);
+  });
+
+  it('reports the version a publish found unchanged, and clears it when the next publish starts', async () => {
+    const { hook, answer } = setup();
+    expect(hook.result.current.unchangedSinceVersion).toBeNull();
+    act(() => { void hook.result.current.publish(false, {}, false); });
+    await flush();
+    answer(0, { ok: true, data: { unchangedSinceVersion: 4 } });
+    await flush();
+    expect(hook.result.current.unchangedSinceVersion).toBe(4);
+    act(() => { void hook.result.current.publish(false, {}, false); });
+    await flush();
+    expect(hook.result.current.unchangedSinceVersion).toBeNull();
+    answer(1, { ok: true, data: { unchangedSinceVersion: null } });
+    await flush();
+    expect(hook.result.current.unchangedSinceVersion).toBeNull();
   });
 
   it('on success: closes the dialog, reloads the editor data once, and shows no error', async () => {

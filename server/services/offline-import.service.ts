@@ -38,6 +38,7 @@ import { auditFromContext } from '../lib/audit';
 import { inspections } from '../lib/db/schema';
 import { getDrizzle } from '../lib/route-helpers';
 import { r2Keys } from '../lib/r2-keys';
+import { lockedInspectionIds } from '../lib/inspection/report-lock';
 import { imagesBinding } from '../lib/media/serve-photo';
 import { signedPhotoExtFor, sniffedPhotoExt, storePhotoAtKey } from '../lib/media/store-photo';
 import { HEAD_BYTES, sniffPhotoType } from '../lib/media/sniff';
@@ -246,6 +247,10 @@ async function validate(c: Context<HonoConfig>, zip: Uint8Array, limits: ImportL
         }
         identities.set(id, auth);
     }
+    // A published report takes no edits until the inspector chooses "Edit and republish": the package is refused whole,
+    // with the inspections named, so the device keeps every edit and can send the rest (`REPORT_PUBLISHED`).
+    const locked = await lockedInspectionIds(getDrizzle(c), tenantId, [...identities.values()].map((i) => ({ inspectionId: i.inspectionId, reportId: i.reportId })));
+    if (locked.length > 0) throw Errors.ReportPublished(locked[0]!, locked);
 
     // A create an earlier import already applied, for an inspection that is gone
     // now, was deleted on purpose. Running it again would bring the inspection

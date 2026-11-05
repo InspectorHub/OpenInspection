@@ -142,7 +142,7 @@ app.openapi(listLinksRoute, async (c) => {
             revokedAt:   revoked,
         };
     });
-    return c.json({ success: true as const, data: { links } }, 200);
+    return c.json({ success: true as const, data: { links } }, 200); // projection-allow: each link is a literal of named fields (ids, the agent's name and email, status, two timestamps), none a row
 });
 app.openapi(revokeRoute, async (c) => {
     await requireRole('owner', 'manager', 'inspector')(c, async () => {});

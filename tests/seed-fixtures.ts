@@ -610,12 +610,13 @@ export function seedFixtures(appDir: string): void {
     ) => {
         const tenantId     = opts.tenantId ?? TENANT_A_ID;
         const inspectorId  = opts.inspectorId ?? LEAD_INSPECTOR_ID;
-        const propertyType = opts.propertyType ?? 'residential';
+        // NULL is "unclassified" and reads the same as the value that stood here before the property types were unified.
+        const propertyType = opts.propertyType === undefined ? 'NULL' : `'${opts.propertyType}'`;
         return `INSERT OR REPLACE INTO inspections
          (id, tenant_id, inspector_id, property_address, property_type, date, status, report_status, payment_status,
           price_cents, is_payment_required, is_agreement_required, created_at)
          VALUES ('${id}', '${tenantId}',
-                 '${inspectorId}', '${addr}', '${propertyType}',
+                 '${inspectorId}', '${addr}', ${propertyType},
                  '2026-06-01', '${status}', '${reportStatus}', 'unpaid', 0, 0, 0, '${now}')`;
     };
     d1(inspectionRow('seed-empty-inspection',        '1 Empty St',        'scheduled', 'in_progress',
@@ -647,6 +648,13 @@ export function seedFixtures(appDir: string): void {
         'seed-delivered-inspection', 'seed-republished-inspection']) {
         d1(rosterRow(id, LEAD_INSPECTOR_ID), cwd);
     }
+    // The republished inspection is the one specs publish, reopen and publish again. Created through the
+    // API an order always has its primary report row, and version numbers run per report, so this one gets
+    // its row up front instead of having one made halfway through a flow (which would restart the numbering).
+    d1(`INSERT OR REPLACE INTO reports
+         (id, tenant_id, inspection_id, kind, title, status, created_at, published_at, sort_order)
+         VALUES ('seed-republished-report', '${TENANT_A_ID}', '${SEED_INSPECTIONS.republished}', 'primary',
+                 'Home Inspection', 'published', ${nowMs}, ${nowMs}, 0)`, cwd);
     // The half-done inspection is the one owned by a DIFFERENT inspector — its
     // specs assert that publish pre-flight fails for its owner, so the roster
     // has to name that owner rather than the lead.
@@ -718,7 +726,7 @@ export function seedFixtures(appDir: string): void {
           report_status, payment_status, price_cents, is_payment_required,
           is_agreement_required, created_at)
          VALUES ('${STATUTORY_INSPECTION_ID}', '${TENANT_A_ID}', '${HALF_INSPECTOR_ID}',
-                 '7 Statutory Way, Plano TX', 'residential', '2026-06-01', 'scheduled',
+                 '7 Statutory Way, Plano TX', NULL, '2026-06-01', 'scheduled',
                  'in_progress', 'unpaid', 0, 0, 0, '${now}')`, cwd);
     d1Script(
         `UPDATE inspections SET template_snapshot = '${JSON.stringify(STATUTORY_TEMPLATE_SNAPSHOT)}'

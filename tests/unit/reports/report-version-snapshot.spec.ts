@@ -8,15 +8,15 @@
  * document (Spec B §1: report surfaces snapshot at publish; live surfaces read
  * current state).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ReportVersionService } from '../../../server/services/report-version.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000099';
 const INSPECTION = '11111111-1111-1111-1111-111111111111';
@@ -49,10 +49,9 @@ describe('snapshotOnPublish — credentials and appearance', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seed(db);
-        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        svc = new ReportVersionService(testD1.binding, 'test-encryption-secret-key', []);
 
         for (const [id, name] of [[LEAD, 'Dana Lead'], [HELPER, 'Sam Helper']] as const) {
             await db.insert(schema.users).values({
@@ -139,7 +138,44 @@ describe('snapshotOnPublish — credentials and appearance', () => {
         // An empty `inspectors` on a v2 row means "held none"; a missing one on
         // a v1 row means "this predates the feature". Identical as JSON,
         // opposite as a claim on a cover page.
-        expect((await snapshotOf()).schemaVersion).toBe(2);
+        // 3 adds the rating system and the commercial parts a client frozen report reads; 4 adds the presentation (categories, time zone).
+        expect((await snapshotOf()).schemaVersion).toBe(4);
+    });
+
+    describe('the version insert after the status flip', () => {
+        // The service builds its own drizzle over the binding, so the failure has to be injected at the binding.
+        const serviceFailingVersionInserts = (times: number) => {
+            const real = testD1.binding;
+            let failures = 0;
+            const failing = new Proxy(real, {
+                get(target, prop) {
+                    if (prop === 'prepare') {
+                        return (sql: string) => {
+                            if (/insert into "report_versions"/i.test(sql) && failures < times) { failures++; throw new Error('D1 hiccup'); }
+                            return target.prepare(sql);
+                        };
+                    }
+                    const value = Reflect.get(target, prop) as unknown;
+                    return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+                },
+            });
+            return { svc: new ReportVersionService(failing as typeof real, 'test-encryption-secret-key', []), failures: () => failures };
+        };
+
+        it('is retried once, so one transient failure still leaves the report with its frozen version', async () => {
+            const failing = serviceFailingVersionInserts(1);
+            const out = await failing.svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a');
+            expect(failing.failures()).toBe(1);
+            expect(out.versionNumber).toBe(1);
+            expect(await db.select().from(schema.reportVersions).all()).toHaveLength(1);
+        });
+
+        it('is thrown after the second failure, for the route to log, and writes no half version', async () => {
+            const failing = serviceFailingVersionInserts(2);
+            await expect(failing.svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a')).rejects.toThrow('D1 hiccup');
+            expect(failing.failures()).toBe(2);
+            expect(await db.select().from(schema.reportVersions).all()).toHaveLength(0);
+        });
     });
 
     it('never reaches into another tenant credentials', async () => {
@@ -177,10 +213,9 @@ describe('snapshot growth vs. already-signed versions', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seed(db);
-        svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        svc = new ReportVersionService(testD1.binding, 'test-encryption-secret-key', []);
     });
 
     it('still verifies a snapshot written in the pre-credentials shape', async () => {
@@ -197,7 +232,7 @@ describe('snapshot growth vs. already-signed versions', () => {
         const { SigningKeyService, base64UrlEncode } =
             await import('../../../server/services/signing-key.service');
         const legacyHash = await sha256Hex(legacyJson);
-        const { privateKey } = await new SigningKeyService({} as D1Database, 'test-encryption-secret-key')
+        const { privateKey } = await new SigningKeyService(testD1.binding, 'test-encryption-secret-key')
             .ensureKeypair(TENANT);
         const sig = base64UrlEncode(new Uint8Array(await crypto.subtle.sign(
             { name: 'Ed25519' }, privateKey, new TextEncoder().encode(legacyHash),

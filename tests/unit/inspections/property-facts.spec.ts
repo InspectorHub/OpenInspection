@@ -10,7 +10,7 @@
  *   - Zod parse on the new PATCH payload.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { PropertyFactsSchema, UpdateInspectionSchema } from '../../../server/lib/validations/inspection.schema';
@@ -18,8 +18,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const TENANT_B = '00000000-0000-0000-0000-000000000002';
@@ -32,9 +32,8 @@ describe('InspectionService.updatePropertyFacts (G1)', () => {
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new InspectionService({} as D1Database);
+        testD1.use(testDb);
+        svc = new InspectionService(testD1.binding);
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT_A,   slug: 'acme',   status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },

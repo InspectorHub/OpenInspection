@@ -6,15 +6,15 @@
  * an inspector signature block + cryptographic verification QR without
  * additional round-trips.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ReportVersionService } from '../../../server/services/report-version.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT     = 'aa000000-0000-0000-0000-000000000001';
 const INSPECTOR  = 'bb000000-0000-0000-0000-000000000002';
@@ -69,10 +69,9 @@ describe('getReportData — signature + verification payload (layer 2)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new InspectionService({} as D1Database);
-        versionSvc = new ReportVersionService({} as D1Database, 'test-secret-key-long-enough-16');
+        testD1.use(testDb);
+        svc = new InspectionService(testD1.binding);
+        versionSvc = new ReportVersionService(testD1.binding, 'test-secret-key-long-enough-16', []);
         await seedBase(testDb);
     });
 

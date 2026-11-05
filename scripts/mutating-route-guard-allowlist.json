@@ -1,7 +1,11 @@
 {
-  "_comment": "Mutating routes with no principal guard (requireRole, requireCapability, ...). Each entry needs a category from CATEGORIES in scripts/lib/mutating-route-guards.mjs and a reason verified in the handler. The list may only shrink: lower maxEntries when you remove one. needs-owner-decision is temporary.",
-  "maxEntries": 67,
+  "_comment": "Mutating routes with no principal guard (requireRole, requireCapability, ...). Each entry needs a category from CATEGORIES in scripts/lib/mutating-route-guards.mjs and a reason verified in the handler. The list may only shrink: lower maxEntries when you remove one. needs-owner-decision is temporary. maxEntries went 67 to 68 for one new entry, the public audit export request (POST /api/public/verify/:envelopeId/export): it is public by design, with its own knowledge check, attempt counters and bot challenge, so it has no principal to guard it with.",
+  "maxEntries": 68,
   "entries": {
+    "server/api/public/verify-export.ts::POST /verify/:envelopeId/export": {
+      "category": "public-by-design",
+      "reason": "signed audit export: public by design; the handler requires a matching signer or client email or the inspection postal code, rate limits per envelope and address, and enforces the bot challenge where the deployment configures one"
+    },
     "server/api/agent-signup.ts::POST /": {
       "category": "public-by-design",
       "reason": "agent account signup: unauthenticated by design (isAgentPublic); handler enforces the Turnstile bot challenge and validates the body"

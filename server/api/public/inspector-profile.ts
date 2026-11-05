@@ -8,11 +8,8 @@ import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { PublicBrandSchema } from '../../lib/validations/public-brand.schema';
 import { isServableBrandAsset } from '../../lib/report-style/brand-asset-key';
 import { getDrizzle } from '../../lib/route-helpers';
-import { r2Get } from '../../lib/r2/objects';
 import { getBaseUrl } from '../../lib/url';
-import { imagesBinding } from '../../lib/media/serve-photo';
-import { resolveBadgeVariant, isVectorBadge } from '../../lib/media/badge-variant';
-import { logger } from '../../lib/logger';
+import { serveBrandAssetObject } from '../../lib/media/serve-brand-asset';
 
 const brandRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -89,16 +86,6 @@ const brandAssetRoute = createRoute(withMcpMetadata({
     description: 'Streams a tenant brand asset (logo) from R2. Only keys under the public `branding/` prefix are servable; everything else in the bucket stays scoped to its own routes.',
 }, { scopes: [], tier: 'extended' }));
 
-/** The stored bytes, unchanged — the answer whenever a transform is not wanted
- *  or not possible. */
-function brandAssetResponse(obj: R2ObjectBody): Response {
-    const headers = new Headers();
-    headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
-    headers.set('Cache-Control', 'public, max-age=3600');
-    if (obj.httpEtag) headers.set('etag', obj.httpEtag);
-    return new Response(obj.body, { status: 200, headers });
-}
-
 const app = createApiRouter();
 app.openapi(brandRoute, async (c) => {
     const { tenant } = c.req.valid('param');
@@ -111,7 +98,7 @@ app.openapi(brandRoute, async (c) => {
         slug: tenant,
         baseUrl: getBaseUrl(c),
     });
-    return c.json({ success: true as const, data: brand }, 200);
+    return c.json({ success: true as const, data: PublicBrandSchema.parse(brand) }, 200);
 });
 app.openapi(legalDocRoute, async (c) => {
     const { tenant, doc } = c.req.valid('param');
@@ -137,7 +124,7 @@ app.openapi(legalDocRoute, async (c) => {
     // inventing a date.
     const latest = await c.var.services.legalVersion.latest(row.id, doc);
     return c.json({ success: true as const, data: {
-        companyName, body, lastUpdated: latest?.version ?? null,
+        companyName, body, lastUpdated: latest?.version ?? null, // projection-allow: the company name and the published legal text (strings on the public page) and its version: a tenant-local date string (YYYY-MM-DD), or null
     } }, 200);
 });
 app.openapi(brandAssetRoute, async (c) => {
@@ -148,41 +135,8 @@ app.openapi(brandAssetRoute, async (c) => {
     // branding/{tenantId}/logo-{ts}.{ext}. Segments must be non-empty alphanumeric
     // identifiers (no ".." path traversal).
     if (!isServableBrandAsset(key)) return c.notFound();
-    const obj = await r2Get(c.env.PHOTOS, key);
-    if (!obj) return c.notFound();
-
-    // Serve-time downscale. This is what reaches the badges ALREADY in R2 —
-    // an upload-time rule only ever helps the next upload, and the 2 MB
-    // photograph somebody has already saved is the one costing every
-    // recipient of every email.
-    //
-    // FAILS OPEN IN EVERY DIRECTION: no variant asked for, no IMAGES
-    // binding, a vector, or a transform that throws — all serve the
-    // original. A badge that is larger than it needed to be is a cost; a
-    // badge that does not render is a broken document.
-    const variant = resolveBadgeVariant(v);
-    const images = imagesBinding(c.env);
-    if (variant && images && !isVectorBadge(obj.httpMetadata?.contentType)) {
-        try {
-            const out = await images.input(obj.body)
-                .transform({ width: variant.width })
-                .output({ format: variant.format });
-            const r = out.response();
-            const h = new Headers(r.headers);
-            // Immutable: the key carries a uuid, so a replaced badge is a
-            // new key. Longer than the original's hour for that reason.
-            h.set('Cache-Control', 'public, max-age=31536000, immutable');
-            return new Response(r.body, { status: 200, headers: h });
-        } catch (err) {
-            logger.warn('[brand-asset] badge transform failed — serving original', {
-                key, variant: v, error: String(err),
-            });
-            const orig = await r2Get(c.env.PHOTOS, key);
-            if (!orig) return c.notFound();
-            return brandAssetResponse(orig);
-        }
-    }
-    return brandAssetResponse(obj);
+    const asset = await serveBrandAssetObject(c.env.PHOTOS, c.env, key, v);
+    return asset ?? c.notFound();
 });
 
 /** Registration order. Drives the typed client; a test pins it to what `app` really registered. */

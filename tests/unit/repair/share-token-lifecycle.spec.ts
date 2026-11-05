@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { RepairRequestService } from '../../../server/services/repair-request.service';
 import { SHARE_TOKEN_TTL_MS } from '../../../server/lib/token-ttl';
 import { createTestDb, setupSchema } from '../db';
@@ -6,8 +6,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP = '11111111-1111-1111-1111-111111111111';
@@ -24,14 +24,14 @@ describe('share token lifecycle (IA-37)', () => {
         const f = createTestDb();
         db = f.db as BetterSQLite3Database<typeof schema>;
         await setupSchema(f.sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
         } as any);
         clock = T0;
         let idSeq = 0;
-        svc = new RepairRequestService({} as D1Database, () => `id-${++idSeq}`, () => clock);
+        svc = new RepairRequestService(testD1.binding, () => `id-${++idSeq}`, () => clock);
     });
 
     it('stamps a ~180-day expiry on create', async () => {

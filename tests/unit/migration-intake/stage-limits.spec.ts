@@ -18,8 +18,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { asD1DrizzleReturn } from '../helpers/test-db';
 import { withBatch } from '../helpers/d1-binding';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
@@ -58,11 +58,11 @@ describe('MigrationStageService row cap', () => {
         await setupSchema(sqlite);
         // The service batches its writes, and better-sqlite3 is the one Drizzle
         // driver with no `batch()` — see helpers/d1-binding.ts.
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(withBatch(db, sqlite)));
+        testD1.use(asD1DrizzleReturn(withBatch(db, sqlite)));
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        svc = new MigrationStageService({} as D1Database);
+        svc = new MigrationStageService(testD1.binding);
     });
 
     afterEach(() => {

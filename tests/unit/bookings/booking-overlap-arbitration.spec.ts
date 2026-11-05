@@ -16,7 +16,7 @@
  * (legacy, or not yet stamped) keeps the old start-time rule, so nothing changes
  * for data that has no duration.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { BookingService } from '../../../server/services/booking.service';
 import { tenants, users, inspections, inspectionInspectors, inspectionRequests, calendarBlocks, availabilityOverrides } from '../../../server/lib/db/schema';
@@ -24,8 +24,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { buildTenantSlotMap } from '../../../server/lib/booking/tenant-slot-map';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = 'aaaaaaaa-0000-0000-0000-0000000000b2';
 const DAY = '2027-03-09';
@@ -62,9 +62,8 @@ describe('arbitrateSlotRace with durations and time off', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new BookingService({} as D1Database);
+        testD1.use(db);
+        svc = new BookingService(testD1.binding);
         await db.insert(tenants).values({ id: TENANT, slug: 'ov', tier: 'free', status: 'active', maxUsers: 5, deploymentMode: 'shared', createdAt: new Date() } as never);
         await db.insert(users).values({ id: 'insp-1', tenantId: TENANT, email: 'i@x.test', passwordHash: 'h', role: 'inspector', name: 'Solo', createdAt: new Date() });
     });

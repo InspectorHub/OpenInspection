@@ -12,6 +12,7 @@ import {
 } from '../lib/validations/contact.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { moneyView } from "../lib/auth/money-access";
+import { withoutCompanyId } from "../lib/response-projection";
 import { resolveInspectionScope, requireVisibleContact } from "../lib/inspection/visibility";
 import { getDrizzle } from "../lib/route-helpers";
 
@@ -230,7 +231,7 @@ app.openapi(listContactsRoute, async (c) => {
     if (q.type) opts.type = q.type;
     if (q.search) opts.search = q.search;
     const rows = await c.var.services.contact.listContacts(tenantId, opts, await resolveInspectionScope(c));
-    return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
+    return c.json({ success: true as const, data: rows.map(withoutCompanyId), meta: { total: rows.length } }, 200);
 });
 app.openapi(restoreContactRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -265,7 +266,7 @@ app.openapi(createContactRoute, async (c) => {
             c.var.services.qbo.upsertCustomer(tenantId, contact),
         );
     }
-    return c.json({ success: true as const, data: { contact } }, 201);
+    return c.json({ success: true as const, data: { contact: withoutCompanyId(contact) } }, 201);
 });
 app.openapi(updateContactRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -293,7 +294,7 @@ app.openapi(updateContactRoute, async (c) => {
             c.var.services.qbo.upsertCustomer(tenantId, contact),
         );
     }
-    return c.json({ success: true as const, data: { contact } }, 200);
+    return c.json({ success: true as const, data: { contact: withoutCompanyId(contact) } }, 200);
 });
 app.openapi(deleteContactRoute, async (c) => {
     const tenantId = c.get('tenantId');

@@ -86,6 +86,27 @@ describe('deleteInspectionCascade', () => {
         expect(r2.deleted).not.toContain(otherInspKey);
     });
 
+    it("deletes the files attached to the inspection's own messages, and only those", async () => {
+        const own = [`${TENANT}/messages/${INSP}/att-1.pdf`, `${TENANT}/messages/${INSP}/att-2.png`];
+        // A sibling inspection whose id merely starts the same, another inspection's folder, another company's folder of the same
+        // inspection id, and an unrelated folder of this company.
+        const keep = [
+            `${TENANT}/messages/${INSP}0/att-3.pdf`,
+            `${TENANT}/messages/i-2/att-4.pdf`,
+            `00000000-0000-0000-0000-000000000009/messages/${INSP}/att-5.pdf`,
+            `${TENANT}/inspector-photos/u1.jpg`,
+        ];
+        const photoKey = `${TENANT}/inspections/${INSP}/photos/m-1.jpg`;
+        const r2 = makeR2([...own, ...keep, photoKey].map((key) => ({ key, size: 10 })));
+
+        await deleteInspectionCascade(testDb as unknown as DrizzleD1Database, r2.bucket, TENANT, INSP);
+
+        for (const key of own) expect(r2.deleted, key).toContain(key);
+        for (const key of keep) expect(r2.deleted, key).not.toContain(key);
+        // Control: the existing photo prefix is still swept by the same call.
+        expect(r2.deleted).toContain(photoKey);
+    });
+
     it('the derived inspection-scoped set covers child tables but not `inspections` itself', () => {
         const names = new Set(inspectionScopedTables().map(getTableName));
         for (const t of ['inspection_results', 'invoices', 'inspection_access_tokens', 'inspection_messages']) {

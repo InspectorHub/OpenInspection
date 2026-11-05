@@ -12,8 +12,8 @@ import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import emailTemplateRoutes from '../../../server/api/email-templates';
 import { REGISTRY } from '../../../server/lib/email-templates/registry';
@@ -53,8 +53,7 @@ describe('GET /api/admin/email-templates', () => {
             createdAt: new Date(),
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -64,7 +63,7 @@ describe('GET /api/admin/email-templates', () => {
 
     it('lists every editable template and no platform-owned one, with correct fields', async () => {
         const app = buildApp();
-        const res = await app.request('/api/admin/email-templates', {}, { DB: {} });
+        const res = await app.request('/api/admin/email-templates', {}, { DB: testD1.binding });
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean; data: Array<{ trigger: string; name: string; required: boolean; enabled: boolean; isCustomized: boolean; subject: string; category: string }> };
         expect(body.success).toBe(true);
@@ -107,8 +106,7 @@ describe('GET /api/admin/email-templates/:trigger', () => {
             createdAt: new Date(),
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -118,7 +116,7 @@ describe('GET /api/admin/email-templates/:trigger', () => {
 
     it('returns 200 with blocks and variables for report-ready', async () => {
         const app = buildApp();
-        const res = await app.request('/api/admin/email-templates/report-ready', {}, { DB: {} });
+        const res = await app.request('/api/admin/email-templates/report-ready', {}, { DB: testD1.binding });
         expect(res.status).toBe(200);
         const body = await res.json() as {
             success: boolean;
@@ -143,7 +141,7 @@ describe('GET /api/admin/email-templates/:trigger', () => {
 
     it('returns 404 for password-reset (non-editable)', async () => {
         const app = buildApp();
-        const res = await app.request('/api/admin/email-templates/password-reset', {}, { DB: {} });
+        const res = await app.request('/api/admin/email-templates/password-reset', {}, { DB: testD1.binding });
         expect(res.status).toBe(404);
         const body = await res.json() as { success: boolean; error: { message: string } };
         expect(body.success).toBe(false);
@@ -170,8 +168,7 @@ describe('PUT /api/admin/email-templates/:trigger', () => {
             createdAt: new Date(),
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -187,14 +184,14 @@ describe('PUT /api/admin/email-templates/:trigger', () => {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ subject: 'X', blocks: { body: 'Y' }, enabled: true }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(putRes.status).toBe(200);
         const putBody = await putRes.json() as { success: boolean; data: { ok: boolean } };
         expect(putBody.success).toBe(true);
         expect(putBody.data.ok).toBe(true);
 
         // Follow-up GET detail should show the saved subject and block value
-        const getRes = await app.request('/api/admin/email-templates/report-ready', {}, { DB: {} });
+        const getRes = await app.request('/api/admin/email-templates/report-ready', {}, { DB: testD1.binding });
         expect(getRes.status).toBe(200);
         const getBody = await getRes.json() as {
             success: boolean;
@@ -208,7 +205,7 @@ describe('PUT /api/admin/email-templates/:trigger', () => {
         expect(bodyBlock?.value).toBe('Y');
 
         // GET list should show isCustomized:true
-        const listRes = await app.request('/api/admin/email-templates', {}, { DB: {} });
+        const listRes = await app.request('/api/admin/email-templates', {}, { DB: testD1.binding });
         const listBody = await listRes.json() as { success: boolean; data: Array<{ trigger: string; isCustomized: boolean }> };
         const item = listBody.data.find(t => t.trigger === 'report-ready');
         expect(item?.isCustomized).toBe(true);
@@ -220,7 +217,7 @@ describe('PUT /api/admin/email-templates/:trigger', () => {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ subject: null, blocks: null, enabled: false }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(400);
         const body = await res.json() as { success: boolean; error: { message: string } };
         expect(body.success).toBe(false);
@@ -233,7 +230,7 @@ describe('PUT /api/admin/email-templates/:trigger', () => {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ subject: null, blocks: { nope: 'x' }, enabled: true }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(400);
         const body = await res.json() as { success: boolean; error: { message: string } };
         expect(body.success).toBe(false);
@@ -261,8 +258,7 @@ describe('POST /api/admin/email-templates/:trigger/reset', () => {
             createdAt: new Date(),
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -278,20 +274,20 @@ describe('POST /api/admin/email-templates/:trigger/reset', () => {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ subject: 'Custom', blocks: null, enabled: true }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
 
         // Now reset
         const resetRes = await app.request('/api/admin/email-templates/report-ready/reset', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(resetRes.status).toBe(200);
         const resetBody = await resetRes.json() as { success: boolean; data: { ok: boolean } };
         expect(resetBody.success).toBe(true);
         expect(resetBody.data.ok).toBe(true);
 
         // GET list should show isCustomized:false
-        const listRes = await app.request('/api/admin/email-templates', {}, { DB: {} });
+        const listRes = await app.request('/api/admin/email-templates', {}, { DB: testD1.binding });
         const listBody = await listRes.json() as { success: boolean; data: Array<{ trigger: string; isCustomized: boolean }> };
         const item = listBody.data.find(t => t.trigger === 'report-ready');
         expect(item?.isCustomized).toBe(false);
@@ -318,8 +314,7 @@ describe('POST /api/admin/email-templates/:trigger/preview', () => {
             createdAt: new Date(),
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     afterEach(() => {
@@ -333,7 +328,7 @@ describe('POST /api/admin/email-templates/:trigger/preview', () => {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ subject: 'Hi {{address}}' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean; data: { subject: string; html: string } };
         expect(body.success).toBe(true);

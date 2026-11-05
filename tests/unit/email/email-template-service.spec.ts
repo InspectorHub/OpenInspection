@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { EmailTemplateService } from '../../../server/services/email-template.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT_1 = '00000000-0000-0000-0000-000000000001';
 const TENANT_2 = '00000000-0000-0000-0000-000000000002';
@@ -26,8 +26,8 @@ describe('EmailTemplateService', () => {
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
         await seedTenants(testDb);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new EmailTemplateService({} as D1Database);
+        testD1.use(testDb);
+        svc = new EmailTemplateService(testD1.binding);
     });
 
     it('listForTenant returns [] when nothing saved', async () => {

@@ -1,0 +1,20 @@
+name: Restore generated i18n output
+description: >-
+  Caches the two paraglide output directories, keyed on exactly the inputs that
+  scripts/i18n-compile-if-changed.mjs hashes. Must run AFTER checkout and BEFORE
+  `npm ci`: the `prepare` script compiles i18n through the stamped script, so a
+  restored directory (which carries its own input stamp) turns that compile into a
+  skip. A hit can only restore output produced by identical inputs; the script
+  still re-verifies the stamp, so a stale or foreign restore recompiles instead of
+  being trusted. The cache key prefix `paraglide-v2` must be bumped whenever the
+  compile flags change (the `i18n:compile*` scripts in package.json or the
+  paraglideVitePlugin options in vite.config.ts).
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: |
+          app/paraglide
+          packages/field-ui/src/i18n/generated
+        key: paraglide-v2-${{ runner.os }}-${{ hashFiles('messages/**', 'project.inlang/**', 'packages/field-ui/project.inlang/**') }}

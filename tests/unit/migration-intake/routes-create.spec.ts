@@ -16,7 +16,7 @@
  * any one of them wired to the wrong branch. Each refusal is paired with a
  * positive control: the same request with the single blocking condition removed.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
@@ -28,8 +28,6 @@ import type { Database as SqliteDatabase } from 'better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import migrationIntakeRoutes from '../../../server/api/migration-intake';
 import {
     SAAS_PROFILE,
@@ -42,7 +40,7 @@ import {
 } from '../../../server/lib/compliance/retention-windows';
 // The shared R2 double rather than a copy of it: the store holds bytes, and a
 // per-file copy is the drift the harness exists to prevent.
-import { intakeBucket, storedText } from '../helpers/migration-intake-routes-harness';
+import { intakeD1 as testD1, intakeBucket, storedText } from '../helpers/migration-intake-routes-harness';
 import type { OutboxEvent } from '../../../server/portal/outbox.service';
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
@@ -162,7 +160,7 @@ function post(opts: AppOpts, fields: Record<string, string>, file: UploadedFile)
     return appFor(opts).request(
         '/api/imports',
         { method: 'POST', body: upload(fields, file) },
-        { DB: {}, PHOTOS: intakeBucket(opts.store) },
+        { DB: testD1.binding, PHOTOS: intakeBucket(opts.store) },
     );
 }
 
@@ -183,8 +181,7 @@ describe('POST /api/imports', () => {
         await setupSchema(sqlite);
         // The staging service batches its writes, and better-sqlite3 is the one
         // Drizzle driver with no `batch()` — see helpers/d1-binding.ts.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(withBatch(db, sqlite));
+        testD1.use(withBatch(db, sqlite));
         store = new Map();
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

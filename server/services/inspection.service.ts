@@ -27,7 +27,7 @@ import {
     type PropertyFactFoundation,
     type CannedCommentLike,
 } from './inspection/shared';
-import { InspectionSharingService } from './inspection/inspection-sharing.service';
+import { InspectionSharingService, type AgentViewTokenRole } from './inspection/inspection-sharing.service';
 import { InspectionAnalyticsService } from './inspection/inspection-analytics.service';
 import { InspectionStatusService } from './inspection/inspection-status.service';
 import { InspectionAnnotationsService } from './inspection/inspection-annotations.service';
@@ -71,17 +71,17 @@ export class InspectionService {
     private readonly publish: InspectionPublishService;
     private readonly core: InspectionCoreService;
 
-    constructor(db: D1Database, r2?: R2Bucket, sdb?: ScopedDB, kv?: KVNamespace, images?: ImagesBinding, planQuota?: PlanQuotaGuard, encryptionSecret?: string) {
+    constructor(db: D1Database, r2?: R2Bucket, sdb?: ScopedDB, kv?: KVNamespace, images?: ImagesBinding, planQuota?: PlanQuotaGuard, signing?: import('../lib/signing-key-secrets').SigningSecrets) {
         this.sharing = new InspectionSharingService(db, r2, sdb, kv, images);
         this.analytics = new InspectionAnalyticsService(db, r2, sdb, kv, images, this);
         this.status = new InspectionStatusService(db, r2, sdb, kv, images);
         this.annotations = new InspectionAnnotationsService(db, r2, sdb, kv, images, this);
         this.photo = new InspectionPhotoService(db, r2, sdb, kv, images, this);
         this.results = new InspectionResultsService(db, r2, sdb, kv, images);
-        // Commercial PCA Phase M — encryptionSecret only feeds the ComplianceService
+        // Commercial PCA Phase M — `signing` (the secret AND its earlier ones, never one without the other) only feeds the ComplianceService
         // this sub-service constructs internally for full_pca reports (§ signoff
         // key material); every other sub-service is unaffected by this param.
-        this.report = new InspectionReportService(db, r2, sdb, kv, images, encryptionSecret);
+        this.report = new InspectionReportService(db, r2, sdb, kv, images, signing);
         this.publish = new InspectionPublishService(db, r2, sdb, kv, images, this);
         // Only the create/clone/reinspection paths (owned by InspectionCoreService)
         // consume the free-tier quota — no other sub-service needs the guard.
@@ -474,7 +474,7 @@ export class InspectionService {
         return this.publish.resolveReleaseGate(inspectionId, tenantId);
     }
 
-    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService): Promise<{
+    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService, recipientEmail?: string | null): Promise<{
         reason: 'payment' | 'agreement';
         companyName: string;
         primaryColor: string | null;
@@ -489,7 +489,7 @@ export class InspectionService {
         amountCents: number | null;
         currency: string | null;
     } | null> {
-        return this.publish.getReportGate(inspectionId, tenantId, tenantSlug, agreementService);
+        return this.publish.getReportGate(inspectionId, tenantId, tenantSlug, agreementService, recipientEmail);
     }
 
     /**
@@ -536,8 +536,8 @@ export class InspectionService {
      * surfaced — they live under inspection_results.data[itemId].customComments
      * and are not exposed by getReportData yet, so we pull them separately.
      */
-    async getRepairList(inspectionId: string, tenantId: string) {
-        return this.analytics.getRepairList(inspectionId, tenantId);
+    async getRepairList(inspectionId: string, tenantId: string, versionNumber?: number) {
+        return this.analytics.getRepairList(inspectionId, tenantId, versionNumber);
     }
 
     /** IA-35 / IA-73 — tenant policy for agent access to the repair list. */
@@ -653,6 +653,10 @@ export class InspectionService {
         return this.status.unpublishReport(inspectionId, tenantId);
     }
 
+    async reopenReport(inspectionId: string, tenantId: string, reportId?: string): Promise<string> {
+        return this.status.reopenReport(inspectionId, tenantId, reportId);
+    }
+
     async markPaymentReceived(tenantId: string, inspectionId: string): Promise<void> {
         return this.status.markPaymentReceived(tenantId, inspectionId);
     }
@@ -703,14 +707,14 @@ export class InspectionService {
      * Generates a 30-day shareable agent view token stored in KV.
      * The token grants read-only access to the report without requiring login.
      */
-    async generateAgentViewToken(tenantId: string, inspectionId: string): Promise<string> {
-        return this.sharing.generateAgentViewToken(tenantId, inspectionId);
+    async generateAgentViewToken(tenantId: string, inspectionId: string, role: AgentViewTokenRole = 'agent'): Promise<string> {
+        return this.sharing.generateAgentViewToken(tenantId, inspectionId, role);
     }
 
     /**
      * Resolves an agent view token from KV.
      */
-    async resolveAgentViewToken(token: string): Promise<{ inspectionId: string; tenantId: string } | null> {
+    async resolveAgentViewToken(token: string): Promise<{ inspectionId: string; tenantId: string; role: AgentViewTokenRole } | null> {
         return this.sharing.resolveAgentViewToken(token);
     }
 
@@ -740,8 +744,8 @@ export class InspectionService {
      * it is not returned by getReportData — branding changes are instead
      * covered by bumping RENDER_VERSION.
      */
-    async getReportContentHash(id: string, tenantId: string, reportId?: string, translation: TranslationIdentity | null = null): Promise<string> {
-        return this.report.getReportContentHash(id, tenantId, reportId, translation);
+    async getReportContentHash(id: string, tenantId: string, reportId?: string, translation: TranslationIdentity | null = null, versionNumber?: number): Promise<string> {
+        return this.report.getReportContentHash(id, tenantId, reportId, translation, versionNumber);
     }
 
     async getReportPdfFooterContext(

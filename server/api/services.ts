@@ -1,3 +1,4 @@
+import { withoutCompanyId } from '../lib/response-projection';
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
@@ -192,11 +193,11 @@ const updateServiceDiscountCodeRoute = createRoute(withMcpMetadata({
 const listServiceDiscountCodesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/discount-codes',
     tags: ["services"], summary: "List service discount codes",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('inspectionFees')] as const,
     responses: { 200: { content: { 'application/json': { schema: DiscountCodeListResponseSchema } }, description: 'OK' } },
     operationId: "listServiceDiscountCodes",
-    description: "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owner, manager and inspector roles."
-}, { scopes: ['read'], tier: 'extended' }));
+    description: "Lists all of the company's service discount codes with type (fixed or percent), value (integer cents for fixed, whole percent for percent), usage cap, uses so far, expiry and active flag. Includes inactive and expired codes. Not paginated and not explicitly ordered. Read-only. Available to owners, managers and inspectors who hold the inspection-fees capability; without it the answer is 403."
+}, { scopes: ['read'], tier: 'extended', capability: 'inspectionFees' }));
 
 const createServiceDiscountCodesRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/discount-codes',
@@ -210,13 +211,13 @@ const createServiceDiscountCodesRoute = createRoute(withMcpMetadata({
 
 const validateServiceRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/discount/validate',
-    tags: ["services"], summary: "Validate service for current tenant",
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    tags: ["services"], summary: "Check a discount code against a subtotal",
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('inspectionFees')] as const,
     request: { body: { content: { 'application/json': { schema: ValidateDiscountSchema.describe('The code to check and the subtotal to price it against.') } } } },
     responses: { 200: { content: { 'application/json': { schema: createApiResponseSchema(ValidateDiscountResponseSchema) } }, description: 'Validation result' } },
     operationId: "validateService",
-    description: "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors."
-}, { scopes: ['write'], tier: 'extended' }));
+    description: "Check a discount code against an order subtotal and report what it would take off. Despite the POST verb this is read-only: it does not redeem the code or change its use count. Only active codes are considered and matching ignores case. A code that is unknown, expired or out of uses still answers 200, with valid false, a zero discountAmount and a message; a valid code returns its id and the amount in cents (a fixed code is capped at the subtotal, a percent code is rounded down). Available to owners, managers and inspectors who hold the inspection-fees capability."
+}, { scopes: ['read'], tier: 'extended', capability: 'inspectionFees' }));
 
 const listServicesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
@@ -237,7 +238,7 @@ servicesRoutes.openapi(listServicesRoute, async (c) => {
     // who may hold the inspection-fees capability or not: the wizard needs the price list
     // to price a line, and a caller without it must not receive a price. Writing the
     // catalogue stays with `companyFinance`.
-    return c.json({ success: true, data: redactMoney(rows, caps, 'inspectionFees') });
+    return c.json({ success: true, data: redactMoney(rows, caps, 'inspectionFees').map((row) => withoutCompanyId(row)) });
 });
 // POST /api/services/discount/validate — MUST be before /:id routes
 servicesRoutes.openapi(validateServiceRoute, async (c) => {
@@ -257,7 +258,7 @@ servicesRoutes.openapi(createServiceDiscountCodesRoute, async (c) => {
 servicesRoutes.openapi(listServiceDiscountCodesRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const rows = await c.var.services.service.listDiscountCodes(tenantId);
-    return c.json({ success: true, data: rows });
+    return c.json({ success: true, data: rows.map((row) => withoutCompanyId(row)) });
 });
 // PUT /api/services/discount-codes/:id — MUST be before /:id routes
 servicesRoutes.openapi(updateServiceDiscountCodeRoute, async (c) => {
@@ -265,7 +266,7 @@ servicesRoutes.openapi(updateServiceDiscountCodeRoute, async (c) => {
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
     const row = await c.var.services.service.updateDiscountCode(tenantId, id, data);
-    return c.json({ success: true, data: row });
+    return c.json({ success: true, data: withoutCompanyId(row) });
 });
 // DELETE /api/services/discount-codes/:id — MUST be before /:id routes
 servicesRoutes.openapi(deleteServiceDiscountCodeRoute, async (c) => {
@@ -279,7 +280,7 @@ servicesRoutes.openapi(createServiceRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const data = c.req.valid('json');
     const row = await c.var.services.service.createService(tenantId, data);
-    return c.json({ success: true, data: row }, 201);
+    return c.json({ success: true, data: withoutCompanyId(row) }, 201);
 });
 // GET /api/services/inspectors-by-service — the restriction lists of many services at once.
 // Registered before the /{id}/... routes so no service id can shadow it.
@@ -354,7 +355,7 @@ servicesRoutes.openapi(replaceServiceRoute, async (c) => {
     const { id } = c.req.valid('param');
     const data = c.req.valid('json');
     const row = await c.var.services.service.updateService(tenantId, id, data);
-    return c.json({ success: true, data: row });
+    return c.json({ success: true, data: withoutCompanyId(row) });
 });
 // DELETE /api/services/:id
 servicesRoutes.openapi(deleteServiceRoute, async (c) => {

@@ -3,14 +3,27 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import publicReportRoutes from '../../../server/api/public-report';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { eq, asc } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { AgreementService } from '../../../server/services/agreement.service';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+
+/** A database holding one tenant and one inspection whose report is published, which is all the publish gate reads. */
+function publishedReportDb(tenantId: string, inspectionId: string) {
+    const { db } = createTestDb();
+    db.insert(schema.tenants).values({
+        id: tenantId, slug: tenantId, status: 'active', deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
+    } as never).run();
+    db.insert(schema.inspections).values({
+        id: inspectionId, tenantId, propertyAddress: '1 Main St', date: '2026-06-01', status: 'requested',
+        paymentStatus: 'unpaid', price: 50000, reportStatus: 'published', createdAt: new Date(),
+    } as never).run();
+    return db;
+}
 
 /**
  * C-10 ③-A.1 — GET /api/public/report/:tenant/:id integration shape.
@@ -30,16 +43,17 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
         // Option A — a recipient read resolves the latest PUBLISHED version and
         // renders its snapshot. `null` is the draft case: no version row yet.
         getLatestPublished = vi.fn().mockResolvedValue({ versionNumber: 7 }),
+        // The company that owns the published inspection the gate reads.
+        gateTenant = 't1',
     ) {
-        // The publish gate added to reportRoute runs drizzle(c.env.DB).select()...get()
+        // The publish gate added to reportRoute reads the inspection's report_status
         // on the resolved (client/legacy) path. These cases all use published
-        // reports, so the chainable fake resolves to report_status='published' and
-        // the gate lets them through (the 404 cases bail before the gate).
-        const publishedDb = { select: () => ({ from: () => ({ where: () => ({ get: async () => ({ reportStatus: 'published' }) }) }) }) };
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(publishedDb as any);
+        // reports, so the database holds one published inspection and the gate
+        // lets them through (the 404 cases bail before the gate).
+        testD1.use(publishedReportDb(gateTenant, 'insp1'));
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding };
             c.set('services', {
                 portalAccess: { resolveToken },
                 inspection: { getReportData, resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken },
@@ -66,7 +80,7 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
     it('200 via the legacy KV agent-view-token fallback (existing share links)', async () => {
         const getReportData = vi.fn().mockResolvedValue({ inspectionId: 'insp1' });
         const legacy = vi.fn().mockResolvedValue({ inspectionId: 'insp1', tenantId: 't9' });
-        const { app } = buildApp(vi.fn().mockResolvedValue(null), getReportData, legacy);
+        const { app } = buildApp(vi.fn().mockResolvedValue(null), getReportData, legacy, undefined, 't9');
         const res = await app.request('/api/public/report/t/insp1?token=kvtok');
         expect(res.status).toBe(200);
         // Third arg: the makePhotoUrl factory added by A-9 (photo serve routes).
@@ -172,9 +186,9 @@ describe('GET /api/public/report-gate/:tenant/:id — ③-A.2', () => {
         expect(body.success).toBe(true);
         expect(body.data.reason).toBe('payment');
         expect(body.data.amountCents).toBe(45000);
-        // Task 7 — the route now threads the agreement service through as the
-        // 4th arg (undefined here since this stub omits it).
-        expect(getReportGate).toHaveBeenCalledWith('insp1', 't1', 'WRONG-TENANT', undefined);
+        // The route threads the agreement service through as the 4th arg (undefined here since this stub omits it) and the recipient
+        // the caller proved to be as the 5th (null: this request carried no portal token).
+        expect(getReportGate).toHaveBeenCalledWith('insp1', 't1', 'WRONG-TENANT', undefined, null);
     });
 });
 
@@ -216,7 +230,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
     }
 
     async function createEnvelope() {
-        const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const svc = new AgreementService(testD1.binding, { jwtSecret: JWT_SECRET });
         const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
             signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
             completionPolicy: 'all',
@@ -228,8 +242,8 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
     }
 
     function makeService() {
-        const inspection = new InspectionService({} as D1Database);
-        const agreement = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const inspection = new InspectionService(testD1.binding);
+        const agreement = new AgreementService(testD1.binding, { jwtSecret: JWT_SECRET });
         return { inspection, agreement };
     }
 
@@ -238,7 +252,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
     });
 
     afterEach(() => sqlite.close());
@@ -248,7 +262,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         const { token, signers } = await createEnvelope();
         const { inspection, agreement } = makeService();
 
-        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'jane@test.com');
         expect(gate).not.toBeNull();
         expect(gate!.reason).toBe('agreement');
         expect(gate!.actionLabel).toBe('Sign & pay');
@@ -265,7 +279,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         const { token, signers } = await createEnvelope();
         const { inspection, agreement } = makeService();
 
-        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'jane@test.com');
         expect(gate!.reason).toBe('agreement');
         expect(gate!.actionLabel).toBe('Sign agreement');
         // The agreement-only sign URL must route through the first outstanding
@@ -282,7 +296,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
     it('multi-signer agreement-only gate URL resolves to signer 1, never a sentinel', async () => {
         await seed({ agreementRequired: true, paymentRequired: false, paymentStatus: 'unpaid' });
         // Two-signer envelope: the gate must route to signer 1's real token.
-        const svc = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
+        const svc = new AgreementService(testD1.binding, { jwtSecret: JWT_SECRET });
         const r = await svc.findOrCreate(TENANT_ID, INSP_ID, {
             signers: [
                 { name: 'Jane', email: 'jane@test.com', role: 'client' },
@@ -295,12 +309,56 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
         const { inspection, agreement } = makeService();
 
-        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'jane@test.com');
         expect(gate!.reason).toBe('agreement');
         const urlToken = gate!.actionUrl.split('/').pop()!;
         expect(urlToken).not.toContain('x:');
         const resolved = await agreement.getSignerByPresentedToken(urlToken);
         expect(resolved?.signer.id).toBe(signers[0].id);
+        // The link is the PROVEN recipient's own: John gets his, never signer 1's.
+        const johns = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'John@Test.com');
+        const johnToken = johns!.actionUrl.split('/').pop()!;
+        expect((await agreement.getSignerByPresentedToken(johnToken))?.signer.id).toBe(signers[1].id);
+        expect(johnToken).not.toBe(urlToken);
+    });
+
+    it('without a proven recipient the gate carries NO signer token: it points at the client portal (agreement) or the invoice (payment)', async () => {
+        await seed({ agreementRequired: true, paymentRequired: true, paymentStatus: 'unpaid' });
+        const { token } = await createEnvelope();
+        const { inspection, agreement } = makeService();
+        for (const email of [undefined, null, '', 'stranger@test.com']) {
+            const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, email);
+            expect(gate!.actionUrl, String(email)).not.toContain(token);
+            expect(gate!.actionUrl, String(email)).not.toContain('/checkout/');
+            expect(gate!.actionUrl, String(email)).not.toContain('/agreements/sign/');
+            expect(gate!.actionUrl, String(email)).toBe(`/portal/${SLUG}/i/${INSP_ID}?section=overview`);
+        }
+    });
+
+    it('without a proven recipient the gate states no property address, inspection date or inspector contact; with one it does', async () => {
+        await seed({ agreementRequired: false, paymentRequired: true, paymentStatus: 'unpaid' });
+        await db.insert(schema.users).values({
+            id: '00000000-0000-0000-0000-0000000000a9', tenantId: TENANT_ID, email: 'pat@acme.test', role: 'inspector', name: 'Pat Inspector',
+            phone: '+15550100', createdAt: new Date(), passwordHash: 'h',
+        } as any);
+        await db.update(schema.inspections).set({ inspectorId: '00000000-0000-0000-0000-0000000000a9' } as any).where(eq(schema.inspections.id, INSP_ID));
+        await db.insert(schema.invoices).values({
+            id: '00000000-0000-0000-0000-0000000000f2', tenantId: TENANT_ID, inspectionId: INSP_ID,
+            amountCents: 45000, currency: 'USD', lineItems: [], createdAt: new Date(),
+        } as any);
+        const { inspection, agreement } = makeService();
+        // Control: with proof the page is whole, so the nulls below are the withholding and not an unseeded fixture.
+        const proven = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, 'jane@test.com');
+        expect(proven).toMatchObject({ propertyAddress: '1 Main St', scheduledDate: '2026-06-01', inspectorName: 'Pat Inspector', inspectorEmail: 'pat@acme.test', inspectorPhone: '+15550100' });
+        for (const email of [undefined, null, '']) {
+            const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement, email);
+            expect(gate, String(email)).toMatchObject({
+                reason: 'payment', propertyAddress: null, scheduledDate: null,
+                inspectorName: null, inspectorEmail: null, inspectorPhone: null, inspectorLicense: null,
+                // What the earlier decisions keep: the amount, the company and the action to take.
+                amountCents: 45000, currency: 'USD', actionUrl: `/invoice/${INSP_ID}`,
+            });
+        }
     });
 
     it('ONLY payment outstanding -> /invoice/:id URL', async () => {
@@ -362,18 +420,15 @@ describe('GET /api/public/report/:tenant/:id/photo — prefix guard (r2-key-conv
             inspectionId: INSP, tenantId: TENANT, role: 'client',
             recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null,
         });
-        // drizzle is mocked globally; the handler calls it twice:
+        // The handler reads the database twice:
         // (1) legacy agent-view-token path — irrelevant here (resolveToken already hits)
         // (2) photoGate: returns published so the report-status gate passes.
-        const publishedDb = {
-            select: () => ({ from: () => ({ where: () => ({ get: async () => ({ reportStatus: 'published' }) }) }) }),
-        };
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(publishedDb as any);
+        testD1.use(publishedReportDb(TENANT, INSP));
 
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             (c as unknown as { env: Record<string, unknown> }).env = {
-                DB: {},
+                DB: testD1.binding,
                 PHOTOS: {
                     get: async (k: string) => mockPhotos[k] ?? null,
                 },

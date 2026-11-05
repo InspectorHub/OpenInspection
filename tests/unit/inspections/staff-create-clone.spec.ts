@@ -172,6 +172,19 @@ describe('office staff create, copy and re-inspect', () => {
             expect([source?.reportStatus, source?.autoSignOnPublish, source?.coverPhotoId]).toEqual(['published', true, 'old/cover.jpg']);
         });
 
+        it('answers with the snapshot as an object when the source stored it as a JSON-encoded string', async () => {
+            const sections = [{ id: 's1', title: 'Roof', items: [] }];
+            await h.db.update(schema.inspections).set({ templateSnapshot: JSON.stringify({ sections }) as never }).where(eq(schema.inspections.id, SOURCE_ID));
+            const res = await call('staff', STAFF_ID, 'POST', `/api/inspections/${SOURCE_ID}/clone`);
+            expect(res.status, await res.clone().text()).toBe(201);
+            const { data } = await res.json() as { data: { inspection: { templateSnapshot: unknown } } };
+            expect(data.inspection.templateSnapshot).toEqual({ sections });
+            // Control: a source with no snapshot answers null, not a string.
+            await h.db.update(schema.inspections).set({ templateSnapshot: null }).where(eq(schema.inspections.id, SOURCE_ID));
+            const none = await call('staff', STAFF_ID, 'POST', `/api/inspections/${SOURCE_ID}/clone`);
+            expect(((await none.json()) as { data: { inspection: { templateSnapshot: unknown } } }).data.inspection.templateSnapshot).toBeNull();
+        });
+
         it('control: an owner gets the same clean copy', async () => {
             const res = await call('owner', OWNER_ID, 'POST', `/api/inspections/${SOURCE_ID}/clone`);
             expect(res.status, await res.clone().text()).toBe(201);

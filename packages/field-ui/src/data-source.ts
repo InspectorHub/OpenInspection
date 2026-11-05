@@ -85,7 +85,7 @@ export interface EditorData {
   /** Always an object: stored text, falling back to the standard boilerplate per field; the data source supplies it. */
   relianceText: RelianceText;
   commercialPresets: CommercialPresets;
-  nextPublishIsAmendment: boolean;
+  nextPublishIsAmendment: boolean; reopenedForEditing?: boolean; // reopened with "Edit and republish": the only state where the server honours the publish notice choice
   /** Null unless the session context reports a cooling window. */
   outboundCoolingWindow: OutboundCoolingWindow | null;
   /** Null on legacy inspections created before every inspection got a results row. */
@@ -183,6 +183,7 @@ export interface ResultsDocHandle {
   doc: Y.Doc;
   persistenceSynced: Promise<void>;
   synced: () => boolean;
+  locked?: () => boolean; // true once the server closed the socket because the report is published (no reconnect follows)
   destroy(): void;
 }
 

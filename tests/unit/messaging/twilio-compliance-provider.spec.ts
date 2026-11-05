@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { describe, it, expect } from 'vitest';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -101,7 +101,7 @@ const INFO = { legalName: 'Acme Inspections', address: '1 Main, TX', repName: 'B
 async function freshDb() {
     const fx = createTestDb();
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
+    testD1.use(fx.db);
     return fx;
 }
 
@@ -124,7 +124,7 @@ describe('TwilioComplianceProvider.provision (sp10dlc)', () => {
         const calls: string[] = [];
         const capturedCampaign: { data?: Record<string, string> } = {};
         const provider = new TwilioComplianceProvider(fakeTwilio(calls, { capturedCampaign }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.provision(
             { tenantId: 'p1', channel: 'sp10dlc', businessInfo: INFO }, store,
         );
@@ -155,7 +155,7 @@ describe('TwilioComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const calls: string[] = [];
         const provider = new TwilioComplianceProvider(fakeTwilio(calls));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await provider.provision({ tenantId: 'p2', channel: 'sp10dlc', businessInfo: INFO }, store);
         calls.length = 0;
         await provider.provision({ tenantId: 'p2', channel: 'sp10dlc', businessInfo: INFO }, store);
@@ -167,7 +167,7 @@ describe('TwilioComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const captured: { data?: Record<string, string> } = {};
         const provider = new TwilioComplianceProvider(fakeTwilio([], { capturedProfile: captured }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const url = 'https://app.example.test/webhooks/compliance-status/twilio/acme';
         await provider.provision(
             { tenantId: 'cb1', channel: 'sp10dlc', businessInfo: INFO, statusCallbackUrl: url }, store,
@@ -181,7 +181,7 @@ describe('TwilioComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const captured: { data?: Record<string, string> } = {};
         const provider = new TwilioComplianceProvider(fakeTwilio([], { capturedProfile: captured }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await provider.provision({ tenantId: 'cb2', channel: 'sp10dlc', businessInfo: INFO }, store);
         expect('StatusCallbackUrl' in (captured.data ?? {})).toBe(false);
         fx.sqlite.close();
@@ -191,7 +191,7 @@ describe('TwilioComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const calls: string[] = [];
         const provider = new TwilioComplianceProvider(fakeTwilio(calls, { campThrows: true }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await expect(
             provider.provision({ tenantId: 'p4', channel: 'sp10dlc', businessInfo: INFO }, store),
         ).rejects.toThrow('TCR error');
@@ -207,7 +207,7 @@ describe('TwilioComplianceProvider.provision (sp10dlc)', () => {
     it('attach resume: crash during attach re-attaches without re-buying', async () => {
         const fx = await freshDb();
         let buys = 0; let attaches = 0; let attachThrows = true;
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const opts: FakeOpts = {
             get attachThrows() { return attachThrows; },
             onBuy: () => { buys++; },
@@ -238,7 +238,7 @@ describe('TwilioComplianceProvider.provision (tollfree)', () => {
         const calls: string[] = [];
         const capturedTollfree: { data?: Record<string, string> } = {};
         const provider = new TwilioComplianceProvider(fakeTwilio(calls, { capturedTollfree }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.provision(
             { tenantId: 'p3', channel: 'tollfree', businessInfo: { ...INFO, email: 'a@b.test' } }, store,
         );
@@ -265,7 +265,7 @@ describe('TwilioComplianceProvider.provision (tollfree)', () => {
     it('crash-resume: numbers.buy runs once even if tfv.create crashed after buy', async () => {
         const fx = await freshDb();
         let buys = 0;
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const crash = new TwilioComplianceProvider(fakeTwilio([], { tfvThrows: true, onBuy: () => { buys++; } }));
         await expect(
             crash.provision({ tenantId: 'p5', channel: 'tollfree', businessInfo: INFO }, store),
@@ -289,7 +289,7 @@ describe('TwilioComplianceProvider.syncStatus', () => {
         const provider = new TwilioComplianceProvider(
             fakeTwilio([], { tfvs: [{ sid: 'HV1', status: 'TWILIO_APPROVED' }] }),
         );
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.syncStatus({ tenantId: 't-sc-1' }, store);
         expect(snap.complianceStatus).toBe('approved');
         expect(snap.rejectionReason).toBeNull();
@@ -302,7 +302,7 @@ describe('TwilioComplianceProvider.syncStatus', () => {
         const provider = new TwilioComplianceProvider(
             fakeTwilio([], { tfvs: [{ sid: 'HV2', status: 'TWILIO_REJECTED' }] }),
         );
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.syncStatus({ tenantId: 't-sc-r' }, store);
         expect(snap.complianceStatus).toBe('rejected');
         expect(snap.rejectionReason).toBe('TWILIO_REJECTED');
@@ -315,7 +315,7 @@ describe('TwilioComplianceProvider.syncStatus', () => {
         const provider = new TwilioComplianceProvider(
             fakeTwilio([], { brands: [{ sid: 'BN_X', status: 'TWILIO_APPROVED' }] }),
         );
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.syncStatus({ tenantId: 't-reg' }, store);
         expect(snap.complianceStatus).toBe('campaign_pending');
         fx.sqlite.close();
@@ -327,7 +327,7 @@ describe('TwilioComplianceProvider.syncStatus', () => {
         const provider = new TwilioComplianceProvider(
             fakeTwilio([], { brands: [{ sid: 'BN_F', status: 'TWILIO_APPROVED' }] }),
         );
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.syncStatus({ tenantId: 't-b1' }, store);
         expect(snap.complianceStatus).toBe('brand_pending');
         fx.sqlite.close();
@@ -336,7 +336,7 @@ describe('TwilioComplianceProvider.syncStatus', () => {
     it('returns not_started sentinel when no row exists', async () => {
         const fx = await freshDb();
         const provider = new TwilioComplianceProvider(fakeTwilio([]));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.syncStatus({ tenantId: 'no-row' }, store);
         expect(snap.complianceStatus).toBe('not_started');
         fx.sqlite.close();

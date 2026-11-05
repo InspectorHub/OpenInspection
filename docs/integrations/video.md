@@ -11,7 +11,7 @@ Video clips are stored directly in the `PHOTOS` R2 bucket alongside field photos
 - **Zero marginal cost** — covered by Cloudflare R2 Free tier (10 GB storage, 1 M Class A ops/month).
 - **Clips are stored as-recorded.** The worker buffers the clip (up to the 200 MB / 30 s cap) and writes it to R2 verbatim. Container-level GPS, EXIF, and other metadata are **not** stripped.
 - **Privacy checkbox.** Because clips carry the original container metadata, the Media Studio `VideoCapture` component presents a privacy notice checkbox. The inspector must acknowledge it before the upload is allowed. The checkbox is absent on the Stream path because Stream re-transcodes on ingest, which drops container-level GPS/EXIF.
-- **HTTP Range serving.** Clips are served via `GET /api/inspections/:id/media/video/r2-object/:mediaId` with full HTTP 206 Range support so the browser `<video>` element can seek without re-downloading.
+- **HTTP Range serving.** Clips are served with full HTTP 206 Range support so the browser `<video>` element can seek without re-downloading. Staff play them through `GET /api/inspections/:id/media/video/r2-object/:mediaId` (session required). A client or agent reading a published report plays them through `GET /api/public/report/:tenant/:id/video/r2-object/:mediaId` (and `/poster`), which takes the same portal token as the report's photos and is held back by the same publish and release gates. It serves any R2 video stored for that inspection, not only the clips a given report version places.
 
 ### Key shape (R2)
 

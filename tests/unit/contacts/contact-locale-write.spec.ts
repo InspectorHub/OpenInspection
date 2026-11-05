@@ -30,8 +30,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const CONTACT = '00000000-0000-0000-0000-0000000000c1';
@@ -107,8 +107,8 @@ describe('ContactService locale writes', () => {
             id: CONTACT, tenantId: TENANT, type: 'client', name: 'Jane',
             email: 'jane@test.com', locale: 'es-419', createdAt: new Date(),
         });
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        svc = new ContactService({} as D1Database);
+        testD1.use(testDb);
+        svc = new ContactService(testD1.binding);
     });
 
     it('leaves a stored preference alone when the patch does not mention it', async () => {

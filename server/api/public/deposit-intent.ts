@@ -106,7 +106,7 @@ app.openapi(depositIntentRoute, async (c) => {
         );
         return c.json({
             success: true as const,
-            data: { clientSecret, publishableKey, amountCents: owed.outstandingCents, currency },
+            data: { clientSecret, publishableKey, amountCents: owed.outstandingCents, currency }, // projection-allow: the payment intent's client secret, publishable key, amount and currency
         }, 200);
     } catch (err) {
         // Raced with the webhook: the deposit landed between our read and

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { resolvePortalAccess } from '../../../server/lib/public-access';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
@@ -39,8 +39,8 @@ describe('resolvePortalAccess', () => {
 });
 
 // ─── Track I-a — hash-at-rest (tier-2) ───────────────────────────────────────
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
 const INSPECTION = '11111111-1111-1111-1111-1111111111c1';
@@ -54,8 +54,7 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -64,7 +63,7 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
         // profiles — seed the defaults so the (unqualified) 'client' role
         // used throughout this suite resolves.
         await seedRoleProfiles(asD1Db(testDb), TENANT);
-        svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
+        svc = new PortalAccessService(testD1.binding, { jwtSecret: JWT });
     });
 
     it('(a) issueToken stores hash + enc, and the row holds no plaintext at all', async () => {

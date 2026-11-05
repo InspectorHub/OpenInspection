@@ -102,6 +102,8 @@ export const NATIVE_CONTRACT: readonly NativeContractEntry[] = [
     { method: 'post', path: '/api/inspections/{id}/inspector-signature' },
     { method: 'patch', path: '/api/inspections/{id}/template-snapshot' },
     { method: 'post', path: '/api/inspections/{id}/publish' },
+    // "Edit and republish": the way past 409 REPORT_PUBLISHED once the person has agreed to update a published report.
+    { method: 'post', path: '/api/inspections/{id}/edit-again' },
     { method: 'patch', path: '/api/inspections/{id}/statutory-details' },
     { method: 'post', path: '/api/inspections/{id}/statutory-form/instances' },
     // Compliance: sign-off, document review, property-condition questionnaire.

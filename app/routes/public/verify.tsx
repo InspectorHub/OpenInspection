@@ -6,6 +6,7 @@ import { SanitizedHtml } from "~/components/SanitizedHtml";
 import { AgreementLanguageDisclosure } from "~/components/agreements/AgreementLanguageDisclosure";
 import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
 import { LazyViewerTimeZoneNotice } from "~/components/public/LazyViewerTimeZoneNotice";
+import { VerifyExportForm } from "~/components/public/VerifyExportForm";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -39,6 +40,8 @@ interface VerifyData {
   // signature and on any surface the platform did not draw — the page then says
   // nothing rather than showing today's words against an older signature.
   languageDisclosureCurrent: boolean;
+  // Site key of the bot challenge on the signed-record request; null where the deployment has none.
+  turnstileSiteKey: string | null;
 }
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -228,6 +231,8 @@ function VerifyBody() {
           <p className="text-ih-bad-fg">{result.chainReason}</p>
         )}
       </div>
+
+      <VerifyExportForm envelopeId={result.envelopeId} siteKey={result.turnstileSiteKey ?? null} />
 
       {result.signers.some((s) => s.signedAt) && <LazyViewerTimeZoneNotice className="mt-4" />}
     </div>

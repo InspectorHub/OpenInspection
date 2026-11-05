@@ -29,6 +29,7 @@ import { parseWordExportJob } from '../lib/sync-events/word-export-job';
 import { sniffImageDimensions } from '../lib/media/image-dimensions';
 import { documentReviewNarrativeItems, type DocumentReviewRow } from '../lib/pca-document-review';
 import type { ImagesBinding } from '../lib/media/strip-exif';
+import { signingKeySecrets } from '../lib/signing-key-secrets';
 
 /** Minimal binding surface the consumer needs, decoupled from the full
  *  Hono `AppEnv` (the queue handler runs outside request context). */
@@ -37,7 +38,7 @@ export interface WordExportConsumerEnv {
     PHOTOS: R2Bucket;
     TENANT_CACHE?: KVNamespace;
     KEY_ENCRYPTION_SECRET?: string;
-    JWT_SECRET?: string;
+    JWT_SECRET?: string; JWT_SECRET_PREVIOUS?: string | undefined;
     IMAGES?: ImagesBinding;
 }
 
@@ -435,10 +436,9 @@ export async function handleWordExportBatch(env: WordExportConsumerEnv, batch: M
 
             const inspectionService = new InspectionService(
                 env.DB, env.PHOTOS, undefined, env.TENANT_CACHE, env.IMAGES, undefined,
-                env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET,
+                signingKeySecrets(env),
             );
-            // Identity makePhotoUrl — photoAppendix entries carry the raw R2
-            // key (not a token-scoped URL) so this consumer can PHOTOS.get it.
+            // Identity makePhotoUrl: photoAppendix entries carry the raw R2 key, so this consumer can PHOTOS.get it.
             const reportData = await inspectionService.getReportData(job.inspectionId, job.tenantId, (key) => key);
 
             if (!reportData.reportTier || !reportData.pcaReport) {

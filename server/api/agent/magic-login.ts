@@ -6,6 +6,8 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getBaseUrl } from '../../lib/url';
 import { signJwt } from '../../lib/jwt-keyring';
 import { logger } from '../../lib/logger';
+import { checkRateLimit } from '../../lib/rate-limit';
+import { safeReturnTo } from '../../lib/mcp/safe-return-to';
 import {
     MagicLoginRequestSchema,
     MagicLoginRequestResponseSchema,
@@ -23,9 +25,9 @@ import { authCookieOptions, AUTH_COOKIE_NAME } from '../../lib/auth-helpers';
  *
  * Two entry points, BOTH public/unauthenticated (the caller holds a report
  * token or a KV code, never a session) — both must be allowlisted past the
- * global JWT middleware (server/index.ts `isAgentPublic`) and, since the
- * redeem path is not under /api, explicitly forwarded to the API app in
- * workers/app.ts (see `/agent/magic-login`).
+ * global JWT middleware (server/index.ts `isAgentPublic`). The redeem handler is NOT reachable from outside: the entry does not forward
+ * `/agent/magic-login` to this app. That address is a page (app/routes/agent/magic-login.tsx) whose Continue action calls this handler
+ * in-process, so opening the emailed link spends nothing.
  */
 
 const requestRoute = createRoute(withMcpMetadata({
@@ -52,7 +54,7 @@ const redeemRoute = createRoute(withMcpMetadata({
     path: '/agent/magic-login',
     tags: ['agents', 'public'],
     summary: 'Redeem a single-use agent magic-login code',
-    description: 'Public, unauthenticated endpoint for the agent unified link. Redeems the single-use code minted by POST /api/agent/magic-login/request into an agent session cookie, then redirects into the agent dashboard. A missing, expired, or already-used code redirects to a friendly recovery page instead of surfacing a raw error.',
+    description: 'Public, unauthenticated endpoint for the agent unified link. Redeems the single-use code minted by POST /api/agent/magic-login/request into an agent session cookie, then redirects into the agent dashboard. Reached only in-process, by the Continue action of the page at /agent/magic-login; the worker entry does not forward that address to the API. A missing, expired, or already-used code redirects to a friendly recovery page instead of surfacing a raw error.',
     request: {
         query: z.object({
             code: z.string().min(1).describe('Single-use magic-login code minted by POST /api/agent/magic-login/request. Expires after 900 seconds and is deleted from KV on the first redeem attempt, success or failure.'),
@@ -67,7 +69,10 @@ const redeemRoute = createRoute(withMcpMetadata({
 /** POST /api/agent/magic-login/request — mounted under the /api/agent router group. */
 export const agentMagicLoginRequestRoutes = createApiRouter();
 agentMagicLoginRequestRoutes.openapi(requestRoute, async (c) => {
+    await checkRateLimit(c, 'agent-magic-login-request');
     const body = c.req.valid('json');
+    // Checked here as well as at redeem, so an unsafe target is never stored in the code's record at all.
+    const returnTo = body.returnTo ? safeReturnTo(body.returnTo, '') : '';
     const result = await requestMagicLogin({
         portalAccess: c.var.services.portalAccess,
         kv: c.env.TENANT_CACHE,
@@ -75,7 +80,7 @@ agentMagicLoginRequestRoutes.openapi(requestRoute, async (c) => {
         inspectionId: body.inspectionId,
         reportToken: body.token,
         coreBaseUrl: getBaseUrl(c),
-        ...(body.returnTo ? { returnTo: body.returnTo } : {}),
+        ...(returnTo ? { returnTo } : {}),
     });
     // EMAIL the single-use sign-in link to the agent's own account inbox —
     // never return it to the caller. The durable report link is a reusable
@@ -111,22 +116,18 @@ agentMagicLoginRequestRoutes.openapi(requestRoute, async (c) => {
 
 export const agentMagicLoginRequestRouteConfigs = [requestRoute] as const;
 
-/** GET /agent/magic-login — mounted at the TOP LEVEL (not under /api); see workers/app.ts. */
 /**
- * IA-47 — only honour a returnTo that is a same-origin relative path. We mint an
- * agent session cookie immediately before this redirect, so an attacker-shaped
- * absolute URL here would be an authenticated open redirect. Require a single
- * leading slash and reject scheme-relative (`//`) and backslash tricks (`/\`).
+ * IA-47 — only honour a returnTo that is a same-origin relative path (the shared `safeReturnTo`: one leading slash, no backslash, no
+ * control character). A session cookie is minted immediately before the redirect, so an attacker-shaped target here would be an
+ * authenticated open redirect. The value is checked when the link is requested AND again when it is redeemed.
  */
-function safeReturnTo(returnTo: string | undefined): string | null {
-    if (!returnTo || !returnTo.startsWith('/')) return null;
-    if (returnTo.startsWith('//') || returnTo.startsWith('/\\')) return null;
-    return returnTo;
-}
+const AFTER_SIGN_IN = '/agent-dashboard';
 
 export const agentMagicLoginRedeemRoutes = createApiRouter();
 agentMagicLoginRedeemRoutes.openapi(redeemRoute, async (c) => {
     const { code } = c.req.valid('query');
+    // Counted per caller before the code is read, and outside the try below: a limit must answer 429, not read as an expired link.
+    await checkRateLimit(c, 'agent-magic-login-redeem');
     try {
         const { userId, email, returnTo } = await redeemMagicLogin(c.env.TENANT_CACHE, c.env.DB, code);
 
@@ -154,7 +155,7 @@ agentMagicLoginRedeemRoutes.openapi(redeemRoute, async (c) => {
 
         // IA-47 — land the agent back on the report they were viewing when a
         // safe returnTo was threaded through; otherwise the dashboard.
-        return c.redirect(safeReturnTo(returnTo) ?? '/agent-dashboard', 302);
+        return c.redirect(safeReturnTo(returnTo, AFTER_SIGN_IN), 302);
     } catch (err) {
         logger.warn('agent.magic_login.redeem_failed', {
             error: err instanceof Error ? err.message : String(err),

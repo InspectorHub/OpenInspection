@@ -20,6 +20,8 @@ export interface StripeWebhookLogEntry {
 const PREFIX = 'stripe-webhook-log:';
 const CAP = 20;
 const SIG_FAILED_CAP = 5;
+/** Two unverified failures closer together than this are one row. */
+const SIG_FAILED_MIN_GAP_MS = 60_000;
 const TTL_S = 60 * 60 * 24 * 30;
 
 export function stripeWebhookLogKey(tenantId: string): string {
@@ -36,6 +38,11 @@ export async function appendWebhookLogEntry(
         const key = stripeWebhookLogKey(tenantId);
         const existing = ((await kv.get(key, { type: 'json' }).catch(() => null)) as StripeWebhookLogEntry[] | null) ?? [];
         const list = Array.isArray(existing) ? existing : [];
+        // A delivery that fails its signature has proven nothing, so anyone can send them, and a key-value write is the scarce thing: one
+        // key takes about one write a second. A failure right after another failure adds no information and is not written.
+        const newest = list[0];
+        if (entry.result === 'signature_failed' && newest?.result === 'signature_failed'
+            && Date.now() - Date.parse(newest.ts) < SIG_FAILED_MIN_GAP_MS) return;
         // Newest first; unverified failures sub-capped so they can never push
         // verified rows out of the window (see eviction defense above).
         let sigFailedKept = 0;

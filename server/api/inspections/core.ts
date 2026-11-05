@@ -18,6 +18,9 @@ import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.s
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { datePatchValues } from '../../services/inspection/reschedule-date';
 import { pushInspectionAfterResponse } from '../../lib/calendar/push-hooks';
+import { isOfflineImportReplay } from '../../lib/request-scope';
+import { changedFrozenFields } from '../../lib/report-freeze';
+import { assertReportContentWritable } from '../../lib/inspection/report-lock';
 import { findPatchRefusal } from './patch-guards';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncAssignmentsAndSplits } from '../../services/pay-split.service';
@@ -25,7 +28,8 @@ import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 import { getDrizzle } from '../../lib/route-helpers';
-import { patchRevisionReport, revisionStatusField, withReadableSnapshot } from './patch-revision-report';
+import { patchRevisionReport, revisionStatusField } from './patch-revision-report';
+import { toInspectionRecord, templateRecord } from '../../lib/response-projection';
 import { createInspectionRoute } from './core-create-route';
 import { completeReplayedCreate } from './create-replay';
 import { moneyView, guardMoneyWrite } from '../../lib/auth/money-access';
@@ -33,6 +37,7 @@ import { assertCanCreate, fireQuotaThresholdNotice, recordCreateAudit, resolveCr
 import { isFieldRole } from '../../lib/auth/roles';
 import { resolveInspectionScope } from '../../lib/inspection/visibility';
 import { resolvePrimaryReportId } from '../../lib/inspection/reports';
+import { loadPublishedStateWithLock } from '../../lib/inspection/published-state';
 
 /**
  * GET /api/inspections/:id
@@ -184,7 +189,6 @@ const createFromWizardRoute = createRoute(withMcpMetadata({
     description: "Creates an inspection from the new-inspection wizard payload (property, services, schedule and team) and returns the new inspection id. The signed-in user becomes the inspector, unless their role cannot inspect (staff), in which case the inspection starts unassigned unless team mode names a lead; a named lead or helper must be a member who can inspect (400 otherwise). The scheduled date and start time are combined into the inspection date. The client is not collected here: the inspection is created with the placeholder client name Private Client and no contact details, so attach a client afterwards. The services list is validated but this route does not use it to create anything. Property type and commercial subtype (only honoured for commercial) are applied after creation. When team mode is on, the lead defaults to the signed-in user and the helpers are assigned; when it is off, any lead or helpers sent are ignored and the creator is the sole assignee. Counts against the company's plan quota. Unlike the plain create route it responds 200, not 201. Available to owner, manager and inspector roles; staff get 403."
 }, { scopes: ['write'], tier: 'extended' }));
 
-
 const coreRoutes = createApiRouter()
     .openapi(getInspectionRoute, async (c) => {
         const { id } = c.req.valid('param');
@@ -192,11 +196,12 @@ const coreRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const result = await service.getInspection(id, tenantId);
         const primaryReportId = await resolvePrimaryReportId(getDrizzle(c), tenantId, id);
+        const published = await loadPublishedStateWithLock(getDrizzle(c), tenantId, id);
         return c.json({
             success: true,
             // Only the inspection row is projected: `template` is customer-authored
             // schema JSON and may legitimately contain a field called `price`.
-            data: { ...result, inspection: await moneyView(c, withReadableSnapshot(result.inspection), 'inspectionFees'), primaryReportId, ...revisionStatusField(result.inspection) },
+            data: { ...result, inspection: await moneyView(c, toInspectionRecord(result.inspection), 'inspectionFees'), template: templateRecord(result.template), primaryReportId, ...published, ...revisionStatusField(result.inspection) },
         }, 200);
     })
     .openapi(deleteInspectionRoute, async (c) => {
@@ -229,6 +234,10 @@ const coreRoutes = createApiRouter()
         // Money fields need `inspectionFees`, but only a CHANGE is refused: the settings
         // form forwards its whole form, price included. Before anything else runs.
         await guardMoneyWrite(c, body, inspection as Record<string, unknown>);
+
+        // The columns the published report shows are its content: changing one needs "Edit and republish" first. An offline
+        // import replays its queued writes through here after refusing the whole package for a published inspection.
+        if (!isOfflineImportReplay(c.env) && changedFrozenFields(body, inspection).length > 0) await assertReportContentWritable(db, tenantId, id);
 
         // Every soft reference this patch can dangle, plus the two status moves
         // it may not make: INTO `cancelled` (#78) and OUT of it (#81). Both live
@@ -305,7 +314,7 @@ const coreRoutes = createApiRouter()
         // answer with the existing inspection, finishing whatever the first attempt did not reach (./create-replay).
         if (body.id) {
             const existing = await service.findInspectionById(tenantId, body.id);
-            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, existing, body), 'inspectionFees') } }, 200);
+            if (existing) return c.json({ success: true, data: { inspection: await moneyView(c, toInspectionRecord(await completeReplayedCreate(c, existing, body)), 'inspectionFees') } }, 200);
         }
 
         const civilDate = String(body.date ?? '').slice(0, 10);
@@ -327,13 +336,13 @@ const coreRoutes = createApiRouter()
         });
         // A concurrent request with the same client id won the insert: this one is a
         // replay, so it answers like one and repeats none of the side effects below.
-        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, await completeReplayedCreate(c, inspection, body), 'inspectionFees') } }, 200);
+        if (!created) return c.json({ success: true, data: { inspection: await moneyView(c, toInspectionRecord(await completeReplayedCreate(c, inspection, body)), 'inspectionFees') } }, 200);
 
         fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({
             success: true,
-            data: { inspection: await moneyView(c, inspection, 'inspectionFees') },
+            data: { inspection: await moneyView(c, toInspectionRecord(inspection), 'inspectionFees') },
         }, 201);
     })
     .openapi(cloneInspectionRoute, async (c) => {
@@ -347,7 +356,7 @@ const coreRoutes = createApiRouter()
             metadata: { clonedFrom: id, propertyAddress: clone.propertyAddress },
         });
         fireQuotaThresholdNotice(c, tenantId);
-        return c.json({ success: true, data: { inspection: await moneyView(c, clone, 'inspectionFees') } }, 201);
+        return c.json({ success: true, data: { inspection: await moneyView(c, toInspectionRecord(clone), 'inspectionFees') } }, 201);
     })
     .openapi(createFromWizardRoute, async (c) => {
         const input    = c.req.valid('json');

@@ -45,7 +45,7 @@ OpenInspection runs as ONE Cloudflare Worker. `workers/app.ts` is a Hono app tha
                     └──────────────────────────────────────────┘
 ```
 
-- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, `/webhooks/*`, `/agent/magic-login`, the ICS feed) to the API app and sends everything else to the React Router v8 SSR handler. `/mcp` and `/mcp/{slug}` are deliberately absent from that list: when MCP is enabled the OAuth provider wrapper owns that prefix and the request never reaches this router; when it is off the path falls through to the SSR 404. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
+- **`workers/app.ts`** — a Hono app is the worker entry. It routes API-owned paths (`/api/*`, `/status`, `/m2m/*`, `/photos/*`, `/.well-known/*`, `/doc`, `/sso`, `/sign/*`, `/webhooks/*`, the ICS feed) to the API app and sends everything else to the React Router v8 SSR handler. The emailed agent sign-in address `/agent/magic-login` is a page, not an API address: its Continue action calls the API redeem handler in-process. `/mcp` and `/mcp/{slug}` are deliberately absent from that list: when MCP is enabled the OAuth provider wrapper owns that prefix and the request never reaches this router; when it is off the path falls through to the SSR 404. It injects an in-process `API_WORKER` self-binding so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding between workers).
 - **`server/`** — Hono + Drizzle + D1. Handles all business logic, authentication, and data access. Exposes a typed JSON API.
 - **`app/`** — React Router v8 + React 19 + Tailwind v4. Server-side renders the React UI on the edge.
 - **Shared UI** (`packages/shared-ui/`) — Design System 0523 token-based React components (Button, Pill, Card, etc.). `packages/shared-ui/src/index.ts` is the authoritative list; [`design-system.md`](design-system.md) describes each one.
@@ -215,7 +215,7 @@ yourself. Three sanctioned readers, by what you are holding:
 
 ### Trust model
 
-Per-tenant Ed25519 keypair generated on first use (`SigningKeyService.ensureKeypair`). The private key is AES-GCM encrypted with `KEY_ENCRYPTION_SECRET` and stored in D1; the public key is exposed unauthenticated at `/.well-known/openinspection/tenant-keys/:slug` (1-hour cache) so any third party can verify signatures independently.
+Per-tenant Ed25519 keypair generated on first use (`SigningKeyService.ensureKeypair`). The private key is AES-GCM encrypted with `KEY_ENCRYPTION_SECRET` (or `JWT_SECRET` when that is not set) and stored in D1. A key wrapped under an earlier secret (`JWT_SECRET_PREVIOUS`, one earlier secret only) is opened with it and re-wrapped under the current one, on first use or by the hosted re-encrypt endpoint, which also reports how many active keys remain under an earlier secret; the public key is exposed unauthenticated at `/.well-known/openinspection/tenant-keys/:slug` (1-hour cache) so any third party can verify signatures independently.
 
 ### Audit chain
 
@@ -242,7 +242,7 @@ The cache directives are part of that claim rather than a separate concern. A st
 ### Verification flow
 
 - **Public verifier** (`/v/:verificationToken`): SSR page resolves the token to an envelope, runs a server-side audit-chain integrity check and Ed25519 signature check, and displays the result with download links. QR code on signed.pdf and certificate.pdf points here.
-- **Offline self-verify** (`/verify`): accepts an `evidence.zip` upload and re-runs SHA-256 chain re-derivation + Ed25519 signature verification entirely in the browser via Web Crypto API — no server involvement, court-friendly independence from the operator.
+- **Offline self-verify** (`/verify`): accepts an `evidence.zip` upload and checks it entirely in the browser via the Web Crypto API (nothing is sent to the server). It applies the server's own rules (`server/lib/esign/chain-verify.ts`): SHA-256 chain re-derivation, Ed25519 signatures checked against the key each event names, and a recomputed fingerprint for every key the pack carries, shown so it can be compared with the online page. A pack that lacks a key an event was signed with is reported as not fully verified, not as invalid.
 
 ### Optional features
 

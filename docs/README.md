@@ -29,6 +29,7 @@ deferred.
 | [`operate/sms-compliance.md`](operate/sms-compliance.md) | Privacy/Terms pages, carrier registration, TCPA/CTIA wording |
 | [`operate/rotate-jwt-keyring.md`](operate/rotate-jwt-keyring.md) | Rotating the ES256 JWT keyring without invalidating live sessions |
 | [`operate/security-headers.md`](operate/security-headers.md) | Response security headers on pages and the API, the report-only CSP, reading `csp_report` log lines, tightening to enforcement |
+| [`operate/legacy-share-tokens.md`](operate/legacy-share-tokens.md) | The 30-day report link token: what it can do, its roles, and when the bridge will be removed |
 
 ## Using the product
 
@@ -77,9 +78,11 @@ conventions common to all of them: [`integrations/README.md`](integrations/READM
 | [`develop/architecture.md`](develop/architecture.md) | Single-worker architecture, request flow, module map, the shared mode-aware editor surfaces, cost model |
 | [`develop/testing.md`](develop/testing.md) | Five suites, where a spec lives, how to run each one |
 | [`develop/gates.md`](develop/gates.md) | The conformance gates — the registry, the two rungs, and the conventions a new gate has to meet |
+| [`develop/public-response-projection.md`](develop/public-response-projection.md) | How a route reachable without signing in builds its response from a field list, the helper, the gate and the escape comment |
 | [`develop/integration-adapters.md`](develop/integration-adapters.md) | Writing code that talks to somebody else's API — shape, credentials, failure recording, contract tests |
 | [`develop/integration-sources.md`](develop/integration-sources.md) | Whose credentials a service runs on — the `provided` / `own` source model, the resolver, and what a company that never chose keeps |
 | [`develop/native-clients.md`](develop/native-clients.md) | Server side of the native app: the `NATIVE_CLIENT_ENABLED` switch, OAuth `native` scope, version handshake, signed uploads, offline package import and limits, and the add-only contract |
+| [`develop/dependency-policy.md`](develop/dependency-policy.md) | How dependency alerts that cannot be fixed within declared ranges are handled, and the open minimatch alert with its watch |
 | [`develop/design-system.md`](develop/design-system.md) | Tokens, `packages/shared-ui`, dark mode, the `lint:ds` gate |
 | [`develop/logo-design.md`](develop/logo-design.md) | Logo construction and brand asset spec |
 | [`develop/conventions/route-metadata.md`](develop/conventions/route-metadata.md) | Metadata every `createRoute()` must declare, and the gate that enforces it |

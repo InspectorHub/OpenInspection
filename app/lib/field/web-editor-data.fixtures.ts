@@ -33,6 +33,7 @@ export function loaderPayload(over: Partial<EditorLoaderData> = {}): EditorLoade
         statutoryDetails: null,
         statutoryCoverage: null,
         nextPublishIsAmendment: false,
+        reportState: { publishedVersionNumber: null, editingAgain: false, readOnly: false },
         initialLayout: "desktop" as const,
     };
     return { ...base, ...over };

@@ -17,6 +17,15 @@ describe("decodeResult", () => {
         expect(r).toEqual({ ok: false, error: "Must be completed" });
     });
 
+    it("publish: carries the version the server found unchanged, null for a real publish, nothing on failure", () => {
+        expect(decodeResult(SAMPLES.publish, 200, { ok: true, intent: "publish", unchangedSinceVersion: 3 }, JSON_CT))
+            .toEqual({ ok: true, data: { unchangedSinceVersion: 3 } });
+        expect(decodeResult(SAMPLES.publish, 200, { ok: true, intent: "publish" }, JSON_CT))
+            .toEqual({ ok: true, data: { unchangedSinceVersion: null } });
+        expect(decodeResult(SAMPLES.publish, 200, { ok: false, intent: "publish", error: "No" }, JSON_CT))
+            .toEqual({ ok: false, error: "No" });
+    });
+
     it("add-statutory-instance: a failure with no ok is ok:false", () => {
         const r = decodeResult(SAMPLES["add-statutory-instance"], 200, { error: "No such slot" }, JSON_CT);
         expect(r).toEqual({ ok: false, error: "No such slot" });

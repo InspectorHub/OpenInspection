@@ -11,7 +11,7 @@
  * implementation (which reads only the legacy column and would render an
  * empty agent cell).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { DataService } from '../../../server/services/data.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -20,8 +20,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000e2';
 const AGENT = 'contact-agent-export';
@@ -38,9 +38,8 @@ describe('DataService.exportInspectionsCSV — buyer_agent sourcing (Task 9c-X3)
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new DataService({} as D1Database);
+        testD1.use(db);
+        svc = new DataService(testD1.binding);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme-export-agent', status: 'active',
@@ -67,7 +66,7 @@ describe('DataService.exportInspectionsCSV — buyer_agent sourcing (Task 9c-X3)
                 paymentRequired: false, agreementRequired: false, createdAt: new Date(),
             },
         ]);
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP_WITH_AGENT, AGENT, roleProfileId('buyer_agent'));
     });
 

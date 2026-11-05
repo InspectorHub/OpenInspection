@@ -47,6 +47,15 @@ export const AUDIT_LOG_ANONYMIZE_MONTHS = 36;
 export const DEDUP_LOG_RETENTION_DAYS = 90;
 
 /**
+ * Deletion window for the attempt counters of the signed audit export's knowledge check (`verify_export_attempts`).
+ *
+ * Measured from the end of a counter's window (15 minutes or an hour). A request replaces an ended window by itself, so this only
+ * has to remove rows nobody came back to; the key holds a keyed hash of a network prefix, so a day is a generous margin rather than
+ * a need. The retention unit is a day at the smallest.
+ */
+export const VERIFY_EXPORT_ATTEMPT_RETENTION_DAYS = 1;
+
+/**
  * Deletion window for the portal to core dead-letter queue
  * (`parked_cmd_events`).
  *

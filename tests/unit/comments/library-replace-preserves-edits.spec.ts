@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq, and } from 'drizzle-orm';
 import { MarketplaceService } from '../../../server/services/marketplace.service';
-import { createTestDb, setupSchema, toRawD1 } from '../db';
+import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { marketplaceLibraries, tenantLibraryImports } from '../../../server/lib/db/schema/marketplace';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const USER = 'user-1';
@@ -35,9 +35,8 @@ describe('MarketplaceService.updateLibraryImport — replace must not destroy re
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new MarketplaceService(toRawD1(setup.sqlite), TENANT);
+        testD1.use(testDb);
+        svc = new MarketplaceService(testD1.binding, TENANT);
     });
 
     /** Seed the catalogue at v1 and run the real import path, so rows are written the way production writes them. */

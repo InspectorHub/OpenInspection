@@ -43,6 +43,20 @@ pass() { printf '  ✓  %b\n' "$1"; }
 fail() { printf '  ✗  %b\n' "$1"; FAILED=1; }
 step() { printf '\n  →  %b\n' "$1"; }
 
+# Wall-clock per stage, machine-greppable:  [timing] <stage> <seconds>s  and a final
+# [timing] total <seconds>s  (printed on the failure path too). `date +%s` is whole
+# seconds, which is the resolution that matters for stages measured in tens of seconds.
+HOOK_T0=$(date +%s)
+HOOK_TLAST=$HOOK_T0
+timing() {
+    _t_now=$(date +%s)
+    printf '[timing] %s %ss\n' "$1" "$((_t_now - HOOK_TLAST))"
+    HOOK_TLAST=$_t_now
+}
+timing_total() {
+    printf '[timing] total %ss\n' "$(( $(date +%s) - HOOK_T0 ))"
+}
+
 printf '%b\n' "${BOLD}── OpenInspection (Pre-commit Checks) ───────────────────────────${NC}"
 
 # 1. Type check — SCOPED to what the staged changes can actually affect.
@@ -139,6 +153,7 @@ else
             GEN_OK=0
         fi
     fi
+    timing "type-gen"
     # The api program includes server/** plus three package trees (see its `include`:
     # packages/api-types, packages/offline-package and packages/field-ui/src/shared), so
     # staged changes confined to app/ workers/ and the REST of packages/ cannot affect
@@ -189,6 +204,8 @@ else
     fi
 fi
 
+timing "type-check"
+
 # 2. Lint & Fix — ONE eslint process over every staged file (see .lintstagedrc).
 #    eslint's cost here is the type-information program, not the file count:
 #    `parserOptions.project` names both tsconfigs, so any invocation builds the app
@@ -219,6 +236,8 @@ else
     fail "Lint failed  →  npx lint-staged"
 fi
 
+timing "lint-staged"
+
 # 3. Conformance gates, all in ONE node process (scripts/run-gates.mjs):
 #      DS tokens · SVG dimensions · migration-reference hygiene · large-file
 #      ratchet · calendar timezone-safety · duplicate-code ceiling
@@ -236,6 +255,8 @@ else
     FAILED=1
 fi
 
+timing "gates"
+
 # NOTE: the Worker bundle-size gate lives in .githooks/pre-push, not here. The
 #    bundle can only break at deploy, and its check runs the REAL build pipeline
 #    (~1-2 min), so paying it on every commit was overkill. pre-push builds it
@@ -243,8 +264,10 @@ fi
 
 if [ "$FAILED" -eq 1 ]; then
     printf '\n%b\n' "${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"
+    timing_total
     exit 1
 fi
 
 printf '\n%b\n' "${GREEN}All pre-commit checks passed.${NC}"
+timing_total
 exit 0

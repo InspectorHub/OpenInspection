@@ -36,6 +36,7 @@ import type { AIService } from '../../services/ai.service';
 import type { InspectionService } from '../../services/inspection.service';
 import type { ReportTranslationService } from '../../services/report-translation.service';
 import { resolveRenderedReportId } from '../../services/inspection/report-grain';
+import { loadLatestPublishedRef } from '../report-snapshot';
 import { segmentReport } from './segment-report';
 import { Errors } from '../errors';
 
@@ -53,6 +54,11 @@ export interface GenerateCourtesyTranslationInput {
     reportId?: string;
     /** BCP-47 target, e.g. `es-419`. */
     locale: string;
+    /**
+     * The published version to translate. Absent = the report's latest published version, which is the document a
+     * client is shown; a report never published is translated from the working copy.
+     */
+    versionNumber?: number;
     /**
      * Building-terminology term map, English term to the approved target term.
      * Empty is legitimate — it means no term is pinned, not that the glossary
@@ -85,8 +91,14 @@ export async function generateCourtesyTranslation(
         throw Errors.NotFound('This inspection has no report to translate.');
     }
 
+    // The translation is OF the document the client reads, and the client reads the published version, so
+    // both the text and the freshness hash below are taken on that version rather than on the inspector's
+    // working copy. A hash from another read would never match the reader's, and the translation would be
+    // withheld from the very report it was made for.
+    const versionNumber = input.versionNumber
+        ?? (await loadLatestPublishedRef(drizzle(deps.db), tenantId, inspectionId, reportId))?.versionNumber;
     const data = await deps.inspection.getReportData(
-        inspectionId, tenantId, (key: string) => key, undefined, undefined, reportId,
+        inspectionId, tenantId, (key: string) => key, undefined, versionNumber, reportId,
     );
 
     const spans = segmentReport(data);
@@ -100,7 +112,7 @@ export async function generateCourtesyTranslation(
     // The hash of the ENGLISH this translation is made from, taken BEFORE the
     // call. `readFresh` compares a reader's current English against this exact
     // value, so it must carry no translation identity of its own.
-    const englishHash = await deps.inspection.getReportContentHash(inspectionId, tenantId, reportId);
+    const englishHash = await deps.inspection.getReportContentHash(inspectionId, tenantId, reportId, null, versionNumber);
 
     // ⚠️ The ONLY call to the translate chokepoint. `context` is deliberately
     // omitted: these spans come from the whole report, so no single part names

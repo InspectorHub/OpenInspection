@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { InspectionContext } from "./helpers";
 
 /**
@@ -22,6 +22,14 @@ export function useInspectionNavigation(ctx: InspectionContext) {
     setBatchSelected,
     getResult,
   } = ctx;
+
+  // The editor schedules an advance a moment after a rating (autoAdvanceDelayMs). If the editor is gone by then, the
+  // timer would still call these setters on an unmounted tree, so the advance checks that it is still mounted.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const selectSection = useCallback(
     (idx: number) => {
@@ -91,7 +99,7 @@ export function useInspectionNavigation(ctx: InspectionContext) {
   const advanceToNextUnrated = useCallback((
     onCrossedSection?: (newSectionTitle: string) => void,
   ) => {
-    if (!activeItemId || !currentSection) return;
+    if (!mountedRef.current || !activeItemId || !currentSection) return;
     const sIdx = sections.findIndex((s) => s.id === currentSection.id);
     if (sIdx < 0) return;
     const fromIdx = currentSectionItems.findIndex((i) => i.id === activeItemId);

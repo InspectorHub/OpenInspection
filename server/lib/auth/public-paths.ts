@@ -20,7 +20,7 @@ function isStaticAssetPath(path: string): boolean {
 }
 
 export function isUnauthenticatedPath(path: string): boolean {
-    const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
+    const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
     // Agent Accounts A1 + the agent unified link (Spec 3 — report token or one-time KV code, never a session).
     // Spec 3 Task 5 — core /agent-login dual-mode front door (password +
     // magic-link request); both are unauthenticated by design (the caller
@@ -31,15 +31,12 @@ export function isUnauthenticatedPath(path: string): boolean {
     // child path. The signup page must display the agent terms before anyone
     // has an account, so a document nobody can read without a session would
     // leave the tick asserting a presentation that never happened.
-    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/api/agent-signup/terms' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context' || path === '/api/agent/login' || path === '/api/agent/login-link';
+    const isAgentPublic = path === '/agent-signup' || path === '/api/agent-signup' || path === '/api/agent-signup/terms' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context' || path === '/api/agent/login' || path === '/api/agent/login-link';
     // Agent Accounts A3 — concierge magic-link entry points (client-facing,
     // no JWT). The token in the URL is the secret.
     const isConciergePublic =
         path.startsWith('/confirm/') ||
-        path === '/api/concierge/confirm' ||
-        path === '/api/concierge/book-info' ||
-        path === '/api/concierge/book' ||
-        path === '/api/concierge/confirm-info';
+        path === '/api/concierge/confirm';
     // `/unsubscribe/:token` is listed for a reason worth writing down: it is the
     // PAGE the emailed link lands on, and the person clicking it may well be
     // signed in — an agent reading their mail in the browser they work in. If

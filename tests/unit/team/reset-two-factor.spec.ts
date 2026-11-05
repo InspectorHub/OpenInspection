@@ -15,7 +15,7 @@
  * must not be reachable across a tenant boundary, on a removed member, or on
  * yourself.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { TeamService } from '../../../server/services/team.service';
 import { createTestDb, setupSchema } from '../db';
@@ -23,8 +23,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { Role } from '../../../server/lib/auth/roles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '11111111-1111-1111-1111-1111111111a1';
 const OTHER_TENANT = '11111111-1111-1111-1111-1111111111b2';
@@ -67,11 +67,10 @@ describe('TeamService.resetMemberTwoFactor', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
     });
 
-    const svc = () => new TeamService({} as D1Database);
+    const svc = () => new TeamService(testD1.binding);
 
     async function enrolmentOf(id: string) {
         return db.select({

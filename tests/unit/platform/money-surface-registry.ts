@@ -48,6 +48,23 @@ export const MONEY_SURFACE: Record<string, Disposition> = {
     'POST /api/inspections/{id}/pay-splits/{splitId}/corrections': gate('companyFinance'),
     'POST /api/team/payroll-export': gate('companyFinance'),
 
+    // The inspection record and the staff report payload document the order's price, deposit and discount; the handlers answer
+    // through moneyView, so a caller without inspectionFees receives none of them.
+    'GET /api/inspections/{id}': redact('inspectionFees', 'inspections/core.ts'),
+    'POST /api/inspections': redact('inspectionFees', 'inspections/core.ts'),
+    'GET /api/inspections/{id}/report-data': redact('inspectionFees', 'inspections/report-delivery.ts'),
+
+    // Service lines on an inspection: owner and manager with inspectionFees, enforced by the route
+    'POST /api/inspections/{id}/services': gate('inspectionFees'),
+    'PATCH /api/inspections/{id}/services/{lineId}': gate('inspectionFees'),
+    'POST /api/services/discount/validate': gate('inspectionFees'),
+
+    // The repair builder answers the client with their own credit request (and the lines' amounts they typed)
+    'GET /api/public/repair-builder/{tenant}/{id}/source': exempt('repair-estimate-not-company-money'),
+    'GET /api/public/repair-builder/{tenant}/{id}/lists/{rrId}': exempt('repair-estimate-not-company-money'),
+    'POST /api/public/repair-builder/{tenant}/{id}/lists/{rrId}/items': exempt('repair-estimate-not-company-money'),
+    'GET /api/public/repair-request/share/{shareToken}': exempt('repair-estimate-not-company-money'),
+
     // Repair estimates belong to the client's repair request, not to company revenue
     'GET /api/inspections/{id}/cost-items': exempt('repair-estimate-not-company-money'),
     'GET /api/inspections/{id}/repair-requests': exempt('repair-estimate-not-company-money'),
@@ -116,10 +133,10 @@ export const MONEY_SURFACE: Record<string, Disposition> = {
  * money-write-guard.spec.ts. The spec checks that every path here still exists.
  */
 export const UNSCANNED_MONEY_SURFACE: Record<string, Disposition> = {
-    'GET /api/inspections/{id}': redact('inspectionFees', 'inspections/core.ts'),
     'GET /api/inspections/dashboard': redact('inspectionFees', 'inspections/bulk.ts'),
-    'POST /api/inspections': redact('inspectionFees', 'inspections/core.ts'),
     'POST /api/inspections/{id}/clone': redact('inspectionFees', 'inspections/core.ts'),
     'PATCH /api/inspections/{id}': gate('inspectionFees', 'inspections/core.ts'),
     'GET /api/admin/export': redact('companyFinance', 'admin/admin-data.ts'),
+    'POST /api/identities/account/export': redact('inspectionFees', 'identity.ts'),
+    'GET /api/admin/audit-logs': redact('inspectionFees', 'admin/admin-data.ts'),
 };

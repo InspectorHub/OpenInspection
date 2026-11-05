@@ -28,6 +28,7 @@ import { qboPaymentKey } from '../lib/qbo-payment-key';
 import invoicePaymentRoutes, { invoicePaymentRouteConfigs } from './invoices/payments';
 
 import { fireAndForget } from '../lib/fire-and-forget';
+import { withoutCompanyId } from '../lib/response-projection';
 import { ALL_INSPECTIONS, resolveInspectionScope } from '../lib/inspection/visibility';
 
 const listInvoicesRoute = createRoute(withMcpMetadata({
@@ -139,7 +140,7 @@ const app = createApiRouter();
 app.route('/', invoicePaymentRoutes);
 app.openapi(listInvoicesRoute, async (c) => {
     const rows = await c.var.services.invoice.listInvoices(c.get('tenantId'), await resolveInspectionScope(c));
-    return c.json({ success: true as const, data: rows }, 200);
+    return c.json({ success: true as const, data: rows.map(withoutCompanyId) }, 200);
 });
 app.openapi(createInvoiceRoute, async (c) => {
     const tenantId = c.get('tenantId');
@@ -170,7 +171,7 @@ app.openapi(createInvoiceRoute, async (c) => {
             }),
         );
     }
-    return c.json({ success: true as const, data: { invoice } }, 201);
+    return c.json({ success: true as const, data: { invoice: withoutCompanyId(invoice) } }, 201);
 });
 app.openapi(markSentRoute, async (c) => {
     const id = c.req.valid('param').id as string;

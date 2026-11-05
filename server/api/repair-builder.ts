@@ -20,13 +20,16 @@
  * before they could ask for anything.
  */
 
+import { projectRepairBuilderLine, projectRepairRequest, projectRepairRequestWithLines, projectRepairShareLine } from '../lib/repair-request-view';
+import { RepairRequestWithLinesSchema } from '../lib/validations/repair-request-view.schema';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import type { ApiOf } from '../lib/api-schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { flattenReportDefects } from '../lib/repair-defects';
+import { flattenPublishedDefects } from '../lib/repair-defects';
 import { generatePdfFromUrl } from '../lib/pdf';
-import { checkRateLimit } from '../lib/rate-limit';
+import { boundSharePdf, boundShareEmail } from '../lib/repair-share-limits';
+import { cachedSharePdf, sharePdfContentKey } from '../lib/repair-share-pdf';
 import { resolveBuilderAccess } from '../lib/repair-access';
 import { runBuilderGate, runAssertCanEdit, runAssertMayAuthorTag, runShareGate, loadQuickPhrases } from '../lib/repair-gates';
 import { getBaseUrl } from '../lib/url';
@@ -68,7 +71,7 @@ const SourceResponseSchema = z.object({
             // the report's cost figures here just puts a number the inspection
             // company appears to stand behind next to that field.
         })).describe('Flattened repair-rated defects from the published report. Carries no cost estimate: the repair builder is pure-credit.'),
-        mine: z.array(z.any()).describe('Caller\'s existing repair requests for this inspection.'),
+        mine: z.array(RepairRequestWithLinesSchema).describe('Caller\'s existing repair requests for this inspection.'),
         // #275 — the ONLY tenant-config value this public, token-authenticated
         // route exposes. Whitelisted field by field on purpose: the rest of the
         // config row is not the client's business.
@@ -132,12 +135,13 @@ app.openapi(sourceRoute, async (c) => {
     // page can rehydrate initialSelected/initialDrafts/initialItemIds on reload
     // without re-adding items (which would inflate creditTotal).
     const [defects, mine, quickPhrases] = await Promise.all([
-        flattenReportDefects(c.var.services.inspection, id, tenantId),
+        flattenPublishedDefects(c.var.services.inspection, c.var.services.reportVersion, id, tenantId),
         c.var.services.repairRequest.listMineWithItems(tenantId, id, creator),
         loadQuickPhrases(c, tenantId),
     ]);
 
-    return c.json({ success: true as const, data: { defects, mine, quickPhrases } }, 200);
+    // projection-allow: the report's defect list and the quick phrases the repair builder shows; the creator's own requests are projected
+    return c.json({ success: true as const, data: { defects, mine: mine.map(projectRepairRequestWithLines), quickPhrases } }, 200);
 });
 
 // POST /repair-builder/:tenant/:id — create list
@@ -156,7 +160,7 @@ app.openapi(createListRoute, async (c) => {
     if (gateResult) return gateResult;
 
     const rr = await c.var.services.repairRequest.create(tenantId, id, creator);
-    return c.json({ success: true as const, data: rr }, 200);
+    return c.json({ success: true as const, data: projectRepairRequest(rr) }, 200);
 });
 
 // GET /repair-builder/:tenant/:id/lists/:rrId — get list + items + creditTotal
@@ -177,7 +181,7 @@ app.openapi(getListRoute, async (c) => {
         return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Repair request not found.' } }, 404);
     }
     const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, id, rrId);
-    return c.json({ success: true as const, data: { request: result.request, items: result.items, creditTotal } }, 200);
+    return c.json({ success: true as const, data: { request: projectRepairRequest(result.request), items: result.items.map(projectRepairBuilderLine), creditTotal } }, 200); // projection-allow: the nested value is the credit total, a number
 });
 
 // POST /repair-builder/:tenant/:id/lists/:rrId/items — add item
@@ -216,7 +220,7 @@ app.openapi(addItemRoute, async (c) => {
         note:                 body.note ?? null,
         repairActionTag:      body.repairActionTag ?? null,
     });
-    return c.json({ success: true as const, data: item }, 200);
+    return c.json({ success: true as const, data: projectRepairBuilderLine(item) }, 200);
 });
 
 // PATCH /repair-builder/:tenant/:id/lists/:rrId/items/:itemId — update item
@@ -310,10 +314,10 @@ app.openapi(shareViewRoute, async (c) => {
     return c.json({
         success: true as const,
         data: {
-            propertyAddress,
+            propertyAddress, // projection-allow: the property address of the repair list, shown to the holder of the share or builder token
             customIntro: request.customIntro,
-            items,
-            creditTotal,
+            items: items.map(projectRepairShareLine),
+            creditTotal, // projection-allow: the total of credits applied to this request, a number
         },
     }, 200);
 });
@@ -325,15 +329,24 @@ app.openapi(sharePdfRoute, async (c) => {
     const gateResult = await runShareGate(c, shareToken);
     if (gateResult instanceof Response) return gateResult;
 
-    const baseUrl = getBaseUrl(c);
-    const pageUrl = `${baseUrl}/repair-request/${shareToken}`;
-    const pdfBuffer = await generatePdfFromUrl(c.env.BROWSER, pageUrl);
-
+    const { request, items, tenantId, propertyAddress } = gateResult;
+    // A stored copy while the page content is unchanged; a render (bounded per link and per company) otherwise.
+    const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.inspectionId, request.id);
+    const contentKey = await sharePdfContentKey({
+        requestId: request.id, inspectionId: request.inspectionId,
+        content: { propertyAddress, customIntro: request.customIntro, items: items.map(projectRepairShareLine), creditTotal },
+    });
+    const pageUrl = `${getBaseUrl(c)}/repair-request/${shareToken}`;
+    const pdfBuffer = await cachedSharePdf(tenantId, contentKey, async () => {
+        await boundSharePdf(c, tenantId, shareToken);
+        return generatePdfFromUrl(c.env.BROWSER, pageUrl);
+    });
     return new Response(pdfBuffer, {
         status: 200,
         headers: {
             'Content-Type': 'application/pdf',
             'Content-Disposition': 'attachment; filename="repair-request.pdf"',
+            'Cache-Control': 'private, max-age=300',
         },
     });
 });
@@ -348,7 +361,8 @@ app.openapi(shareEmailRoute, async (c) => {
 
     const { propertyAddress, tenantId } = gateResult;
 
-    await checkRateLimit(c, 'book');
+    // Bounded per link, company, recipient and day: this sends mail from the company's domain to an address the caller types.
+    await boundShareEmail(c, tenantId, shareToken, body.to);
 
     const baseUrl = getBaseUrl(c);
 

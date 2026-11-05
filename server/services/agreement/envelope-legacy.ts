@@ -116,8 +116,8 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 // to swallow the error and hand back the envelope-level `token`
                 // instead — a value the public lookup path stopped resolving when
                 // envelope tokens went hash-only, so the caller built a sign link
-                // that could only 404. `getFirstOutstandingSignerLink` in this same
-                // service already gets this right by returning null rather than a
+                // that could only 404. `getSignerLinkByEmail` in this same
+                // service gets this right by returning null rather than a
                 // token nothing can redeem; the one caller that reads this token
                 // (the concierge confirm route) has a catch that lands the customer
                 // on their report instead of a dead signing page.
@@ -280,7 +280,7 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 added.push(id);
             }
 
-            const nothingSigned = current.every((s) => s.status !== 'signed');
+            const nothingSigned = current.every((s) => s.status !== 'signed' && s.status !== 'signing');
             if (completionPolicy && completionPolicy !== envelope.completionPolicy && nothingSigned) {
                 await db.update(agreementRequests)
                     .set({ completionPolicy })

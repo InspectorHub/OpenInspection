@@ -79,6 +79,17 @@ export class DefectCategoryService {
         return rows.length > 0;
     }
 
+    /**
+     * The tenant's categories for a READ path: the stored rows, or the canonical seed rows in memory when there are none yet.
+     * Nothing is written. A report view is a GET, and seeding on it made the first views of a tenant race each other into
+     * duplicate rows; the rows are created by the admin list (`ensureSeed`), which is a deliberate staff read.
+     */
+    async listOrDefaults(tenantId: string): Promise<DefectCategory[]> {
+        const existing = await this.list(tenantId);
+        if (existing.length > 0) return existing;
+        return SEED.map((s) => ({ id: s.name, tenantId, ...s, isSeed: true, createdAt: new Date(0) }));
+    }
+
     async ensureSeed(tenantId: string): Promise<DefectCategory[]> {
         const existing = await this.list(tenantId);
         if (existing.length > 0) return existing;

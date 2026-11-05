@@ -1,5 +1,5 @@
 // tests/unit/reports/pca-compliance-service.spec.ts
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ComplianceService } from '../../../server/services/compliance/pca-compliance.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -11,8 +11,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // in-memory better-sqlite3 db lets every internal call — including the
 // SigningKeyService instance ComplianceService constructs for signing and
 // verifying — share the same test database.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const SECRET = 'test-encryption-secret-32-bytes-long!!';
 
@@ -33,10 +33,9 @@ describe('ComplianceService (Phase M Task 5 — dual sign-off + PSQ + doc-review
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await seedTenants(testDb);
-        svc = new ComplianceService({} as D1Database, SECRET);
+        svc = new ComplianceService(testD1.binding, SECRET, []);
     });
 
     it('signs a reviewer attestation that verifies against the tenant key', async () => {

@@ -1,10 +1,12 @@
 import { z } from '@hono/zod-openapi';
+import { postalOrNull } from '../postal-code';
 import { createApiResponseSchema, SuccessResponseSchema } from '../shared.schema';
 import { INSPECTION_STATUSES } from '../../status/inspection-status';
 import { CANCELLATION_REASONS } from '../../cancellation-reason';
 import { INSPECTION_PROPERTY_TYPES } from '@core/field-ui/shared/inspection-property-type';
 import { RESERVED_INSPECTION_SEGMENTS } from '../../inspection/reserved-segments';
 import { RevisionStatusSchema } from '../statutory-revision.schema';
+import { INSPECTION_ROW_FIELDS, INSPECTION_COMPUTED_FIELDS } from './inspection-row';
 
 /**
  * Core Inspection Schema (Output)
@@ -27,6 +29,13 @@ export const InspectionSchema = z.object({
     templateId: z.string().min(1).nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('Id of the template the inspection is built from, or null when none is attached.'),
     createdAt: z.string().datetime().openapi({ example: '2024-03-20T10:00:00Z' }).describe('When the inspection record was created (ISO 8601).'),
 }).openapi('Inspection');
+
+/**
+ * The inspection record as a single read or a create returns it: the `Inspection` header plus the columns of the row.
+ * Kept apart from `Inspection` because that one is the short DTO the list and the agent account track publish; the row fields are
+ * shared with the staff report payload (inspection-row.ts), so the two cannot drift.
+ */
+export const InspectionRecordSchema = InspectionSchema.extend(INSPECTION_ROW_FIELDS).openapi('InspectionRecord');
 
 /**
  * Validation schema for list filtering and pagination.
@@ -78,7 +87,8 @@ export const CreateInspectionSchema = z.object({
     addressStreet:  z.string().max(200).optional().nullable().describe('Street line of the geocoded address.'),
     addressCity:    z.string().max(100).optional().nullable().describe('City of the geocoded address.'),
     addressState:   z.string().max(10).optional().nullable().describe('State or region code of the geocoded address.'),
-    addressZip:     z.string().max(20).optional().nullable().describe('Postal code of the geocoded address.'),
+    // Trimmed; a placeholder (nothing but punctuation or a single character, such as "-" or " ") is read as no postal code (null), never refused, so a queued write from an older client still applies.
+    addressZip:     z.string().max(20).optional().nullable().transform(postalOrNull).describe('Postal code of the geocoded address.'),
     addressCounty:  z.string().max(100).optional().nullable().describe('County of the geocoded address.'),
     addressLat:     z.number().min(-90).max(90).optional().nullable().describe('Latitude of the geocoded address, from -90 to 90.'),
     addressLng:     z.number().min(-180).max(180).optional().nullable().describe('Longitude of the geocoded address, from -180 to 180.'),
@@ -251,17 +261,22 @@ export const BulkInspectionSchema = z.object({
 /**
  * Response Schemas
  */
-export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionSchema)).openapi('InspectionListResponse');
+/** One row of GET /api/inspections: the inspection header plus where its report stands (flat, so a client compares one object). */
+const InspectionListEntrySchema = z.object({
+    ...InspectionSchema.shape,
+    publishedVersionNumber: z.number().int().nullable().describe('The version of the report clients read, or null while clients see none (never published, or retracted).'),
+    editingAgain: z.boolean().describe('True while a published report is open for "Edit and republish": clients still read publishedVersionNumber and the inspector has unpublished edits.'),
+}).openapi('InspectionListEntry');
 
-/** Response of GET /api/inspections/{id}. Kept inline-shaped (unnamed) so the published contract does not gain a component. */
+export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionListEntrySchema)).openapi('InspectionListResponse');
+
+/** Response of GET /api/inspections/{id}. Inline-shaped (unnamed): the record is expanded in place, with the two computed keys a single read adds. */
 export const GetInspectionResponseSchema = createApiResponseSchema(z.object({
-    inspection: InspectionSchema.extend({
-        templateSnapshot: z.record(z.string(), z.unknown()).nullable().optional().describe('The template structure frozen onto this inspection, or null when it has none or the stored value is not a readable object. The editor reads it to render the checklist.'),
-        coverPhotoId: z.string().nullable().optional().describe('Storage key of the photo chosen as the report cover, or null when none is chosen.'),
-        propertyFacts: z.record(z.string(), z.unknown()).nullable().optional().describe('The Property Facts values (year built, size, foundation and the like), or null when none are stored.'),
-        pcaNarrative: z.record(z.string(), z.string()).nullable().optional().describe('The stored PCA report narrative blocks by key, or null when none are stored. Blocks left empty fall back to seed copy when the report renders.'),
-    }).describe('The inspection record.'),
+    inspection: InspectionRecordSchema.extend(INSPECTION_COMPUTED_FIELDS).describe('The inspection record.'),
     template: z.unknown().openapi({ description: 'The associated template schema' }),
+    publishedVersionNumber: z.number().int().nullable().describe('The version of the primary report that clients read, or null while clients see none (never published, or retracted).'),
+    editingAgain: z.boolean().describe('True while the published primary report is open for "Edit and republish": clients still read publishedVersionNumber and the inspector has unpublished edits.'),
+    contentLocked: z.boolean().describe('True when a write to the primary report content is refused (409 REPORT_PUBLISHED): the report and the order are both published. The editor opens read-only exactly then.'),
     primaryReportId: z.string().nullable().describe('Id of the primary report of this inspection, or null when it has none yet. A native device writes it into the manifest of an exported package; the importer refuses a package for an existing inspection whose report id differs from this one. The key is always present on a server that supports it; a missing key means an older server.'),
     revisionStatus: RevisionStatusSchema.optional().describe('How the inspection date sits against the statutory form revision its template produces. Present only for an inspection whose template declares a statutory form and names its revision; absent means there is nothing to say, never that nobody looked. It changes with the date and with the current time, so a cached copy can show an earlier answer.'),
 }));
@@ -288,14 +303,10 @@ const PublishRecipientSchema = z.object({
   channels:  z.array(z.enum(['email', 'text'])).default([]).describe('Channels to deliver through; empty skips the recipient. Accepted but not used by the publish route.'),
 }).openapi('PublishRecipient');
 
-// F79 — there are deliberately NO `notifyClient` / `notifyAgent` fields here.
-// They were accepted, defaulted to true, passed down, and read by nothing: who
-// receives a published report is decided by the workspace's `report.published`
-// automation rules. Having them on the wire is what let the publish audit row
-// state a notification decision the rules had already made differently. Zod
-// strips unknown keys, so a client still posting them is accepted and the flags
-// ignored — no 400, no contract break. Do not re-add them to give the UI
-// something to bind to; the UI now names the automation rules instead.
+// F79 — `notifyClient` / `notifyAgent` used to be accepted here, defaulted to true and read by nothing, so a publish
+// marked "notify nobody" was recorded as such while every rule fired. That is why they were removed. `notifyClient` is back
+// with a narrower meaning that IS honoured: it applies to an amendment only (see the field below). `notifyAgent` is still
+// not a field: who else is told is the workspace's automation rules' call.
 export const PublishInspectionSchema = z.object({
   theme: z.enum(['modern', 'classic', 'minimal']).default('modern').describe('Report theme. Accepted but not used: the publish route ignores it.'),
   requireSignature: z.boolean().default(false).describe('Signature requirement flag. Accepted but not used: the publish route ignores it.'),
@@ -318,6 +329,9 @@ export const PublishInspectionSchema = z.object({
   // each with its own version chain. Omitted = the order's primary report,
   // which is what every caller predating multi-report delivery means.
   reportId: z.string().min(1).optional().describe('Report to publish; defaults to the inspection primary report.'),
+  // The publisher's choice at REPUBLISH. Default false, so an amendment tells nobody unless asked. It is read by the
+  // publish service and changes nothing about a first publish.
+  notifyClient: z.boolean().default(false).describe('Amendments only (a re-publish of a report reopened with edit-again): true fires the report-updated notification rules for this publish (every one of them: the client rule, the buyer agent rule, custom and in-app rules), false (the default) fires none. Ignored on a first publish and on a republish after a retract, where the report.published rules decide as before.'),
   // #23 — the per-publish courtesy-translation opt-in. A locale, or absent.
   //
   // Absent is the DEFAULT and means "no", because producing a translation

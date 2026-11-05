@@ -31,6 +31,7 @@ import { services, servicePayRules, users } from '../../lib/db/schema';
 import { FIELD_ROLES } from '../../lib/auth/roles';
 import type { ServicePayRule } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
+import { isUniqueViolation as isUniqueViolationOn } from '../../lib/db/unique-violation';
 import { safeISODate } from '../../lib/date';
 import type { z } from 'zod';
 import type { CreatePayRuleSchema, UpdatePayRuleSchema } from '../../lib/validations/service.schema';
@@ -141,8 +142,8 @@ function duplicateError(userId: string | null) {
 
 /** True when the driver refused the write on one of the two partial uniques. */
 function isUniqueViolation(err: unknown): boolean {
-    const msg = err instanceof Error ? err.message : String(err);
-    return /UNIQUE constraint failed/i.test(msg) && /service_pay_rules/i.test(msg);
+    // Drizzle wraps the driver error, so the UNIQUE text is on `.cause`; the shared helper walks the chain.
+    return isUniqueViolationOn(err, 'service_pay_rules');
 }
 
 export async function listPayRules(db: Db, tenantId: string, serviceId: string): Promise<PayRuleWire[]> {

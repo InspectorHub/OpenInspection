@@ -1,12 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { CredentialService } from '../../../server/services/credential.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T = '00000000-0000-0000-0000-000000000001';
 const T2 = '00000000-0000-0000-0000-000000000002';
@@ -19,8 +19,8 @@ describe('CredentialService', () => {
 
   beforeEach(async () => {
     const f = createTestDb(); testDb = f.db; await setupSchema(f.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-    svc = new CredentialService({} as D1Database);
+    testD1.use(testDb);
+    svc = new CredentialService(testD1.binding);
   });
 
   it('creates, lists in sort order, updates, deletes — scoped to (tenant, user)', async () => {
@@ -71,8 +71,8 @@ describe('CredentialService.listRenderable', () => {
 
   beforeEach(async () => {
     const f = createTestDb(); testDb = f.db; await setupSchema(f.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-    svc = new CredentialService({} as D1Database);
+    testD1.use(testDb);
+    svc = new CredentialService(testD1.binding);
   });
 
   it('emits the public brand-asset path, url-encoded, in the inspector own order', async () => {
@@ -134,8 +134,8 @@ describe('CredentialService.primaryLicenseNumber', () => {
 
   beforeEach(async () => {
     const f = createTestDb(); testDb = f.db; await setupSchema(f.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-    svc = new CredentialService({} as D1Database);
+    testD1.use(testDb);
+    svc = new CredentialService(testD1.binding);
   });
 
   it('returns the licence, not a voluntary badge that happens to sort first', async () => {

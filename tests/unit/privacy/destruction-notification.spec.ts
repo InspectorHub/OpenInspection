@@ -28,7 +28,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -66,8 +67,7 @@ describe('destruction — incomplete notification', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
 
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -83,7 +83,7 @@ describe('destruction — incomplete notification', () => {
 
     it('resolves the owner BEFORE the cascade, so an incomplete purge still has an addressee', async () => {
         const { sent, notifier } = makeNotifier();
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: namespace(false), TENANT_PRESENCE: namespace(false),
         }, notifier);
 
@@ -100,7 +100,7 @@ describe('destruction — incomplete notification', () => {
 
     it('records that the controller was notified, and not who they are', async () => {
         const { notifier } = makeNotifier();
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: namespace(false), TENANT_PRESENCE: namespace(false),
         }, notifier);
 
@@ -115,7 +115,7 @@ describe('destruction — incomplete notification', () => {
 
     it('sends nothing when every store completed', async () => {
         const { sent, notifier } = makeNotifier();
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: namespace(true), TENANT_PRESENCE: namespace(true),
         }, notifier);
 
@@ -130,7 +130,7 @@ describe('destruction — incomplete notification', () => {
         // The absence IS the alert, exactly as `status` stuck at 'started' is.
         // Writing the timestamp before the send, or regardless of it, would
         // produce a record asserting a notification nobody received.
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: namespace(false), TENANT_PRESENCE: namespace(false),
         }, {
             async sendDestructionIncompleteNotice() { throw new Error('provider down'); },
@@ -145,7 +145,7 @@ describe('destruction — incomplete notification', () => {
     });
 
     it('with no notifier wired, the purge still completes and records no notice', async () => {
-        const svc = new TenantPurgeService({} as D1Database, makeR2(), makeKv(), {
+        const svc = new TenantPurgeService(testD1.binding, makeR2(), makeKv(), {
             INSPECTION_DOC: namespace(false), TENANT_PRESENCE: namespace(false),
         });
         const out = await svc.purge(TENANT);

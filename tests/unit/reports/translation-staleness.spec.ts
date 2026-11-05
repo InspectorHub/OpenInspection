@@ -12,15 +12,15 @@
  * "there is one and it is currently withheld" are different states, and only
  * the second one can be repaired.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { ReportTranslationService } from '../../../server/services/report-translation.service';
 import { COURTESY_TRANSLATION_NOTICE } from '../../../server/lib/legal/courtesy-translation-notice';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000t1';
 const OTHER_TENANT = '00000000-0000-0000-0000-0000000000t2';
@@ -49,9 +49,8 @@ describe('ReportTranslationService', () => {
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new ReportTranslationService({} as D1Database);
+        testD1.use(testDb);
+        svc = new ReportTranslationService(testD1.binding);
     });
 
     it('serves a translation whose english hash matches the report it is read against', async () => {

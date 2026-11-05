@@ -11,6 +11,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
+import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { InspectionService } from '../../../server/services/inspection.service';
@@ -34,10 +35,15 @@ import { inspectionsRoutes } from '../../../server/api/inspections';
 import contactRoutes from '../../../server/api/contacts';
 // eslint-disable-next-line import/order
 import inspectionRequestsRoutes from '../../../server/api/inspection-requests';
+// eslint-disable-next-line import/order
+import identityRoutes from '../../../server/api/identity';
+// eslint-disable-next-line import/order
+import adminDataRoutes from '../../../server/api/admin/admin-data';
+import { AdminService } from '../../../server/services/admin.service';
 
 const T = '00000000-0000-0000-0000-000000000001';
 const FAKE_ENV = { DB: {} } as HonoConfig['Bindings'];
-const MONEY_KEY = /"(price|[A-Za-z]*Cents)"\s*:/;
+const MONEY_KEY = /"(price|discountAmount|priceOverride|priceSnapshot|[A-Za-z]*Cents)"\s*:/;
 
 let db: BetterSQLite3Database<typeof schema>;
 type Overrides = Record<string, boolean> | null;
@@ -63,12 +69,15 @@ function buildApp(role: UserRole, overrides: Overrides = null) {
             inspection: new InspectionService({} as D1Database, undefined, sdb),
             contact: new ContactService({} as D1Database),
             inspectionRequest: new InspectionRequestService({} as D1Database),
+            admin: new AdminService({} as D1Database),
         } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
     app.route('/api/inspections', inspectionsRoutes);
     app.route('/api/contacts', contactRoutes);
     app.route('/api/inspection-requests', inspectionRequestsRoutes);
+    app.route('/api/identities', identityRoutes);
+    app.route('/api/admin', adminDataRoutes);
     return app;
 }
 
@@ -90,7 +99,7 @@ beforeEach(async () => {
     } as never);
     await db.insert(schema.inspections).values({
         id: 'i1', tenantId: T, propertyAddress: '1 Oak St', date: '2099-01-01', status: 'confirmed',
-        paymentStatus: 'unpaid', price: 45000, depositRequiredCents: 9000, requestId: 'req1',
+        paymentStatus: 'unpaid', price: 45000, discountAmount: 2500, depositRequiredCents: 9000, requestId: 'req1',
         paymentRequired: false, agreementRequired: false, createdAt: now,
     });
     await db.insert(schema.contacts).values({
@@ -107,6 +116,7 @@ beforeEach(async () => {
 // Money on one inspection: gated by inspectionFees.
 const FEE_SURFACES: Array<[string, string]> = [
     ['GET /api/inspections/:id', '/api/inspections/i1'],
+    ['GET /api/inspections/:id/report-data', '/api/inspections/i1/report-data'],
     ['GET /api/inspections/dashboard', '/api/inspections/dashboard'],
     ['GET /api/inspection-requests/by-inspection/:id', '/api/inspection-requests/by-inspection/i1'],
 ];
@@ -188,5 +198,66 @@ describe('GET /api/inspections (list)', () => {
             expect(text).toContain('"i1"');
             expect(text).not.toMatch(MONEY_KEY);
         }
+    });
+});
+
+// The account export returns the caller's own inspections as whole rows; their fee columns follow inspectionFees like every other read.
+describe('POST /api/identities/account/export', () => {
+    const exportAs = async (app: OpenAPIHono<HonoConfig>) => {
+        const res = await app.request('/api/identities/account/export', { method: 'POST' }, FAKE_ENV);
+        expect(res.status).toBe(200);
+        return res.text();
+    };
+    beforeEach(async () => {
+        await db.insert(schema.users).values({
+            id: 'actor', tenantId: T, email: 'actor@example.com', passwordHash: 'h', role: 'inspector', name: 'Actor', createdAt: new Date(),
+        });
+        await db.update(schema.inspections).set({ inspectorId: 'actor' }).where(eq(schema.inspections.id, 'i1'));
+    });
+    it('positive control: a caller with inspectionFees receives the price of their own inspection', async () => {
+        const text = await exportAs(buildApp('inspector'));
+        expect(text).toContain('"i1"');
+        expect(text).toMatch(MONEY_KEY);
+    });
+    it('a caller with inspectionFees switched off receives the inspection and no money key', async () => {
+        const text = await exportAs(buildApp('inspector', { inspectionFees: false }));
+        expect(text).toContain('"i1"');
+        expect(text).not.toMatch(MONEY_KEY);
+    });
+    it('companyFinance does not bring the fee columns back', async () => {
+        const text = await exportAs(buildApp('manager', { inspectionFees: false, companyFinance: true }));
+        expect(text).toContain('"i1"');
+        expect(text).not.toMatch(MONEY_KEY);
+    });
+});
+
+// An audit entry's metadata records what happened; a cancellation records the fee and the refund, so the list follows inspectionFees.
+describe('GET /api/admin/audit-logs', () => {
+    beforeEach(async () => {
+        await db.insert(schema.auditLogs).values({
+            id: 'a1', tenantId: T, userId: null, action: 'inspection.status_change', entityType: 'inspection', entityId: 'i1',
+            metadata: { from: 'confirmed', to: 'cancelled', reason: 'client_cancelled', feeCents: 5000, refundCents: 2000, refundPaymentId: null },
+            createdAt: new Date(),
+        } as never);
+    });
+    const list = async (app: OpenAPIHono<HonoConfig>) => {
+        const res = await get(app, '/api/admin/audit-logs');
+        expect(res.status).toBe(200);
+        return res.text();
+    };
+    it('positive control: a manager with inspectionFees sees the fee and the refund', async () => {
+        const text = await list(buildApp('manager'));
+        expect(text).toContain('"to":"cancelled"');
+        expect(text).toMatch(MONEY_KEY);
+    });
+    it('a manager with inspectionFees switched off sees the entry and no money key', async () => {
+        const text = await list(buildApp('manager', { inspectionFees: false }));
+        expect(text).toContain('"to":"cancelled"');
+        expect(text).toContain('"reason":"client_cancelled"');
+        expect(text).not.toMatch(MONEY_KEY);
+    });
+    it('companyFinance does not bring the fee back', async () => {
+        const text = await list(buildApp('manager', { inspectionFees: false, companyFinance: true }));
+        expect(text).not.toMatch(MONEY_KEY);
     });
 });

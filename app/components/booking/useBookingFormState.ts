@@ -43,6 +43,8 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  // Bumped after each submit that spent a token, so the challenge is rendered again and the next attempt gets a fresh one.
+  const [turnstileRound, setTurnstileRound] = useState(0);
   /** Set once the booking exists — the capability the deposit-intent route keys on. */
   const [bookedInspectionId, setBookedInspectionId] = useState<string | null>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
@@ -206,6 +208,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     }
     setSubmitting(true);
     setMessage(null);
+    let succeeded = false;
     try {
       const res = await fetch(`/api/public/book`, {
         method: "POST",
@@ -235,6 +238,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
         }),
       });
       if (res.ok) {
+        succeeded = true;
         saveRememberedContact();
         const created = (await res.json().catch(() => ({}))) as {
           data?: { inspectionId?: string; depositRequiredCents?: number };
@@ -251,6 +255,12 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
       setMessage({ text: m.helper_booking_network_error(), ok: false });
     } finally {
       setSubmitting(false);
+      // A challenge token is good for one request, whatever the answer was: drop it. After a refusal the challenge is rendered again
+      // for the next attempt; after a booking nothing more is asked of this visitor, and the challenge is hidden instead.
+      if (turnstileToken) {
+        setTurnstileToken(null);
+        if (!succeeded) setTurnstileRound((n) => n + 1);
+      }
     }
   }
 
@@ -270,6 +280,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     submitting: submitting || agentFetcher.state === "submitting",
     message,
     turnstileToken, setTurnstileToken,
+    turnstileRound,
     turnstileRef,
     toggleService,
     totalPrice,

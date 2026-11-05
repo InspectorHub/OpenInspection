@@ -72,7 +72,6 @@ export default function NotificationsPage() {
   // was never dispatched anywhere. Same mapping as the bell's resource route.
   const notices: NoticeRowData[] = notifications.map((n) => ({
     id: n.id,
-    tenantId: "",
     type: n.type,
     title: n.title,
     body: n.body,

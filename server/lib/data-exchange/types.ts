@@ -37,10 +37,10 @@
 import { safeISODate } from '../date';
 
 /** What an export does with a field, and whether an import can read it back. */
-export type ExchangeDisposition = 'roundTrip' | 'exportOnly';
+type ExchangeDisposition = 'roundTrip' | 'exportOnly';
 
 /** How a stored value becomes a cell. */
-export type ExchangeSerializer = 'text' | 'isoTimestamp';
+type ExchangeSerializer = 'text' | 'isoTimestamp';
 
 export interface ExchangeField {
     /** The DRIZZLE PROPERTY name on the selected row — the key the projection reads. */
@@ -63,7 +63,7 @@ export interface ExchangeField {
 }
 
 /** A column the export does not carry at all, and why it does not. */
-export interface ExchangeOmission {
+interface ExchangeOmission {
     column: string;
     reason: string;
 }

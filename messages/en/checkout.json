@@ -164,6 +164,7 @@
   "agreement_detail_error_no_link": "Could not get link.",
   "agreement_detail_error_timeout": "Timed out fetching link.",
   "agreement_signers_remind_terminal": "This signer is no longer awaiting signature.",
+  "agreement_signers_remind_signing": "A signature is being recorded for this signer right now.",
   "agreement_signers_remind_ratelimited": "Reminded within the last hour. Try again later.",
   "agreement_signers_empty": "No signers on this agreement yet.",
   "agreement_signers_remind_error": "Could not send reminder. Try again later.",

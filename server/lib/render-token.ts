@@ -98,3 +98,19 @@ export async function resolveRenderAccess(
   if (!v || v.inspectionId !== requestedId) return null;
   return v;
 }
+
+/**
+ * The agreement renderer's token. The same signed, short-lived token as above, with the subject prefixed so a report token (whose subject
+ * is an inspection id) never opens an agreement and an agreement token never opens a report.
+ */
+const AGREEMENT_SUBJECT = 'agreement:';
+
+export function signAgreementRenderToken(requestId: string, secret: string, ttlMs: number = DEFAULT_TTL_MS): Promise<string> {
+  return signRenderToken(AGREEMENT_SUBJECT + requestId, secret, ttlMs);
+}
+
+/** True only for a valid, unexpired token minted for exactly this envelope. A missing secret or any defect is false. */
+export async function agreementRenderAllowed(render: string | undefined, requestId: string, secret: string | undefined): Promise<boolean> {
+  if (!secret) return false;
+  return (await resolveRenderAccess(render, AGREEMENT_SUBJECT + requestId, secret)) !== null;
+}

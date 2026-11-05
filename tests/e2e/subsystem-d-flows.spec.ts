@@ -75,7 +75,7 @@ test.describe('Subsystem D — units, republish, version diff', () => {
      * never existed in this repo; today's submit is "Publish report".
      *
      * The hub offers Publish only while the report is NOT published, so the flow
-     * unpublishes first — that is the real republish path, not a workaround.
+     * retracts first — that is the real republish path, not a workaround.
      */
     test('P7+P9 — republish prompts for a summary and records it on the new version', async ({ page }) => {
         await loginAsSeedUser(page, SEED_EMAILS.lead);
@@ -87,7 +87,9 @@ test.describe('Subsystem D — units, republish, version diff', () => {
         await apiPost(page, `/api/inspections/${id}/publish`, {});
 
         await page.goto(`/inspections/${id}`);
-        await page.getByRole('button', { name: 'Unpublish' }).click();
+        // Retracting asks first, in a dialog that says what it does; the confirm is the second click.
+        await page.getByRole('button', { name: 'Retract report' }).click();
+        await page.getByRole('dialog').getByRole('button', { name: 'Retract and expire links' }).click();
         // The card action and the modal's submit share the label "Publish
         // report", so the trigger is taken from the page and the submit from
         // inside the dialog rather than by text alone.
@@ -126,6 +128,8 @@ test.describe('Subsystem D — units, republish, version diff', () => {
 
         // v1 → add a unit → v2, so the diff has exactly one real change to show.
         await apiPost(page, `/api/inspections/${id}/publish`, {});
+        // A published report takes no content writes until it is opened for editing again.
+        await apiPost(page, `/api/inspections/${id}/edit-again`, {});
         await apiPost(page, `/api/inspections/${id}/units`, {
             name: 'Unit 101', parentUnitId: null, kind: 'unit', type: 'unit',
         });

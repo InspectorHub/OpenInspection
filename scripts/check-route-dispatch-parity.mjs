@@ -69,6 +69,12 @@ const ROOT_MOUNTS = new Map([
     verify: "path: '/sso'",
     why: "portal mints an ABSOLUTE /sso URL and the browser follows it, so this one auth route answers at the root as well as under /api/auth",
   }],
+  ["signRedirectRoutes", {
+    module: join(ROOT, "server", "api", "sign-redirect.ts"),
+    paths: ["/sign/:tenant/:id"],
+    verify: "'/sign/:tenant/:id'",
+    why: "the public signing link is a top-level address that redirects to the signer's page, so the router is mounted at the root",
+  }],
   ["agentMagicLoginRedeemRoutes", {
     module: join(ROOT, "server", "api", "agent", "magic-login.ts"),
     paths: ["/agent/magic-login"],
@@ -91,6 +97,7 @@ const NOT_FORWARDED_ON_PURPOSE = [
   { path: "/fonts/*", why: "served by the Cloudflare assets layer from build/client before the worker runs" },
   { path: "/setup", why: "React Router serves the setup page (app/routes.ts route(\"setup\")); the Hono mount is a profile gate the entry never reaches" },
   { path: "/agreement-sign", why: "React Router owns /agreements/*; this Hono handler only redirects to a not-found page, which is what React Router renders anyway" },
+  { path: "/agent/magic-login", why: "React Router owns the page (a Continue button on GET, the POST spends the code); this Hono handler is reached only by that page's action through the in-process binding, never from outside" },
   { path: "/agreements/sign", why: "React Router owns /agreements/sign/:tenant/:token; this Hono handler only redirects to a not-found page" },
 ];
 

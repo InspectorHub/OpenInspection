@@ -19,8 +19,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { InspectionService } from '../../../server/services/inspection.service';
@@ -66,7 +66,7 @@ async function read() {
         INSPECTION, TENANT, (k) => k, undefined, undefined, REPORT,
     );
     return readCourtesyTranslationForReport(
-        { db: {} as D1Database, inspection, translations },
+        { db: testD1.binding, inspection, translations },
         { tenantId: TENANT, inspectionId: INSPECTION, locale: LOCALE, data },
     );
 }
@@ -75,7 +75,7 @@ beforeEach(async () => {
     const created = createTestDb();
     await setupSchema(created.sqlite);
     db = created.db;
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'read-tenant', status: 'active',
@@ -118,8 +118,8 @@ beforeEach(async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    inspection = new InspectionService({} as D1Database);
-    translations = new ReportTranslationService({} as D1Database);
+    inspection = new InspectionService(testD1.binding);
+    translations = new ReportTranslationService(testD1.binding);
 });
 
 describe('the hash decides whether a reader sees it', () => {
@@ -215,5 +215,52 @@ describe('the notice travels with the payload', () => {
         // notice — which IS the record, hence authoritative.
         expect(payload!.notice.locale).toBe('en');
         expect(payload!.notice.authoritative).toBe(true);
+    });
+});
+
+describe('the freshness check reads the same version the reader is shown', () => {
+    /** Publish version 1 crediting an inspector the live tables do not name (the live row has no inspector at all). */
+    async function publishV1() {
+        await db.insert(schema.reportVersions).values({
+            id: 'rv-read-1', tenantId: TENANT, inspectionId: INSPECTION, versionNumber: 1,
+            snapshotJson: JSON.stringify({ schemaVersion: 2, data: {}, units: [], inspectors: [{ userId: 'u-snap', name: 'Pat Snapshot', role: 'lead', credentials: [] }] }),
+            publishedAt: new Date(), publishedBy: 'u1', verificationToken: 'vt-read-1', contentHash: 'h1',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any);
+    }
+
+    it('keeps a translation made against the published document fresh, though the live tables describe it differently', async () => {
+        await publishV1();
+        const pinnedHash = await inspection.getReportContentHash(INSPECTION, TENANT, REPORT, null, 1);
+        const liveHash = await inspection.getReportContentHash(INSPECTION, TENANT, REPORT);
+        // The fixture is only meaningful if the two reads really differ.
+        expect(pinnedHash).not.toBe(liveHash);
+        const pinnedData = await inspection.getReportData(INSPECTION, TENANT, (k) => k, undefined, 1, REPORT);
+        const segments = segmentReport(pinnedData).map((_, i) => `ES-${i}`);
+        await translations.store(TENANT, REPORT, LOCALE, { segments, source: 'recording:byo', englishHash: pinnedHash, aiCallId: 'call-1' });
+        const deps = { db: testD1.binding, inspection, translations };
+        const shown = await readCourtesyTranslationForReport(deps, { tenantId: TENANT, inspectionId: INSPECTION, locale: LOCALE, data: pinnedData, versionNumber: 1 });
+        expect(shown?.segments).toEqual(segments);
+        // Control: asked against the live read, the same row is withheld, so the pinned basis is what kept it.
+        const live = await readCourtesyTranslationForReport(deps, { tenantId: TENANT, inspectionId: INSPECTION, locale: LOCALE, data: pinnedData });
+        expect(live).toBeNull();
+    });
+});
+
+describe('building the report to decide about a translation', () => {
+    it('does not build the report a second time when no translation is stored, and does when one is', async () => {
+        const { InspectionReportService } = await import('../../../server/services/inspection/inspection-report.service');
+        const spy = vi.spyOn(InspectionReportService.prototype, 'getReportData');
+        try {
+            const deps = { db: testD1.binding, inspection, translations };
+            const data = await inspection.getReportData(INSPECTION, TENANT, (k) => k, undefined, undefined, REPORT);
+            spy.mockClear();
+            expect(await readCourtesyTranslationForReport(deps, { tenantId: TENANT, inspectionId: INSPECTION, locale: LOCALE, data })).toBeNull();
+            expect(spy).toHaveBeenCalledTimes(0);
+            await storeFresh();
+            spy.mockClear();
+            expect(await readCourtesyTranslationForReport(deps, { tenantId: TENANT, inspectionId: INSPECTION, locale: LOCALE, data })).not.toBeNull();
+            expect(spy).toHaveBeenCalledTimes(1);
+        } finally { spy.mockRestore(); }
     });
 });

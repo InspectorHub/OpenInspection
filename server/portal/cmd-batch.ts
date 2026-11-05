@@ -38,10 +38,12 @@ export async function handleCmdBatch(
      *  is the only command that reads it. Optional so standalone (which
      *  receives no commands at all) type-checks unchanged. */
     encryptionSecret?: string,
+    /** Earlier secrets a stored signing key may still be wrapped under; without them an amendment fails after a rotation. */
+    previousSecrets: readonly string[] = [],
 ): Promise<void> {
     for (const msg of batch.messages) {
         try {
-            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue, buckets, dos, emailEnv, encryptionSecret);
+            const result = await applyCmdEnvelope(dbBinding, kv, msg.body, syncQueue, buckets, dos, emailEnv, encryptionSecret, previousSecrets);
             logger.info('[cmd] queue message handled', { id: msg.id, attempts: msg.attempts, result });
             msg.ack();
         } catch (err) {

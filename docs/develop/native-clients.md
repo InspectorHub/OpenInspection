@@ -348,9 +348,18 @@ exactly those two origins the API answers with:
 - **no `Access-Control-Allow-Credentials`** and no `Set-Cookie` exposure.
 
 The convention is **Bearer only, no credentials**: the app never relies on a
-cookie, so the browser is never asked to send one cross-origin. Every other
-origin keeps the baseline policy unchanged. Other origins cannot opt in; the
-list is fixed in `server/lib/native/cors-origins.ts`.
+cookie, so the browser is never asked to send one cross-origin. Other origins cannot opt in to these headers; the
+list is fixed in `server/lib/native/cors-origins.ts`. The Windows shell is served from
+`https://localhost` too, so it is covered by the same entry.
+
+For every other origin the API never reflects the caller's origin. Only this
+deployment's own origin, `APP_BASE_URL`, and the origins listed in the optional
+`CORS_ALLOWED_ORIGINS` setting (comma-separated) get `Access-Control-Allow-Origin`
+with `Access-Control-Allow-Credentials: true`; anyone else gets no CORS headers.
+Responses that depend on the Origin carry `Vary: Origin`. The public booking widget
+routes (`/api/public/widget`, `/api/public/book`, and the booking lookups under
+`/api/public`) answer any origin with `Access-Control-Allow-Origin: *` and never with credentials.
+On a loopback host (`localhost`, `127.0.0.1`) the Vite dev origins on port 5173 are also allowed.
 
 ---
 
@@ -443,6 +452,82 @@ when the document changed since the last ack; a snapshot over 64 KiB is skipped.
 included, is stored. It does not mean the edit reached other clients or the D1
 projection. A socket opened without `ack=1` receives no such frame.
 
+### Published reports take no edits
+
+Once a report is published, clients read its frozen version and its content may not change silently. A write to a
+published report's content is refused with `409` `REPORT_PUBLISHED` and the message `Report is published. Update and
+republish?`. Nothing is written. The error's `details` carry `inspectionId` (and `inspectionIds` when several were
+refused at once).
+
+A report is **published** while its `reports.status` is `published`. The inspector lifts the lock with
+`POST /api/inspections/{id}/edit-again` (body `{}`, or `{ "reportId": "…" }` for a report other than the primary one;
+it needs the same capability as publishing). The report is then **editing**: its content accepts writes again, the
+order stays published, no client link expires, and clients keep reading the latest published version until the next
+publish freezes the following one. A report that was never published, or was retracted (`POST
+/api/inspections/{id}/unpublish`, which also expires every client link), is a **draft** and is not locked. A publish with
+nothing changed since the latest version restores the lock without creating a version.
+
+Where a report stands is also readable without probing for the `409`. `GET /api/inspections/{id}`, each row of
+`GET /api/inspections` and each dashboard row carry `publishedVersionNumber` (the version clients read, or `null` while
+none is out, including after a retract) and `editingAgain` (`true` while a published report is open for editing again).
+Both are derived from the primary report on every read and are never stored; there is no extra status value. A client
+that shows "Published v3, unpublished edits" is combining exactly these two fields.
+
+A published order whose primary report has no row yet counts as published (the row is created on demand by
+`edit-again`): it reports the order's latest version number and `editingAgain: false`. `GET /api/inspections/{id}` also
+returns `contentLocked`, the write guard's own answer for the primary report (the report and the order are both
+published); a client that opens a report read-only should use it rather than infer it from the order status. In the hub
+payload each report carries `latestVersionNumber`, the same number as `publishedVersionNumber` for the primary report.
+Version numbers are monotonic per order, so with several reports they have gaps, and `versionCount` is not the "vN" a
+reader means.
+
+What the lock covers is every route that writes report content: results, items, notes, photos, videos and annotations,
+units, the cover, the template snapshot, rating system and template upgrade, compliance and statutory inputs, cost
+items, narratives, translations, property facts, the inspector signature, and a change to any inspection column the
+report shows (`PATCH /api/inspections/{id}` with a changed address, date, property facts, cover and similar columns). A
+field sent back unchanged is not a change. It does **not** cover the actions around a published report: resending or
+forwarding it, payment, agreement signing, retracting it, people on the job, scheduling, services, messages and
+documents.
+
+What a client must do:
+
+- **Offline package (`POST /api/client/import`).** A package that names a published inspection is refused whole with
+  `409` `REPORT_PUBLISHED`; `details.inspectionIds` lists every published inspection in it. Nothing is applied and nothing
+  is recorded as applied, so the device still holds every edit. Treat it as the first kind of refusal in "Splitting a
+  package that one inspection keeps refusing": keep the named inspections on the device, send the rest, and ask the
+  person whether to update and republish. If they confirm, call `edit-again` and send the same package again, which now
+  applies; if they decline, discard the local edits. Queued writes inside an accepted package are not checked a second
+  time.
+- **Single writes (field sync routes, the editor's item and media routes).** The same `409`. Keep the edit and prompt the
+  person in the same way.
+- **The collaborative socket.** The Yjs protocol has no error frame, so the document answers with the WebSocket close
+  code **`4409`** and the reason **`REPORT_PUBLISHED`**. The socket is closed straight after it opens when the report is
+  published, and sockets that were already open when the report was published are closed with the same code. A client
+  that is closed this way has not had its pending edits acknowledged (see the ack frame above): it keeps them in its local
+  document, does not retry the socket until the person has chosen, and treats `4409` as final rather than as a dropped
+  connection. After `edit-again` the same local document syncs normally. Reading is not affected: a published report still
+  loads, and `GET` routes keep working.
+- **Tickets.** `POST /api/inspections/{id}/collab/ticket` answers `409` `REPORT_PUBLISHED` for a published report, so a
+  client learns before it opens a socket.
+
+An update that reached the document through a socket that was open at the instant of publishing, and could not be told
+in time, is merged into the document as before. Clients read the frozen version, so it is not visible to them, and the
+edit is kept for the next publish.
+
+Two windows are open by design. Edits accepted between the moment a report is marked published and the moment its
+document is told (a fraction of a second) merge into the live results but not into the frozen version, while the phone is
+told they are saved; clients are unaffected, and the next republish includes them. And the order the lock is read in is
+covered by a timestamp: a document that was locked after the route last read the report's state keeps its lock.
+
+Two writers are outside the lock on purpose. The administrative finding-key migration rewrites live results across every
+inspection, published ones included, to rename keys; it changes how findings are addressed, not what they say, and clients
+keep reading the frozen version. And the portal's `cmd.report.correct` is itself an explicit amendment: it changes the
+named field and publishes a new signed version, so it does not need the lock lifted first.
+
+On the web, the editor does not use a collab ticket (the session cookie authenticates its socket). When the socket is closed
+with `4409` the connection stops reconnecting and reports `locked`; the page's results come from the loader, so a published
+report still loads and reads as before.
+
 ---
 
 ## 8. Signed media uploads
@@ -482,6 +567,11 @@ Rules the upload route applies, in order:
   or `image/heic`).
 - The storage key is a pure function of the token, so sending the same token
   twice overwrites one object instead of adding another.
+- A photo upload answers `{ "data": { "key": ... } }` with the key relative to the
+  company (`inspections/{inspectionId}/photos/...`). The native client does not
+  read it: it records the key from the `upload-url` response, which is the full
+  form. The relative form is for this answer only; other routes keep taking and
+  returning the key as their own contract states.
 
 ### Chunked video upload
 
@@ -790,8 +880,8 @@ A refusal about one inspection refuses the whole package, so a single bad entry
 can hold up every other inspection in it. The error names the inspection:
 `details.inspectionId` on a `403` (the importer cannot edit it) and a `404` (it
 does not exist and the package does not create it), on a `400` for an inspection
-exported from a different report, on `409` `PACKAGE_INSPECTION_DELETED` (which
-also lists `details.inspectionIds`), and on a failure while its results or photos
+exported from a different report, on `409` `PACKAGE_INSPECTION_DELETED` and `409`
+`REPORT_PUBLISHED` (both of which also list `details.inspectionIds`), and on a failure while its results or photos
 were being applied. A client that gets one of these should write the inspection
 named into a package of its own, send the rest as a package without it, and keep
 the named one on the device for the person to resolve.
@@ -905,8 +995,42 @@ npm run lint:native-contract # registry and committed document must agree
   file, when an operation has no registry entry, when none are found, or when the
   registry is empty. It prints both numbers on every run.
 - In CI, **oasdiff** compares the file against the base branch's copy and fails
-  the pull request on any breaking change. The comparison is skipped only in the
-  pull request that first introduces the file.
+  the pull request on any breaking change. The step reads the base copy with
+  `git show origin/<base>:contracts/native-contract.openapi.json` under `set -eu`,
+  so a base branch that cannot be resolved, or that has no contract file, fails
+  the step; it never skips.
+- A second CI step keeps the list of undeclared response keys (below) from
+  growing. It is the one step that skips, and only when the base branch has no
+  such list yet (the pull request that introduces it); it says so and prints both
+  counts.
+
+### Response conformance
+
+The contract states what the routes return. `tests/unit/native/response-conformance.spec.ts`
+checks that it does: every covered operation is requested through the real
+application, and the JSON body is walked against the response schema of the status
+it answers in the committed contract.
+
+- A documented required key that is missing, a value of the wrong type, or a string
+  outside the listed `enum` or `const` values always fails. Formats (date-time,
+  email, uri) are not checked.
+- A key the body returns that the schema does not declare must be recorded in
+  `tests/unit/helpers/undeclared-response-keys.allowlist.json` with a specific
+  reason. That list is now empty and may only shrink; CI compares its key count with
+  the base branch. A new undeclared key is documented in the schema or removed from
+  the response, not added to the list.
+- Every array of objects the schema declares must be reached with at least one
+  element, or the path is listed in `EMPTY_OK`
+  (`tests/unit/helpers/response-conformance-skips.ts`). An operation the suite does
+  not request is listed in `NOT_COVERED` in the same file, with the reason.
+- The walker is `tests/unit/helpers/response-shape.ts` (pure, with its own
+  controls in the spec); the operations, the seed and the checker are in
+  `tests/unit/helpers/response-conformance.ts`.
+
+If the list ever holds an entry, shrink it by documenting the field in the schema instead
+(`.describe(...)` on the response schema), run `npm run native:contract`, and
+delete the key from its allow-list entry (the entry itself when it has no key left).
+The spec fails on an entry that no longer matches anything.
 
 ### Editor operations in the contract
 
@@ -931,7 +1055,7 @@ inspector role. Three separate mechanisms decide who may write, so none of them 
 | Group | Operations | Notes |
 |---|---|---|
 | Units | create, bulk create, duplicate, rename, delete, unit-mode switch | Rename and delete answer 404 for an unknown unit or one that belongs to another inspection, and change nothing. Create and bulk create answer 400 for a parent that is not a unit of this inspection. Duplicate answers 400 (not 404) for an unknown or foreign unit. Unit-mode switch wraps every failure, a missing inspection included, as 400. Switching to `tagged` is lossy. |
-| Inspection record | property facts (patch, autofill), PCA narrative, inspector signature, template snapshot, statutory details, statutory form instances, publish, publish readiness | Autofill is open to owner, manager and inspector (an inspector only for inspections they may see). The narrative patch answers 400, naming the key, for a key that is not a narrative block. A statutory template's snapshot is read-only (403). A repeat publish with an `Idempotency-Key` replays the first answer. Without one, a publish with nothing changed since the latest version (same results and report status, same `summary`, no `translateTo`) answers 200 in the normal shape without publishing again: no new version, automation, audit entry, translation, PDF or ISN sync, and `isnSync` is null. Any change to the results, the status or the summary, or a translation request, publishes and creates a new version. |
+| Inspection record | property facts (patch, autofill), PCA narrative, inspector signature, template snapshot, statutory details, statutory form instances, publish, publish readiness | Autofill is open to owner, manager and inspector (an inspector only for inspections they may see). The narrative patch answers 400, naming the key, for a key that is not a narrative block. A statutory template's snapshot is read-only (403). A repeat publish with an `Idempotency-Key` replays the first answer. Without one, a publish with nothing changed since the latest version (same results and report status, same `summary`, no `translateTo`) answers 200 in the normal shape without publishing again: no new version, automation, audit entry, translation, PDF or ISN sync, and `isnSync` is null. Any change to the results, the status or the summary, or a translation request, publishes and creates a new version. The publish body takes an optional `notifyClient` (default `false`) that applies to a republish of a report reopened with `edit-again`: `true` fires the workspace's report-updated automation rules, `false` fires none and leaves the report's notified-at stamp untouched. The choice covers every report-updated rule (the client's, the buyer's agent's, custom and in-app ones), not only the client's, and an API or MCP caller that omits it on an amendment sends no report-updated notices; the response does not say whether notices were suppressed. A report reopened with `edit-again` counts as an amendment even if it never had a version row. A native client that adds "Edit and republish" must set `reopenedForEditing` on its editor data from `editingAgain` (the field is optional and only the web host sets it today), forward `notifyClient` in the publish body, and read `unchangedSinceVersion` from the answer so its receipt can say nothing was published. A first publish, and a republish after a retract, ignore it and are decided by the rules as before. |
 | Compliance | sign-off (add, remove), document review (seed, patch), questionnaire (put, status) | Sign-off and questionnaire routes need `report_tier=full_pca` (409 otherwise). The person on a sign-off is the signed-in user: send only `role`, `license` and `dualRole`, and the server fills `personId` and the name from the session and the user record. A role other than owner or manager that sends a different `personId` gets 400 (a name it sends is ignored). An owner or manager may record another person by sending both `personId` and `name`, stored as given; sending only one answers 400. The role is the one in the verified token, never a request field. Signing a role again replaces the earlier sign-off. Seed and document-review patch answer 404 for an inspection that is not in the company. |
 | Collaboration | restructure, followup, restore, snapshots (capture, list, read) | Owners and managers may use these; an inspector only when on the inspection's roster as lead or helper, otherwise 403. The request bodies of `followup` (`{itemId, status, notes?}`) and `restore` (`{seq}`) are deliberately not declared in the OpenAPI schema (the route authorizes before it validates); they are stated in the operation description and pinned by `tests/unit/native/contract-editor-writes.spec.ts`. Without the collaboration Durable Object these answer 501. |
 | Templates | list, read, create, update | `GET /api/inspections/templates/{id}` returns the row under `data.template`. |

@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -110,7 +110,7 @@ const INFO = { legalName: 'Acme Inspections', address: '1 Main, Austin, TX', rep
 async function freshDb() {
     const fx = createTestDb();
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(fx.db);
+    testD1.use(fx.db);
     return fx;
 }
 
@@ -124,7 +124,7 @@ describe('TelnyxComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const calls: string[] = [];
         const provider = new TelnyxComplianceProvider(fakeTelnyx(calls));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.provision(
             { tenantId: 'p1', channel: 'sp10dlc', businessInfo: INFO }, store,
         );
@@ -151,7 +151,7 @@ describe('TelnyxComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const calls: string[] = [];
         const provider = new TelnyxComplianceProvider(fakeTelnyx(calls));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await provider.provision({ tenantId: 'p2', channel: 'sp10dlc', businessInfo: INFO }, store);
         calls.length = 0;
         await provider.provision({ tenantId: 'p2', channel: 'sp10dlc', businessInfo: INFO }, store);
@@ -163,7 +163,7 @@ describe('TelnyxComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const capturedBrand: { body?: Record<string, unknown> } = {};
         const provider = new TelnyxComplianceProvider(fakeTelnyx([], { capturedBrand }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const url = 'https://app.example.test/webhooks/compliance-status/telnyx/acme';
         await provider.provision(
             { tenantId: 'cb1', channel: 'sp10dlc', businessInfo: INFO, statusCallbackUrl: url }, store,
@@ -178,7 +178,7 @@ describe('TelnyxComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const capturedBrand: { body?: Record<string, unknown> } = {};
         const provider = new TelnyxComplianceProvider(fakeTelnyx([], { capturedBrand }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await provider.provision({ tenantId: 'cb2', channel: 'sp10dlc', businessInfo: INFO }, store);
         expect('webhookURL' in (capturedBrand.body ?? {})).toBe(false);
         fx.sqlite.close();
@@ -188,7 +188,7 @@ describe('TelnyxComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const capturedCampaign: { body?: Record<string, unknown> } = {};
         const provider = new TelnyxComplianceProvider(fakeTelnyx([], { capturedCampaign }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await provider.provision({ tenantId: 'cw', channel: 'sp10dlc', businessInfo: INFO }, store);
         expect(capturedCampaign.body?.usecase).toBe('AGENTS_FRANCHISES');
         expect(capturedCampaign.body?.brandId).toBe('BR1');
@@ -199,7 +199,7 @@ describe('TelnyxComplianceProvider.provision (sp10dlc)', () => {
         const fx = await freshDb();
         const calls: string[] = [];
         const provider = new TelnyxComplianceProvider(fakeTelnyx(calls, { campThrows: true }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await expect(
             provider.provision({ tenantId: 'p4', channel: 'sp10dlc', businessInfo: INFO }, store),
         ).rejects.toThrow('TCR campaign error');
@@ -214,7 +214,7 @@ describe('TelnyxComplianceProvider.provision (sp10dlc)', () => {
     it('assign resume: crash during assign re-assigns without re-buying', async () => {
         const fx = await freshDb();
         let buys = 0; let assigns = 0; let assignThrows = true;
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const opts: FakeOpts = {
             get assignThrows() { return assignThrows; },
             onBuy: () => { buys++; },
@@ -244,7 +244,7 @@ describe('TelnyxComplianceProvider.provision (tollfree)', () => {
         const fx = await freshDb();
         const calls: string[] = [];
         const provider = new TelnyxComplianceProvider(fakeTelnyx(calls));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const snap = await provider.provision(
             { tenantId: 'tf1', channel: 'tollfree', businessInfo: INFO }, store,
         );
@@ -274,7 +274,7 @@ describe('TelnyxComplianceProvider.provision (tollfree)', () => {
         const fx = await freshDb();
         const calls: string[] = [];
         const provider = new TelnyxComplianceProvider(fakeTelnyx(calls));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await provider.provision({ tenantId: 'tf2', channel: 'tollfree', businessInfo: INFO }, store);
         calls.length = 0;
         await provider.provision({ tenantId: 'tf2', channel: 'tollfree', businessInfo: INFO }, store);
@@ -286,7 +286,7 @@ describe('TelnyxComplianceProvider.provision (tollfree)', () => {
         const fx = await freshDb();
         const capturedTfv: { body?: Record<string, unknown> } = {};
         const provider = new TelnyxComplianceProvider(fakeTelnyx([], { capturedTfv }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const url = 'https://app.example.test/webhooks/compliance-status/telnyx/acme';
         await provider.provision(
             { tenantId: 'tf3', channel: 'tollfree', businessInfo: INFO, statusCallbackUrl: url }, store,
@@ -299,7 +299,7 @@ describe('TelnyxComplianceProvider.provision (tollfree)', () => {
         const fx = await freshDb();
         const capturedTfv: { body?: Record<string, unknown> } = {};
         const provider = new TelnyxComplianceProvider(fakeTelnyx([], { capturedTfv }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await provider.provision({ tenantId: 'tf4', channel: 'tollfree', businessInfo: INFO }, store);
         expect('webhookUrl' in (capturedTfv.body ?? {})).toBe(false);
         fx.sqlite.close();
@@ -309,7 +309,7 @@ describe('TelnyxComplianceProvider.provision (tollfree)', () => {
         const fx = await freshDb();
         const capturedTfv: { body?: Record<string, unknown> } = {};
         const provider = new TelnyxComplianceProvider(fakeTelnyx([], { capturedTfv }));
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await provider.provision({ tenantId: 'tf5', channel: 'tollfree', businessInfo: INFO }, store);
         expect(capturedTfv.body?.businessName).toBe('Acme Inspections');
         expect(capturedTfv.body?.useCase).toBe('Real Estate Services');
@@ -489,7 +489,7 @@ function fakeTelnyxSync(opts: SyncOpts = {}): TelnyxComplianceClient {
 describe('TelnyxComplianceProvider.syncStatus', () => {
     it('flips a tfv_pending row to approved when TFV retrieve returns Verified', async () => {
         const fx = await freshDb();
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await store.init('s1', 'telnyx');
         await store.persist('s1', { tfvSid: 'TFV1', tfvStatus: 'In Progress', complianceStatus: 'tfv_pending' });
 
@@ -505,7 +505,7 @@ describe('TelnyxComplianceProvider.syncStatus', () => {
 
     it('flips a tfv_pending row to rejected with the reason when TFV retrieve returns Rejected', async () => {
         const fx = await freshDb();
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await store.init('s2', 'telnyx');
         await store.persist('s2', { tfvSid: 'TFV2', complianceStatus: 'tfv_pending' });
 
@@ -520,7 +520,7 @@ describe('TelnyxComplianceProvider.syncStatus', () => {
 
     it('advances a campaign_pending row to approved when campaign retrieve is MNO_PROVISIONED', async () => {
         const fx = await freshDb();
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await store.init('s3', 'telnyx');
         await store.persist('s3', { brandSid: 'BR1', campaignSid: 'CAMP1', complianceStatus: 'campaign_pending' });
 
@@ -532,7 +532,7 @@ describe('TelnyxComplianceProvider.syncStatus', () => {
 
     it('keeps a campaign_pending row pending when campaign retrieve is still MNO_PENDING', async () => {
         const fx = await freshDb();
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await store.init('s4', 'telnyx');
         await store.persist('s4', { brandSid: 'BR1', campaignSid: 'CAMP1', complianceStatus: 'campaign_pending' });
 
@@ -544,7 +544,7 @@ describe('TelnyxComplianceProvider.syncStatus', () => {
 
     it('no-regress: a brand VERIFIED never rolls back a row already at campaign_pending', async () => {
         const fx = await freshDb();
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         await store.init('s5', 'telnyx');
         // Brand-only row artificially pinned at campaign_pending — the brand branch
         // must NOT regress it to brand_pending.
@@ -562,7 +562,7 @@ describe('TelnyxComplianceProvider.syncStatus', () => {
 
     it('returns not_started for a missing row', async () => {
         const fx = await freshDb();
-        const store = new D1ComplianceStateStore({} as D1Database);
+        const store = new D1ComplianceStateStore(testD1.binding);
         const provider = new TelnyxComplianceProvider(fakeTelnyxSync());
         const snap = await provider.syncStatus({ tenantId: 'nope' }, store);
         expect(snap.complianceStatus).toBe('not_started');

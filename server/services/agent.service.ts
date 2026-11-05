@@ -12,6 +12,7 @@ import {
 import { signup, autoLinkSameEmail } from './agent/signup';
 import { updateProfile, getProfile, type AgentProfilePatch } from './agent/profile';
 import { findGlobalAgentByEmail } from './agent/account';
+import type { AgentRepairAccess } from '../lib/people/agent-repair-access';
 
 export type { AgentReferralRow, AgentInspectorRow } from './agent/referral';
 export type { AgentProfilePatch } from './agent/profile';
@@ -115,7 +116,7 @@ export class AgentService {
     async accessToInspection(
         agentUserId: string,
         inspectionId: string,
-    ): Promise<{ tenantId: string } | null> {
+    ): Promise<{ tenantId: string; repairAccess: AgentRepairAccess } | null> {
         return accessToInspection(this.db, agentUserId, inspectionId);
     }
 

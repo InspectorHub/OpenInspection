@@ -38,8 +38,8 @@ import { QBOServiceBase } from '../../../server/services/qbo/api-base';
 import { withInvoiceSync } from '../../../server/services/qbo/invoice-sync';
 import { withCustomerSync } from '../../../server/services/qbo/customer-sync';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import cancellationRoutes from '../../../server/api/inspections/cancellation';
@@ -85,7 +85,7 @@ function stubDb(defaultTimezone?: string) {
 class ProbeQbo extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {
     calls: Call[] = [];
     constructor(private readonly tenantTz?: string) {
-        super({} as never, 'cid', 'secret', 'whsec', 'jwt');
+        super(testD1.binding, 'cid', 'secret', 'whsec', 'jwt');
     }
     public override getDrizzle() { return stubDb(this.tenantTz) as never; }
     public override async getQBOCustomerIdForInvoice(): Promise<string | null> { return 'QBO-CUST-9'; }
@@ -161,7 +161,7 @@ class DbQbo extends withInvoiceSync(withCustomerSync(QBOServiceBase)) {
     calls: Call[] = [];
     private n = 0;
     constructor(private readonly realDb: unknown) {
-        super({} as never, 'cid', 'secret', 'whsec', 'jwt');
+        super(testD1.binding, 'cid', 'secret', 'whsec', 'jwt');
     }
     public override getDrizzle() { return this.realDb as never; }
     public override async apiCall<T>(
@@ -266,7 +266,7 @@ describe('a cancellation refund reaches QuickBooks', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
         createCreditMemo = vi.fn().mockResolvedValue(undefined);
 
         await db.insert(schema.tenants).values({
@@ -319,7 +319,7 @@ describe('a cancellation refund reaches QuickBooks', () => {
             c.set('tenantId', TENANT);
             c.set('user', { sub: 'user-1' } as never);
             c.set('services', {
-                invoice: new InvoiceService({} as D1Database),
+                invoice: new InvoiceService(testD1.binding),
                 inspection: { cancelInspection: vi.fn().mockResolvedValue(undefined) },
                 qbo: { createCreditMemo },
             } as never);
@@ -340,7 +340,7 @@ describe('a cancellation refund reaches QuickBooks', () => {
                 acknowledgedFeeCents: opts.acknowledgedFeeCents ?? 22500,
             }),
         });
-        const env = { DB: {}, JWT_SECRET: 'test-jwt-secret', QBO_CLIENT_ID: 'qbo-client', ...(opts.env ?? {}) };
+        const env = { DB: testD1.binding, JWT_SECRET: 'test-jwt-secret', QBO_CLIENT_ID: 'qbo-client', ...(opts.env ?? {}) };
         // Promise.resolve normalises `app.fetch`'s `Response | Promise<Response>`
         // return — the union has no `.then`.
         return Promise.resolve(app.fetch(req, env as never, {

@@ -132,7 +132,6 @@ export const PaymentLedgerRowSchema = z.object({
 
 export const InvoiceResponseSchema = z.object({
     id: z.string().trim().min(1),
-    tenantId: z.string().trim().min(1),
     inspectionId: z.string().trim().min(1).nullable(),
     clientName: z.string().nullable(),
     clientEmail: z.string().nullable(),
@@ -194,3 +193,10 @@ export const PublicInvoiceBodySchema = z.object({
     // Resolved from the GRANT's tenantId, never from anything the caller sent.
     tenantSlug: z.string().nullable().optional(),
 });
+
+/**
+ * The columns of the invoice row the pay page states. The list is the row-sourced half of `PublicInvoiceBodySchema`
+ * (the line items, the brand and the slug are built separately). Columns not named here are not carried by the pay page
+ * response, and a new column joins it only when it is named here and in the schema.
+ */
+export const PUBLIC_INVOICE_FIELDS = ['id', 'invoiceNumber', 'amountCents', 'amountPaidCents', 'currency', 'status', 'createdAt', 'dueDate', 'clientName'] as const;

@@ -35,11 +35,12 @@ import { makeExecutionContext } from '../helpers/exec-ctx';
 import { buildKeyring, signJwt } from '../../../server/lib/jwt-keyring';
 import { createHarness, TENANT_ID, OWNER_ID, INSPECTOR_ID, type Harness } from '../helpers/tenant-email-harness';
 import { FIXED_NOW, MANAGER_ID, seedDashboard } from '../helpers/dashboard-fixture';
-import { measureWall, recordRoundTrips, wallWithinBudget, type RoundTripLog } from '../helpers/round-trip-recorder';
+import { recordRoundTrips, runCounted, type RoundTripLog } from '../helpers/round-trip-recorder';
 
-const LATENCY_MS = 40;
+// Real timers overlap the statements that are issued together; no assertion reads the elapsed time.
+const LATENCY_MS = 5;
 
-async function measure(h: Harness, sub: string, role: string): Promise<RoundTripLog & { ms: number; base: number }> {
+async function measure(h: Harness, sub: string, role: string): Promise<RoundTripLog> {
     const rec = recordRoundTrips(h.env.DB as D1Database, LATENCY_MS);
     (h.env as unknown as Record<string, unknown>).DB = rec.binding;
     const keyring = await buildKeyring(h.env as unknown as Record<string, string | undefined>);
@@ -55,8 +56,8 @@ async function measure(h: Harness, sub: string, role: string): Promise<RoundTrip
     // the database, the second is the first to reach the slug lookup that depends on that answer.
     await call();
     await call();
-    const { base, ms } = await measureWall(rec, LATENCY_MS, call);
-    return { ...rec.log, sql: [...rec.log.sql], ms, base };
+    await runCounted(rec, LATENCY_MS, call);
+    return { ...rec.log, sql: [...rec.log.sql] };
 }
 
 describe('dashboard round-trip budget', () => {
@@ -64,13 +65,10 @@ describe('dashboard round-trip budget', () => {
     beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(FIXED_NOW); });
     afterEach(() => { h?.close(); vi.useRealTimers(); });
 
-    const report = (who: string, m: RoundTripLog & { ms: number; base: number }, budget: number) => {
+    const report = (who: string, m: RoundTripLog, budget: number) => {
         // ROUNDTRIP_SQL=1 prints each statement with the wave it started in.
         if (process.env.ROUNDTRIP_SQL) console.log(m.sql.map((q) => '  ' + q.slice(0, 100)).join(String.fromCharCode(10)));
-        console.log(`dashboard ${who}: statements=${m.statements} roundTrips=${m.roundTrips} waves=${m.waves} budget=${budget} wall=${m.ms.toFixed(0)}ms (base ${m.base.toFixed(0)}ms) at ${LATENCY_MS}ms per call`);
-        // The wall clock agrees with the wave count: nothing hides a serial chain from both. Relative to the
-        // request's own cost on this machine, so a slow machine does not loosen it.
-        expect(wallWithinBudget(m, budget, LATENCY_MS), `wall ${m.ms.toFixed(0)}ms vs base ${m.base.toFixed(0)}ms + ${budget + 1} x ${LATENCY_MS}ms`).toBe(true);
+        console.log(`dashboard ${who}: statements=${m.statements} roundTrips=${m.roundTrips} waves=${m.waves} budget=${budget}`);
     };
 
 

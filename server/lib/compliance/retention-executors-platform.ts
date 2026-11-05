@@ -6,7 +6,7 @@
  * over a table with a `tenant_id` column can exclude that tenant's rows, and one
  * over a table without it cannot express the hold at all. Keeping the second
  * group in its own file makes that property structural instead of something a
- * reader has to reconstruct from eighteen WHERE clauses — and makes adding a new
+ * reader has to reconstruct from every executor's WHERE clause — and makes adding a new
  * tenant-less sweep a decision somebody has to make in the right file.
  *
  * Each rule here carries its answer in the manifest's `legalHold` field:
@@ -29,6 +29,7 @@ import {
     processedCmdEvents,
     processedWebhookEvents,
     syncOutbox,
+    verifyExportAttempts,
     smsConsentLog,
     smsDisclosureVersions,
 } from '../db/schema';
@@ -54,6 +55,16 @@ export const PLATFORM_EXECUTORS: Record<string, Executor> = {
         const db = rawDb as any;
         const res = await db.delete(processedCmdEvents)
             .where(lt(processedCmdEvents.processedAt, cutoff))
+            .run();
+        return changeCount(res);
+    },
+
+    // Counters whose window ended before the cutoff. A request replaces an ended window itself; this removes the rows nobody came back to.
+    verify_export_attempts: async (rawDb, cutoff) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const db = rawDb as any;
+        const res = await db.delete(verifyExportAttempts)
+            .where(lt(verifyExportAttempts.windowEndsAt, cutoff))
             .run();
         return changeCount(res);
     },

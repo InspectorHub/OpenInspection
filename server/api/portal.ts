@@ -23,7 +23,8 @@ import type { Context } from 'hono';
 import { deleteCookie, setCookie } from 'hono/cookie';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { signMagicLink, verifyMagicLink, signPortalSession } from '../lib/portal-session';
+import { signMagicLink, verifyMagicLink, signPortalSession, MAGIC_LINK_TTL_SECONDS } from '../lib/portal-session';
+import { claimMagicLinkOnce } from '../lib/portal-link-once';
 import { portalSessionGuard } from '../lib/middleware/portal-session-guard';
 import { resolvePortalAccess } from '../lib/public-access';
 import { getBaseUrl } from '../lib/url';
@@ -31,6 +32,7 @@ import { logger } from '../lib/logger';
 import { signJwt } from '../lib/jwt-keyring';
 import { findGlobalAgentByEmail } from '../services/agent/account';
 import type { HonoConfig } from '../types/hono';
+import { checkRateLimit } from '../lib/rate-limit';
 import { authCookieOptions, AUTH_COOKIE_NAME, portalSessionCookieOptions, PORTAL_SESSION_COOKIE_NAME } from '../lib/auth-helpers';
 import {
     RecipientInspectionSchema, HubOverviewResponseSchema, ObserveSchema,
@@ -271,6 +273,8 @@ const portalRoutes = portalRouter
     .openapi(requestLinkRoute, async (c) => {
         const tenantId = resolveTenantId(c);
         if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
+        // An unauthenticated door that sends an email: limited per caller before it looks anything up.
+        await checkRateLimit(c, 'portal-request-link');
 
         const { email, destination } = c.req.valid('json');
 
@@ -327,9 +331,12 @@ const portalRoutes = portalRouter
         return c.json({ data: { sent: true } }, 200);
     })
     .openapi(redeemRoute, async (c) => {
+        // Counted per caller before the token is even read: a sign-in link is a bearer secret and this door is anonymous.
+        await checkRateLimit(c, 'portal-redeem');
         const { link } = c.req.valid('query');
         const verified = await verifyMagicLink(c.env.JWT_SECRET, link);
-        if (!verified) {
+        // A link that verifies is still refused the second time: it signs in once.
+        if (!verified || !await claimMagicLinkOnce(c.env.TENANT_CACHE, link, MAGIC_LINK_TTL_SECONDS)) {
             return c.json({ error: 'Invalid or expired link' }, 401);
         }
 
@@ -402,12 +409,12 @@ const portalRoutes = portalRouter
         // tenant) — agent-kind gets `agent: true` + no Set-Cookie instead.
         const kind = await c.var.services.people.kindForKey(grant.tenantId, grant.role);
         if (kind === 'agent') {
-            return c.json({ data: { email: grant.recipientEmail, agent: true } }, 200);
+            return c.json({ data: { email: grant.recipientEmail, agent: true } }, 200); // projection-allow: the recipient email of the caller's own grant
         }
 
         const sess = await signPortalSession(c.env.JWT_SECRET, grant.recipientEmail);
         setCookie(c, PORTAL_SESSION_COOKIE_NAME, sess, portalSessionCookieOptions());
-        return c.json({ data: { email: grant.recipientEmail } }, 200);
+        return c.json({ data: { email: grant.recipientEmail } }, 200); // projection-allow: the recipient email of the caller's own grant
     })
     .openapi(logoutRoute, async (c) => {
         // Tenant-agnostic + idempotent: clearing the cookie works regardless of
@@ -423,7 +430,7 @@ const portalRoutes = portalRouter
         const email = c.get('portalEmail') as string;
 
         const inspections = await c.var.services.portal.listRecipientInspections(tenantId, email);
-        return c.json({ data: { email, inspections } }, 200);
+        return c.json({ data: { email, inspections } }, 200); // projection-allow: listRecipientInspections returns the typed RecipientInspection list the portal picker states
     })
     .openapi(overviewRoute, async (c) => {
         const tenantId = resolveTenantId(c);
@@ -461,7 +468,7 @@ const portalRoutes = portalRouter
 
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: { ...overview, token, signerToken } }, 200);
+        return c.json({ data: { ...overview, token, signerToken } }, 200); // projection-allow: hubOverview builds the typed HubOverview the portal page states; token and signerToken are the reader's own
     })
     .openapi(observeRoute, async (c) => {
         const tenantId = resolveTenantId(c);
@@ -479,7 +486,7 @@ const portalRoutes = portalRouter
         // Tenant + inspection scoped server-side; the portal session is the only gate.
         const observe = await c.var.services.portal.observeProgress(tenantId, inspectionId);
         if (!observe) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: observe }, 200);
+        return c.json({ data: observe }, 200); // projection-allow: observeProgress builds the typed progress view the portal page states
     });
 
 export type PortalApi = typeof portalRoutes;

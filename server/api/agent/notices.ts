@@ -29,6 +29,7 @@ import {
     getOwnedNotice,
 } from '../../services/notice-inbox';
 import { mintOptinToken } from '../../lib/sms/optin-token';
+import { withoutCompanyId } from '../../lib/response-projection';
 
 const listRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -120,7 +121,7 @@ agentNoticeRoutes.openapi(listRoute, async (c) => {
         listNoticesForContacts(db, { contactIds }),
         unreadNoticeCountForContacts(db, contactIds),
     ]);
-    return c.json({ success: true as const, data: { notices, unread } }, 200);
+    return c.json({ success: true as const, data: { notices: notices.map(withoutCompanyId), unread } }, 200);
 });
 agentNoticeRoutes.openapi(markReadRoute, async (c) => {
     await requireRole('agent')(c, async () => {});

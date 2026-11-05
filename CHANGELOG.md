@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+* Calendar feeds no longer publish inspection ids. Each event UID is a keyed hash of the id, so subscribed calendars will show each event replaced once after the update. The company feed covers yesterday through 90 days ahead, and the inspector busy feed no longer lists inspections older than yesterday. A deployment with no `JWT_SECRET` answers `404` for every feed.
+* An inspection id alone no longer leads to a signer's signing link. `GET /sign/:tenant/:inspectionId` goes to the client portal unless the request carries the recipient's own portal token, and the report gate returns a signer link only to a recipient who proved who they are. Recipients using their emailed links are unaffected.
+* The signed audit export needs a signer email. A postal code is an optional second factor that must match when supplied; it never releases the export by itself.
+* Portal sign-in links open a page with a Continue button and are spent by that button, once. Mail scanners that fetch the link first no longer use it up.
+* The emailed agent sign-in link opens the same kind of Continue page and is spent by that button, once.
+* SVG uploads for logos and credential badges are accepted only when made of plain drawing elements. A logo may embed a raster picture (png, jpeg, gif or webp as base64 data, up to 1 MB). Everything else is refused: scripts, event attributes, animation elements, external links, nested SVG, any other `data:` link, non-UTF-8 files and oversized files. Stored brand assets are served with a sandbox policy.
+* Public sign-in, sign-up, setup, portal and OAuth registration doors are limited per caller network (an IPv6 caller counts as its /64). The OAuth token endpoint has its own limiter binding, `OAUTH_TOKEN_RATE_LIMITER` (120 per minute); add it to your Wrangler configuration if you maintain your own, otherwise the endpoint is not limited. Its refusal is an OAuth error (`temporarily_unavailable`) with `Retry-After`.
+* Webhook callbacks for SMS, compliance status and email are never refused for volume while their signature verifies; only repeated failed verifications from one source are limited.
+* Public file uploads on client message threads must declare their size (`411` without a length, `413` above the limit) before the body is read.
+
 ### Removed
 
 * Unused API routes that no client called: `PUT /api/event-types/:id`, `DELETE /api/event-types/:id`, `POST /api/event-types/seed`, `GET /api/events/upcoming`, `GET /api/calendar/connections/:id/calendars`, `GET /api/inspections/{id}/full`, `GET /api/inspections/{id}/sign-status`, the `statusFlags` object on dashboard rows, `POST /api/auth/setup/skip` and `POST /api/auth/onboarding/flag`. Missing default event types are filled in by `POST /api/admin/data/install-bundled-content`; the signed state of an inspection is still returned as `signedByClient` by the inspection read.

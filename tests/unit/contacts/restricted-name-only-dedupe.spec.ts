@@ -7,11 +7,10 @@
  * behaviour. The same rule is checked end to end through POST /api/inspections in `restricted-create-contacts.spec.ts`;
  * this file pins the service in isolation.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/d1';
 import { createTestDb, setupSchema } from '../db';
-import { asD1Db, asD1DrizzleReturn } from '../helpers/test-db';
+import { asD1Db } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ContactService } from '../../../server/services/contact.service';
 import { PeopleService } from '../../../server/services/people.service';
@@ -19,7 +18,8 @@ import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profil
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import { ALL_INSPECTIONS, type InspectionScope } from '../../../server/lib/inspection/visibility';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const A: InspectionScope = { kind: 'assigned', userId: USERS.inspA };
 const rp = (key: string) => `crp_${TENANT}_${key}`;
@@ -30,8 +30,8 @@ describe('name-only client upsert honours the scope', () => {
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
-        service = new ContactService({} as D1Database);
+        testD1.use(db);
+        service = new ContactService(testD1.binding);
         await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values([
             { id: 'c-visible', name: 'Pat Visible', email: null, createdByUserId: USERS.inspA, createdAt: new Date(1000) },
@@ -41,7 +41,7 @@ describe('name-only client upsert honours the scope', () => {
             { id: 'c-dup-old', name: 'Pat Twin', email: null, createdByUserId: USERS.inspA, createdAt: new Date(1000) },
             { id: 'c-dup-new', name: 'Pat Twin', email: null, createdByUserId: USERS.inspA, createdAt: new Date(2000) },
         ].map(r => ({ tenantId: TENANT, type: 'client' as const, ...r })));
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP.own, 'c-visible', rp('client'));
         await people.addPerson(TENANT, INSP.own, 'c-visible-theirs', rp('client'));
         await people.addPerson(TENANT, INSP.own, 'c-visible-addr', rp('client'));

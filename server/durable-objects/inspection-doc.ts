@@ -50,6 +50,7 @@ import { findingKeysFromTemplateSnapshot } from '@core/field-ui/shared/finding-k
 import { inspectionResults, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { purgePathMatches } from './purge-path';
+import { CLOSE_REASON, CLOSE_REPORT_PUBLISHED, isDocLocked, lockDoc, refusedSocketResponse, unlockDoc, upgradeRefused } from './inspection-doc-lock';
 import { writeResultsProjection } from './inspection-doc-d1';
 import { importResponse, newestImportSeq, resolvePendingResponse } from './inspection-doc-import';
 import { isNonEmptyProjection, logDivergence, projectionsEqual } from './results-divergence';
@@ -279,6 +280,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 return new Response('expected websocket upgrade', { status: 426 });
             }
 
+            // A published report takes no edits (see ./inspection-doc-lock): the route's header is D1's answer.
+            if (await upgradeRefused(this.ctx, req.headers.get('x-report-locked'), Number(req.headers.get('x-report-checked-at')) || 0)) return refusedSocketResponse(this.ctx);
+
             // Identity is forwarded by the authorized route — store for D1
             // persistence. The DO never uses these for access control (the
             // authorized route is the trust boundary).
@@ -365,6 +369,23 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             return snap
                 ? Response.json(snap)
                 : new Response('snapshot not found', { status: 404 });
+        }
+
+        // Stores what the open sockets have sent, without locking: a caller about to decide something from the database (is the
+        // report unchanged since its last version?) asks for this first, because the debounce may not have run yet.
+        if (url.pathname.endsWith('/flush') && req.method === 'POST') {
+            const open = this.ctx.getWebSockets().length;
+            if (open > 0) await this.persist();
+            return Response.json({ flushed: open > 0 });
+        }
+
+        // Publish marks the document locked and closes the open sockets; "Edit and republish" and retract clear it.
+        if (url.pathname.endsWith('/lock') && req.method === 'POST') {
+            return Response.json({ closed: await lockDoc(this.ctx, () => this.persist()) });
+        }
+        if (url.pathname.endsWith('/unlock') && req.method === 'POST') {
+            await unlockDoc(this.ctx);
+            return Response.json({ ok: true });
         }
 
         if (url.pathname.endsWith('/restore') && req.method === 'POST') {
@@ -463,6 +484,8 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
     async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer): Promise<void> {
         // Only binary frames carry y-protocols messages.
         if (typeof raw === 'string') return;
+        // A socket that was open when the report was published: its update is not applied, and the close code says why.
+        if (await isDocLocked(this.ctx)) { ws.close(CLOSE_REPORT_PUBLISHED, CLOSE_REASON); return; }
 
         const data = raw instanceof ArrayBuffer ? new Uint8Array(raw) : raw;
         if (data.length === 0) return;

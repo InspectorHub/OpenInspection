@@ -322,18 +322,10 @@ app.openapi(getAuditLogsRoute, async (c) => {
         entityType
     } as Parameters<typeof adminService.getAuditLogs>[1]);
 
-    // Map Date to string for schema compatibility
-    const formattedResult = {
-        ...result,
-        items: result.logs.map((log: (typeof result.logs)[number]) => ({
-            ...log,
-            createdAt: safeISODate(log.createdAt)
-        }))
-    };
-
+    // A cancellation entry's fee and refund follow inspectionFees like any other read of them; `logs` and `items` carry the same entries.
+    const items = await moneyView(c, result.logs.map((log: (typeof result.logs)[number]) => ({ ...log, createdAt: safeISODate(log.createdAt) })), 'inspectionFees');
     auditFromContext(c, 'audit.view', 'audit_log');
-
-    return c.json({ success: true, data: formattedResult }, 200);
+    return c.json({ success: true, data: { ...result, logs: items, items } }, 200);
 });
 app.openapi(postAuditLogRoute, async (c) => {
     const { action, resourceType, resourceId, detail } = c.req.valid('json');

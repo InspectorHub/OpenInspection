@@ -237,12 +237,40 @@ describe('OI #271 — report view confirmation', () => {
         vi.useRealTimers();
     });
 
+    it('counts one reading for reloads inside the 10 minute window, writes nothing for them, and counts again after it', async () => {
+        const token = await issue();
+        const app = buildApp();
+        const writes = () => testDb.select().from(schema.reportViews).then((rows) => rows.map((r) => `${r.viewCount}@${r.lastViewedAt?.getTime()}`));
+        vi.setSystemTime(new Date('2026-08-07T10:00:00Z'));
+        await app.request(reportUrl(token));
+        const afterFirst = await writes();
+        expect(afterFirst).toHaveLength(1);
+        // A refresh and a mail-client double open, 1 and 9 minutes later: the row is exactly as it was (no count, no timestamp).
+        vi.setSystemTime(new Date('2026-08-07T10:01:00Z'));
+        expect((await app.request(reportUrl(token))).status).toBe(200);
+        vi.setSystemTime(new Date('2026-08-07T10:09:59Z'));
+        expect((await app.request(reportUrl(token))).status).toBe(200);
+        expect(await writes()).toEqual(afterFirst);
+        expect((await counters()).viewCount).toBe(1);
+        // Control: the window ends, so the counter is working and the zero change above is the dedupe.
+        vi.setSystemTime(new Date('2026-08-07T10:10:00Z'));
+        await app.request(reportUrl(token));
+        const row = await counters();
+        expect(row.viewCount).toBe(2);
+        expect(row.lastViewedAt?.getTime()).toBe(new Date('2026-08-07T10:10:00Z').getTime());
+        vi.useRealTimers();
+    });
+
     it('counts per recipient, not per order', async () => {
         const a = await issue('client@x.com', 'client');
         const b = await issue('agent@x.com', 'buyer_agent');
+        vi.setSystemTime(new Date('2026-08-07T10:00:00Z'));
         await buildApp().request(reportUrl(a));
+        // Past the dedupe window, so this is a second reading by the same recipient.
+        vi.setSystemTime(new Date('2026-08-07T10:30:00Z'));
         await buildApp().request(reportUrl(a));
         await buildApp().request(reportUrl(b));
+        vi.useRealTimers();
         const rows = await testDb.select().from(schema.reportViews);
         expect(rows.map((r) => r.viewCount).sort()).toEqual([1, 2]);
     });
@@ -355,8 +383,11 @@ describe('OI #271 — report view confirmation', () => {
     it('an objection does NOT clear counters already recorded (Art. 21 is not Art. 17)', async () => {
         const token = await issue();
         const app = buildApp();
+        vi.setSystemTime(new Date('2026-08-07T10:00:00Z'));
         await app.request(reportUrl(token));
+        vi.setSystemTime(new Date('2026-08-07T10:30:00Z'));
         await app.request(reportUrl(token));
+        vi.useRealTimers();
         await app.request(`/api/public/inspections/${INSP}/view-tracking-objection?token=${token}`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },

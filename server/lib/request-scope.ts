@@ -64,8 +64,18 @@ export function createRequestScope(): RequestScope {
     };
 }
 
-/** Keys a credential scope shares: who the bearer is, and whether a credential change cut it off. */
-const CREDENTIAL_KEY = /^(native|pwchanged):/;
+/**
+ * Keys a credential scope shares: who the bearer is, whether a credential change cut it off, and the permission overrides of that user
+ * (`caps-overrides:`). The replays of an import are inspection create, update and complete, none of which writes a user's permission
+ * overrides (the caller's last-active time is updated, which is not an override), so the overrides one replay reads are the ones the
+ * next would read.
+ */
+export const CREDENTIAL_KEY = /^(native|pwchanged|caps-overrides):/;
+
+/** The memo key of one user's permission overrides in one company: both parts are in it, so no other user or company shares the entry. */
+export function capsOverridesKey(tenantId: string, userId: string): string {
+    return `caps-overrides:${tenantId}:${userId}`;
+}
 
 /**
  * A scope that shares ONLY credential lookups, for a request that calls the API

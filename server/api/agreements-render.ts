@@ -11,6 +11,7 @@ import {
 } from '../lib/legal/agreement-language-disclosure';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
+import { agreementRenderAllowed } from '../lib/render-token';
 
 /**
  * Human-readable UTC string from a Drizzle-hydrated date value (Date object, or
@@ -58,6 +59,33 @@ function verifyQrHtml(
   }
 }
 
+/**
+ * The `src` for a stored signature, or null when what is stored is not a picture this page will embed. A signature arrives as text from
+ * the signer's browser, so it is embedded only if it is a base64 PNG, JPEG, GIF or WebP data URL (or bare base64, which is a PNG): a
+ * `data:` URL of any other type, a link, or anything else gets a plain "not available" line in the signature block instead of a source.
+ */
+const SIGNATURE_DATA_URL = /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+const BARE_BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+function signatureImageSrc(sig: string): string | null {
+  if (SIGNATURE_DATA_URL.test(sig)) return sig;
+  if (BARE_BASE64.test(sig)) return `data:image/png;base64,${sig}`;
+  return null;
+}
+
+/** The signature picture, or a line saying there is none to show. */
+function signatureImgHtml(sig: string, alt: string, escapeHtml: (s: string) => string): string {
+  const src = signatureImageSrc(sig);
+  return src
+    ? `<img src="${escapeHtml(src)}" alt="${alt}">`
+    : `<div class="meta">[signature image not available]</div>`;
+}
+
+/** What stands where a drawn signature would be, for a request that did not carry a valid render token. */
+const SIGNATURE_ON_FILE = `<div class="meta">[signature on file]</div>`;
+/** Headers for both render pages, 404s included: they name people and are not for caches or search indexes. */
+const RENDER_HEADERS = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' } as const;
+const notFound = () => new Response('Not Found', { status: 404, headers: { ...RENDER_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' } });
+
 /** Human-readable label for a signer role. */
 const roleLabel = (role: string | null | undefined): string => {
   switch (role) {
@@ -78,11 +106,13 @@ const roleLabel = (role: string | null | undefined): string => {
 function signerCellHtml(
   signer: typeof schema.agreementSigners.$inferSelect,
   escapeHtml: (s: string) => string,
+  withImages: boolean,
 ): string {
   const sig = signer.signatureBase64 ?? '';
-  const sigData = sig.startsWith('data:') ? sig : `data:image/png;base64,${sig}`;
   const at = signer.signedAt ? escapeHtml(utcDisplay(signer.signedAt)) : '';
-  const name = escapeHtml(signer.name || signer.email || 'Signer');
+  // A signer's name, never their email address: a document that is shared and printed should not print an address the signer was
+  // never asked to put on it. A signer with no name shows as the role-neutral "Signer".
+  const name = escapeHtml(signer.name || 'Signer');
   const inPerson = signer.channel === 'in_person'
     ? `<span class="badge">Signed in person</span>`
     : '';
@@ -91,7 +121,7 @@ function signerCellHtml(
     : '';
   return `<div class="sig-cell">` +
       `<div class="label">${escapeHtml(roleLabel(signer.role))}${inPerson}</div>` +
-      `<img src="${escapeHtml(sigData)}" alt="${name} signature">` +
+      (withImages ? signatureImgHtml(sig, `${name} signature`, escapeHtml) : SIGNATURE_ON_FILE) +
       `<div class="meta">${name} · ${at}</div>` +
       onBehalf +
   `</div>`;
@@ -169,6 +199,7 @@ export async function agreementRenderHandler(
   tenantSlug: string,
   requestId: string,
   baseUrl: string = '',  // pass from route wrapper; tests pass '' which omits QR
+  withImages: boolean = false,  // true only for a request that carried a valid render token (see the route below)
 ): Promise<Response> {
   // Track I-a — resolved by the stable envelope requestId. The unguessable
   // requestId is the URL secret, same posture as /verify/:requestId and the R2
@@ -177,19 +208,16 @@ export async function agreementRenderHandler(
   const reqRow = await db.select().from(schema.agreementRequests)
     .where(eq(schema.agreementRequests.id, requestId)).get();
   if (!reqRow || reqRow.status !== 'signed') {
-    return new Response('Not Found', { status: 404 });
+    return notFound();
   }
-  // The unguessable `requestId` (UUIDv4) IS the access credential, same posture
-  // as /m2m/cert-render/:id and /verify/:id. `tenantSlug` is INFORMATIONAL and
-  // MUST NOT gate the render. A slug gate here caused a production incident: the
-  // public sign route has no :tenant segment, so the slug arrived '', the
-  // sign-completion workflow built /m2m/agreement-render//<id> (router 404), and
-  // Browser Rendering rasterized that "Not found" page into the emailed
-  // signed.pdf. The slug adds no entropy over the requestId — only that failure.
+  // The unguessable `requestId` (UUIDv4) is the access credential for the document, as for /m2m/cert-render/:id and /verify/:id. PUBLIC
+  // (`/m2m/` is unauthenticated); the verify page's document link redirects here and, without a render token, shows no drawn signatures.
+  // `tenantSlug` is INFORMATIONAL and MUST NOT gate the render: a slug gate once made the workflow's PDF a rasterized "Not found" page
+  // (the public sign route has no :tenant segment, so the slug arrived '').
   void tenantSlug;
   const agreement = await db.select().from(schema.agreements)
     .where(eq(schema.agreements.id, reqRow.agreementId)).get();
-  if (!agreement) return new Response('Not Found', { status: 404 });
+  if (!agreement) return notFound();
 
   // Track I-a — "what was signed" comes from the pinned content snapshot, never
   // the live template. The service handles snapshot ?? live-template fallback
@@ -214,19 +242,18 @@ export async function agreementRenderHandler(
     // envelope's `status` onto a row it creates without its signature, so this
     // is reachable — and a signed agreement drawn with an empty signature block
     // is worse than one that is not served.
-    return new Response('Not Found', { status: 404 });
+    return notFound();
   }
-  const signerCellsHtml = signedSigners.map((s) => signerCellHtml(s, escapeHtml)).join('');
+  const signerCellsHtml = signedSigners.map((s) => signerCellHtml(s, escapeHtml, withImages)).join('');
 
   const inspectorBlock = reqRow.inspectorSignatureBase64 ? (() => {
       const sig = reqRow.inspectorSignatureBase64!;
-      const sigData = sig.startsWith('data:') ? sig : `data:image/png;base64,${sig}`;
       const at = reqRow.inspectorSignedAt
           ? escapeHtml(utcDisplay(reqRow.inspectorSignedAt))
           : '';
       return `<div class="sig-cell">` +
           `<div class="label">Inspector</div>` +
-          `<img src="${escapeHtml(sigData)}" alt="Inspector signature">` +
+          (withImages ? signatureImgHtml(sig, 'Inspector signature', escapeHtml) : SIGNATURE_ON_FILE) +
           `<div class="meta">${at}</div>` +
       `</div>`;
   })() : '';
@@ -248,26 +275,16 @@ export async function agreementRenderHandler(
     qrHtml +
     HTML_FOOT;
 
-  return new Response(html, {
-    status: 200,
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
-  });
+  return new Response(html, { status: 200, headers: RENDER_HEADERS });
 }
 
 /**
  * Certificate-of-completion renderer (Track I-a).
  *
- * INTERNAL M2M SURFACE. Its route is `/m2m/cert-render/:id` — note there is NO
- * tenant segment (unlike agreementRenderHandler's `/agreement-render/:tenant/:id`,
- * which additionally asserts the slug matches). Here the unguessable
- * envelope `requestId` (a UUIDv4) IS the access credential, the same security
- * posture as the public `/verify/:envelopeId` surface. By design this renders
- * nothing beyond what `/verify` already exposes (signer roster without raw
- * emails-by-preference, audit event names + truncated hashes + key fingerprint
- * — no signatures, no secrets, no private keys), so no tenant-slug gate is
- * required or possible. If this handler is ever extended to render materially
- * more than `/verify`, add a tenant check by threading a tenant segment through
- * the route first.
+ * PUBLIC, though it lives under `/m2m/`: that prefix is unauthenticated, so anyone holding the envelope id (part of every verification
+ * link) can fetch it. Route `/m2m/cert-render/:id` has no tenant segment. It shows the signer roster (names, roles, channel, time,
+ * "on behalf of"), the contracting entity, event names with the first 16 characters of each hash, and the key fingerprint: no signature
+ * images, no private material, no email addresses. If it ever shows more, gate it first with the render token the agreement page uses.
  */
 export async function certRenderHandler(
   d1: D1Database,
@@ -280,7 +297,7 @@ export async function certRenderHandler(
   const reqRow = await db.select().from(schema.agreementRequests)
     .where(eq(schema.agreementRequests.id, requestId)).get();
   if (!reqRow || reqRow.status !== 'signed') {
-    return new Response('Not Found', { status: 404 });
+    return notFound();
   }
   const auditRows = await db.select().from(schema.esignAuditLogs)
     .where(and(
@@ -290,7 +307,8 @@ export async function certRenderHandler(
     .orderBy(asc(schema.esignAuditLogs.createdAt))
     .all();
   const keyFingerprint = auditRows[0]?.keyFingerprint ?? 'unknown';
-  const clientLabel = reqRow.clientName ?? reqRow.clientEmail;
+  // The client's name; never their email address (see signerCellHtml).
+  const clientLabel = reqRow.clientName || 'the client';
 
   // Track I-a — per-signer roster: who signed, in what role/channel, when, and
   // on whose behalf. Falls back to the envelope-level client when no signer rows
@@ -303,7 +321,7 @@ export async function certRenderHandler(
   const signersHtml = signedSigners.length > 0
     ? signedSigners.map((s) => {
         const at = s.signedAt ? escapeHtml(utcDisplay(s.signedAt)) : '';
-        const name = escapeHtml(s.name || s.email || 'Signer');
+        const name = escapeHtml(s.name || 'Signer');
         const inPerson = s.channel === 'in_person' ? ' · Signed in person' : '';
         const onBehalf = s.onBehalfOf ? ` · on behalf of ${escapeHtml(s.onBehalfOf)}` : '';
         // The certificate states FACTS about the signing event, so unlike the
@@ -358,10 +376,7 @@ export async function certRenderHandler(
     qrHtml +
     HTML_FOOT;
 
-  return new Response(html, {
-    status: 200,
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
-  });
+  return new Response(html, { status: 200, headers: RENDER_HEADERS });
 }
 
 const agreementsRenderRoutes = new Hono<HonoConfig>();
@@ -371,7 +386,9 @@ const agreementsRenderRoutes = new Hono<HonoConfig>();
 agreementsRenderRoutes.get('/agreement-render/:tenant/:id', async (c) => {
   const tenant = c.req.param('tenant');
   const id = c.req.param('id');
-  return agreementRenderHandler(c.env.DB, tenant, id, c.env.APP_BASE_URL || '');
+  // Drawn signatures only for the workflow's own fetch (a token minted for this envelope); everyone else sees the document without them.
+  const withImages = await agreementRenderAllowed(c.req.query('render'), id, c.env.JWT_SECRET);
+  return agreementRenderHandler(c.env.DB, tenant, id, c.env.APP_BASE_URL || '', withImages);
 });
 agreementsRenderRoutes.get('/cert-render/:id', async (c) =>
   certRenderHandler(c.env.DB, c.req.param('id'), c.env.APP_BASE_URL || ''));

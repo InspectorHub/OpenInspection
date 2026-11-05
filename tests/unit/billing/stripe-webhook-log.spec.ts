@@ -1,16 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { appendWebhookLogEntry, readWebhookLog, stripeWebhookLogKey } from '../../../server/lib/stripe-webhook-log';
 
 function makeKv() {
     const store = new Map<string, string>();
+    const puts: string[] = [];
     return {
         store,
+        puts,
         get: async (k: string, _o?: unknown) => {
             const v = store.get(k);
             return v === undefined ? null : JSON.parse(v);
         },
-        put: async (k: string, v: string) => { store.set(k, v); },
-    } as unknown as KVNamespace & { store: Map<string, string> };
+        put: async (k: string, v: string) => { puts.push(k); store.set(k, v); },
+    } as unknown as KVNamespace & { store: Map<string, string>; puts: string[] };
 }
 
 describe('stripe webhook rolling log', () => {
@@ -57,5 +59,31 @@ describe('signature_failed eviction defense', () => {
         expect(failed.length).toBeLessThanOrEqual(5);
         expect(processed).toHaveLength(10); // none evicted
         expect(log[0].result).toBe('signature_failed'); // newest still first
+    });
+});
+
+describe('signature_failed write throttle', () => {
+    afterEach(() => vi.useRealTimers());
+
+    it('writes one row for a burst of unverified failures, and another once the gap has passed', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-11-04T10:00:00Z'));
+        const kv = makeKv();
+        for (let i = 0; i < 30; i++) await appendWebhookLogEntry(kv, 't1', { eventType: 'unknown', result: 'signature_failed' });
+        expect(kv.puts).toHaveLength(1);
+        vi.setSystemTime(new Date('2026-11-04T10:01:01Z'));
+        await appendWebhookLogEntry(kv, 't1', { eventType: 'unknown', result: 'signature_failed' });
+        expect(kv.puts).toHaveLength(2);
+    });
+
+    it('never throttles a verified delivery behind a failure, nor a failure behind a verified one', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-11-04T10:00:00Z'));
+        const kv = makeKv();
+        await appendWebhookLogEntry(kv, 't1', { eventType: 'unknown', result: 'signature_failed' });
+        await appendWebhookLogEntry(kv, 't1', { eventType: 'payment_intent.succeeded', result: 'processed' });
+        await appendWebhookLogEntry(kv, 't1', { eventType: 'unknown', result: 'signature_failed' });
+        expect(kv.puts).toHaveLength(3);
+        expect((await readWebhookLog(kv, 't1')).map((e) => e.result)).toEqual(['signature_failed', 'processed', 'signature_failed']);
     });
 });

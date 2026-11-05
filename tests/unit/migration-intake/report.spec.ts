@@ -25,8 +25,8 @@ import {
     type MigrationBundleV1,
 } from '../../../server/lib/migration-intake/bundle';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 import { MigrationReportService } from '../../../server/services/migration-intake/report.service';
 import { limitsFor } from '../../../server/lib/migration-intake/limits';
@@ -138,16 +138,16 @@ describe('MigrationReportService', () => {
         await setupSchema(sqlite);
         // The staging step batches its writes, and better-sqlite3 is the one
         // Drizzle driver with no `batch()` — see helpers/d1-binding.ts.
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(withBatch(db, sqlite)));
+        testD1.use(asD1DrizzleReturn(withBatch(db, sqlite)));
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared',
             tier: 'free', maxUsers: 12, createdAt: new Date(),
         });
-        stage = new MigrationStageService({} as D1Database);
+        stage = new MigrationStageService(testD1.binding);
         // No run staged here records a source key, so the report never reaches
         // the bucket. A stub that would THROW if it did is deliberate: it turns
         // an accidental read into a failure rather than a quiet null.
-        report = new MigrationReportService({} as D1Database, {} as R2Bucket);
+        report = new MigrationReportService(testD1.binding, {} as R2Bucket);
     });
 
     afterEach(() => {

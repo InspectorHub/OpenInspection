@@ -7,11 +7,9 @@ import * as schema from '../../../server/lib/db/schema';
 
 // Route every drizzle(d1) call inside the services under test to the
 // in-memory SQLite test DB (the established pattern in this suite).
-vi.mock('drizzle-orm/d1', () => ({
-    drizzle: vi.fn(),
-}));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { OutboxService, publishRow, flushOutboxOnce } from '../../../server/portal/outbox.service';
 import { handleSyncDlqBatch } from '../../../server/portal/integration.module';
 import { TeamService } from '../../../server/services/team.service';
@@ -53,8 +51,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         const { sqlite, db } = createTestDb();
         await setupSchema(sqlite);
         testDb = db;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
     });
 
     it('publishRow sends a CloudEvents envelope and marks the row published', async () => {
@@ -63,7 +60,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         const row = (await testDb.select().from(syncOutbox).where(eq(syncOutbox.id, id)).get())!;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await publishRow({} as any, queue, row as any);
+        await publishRow(testD1.binding, queue, row as any);
 
         expect(sent).toHaveLength(1);
         expect(sent[0]).toMatchObject({
@@ -85,7 +82,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         const row = (await testDb.select().from(syncOutbox).where(eq(syncOutbox.id, id)).get())!;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await expect(publishRow({} as any, queue, row as any)).rejects.toThrow('queue down');
+        await expect(publishRow(testD1.binding, queue, row as any)).rejects.toThrow('queue down');
         const after = await testDb.select().from(syncOutbox).where(eq(syncOutbox.id, id)).get();
         expect(after!.status).toBe('pending');
     });
@@ -95,8 +92,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         const stale = await insertRow(testDb, { createdAt: NOW() - 300_000 });
         const { queue, sent } = mockQueue();
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const res = await flushOutboxOnce({} as any, queue, 50);
+        const res = await flushOutboxOnce(testD1.binding, queue, 50);
 
         expect(res.published).toBe(1);
         expect(sent.map((e) => e.id)).toEqual([stale]);
@@ -110,8 +106,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         const f1 = await insertRow(testDb, { status: 'failed', lastError: 'x' });
         const f2 = await insertRow(testDb, { status: 'failed', lastError: 'y' });
         const done = await insertRow(testDb, { status: 'published' });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const svc = new OutboxService({} as any);
+        const svc = new OutboxService(testD1.binding);
 
         expect(await svc.redrive([f1])).toBe(1);
         expect((await testDb.select().from(syncOutbox).where(eq(syncOutbox.id, f1)).get())!.status).toBe('pending');
@@ -126,8 +121,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         await insertRow(testDb, { createdAt: NOW() - 600_000 });
         await insertRow(testDb);
         await insertRow(testDb, { status: 'failed' });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const c = await new OutboxService({} as any).counts();
+        const c = await new OutboxService(testD1.binding).counts();
         expect(c.pending).toBe(2);
         expect(c.failed).toBe(1);
         expect(c.oldestPendingAge).toBeGreaterThanOrEqual(590);
@@ -145,7 +139,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         };
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await handleSyncDlqBatch({} as any, batch as any);
+        await handleSyncDlqBatch(testD1.binding, batch as any);
 
         const after = await testDb.select().from(syncOutbox).where(eq(syncOutbox.id, id)).get();
         expect(after!.status).toBe('failed');
@@ -156,8 +150,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
 
     it('append fires the inline-publish hook with the inserted row', async () => {
         const seen: string[] = [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const svc = new OutboxService({} as any, (row) => { seen.push(row.id); });
+        const svc = new OutboxService(testD1.binding, (row) => { seen.push(row.id); });
         const id = await svc.append({ type: 'user.deleted', payload: { tenantId: 't1', email: 'x@example.com' } });
         expect(seen).toEqual([id]);
         const row = await testDb.select().from(syncOutbox).where(eq(syncOutbox.id, id)).get();
@@ -170,10 +163,8 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
             id: 'u-victim', tenantId: 't1', email: 'victim@example.com',
             passwordHash: 'hash', role: 'inspector', createdAt: new Date(),
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const outbox = new OutboxService({} as any);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const team = new TeamService({} as any, outbox);
+        const outbox = new OutboxService(testD1.binding);
+        const team = new TeamService(testD1.binding, outbox);
 
         await team.removeMember('t1', 'u-victim', 'u-admin', 'owner');
 
@@ -193,8 +184,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
             id: 'u-mover', tenantId: 't1', email: 'mover@example.com',
             passwordHash: 'hash', role: 'inspector', createdAt: new Date(),
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const team = new TeamService({} as any, new OutboxService({} as any));
+        const team = new TeamService(testD1.binding, new OutboxService(testD1.binding));
 
         await team.updateMember({ tenantId: 't1', userId: 'u-mover', requesterId: 'u-admin', requesterRole: 'owner', role: 'staff' });
 
@@ -209,8 +199,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
             id: 'u-same', tenantId: 't1', email: 'same@example.com',
             passwordHash: 'hash', role: 'inspector', createdAt: new Date(),
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const team = new TeamService({} as any, new OutboxService({} as any));
+        const team = new TeamService(testD1.binding, new OutboxService(testD1.binding));
 
         // Same role named again, and an override-only edit: neither moves the role.
         await team.updateMember({ tenantId: 't1', userId: 'u-same', requesterId: 'u-admin', requesterRole: 'owner', role: 'inspector' });

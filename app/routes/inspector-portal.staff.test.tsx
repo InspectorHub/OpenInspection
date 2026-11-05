@@ -77,13 +77,13 @@ describe("hub as an inspector who is not on the job", () => {
         for (const label of ["Edit schedule", "Cancel inspection", "Mark fieldwork complete"]) expect(await offers(notOn, label), label).toBe(false);
     });
 
-    it("is not offered Request payment or Send agreement, nor Unpublish on a published report", async () => {
+    it("is not offered Request payment or Send agreement, nor Retract report on a published report", async () => {
         const notOn = { role: "inspector", scheduleOthers: false, inspectorId: "someone-else", canPublishCap: true };
         expect(await offers({ ...notOn }, "Send agreement")).toBe(false);
-        expect(await offers({ ...notOn, reportStatus: "published" }, "Unpublish")).toBe(false);
+        expect(await offers({ ...notOn, reportStatus: "published" }, "Retract report")).toBe(false);
         // Control: on the job, the same inspector gets both.
         expect(await offers({ ...notOn, inspectorId: "me" }, "Send agreement")).toBe(true);
-        expect(await offers({ ...notOn, inspectorId: "me", reportStatus: "published" }, "Unpublish")).toBe(true);
+        expect(await offers({ ...notOn, inspectorId: "me", reportStatus: "published" }, "Retract report")).toBe(true);
     });
 
     it("POSITIVE CONTROL - the inspector on the job, or one with scheduleOthers, is offered it", async () => {
@@ -142,7 +142,7 @@ describe("hub as office staff", () => {
         const hub = await renderHub({ role: "staff", reportStatus: "published", canPublishCap: false });
         expect(hub.has("Send report")).toBe(true);
         expect(hub.has("Create re-inspection")).toBe(true);
-        expect(hub.has("Unpublish")).toBe(false);
+        expect(hub.has("Retract report")).toBe(false);
     });
 
     it("sending follows the server rule: a place on the job or scheduleOthers", async () => {

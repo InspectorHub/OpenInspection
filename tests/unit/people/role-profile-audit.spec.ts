@@ -18,8 +18,8 @@ import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import roleProfilesRoutes from '../../../server/api/role-profiles';
 import { asD1Db } from '../helpers/test-db';
@@ -39,7 +39,7 @@ function buildApp() {
         c.set('userRole', 'owner' as HonoConfig['Variables']['userRole']);
         c.set('tenantId', TENANT_ID);
         c.set('user', { sub: 'u-auditor' } as never);
-        c.set('services', { people: new PeopleService({ DB: {} as D1Database }) } as unknown as HonoConfig['Variables']['services']);
+        c.set('services', { people: new PeopleService({ DB: testD1.binding }) } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
     app.route('/api/role-profiles', roleProfilesRoutes);
@@ -61,8 +61,7 @@ describe('role profile capability audit', () => {
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(db), TENANT_ID, new Date(1));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
     });
 
     afterEach(() => {
@@ -93,7 +92,7 @@ describe('role profile capability audit', () => {
                     showsInAgentPortal: false, canAccessRepairList: 'read',
                 },
             }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(200);
 
         const rows = await auditRows();
@@ -111,7 +110,7 @@ describe('role profile capability audit', () => {
             method: 'PUT',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ label: 'Real Estate Attorney' }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(200);
         expect(await auditRows()).toHaveLength(0);
     });
@@ -129,7 +128,7 @@ describe('role profile capability audit', () => {
                     showsInAgentPortal: false, canAccessRepairList: 'off',
                 },
             }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(200);
         expect(await auditRows()).toHaveLength(0);
     });
@@ -145,7 +144,7 @@ describe('role profile capability audit', () => {
                     showsInAgentPortal: false, canAccessRepairList: 'off',
                 },
             }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(400);
         const body = await res.json() as { error: { message: string } };
         expect(body.error.message).toMatch(/not yet available/i);
@@ -165,7 +164,7 @@ describe('role profile capability audit', () => {
                     showsInAgentPortal: false, canAccessRepairList: 'off',
                 },
             }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(201);
         const body = await res.json() as { data: { id: string } };
         const row = await db.select().from(schema.contactRoleProfiles)

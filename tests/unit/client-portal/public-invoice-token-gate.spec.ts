@@ -7,8 +7,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // PortalAccessService builds its drizzle handle via `drizzle(this.db)`
 // (drizzle-orm/d1). Mock that factory to hand back the in-memory better-sqlite3
 // test DB (mirrors client-document-routes.spec.ts).
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -44,7 +44,7 @@ describe('IA-34 — public invoice + pay-intent token gate', () => {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             (c as unknown as { env: Record<string, unknown> }).env = {
-                DB: {}, JWT_SECRET: SECRET, ...env,
+                DB: testD1.binding, JWT_SECRET: SECRET, ...env,
             };
             // What the tenant-by-inspection-id router resolves in production.
             // Tests pass null / a foreign id to prove the handlers trust the
@@ -65,14 +65,13 @@ describe('IA-34 — public invoice + pay-intent token gate', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await seedRoleProfiles(asD1Db(testDb), TENANT);
-        portalAccess = new PortalAccessService({} as D1Database, { jwtSecret: SECRET });
+        portalAccess = new PortalAccessService(testD1.binding, { jwtSecret: SECRET });
         findByInspectionId = vi.fn().mockImplementation(async (tenantId: string, id: string) =>
             tenantId === TENANT && id === INSP
                 ? { id: 'inv-1', inspectionId: INSP, amountCents: 5000, currency: 'USD', status: 'sent', paidAt: null, lineItems: [] }

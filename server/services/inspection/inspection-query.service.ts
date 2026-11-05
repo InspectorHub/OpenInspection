@@ -10,6 +10,7 @@ import { REPORT_STATUS } from '../../lib/status/report-status';
 import { visibleInspectionsCondition, type InspectionScope } from '../../lib/inspection/visibility';
 import type { Inspection, InspectionListParams } from './shared';
 import { InspectionSubService } from './base';
+import { loadPublishedStates, NOT_PUBLISHED, type PublishedState } from '../../lib/inspection/published-state';
 
 /**
  * READING MANY inspections: the dashboard list and its status counts.
@@ -146,7 +147,10 @@ export class InspectionQueryService extends InspectionSubService {
             nextCursor = btoa(JSON.stringify({ createdAt: safeTimestamp(last.createdAt), id: last.id }));
         }
 
-        const inspectionsFormatted: Inspection[] = page.map((row) => ({
+        // ONE bounded read for the page's ids: where each report stands (derived, no status of its own).
+        const published = await loadPublishedStates(db, tenantId, page.map((r) => r.id as string));
+        const inspectionsFormatted: Array<Inspection & PublishedState> = page.map((row) => ({
+            ...(published.get(row.id as string) ?? NOT_PUBLISHED),
             id: row.id as string,
             propertyAddress: row.propertyAddress as string,
             clientName: row.primaryClientName ?? null,

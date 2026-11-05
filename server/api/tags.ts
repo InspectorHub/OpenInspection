@@ -26,6 +26,7 @@ import {
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { filterVisibleInspectionIds, resolveInspectionScope } from "../lib/inspection/visibility";
 import { getDrizzle } from "../lib/route-helpers";
+import { withoutCompanyId } from "../lib/response-projection";
 
 const IdParamSchema = z.object({ id: z.string().min(1).describe('Unique id of the tag.') });
 
@@ -135,14 +136,14 @@ tagsRoutes.openapi(listTagsRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
     // Lazy-seed canonical tags so first-time tenants always see the five.
     const data = await c.var.services.tag.listWithDefaults(tenantId);
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: data.map(withoutCompanyId) }, 200);
 });
 tagsRoutes.openapi(createTagRoute, async (c) => {
     const input = c.req.valid('json');
     const tenantId = c.get('tenantId') as string;
     const tag = await c.var.services.tag.create(tenantId, input);
     auditFromContext(c, 'tag.created', 'tag', { entityId: tag.id, metadata: { name: tag.name } });
-    return c.json({ success: true as const, data: tag }, 200);
+    return c.json({ success: true as const, data: withoutCompanyId(tag) }, 200);
 });
 tagsRoutes.openapi(replaceTagRoute, async (c) => {
     const { id } = c.req.valid('param');
@@ -150,7 +151,7 @@ tagsRoutes.openapi(replaceTagRoute, async (c) => {
     const tenantId = c.get('tenantId') as string;
     const tag = await c.var.services.tag.update(id, tenantId, patch);
     auditFromContext(c, 'tag.updated', 'tag', { entityId: tag.id });
-    return c.json({ success: true as const, data: tag }, 200);
+    return c.json({ success: true as const, data: withoutCompanyId(tag) }, 200);
 });
 tagsRoutes.openapi(listTagInspectionsRoute, async (c) => {
     const { id } = c.req.valid('param');
@@ -265,7 +266,7 @@ inspectionTagRoutes.openapi(listInspectionItemTagsRoute, async (c) => {
     const { id, itemId } = c.req.valid('param');
     const tenantId = c.get('tenantId') as string;
     const data = await c.var.services.tag.getItemTags(tenantId, id, itemId);
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: data.map(withoutCompanyId) }, 200);
 });
 inspectionTagRoutes.openapi(linkInspectionItemTagRoute, async (c) => {
     const { id, itemId } = c.req.valid('param');
@@ -300,7 +301,7 @@ inspectionTagRoutes.openapi(listInspectionTagMapRoute, async (c) => {
     await c.var.services.inspection.getInspection(id, tenantId);
     const data = await c.var.services.tag.getInspectionTagMap(tenantId, id);
     if (!data) throw Errors.Internal('Tag map unavailable');
-    return c.json({ success: true as const, data }, 200);
+    return c.json({ success: true as const, data: Object.fromEntries(Object.entries(data).map(([itemId, rows]) => [itemId, rows.map(withoutCompanyId)])) }, 200);
 });
 
 export const inspectionTagRouteConfigs = [listInspectionItemTagsRoute, linkInspectionItemTagRoute, unlinkInspectionItemTagRoute, listInspectionTagMapRoute] as const;

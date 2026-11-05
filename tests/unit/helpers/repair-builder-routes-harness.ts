@@ -14,6 +14,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import repairBuilderRoutes from '../../../server/api/repair-builder';
 import type { HonoConfig } from '../../../server/types/hono';
+import { AppError } from '../../../server/lib/errors';
 
 // ---------------------------------------------------------------------------
 // Chainable drizzle fake helpers
@@ -114,6 +115,10 @@ export function makeServices(overrides: {
         },
         agent: {
             accessToInspection: overrides.accessToInspection ?? vi.fn().mockResolvedValue(null),
+        },
+        // The source route lists the PUBLISHED version's defects; no published version means the report as it is.
+        reportVersion: {
+            getLatestPublished: vi.fn().mockResolvedValue(null),
         },
         repairRequest: {
             listMine:          overrides.listMine ?? defaultListMine,
@@ -264,6 +269,8 @@ export function buildShareApp(opts: {
     creditTotalResult?: number;
     sendRepairRequestShare?: ReturnType<typeof vi.fn>;
     browserBinding?: unknown;
+    /** Extra bindings merged into the request environment (a limiter, a KV). */
+    env?: Record<string, unknown>;
 }) {
     const {
         rrResult = { request: SHARE_RR, items: SHARE_ITEMS },
@@ -271,6 +278,7 @@ export function buildShareApp(opts: {
         creditTotalResult = 5000,
         sendRepairRequestShare,
         browserBinding,
+        env: extraEnv = {},
     } = opts;
 
     const getByShareToken = vi.fn().mockResolvedValue(rrResult);
@@ -287,10 +295,13 @@ export function buildShareApp(opts: {
             DB:           {},
             APP_BASE_URL: 'https://app.example.com',
             BROWSER:      browserBinding,
+            ...extraEnv,
         } as unknown as HonoConfig['Bindings'];
         c.set('services', svc as unknown as HonoConfig['Variables']['services']);
         await next();
     });
+    // The application answers an AppError with its own status (a limiter's 429); without this the harness would call it a 500.
+    app.onError((err, c) => (err instanceof AppError ? c.json({ error: err.message }, err.status) : c.json({ error: String(err) }, 500)));
     app.route('/api/public', repairBuilderRoutes);
     return { app, svc };
 }

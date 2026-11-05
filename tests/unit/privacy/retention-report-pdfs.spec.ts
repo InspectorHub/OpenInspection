@@ -86,6 +86,88 @@ describe('report_pdfs retention', () => {
         expect(await db.select().from(reportPdfs).all()).toHaveLength(1);
     });
 
+    it('never destroys a PDF of a published report, however old, and still expires one of a report that was never published', async () => {
+        const publishedKey = `${TENANT}/i-p1/reports/full-published.pdf`;
+        const laterRenderKey = `${TENANT}/i-p1/reports/full-later.pdf`;
+        const draftKey = `${TENANT}/i-p2/reports/full-draft.pdf`;
+        const old = REPORT_PDF_RETENTION_DEFAULT_YEARS + 3;
+        await seedPdf('p1', TENANT, old, publishedKey);
+        await db.insert(reportPdfs).values({
+            id: 'p1b', tenantId: TENANT, inspectionId: 'i-p1', type: 'full', r2Key: laterRenderKey,
+            renderedAt: new Date(yearsAgo(old)), sourceVersion: 2, status: 'ready',
+        });
+        await seedPdf('p2', TENANT, old, draftKey);
+        await db.insert(schema.reportVersions).values({
+            id: 'v1', tenantId: TENANT, inspectionId: 'i-p1', versionNumber: 1, publishedAt: new Date(yearsAgo(old)), publishedBy: 'u',
+            snapshotJson: '{}',
+        });
+        const r2 = makeR2([publishedKey, laterRenderKey, draftKey]);
+
+        const out = await runLogRetentionSweep(asAnyDb(db), NOW, { photos: r2.bucket });
+
+        // Control: the sweep did expire something, so the survivors are the published rule and not a sweep that did nothing.
+        expect(out.perTable['report_pdfs']).toBe(1);
+        expect(r2.store.has(draftKey)).toBe(false);
+        expect(r2.store.has(publishedKey)).toBe(true);
+        expect(r2.store.has(laterRenderKey)).toBe(true);
+        expect((await db.select().from(reportPdfs).all()).map((r) => r.id).sort()).toEqual(['p1', 'p1b']);
+    });
+
+    it("a version of another company's inspection does not protect this one's PDF", async () => {
+        const key = `${TENANT}/i-p1/reports/full-a.pdf`;
+        await seedPdf('p1', TENANT, REPORT_PDF_RETENTION_DEFAULT_YEARS + 1, key);
+        await db.insert(schema.reportVersions).values({
+            id: 'v-other', tenantId: OTHER, inspectionId: 'i-p1', versionNumber: 1, publishedAt: new Date(), publishedBy: 'u', snapshotJson: '{}',
+        });
+        const r2 = makeR2([key]);
+
+        const out = await runLogRetentionSweep(asAnyDb(db), NOW, { photos: r2.bucket });
+
+        expect(out.perTable['report_pdfs']).toBe(1);
+        expect(r2.store.has(key)).toBe(false);
+    });
+
+    it('removes a queued placeholder row without ever handing storage an empty key', async () => {
+        const real = `${TENANT}/i-p1/reports/full-old.pdf`;
+        await seedPdf('p1', TENANT, REPORT_PDF_RETENTION_DEFAULT_YEARS + 1, real);
+        // What markQueued writes before any render happened: no file, rendered at the epoch.
+        await db.insert(reportPdfs).values({
+            id: 'q1', tenantId: TENANT, inspectionId: 'i-q1', type: 'full', r2Key: '',
+            renderedAt: new Date(0), sourceVersion: 0, status: 'queued',
+        });
+        const calls: string[][] = [];
+        const r2 = makeR2([real]);
+        const bucket = { delete: async (keys: string | string[]) => { calls.push(Array.isArray(keys) ? keys : [keys]); await (r2.bucket as unknown as { delete(k: string | string[]): Promise<void> }).delete(keys); } } as unknown as R2Bucket;
+
+        const out = await runLogRetentionSweep(asAnyDb(db), NOW, { photos: bucket });
+
+        expect(out.perTable['report_pdfs']).toBe(2);
+        expect(calls.flat()).toEqual([real]);
+        expect(calls.flat()).not.toContain('');
+        expect(await db.select().from(reportPdfs).all()).toHaveLength(0);
+    });
+
+    it('deletes storage keys in groups of at most 500 and every expired row goes', async () => {
+        const total = 1100;
+        const keys: string[] = [];
+        for (let n = 0; n < total; n++) {
+            const key = `${TENANT}/i-bulk-${n}/reports/full-${n}.pdf`;
+            keys.push(key);
+            await db.insert(reportPdfs).values({
+                id: `b${n}`, tenantId: TENANT, inspectionId: `i-bulk-${n}`, type: 'full', r2Key: key,
+                renderedAt: new Date(yearsAgo(REPORT_PDF_RETENTION_DEFAULT_YEARS + 1)), sourceVersion: 1, status: 'ready',
+            });
+        }
+        const batches: number[] = [];
+        const bucket = { delete: async (k: string | string[]) => { batches.push(Array.isArray(k) ? k.length : 1); } } as unknown as R2Bucket;
+
+        const out = await runLogRetentionSweep(asAnyDb(db), NOW, { photos: bucket });
+
+        expect(out.perTable['report_pdfs']).toBe(total);
+        expect(batches).toEqual([500, 500, 100]);
+        expect(await db.select().from(reportPdfs).all()).toHaveLength(0);
+    });
+
     it('keeps a row that is inside the window', async () => {
         const key = 'inside';
         await seedPdf('p1', TENANT, REPORT_PDF_RETENTION_DEFAULT_YEARS - 1, key);

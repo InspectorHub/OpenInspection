@@ -164,6 +164,7 @@
   "agreement_detail_error_no_link": "No se pudo obtener el enlace.",
   "agreement_detail_error_timeout": "Se agotó el tiempo al obtener el enlace.",
   "agreement_signers_remind_terminal": "Este firmante ya no está en espera de firma.",
+  "agreement_signers_remind_signing": "Se está registrando una firma de este firmante en este momento.",
   "agreement_signers_remind_ratelimited": "Ya se envió un recordatorio en la última hora. Inténtelo de nuevo más tarde.",
   "agreement_signers_empty": "Aún no hay firmantes en este acuerdo.",
   "agreement_signers_remind_error": "No se pudo enviar el recordatorio. Inténtelo de nuevo más tarde.",

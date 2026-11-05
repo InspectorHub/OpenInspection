@@ -4,13 +4,15 @@ import type { AppEnv } from '../types/hono';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { m2mAgreementRenderUrl } from '../lib/public-urls';
+import { signAgreementRenderToken } from '../lib/render-token';
 import { buildEvidencePack } from '../services/evidence-pack.service';
 import { sendSignedEvidenceEmail } from './sign-completion-email';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { r2Keys } from '../lib/r2-keys';
 import { logger } from '../lib/logger';
+import { errorSummary } from '../lib/error-summary';
 
 /**
  * The machine-readable half of the evidence pack — extracted from the workflow
@@ -45,6 +47,8 @@ export async function buildAuditTrailPayload(
             eq(schema.esignAuditLogs.tenantId, tenantId),
             eq(schema.esignAuditLogs.requestId, requestId),
         ))
+        // In the order they were written: the pack lists the chain, and a reader (the offline verifier included) should not have to guess it.
+        .orderBy(asc(schema.esignAuditLogs.createdAt), asc(sql`rowid`))
         .all();
     return {
         envelopeId: requestId,
@@ -148,8 +152,10 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
             timeout: '2 minutes',
         }, async () => {
             try {
+                // Minted inside the step, so a retry carries a fresh one. It is what lets this fetch see the drawn signatures.
+                const renderToken = await signAgreementRenderToken(requestId, env.JWT_SECRET);
                 return await renderPdfToR2(env, {
-                    renderUrl: m2mAgreementRenderUrl(baseHost(env), renderSlug, requestId),
+                    renderUrl: m2mAgreementRenderUrl(baseHost(env), renderSlug, requestId, renderToken),
                     r2Key: r2Keys.agreementFile(tenantId, inspectionId, requestId, 'signed.pdf'),
                 });
             } catch (e) {
@@ -186,11 +192,19 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         const evidenceZipMeta = await step.do('build-evidence-pack', async () => {
             try {
                 if (!env.PHOTOS) return null;
-                const signing = new SigningKeyService(env.DB, env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET);
+                const signing = SigningKeyService.fromEnv(env.DB, env);
                 const pubKey = await signing.getPublicKey(tenantId);
                 if (!pubKey) return null;
                 const db = drizzle(env.DB, { schema });
-                const auditPayload = await buildAuditTrailPayload(db, tenantId, requestId, pubKey);
+                const trail = await buildAuditTrailPayload(db, tenantId, requestId, pubKey);
+                // Every key the chain was signed with travels in the pack (a chain that spans a key rotation names two). The offline
+                // verifier checks each event against the key its own fingerprint names, so a pack with only the active key would leave the
+                // earlier events unverifiable.
+                const fingerprints = [...new Set(trail.events.map((e) => e.keyFingerprint))];
+                const chainKeys = (await Promise.all(fingerprints.map((fp) => signing.getPublicKeyByFingerprint(tenantId, fp))))
+                    .filter((k): k is NonNullable<typeof k> => !!k)
+                    .map((k) => ({ fingerprint: k.fingerprint, pem: k.pem }));
+                const auditPayload = { ...trail, keys: chainKeys };
                 const zipBuf = await buildEvidencePack({
                     r2: env.PHOTOS,
                     auditTrailJson: JSON.stringify(auditPayload, null, 2),
@@ -218,7 +232,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         // PDF render success. The legally-meaningful 'agreement.signed' row is
         // already in the chain; this row records the post-sign workflow status.
         await step.do('append-workflow-complete', async () => {
-            const signing = new SigningKeyService(env.DB, env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET);
+            const signing = SigningKeyService.fromEnv(env.DB, env);
             const auditLog = new AuditLogService(env.DB, signing);
             await auditLog.append(tenantId, requestId, 'workflow.complete', {
                 certPdfHash: certPdfMeta ? `sha256:${certPdfMeta.sha256}` : null,
@@ -250,7 +264,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                     baseUrl: baseUrl(env),
                 });
             } catch (e) {
-                logger.error('[sign-workflow] email-parties failed', {}, e instanceof Error ? e : undefined);
+                logger.error('[sign-workflow] email-parties failed', { error: errorSummary(e) });
             }
         });
 

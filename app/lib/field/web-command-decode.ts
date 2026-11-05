@@ -52,6 +52,9 @@ function decodeBody(cmd: FieldCommand, body: Json): CommandResult<unknown> {
             result.data = { facts, reason: str(body.reason) ?? null };
             return result;
         }
+        case "publish":
+            if (ok) result.data = { unchangedSinceVersion: typeof body.unchangedSinceVersion === "number" ? body.unchangedSinceVersion : null };
+            return result;
         case "load-scope":
             if (ok) result.data = { scope: str(body.scope) ?? cmd.scope, results: isRecord(body.results) ? body.results : {} };
             return result;

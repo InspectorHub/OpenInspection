@@ -60,7 +60,12 @@ export interface ResultsDocHandle {
     persistenceSynced: boolean;
     /** True after the first Yjs sync step2 from the DO is applied. */
     synced: boolean;
+    /** True once the server closed the socket with 4409: the report is published and takes no edits. No reconnect follows; the host decides what to show. */
+    locked?: boolean;
 }
+
+/** WebSocket close code the results document uses for "this report is published" (the socket twin of HTTP 409 REPORT_PUBLISHED). */
+const REPORT_PUBLISHED_CLOSE_CODE = 4409;
 
 /** What a persistence store handed back by the host must offer. */
 export interface ResultsDocPersistence {
@@ -196,7 +201,7 @@ export function connectResultsDoc(
      * restore path resyncs on the still-open socket and must not race a reopen).
      */
     function scheduleReconnect(): void {
-        if (destroyed || restoring) return;
+        if (destroyed || restoring || handle.locked) return;
         if (reconnectTimer !== null) return; // a reopen is already pending
         const delay = reconnectDelayMs(reconnectAttempts);
         reconnectAttempts += 1;
@@ -215,7 +220,7 @@ export function connectResultsDoc(
      * media-queue drain happen with no wait.
      */
     function handleOnline(): void {
-        if (destroyed) return;
+        if (destroyed || handle.locked) return;
         reconnectAttempts = 0;
         clearReconnectTimer();
         if (ws && (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING)) return;
@@ -374,12 +379,19 @@ export function connectResultsDoc(
             }
         });
 
-        ws.addEventListener('close', () => {
+        ws.addEventListener('close', (ev) => {
             // Auto-reconnect: a dropped socket (network loss, server restart) is
             // reopened with exponential backoff. The restore path resyncs on the
             // SAME open socket, so its close (if any) is guarded by `restoring`.
             // Destroyed connections never reconnect.
             if (destroyed || restoring) return;
+            // Published: a reopened socket would be closed the same way, forever. Stop and say so.
+            if (ev.code === REPORT_PUBLISHED_CLOSE_CODE) {
+                clearReconnectTimer();
+                handle.locked = true;
+                opts.onChange?.(handle);
+                return;
+            }
             scheduleReconnect();
         });
 

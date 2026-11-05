@@ -13,6 +13,8 @@ import type { HonoConfig } from '../../../server/types/hono';
 
 // No money-named fields, so the response projection has nothing to redact and needs no capability lookup.
 const TYPE_ROW = { id: 'et1', tenantId: 't1', name: 'Radon', slug: 'radon', defaultDurationMin: 60, color: '#123456', sortOrder: 1, active: true };
+/** The row as a signed-in caller receives it: the service row holds the company id, the response does not restate it. */
+const withoutCompany = (row: Record<string, unknown>) => Object.fromEntries(Object.entries(row).filter(([key]) => key !== 'tenantId'));
 
 function buildApp(event: Record<string, unknown>, role = 'owner') {
     const app = new OpenAPIHono<HonoConfig>();
@@ -37,7 +39,8 @@ describe('events OpenAPI routes', () => {
                 const listEventTypes = vi.fn().mockResolvedValue([TYPE_ROW]);
                 const res = await buildApp({ listEventTypes }, role).request('/api/event-types');
                 expect(res.status).toBe(200);
-                expect(await res.json()).toEqual({ success: true, data: [TYPE_ROW] });
+                expect(TYPE_ROW.tenantId).toBe('t1'); // control: the row the service returns does hold the company id
+                expect(await res.json()).toEqual({ success: true, data: [withoutCompany(TYPE_ROW)] });
                 expect(listEventTypes).toHaveBeenCalledWith('t1');
             }
         });

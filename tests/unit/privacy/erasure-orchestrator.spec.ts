@@ -13,8 +13,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // the compliance-proof assertion below exercises the SAME live read path
 // production code uses (getInspection/listInspections/agreements all call
 // through PeopleService too).
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const TENANT_B = '00000000-0000-0000-0000-000000000002';
@@ -100,8 +100,7 @@ describe('runErasure', () => {
         sqlite = fixture.sqlite;
         await setupSchema(fixture.sqlite);
         await seedTenants(db);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
     });
 
     it('signed agreement -> anonymized PII, signature + chain KEPT, log row w/ retentionExpiry + legalBasis', async () => {
@@ -298,7 +297,7 @@ describe('runErasure', () => {
         // through (getInspection/listInspections/agreements all call
         // PeopleService.getPrimaryClient) now resolves to null for this subject
         // — the client is provably gone, not just relocated.
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         const primary = await people.getPrimaryClient(TENANT_A, inspId);
         expect(primary).toBeNull();
 
@@ -415,8 +414,7 @@ describe('runErasure — the residences the original manifest missed (#88)', () 
         db = fixture.db;
         await setupSchema(fixture.sqlite);
         await seedTenants(db);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.inspections).values({
             id: INSP, tenantId: TENANT_A, propertyAddress: '2 Elm St',
             date: '2026-06-02', status: 'completed', paymentStatus: 'unpaid', price: 40000, createdAt: new Date(),
@@ -627,8 +625,7 @@ describe('runErasure — repair-request lists (#88)', () => {
         await setupSchema(fixture.sqlite);
         await seedTenants(db);
         await seedRoleProfiles(asD1Db(db), TENANT_A, new Date(1));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await db.insert(schema.inspections).values({
             id: INSP, tenantId: TENANT_A, propertyAddress: '4 Elm St',
             date: '2026-06-04', status: 'completed', paymentStatus: 'unpaid', price: 40000, createdAt: new Date(),

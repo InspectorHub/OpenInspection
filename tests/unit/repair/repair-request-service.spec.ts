@@ -3,7 +3,7 @@
  *
  * Harness mirrors contractor-type.service.spec.ts:
  *   - vi.mock drizzle-orm/d1 → in-memory better-sqlite3 via createTestDb
- *   - service constructed with {} as D1Database (mockDrizzle intercepts calls)
+ *   - service constructed with testD1.binding (mockDrizzle intercepts calls)
  *   - genId / now injected for determinism
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -12,19 +12,19 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP   = '11111111-1111-1111-1111-111111111111';
 
 let idSeq = 0;
 function makeRepairRequestService(db: BetterSQLite3Database<typeof schema>) {
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     idSeq = 0;
     const genId = () => `id-${++idSeq}`;
     const now = () => 1_700_000_000_000 + idSeq * 1000;
-    return new RepairRequestService({} as D1Database, genId, now);
+    return new RepairRequestService(testD1.binding, genId, now);
 }
 
 async function seedTenant(db: BetterSQLite3Database<typeof schema>) {

@@ -25,6 +25,7 @@ import {
 } from '../lib/validations/identity.schema';
 import { exportAccount, softDeleteAccount } from '../services/account.service';
 import { getDrizzle } from '../lib/route-helpers';
+import { moneyView } from '../lib/auth/money-access';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 
 function getCallerUserId(c: Context<HonoConfig>): string {
@@ -93,7 +94,8 @@ app.openapi(accountExportRoute, async (c) => {
     const userId = getCallerUserId(c);
     const db = getDrizzle(c);
     const data = await exportAccount(db, userId);
-    return c.json({ success: true as const, data }, 200);
+    // The export carries whole inspection rows, so the fee columns follow the same capability as every other read of them.
+    return c.json({ success: true as const, data: { ...data, inspections: await moneyView(c, data.inspections, 'inspectionFees') } }, 200);
 });
 app.openapi(accountDeleteRoute, async (c) => {
     const userId = getCallerUserId(c);

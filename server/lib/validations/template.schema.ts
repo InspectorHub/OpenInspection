@@ -195,7 +195,8 @@ const PhotoOnlyItemSchema = z.object({
     options: ItemOptionsSchema.optional().describe('Optional settings carried with the item. The photo-only control reads none of them.'),
 }).strict();
 
-const TemplateItemSchema = z.discriminatedUnion('type', [
+/** Exported for the test that keeps the report-data item types in step with these (tests/unit/reports/report-item-types-match-template.spec.ts). */
+export const TemplateItemSchema = z.discriminatedUnion('type', [
     RichItemSchema,
     TextItemSchema,
     BooleanItemSchema,

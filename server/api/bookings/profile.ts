@@ -23,6 +23,11 @@ import {
     BookingProfileNotFoundSchema, CompanyBookingProfileResponseSchema, InspectorBookingProfileResponseSchema,
 } from '../../lib/validations/booking-profile.schema';
 import { hasDeclaredTenantTimeZone } from '../../lib/tz';
+import type { DepositPolicy } from '../../lib/billing/deposit-policy';
+
+/** The quoted deposit as the booking page reads it: the three fields of the policy and nothing else a stored value might carry. */
+const projectDepositPolicy = (policy: DepositPolicy | null | undefined) =>
+    (policy ? { type: policy.type, percent: policy.percent, amountCents: policy.amountCents } : null);
 
 const tenantParam = z.string().describe('Tenant slug from the booking page URL; resolved server-side to the company.');
 
@@ -137,15 +142,15 @@ bookingProfileRoutes.openapi(companyProfileRoute, async (c) => {
     return c.json({
         success: true as const,
         data: {
-            company: tenantRow.name,
-            turnstileSiteKey: resolveTurnstileSiteKey(c.env),
-            bookingOpen,
+            company: tenantRow.name, // projection-allow: the company name shown on the public booking page
+            turnstileSiteKey: resolveTurnstileSiteKey(c.env), // projection-allow: the public widget site key the booking page needs to render its bot check
+            bookingOpen, // projection-allow: a boolean the public booking page reads: whether online booking is open
             // Operator diagnostic, not visitor copy: the public page says
             // only that booking is closed, and says it from `bookingOpen`.
             bookingClosedReason,
             allowInspectorChoice: allowChoice,
             conciergeReviewRequired: !!config?.conciergeReviewRequired,
-            inspectors,
+            inspectors, // projection-allow: the inspectors a visitor may choose, selected as id, name and photo URL only
             // The deposit is QUOTED here and RESOLVED again on the server at
             // booking time from the same catalogue rows. The client copy has
             // to exist — a charge a client only discovers after clicking Book
@@ -153,10 +158,10 @@ bookingProfileRoutes.openapi(companyProfileRoute, async (c) => {
             // authority: `inspections.deposit_required_cents` is what the
             // server froze, and only the server writes it.
             currency: config?.currency ?? 'USD',
-            depositPolicy: config?.depositPolicy ?? null,
+            depositPolicy: projectDepositPolicy(config?.depositPolicy),
             services: visible.map(s => ({
                 id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
-                depositPolicy: s.depositPolicy ?? null,
+                depositPolicy: projectDepositPolicy(s.depositPolicy),
             })),
         },
     }, 200);
@@ -203,15 +208,15 @@ bookingProfileRoutes.openapi(inspectorProfileRoute, async (c) => {
     return c.json({
         success: true as const,
         data: {
-            inspectorId: inspector.id,
+            inspectorId: inspector.id, // projection-allow: the inspector id the booking form names when booking
             name: inspector.name,
-            company: tenantRow.name,
-            avatar: inspector.photoUrl,
-            turnstileSiteKey: resolveTurnstileSiteKey(c.env),
+            company: tenantRow.name, // projection-allow: the company name shown on the public booking page
+            avatar: inspector.photoUrl, // projection-allow: the inspector's profile photo URL, shown on the public booking page
+            turnstileSiteKey: resolveTurnstileSiteKey(c.env), // projection-allow: the public widget site key the booking page needs to render its bot check
             // Hours AND a declared company zone — the same two-part test the
             // company page and the submit path apply. An hour nobody
             // anchored is not an hour this page may offer.
-            bookingOpen: !!hasHours && hasDeclaredTenantTimeZone(tenantRow.defaultTimezone),
+            bookingOpen: !!hasHours && hasDeclaredTenantTimeZone(tenantRow.defaultTimezone), // projection-allow: a boolean the public booking page reads: whether online booking is open
             services: svcRows.map(s => ({
                 id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),
             })),

@@ -8,14 +8,15 @@
  * may then answer 400/404/500 because this harness has no services behind it,
  * which is irrelevant to the gate).
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 // eslint-disable-next-line import/order
+import { createTestDb } from '../db';
+import { d1For } from '../helpers/d1-binding';
 import invoiceRoutes from '../../../server/api/invoices';
 // eslint-disable-next-line import/order
 import { servicesRoutes } from '../../../server/api/services';
@@ -25,7 +26,7 @@ import adminConfigRoutes from '../../../server/api/admin/admin-config';
 import inspectionServiceRoutes from '../../../server/api/inspections/services';
 
 const T = '00000000-0000-0000-0000-000000000001';
-const ENV = { DB: {} } as HonoConfig['Bindings'];
+const ENV = { DB: d1For(createTestDb().sqlite) } as HonoConfig['Bindings'];
 
 function buildApp(role: UserRole, overrides: Record<string, boolean> | null) {
     const app = new OpenAPIHono<HonoConfig>();
@@ -72,6 +73,8 @@ const FEES_CASES: Case[] = [
     ['POST', '/api/inspections/i1/services', { serviceId: 'svc1' }],
     ['PATCH', '/api/inspections/i1/services/l1', { priceOverrideCents: 100 }],
     ['DELETE', '/api/inspections/i1/services/l1'],
+    ['GET', '/api/services/discount-codes'],
+    ['POST', '/api/services/discount/validate', { code: 'SAVE', subtotal: 1000 }],
 ];
 
 const call = (app: OpenAPIHono<HonoConfig>, [method, path, body]: Case) =>

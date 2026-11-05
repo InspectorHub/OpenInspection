@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ReportVersionService } from '../../../server/services/report-version.service';
 import { PeopleService } from '../../../server/services/people.service';
@@ -9,8 +9,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq as schema_eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT   = '00000000-0000-0000-0000-000000000099';
 const ORIGINAL = '11111111-1111-1111-1111-111111111111';
@@ -54,7 +54,7 @@ async function seed(testDb: BetterSQLite3Database<typeof schema>) {
         id: CLIENT_CONTACT, tenantId: TENANT, type: 'client',
         name: 'Jane Buyer', email: 'jane@example.com', createdAt: new Date(),
     });
-    await new PeopleService({ DB: {} as D1Database }).addPerson(
+    await new PeopleService({ DB: testD1.binding }).addPerson(
         TENANT, ORIGINAL, CLIENT_CONTACT,
         `crp_${TENANT}_client`,
     );
@@ -93,13 +93,12 @@ describe('InspectionService.createReinspection (#119)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await seed(testDb);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sdb = new ScopedDB(testDb as any, TENANT);
-        svc = new InspectionService({} as D1Database, undefined, sdb);
-        reportVersionSvc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        svc = new InspectionService(testD1.binding, undefined, sdb);
+        reportVersionSvc = new ReportVersionService(testD1.binding, 'test-encryption-secret-key', []);
     });
 
     it('creates a linked re-inspection seeding only the selected items', async () => {
@@ -125,7 +124,7 @@ describe('InspectionService.createReinspection (#119)', () => {
             selectedItemIds: ['item-a'], inspectorId: 'user-a', scheduledDate: DAY,
         });
 
-        const people = await new PeopleService({ DB: {} as D1Database }).listPeople(TENANT, out.id);
+        const people = await new PeopleService({ DB: testD1.binding }).listPeople(TENANT, out.id);
         expect(people.map(p => p.roleKey)).toContain('client');
         const clientRow = people.find(p => p.roleKey === 'client');
         expect(clientRow?.contactId).toBe(CLIENT_CONTACT);

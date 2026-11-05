@@ -165,8 +165,8 @@
   "inspections_hub_report_published": "Informe publicado.",
   "inspections_hub_report_published_on": "Informe publicado el {date}.",
   "inspections_hub_publish_ok": "Informe publicado. La entrega sigue las reglas de automatización de informe publicado de esta empresa; use Enviar informe para escribirle a alguien que no esté cubierto por ellas.",
-  "inspections_hub_report_unpublishing": "Anulando la publicación…",
-  "inspections_hub_report_unpublish": "Anular la publicación",
+  "inspections_hub_report_unpublishing": "Retirando…",
+  "inspections_hub_report_unpublish": "Retirar informe",
   "inspections_hub_report_submitted": "Informe enviado para revisión.",
   "inspections_hub_report_ready": "Todos los campos obligatorios están completos.",
   "inspections_hub_report_blockers": "{count} elemento(s) requieren atención.",
@@ -378,5 +378,11 @@
   "inspections_hub_delete_error": "No se pudo eliminar la inspección. Inténtelo de nuevo.",
   "inspections_list_delete_failed": "Estas inspecciones no se pudieron eliminar y siguen en la lista:",
   "inspections_list_delete_failed_item": "{address}: {reason}",
-  "inspections_list_delete_too_many": "Elimine como máximo {max} inspecciones a la vez."
+  "inspections_list_delete_too_many": "Elimine como máximo {max} inspecciones a la vez.",
+  "inspections_published_state_label": "Publicado v{version}, cambios sin publicar",
+  "inspections_hub_retract_title": "¿Retirar este informe?",
+  "inspections_hub_retract_body": "Esto retira el informe de sus clientes y vence todos los enlaces que recibieron. Para cambiar el informe mientras los clientes siguen viendo la última versión publicada, abra el editor y elija Editar y volver a publicar.",
+  "inspections_hub_retract_cancel": "Mantener publicado",
+  "inspections_hub_retract_confirm": "Retirar y vencer enlaces",
+  "inspections_hub_reports_unpublished_edits": "Cambios sin publicar"
 }

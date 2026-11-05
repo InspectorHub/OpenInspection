@@ -38,6 +38,7 @@ export function BookingWizard({
     submitting,
     message,
     turnstileToken, setTurnstileToken,
+    turnstileRound,
     turnstileRef,
     toggleService,
     totalPrice,
@@ -78,8 +79,19 @@ export function BookingWizard({
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verifyUnavailable, setVerifyUnavailable] = useState(false);
 
-  useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step, setTurnstileToken, {
+  // The widget is rendered again when the step changes (the host mounts on the confirm step) and after a refused submit spent its
+  // token. The hook takes one number to depend on, so the two are folded: step * 1000 + round, which holds while there are fewer
+  // than 1000 steps (there are four).
+  useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step * 1000 + (turnstileRound ?? 0), (token) => {
+    // A new token ends whatever the last one left on screen: the expiry message and the could-not-load message.
+    setTurnstileToken(token);
+    setVerifyError(null);
+    setVerifyUnavailable(false);
+  }, {
     onLoadFailed: () => setVerifyUnavailable(true),
+    // A token that sat unused too long is no longer good: drop it and say what to do, instead of failing the submit later.
+    onExpired: () => { setTurnstileToken(null); setVerifyError(m.booking_verify_required()); },
+    onError: () => { setTurnstileToken(null); setVerifyUnavailable(true); },
   });
 
   const showInspectorDropdown = inspectorOptions.length > 0;
@@ -202,7 +214,7 @@ export function BookingWizard({
       )}
 
       {/* Turnstile — shown on confirm step */}
-      {step === 3 && needsTurnstile && (
+      {step === 3 && needsTurnstile && !(message?.ok || bookedInspectionId) && (
         <div className="mt-6 flex justify-center">
           <div ref={turnstileRef} />
         </div>

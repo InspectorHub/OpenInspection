@@ -2,6 +2,7 @@ import { Form, useActionData, useLoaderData, useNavigation, redirect } from "rea
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/accept-terms";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { createApi } from "~/lib/api-client.server";
 import { requireToken } from "~/lib/session.server";
 import { makeAgentTermsAcceptSchema } from "~/lib/forms/auth.schema";
@@ -93,6 +94,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (submission.status !== "success") {
     return submission.reply();
   }
+  // An acceptance is recorded only from this page: a form posted from another site is refused.
+  if (isCrossSitePost(request)) return submission.reply({ formErrors: [m.auth_agent_accept_terms_error_failed()] });
 
   // What this page actually rendered, round-tripped by AgentTermsConsent. NOT
   // the evidence — the server records the hash it read itself. It is here so a

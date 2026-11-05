@@ -18,10 +18,55 @@ saying why this number and not another, and a digest cannot say that.
 ## Status
 
 `approved_with_conditions`. The windows have been reviewed and the conditions
-attached to that review are named in `retention-policy.ts` — two of five remain
-unmet, both on the customer Terms publish rather than on any period here. The
+attached to that review are named in `retention-policy.ts`. Of the five that came
+with it, two remain unmet, both on the customer Terms publish rather than on any
+period here. Rules added after the review (such as `migration_batches` and
+`verify_export_attempts`) each have a further condition of their own there. The
 status is deliberately not `approved`: a reader who sees that word stops asking
 what is left.
+
+---
+
+## Report PDFs of published reports are not expired
+
+**What changed.** The `report_pdfs` executor skips every PDF whose inspection has at
+least one published version on record, whatever window the tenant chose. Only the
+PDFs of reports that were never published expire under the window.
+
+**Why.** The PDF of a published report is the file the client was given and
+downloads. A window that destroyed it after the period left a published report with no
+downloadable copy, and the row that named the file kept answering "ready". The decision
+to keep them was taken by the product owner on 2026-11-05.
+
+**What did not change.** The window, the default, the zero-means-indefinite
+instruction and the manifest row are as before, so the digest in `retention-policy.ts`
+is unchanged. This is an exemption inside the executor, not a new rule. It narrows what
+the window deletes; it does not widen it.
+
+---
+
+## 2026-09-11.10 — attempt counters for the signed audit export
+
+**What changed.** One rule was added: `verify_export_attempts`, the attempt
+counters of the knowledge check in front of the signed audit export, deleted a
+day after a counter's window ended (`window_ends_at`). The rule is
+`not_applicable` for legal holds: a row is a counter key and a count.
+
+**Why a day.** A counter matters while its window (15 minutes or an hour) is
+open, and a request replaces an ended window by itself. The sweep only has to
+remove counters nobody came back to; the unit cannot be smaller than a day.
+
+**What a row holds.** An envelope id and a keyed hash of the caller's network
+(an IPv4 address, or the /64 prefix of an IPv6 address), never the address.
+Rows are written only for envelopes that exist.
+
+**A rule added after the review.** Like `migration_batches` (condition 6 in
+`retention-policy.ts`), this rule came after the external review and has had no
+review of its own, so the status header gains condition 8 naming it rather than
+reading as covering it. The table holds counters only: no name, email or other
+personal data, and the network is stored as a keyed hash. What needs review is
+whether such a hash beside an envelope id is personal data in any reading, and
+whether a day is the right margin after a window ends.
 
 ---
 

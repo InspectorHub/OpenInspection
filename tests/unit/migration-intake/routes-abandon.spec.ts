@@ -11,16 +11,14 @@
  * a delete that never ran both leave the run in place — so each refusal reads
  * back the batch row, its entries AND the stored file.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import { withBatch } from '../helpers/d1-binding';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
-import {
+import { intakeD1 as testD1,
     OTHER,
     TENANT,
     USER,
@@ -56,8 +54,7 @@ describe('abandoning a run', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(withBatch(db, fix.sqlite));
+        testD1.use(withBatch(db, fix.sqlite));
         store = new Map();
         await seedIntakeTenant(db);
         await seedIntakeTenant(db, OTHER);
@@ -137,13 +134,12 @@ describe('the per-intent gate is re-applied on every route, not only on the uplo
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(withBatch(db, fix.sqlite));
+        testD1.use(withBatch(db, fix.sqlite));
         store = new Map();
         await seedIntakeTenant(db);
         const sourceKey = r2Keys.migrationSource(TENANT, 'waiting', 'csv');
         store.set(sourceKey, new TextEncoder().encode('PK binary rubbish'));
-        const created = await new MigrationStageService({} as D1Database).createAssistanceBatch({
+        const created = await new MigrationStageService(testD1.binding).createAssistanceBatch({
             tenantId: TENANT,
             createdBy: USER,
             intent: 'assisted.full',

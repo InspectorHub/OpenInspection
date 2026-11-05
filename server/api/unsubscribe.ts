@@ -176,8 +176,8 @@ app.openapi(resolveRoute, async (c) => {
         data: {
             companyName: cfg?.companyName ?? 'this company',
             label: cls.label,
-            classId: cls.id,
-            muted: await isPreferenceMuted(db, grant.tenantId, cls.id, 'email', subjects),
+            classId: cls.id, // projection-allow: the preference class id the unsubscribe link names
+            muted: await isPreferenceMuted(db, grant.tenantId, cls.id, 'email', subjects), // projection-allow: a boolean: whether the link holder's own class is muted
         },
     }, 200);
 });
@@ -199,7 +199,7 @@ app.openapi(setRoute, async (c) => {
             enabled,
         });
     }
-    return c.json({ success: true as const, enabled }, 200);
+    return c.json({ success: true as const, enabled }, 200); // projection-allow: the boolean preference the link holder just set
 });
 
 /** Registration order. Drives `UnsubscribeApi`; a test pins it to what `app` really registered. */

@@ -3,7 +3,7 @@
  * read side, which also has to drop an id left behind by an older build, and the PATCH merge, which must not
  * carry such an id forward.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { eq } from 'drizzle-orm';
 import prefsRoutes from '../../../server/api/inspection-prefs';
@@ -12,8 +12,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER = '00000000-0000-0000-0000-000000000002';
@@ -25,8 +25,7 @@ describe('inspection prefs - pinned tags that no longer exist', () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values([
             { id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: OTHER, slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
@@ -54,7 +53,7 @@ describe('inspection prefs - pinned tags that no longer exist', () => {
     }
 
     it('GET drops an id with no tag behind it, and an id that belongs to another company', async () => {
-        const res = await app().request('/', {}, { DB: {} });
+        const res = await app().request('/', {}, { DB: testD1.binding });
         expect(res.status).toBe(200);
         const body = await res.json() as { pinnedTagIds: string[] };
         expect(body.pinnedTagIds).toEqual(['live']);
@@ -65,7 +64,7 @@ describe('inspection prefs - pinned tags that no longer exist', () => {
             method: 'PATCH',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ autoAdvanceDelayMs: 300 }),
-        }, { DB: {} });
+        }, { DB: testD1.binding });
         expect(res.status).toBe(200);
         const stored = await testDb.select({ p: schema.tenantConfigs.inspectionPrefs }).from(schema.tenantConfigs)
             .where(eq(schema.tenantConfigs.tenantId, TENANT)).get();

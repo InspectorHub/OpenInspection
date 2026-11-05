@@ -127,6 +127,12 @@
         "name": "STRIPE_WEBHOOK_RATE_LIMITER",
         "namespace_id": "1003",
         "simple": { "limit": 300, "period": 60 }
+      },
+      {
+        "type": "ratelimit",
+        "name": "OAUTH_TOKEN_RATE_LIMITER",
+        "namespace_id": "1004",
+        "simple": { "limit": 120, "period": 60 }
       }
     ]
   }

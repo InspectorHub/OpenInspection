@@ -4,7 +4,6 @@
   "needsAttention": [
    {
     "id": "55555555-0000-4000-8000-000000000009",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "9 Fixture Road",
     "addressPlaceId": null,
@@ -29,7 +28,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -84,11 +82,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000007",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "7 Fixture Road",
     "addressPlaceId": null,
@@ -113,7 +112,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -210,11 +208,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000109",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "109 Fixture Road",
     "addressPlaceId": null,
@@ -239,7 +238,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -294,11 +292,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000124",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "124 Fixture Road",
     "addressPlaceId": null,
@@ -323,7 +322,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -378,11 +376,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000139",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "139 Fixture Road",
     "addressPlaceId": null,
@@ -407,7 +406,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -462,11 +460,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000154",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "154 Fixture Road",
     "addressPlaceId": null,
@@ -491,7 +490,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -546,11 +544,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000103",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "103 Fixture Road",
     "addressPlaceId": null,
@@ -575,7 +574,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -630,11 +628,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000118",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "118 Fixture Road",
     "addressPlaceId": null,
@@ -659,7 +658,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -714,11 +712,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000133",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "133 Fixture Road",
     "addressPlaceId": null,
@@ -743,7 +742,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -798,11 +796,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000148",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "148 Fixture Road",
     "addressPlaceId": null,
@@ -827,7 +826,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -882,11 +880,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000112",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "112 Fixture Road",
     "addressPlaceId": null,
@@ -911,7 +910,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -966,11 +964,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000127",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "127 Fixture Road",
     "addressPlaceId": null,
@@ -995,7 +994,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1050,11 +1048,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000142",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "142 Fixture Road",
     "addressPlaceId": null,
@@ -1079,7 +1078,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1134,11 +1132,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000002",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "2 Fixture Road",
     "addressPlaceId": null,
@@ -1163,7 +1162,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1260,13 +1258,14 @@
     },
     "agentName": "Bob Buyer",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "today": [
    {
     "id": "55555555-0000-4000-8000-000000000002",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "2 Fixture Road",
     "addressPlaceId": null,
@@ -1291,7 +1290,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1388,13 +1386,14 @@
     },
     "agentName": "Bob Buyer",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "thisWeek": [
    {
     "id": "55555555-0000-4000-8000-000000000004",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "4 Fixture Road",
     "addressPlaceId": null,
@@ -1419,7 +1418,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1516,11 +1514,12 @@
     },
     "agentName": "Lisa Listing",
     "inspectorName": "Ivan Inspector",
-    "siblingCount": 2
+    "siblingCount": 2,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000005",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000001",
     "propertyAddress": "5 Fixture Road",
     "addressPlaceId": null,
@@ -1545,7 +1544,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1600,13 +1598,14 @@
     },
     "agentName": null,
     "inspectorName": "Olive Owner",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "later": [
    {
     "id": "55555555-0000-4000-8000-000000000109",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "109 Fixture Road",
     "addressPlaceId": null,
@@ -1631,7 +1630,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1686,11 +1684,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000124",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "124 Fixture Road",
     "addressPlaceId": null,
@@ -1715,7 +1714,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1770,11 +1768,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000139",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "139 Fixture Road",
     "addressPlaceId": null,
@@ -1799,7 +1798,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1854,11 +1852,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000154",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "154 Fixture Road",
     "addressPlaceId": null,
@@ -1883,7 +1882,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -1938,11 +1936,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000103",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "103 Fixture Road",
     "addressPlaceId": null,
@@ -1967,7 +1966,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2022,11 +2020,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000118",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "118 Fixture Road",
     "addressPlaceId": null,
@@ -2051,7 +2050,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2106,11 +2104,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000133",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "133 Fixture Road",
     "addressPlaceId": null,
@@ -2135,7 +2134,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2190,11 +2188,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000148",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "148 Fixture Road",
     "addressPlaceId": null,
@@ -2219,7 +2218,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2274,11 +2272,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000112",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "112 Fixture Road",
     "addressPlaceId": null,
@@ -2303,7 +2302,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2358,11 +2356,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000127",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "127 Fixture Road",
     "addressPlaceId": null,
@@ -2387,7 +2386,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2442,11 +2440,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000142",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "142 Fixture Road",
     "addressPlaceId": null,
@@ -2471,7 +2470,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2526,11 +2524,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000106",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "106 Fixture Road",
     "addressPlaceId": null,
@@ -2555,7 +2554,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2610,11 +2608,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000121",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "121 Fixture Road",
     "addressPlaceId": null,
@@ -2639,7 +2638,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2694,11 +2692,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000136",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "136 Fixture Road",
     "addressPlaceId": null,
@@ -2723,7 +2722,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2778,11 +2776,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000151",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "151 Fixture Road",
     "addressPlaceId": null,
@@ -2807,7 +2806,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2862,11 +2860,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000100",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "100 Fixture Road",
     "addressPlaceId": null,
@@ -2891,7 +2890,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -2946,11 +2944,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000115",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "115 Fixture Road",
     "addressPlaceId": null,
@@ -2975,7 +2974,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -3030,11 +3028,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000130",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "130 Fixture Road",
     "addressPlaceId": null,
@@ -3059,7 +3058,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -3114,11 +3112,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000145",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "145 Fixture Road",
     "addressPlaceId": null,
@@ -3143,7 +3142,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -3198,14 +3196,15 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "laterTotal": 19,
   "recentReports": [
    {
     "id": "55555555-0000-4000-8000-000000000007",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "7 Fixture Road",
     "addressPlaceId": null,
@@ -3230,7 +3229,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -3327,13 +3325,14 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "cancelled": [
    {
     "id": "55555555-0000-4000-8000-000000000012",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "12 Fixture Road",
     "addressPlaceId": null,
@@ -3358,7 +3357,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -3413,11 +3411,12 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    },
    {
     "id": "55555555-0000-4000-8000-000000000006",
-    "tenantId": "11111111-0000-4000-8000-000000000001",
     "inspectorId": "22222222-0000-4000-8000-000000000002",
     "propertyAddress": "6 Fixture Road",
     "addressPlaceId": null,
@@ -3442,7 +3441,6 @@
     "agreementRequired": false,
     "autoSignOnPublish": false,
     "discountCodeId": null,
-    "discountAmount": null,
     "closingDate": null,
     "referralSource": null,
     "referenceNumber": null,
@@ -3497,7 +3495,9 @@
     },
     "agentName": null,
     "inspectorName": "Ivan Inspector",
-    "siblingCount": null
+    "siblingCount": null,
+    "publishedVersionNumber": null,
+    "editingAgain": false
    }
   ],
   "defectAggregate": {

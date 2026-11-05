@@ -6,10 +6,13 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { eq, and, desc } from 'drizzle-orm';
-import { agreements, tenantConfigs, invoices, inspections, esignAuditLogs } from '../../lib/db/schema';
+import { agreements, tenantConfigs, invoices, inspections } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { signingIntentProblem } from '../../lib/esign/signing-intent';
+import { presentationRowsOf, PRESENTATION_DEDUPE_WINDOW_MS } from '../../lib/esign/signer-presentations';
+import { drawingHash, DrawingSchema } from '../../lib/esign/drawing';
+import { refuseUnrecordedSignature, errorSummary, publicSignerStatus, resumeConfirmedSigning } from '../../lib/esign/claim-failure';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
@@ -136,7 +139,7 @@ const signAgreementRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        signatureBase64: z.string().min(1).describe('The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail'),
+                        signatureBase64: DrawingSchema.describe('The drawn signature as a base64-encoded image, optionally with a data:image/...;base64, prefix. It is stored on the signer record and a SHA-256 hash of the image bytes is written to the signing audit trail'),
                         onBehalfOf: z.string().max(200).optional().describe('Client name an authorized agent is signing on behalf of'),
                         onBehalfDisclaimer: z.string().max(2000).optional().describe('Authorized-agent disclaimer text shown at sign time'),
                     }).describe('The signature and, when signing for someone else, who for'),
@@ -153,9 +156,10 @@ const signAgreementRoute = createRoute(withMcpMetadata({
             },
             description: 'Signed',
         },
+        503: { description: 'The signing record could not be written; the signature was not stored. Retry.' },
     },
     operationId: "createBookingAgreementsSign",
-    description: "Record a remote signature for one signer of an agreement, identified by the token in their personal signing link. Public: the token is the only credential. The signature is refused with 400 unless the signing audit trail already shows this signer was presented this exact agreement text, which happens when they open it through the get-agreement route. It also writes a signer.signed entry to that trail with IP, country, user agent and a hash of the signature image, stores the signature, and fires the per-signature automation trigger. When this signature completes the envelope under its completion policy, the completion pipeline runs exactly once (audit entry, verification token, completion workflow, admin notification, completion automation and confirmation email). The signer is also emailed a receipt with a verification link, except when their signature completed the envelope and they are the envelope's client, who gets the completion email instead. A signer who declined or whose request expired gets 409, and an unknown token gets 404. Repeating the call for a signer who already signed does not change the stored signature, but it can still append another audit entry and resend the receipt.",
+    description: "Record a remote signature for one signer of an agreement, identified by the token in their personal signing link. Public: the token is the only credential. The signature is refused with 400 unless the signing audit trail already shows this signer was presented this exact agreement text, which happens when they open it through the get-agreement route. It also writes a signer.signed entry to that trail with IP, country, user agent and a hash of the signature image, stores the signature, and fires the per-signature automation trigger. When this signature completes the envelope under its completion policy, the completion pipeline runs exactly once (audit entry, verification token, completion workflow, admin notification, completion automation and confirmation email). The signer is also emailed a receipt with a verification link, except when their signature completed the envelope and they are the envelope's client, who gets the completion email instead. The drawing must be valid base64 image data, otherwise 400. A signer who declined or whose request has expired (the signature is not accepted on an expired envelope) gets 409, and so does a signer whose signature is still being recorded by another request: the answer is then to try again in a moment, and nothing is written. An unknown token gets 404. Repeating the call for a signer whose signing was confirmed answers 200: the stored signature is kept, no further audit entry is written and the receipt is not sent again, but if an earlier attempt stopped before the envelope was rolled forward, the repeat completes it, once. If the audit entry cannot be written the signature is refused with 503 and nothing is stored, so the signer can retry.",
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -183,7 +187,7 @@ const declineAgreementRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "declineBooking",
-    description: "Decline an agreement as one signer, identified by the token in their personal signing link. Public: the token is the only credential. Marks that signer declined, writes a signer.declined entry (with reason, IP, country and user agent) to the signing audit trail, and recomputes the envelope status under its completion policy. The agreement-declined automation fires only when the whole envelope ends up declined. A signer who already signed or whose request expired gets 409; declining again after a decline succeeds without further change to the signer's status. 404 for an unknown token."
+    description: "Decline an agreement as one signer, identified by the token in their personal signing link. Public: the token is the only credential. Marks that signer declined, writes a signer.declined entry (with reason, IP, country and user agent) to the signing audit trail, and recomputes the envelope status under its completion policy. The agreement-declined automation fires only when the whole envelope ends up declined. A signer who already signed or whose request expired gets 409, and so does a signer whose signature is still being recorded (a recording that stopped for more than two minutes no longer blocks a decline); declining again after a decline succeeds without further change to the signer's status. 404 for an unknown token."
 }, { scopes: ['write'], tier: 'extended' }));
 
 const agreementRoutes = createApiRouter()
@@ -227,11 +231,10 @@ const agreementRoutes = createApiRouter()
                 signerEmail: signer.email,
                 contentHash: snapshot.hash,
                 presentedAt: Date.now(),
-            });
+            }, { dedupe: { signerId: signer.id, match: { contentHash: snapshot.hash }, windowMs: PRESENTATION_DEDUPE_WINDOW_MS } });
         } catch (err) {
             logger.error('agreement presentation audit append failed',
-                { envelopeId: envelope.id, signerId: signer.id },
-                err instanceof Error ? err : undefined);
+                { envelopeId: envelope.id, signerId: signer.id, error: errorSummary(err) });
         }
 
         // Agreement name comes from the template row (display only, not content).
@@ -246,19 +249,19 @@ const agreementRoutes = createApiRouter()
             success: true as const,
             data: {
                 status: envelope.status as EnvelopeStatus,
-                envelopeId: envelope.id,
+                envelopeId: envelope.id, // projection-allow: the envelope id: the signer reached this page with the signer token, which is the capability
                 clientName: envelope.clientName ?? null,
-                agreementName: agreementRow?.name ?? 'Agreement',
-                agreementContent: snapshot.content,
+                agreementName: agreementRow?.name ?? 'Agreement', // projection-allow: the agreement name the signer is asked to sign, shown on the signing page
+                agreementContent: snapshot.content, // projection-allow: the agreement text the signer is asked to sign: the signer token is the capability and the signing page shows the text by design
                 signer: {
                     name: signer.name,
                     role: signer.role as SignerRole,
                     // Re-read this signer's status post-view (markViewedBySigner may
                     // have flipped it from sent → viewed).
-                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as EnvelopeStatus,
+                    status: publicSignerStatus(signers.find((s) => s.id === signer.id)?.status ?? signer.status), // projection-allow: the signer's own signing status, one of the envelope status strings
                 },
                 progress: { signed: signedCount, total: signers.length },
-                completionPolicy: envelope.completionPolicy as 'all' | 'one',
+                completionPolicy: envelope.completionPolicy as 'all' | 'one', // projection-allow: the completion policy, either all or one
             },
         }, 200);
     })
@@ -354,7 +357,7 @@ const agreementRoutes = createApiRouter()
                 // Never let a token-issuance problem block signing or paying —
                 // the page degrades to "no hub hand-off", not to a dead end.
                 logger.warn('checkout.portal-token.issue.failed', {
-                    requestId: envelope.id, signerId: signer.id, error: (e as Error).message,
+                    requestId: envelope.id, signerId: signer.id, error: errorSummary(e),
                 });
             }
         }
@@ -365,19 +368,19 @@ const agreementRoutes = createApiRouter()
                 signer: {
                     name: signer.name,
                     role: signer.role as SignerRole,
-                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as EnvelopeStatus,
+                    status: publicSignerStatus(signers.find((s) => s.id === signer.id)?.status ?? signer.status), // projection-allow: the signer's own signing status, one of the envelope status strings
                 },
                 agreement: {
                     name: agreementRow?.name ?? 'Agreement',
                     content: snapshot.content,
-                    contentHash: snapshot.hash,
+                    contentHash: snapshot.hash, // projection-allow: the hash of the agreement text the signer signed, shown on the signing confirmation
                 },
                 envelope: {
                     status: envelope.status as EnvelopeStatus,
-                    completionPolicy: envelope.completionPolicy as 'all' | 'one',
+                    completionPolicy: envelope.completionPolicy as 'all' | 'one', // projection-allow: the completion policy, either all or one
                     progress: { signed: signedCount, total: signers.length },
                 },
-                invoice: invoiceRow && invoiceStatus
+                invoice: invoiceRow && invoiceStatus // projection-allow: a literal of the invoice id, amounts, currency and status written on the next line, or null
                     ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, amountPaidCents: invoiceRow.amountPaidCents ?? null, currency: invoiceRow.currency, status: invoiceStatus }
                     : null,
                 payment: {
@@ -392,7 +395,7 @@ const agreementRoutes = createApiRouter()
                     companyName: branding?.companyName ?? 'OpenInspection',
                     primaryColor: branding?.primaryColor ?? null,
                 },
-                portalToken,
+                portalToken, // projection-allow: the portal link token (string or null): minted only for client and co-client signers, null for an agent signer, and returned to that signer
             },
         }, 200);
     })
@@ -406,6 +409,10 @@ const agreementRoutes = createApiRouter()
         if (!resolved) throw Errors.NotFound('Agreement request not found');
         const { signer, envelope } = resolved;
 
+        // A signer who already signed gets the same answer again; one who declined or whose link ended cannot sign. Nothing is written for either.
+        if (signer.status === 'signed') { await resumeConfirmedSigning(c, svc, signer, envelope); return c.json({ success: true as const }, 200); }
+        if (signer.status === 'declined' || signer.status === 'expired') throw Errors.Conflict('Agreement is no longer signable');
+
         // INTENT MUST COME FROM AN ACT. It is never inferred back
         // from the fact that a signature image exists. So before recording one,
         // the chain has to show this signer was presented THIS document.
@@ -416,14 +423,7 @@ const agreementRoutes = createApiRouter()
         // neither — an envelope predating content hashing has nothing to compare,
         // and refusing there would block a signature for a reason about our own
         // history rather than about the signer.
-        const intentLogs = await getDrizzle(c)
-            .select({ event: esignAuditLogs.event, payloadJson: esignAuditLogs.payloadJson })
-            .from(esignAuditLogs)
-            .where(and(
-                eq(esignAuditLogs.tenantId, envelope.tenantId),
-                eq(esignAuditLogs.requestId, envelope.id),
-            ))
-            .all();
+        const intentLogs = await presentationRowsOf(getDrizzle(c), envelope, signer.id);
         const intentProblem = signingIntentProblem({
             logs: intentLogs, signerId: signer.id, signedHash: envelope.contentHash ?? null,
         });
@@ -441,22 +441,16 @@ const agreementRoutes = createApiRouter()
         const country = c.req.header('cf-ipcountry') || null;
         const tsMs = Date.now();
 
-        // Spec 5H P0 — append the per-signer audit BEFORE flipping DB status so
-        // chain integrity survives a partial failure (audit-before-mutation).
-        // Hash the signature image for cert reference (full image stored in DB).
-        const sigBytes = (() => {
-            try {
-                const b64 = signatureBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-                const bin = atob(b64);
-                const out = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-                return out;
-            } catch { return new Uint8Array(); }
-        })();
-        const sigHash = sigBytes.length > 0
-            ? Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', sigBytes)))
-                .map((b) => b.toString(16).padStart(2, '0')).join('')
-            : null;
+        // The hash of the drawing the audit row names (the full image is stored on the signer row).
+        const sigHash = await drawingHash(signatureBase64);
+        // The state is decided FIRST (see claimSignedBySigner for the invariant and the one crash window); a request that lost writes nothing.
+        const claim = await svc.claimSignedBySigner(token, signatureBase64, {
+            signedAtMs: tsMs, channel: 'remote', ipAddress: ip, userAgent: ua,
+            onBehalfOf: onBehalfOf ?? null, onBehalfDisclaimer: onBehalfDisclaimer ?? null,
+            // Both surfaces this route serves render <AgreementLanguageDisclosure> (asserted by the containment spec).
+            languageDisclosureVersion: AGREEMENT_LANGUAGE_DISCLOSURE.version,
+        });
+        if (claim.kind === 'already_signed') { await resumeConfirmedSigning(c, svc, claim.signer, claim.envelope); return c.json({ success: true as const }, 200); }
         try {
             await c.var.services.auditLog.append(envelope.tenantId, envelope.id, 'signer.signed', {
                 envelopeId: envelope.id,
@@ -468,26 +462,15 @@ const agreementRoutes = createApiRouter()
                 onBehalfOf: onBehalfOf ?? null,
                 country,
                 ip,
-                signatureImageHash: sigHash ? `sha256:${sigHash}` : null,
+                signatureImageHash: sigHash,
                 tsMs,
                 ua,
-            });
+            }, sigHash ? { dedupe: { signerId: signer.id, match: { signatureImageHash: sigHash, tsMs } } } : {});
         } catch (e) {
-            logger.warn('audit.append.signer-signed.failed', { requestId: envelope.id, signerId: signer.id, error: (e as Error).message });
+            await refuseUnrecordedSignature(claim, { tenantId: envelope.tenantId, requestId: envelope.id, signerId: signer.id }, e);
         }
-
-        const result = await svc.markSignedBySigner(token, signatureBase64, {
-            signedAtMs: tsMs,
-            channel: 'remote',
-            ipAddress: ip,
-            userAgent: ua,
-            onBehalfOf: onBehalfOf ?? null,
-            onBehalfDisclaimer: onBehalfDisclaimer ?? null,
-            // The two surfaces this route serves — standalone sign page, checkout
-            // sign card — both render <AgreementLanguageDisclosure> (asserted by
-            // the containment spec), so this states a screen the signer saw.
-            languageDisclosureVersion: AGREEMENT_LANGUAGE_DISCLOSURE.version,
-        });
+        await claim.confirm();
+        const result = await svc.finishSignedBySigner(claim.signer, claim.envelope, tsMs);
 
         // Spec 2A — per-signer automation event so per-tenant rules can react to
         // each individual signature (fires on EVERY sign, not just completion).
@@ -543,27 +526,31 @@ const agreementRoutes = createApiRouter()
         if (!resolved) throw Errors.NotFound('Agreement request not found');
         const { signer, envelope } = resolved;
 
+        if (signer.status === 'declined') return c.json({ success: true as const }, 200);
+        if (signer.status === 'signed' || signer.status === 'expired') throw Errors.Conflict('Agreement cannot be declined');
+
         const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
         const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;
         const country = c.req.header('cf-ipcountry') || null;
 
-        // Per-signer audit append (audit-before-mutation, try/catch).
-        try {
-            await c.var.services.auditLog.append(envelope.tenantId, envelope.id, 'signer.declined', {
-                envelopeId: envelope.id,
-                signerId: signer.id,
-                signerEmail: signer.email,
-                reason: reason ?? null,
-                country,
-                ip,
-                tsMs: Date.now(),
-                ua,
-            });
-        } catch (e) {
-            logger.warn('audit.append.signer-declined.failed', { requestId: envelope.id, signerId: signer.id, error: (e as Error).message });
-        }
-
+        // State first (one conditional update), then the event. A decline stores no signature, so a failed append is logged, not refused.
         const r = await svc.markDeclinedBySigner(token, reason);
+        if (r.declinedNow) {
+            try {
+                await c.var.services.auditLog.append(envelope.tenantId, envelope.id, 'signer.declined', {
+                    envelopeId: envelope.id,
+                    signerId: signer.id,
+                    signerEmail: signer.email,
+                    reason: reason ?? null,
+                    country,
+                    ip,
+                    tsMs: Date.now(),
+                    ua,
+                }, { dedupe: { signerId: signer.id } });
+            } catch (e) {
+                logger.error('audit.append.signer-declined.failed', { tenantId: envelope.tenantId, requestId: envelope.id, signerId: signer.id, error: errorSummary(e) });
+            }
+        }
 
         // Envelope-level automation fires ONLY when the WHOLE envelope declined.
         if (r.inspectionId && r.envelopeStatus === 'declined') {

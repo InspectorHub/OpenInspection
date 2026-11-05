@@ -8,6 +8,7 @@ import { getBookingHost } from './url';
 import { buildSignUrl } from './signature-helpers';
 import { logger } from './logger';
 import { AppError } from './errors';
+import { isLiveSigning } from '../services/agreement/base';
 
 /**
  * IA-65 — email every signer on an envelope their own signing link.
@@ -56,14 +57,14 @@ export async function emailSignersTheirLinks(
          * inputs to the same footer.
          */
         senderSignature: SignatureUser | undefined;
-        signers: Array<{ id: string; name: string | null; email: string; status: string }>;
+        signers: Array<{ id: string; name: string | null; email: string; status: string; signedAt?: Date | null }>;
     },
 ): Promise<void> {
     const host = getBookingHost(c);
     const db = getDrizzle(c);
 
     for (const s of opts.signers) {
-        if (['signed', 'declined', 'expired'].includes(s.status)) continue;
+        if (['signed', 'declined', 'expired'].includes(s.status) || isLiveSigning(s)) continue;
 
         let signUrl: string;
         try {

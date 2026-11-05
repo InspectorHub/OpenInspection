@@ -17,7 +17,7 @@ import { Errors } from '../../lib/errors';
  * get-then-delete-before-use on redeem.
  */
 
-const MAGIC_LOGIN_KV_PREFIX = 'agent_ml:';
+export const MAGIC_LOGIN_KV_PREFIX = 'agent_ml:';
 const MAGIC_LOGIN_TTL_SECONDS = 900;
 
 interface MagicLoginKvPayload {

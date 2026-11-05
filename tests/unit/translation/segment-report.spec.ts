@@ -19,12 +19,12 @@
  * same call yielding a finding's own prose. Two failures look identical to a
  * reader and only one of them is real; the pair is what tells them apart.
  */
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { InspectionReportService } from '../../../server/services/inspection/inspection-report.service';
@@ -85,7 +85,7 @@ let payload: any;
 beforeAll(async () => {
     const { sqlite, db } = createTestDb();
     await setupSchema(sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'seg-tenant', status: 'active',
@@ -137,7 +137,7 @@ beforeAll(async () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
-    const service = new InspectionReportService({} as unknown as D1Database);
+    const service = new InspectionReportService(testD1.binding);
     payload = await service.getReportData(INSPECTION, TENANT, (k) => k);
 });
 

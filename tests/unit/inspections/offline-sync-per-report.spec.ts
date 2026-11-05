@@ -152,6 +152,28 @@ describe('offline field sync writes to the primary report, not to whichever resu
         expect(sewer['item-1'].photos.map((p) => p.key)).toEqual(['sewer-a.jpg', 'sewer-b.jpg']);
     });
 
+    it('removes the photo from the report but keeps the stored file when a published version shows it', async () => {
+        await seedResults();
+        await db.insert(schema.reportVersions).values({
+            id: 'rv-sync', tenantId: TENANT_ID, inspectionId: INSP_ID, reportId: PRIMARY_REPORT, versionNumber: 1,
+            publishedAt: new Date(), publishedBy: 'u-1',
+            snapshotJson: JSON.stringify({ data: photoRow('primary'), units: [] }),
+        });
+        const del = vi.fn(async () => undefined);
+        const env = { DB: {}, PHOTOS: { delete: del } } as unknown as HonoConfig['Bindings'];
+
+        // photo 0 is in the published version: the working copy drops it, the file stays.
+        expect((await buildApp(db).request(`/${INSP_ID}/items/item-1/photos/0`, { method: 'DELETE' }, env)).status).toBe(200);
+        expect(del).not.toHaveBeenCalled();
+        const primary = (await readRow('res-primary'))?.data as Record<string, { photos: { key: string }[] }>;
+        expect(primary['item-1'].photos.map((p) => p.key)).toEqual(['primary-b.jpg']);
+
+        // Control: a photo added after the publish is deleted for real.
+        await db.update(inspectionResults).set({ data: { 'item-1': { photos: [{ key: 'added-later.jpg' }] } } as never }).where(eq(inspectionResults.id, 'res-primary'));
+        expect((await buildApp(db).request(`/${INSP_ID}/items/item-1/photos/0`, { method: 'DELETE' }, env)).status).toBe(200);
+        expect(del).toHaveBeenCalledWith('added-later.jpg');
+    });
+
     it('binds a results row it has to create to the primary report', async () => {
         // No results rows yet — the first thing to reach the server is the
         // signature. The row it creates used to carry a NULL report_id, which

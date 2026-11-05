@@ -46,7 +46,7 @@ async function authorize(c: Context<HonoConfig>, opts: { inspection: boolean }):
 }
 
 const refuse = (c: Context<HonoConfig>, f: UploadFailure): Response =>
-    c.json({ error: f.error, code: f.code, ...f.extra }, f.status);
+    c.json({ error: f.error, code: f.code, ...f.extra }, f.status); // projection-allow: UploadFailure is a closed union of literal error, code and limits
 
 export const videoChunkedRoutes = new Hono<HonoConfig>()
     .post('/', async (c) => {
@@ -55,7 +55,7 @@ export const videoChunkedRoutes = new Hono<HonoConfig>()
         const body = OpenChunkedVideoUploadSchema.safeParse(await c.req.json().catch(() => null));
         if (!body.success) return c.json({ error: 'totalBytes must be a positive integer.', code: 'VALIDATION_ERROR' }, 400);
         const opened = await createOrResume(getDrizzle(c), scope, body.data.totalBytes);
-        return opened.ok ? c.json({ success: true, data: opened.session }, 200) : refuse(c, opened);
+        return opened.ok ? c.json({ success: true, data: opened.session }, 200) : refuse(c, opened); // projection-allow: the resumable upload session: ids, byte counts and state
     })
     .put('/parts/:n', async (c) => {
         const scope = await authorize(c, { inspection: false });

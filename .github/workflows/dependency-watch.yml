@@ -1,0 +1,53 @@
+name: "Dependency watch"
+
+# A weekly look at whether the tools that hold an older minimatch (see docs/develop/dependency-policy.md) now accept a patched one.
+# scripts/check-minimatch-upstream.mjs reads package-lock.json and asks https://registry.npmjs.org; it needs no install and no secrets.
+# Exit codes: 0 not ready (green); 10 READY (every holder admits a patched minimatch) and 11 DONE (no holder remains) fail this run
+# with an ::error:: annotation and a summary line, which is the signal to try the upgrade, remove the nested overrides and close the
+# alert; 2 means the watch itself failed; any other code (including 1, a crash of the runtime) is reported as an error, not as the signal.
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  minimatch-upstream:
+    name: minimatch upstream watch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22.22.x }
+      - name: Check whether every holder admits a patched minimatch
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-minimatch-upstream.mjs 2>&1 | tee "$RUNNER_TEMP/watch.txt"
+          code=${PIPESTATUS[0]}
+          set -e
+          last=$(tail -n 1 "$RUNNER_TEMP/watch.txt")
+          case "$code" in
+            0)
+              echo "Not ready: $last" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            10|11)
+              echo "::error::minimatch upstream watch: $last"
+              echo "Signal ($code): $last" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+            2)
+              echo "::error::the minimatch upstream watch itself failed: $last"
+              echo "Watch error: $last" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+            *)
+              echo "::error::the minimatch upstream watch exited with unexpected code $code (not a signal): $last"
+              echo "Unexpected exit code $code: $last" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+          esac

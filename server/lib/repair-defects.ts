@@ -48,6 +48,7 @@ export interface InspectionSvcForDefects {
     getRepairList(
         inspectionId: string,
         tenantId: string,
+        versionNumber?: number,
     ): Promise<{
         defects: Array<{
             sectionId:        string;
@@ -83,8 +84,10 @@ export async function flattenReportDefects(
     inspectionSvc: InspectionSvcForDefects,
     inspectionId:  string,
     tenantId:      string,
+    /** The published version the list is read at; absent reads the inspector's working copy. */
+    versionNumber?: number,
 ): Promise<RepairDefect[]> {
-    const { defects } = await inspectionSvc.getRepairList(inspectionId, tenantId);
+    const { defects } = await inspectionSvc.getRepairList(inspectionId, tenantId, versionNumber);
 
     const seen = new Map<string, number>();
 
@@ -108,4 +111,18 @@ export async function flattenReportDefects(
             trade:        d.trade,
         };
     });
+}
+
+/**
+ * The defect list of the PUBLISHED report, as frozen: a client building a repair request sees the findings of
+ * the version they were sent, not the inspector's working copy. Without a published version it is the report as it is.
+ */
+export async function flattenPublishedDefects(
+    inspectionSvc: InspectionSvcForDefects,
+    versions: { getLatestPublished(tenantId: string, inspectionId: string): Promise<{ versionNumber: number } | null> },
+    inspectionId:  string,
+    tenantId:      string,
+): Promise<RepairDefect[]> {
+    const published = await versions.getLatestPublished(tenantId, inspectionId);
+    return flattenReportDefects(inspectionSvc, inspectionId, tenantId, published?.versionNumber);
 }

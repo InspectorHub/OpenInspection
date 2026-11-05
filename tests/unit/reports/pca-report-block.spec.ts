@@ -24,8 +24,9 @@ describe('buildPcaReportBlock — commercial gate', () => {
     expect(buildPcaReportBlock({ sections })).toBeNull();
   });
 
-  it('returns null for any non-commercial value (multi_family)', () => {
-    expect(buildPcaReportBlock({ propertyType: 'multi_family', sections })).toBeNull();
+  it('returns null for any non-commercial value (multi_unit, and a value no list knows)', () => {
+    expect(buildPcaReportBlock({ propertyType: 'multi_unit', sections })).toBeNull();
+    expect(buildPcaReportBlock({ propertyType: 'not-a-known-type', sections })).toBeNull();
   });
 
   it('assembles the full skeleton block for a commercial report', () => {

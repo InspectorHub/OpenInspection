@@ -1,3 +1,4 @@
+import { checkRateLimit } from '../../lib/rate-limit';
 import { createRoute, z } from '@hono/zod-openapi';
 import { eq, and } from 'drizzle-orm';
 import { agreementRequests, inspections, reportVersions } from '../../lib/db/schema';
@@ -10,6 +11,7 @@ import { buildRenderReportUrl } from '../../lib/public-urls';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { isReportPublished } from '../../lib/status/report-status';
 import { getDrizzle } from '../../lib/route-helpers';
+import { resolveTurnstileSiteKey } from '../../lib/middleware/bot-protection';
 
 // Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'
 // loadVerifyData; this is the base JSON route the verify page consumes.
@@ -42,6 +44,8 @@ const VerifyResponseSchema = z.object({
     // rather than the raw versions: the rule is about the record's ability to
     // support a claim, and a public page must not be the place it is re-derived.
     languageDisclosureCurrent: z.boolean(),
+    // The public site key of the bot challenge the signed export request carries; null where the deployment does not challenge.
+    turnstileSiteKey: z.string().nullable().describe('Site key of the bot challenge on the export request, or null where there is none.'),
 });
 
 const verifyRoute = createRoute(withMcpMetadata({
@@ -145,37 +149,42 @@ const verifyByTokenRoute = createRoute(withMcpMetadata({
 const app = createApiRouter();
 app.openapi(verifyRoute, async (c) => {
     const { envelopeId } = c.req.valid('param');
+    // Each call re-verifies the whole chain, so an anonymous caller is counted per network (the key and document links are, too).
+    await checkRateLimit(c, 'verify-public');
     const data = await loadVerifyData(c, envelopeId);
     if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
     return c.json({
         success: true as const,
         data: {
-            envelopeId,
-            documentTitle: data.agreement?.name ?? null,
-            clientName: data.reqRow.clientName,
-            // clientEmail deliberately NOT exposed — this is a public, no-auth
-            // endpoint; the signer roster below is email-free for the same reason.
-            chainValid: data.verify.valid,
-            chainReason: data.verify.valid ? null : (data.verify.reason as string),
-            keyFingerprint: data.pubKey?.fingerprint ?? null,
+            envelopeId, // projection-allow: the envelope id the public verifier was asked about, echoed back
+            documentTitle: data.agreement?.name ?? null, // projection-allow: the agreement name shown on the public verifier page
+            clientName: data.reqRow.clientName, // projection-allow: the client name on the envelope: the verifier link (the envelope id) is the capability and the verifier page shows the name by design
+            // This verification route and the signer roster below carry no email. The signed export (which does record the emails given
+            // at signing) is a separate route, released after a knowledge check; see ./verify-export.
+            chainValid: data.verify.valid, // projection-allow: a boolean: whether the signed audit chain verifies
+            chainReason: data.verify.valid ? null : (data.verify.reason as string), // projection-allow: one of six codes (not_found, chain, hash, key_mismatch, signature, no_key) or null
+            keyFingerprint: data.pubKey?.fingerprint ?? null, // projection-allow: the public signing key fingerprint, public by design (anyone verifies a signature with it)
             keyAlgorithm: 'Ed25519',
             eventCount: data.auditRows.length,
-            contentSnapshot: data.reqRow.contentSnapshot ?? null,
-            contentHash: data.reqRow.contentHash ?? null,
+            contentSnapshot: data.reqRow.contentSnapshot ?? null, // projection-allow: the signed agreement text: the verifier link (the envelope id) is the capability and the verifier page shows the text by design
+            contentHash: data.reqRow.contentHash ?? null, // projection-allow: the hash of the signed text, the value the verifier page compares
+            // projection-allow: the public roster by design: name, role, status, signing time and channel of each signer (never an email address)
             signers: data.signers.map((s) => ({
                 name: s.name,
                 role: s.role,
-                status: s.status,
-                signedAt: s.signedAt ? new Date(s.signedAt).toISOString() : null,
+                // A signature still being recorded is not a signature: the roster shows it as viewed, with no signing time.
+                status: s.status === 'signing' ? 'viewed' : s.status,
+                signedAt: s.signedAt && s.status !== 'signing' ? new Date(s.signedAt).toISOString() : null,
                 channel: s.channel ?? null,
             })),
             // SIGNED signers only. A pending signer has been shown nothing
             // and recorded nothing; counting it would suppress the notice on
             // a document whose actual signatories all saw it.
-            languageDisclosureCurrent: signaturesRecordCurrentDisclosure(
+            languageDisclosureCurrent: signaturesRecordCurrentDisclosure( // projection-allow: a boolean: whether the signatures record the current disclosure
                 data.signers.filter((s) => s.status === 'signed')
                     .map((s) => s.languageDisclosureVersion),
             ),
+            turnstileSiteKey: resolveTurnstileSiteKey(c.env), // projection-allow: the public widget site key the verifier page needs to render the bot check of the export request
         },
     }, 200);
 });
@@ -183,18 +192,19 @@ app.openapi(reportVerifyRoute, async (c) => {
     const { token } = c.req.valid('param');
     const data = await loadReportVerifyData(c, token);
     if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Token not found' } }, 404);
+    const proof = data.verify;
     return c.json({ success: true as const, data: {
-        versionNumber: data.verify.versionNumber,
-        isAmendment:   data.verify.isAmendment,
-        publishedAt:   data.verify.publishedAt,
-        contentHash:   data.verify.contentHash,
-        keyFingerprint: data.verify.keyFingerprint,
+        versionNumber: proof.versionNumber,
+        isAmendment:   proof.isAmendment,
+        publishedAt:   proof.publishedAt,
+        contentHash:   proof.contentHash,
+        keyFingerprint: proof.keyFingerprint,
         keyAlgorithm:  'Ed25519',
-        legacy:        data.verify.legacy,
-        hashValid:     data.verify.hashValid,
-        signatureValid: data.verify.signatureValid,
-        keyMissing:    data.verify.keyMissing,
-        chainValid:    data.verify.chainValid,
+        legacy:        proof.legacy,
+        hashValid:     proof.hashValid,
+        signatureValid: proof.signatureValid,
+        keyMissing:    proof.keyMissing,
+        chainValid:    proof.chainValid,
         propertyAddressMasked: data.propertyAddressMasked,
         notPublished: data.notPublished,
         tenantSlug: data.tenantSlug,
@@ -253,7 +263,7 @@ app.openapi(reportVerifyPdfRoute, async (c) => {
 
     // Use contentHash from the snapshot row if available; fall back to live hash
     // so even legacy rows (no contentHash) get a rendered PDF.
-    const hash = contentHash ?? await c.var.services.inspection.getReportContentHash(inspectionId, tenantId);
+    const hash = contentHash ?? await c.var.services.inspection.getReportContentHash(inspectionId, tenantId, undefined, null, versionNumber);
     const footer = await c.var.services.inspection.getReportPdfFooterContext(inspectionId, tenantId);
 
     const record = await c.var.services.reportPdf.getOrRender(inspectionId, tenantId, 'full', {
@@ -278,6 +288,7 @@ app.openapi(verifyByTokenRoute, async (c) => {
         .where(eq(agreementRequests.verificationToken, token))
         .get();
     if (!row) return c.json({ success: false as const, error: { message: 'Not found', code: 'NOT_FOUND' } }, 404);
+    // projection-allow: the envelope id the verification token resolved to, which the verify page links to
     return c.json({ success: true as const, data: { envelopeId: row.id } }, 200);
 });
 

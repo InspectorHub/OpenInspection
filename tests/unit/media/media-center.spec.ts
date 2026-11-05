@@ -7,8 +7,8 @@ import { MAX_PHOTO_BYTES } from '../../../server/lib/media/store-photo';
 import { AVIF_BYTES, EXE_BYTES, HEIC_BYTES, HTML_BYTES, JPEG_BYTES, PNG_BYTES, SVG_BYTES, WEBP_BYTES, ZIP_BYTES } from '../helpers/media-bytes';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000099';
 const INSPECTION_ID = '11111111-1111-1111-1111-111111111111';
@@ -40,13 +40,12 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         const fixture = createTestDb();
         testDb = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         // Wire a ScopedDB over the same fixture db so this.photo's tenant-scoped
         // reads/writes resolve (mirrors the DI-provided sdb in production).
         const sdb = new ScopedDB(testDb as unknown as DrizzleDB, TENANT);
         // Cast r2Mock to the R2Bucket shape we use (put/delete only).
-        svc = new InspectionService({} as D1Database, r2Mock as unknown as R2Bucket, sdb);
+        svc = new InspectionService(testD1.binding, r2Mock as unknown as R2Bucket, sdb);
         r2Mock.put.mockClear();
         r2Mock.delete.mockClear();
 
@@ -104,7 +103,6 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
             id:            'res-1',
             tenantId:      TENANT,
             inspectionId:  INSPECTION_ID,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             data:          {
                 'item-cover': {
                     photos: [
@@ -229,7 +227,6 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
                 tenantId:     TENANT,
                 inspectionId: INSPECTION_ID,
                 reportId:     'report-standard',
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 data:         {
                     'item-cover': { photos: [{ key: 'k-cover-1' }, { key: 'k-cover-2' }] },
                     'item-panel': { photos: [{ key: 'k-panel-1' }] },
@@ -267,6 +264,24 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
         const after = await svc.getMediaCenter(INSPECTION_ID, TENANT);
         expect(after.pool).toHaveLength(0);
         expect(r2Mock.delete).toHaveBeenCalledWith(pool.key);
+    });
+
+    it('deletePoolPhoto refuses a photo a published version shows, and keeps both the row and the file', async () => {
+        const pool = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([JPEG_BYTES], 'r.jpg', { type: 'image/jpeg' }));
+        await testDb.insert(schema.reportVersions).values({
+            id: 'rv-pool', tenantId: TENANT, inspectionId: INSPECTION_ID, versionNumber: 1, publishedAt: new Date(), publishedBy: 'u',
+            snapshotJson: JSON.stringify({ data: { item: { photos: [{ key: pool.key }] } }, units: [] }),
+        });
+        r2Mock.delete.mockClear();
+
+        await expect(svc.deletePoolPhoto(INSPECTION_ID, TENANT, pool.id)).rejects.toMatchObject({ status: 409 });
+        expect((await svc.getMediaCenter(INSPECTION_ID, TENANT)).pool).toHaveLength(1);
+        expect(r2Mock.delete).not.toHaveBeenCalled();
+
+        // Control: a pool photo no version names is deleted as before.
+        const other = await svc.uploadPoolPhoto(INSPECTION_ID, TENANT, new File([JPEG_BYTES], 'o.jpg', { type: 'image/jpeg' }));
+        await svc.deletePoolPhoto(INSPECTION_ID, TENANT, other.id);
+        expect(r2Mock.delete).toHaveBeenCalledWith(other.key);
     });
 
     it('tenant isolation — pool rows for another tenant are invisible to attach/list/delete', async () => {

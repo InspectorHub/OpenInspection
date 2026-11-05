@@ -324,13 +324,13 @@ export async function fulfillBooking(
         success: true,
         data: {
             success: true,
-            inspectionId,
-            requestId: createdRequestId,
-            inspectionIds: allInspectionIds,
+            inspectionId, // projection-allow: the id of the inspection just created
+            requestId: createdRequestId, // projection-allow: the id of the request just created, returned to the client who booked it
+            inspectionIds: allInspectionIds, // projection-allow: the ids of the inspections just created, returned to the client who booked them
             // What is OWED, not what has been collected — nothing has, at this
             // point. The confirmation step reads this to decide whether to ask
             // for a card at all; 0 means no payment step is rendered.
-            depositRequiredCents,
+            depositRequiredCents, // projection-allow: the deposit owed in cents, a number the confirmation step reads to decide whether to ask for a card
         }
     }, 200);
 }

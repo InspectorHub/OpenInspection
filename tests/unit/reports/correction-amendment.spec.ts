@@ -35,8 +35,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { ReportVersionService } from '../../../server/services/report-version.service';
 import { correctReport } from '../../../server/services/report-correction.service';
@@ -104,7 +104,7 @@ describe('a signed report is corrected by amendment', () => {
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -135,11 +135,11 @@ describe('a signed report is corrected by amendment', () => {
             },
         ]);
 
-        svc = new ReportVersionService({} as D1Database, SECRET);
+        svc = new ReportVersionService(testD1.binding, SECRET, []);
     });
 
     const correct = (extra: Record<string, unknown> = {}) =>
-        correctReport({} as D1Database, SECRET, { ...CORRECTION, ...extra });
+        correctReport(testD1.binding, SECRET, { ...CORRECTION, ...extra });
 
     it('publishes a new version and never mutates the one already delivered', async () => {
         await svc.snapshotOnPublish(TENANT, INSPECTION, ACTOR);
@@ -176,7 +176,7 @@ describe('a signed report is corrected by amendment', () => {
 
     it.each(HELPERS)('serves the superseded %s as historical, not as current', async (_file, download) => {
         await correct();
-        const res = await download({} as D1Database, r2Stub(), ENVELOPE, TENANT);
+        const res = await download(testD1.binding, r2Stub(), ENVELOPE, TENANT);
         // Positive control: still retrievable. The old artefact remains
         // available as evidence; what changes is what it claims to be.
         expect(res.status).toBe(200);
@@ -186,13 +186,13 @@ describe('a signed report is corrected by amendment', () => {
     it.each(HELPERS)('labels an uncorrected %s `current`, not merely unlabelled', async (_file, download) => {
         // The control for the block above. Without it, deleting the header
         // entirely would still satisfy "is not current".
-        const res = await download({} as D1Database, r2Stub(), UNCORRECTED, TENANT);
+        const res = await download(testD1.binding, r2Stub(), UNCORRECTED, TENANT);
         expect(res.status).toBe(200);
         expect(res.headers.get('x-artifact-status')).toBe('current');
     });
 
     it.each(HELPERS)('gives no cache a window in which %s can keep the old answer', async (_file, download) => {
-        const fresh = await download({} as D1Database, r2Stub(), UNCORRECTED, TENANT);
+        const fresh = await download(testD1.binding, r2Stub(), UNCORRECTED, TENANT);
         const cache = fresh.headers.get('cache-control') ?? '';
         // A status header is a claim about right now. `max-age=300` let a
         // response fetched before a correction go on claiming `current` for
@@ -202,7 +202,7 @@ describe('a signed report is corrected by amendment', () => {
         expect(cache).toContain('private');
 
         await correct();
-        const stale = await download({} as D1Database, r2Stub(), ENVELOPE, TENANT);
+        const stale = await download(testD1.binding, r2Stub(), ENVELOPE, TENANT);
         expect(stale.headers.get('cache-control') ?? '').toMatch(/no-store/);
     });
 

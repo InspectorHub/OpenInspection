@@ -1,8 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { createTestDb, setupSchema } from '../db';
-import { asD1Db, asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asD1Db, asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { ContactService } from '../../../server/services/contact.service';
@@ -14,7 +13,8 @@ import { ALL_INSPECTIONS, type InspectionScope } from '../../../server/lib/inspe
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const rp = (key: string) => `crp_${TENANT}_${key}`;
 const A: InspectionScope = { kind: 'assigned', userId: USERS.inspA };
@@ -28,18 +28,18 @@ describe('contact reads honour the scope', () => {
     let svc: ContactService;
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
         await seedRoleProfiles(asD1Db(db), TENANT, new Date(1));
         await db.insert(schema.contacts).values(CONTACTS.map(id => ({
             id, tenantId: TENANT, type: 'client' as const, name: `Name ${id}`, email: `${id}@example.test`, createdAt: new Date(),
             createdByUserId: id === 'c-mine' ? USERS.inspA : null,
         })));
-        const people = new PeopleService({ DB: {} as D1Database });
+        const people = new PeopleService({ DB: testD1.binding });
         await people.addPerson(TENANT, INSP.own, 'c-own', rp('client'));
         await people.addPerson(TENANT, INSP.other, 'c-other', rp('client'));
         await people.addPerson(TENANT, INSP.own, 'c-both', rp('client'));
         await people.addPerson(TENANT, INSP.other, 'c-both', rp('buyer_agent'));
-        svc = new ContactService({} as D1Database);
+        svc = new ContactService(testD1.binding);
     });
     const list = async (scope: InspectionScope, extra: { search?: string; type?: 'client' | 'agent' } = {}) =>
         (await svc.listContacts(TENANT, { limit: 50, offset: 0, ...extra }, scope));
@@ -88,7 +88,7 @@ describe('contact reads honour the scope', () => {
                 { inspectionId: INSP.other, propertyAddress: 'b', role: 'client', createdAt: 2 },
             ],
         } as unknown as import('../../../server/services/portal-access.service').PortalAccessService;
-        const withAccess = new ContactService({} as D1Database, portalAccess);
+        const withAccess = new ContactService(testD1.binding, portalAccess);
         expect((await withAccess.listAccess('c-both', TENANT, A))?.map(a => a.inspectionId)).toEqual([INSP.own]);
         expect((await withAccess.listAccess('c-both', TENANT, ALL_INSPECTIONS))?.map(a => a.inspectionId).sort()).toEqual([INSP.other, INSP.own].sort());
     });
@@ -111,7 +111,7 @@ describe('contact reads honour the scope', () => {
             return app;
         }
         const get = async (userId: string, role: 'owner' | 'manager' | 'inspector', p: string) => {
-            const res = await build(userId, role).request(p, {}, { DB: {} });
+            const res = await build(userId, role).request(p, {}, { DB: testD1.binding });
             return { status: res.status, body: await res.json() as { data?: unknown } };
         };
         it('GET /api/contacts', async () => {

@@ -1,12 +1,12 @@
 // tests/unit/reports/cost-item-service.spec.ts
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { CostItemService } from '../../../server/services/cost-item.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000c1';
 const INSPECTION = '11111111-1111-1111-1111-1111111111c1';
@@ -19,9 +19,8 @@ describe('CostItemService', () => {
     const fixture = createTestDb();
     testDb = fixture.db;
     await setupSchema(fixture.sqlite);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(testDb);
-    svc = new CostItemService({} as D1Database);
+    testD1.use(testDb);
+    svc = new CostItemService(testD1.binding);
   });
 
   it('creates and lists items by inspection in sortOrder, tenant-scoped', async () => {

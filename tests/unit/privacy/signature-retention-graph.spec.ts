@@ -10,7 +10,7 @@
  *
  * The one thing that must NOT go is `esign_audit_logs`. It is hash-chained, so
  * removing any row breaks verification for every row after it, and it is the
- * minimal PII-light record that deliberately survives even final destruction.
+ * signed record that deliberately survives even final destruction (it still holds the personal data recorded at each event, such as signer emails and device addresses).
  * The sweep already treats that as a hard rule; a test pins it here because a
  * change that widened this pass to "delete everything about the envelope" would
  * otherwise look like tidying up.

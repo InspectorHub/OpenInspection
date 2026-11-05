@@ -13,6 +13,7 @@ const collabRestructure = vi.fn();
 const templateGet = vi.fn();
 const templatePut = vi.fn();
 const signoffPost = vi.fn();
+const editAgainPost = vi.fn();
 /** Call order across endpoints — the whole point of the auto-sign specs. */
 const calls: string[] = [];
 
@@ -25,6 +26,7 @@ vi.mock('~/lib/api-client.server', () => ({
             ':id': {
                 complete: { $post: completePost },
                 publish: { $post: publishPost },
+                'edit-again': { $post: editAgainPost },
                 $patch: inspectionPatch,
                 units: { $post: unitsPost },
                 'template-snapshot': { $patch: snapshotPatch },
@@ -191,6 +193,24 @@ describe('editor action — the revision reason travels with the publish', () =>
             param: { id: 'insp-1' },
             json: { summary: 'Reworded the summary.' },
         });
+    });
+
+    it('carries the version a publish found unchanged back to the dialog, and nothing for a real publish', async () => {
+        publishPost.mockResolvedValue(new Response(JSON.stringify({ success: true, data: { unchangedSinceVersion: 3 } }), { status: 200 }));
+        expect(await post({ intent: 'publish' })).toEqual({ ok: true, intent: 'publish', unchangedSinceVersion: 3 });
+        publishPost.mockResolvedValue(new Response(JSON.stringify({ success: true, data: { reportUrl: '/r' } }), { status: 200 }));
+        expect(await post({ intent: 'publish' })).toEqual({ ok: true, intent: 'publish' });
+        publishPost.mockResolvedValue(new Response(null, { status: 200 }));
+        expect(await post({ intent: 'publish' })).toEqual({ ok: true, intent: 'publish' });
+    });
+
+    it('forwards notifyClient only when the form says "true"', async () => {
+        await post({ intent: 'publish', notifyClient: 'true' });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: 'insp-1' }, json: { notifyClient: true } });
+        await post({ intent: 'publish', notifyClient: 'false' });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: 'insp-1' }, json: {} });
+        await post({ intent: 'publish' });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: 'insp-1' }, json: {} });
     });
 
     it('still orders the auto-sign write before the publish that carries a reason', async () => {
@@ -506,5 +526,26 @@ describe('editor action - compliance sign-off names a person only when one is ty
         const res = await post({ intent: 'compliance-signoff', role: 'owner' });
         expect(res).toMatchObject({ ok: false, intent: 'compliance-signoff' });
         expect(signoffPost).not.toHaveBeenCalled();
+    });
+});
+
+describe('editor action - edit-again', () => {
+    beforeEach(() => { editAgainPost.mockReset(); });
+
+    it('posts to the edit-again route for this inspection and answers ok', async () => {
+        editAgainPost.mockResolvedValue(new Response(null, { status: 200 }));
+        const res = await post({ intent: 'edit-again' });
+        expect(editAgainPost).toHaveBeenCalledWith({ param: { id: 'insp-1' }, json: {} });
+        expect(res).toEqual({ ok: true, intent: 'edit-again' });
+    });
+
+    it('carries the server refusal message back so the banner can show it', async () => {
+        editAgainPost.mockResolvedValue(new Response(JSON.stringify({ error: { message: 'Report is not published.' } }), { status: 400 }));
+        expect(await post({ intent: 'edit-again' })).toMatchObject({ ok: false, intent: 'edit-again', error: 'Report is not published.' });
+    });
+
+    it('control: a refusal with no readable body carries a generic message', async () => {
+        editAgainPost.mockResolvedValue(new Response(null, { status: 500 }));
+        expect(await post({ intent: 'edit-again' })).toMatchObject({ ok: false, error: expect.stringMatching(/editing/i) });
     });
 });

@@ -32,7 +32,8 @@ import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER = '00000000-0000-0000-0000-0000000000ff';
@@ -69,8 +70,7 @@ describe('tenant purge — KV share tokens', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -84,7 +84,7 @@ describe('tenant purge — KV share tokens', () => {
             [`agent_view_token:${mine[1]}`]: `i-2:${TENANT}`,
         });
 
-        await new TenantPurgeService({} as D1Database, makeR2(), kv.ns).purge(TENANT);
+        await new TenantPurgeService(testD1.binding, makeR2(), kv.ns).purge(TENANT);
 
         expect(kv.store.has(`agent_view_token:${mine[0]}`)).toBe(false);
         expect(kv.store.has(`agent_view_token:${mine[1]}`)).toBe(false);
@@ -98,7 +98,7 @@ describe('tenant purge — KV share tokens', () => {
             [`agent_view_token:${theirs}`]: `i-9:${OTHER}`,
         });
 
-        await new TenantPurgeService({} as D1Database, makeR2(), kv.ns).purge(TENANT);
+        await new TenantPurgeService(testD1.binding, makeR2(), kv.ns).purge(TENANT);
 
         expect(kv.store.has(`agent_view_token:${mine}`)).toBe(false);
         expect(kv.store.has(`agent_view_token:${theirs}`)).toBe(true);
@@ -109,7 +109,7 @@ describe('tenant purge — KV share tokens', () => {
             [`agent_view_token:${mintAgentViewToken(TENANT)}`]: `i-1:${TENANT}`,
             [`agent_view_token:${mintAgentViewToken(TENANT)}`]: `i-2:${TENANT}`,
         });
-        const out = await new TenantPurgeService({} as D1Database, makeR2(), kv.ns).purge(TENANT);
+        const out = await new TenantPurgeService(testD1.binding, makeR2(), kv.ns).purge(TENANT);
         // Two tokens plus `tenant:acme` and `setup_code:acme`.
         expect(out.kv).toBe(4);
     });
@@ -122,7 +122,7 @@ describe('tenant purge — KV share tokens', () => {
         const legacy = 'f'.repeat(64);
         const kv = makeKv({ [`agent_view_token:${legacy}`]: `i-1:${TENANT}` });
 
-        await new TenantPurgeService({} as D1Database, makeR2(), kv.ns).purge(TENANT);
+        await new TenantPurgeService(testD1.binding, makeR2(), kv.ns).purge(TENANT);
 
         expect(kv.store.has(`agent_view_token:${legacy}`)).toBe(true);
     });

@@ -11,6 +11,9 @@ import { visibleInspectionsCondition, type InspectionScope } from '../../lib/ins
 import { chunkIds } from '../../lib/id-chunks';
 import { readDashboardInputs } from './dashboard-reads';
 import { InspectionSubService } from './base';
+import { loadPublishedStates, NOT_PUBLISHED } from '../../lib/inspection/published-state';
+import { loadPinnedSnapshot } from '../../lib/report-snapshot';
+import { resolveRenderedReportId } from './report-grain';
 import type { InspectionService } from '../inspection.service';
 
 type DefectCategory = 'safety' | 'recommendation' | 'maintenance';
@@ -137,9 +140,16 @@ export class InspectionAnalyticsService extends InspectionSubService {
      * Custom (per-inspection) defects added by the inspector are also
      * surfaced — they live under inspection_results.data[itemId].customComments
      * and are not exposed by getReportData yet, so we pull them separately.
+     *
+     * `versionNumber` reads the list as one PUBLISHED version froze it, which is what a client's repair
+     * builder must show; absent, it is the inspector's working copy.
      */
-    async getRepairList(inspectionId: string, tenantId: string) {
-        const report = await this.facade.getReportData(inspectionId, tenantId);
+    async getRepairList(inspectionId: string, tenantId: string, versionNumber?: number) {
+        const report = await this.facade.getReportData(inspectionId, tenantId, undefined, undefined, versionNumber);
+        const pinned = typeof versionNumber === 'number'
+            ? await loadPinnedSnapshot(this.getDrizzle(), tenantId, inspectionId, versionNumber,
+                await resolveRenderedReportId(this.getDrizzle(), tenantId, inspectionId))
+            : null;
 
         // Pull custom defects directly from inspection_results since
         // getReportData only resolves the template canned tabs.
@@ -162,10 +172,11 @@ export class InspectionAnalyticsService extends InspectionSubService {
             ))
             .get();
         const customByItem = new Map<string, CustomDefect[]>();
-        if (resultsRow?.data) {
-            const rawData = typeof resultsRow.data === 'string'
-                ? JSON.parse(resultsRow.data) as Record<string, unknown>
-                : resultsRow.data as Record<string, unknown>;
+        const storedData = pinned?.data ?? resultsRow?.data;
+        if (storedData) {
+            const rawData = typeof storedData === 'string'
+                ? JSON.parse(storedData) as Record<string, unknown>
+                : storedData as Record<string, unknown>;
             for (const key of Object.keys(rawData)) {
                 const parsedKey = parseFindingKey(key);
                 const entry = rawData[key] as { customComments?: { defects?: CustomDefect[] } } | null;
@@ -552,7 +563,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
         // The second group of reads: everything that needs the inspection set. Defect counts take the
         // template snapshots from `all` instead of reading them again.
         const snapshotById = new Map<string, unknown>(all.map(i => [i.id as string, i.templateSnapshot]));
-        const [statsMap, agentRoleChunks, inspectorChunks] = await Promise.all([
+        const [statsMap, agentRoleChunks, inspectorChunks, publishedStates] = await Promise.all([
             this.getDefectStatsBatch(tenantId, uniqueIds, snapshotById),
             Promise.all(chunkIds(uniqueIds).map((chunk) => db.select({
                 inspectionId: inspectionPeople.inspectionId,
@@ -578,6 +589,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 .select({ id: users.id, name: users.name, email: users.email })
                 .from(users)
                 .where(and(eq(users.tenantId, tenantId), inArray(users.id, chunk))))),
+            // Where each rendered report stands (derived): ONE bounded read in the same wave, no extra round trip depth.
+            loadPublishedStates(db, tenantId, uniqueIds),
         ]);
         for (const r of agentRoleChunks.flat()) {
             if (!r.contactName) continue;
@@ -637,6 +650,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
             inspectorName:  string | null;
             requestId:      string | null;
             siblingCount:   number | null;
+            publishedVersionNumber: number | null;
+            editingAgain:   boolean;
         }> =>
             rows.map(r => {
                 const id = r.id as string;
@@ -660,6 +675,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                     // null, not 1: an inspection in no request has no sibling group.
                     requestId:    reqId ?? null,
                     siblingCount: reqId ? siblingCount : null,
+                    ...(publishedStates.get(id) ?? NOT_PUBLISHED),
                 };
             });
 

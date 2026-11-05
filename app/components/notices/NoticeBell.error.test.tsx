@@ -7,7 +7,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 import { StaffNoticeBell } from "./StaffNoticeBell";
 
-const NOTICE = { id: "n1", tenantId: "", type: "report.published", title: "Report ready", body: null, inspectionId: null, createdAt: Date.now() - 3600_000, readAt: null, channels: [] };
+const NOTICE = { id: "n1", type: "report.published", title: "Report ready", body: null, inspectionId: null, createdAt: Date.now() - 3600_000, readAt: null, channels: [] };
 
 function mount(writeOk: boolean) {
     const Stub = createRoutesStub([

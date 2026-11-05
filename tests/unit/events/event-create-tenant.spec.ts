@@ -3,14 +3,14 @@
  * caller's own company: otherwise a visit could be hung on another company's inspection, or on an
  * id that does not exist, and show up on the calendar as an orphan.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 import { EventService } from '../../../server/services/event.service';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T_OWN = '00000000-0000-0000-0000-0000000000a1';
 const T_OTHER = '00000000-0000-0000-0000-0000000000b2';
@@ -30,19 +30,19 @@ describe('creating a visit', () => {
         const t = createTestDb();
         await setupSchema(t.sqlite);
         db = t.db;
-        vi.mocked(mockDrizzle).mockReturnValue(db as never);
+        testD1.use(db);
         for (const [id, slug] of [[T_OWN, 'own'], [T_OTHER, 'other']] as const) {
             await db.insert(schema.tenants).values({
                 id, slug, tier: 'free', status: 'active', maxUsers: 10, deploymentMode: 'shared', createdAt: new Date(),
             } as never);
         }
-        const type = await new EventService({} as D1Database).createEventType(T_OWN, { name: 'Radon test', slug: 'radon-test' });
+        const type = await new EventService(testD1.binding).createEventType(T_OWN, { name: 'Radon test', slug: 'radon-test' });
         BODY = { eventTypeId: type.id, scheduledAt: new Date('2026-11-03T14:00:00.000Z'), durationMin: 60 };
         await seedInspection('own-1', T_OWN);
         await seedInspection('other-1', T_OTHER);
     });
 
-    const svc = () => new EventService({} as D1Database);
+    const svc = () => new EventService(testD1.binding);
 
     it('works for an inspection of the caller\'s own company (control)', async () => {
         const row = await svc().createEvent(T_OWN, 'own-1', BODY);

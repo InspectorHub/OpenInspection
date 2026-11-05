@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
 import { BookingService } from '../../../server/services/booking.service';
 import {
@@ -11,8 +11,8 @@ import {
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 /** Thanksgiving 2026 is a Thursday (dayOfWeek = 4). */
 const THANKSGIVING = '2026-11-26';
@@ -27,8 +27,8 @@ describe('getTenantSlots holiday policies', () => {
         db = setup.db;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(db);
-        svc = new BookingService({} as D1Database);
+        testD1.use(db);
+        svc = new BookingService(testD1.binding);
 
         await db.insert(tenants).values({ id: 't1', slug: 'acme', createdAt: new Date() });
         await db.insert(users).values({

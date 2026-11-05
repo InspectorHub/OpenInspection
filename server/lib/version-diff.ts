@@ -40,6 +40,12 @@ export interface SnapshotInspector {
  * 1 — `{ inspection, data, units }`. Every row written before the credential
  *     snapshot. Absent `schemaVersion` means 1; the field did not exist.
  * 2 — adds `inspectors` and `styleProfile`.
+ * 3 — adds what the report reads that is not in `inspection`, `data` or `units`: `ratingSystemSnapshot`,
+ *     and, for a commercial report, `costItems`, `costYear`, `reserve` and `compliance`. A version published
+ *     under 1 or 2 lacks them, and the reader falls back to the live value for exactly those.
+ * 4 — adds `presentation`: the defect categories (colours, and whether each drives the Summary) and the time zone the
+ *     report was rendered under, so the page and its cached PDF cannot drift apart when a company changes them. A
+ *     version published under 1 to 3 lacks it, and the reader falls back to the live values for exactly those two.
  *
  * The version exists so a READER can tell "this report predates credentials"
  * from "this inspector held none" — two states that look identical as an empty
@@ -54,7 +60,7 @@ export interface SnapshotInspector {
  * kind of reasoning that is easy to get wrong in the safe direction and
  * expensive to get wrong in the other.
  */
-export const SNAPSHOT_SCHEMA_VERSION = 2;
+export const SNAPSHOT_SCHEMA_VERSION = 4;
 
 /**
  * The inspector a PINNED version credits, or null when the snapshot cannot say.
@@ -83,6 +89,14 @@ export function pinnedLead(
     return inspectors.find((i) => i.role === 'lead') ?? inspectors[0] ?? null;
 }
 
+/** The company presentation settings a rendered report depends on: only what the renderer reads. */
+export interface SnapshotPresentation {
+    /** Every defect category: its colour (the chip) and whether a defect in it drives the Summary. */
+    defectCategories: Array<{ id: string; name: string; color: string; drivesSummary: boolean }>;
+    /** The IANA zone report times are printed in (the company's, resolved: never empty). */
+    timeZone: string;
+}
+
 export interface Snapshot {
     /** Absent on rows written before the credential snapshot — treat as 1. */
     schemaVersion?: number;
@@ -93,6 +107,22 @@ export interface Snapshot {
     inspectors?: SnapshotInspector[];
     /** v2+. The appearance profile resolved at publish (Report Style Presets). */
     styleProfile?: Record<string, unknown> | null;
+    /** v3+. The results row's frozen rating system (null when the row had none). */
+    ratingSystemSnapshot?: unknown;
+    /** v3+, commercial reports only. The cost line items the cost tables were built from. */
+    costItems?: Array<Record<string, unknown>>;
+    /** v3+, with `costItems`. The company's reserve-schedule assumptions the cost tables were built under. */
+    reserve?: { reserveScheduleEnabled: boolean; reserveTermYears: number; inflationRateBps: number | null };
+    /** v3+, with `costItems`. The calendar year the reserve schedule counted from, so it does not drift each January. */
+    costYear?: number;
+    /** v4+. What the report is PRESENTED under, frozen so the page and its PDF agree for the life of the version. */
+    presentation?: SnapshotPresentation;
+    /** v3+, full PCA reports only. Sign-offs (with `signedAt` as epoch milliseconds), the PSQ and the document review. */
+    compliance?: {
+        reportSignoffs: Array<Record<string, unknown>>;
+        psq: Record<string, unknown> | null;
+        documentReview: Array<Record<string, unknown>>;
+    };
 }
 
 interface ItemDiff {

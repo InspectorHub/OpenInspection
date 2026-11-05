@@ -3,15 +3,9 @@ import { eq, and, desc, inArray } from 'drizzle-orm';
 // so nothing in this file reads the templates row any more.
 import { inspections, inspectionResults, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices, contacts } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
-import { logger } from '../../lib/logger';
 import { applyAutoSignatureOnPublish, type AutoSignActor } from '../../lib/inspection/auto-sign';
-import {
-    lastSiblingNotifiedAt,
-    markReportNotified,
-    markReportPublished,
-    resolvePublishTargetReport,
-    shouldCoalesceNotification,
-} from '../../lib/inspection/report-notifications';
+import { markReportPublished, resolvePublishTargetReport } from '../../lib/inspection/report-notifications';
+import { announcePublish, wasReopenedForEditing } from './publish-notice';
 import { safeISODate } from '../../lib/date';
 import { resolveLocale } from '../../lib/locale';
 import { InvoiceService } from '../invoice.service';
@@ -20,8 +14,6 @@ import { REPORT_STATUS } from '../../lib/status/report-status';
 import type { AgreementService } from '../agreement.service';
 import type { TemplateSchemaV2 } from '@core/field-ui/shared/template-schema';
 import {
-    fireAutomation,
-    resolvePublishTrigger,
     resolveRequireDefectFields,
     computePublishReadinessFromState,
     requireTemplateSnapshot,
@@ -146,7 +138,7 @@ export class InspectionPublishService extends InspectionSubService {
         return { reason, paymentOutstanding };
     }
 
-    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService): Promise<{
+    async getReportGate(inspectionId: string, tenantId: string, tenantSlug: string, agreementService?: AgreementService, recipientEmail?: string | null): Promise<{
         reason: 'payment' | 'agreement';
         companyName: string;
         primaryColor: string | null;
@@ -214,9 +206,13 @@ export class InspectionPublishService extends InspectionSubService {
         const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor, defaultLocale: tenantConfigs.defaultLocale })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 
+        // Who is asking decides what the page may say about the job. The inspection id is not a credential, so a caller with no proof of
+        // being a recipient (`recipientEmail` comes from their portal token) learns that a report is held and what to do next, but not
+        // where the property is, when it was inspected, or how to reach the inspector directly: that is the report's own content.
+        const proven = !!recipientEmail;
         let inspector: { name: string | null; email: string | null; phone: string | null } | undefined;
         let licenseNumber: string | null = null;
-        if (insp.inspectorId) {
+        if (proven && insp.inspectorId) {
             inspector = await db.select({
                 name: users.name, email: users.email, phone: users.phone,
             }).from(users)
@@ -256,9 +252,13 @@ export class InspectionPublishService extends InspectionSubService {
         // which is NULL on exactly the envelopes the fallback was there for. It
         // was handing the customer a link that could only 404, which is worse
         // than offering no link: no link routes them to their report instead.
+        //
+        // A signer's link is handed out only to a recipient who has proved who they are (`recipientEmail`, taken from their portal token by
+        // the caller): the link returned is that recipient's own, never "the first outstanding signer's". With no proof the page gets no
+        // token and falls back to the client portal, which asks for an email sign-in. The inspection id alone is not a credential.
         let signerLink: string | null = null;
-        if ((bothOutstanding || reason === 'agreement') && agreementService) {
-            signerLink = await agreementService.getFirstOutstandingSignerLink(tenantId, inspectionId);
+        if ((bothOutstanding || reason === 'agreement') && agreementService && recipientEmail) {
+            signerLink = await agreementService.getSignerLinkByEmail(tenantId, inspectionId, recipientEmail);
         }
         const agreementLinkToken = signerLink;
 
@@ -289,12 +289,12 @@ export class InspectionPublishService extends InspectionSubService {
             primaryColor: branding?.primaryColor ?? null,
             actionUrl,
             actionLabel,
-            propertyAddress: insp.propertyAddress ?? null,
+            propertyAddress: proven ? (insp.propertyAddress ?? null) : null,
             inspectorName: inspector?.name ?? null,
             inspectorEmail: inspector?.email ?? null,
             inspectorPhone: inspector?.phone ?? null,
             inspectorLicense: licenseNumber,
-            scheduledDate: insp.date ?? null,
+            scheduledDate: proven ? (insp.date ?? null) : null,
             amountCents,
             // Snapshot currency from the invoice (Phase B); fall back to USD only
             // when an amount exists without a resolvable currency.
@@ -609,9 +609,12 @@ export class InspectionPublishService extends InspectionSubService {
      *
      * `reportId` names WHICH deliverable — a standard report today, the radon report
      * on Thursday. Omitted, it means the order's primary report, which is what every
-     * caller predating multi-report delivery intends. No notify flags (F79):
-     * `notifyClient`/`notifyAgent` were declared here, read by nothing. Delivery is
-     * the `report.published`/`report.amended` rules' call — never add a second.
+     * caller predating multi-report delivery intends. Delivery is the
+     * `report.published`/`report.amended` rules' call, with ONE choice the publisher
+     * makes: `notifyClient` applies to an AMENDMENT only (a re-publish of a report
+     * that is open for editing again after a publish) and decides whether the
+     * `report.amended` rules fire at all. A first publish, and a republish after a
+     * retract, ignore it.
      */
     async publishInspection(inspectionId: string, tenantId: string, _options: {
         theme: string;
@@ -620,6 +623,8 @@ export class InspectionPublishService extends InspectionSubService {
         // Round-2 F1 — optional per-recipient delivery list; older callers work without it.
         recipients?: Array<{ contactId: string | null; channels: Array<'email' | 'text'> }>;
         sendAgreementCopy?: boolean;
+        /** Amendments only: fire the report-updated rules. Absent or false = do not. */
+        notifyClient?: boolean;
         /** Which report to publish. Defaults to the inspection's primary. */
         reportId?: string;
         actor?: AutoSignActor; // who publishes: decides the automatic signature, and is recorded with it
@@ -639,37 +644,18 @@ export class InspectionPublishService extends InspectionSubService {
         const targetReportId = await resolvePublishTargetReport(
             db, tenantId, inspectionId, _options.reportId);
 
+        // Asked before the flip: a report open for editing again is what makes a re-publish an amendment.
+        const wasReopened = await wasReopenedForEditing(db, tenantId, targetReportId);
+
         await db.update(inspections)
             .set({ reportStatus: REPORT_STATUS.PUBLISHED })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
         if (targetReportId) await markReportPublished(db, tenantId, targetReportId, now);
 
-        // Await so AutomationService.trigger actually inserts automation_logs
-        // before the response goes out — the prior fire-and-forget pattern
-        // dangled the promise so CF terminated the isolate before the insert
-        // completed (and ditto for inspection.confirmed / cancelled / created
-        // below — all four paths now block on trigger). First publish fires
-        // report.published; a re-publish (a prior version row exists) fires
-        // report.amended so the client gets a distinct amendment notice.
-        const reportTrigger = await resolvePublishTrigger(
-            this.db, tenantId, inspectionId, targetReportId ?? undefined);
-
-        // COALESCE WITHIN A WINDOW (see lib/inspection/report-notifications).
-        // An AMENDMENT is never coalesced — "your report changed" is its own
-        // thing to say, and suppressing it leaves the client reading a document
-        // they think they have already seen.
-        const coalesced = reportTrigger === 'report.published' && shouldCoalesceNotification(
-            targetReportId ? await lastSiblingNotifiedAt(db, tenantId, inspectionId, targetReportId) : null,
-            now.getTime());
-
-        if (coalesced) {
-            logger.info('report notification coalesced into a sibling delivery',
-                { inspectionId, reportId: targetReportId });
-        } else {
-            await fireAutomation(this.db, tenantId, inspectionId, reportTrigger,
-                targetReportId ?? undefined);
-            if (targetReportId) await markReportNotified(db, tenantId, targetReportId, now);
-        }
+        const { amendment } = await announcePublish({
+            db, rawDb: this.db, tenantId, inspectionId, reportId: targetReportId, now,
+            wasReopened, notifyClient: _options.notifyClient === true,
+        });
 
         // Spec 5H D2 — auto-sign on publish (lib/inspection/auto-sign).
         await applyAutoSignatureOnPublish(db, tenantId, inspectionId, _options.actor);
@@ -680,6 +666,8 @@ export class InspectionPublishService extends InspectionSubService {
         return {
             reportUrl: `/report/${tenantSlug}/${inspectionId}`,
             reportStatus: REPORT_STATUS.PUBLISHED,
+            /** Whether this publish was a re-publish. Internal: the route records it, the response does not carry it. */
+            amendment,
         };
     }
 

@@ -345,10 +345,13 @@ export class MessageService {
         inspectionId: string,
         tenantId: string,
         attachmentId: string,
+        /** When given, only the attachments of this contact's thread are searched (a portal reader sees their own thread). */
+        contactId?: string,
     ): Promise<{ key: string; name: string; type: string } | null> {
         if (!attachmentId) return null;
         const rows = await this.listForInspection(inspectionId, tenantId);
         for (const row of rows) {
+            if (contactId !== undefined && row.contactId !== contactId) continue;
             for (const att of row.attachments ?? []) {
                 if (att.id === attachmentId) {
                     return { key: att.key, name: att.name, type: att.type };

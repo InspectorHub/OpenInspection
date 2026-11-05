@@ -111,7 +111,7 @@ app.openapi(publicGeocodeRoute, async (c) => {
                 placeId: p.place_id,
             };
         });
-        return c.json({ success: true, data }, 200);
+        return c.json({ success: true, data }, 200); // projection-allow: address suggestions, each a literal of label, address parts and place id; public geocoding output
     } catch (e) {
         logger.error('[public.geocode] exception', {}, e instanceof Error ? e : undefined);
         return c.json({ success: true, data: [], meta: { reason: 'UPSTREAM_ERROR' as const } }, 200);

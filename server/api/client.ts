@@ -84,8 +84,8 @@ clientRoutes.openapi(getClientCompatRoute, (c) => {
     const policy = readVersionPolicy(c.env, platform);
     const accountUrl = readAccountUrl(c.env);
     return c.json({ success: true as const, data: {
-        ...policy, serverContractVersion: SERVER_CONTRACT_VERSION, ...(accountUrl ? { accountUrl } : {}),
-        ...(nativeClientEnabled(c.env) ? { videoUpload: {
+        ...policy, serverContractVersion: SERVER_CONTRACT_VERSION, ...(accountUrl ? { accountUrl } : {}), // projection-allow: the version policy and server contract version (configuration the app reads before it signs in) and the account URL
+        ...(nativeClientEnabled(c.env) ? { videoUpload: { // projection-allow: the chunked-upload limits: a literal of a path, sizes and methods
             path: '/api/public/uploads/video/chunked', chunkBytes: VIDEO_PART_BYTES, maxBytes: MAX_VIDEO_BYTES,
             maxOpen: MAX_OPEN_VIDEO_UPLOADS, methods: ['chunked' as const, 'form' as const],
         } } : {}),
@@ -105,8 +105,8 @@ clientRoutes.openapi(getClientSessionRoute, async (c) => {
     // versions are still in use. Throttled and bounded inside; never fails the response.
     await recordNativeClientSeen(db, tenantId, c.req.header('X-Client-Platform'), c.req.header('X-Client-Version'));
     return c.json({ success: true as const, data: {
-        userId: user.sub, tenantId, role: user.role, offlineMaxDays: row?.days ?? DEFAULT_OFFLINE_MAX_DAYS,
-        tenantName: displayName(row?.name),
+        userId: user.sub, tenantId, role: user.role, offlineMaxDays: row?.days ?? DEFAULT_OFFLINE_MAX_DAYS, // projection-allow: the signed-in native session's own user id, company id and offline limit
+        tenantName: displayName(row?.name), // projection-allow: the company's display name, a string
         // Read last, after every await, and from the server clock only: nothing the client sends reaches it.
         serverNowMs: Date.now(),
     } }, 200);
@@ -126,6 +126,7 @@ clientRoutes.openapi(visibleInspectionsRoute, async (c) => {
     }
     const scope = await resolveInspectionScope(c);
     const visible = await findVisibleInspectionIds(getDrizzle(c), scope, tenantId, ids);
+    // projection-allow: the ids the caller asked about that its own scope can see
     return c.json({ success: true as const, data: { visible } }, 200);
 });
 clientRoutes.openapi(importOfflinePackageRoute, async (c) => {
@@ -140,6 +141,7 @@ clientRoutes.openapi(importOfflinePackageRoute, async (c) => {
         throw new AppError(body.status, ErrorCode.BAD_REQUEST, message);
     }
     const data = await importOfflinePackage(c, body.bytes, limits);
+    // projection-allow: the import summary the service builds for the caller's own offline package
     return c.json({ success: true as const, data }, 200);
 });
 

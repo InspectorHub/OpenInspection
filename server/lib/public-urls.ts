@@ -99,6 +99,8 @@ export function agreementRenderPath(tenantSlug: string, requestId: string): stri
 }
 
 /** Absolute form of {@link agreementRenderPath}, for Browser Rendering and mail. */
-export function m2mAgreementRenderUrl(host: string, tenantSlug: string, requestId: string): string {
-    return joinUrl(host, agreementRenderPath(tenantSlug, requestId));
+export function m2mAgreementRenderUrl(host: string, tenantSlug: string, requestId: string, renderToken?: string): string {
+    const url = joinUrl(host, agreementRenderPath(tenantSlug, requestId));
+    // The token is what lets the headless browser see the drawn signatures; without it the page shows a "signature on file" note.
+    return renderToken ? `${url}?render=${encodeURIComponent(renderToken)}` : url;
 }

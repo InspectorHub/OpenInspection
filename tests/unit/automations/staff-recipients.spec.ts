@@ -17,14 +17,14 @@
  * kind with the same property is exactly when that becomes a shared rule
  * instead of a repeated literal.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AutomationService } from '../../../server/services/automation.service';
 import { isStaffRecipient, STAFF_ROLE_KEY } from '../../../server/services/automation/shared';
 import { createHeadersForInsertedLogs } from '../../../server/services/automation/notice-headers';
@@ -42,7 +42,7 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values([
         { id: T, slug: 'acme-staff', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
@@ -68,7 +68,7 @@ const insp = async () =>
 
 describe('staff recipients (B2)', () => {
     it('resolves to the workspace owners and managers', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         const out = await svc.resolveRecipients(
             { recipientKind: 'staff', recipientRoleProfileId: null },
             (await insp()) as never,
@@ -78,7 +78,7 @@ describe('staff recipients (B2)', () => {
     });
 
     it('never reaches another workspace, and never an inspector or an agent', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         const out = await svc.resolveRecipients(
             { recipientKind: 'staff', recipientRoleProfileId: null },
             (await insp()) as never,
@@ -101,7 +101,7 @@ describe('staff recipients (B2)', () => {
         await db.insert(schema.users).values(
             { ...user('u-gone', 'owner', T, 'gone@acme.com'), deletedAt: new Date() } as never,
         );
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         const out = await svc.resolveRecipients(
             { recipientKind: 'staff', recipientRoleProfileId: null },
             (await insp()) as never,
@@ -114,13 +114,13 @@ describe('staff recipients (B2)', () => {
         // The reminder path asks for ONE address. Picking an arbitrary admin
         // would be a silent wrong-recipient bug; returning null enqueues
         // nothing, which is visible and safe.
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         const addr = await svc.resolveAddress('staff', null, 'email', (await insp()) as never, db as never);
         expect(addr).toBeNull();
     });
 
     it('marks its recipients as staff, so the notice header lands on user_id', async () => {
-        const svc = new AutomationService({} as D1Database);
+        const svc = new AutomationService(testD1.binding);
         const out = await svc.resolveRecipients(
             { recipientKind: 'staff', recipientRoleProfileId: null },
             (await insp()) as never,

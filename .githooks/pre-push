@@ -28,6 +28,20 @@ pass() { printf '  ✓  %b\n' "$1"; }
 fail() { printf '  ✗  %b\n' "$1"; }
 step() { printf '\n  →  %b\n' "$1"; }
 
+# Wall-clock per stage, machine-greppable:  [timing] <stage> <seconds>s  and a final
+# [timing] total <seconds>s  printed by hook_exit on EVERY exit path, failures included.
+HOOK_T0=$(date +%s)
+HOOK_TLAST=$HOOK_T0
+timing() {
+    _t_now=$(date +%s)
+    printf '[timing] %s %ss\n' "$1" "$((_t_now - HOOK_TLAST))"
+    HOOK_TLAST=$_t_now
+}
+hook_exit() {
+    printf '[timing] total %ss\n' "$(( $(date +%s) - HOOK_T0 ))"
+    exit "$1"
+}
+
 printf '%b\n' "${BOLD}── OpenInspection (Pre-push Checks) ─────────────────────────────${NC}"
 
 ZERO=0000000000000000000000000000000000000000
@@ -47,7 +61,7 @@ if [ -n "$REFS" ]; then
     if [ -z "$NON_DELETE" ]; then
         pass "Skipped — this push only deletes refs, so nothing ships"
         printf '\n%b\n' "${GREEN}Pre-push checks passed.${NC}"
-        exit 0
+        hook_exit 0
     fi
 fi
 
@@ -63,13 +77,14 @@ fi
 step "Dependency advisories"
 ADV_OUT=$(node scripts/check-advisories.mjs --level=high 2>&1)
 ADV_RC=$?
+timing "advisory-audit"
 if [ "$ADV_RC" -eq 0 ]; then
     pass "$(printf '%s' "$ADV_OUT" | tail -1)"
 else
     printf '%s\n' "$ADV_OUT"
     fail "Dependency-advisory gate failed"
     printf '\n%b\n' "${RED}Pre-push checks failed. Fix the errors before pushing.${NC}"
-    exit 1
+    hook_exit 1
 fi
 
 # --- QuickBooks live contract ------------------------------------------------
@@ -127,11 +142,14 @@ if [ "$QBO_CHANGED" = "unknown" ] || printf '%s\n' "$QBO_CHANGED" | grep -qE "$Q
             printf '%s\n' "$QBO_OUT" | tail -30
             fail "QuickBooks live contract failed — or no sandbox is connected (the reason is printed above)"
             printf '%b\n' "  No Intuit sandbox on this machine? ${YELLOW}SKIP_QBO_CONTRACT=1 git push${NC}"
+            timing "qbo-live-contract"
             printf '\n%b\n' "${RED}Pre-push checks failed. Fix the errors before pushing.${NC}"
-            exit 1
+            hook_exit 1
         fi
     fi
+    timing "qbo-live-contract"
 fi
+timing "qbo-scope"
 
 # The gate runs a REAL build (~1-2 min). Nothing that cannot reach the worker
 # bundle can change its size, so a push touching only .github/, docs/ or tests/
@@ -169,19 +187,21 @@ if [ "$FORCE_CHECK" -eq 0 ] && [ -n "$CHANGED" ] &&    ! printf '%s
     printf '
 %b
 ' "${GREEN}Pre-push checks passed.${NC}"
-    exit 0
+    hook_exit 0
 fi
+timing "bundle-scope"
 
 step "Worker bundle size"
 BUNDLE_OUT=$(node scripts/check-bundle-size.mjs 2>&1)
 BUNDLE_RC=$?
+timing "bundle-size-build"
 BUNDLE_LINE=$(echo "$BUNDLE_OUT" | grep -E '^\[bundle-size\] (worker upload|FAIL|WARNING)' | tail -2 | tr '\n' ' ')
 if [ "$BUNDLE_RC" -eq 0 ]; then
     pass "Bundle size OK — ${BUNDLE_LINE:-see node scripts/check-bundle-size.mjs}"
     printf '\n%b\n' "${GREEN}Pre-push checks passed.${NC}"
-    exit 0
+    hook_exit 0
 else
     fail "Bundle size gate failed — ${BUNDLE_LINE:-run node scripts/check-bundle-size.mjs}"
     printf '\n%b\n' "${RED}Pre-push checks failed. Fix the errors before pushing.${NC}"
-    exit 1
+    hook_exit 1
 fi

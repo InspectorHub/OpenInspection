@@ -8,8 +8,8 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 // PortalService builds its drizzle handle via `drizzle(this.db)` (drizzle-orm/d1).
 // Mock that factory to hand back the in-memory better-sqlite3 test DB, mirroring
 // the harness used by portal-access.spec.ts.
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 import { TENANT, inspStub } from '../helpers/portal-routes-setup';
 
@@ -24,6 +24,8 @@ import portalRoutes from '../../../server/api/portal';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { hashToken } from '../../../server/lib/token-hash';
+import { AppError } from '../../../server/lib/errors';
+import { MockKV } from '../mocks';
 
 const SECRET = 'test-jwt-secret';
 
@@ -121,7 +123,7 @@ describe('portal API', () => {
     }
 
     function buildApp(tenantId: string | null = TENANT) {
-        const portalSvc = new PortalService({} as D1Database, inspStub);
+        const portalSvc = new PortalService(testD1.binding, inspStub);
         sendClientPortalLogin = vi.fn().mockResolvedValue(undefined);
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
@@ -136,7 +138,7 @@ describe('portal API', () => {
                 // Hub exchange (server/api/portal.ts) now resolves the
                 // self-retrieve role-key set via PeopleService instead of a
                 // hard-coded ['client', 'co_client'] literal check.
-                people: new PeopleService({ DB: {} as D1Database }),
+                people: new PeopleService({ DB: testD1.binding }),
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
@@ -164,15 +166,14 @@ describe('portal API', () => {
 
     // JWT_SECRET is injected via the env arg to app.request().
     function reqEnv() {
-        return { JWT_SECRET: SECRET, APP_BASE_URL: 'https://example.test' } as unknown as HonoConfig['Bindings'];
+        return { DB: testD1.binding, JWT_SECRET: SECRET, APP_BASE_URL: 'https://example.test', TENANT_CACHE: new MockKV() } as unknown as HonoConfig['Bindings'];
     }
 
     beforeEach(async () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
@@ -296,6 +297,39 @@ describe('portal API', () => {
 
         const bad = await app.request('/api/portal/acme/redeem?link=garbage', {}, reqEnv());
         expect(bad.status).toBe(401);
+    });
+
+    it('GET /redeem signs in once: the same link a second time is refused like an expired one, and a different link still works', async () => {
+        const app = buildApp();
+        const env = reqEnv();
+        const link = await signMagicLink(SECRET, 'a@x.com');
+        const url = `/api/portal/acme/redeem?link=${encodeURIComponent(link)}`;
+        expect((await app.request(url, {}, env)).status).toBe(200);
+        const again = await app.request(url, {}, env);
+        expect(again.status).toBe(401);
+        expect(again.headers.get('set-cookie') ?? '').not.toContain('__Host-portal_session=');
+        // Control: another link (a new request-link mails a new token) signs in.
+        const other = await signMagicLink(SECRET, 'a@x.com', 899);
+        expect((await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(other)}`, {}, env)).status).toBe(200);
+    });
+
+    it('GET /redeem refuses when there is no store to remember a used link in, rather than letting it through unchecked', async () => {
+        const app = buildApp();
+        const link = await signMagicLink(SECRET, 'a@x.com');
+        const env = { ...reqEnv(), TENANT_CACHE: undefined } as unknown as HonoConfig['Bindings'];
+        expect((await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(link)}`, {}, env)).status).toBe(401);
+    });
+
+    it('GET /redeem and POST /request-link answer 429 when the caller is over the limit, before reading the link or the address', async () => {
+        const app = buildApp();
+        // The route throws the shared rate-limit error; the real application maps it to 429 in its error handler, which this stub app lacks.
+        app.onError((err, c) => c.json({ error: err.message }, err instanceof AppError ? err.status as 429 : 500));
+        const limited = { ...reqEnv(), RATE_LIMITER: { limit: async () => ({ success: false }) } } as unknown as HonoConfig['Bindings'];
+        const link = await signMagicLink(SECRET, 'a@x.com');
+        expect((await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(link)}`, {}, limited)).status).toBe(429);
+        expect((await app.request('/api/portal/acme/request-link', {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'a@x.com' }),
+        }, limited)).status).toBe(429);
     });
 
     it('GET /exchange with a valid client token for the matching inspection → 200 + Set-Cookie', async () => {

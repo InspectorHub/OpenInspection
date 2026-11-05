@@ -6,12 +6,11 @@
  * named inspection is inside the caller's set, so the gate and the check cannot both be dropped by one change.
  * That second line is driven here by pinning a restricted scope on a caller who still passes the gate.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn, asScopedDbSource } from '../helpers/test-db';
+import { asScopedDbSource } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import bulkRoutes from '../../../server/api/inspections/bulk';
@@ -20,14 +19,15 @@ import type { InspectionScope } from '../../../server/lib/inspection/visibility'
 import { seedVisibilityFixture, TENANT, USERS, INSP } from '../helpers/visibility-fixture';
 import type { HonoConfig } from '../../../server/types/hono';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('bulk update honours the scope', () => {
     let db: ReturnType<typeof createTestDb>['db'];
 
     beforeEach(async () => {
         const f = createTestDb(); db = f.db; await setupSchema(f.sqlite); await seedVisibilityFixture(db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(db);
     });
 
     function build(userId: string, role: 'owner' | 'manager' | 'inspector', pinned?: InspectionScope) {
@@ -49,7 +49,7 @@ describe('bulk update honours the scope', () => {
     const patch = async (app: OpenAPIHono<HonoConfig>, body: unknown) => {
         const res = await app.request('/api/inspections/bulk', {
             method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-        }, { DB: {} } as never);
+        }, { DB: testD1.binding } as never);
         return res.status;
     };
     const status = async (id: string) => (await db.select().from(schema.inspections).where(eq(schema.inspections.id, id)).get())?.status;

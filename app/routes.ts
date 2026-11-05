@@ -92,6 +92,8 @@ export default [
   route("agent-signup", "routes/agent/signup.tsx"),
   // Spec 3 Task 5 — core dual-mode agent front door (password + magic-link).
   route("agent-login", "routes/agent/login.tsx"),
+  // The page behind the emailed agent sign-in link: shows Continue on GET, spends the single-use code on the POST.
+  route("agent/magic-login", "routes/agent/magic-login.tsx"),
   // The way out of the agent-terms gate. Standalone on purpose: agent-layout's
   // loader is what redirects a gated agent here, so a page under that layout
   // would redirect to itself. Keeps the `agent-` prefix so loginPathFor() sends

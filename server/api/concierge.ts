@@ -93,17 +93,18 @@ app.openapi(confirmViewRoute, async (c) => {
     if (!view) {
         return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Token not found' } }, 404);
     }
+    const { inspection: job, inspector } = view;
     return c.json({
         success: true as const,
         data: {
             inspection: {
-                propertyAddress:   view.inspection.propertyAddress,
-                date:              view.inspection.date,
-                clientName:        view.inspection.clientName,
-                agreementRequired: view.inspection.agreementRequired,
+                propertyAddress:   job.propertyAddress,
+                date:              job.date,
+                clientName:        job.clientName,
+                agreementRequired: job.agreementRequired,
             },
-            inspector: view.inspector
-                ? { name: view.inspector.name, photoUrl: view.inspector.photoUrl }
+            inspector: inspector
+                ? { name: inspector.name, photoUrl: inspector.photoUrl }
                 : null,
             expired:          view.expired,
             alreadyConfirmed: view.alreadyConfirmed,
@@ -148,7 +149,7 @@ app.openapi(confirmRoute, async (c) => {
 
     return c.json({
         success: true as const,
-        data: { inspectionId: result.inspectionId, redirect },
+        data: { inspectionId: result.inspectionId, redirect }, // projection-allow: the report path, or the agreement signing path (which carries the agreement signing token); returned only after the client confirmed, to the holder of the concierge token
     }, 200);
 });
 

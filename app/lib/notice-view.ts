@@ -36,7 +36,6 @@ export interface NoticeChannelAttempt {
 
 export interface NoticeRowData {
   id: string;
-  tenantId: string;
   type: string;
   title: string;
   body: string | null;

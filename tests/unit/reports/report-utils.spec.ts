@@ -110,6 +110,18 @@ describe('computeReportStats', () => {
     expect(partial.completionPercent).toBe(25);
   });
 
+  it('does not count a stored value of a shape the report cannot show (it would be reported as null)', () => {
+    const odd = computeReportStats(sections, {
+      i1: { value: { nested: true } },
+      i2: { value: [1, 2] },
+      i3: { value: Number.NaN },
+    }, defaultLevels);
+    expect(odd.completionPercent).toBe(0);
+    // control: the same items with shapes the report can show do count
+    const fine = computeReportStats(sections, { i1: { value: 'a' }, i2: { value: ['a'] }, i3: { value: 3 } }, defaultLevels);
+    expect(fine.completionPercent).toBe(75);
+  });
+
   it('counts non-rich item values toward completionPercent', () => {
     // 1 rated + 1 with numeric value + 1 empty + 1 missing = 2 / 4 = 50%
     const mixed = computeReportStats(sections, {

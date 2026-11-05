@@ -51,7 +51,7 @@ function Harness({ initial, onCommit }: { initial: Record<string, unknown>; onCo
 describe("PropertyInfoForm field sets", () => {
   it("renders bedrooms/bathrooms plus unit + county for a residential inspection", () => {
     const { getByText } = renderPF(
-      <PropertyInfoForm inspection={{ propertyType: "residential" }} />,
+      <PropertyInfoForm inspection={{ propertyType: "single_family" }} />,
     );
     expect(getByText("Bedrooms")).toBeTruthy();
     expect(getByText("Bathrooms")).toBeTruthy();
@@ -77,7 +77,7 @@ describe("PropertyInfoForm field sets", () => {
 
   it("renders lotSize (Lot Size)", () => {
     const { getByText } = renderPF(
-      <PropertyInfoForm inspection={{ propertyType: "residential" }} />,
+      <PropertyInfoForm inspection={{ propertyType: "single_family" }} />,
     );
     expect(getByText("Lot Size")).toBeTruthy();
   });
@@ -87,7 +87,7 @@ describe("PropertyInfoForm raw-string typing (Finding 4)", () => {
   it("keeps a fractional Bathrooms value ('2.5') verbatim — onChange is the raw string, not coerced to 2", () => {
     const onSave = vi.fn();
     const { container } = renderPF(
-      <PropertyInfoForm inspection={{ propertyType: "residential" }} onSave={onSave} />,
+      <PropertyInfoForm inspection={{ propertyType: "single_family" }} onSave={onSave} />,
     );
     const input = labelInput(container, "Bathrooms")!;
     expect(input).toBeTruthy();
@@ -98,7 +98,7 @@ describe("PropertyInfoForm raw-string typing (Finding 4)", () => {
 
   it("does not clear the input on the transient mid-decimal '2.' keystroke", () => {
     const onCommit = vi.fn();
-    const { container } = renderPF(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
+    const { container } = renderPF(<Harness initial={{ propertyType: "single_family" }} onCommit={onCommit} />);
     const input = labelInput(container, "Bathrooms")!;
     fireEvent.change(input, { target: { value: "2." } });
     // Controlled value retains "2." — a coerce here would snap it to "2" or "".
@@ -111,7 +111,7 @@ describe("PropertyInfoForm raw-string typing (Finding 4)", () => {
 describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
   it("commits the WHOLE facts object on blur with the changed field coerced and empty fields → null", () => {
     const onCommit = vi.fn();
-    const { container } = renderPF(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
+    const { container } = renderPF(<Harness initial={{ propertyType: "single_family" }} onCommit={onCommit} />);
     const input = labelInput(container, "Year Built")!;
     fireEvent.change(input, { target: { value: "1990" } });
     // onChange must NOT commit (no keystroke persistence).
@@ -132,7 +132,7 @@ describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
 
   it("commits a fractional bathrooms value coerced to a Number within the full object", () => {
     const onCommit = vi.fn();
-    const { container } = renderPF(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
+    const { container } = renderPF(<Harness initial={{ propertyType: "single_family" }} onCommit={onCommit} />);
     const input = labelInput(container, "Bathrooms")!;
     fireEvent.change(input, { target: { value: "2.5" } });
     fireEvent.blur(input);
@@ -142,7 +142,7 @@ describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
 
   it("preserves already-entered sibling fields when a second field commits (superset PATCH)", () => {
     const onCommit = vi.fn();
-    const { container } = renderPF(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
+    const { container } = renderPF(<Harness initial={{ propertyType: "single_family" }} onCommit={onCommit} />);
     const year = labelInput(container, "Year Built")!;
     fireEvent.change(year, { target: { value: "1990" } });
     fireEvent.blur(year);
@@ -157,7 +157,7 @@ describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
 
   it("commits null when a number field is cleared to empty on blur", () => {
     const onCommit = vi.fn();
-    const { container } = renderPF(<Harness initial={{ propertyType: "residential", yearBuilt: 1990 }} onCommit={onCommit} />);
+    const { container } = renderPF(<Harness initial={{ propertyType: "single_family", yearBuilt: 1990 }} onCommit={onCommit} />);
     const input = labelInput(container, "Year Built")!;
     fireEvent.change(input, { target: { value: "" } });
     fireEvent.blur(input);
@@ -167,7 +167,7 @@ describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
 
   it("commits null when a text field (lotSize) is blurred empty", () => {
     const onCommit = vi.fn();
-    const { container } = renderPF(<Harness initial={{ propertyType: "residential", lotSize: "old" }} onCommit={onCommit} />);
+    const { container } = renderPF(<Harness initial={{ propertyType: "single_family", lotSize: "old" }} onCommit={onCommit} />);
     const input = labelInput(container, "Lot Size")!;
     expect(input).toBeTruthy();
     fireEvent.change(input, { target: { value: "" } });
@@ -178,7 +178,7 @@ describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
 
   it("commits a text field (lotSize) value on blur", () => {
     const onCommit = vi.fn();
-    const { container } = renderPF(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
+    const { container } = renderPF(<Harness initial={{ propertyType: "single_family" }} onCommit={onCommit} />);
     const input = labelInput(container, "Lot Size")!;
     fireEvent.change(input, { target: { value: "0.25 acres" } });
     fireEvent.blur(input);
@@ -189,7 +189,7 @@ describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
   it("still fires onSave optimistically on change with the raw string", () => {
     const onSave = vi.fn();
     const { container } = renderPF(
-      <PropertyInfoForm inspection={{ propertyType: "residential" }} onSave={onSave} />,
+      <PropertyInfoForm inspection={{ propertyType: "single_family" }} onSave={onSave} />,
     );
     const input = labelInput(container, "Year Built")!;
     fireEvent.change(input, { target: { value: "1985" } });
@@ -256,7 +256,7 @@ describe("PropertyInfoForm select commit", () => {
   it("commits foundationType on change (discrete select) with the full facts object", () => {
     const onCommit = vi.fn();
     const { container } = renderPF(
-      <PropertyInfoForm inspection={{ propertyType: "residential" }} onCommit={onCommit} />,
+      <PropertyInfoForm inspection={{ propertyType: "single_family" }} onCommit={onCommit} />,
     );
     const select = container.querySelector("select") as HTMLSelectElement;
     expect(select).toBeTruthy();

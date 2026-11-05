@@ -1,14 +1,16 @@
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, lte } from 'drizzle-orm';
 import { inspections, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
 import { CredentialService, type RenderableCredential } from '../credential.service';
 import { primaryLicenseOf } from '../../lib/credentials/primary';
 import { pinnedLead } from '../../lib/version-diff';
-import { loadPinnedSnapshot } from '../../lib/report-snapshot';
+import { loadPinnedSnapshot, reportVersionScope } from '../../lib/report-snapshot';
+import { logger } from '../../lib/logger';
+import { freezeInspection, freezeResultsRow, freezeUnitRows, frozenCompliance, frozenCostItems, frozenCostYear, frozenPresentation } from '../../lib/report-freeze';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
 import { resolveTenantTimeZone } from '../../lib/tz';
 import { parseReinspectionStatuses } from '@core/field-ui/shared/reinspection-status';
-import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
+import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, toReportItemValue, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
 import { renderTemplate } from '../../lib/mustache';
 import { mapRepairItems } from '../../lib/report-repair-items';
@@ -75,7 +77,7 @@ export function defectDrivesSummary(
  */
 export class InspectionReportService extends InspectionSubService {
     /**
-     * `encryptionSecret` is only consumed to construct a scoped
+     * `signing` (the secret and its earlier ones) is only consumed to construct a scoped
      * `ComplianceService` (Phase M) for full_pca reports — every other method
      * on this service is unaffected. Optional so existing positional
      * construction call sites (and unit tests that build this service
@@ -89,7 +91,7 @@ export class InspectionReportService extends InspectionSubService {
         sdb?: ScopedDB,
         kv?: KVNamespace,
         images?: ImagesBinding,
-        private readonly encryptionSecret?: string,
+        private readonly signing?: import('../../lib/signing-key-secrets').SigningSecrets,
     ) {
         super(db, r2, sdb, kv, images);
     }
@@ -130,35 +132,46 @@ export class InspectionReportService extends InspectionSubService {
     ) {
         const db = this.getDrizzle();
 
-        // Spec B §1 — a published version renders what it FROZE. Loaded up front
-        // so the live resolutions below can be overlaid rather than duplicated.
+        // A published version renders what it FROZE. Loaded up front so the live reads below can be overlaid
+        // rather than duplicated.
         //
-        // WHAT THE OVERLAY COVERS, precisely, because the gap matters: inspector
-        // identity + credentials, and the resolved style profile. Everything the
-        // snapshot does not carry still resolves live. That is less alarming than
-        // it sounds — the report's STRUCTURE is already frozen elsewhere, at
-        // creation, by `inspections.template_snapshot` and
-        // `inspection_results.rating_system_snapshot` — but it is not "the whole
-        // report is immutable", and anything added to the snapshot later has to
-        // be overlaid here too or it silently keeps tracking live state.
+        // WHAT THE OVERLAY COVERS: everything a reader sees of the inspection's findings. The results data
+        // (ratings, notes, defects, photos), the unit tree, the inspection's report-content columns (see
+        // `lib/report-freeze.ts`), the rating system the findings were rated on, the cost line items and the
+        // sign-offs of a commercial report, the inspector's identity and credentials, and the style profile.
+        // A snapshot written before a part was added to it lacks that part and the live value is used for
+        // exactly that part.
         //
-        // (An earlier version of this comment claimed the payload advertises
-        // `snapshotSchemaVersion`. It does not — nothing emits that field. Said
-        // here instead of promising a field that does not exist.)
+        // WHAT STAYS LIVE: the order's current state (status, payment, gate) and the repair-export switch (an access
+        // switch, not part of the document). Defect categories and the time zone are frozen from version 4; older reads are live.
+        //
+        // The report id is resolved first: version numbers run per report, so "version 1" is only a row once
+        // the report is known.
+        const renderedReportId = await resolveRenderedReportId(db, tenantId, inspectionId, reportId);
+        // A version published before reports existed has no report id and is the PRIMARY report's.
+        const legacyIsMine = !reportId || renderedReportId === await resolveRenderedReportId(db, tenantId, inspectionId);
         const pinned = typeof versionNumber === 'number'
-            ? await loadPinnedSnapshot(this.getDrizzle(), tenantId, inspectionId, versionNumber)
+            ? await loadPinnedSnapshot(db, tenantId, inspectionId, versionNumber, renderedReportId, legacyIsMine)
             : null;
+        if (typeof versionNumber === 'number' && !pinned) {
+            // FAIL CLOSED. A reader that named a published version must get that version or nothing: answering with
+            // the live tables would put the inspector's unpublished edits in front of a client, under the name of a
+            // document that does not contain them. A client whose link hits this sees an error and the inspector's
+            // logs say which version could not be read; a PDF render fails instead of being cached under the wrong hash.
+            logger.error('published report version could not be loaded', { tenantId, inspectionId, versionNumber, reportId: renderedReportId });
+            throw Errors.ServiceUnavailable('This version of the report cannot be shown right now. Please try again shortly.');
+        }
 
-        const inspection = await db.select().from(inspections)
+        const liveInspection = await db.select().from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
-        if (!inspection) throw Errors.NotFound('Inspection not found');
+        if (!liveInspection) throw Errors.NotFound('Inspection not found');
+        const inspection = freezeInspection(liveInspection, pinned);
 
         const template = inspection.templateId
             ? await db.select().from(templates).where(and(eq(templates.id, inspection.templateId), eq(templates.tenantId, tenantId))).get()
             : null;
-        const renderedReportId = await resolveRenderedReportId(db, tenantId, inspectionId, reportId);
-        const resultsRow = await resolveResultsRow(db, tenantId, inspectionId, renderedReportId);
+        const resultsRow = freezeResultsRow(await resolveResultsRow(db, tenantId, inspectionId, renderedReportId), pinned);
 
         // Spec 5B — the v2 schema shapes now live in `./report-schema-types`.
         // They were function-local here, which meant nothing outside this
@@ -278,7 +291,8 @@ export class InspectionReportService extends InspectionSubService {
         // looked up per-defect below with no N+1 query. Keyed by BOTH name
         // and id: seed template JSON stores category NAMES ("safety"), while
         // a template authored after Plan-4 may store a defect_categories.id.
-        const defectCategories = await new DefectCategoryService(this.db).ensureSeed(tenantId);
+        const frozenLook = frozenPresentation(pinned); // categories and zone as published (version 4+); older versions read them live
+        const defectCategories = frozenLook?.defectCategories ?? await new DefectCategoryService(this.db).listOrDefaults(tenantId);
         const categoryColorByKey = new Map<string, string>();
         for (const cat of defectCategories) {
             categoryColorByKey.set(cat.name, cat.color);
@@ -427,7 +441,7 @@ export class InspectionReportService extends InspectionSubService {
                     // res.value; surface it to the report viewer plus the
                     // unit from item.options so the customer sees "Year
                     // built · 1995 · yr" instead of an empty rating chip.
-                    value: (res as { value?: unknown }).value ?? null,
+                    value: toReportItemValue((res as { value?: unknown }).value),
                     unit:  (item as unknown as { options?: { unit?: string } }).options?.unit ?? null,
                     // Spec 5B v2 resolved tab payload — report PDFs render
                     // only entries where `included === true`.
@@ -551,6 +565,12 @@ export class InspectionReportService extends InspectionSubService {
         } catch {
             // tenant_configs row missing — defaults apply.
         }
+        // The reserve schedule's assumptions are part of the cost opinion a version published, so they are read from
+        // the version, and so is the time zone. The repair-export switch stays live on purpose: it is an access switch.
+        if (pinned?.reserve) {
+            ({ reserveScheduleEnabled, reserveTermYears, inflationRateBps } = pinned.reserve);
+        }
+        if (frozenLook) reportTimeZone = frozenLook.timeZone;
         // Report Style Presets (Plan 1a) — three-tier resolution + field-level tweaks.
         const insp = inspection as { profileOverride?: string | null; badgeLayoutOverride?: string | null; reportPhotoColumns?: number | null };
         // Same rule as the badges: a pinned version keeps the appearance it was
@@ -590,13 +610,14 @@ export class InspectionReportService extends InspectionSubService {
         // e.g., a tenant with reserveScheduleEnabled on would render an empty
         // Reserve Schedule on every residential report. See #234 follow-up.
         const costItemRows = reportTier
-            ? await new CostItemService(this.db).listByInspection(inspectionId, tenantId)
+            ? frozenCostItems<Awaited<ReturnType<CostItemService['listByInspection']>>[number]>(pinned)
+                ?? await new CostItemService(this.db).listByInspection(inspectionId, tenantId)
             : [];
         const costTables = reportTier
             ? buildCostTables(
                 costItemRows,
                 { reserveScheduleEnabled, reserveTermYears, inflationRateBps },
-                new Date().getFullYear(),
+                frozenCostYear(pinned, new Date().getFullYear()),
                 (inspection as { sqft?: number | null }).sqft ?? null,
             )
             : null;
@@ -662,8 +683,9 @@ export class InspectionReportService extends InspectionSubService {
         })
             .from(reportVersions)
             .where(and(
-                eq(reportVersions.tenantId, tenantId),
-                eq(reportVersions.inspectionId, inspectionId),
+                reportVersionScope(tenantId, inspectionId, renderedReportId, legacyIsMine),
+                // A version of the report cannot list the amendments that came after it.
+                ...(pinned && typeof versionNumber === 'number' ? [lte(reportVersions.versionNumber, versionNumber)] : []),
             ))
             .orderBy(desc(reportVersions.versionNumber))
             .all();
@@ -699,7 +721,9 @@ export class InspectionReportService extends InspectionSubService {
         // Layer-2 report signature + cryptographic verification metadata.
         // Both fields are null for draft/submitted reports; once published the
         // report page renders the inspector signature block and a verifiable QR.
-        const isPublished = isReportPublished(inspection.reportStatus);
+        // A pinned version IS a published document, whatever the order's status says now: the inspector may be
+        // editing the next version while the client still reads this one.
+        const isPublished = pinned !== null || isReportPublished(inspection.reportStatus);
 
         // Extract _inspector_signature from the already-loaded results row.
         type InspectorSig = { signatureBase64?: string | null; signedAt?: number | null; userId?: string | null; auto?: boolean };
@@ -736,7 +760,11 @@ export class InspectionReportService extends InspectionSubService {
                 verificationToken: reportVersions.verificationToken,
                 publishedAt:       reportVersions.publishedAt,
             }).from(reportVersions)
-                .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
+                .where(and(
+                    reportVersionScope(tenantId, inspectionId, renderedReportId, legacyIsMine),
+                    // The version the reader holds, not the newest: a render of version 1 carries version 1's token.
+                    ...(pinned && typeof versionNumber === 'number' ? [eq(reportVersions.versionNumber, versionNumber)] : []),
+                ))
                 .orderBy(desc(reportVersions.versionNumber))
                 .limit(1)
                 .get();
@@ -764,8 +792,9 @@ export class InspectionReportService extends InspectionSubService {
         let documentReview: Awaited<ReturnType<ComplianceService['getCompliance']>>['documentReview'] = [];
         let relianceText: typeof RELIANCE_TEMPLATES = { ...RELIANCE_TEMPLATES };
         if (isFullPca) {
-            const compliance = new ComplianceService(this.db, this.encryptionSecret ?? '');
-            const c = await compliance.getCompliance(tenantId, inspectionId);
+            const compliance = new ComplianceService(this.db, this.signing?.current ?? '', this.signing?.previous ?? []);
+            const c = frozenCompliance<Awaited<ReturnType<ComplianceService['getCompliance']>>>(pinned)
+                ?? await compliance.getCompliance(tenantId, inspectionId);
             const deviations = (inspection as { deviations?: Deviation[] | null }).deviations ?? [];
             // `signedAt` is a drizzle `timestamp_ms` column — reads yield Date
             // instances at runtime. The wire contract (ReportSignoffView.signedAt
@@ -800,9 +829,9 @@ export class InspectionReportService extends InspectionSubService {
         // no-op until Phase F lands and for every non-per_unit inspection.
         const unitInspectionMode =
             (inspection as { unitInspectionMode?: 'tagged' | 'per_unit' | null }).unitInspectionMode ?? 'tagged';
-        const unitRows = await db.select().from(inspectionUnits)
+        const unitRows = freezeUnitRows(await db.select().from(inspectionUnits)
             .where(and(eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
-            .orderBy(asc(inspectionUnits.sortOrder)).all();
+            .orderBy(asc(inspectionUnits.sortOrder)).all(), pinned);
         // Only kind='unit' rows form matrix rows; buildings/floors are grouping.
         const matrixUnits = unitRows
             .filter((u) => u.kind === 'unit')
@@ -818,10 +847,9 @@ export class InspectionReportService extends InspectionSubService {
             ? defectCountsByUnit(matrixUnits, resultData as Record<string, unknown>, levels)
             : {};
 
-        // IA-33 (boundary A) — this object is returned verbatim by the public
-        // report endpoint to any link holder (incl. agent-kind tokens); strip
-        // the columns the account track withholds from agents (agent.schema.ts):
-        // private `internalNotes` and commercial `price`.
+        // The staff editor, the PDF and the Word export use the whole row. Two columns the account track withholds from agents
+        // (agent.schema.ts), the private `internalNotes` and the commercial `price`, are removed here as well; the response for a
+        // report link is built from the field lists in server/lib/report-link-response.ts.
         const publicInspection = { ...inspection, inspectorName };
         delete (publicInspection as Partial<typeof publicInspection>).internalNotes;
         delete (publicInspection as Partial<typeof publicInspection>).price;
@@ -897,12 +925,12 @@ export class InspectionReportService extends InspectionSubService {
      * is two different deliverables and must not share a cached PDF.
      */
     async getReportContentHash(
-        id: string,
-        tenantId: string,
+        id: string, tenantId: string,
         reportId?: string,
         translation: TranslationIdentity | null = null,
+        versionNumber?: number, // the published version the document is read at; absent hashes the live read
     ): Promise<string> {
-        const data = await this.getReportData(id, tenantId, (key: string) => key, undefined, undefined, reportId);
+        const data = await this.getReportData(id, tenantId, (key: string) => key, undefined, versionNumber, reportId);
         return reportContentHash(data, translation);
     }
 

@@ -35,27 +35,29 @@ export interface PublishModalProps {
   * revision ever published from the editor recorded `null`, and the amendment
   * email's "what changed" line was blank by construction.
   *
-  * ── WHY THERE ARE NO NOTIFY FLAGS ───────────────────────────────────────────
-  * A "notify the client / the agent" switch looks like the obvious companion to
-  * this field, and this dialog never offered one. F79 settled the question for
-  * the whole product: the endpoint no longer accepts `notifyClient` /
-  * `notifyAgent` at all, the publish service no longer declares them, and the
-  * hub's publish modal — which did render them — lost them too. They changed
-  * nothing about who was told (delivery is decided by the workspace's own
-  * report-published automation rules) while the publish audit entry recorded the
-  * flag as given, so a publish marked "do not notify" read as one that notified
-  * nobody while every rule fired as usual. Do not add such a switch here: there
-  * is no longer a field on the wire for it to bind to, and adding one back would
-  * make this dialog a second authority over a decision the rules already own.
+  * ── THE NOTIFY CHOICE IS FOR REVISIONS ONLY ─────────────────────────────────
+  * F79 removed the old `notifyClient` / `notifyAgent` switches because the endpoint ignored them while the audit row
+  * recorded them. One choice is back and it is honoured: on a REVISION the inspector decides here whether the client is
+  * told that the report was updated (unchecked by default, so a revision tells nobody unless asked). A first publish has
+  * no such box: the workspace's own report-published rules decide, as before. There is no agent switch.
   */
  isAmendment: boolean;
+ /**
+  * Whether the server will honour the notice choice for this publish: the report was reopened with "Edit and republish"
+  * (in progress, published once). Separate from `isAmendment`, which only decides whether the dialog asks what changed:
+  * a republish after a retract has earlier versions but is a fresh delivery the automation rules decide, so it offers no
+  * choice and the dialog says nothing about notices beyond the first-publish sentence.
+  */
+ noticeChoice?: boolean;
+ /** Set when the server answered the last publish as unchanged: the version still current. The receipt says nothing was published. */
+ unchangedSinceVersion?: number | null;
  /** Whether to auto-sign the report on publish. */
  autoSign: boolean;
  /** Handler for the auto-sign checkbox. */
  onAutoSignToggle: (checked: boolean) => void;
 }
 
-export function PublishModal({ open, inspectionId, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, coolingUnlockAtMs }: PublishModalProps) {
+export function PublishModal({ open, inspectionId, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle, isAmendment, noticeChoice = false, unchangedSinceVersion = null, coolingUnlockAtMs }: PublishModalProps) {
  // The order lifecycle does not gate publishing (report and order axes are
  // independent). When the on-site work is not yet marked complete, offer an
  // advisory choice — do both, or just publish — but never block.
@@ -98,14 +100,24 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
   * string that would render as a reason nobody wrote.
   */
  const [summary, setSummary] = useState("");
- const extras = (): PublishExtras =>
-  isAmendment && summary.trim() ? { summary: summary.trim() } : {};
+ // Unchecked every time the dialog opens: telling a client is a decision made for THIS revision.
+ const [notifyClient, setNotifyClient] = useState(false);
+ const extras = (): PublishExtras => ({
+  ...(isAmendment && summary.trim() ? { summary: summary.trim() } : {}),
+  ...(noticeChoice && notifyClient ? { notifyClient: true } : {}),
+ });
+ /**
+  * What THIS submission was, held in state so the receipt cannot lag: the order reads as published straight after a
+  * first publish, so the live props no longer say what was submitted. `null` until something is submitted.
+  */
+ const [submitted, setSubmitted] = useState<{ choice: boolean; notify: boolean } | null>(null);
+ useEffect(() => { if (!open) setNotifyClient(false); }, [open]);
  const [receiptOpen, setReceiptOpen] = useState(false);
  // Two clicks in one frame both run before `isSubmitting` has rendered. The caller can also decline
  // before it submits (the human check is dismissed), which never raises `isSubmitting`, so the latch
  // reopens one macrotask later instead of waiting for a `isSubmitting` change.
  const latch = useActionLatch(isSubmitting);
- const publish = (markComplete: boolean) => latch(() => onPublish(markComplete, extras()));
+ const publish = (markComplete: boolean) => latch(() => { setSubmitted({ choice: noticeChoice, notify: noticeChoice && notifyClient }); onPublish(markComplete, extras()); });
  /** Set while a publish is in flight, so a plain Cancel shows no receipt. */
  const submitSeen = useRef(false);
  /**
@@ -181,7 +193,7 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
      a client with nothing. Both sentences are needed: the first says what
      was achieved, the second says what was not. */}
  {m.report_publish_body_finalize()}{" "}
- <span className="block mt-2">{m.report_publish_body_delivery()}</span>
+ <span className="block mt-2">{noticeChoice ? m.report_publish_body_delivery_amendment() : m.report_publish_body_delivery()}</span>
  {progress.pct < 100 && (
  <span className="block mt-2 text-ih-watch font-medium">
  {m.editor_publish_warning({ rated: progress.rated, total: progress.total, pct: progress.pct })}
@@ -236,7 +248,18 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
  />
  </label>
  )}
- <label className="mt-4 inline-flex items-center gap-2 text-[12px] font-medium text-ih-fg-3 cursor-pointer select-none">
+ {noticeChoice && (
+ <label className="mt-4 flex items-center gap-2 text-[12px] font-medium text-ih-fg-2 cursor-pointer select-none">
+ <input
+  type="checkbox"
+  checked={notifyClient}
+  onChange={(e) => setNotifyClient(e.target.checked)}
+  className="h-3.5 w-3.5 rounded border-ih-border-strong text-ih-primary"
+ />
+ {m.editor_publish_notify_client()}
+ </label>
+ )}
+ <label className="mt-4 flex items-center gap-2 text-[12px] font-medium text-ih-fg-3 cursor-pointer select-none">
  <input
   type="checkbox"
   checked={autoSign}
@@ -249,7 +272,7 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
  <Modal
  open={receiptOpen}
  onClose={() => setReceiptOpen(false)}
- title={m.report_publish_receipt_title()}
+ title={unchangedSinceVersion !== null ? m.report_publish_receipt_title_unchanged() : m.report_publish_receipt_title()}
  footer={
   <>
   <Button variant="ghost" onClick={() => setReceiptOpen(false)}>{m.common_close()}</Button>
@@ -264,11 +287,14 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
   </>
  }
  >
- <p className="text-[13px] text-ih-fg-2">{m.report_publish_receipt_nothing_sent()}</p>
- {/* The SAME sentence the dialog showed BEFORE publishing. The promise and the
-     receipt have to agree word for word, or one of the two is where the reader
-     learns something new at the wrong moment. */}
- <p className="mt-2 text-[13px] text-ih-fg-3">{m.report_publish_body_delivery()}</p>
+ {/* An unchanged publish published nothing, so "final, new version recorded" would contradict it; its own sentence below says all there is to say. */}
+ {unchangedSinceVersion === null && <p className="text-[13px] text-ih-fg-2">{m.report_publish_receipt_nothing_sent()}</p>}
+ {/* What was sent, in the receipt's own words. A first publish repeats the SAME sentence the dialog showed before
+     publishing, so promise and receipt agree word for word. A revision cannot: its dialog points at a box that is gone
+     here, so the receipt states which way the submitted choice went. */}
+ <p className={unchangedSinceVersion !== null ? "text-[13px] text-ih-fg-2" : "mt-2 text-[13px] text-ih-fg-3"}>
+ {unchangedSinceVersion !== null ? m.report_publish_receipt_unchanged({ version: unchangedSinceVersion }) : !submitted?.choice ? m.report_publish_body_delivery() : submitted.notify ? m.report_publish_receipt_amendment_notified() : m.report_publish_receipt_amendment_not_notified()}
+ </p>
  </Modal>
  </>
  );

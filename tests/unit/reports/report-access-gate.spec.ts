@@ -25,8 +25,8 @@ describe('publicReportAccessAllowed', () => {
  * Client/token access must be revoked (403 NOT_PUBLISHED) while the report is not
  * published; owner-preview and render-token paths bypass.
  */
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { OpenAPIHono } from '@hono/zod-openapi';
 import publicReportRoutes from '../../../server/api/public-report';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -94,7 +94,7 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
         app.use('*', async (c, next) => {
             // The gate runs drizzle(c.env.DB); the drizzle mock ignores its arg and
             // returns the seeded db, but c.env.DB must be a defined property.
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding };
             c.set('services', {
                 portalAccess: { resolveToken },
                 inspection: { getReportData, resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken },
@@ -115,7 +115,7 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
     });
 
     afterEach(() => sqlite.close());
@@ -175,7 +175,7 @@ describe('GET /api/public/report/:tenant/:id/photo — publish gate', () => {
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         // Seed tenant + inspection with report_status='in_progress'
         await db.insert(schema.tenants).values({
@@ -196,7 +196,7 @@ describe('GET /api/public/report/:tenant/:id/photo — publish gate', () => {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             // PHOTOS is intentionally absent — the gate must fire before the PHOTOS check
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} } as any;
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding } as any;
             c.set('services', {
                 portalAccess: { resolveToken: vi.fn().mockResolvedValue({
                     inspectionId: ID, tenantId: T, role: 'client',
@@ -226,7 +226,7 @@ describe('GET /api/public/report/:tenant/:id/pdf — publish gate', () => {
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         // Seed tenant + inspection with report_status='in_progress'
         await db.insert(schema.tenants).values({
@@ -246,7 +246,7 @@ describe('GET /api/public/report/:tenant/:id/pdf — publish gate', () => {
     it('403 NOT_PUBLISHED when report_status=in_progress (pure client endpoint)', async () => {
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            c.env = { DB: {}, BROWSER: {}, PHOTOS: {} } as any; // BROWSER+PHOTOS must be truthy to pass the 503 guard
+            c.env = { DB: testD1.binding, BROWSER: {}, PHOTOS: {} } as any; // BROWSER+PHOTOS must be truthy to pass the 503 guard
             c.set('services', {
                 portalAccess: { resolveToken: vi.fn().mockResolvedValue({ inspectionId: ID, tenantId: T, role: 'client', recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null }) },
                 inspection: { resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
@@ -274,7 +274,7 @@ describe('GET /api/public/verify/report/:token — reflects current publish stat
         db = setup.db as BetterSQLite3Database<typeof schema>;
         sqlite = setup.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         // Seed tenant + inspection with report_status='in_progress' (unpublished).
         await db.insert(schema.tenants).values({
@@ -299,7 +299,7 @@ describe('GET /api/public/verify/report/:token — reflects current publish stat
         });
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: testD1.binding };
             c.set('services', { reportVersion: { verifyByToken } } as any);
             await next();
         });

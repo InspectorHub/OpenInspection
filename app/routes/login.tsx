@@ -2,6 +2,7 @@ import { Form, useActionData, useLoaderData, useNavigation, redirect } from "rea
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/login";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { getToken, createSessionWithToken, isTokenExpired } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeLoginSchema } from "~/lib/forms/auth.schema";
@@ -72,6 +73,7 @@ async function completeTwoFactor(
   context: Route.ActionArgs["context"],
   formData: FormData,
   challengeToken: string,
+  crossSite: boolean,
 ) {
   const code = String(formData.get("code") ?? "").trim();
   const returnTo = formData.get("returnTo");
@@ -87,6 +89,9 @@ async function completeTwoFactor(
     returnTo: typeof returnTo === "string" ? returnTo : "",
     app: formData.get("app") === "1",
   };
+
+  // A form posted from another site is refused before anything is spent or any session is created (login CSRF).
+  if (crossSite) return { ...again, error: m.auth_login_2fa_error_failed() };
 
   if (code.length < 6) {
     return { ...again, error: m.auth_login_2fa_error_code_required() };
@@ -123,7 +128,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   // someone who has already proved their password.
   const challengeToken = formData.get("challengeToken");
   if (typeof challengeToken === "string" && challengeToken.length > 0) {
-    return completeTwoFactor(context, formData, challengeToken);
+    return completeTwoFactor(context, formData, challengeToken, isCrossSitePost(request));
   }
 
   // Same schema as the client (Conform onValidate) — defends the API and powers
@@ -133,6 +138,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply();
   }
   const { email, password } = submission.value;
+  // A form posted from another site is refused before anything is spent or any session is created (login CSRF).
+  if (isCrossSitePost(request)) return submission.reply({ formErrors: [m.auth_login_2fa_error_failed()] });
 
   try {
     const api = createApi(context);

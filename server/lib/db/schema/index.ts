@@ -159,3 +159,6 @@ export type {
 // sparse switch diff, copied onto an invite or a member when applied. No live link.
 export { permissionTemplates } from './permission-template';
 export type { PermissionTemplateRow, NewPermissionTemplateRow } from './permission-template';
+// Attempt counters of the signed audit export's knowledge check (atomic reserve, short-lived rows).
+export { verifyExportAttempts } from './verify-export-attempts';
+export type { VerifyExportAttempt } from './verify-export-attempts';

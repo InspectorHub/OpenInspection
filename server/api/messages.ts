@@ -28,26 +28,27 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { mounted, type ApiOf } from '../lib/api-schema';
 import { z } from '@hono/zod-openapi';
+import { getDrizzle } from '../lib/route-helpers';
 import { requireRole } from '../lib/middleware/rbac';
-import { Errors } from '../lib/errors';
-import { detectMime } from '../lib/file-validation';
+import { AppError, Errors } from '../lib/errors';
+import { serveAttachment, storeAttachment, verifyAttachments, MAX_BYTES as ATTACHMENT_MAX_BYTES } from '../lib/message-attachment';
+import { declaredLengthRefusal } from '../lib/declared-length';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { resolveClientActor } from '../lib/portal-client-actor';
 import { buildPortalUrl } from '../lib/portal-urls';
 import { getBaseUrl, resolveTenantSlug } from '../lib/url';
 import type { HonoConfig } from '../types/hono';
-import { r2Keys } from '../lib/r2-keys';
 import { messageThreadRoutes, messageThreadRouteConfigs } from './messages-threads';
 import { clientMessageListRoute, clientMessageSendRoute } from './messages-client-routes';
 import { resolveInspectionScope } from '../lib/inspection/visibility';
-import { r2Get } from '../lib/r2/objects';
+import { projectClientMessage } from '../lib/client-message-view';
 
 const AttachmentSchema = z.object({
-    id: z.string().describe('Stable attachment identifier within the message.'),
-    key: z.string().describe('R2 object key the attachment bytes are stored under.'),
-    name: z.string().describe('Original uploaded filename.'),
+    id: z.string().max(64).describe('Stable attachment identifier within the message.'),
+    key: z.string().max(300).describe('R2 object key the attachment bytes are stored under.'),
+    name: z.string().max(255).describe('Original uploaded filename.'),
     size: z.number().describe('Attachment size in bytes.'),
-    type: z.string().describe('Detected MIME type of the attachment.'),
+    type: z.string().max(100).describe('Detected MIME type of the attachment.'),
     uploadedAt: z.number().describe('Epoch-ms timestamp the attachment was uploaded.'),
 });
 
@@ -89,6 +90,7 @@ const sendRoute = createRoute(withMcpMetadata({
     responses: {
         201: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('Whether the request succeeded.'), data: z.any().describe('The created message row.') }).describe('Created message.') } }, description: 'Created' },
         401: { description: 'Unauthorized' },
+        503: { description: 'Attachment storage could not be read' },
     },
     operationId: 'createMessageInspection',
     summary: 'Send a message to a client (inspector)',
@@ -107,6 +109,7 @@ const uploadRoute = createRoute(withMcpMetadata({
             success: z.boolean().describe('Whether the request succeeded.'),
             data: AttachmentSchema.describe('The stored attachment descriptor.'),
         }) } }, description: 'OK' },
+        503: { description: 'Attachment storage could not be written' },
     },
     operationId: 'uploadMessageInspection',
     summary: 'Upload a message attachment (inspector)',
@@ -126,6 +129,7 @@ const attachmentRoute = createRoute(withMcpMetadata({
     responses: {
         200: { content: { 'application/octet-stream': { schema: z.any() } }, description: 'Attachment bytes' },
         404: { description: 'Not found' },
+        503: { description: 'Attachment storage could not be read' },
     },
     operationId: 'downloadMessageAttachmentInspection',
     summary: 'Download a message attachment (inspector)',
@@ -151,44 +155,6 @@ const unreadRoute = createRoute(withMcpMetadata({
 
 // ── helpers (shared upload logic) ────────────────────────────────────────────
 
-/** Validate + persist a multipart attachment to R2; returns the descriptor. */
-async function storeAttachment(
-    photos: R2Bucket | undefined,
-    file: File | undefined,
-    tenantId: string,
-): Promise<{ id: string; key: string; name: string; size: number; type: string; uploadedAt: number }> {
-    if (!file) throw Errors.BadRequest('file required');
-    if (file.size > 10 * 1024 * 1024) throw Errors.BadRequest('file too large (max 10MB)');
-    const buf = new Uint8Array(await file.arrayBuffer());
-    const detected = detectMime(buf);
-    if (!detected && !file.name.toLowerCase().endsWith('.heic')) throw Errors.BadRequest('unsupported file type');
-    const id = crypto.randomUUID();
-    const ext = (file.name.split('.').pop() || 'bin').toLowerCase().slice(0, 8);
-    // Each upload gets a fresh UUID (id) that serves as both the message bucket
-    // and the attachment id — the attachment IS the addressable unit here.
-    const key = r2Keys.messageAttachment(tenantId, id, id, ext);
-    if (!photos) throw Errors.BadRequest('Storage not available');
-    await photos.put(key, buf, { httpMetadata: { contentType: detected ?? file.type } });
-    return { id, key, name: file.name, size: file.size, type: detected ?? file.type, uploadedAt: Date.now() };
-}
-
-/** Stream a resolved attachment descriptor from R2 with a safe filename. */
-function streamAttachment(
-    obj: R2ObjectBody,
-    att: { name: string; type: string },
-): Response {
-    // Sanitize the filename for the Content-Disposition header (strip quotes and
-    // control/path characters) so a crafted attachment name can't inject header
-    // tokens.
-    const safeName = (att.name || 'attachment').replace(/["\\\r\n]/g, '').replace(/[/\\]/g, '_').slice(0, 200);
-    const headers = new Headers();
-    headers.set('Content-Type', att.type || obj.httpMetadata?.contentType || 'application/octet-stream');
-    headers.set('Content-Disposition', `attachment; filename="${safeName}"`);
-    headers.set('Cache-Control', 'private, max-age=300');
-    if (obj.httpEtag) headers.set('etag', obj.httpEtag);
-    return new Response(obj.body, { status: 200, headers });
-}
-
 /** Sending into an inspection's thread is the assignee's act (or `scheduleOthers`). */
 async function guardMessageSend(c: Context<HonoConfig>, next: Next) {
     await assertMayActOnInspection(c, c.req.param('inspectionId') ?? '', 'message its client');
@@ -208,12 +174,14 @@ inspectorMessageRoutes.openapi(listRoute, async (c) => {
     // that shows them all).
     // Reading stays company-wide; clearing the counts is the assignee's act.
     if (await mayActOnInspection(c, inspectionId)) await svc.markInspectionReadForStaff(inspectionId, tenantId);
-    return c.json({ success: true, data: messages }, 200);
+    return c.json({ success: true, data: messages }, 200); // projection-allow: inspector route behind the session middleware: the staff view of the conversation
 });
 inspectorMessageRoutes.openapi(sendRoute, async (c) => {
     const { inspectionId } = c.req.valid('param');
     const tenantId = c.get('tenantId');
     const { body, attachments, contactId } = c.req.valid('json');
+    const stored = await verifyAttachments(c.env.PHOTOS, attachments ?? [], tenantId, inspectionId);
+    if (!stored) throw Errors.BadRequest('Check the attachments and try again.');
     const jwtUser = c.get('user');
     const svc = c.var.services.message;
     // Which thread this reply belongs to: the named contact's (compose
@@ -231,11 +199,9 @@ inspectorMessageRoutes.openapi(sendRoute, async (c) => {
     const authorId = (jwtUser as { sub?: string } | undefined)?.sub ?? null;
     let authorName: string | null = (jwtUser as { name?: string } | undefined)?.name ?? null;
     if (!authorName && authorId) {
-        const { drizzle } = await import('drizzle-orm/d1');
         const { users } = await import('../lib/db/schema');
         const { and, eq } = await import('drizzle-orm');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const u = await drizzle(c.env.DB as any).select({ name: users.name }).from(users)
+        const u = await getDrizzle(c).select({ name: users.name }).from(users)
             .where(and(eq(users.id, authorId), eq(users.tenantId, tenantId))).get();
         authorName = u?.name ?? null;
     }
@@ -247,7 +213,7 @@ inspectorMessageRoutes.openapi(sendRoute, async (c) => {
         fromUserId: authorId,
         fromName: authorName,
         body,
-        attachments: attachments ?? [],
+        attachments: stored,
     });
     // T22: notify the THREAD's contact — not unconditionally the primary
     // client. Build a unified-portal Messages deep-link the same way the
@@ -270,23 +236,21 @@ inspectorMessageRoutes.openapi(sendRoute, async (c) => {
             contactEmail: thread.email ?? undefined,
         });
     } catch { /* silent */ }
-    return c.json({ success: true, data: row }, 201);
+    return c.json({ success: true, data: row }, 201); // projection-allow: inspector route behind the session middleware: the staff view of the created message
 });
 inspectorMessageRoutes.openapi(uploadRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const fd = await c.req.parseBody();
-    const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, tenantId);
-    return c.json({ success: true, data }, 200);
+    const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, tenantId, c.req.valid('param').inspectionId);
+    return c.json({ success: true, data }, 200); // projection-allow: inspector route behind the session middleware: the descriptor of the file just uploaded
 });
 inspectorMessageRoutes.openapi(attachmentRoute, async (c) => {
     const { inspectionId, attachmentId } = c.req.valid('param');
     const tenantId = c.get('tenantId');
     const att = await c.var.services.message.resolveAttachmentForInspection(inspectionId, tenantId, attachmentId);
-    if (!att) throw Errors.NotFound('Attachment not found');
-    if (!c.env.PHOTOS) throw Errors.NotFound('Storage not available');
-    const obj = await r2Get(c.env.PHOTOS, att.key);
-    if (!obj) throw Errors.NotFound('Attachment not found');
-    return streamAttachment(obj, att);
+    const download = att ? await serveAttachment(c.env.PHOTOS, att, tenantId) : null;
+    if (!download) throw Errors.NotFound('Attachment not found');
+    return download;
 });
 
 export const inspectorMessageRouteConfigs = [listRoute, sendRoute, uploadRoute, attachmentRoute] as const;
@@ -298,7 +262,7 @@ const messageRoutes = createApiRouter();
 messageRoutes.openapi(unreadRoute, async (c) => {
     const tenantId = c.get('tenantId');
     const count = await c.var.services.message.unreadCountForTenant(tenantId, await resolveInspectionScope(c));
-    return c.json({ success: true, data: { count } }, 200);
+    return c.json({ success: true, data: { count } }, 200); // projection-allow: inspector route behind the session middleware: an unread count
 });
 messageRoutes.route('/', messageThreadRoutes);
 
@@ -312,7 +276,7 @@ export type InspectorMessagesApi = ApiOf<typeof inspectorMessageRouteConfigs>;
 const sendBodySchema = z.object({
     body: z.string().min(1).max(5000),
     attachments: z.array(z.object({
-        id: z.string(), key: z.string(), name: z.string(), size: z.number(), type: z.string(), uploadedAt: z.number(),
+        id: z.string().max(64), key: z.string().max(300), name: z.string().max(255), size: z.number(), type: z.string().max(100), uploadedAt: z.number(),
     })).max(5).optional(),
 });
 
@@ -328,9 +292,9 @@ clientMessageRoutes.openapi(clientMessageListRoute, async (c) => {
     // thread the moment one of them looked (per-contact threading, design §3.9).
     const thread = await svc.resolveThreadContact(actor.tenantId, inspectionId, actor.ref);
     const all = await svc.listForInspection(inspectionId, actor.tenantId);
-    const messages = thread ? all.filter((mrow) => mrow.contactId === thread.contactId) : all;
+    const messages = thread ? all.filter((mrow) => mrow.contactId === thread.contactId) : []; // a caller with no seat has no thread, so the list is empty
     if (thread) await svc.markThreadReadForContact(actor.tenantId, thread.contactId, inspectionId);
-    return c.json({ success: true as const, data: messages }, 200);
+    return c.json({ success: true as const, data: messages.map((message) => projectClientMessage(message)) }, 200);
 });
 
 clientMessageRoutes.openapi(clientMessageSendRoute, async (c) => {
@@ -338,7 +302,14 @@ clientMessageRoutes.openapi(clientMessageSendRoute, async (c) => {
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
     const parsed = sendBodySchema.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: 'Invalid message payload.' }, 400);
+    let stored: Awaited<ReturnType<typeof verifyAttachments>>;
+    try {
+        stored = parsed.success ? await verifyAttachments(c.env.PHOTOS, parsed.data.attachments ?? [], actor.tenantId, inspectionId) : null;
+    } catch (err) {
+        if (err instanceof AppError && err.status === 503) return c.json({ error: 'Attachment storage is unavailable.' }, 503);
+        throw err;
+    }
+    if (!parsed.success || !stored) return c.json({ error: 'Invalid message payload.' }, 400);
     const svc = c.var.services.message;
     // Attribution goes through the actor's OWN seat (matched by their verified
     // email), not unconditionally through the primary client — the old path is
@@ -352,7 +323,7 @@ clientMessageRoutes.openapi(clientMessageSendRoute, async (c) => {
         fromRole: 'client',
         fromName: thread.name ?? actor.ref,
         body: parsed.data.body,
-        attachments: parsed.data.attachments ?? [],
+        attachments: stored,
     });
     // T22: notify inspector
     try {
@@ -360,7 +331,7 @@ clientMessageRoutes.openapi(clientMessageSendRoute, async (c) => {
             db: c.env.DB, kv: c.env.TENANT_CACHE, baseUrl: c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`,
         });
     } catch { /* silent */ }
-    return c.json({ success: true as const, data: row }, 201);
+    return c.json({ success: true as const, data: projectClientMessage(row) }, 201);
 });
 
 // POST /api/public/inspections/:id/messages/upload — attach a file (client).
@@ -368,13 +339,16 @@ clientMessageRoutes.post('/inspections/:id/messages/upload', async (c) => {
     const inspectionId = c.req.param('id');
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
+    // A link holder can send any body: its declared size is checked before the multipart is buffered.
+    const refused = declaredLengthRefusal(c, ATTACHMENT_MAX_BYTES, { error: 'Upload rejected.' });
+    if (refused) return refused;
     const fd = await c.req.parseBody();
     try {
-        const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, actor.tenantId);
-        return c.json({ success: true, data }, 200);
+        const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, actor.tenantId, inspectionId);
+        return c.json({ success: true, data }, 200); // projection-allow: the descriptor of the file just uploaded; the sender posts it back with its key, which the send route validates
     } catch (err) {
-        const status = (err as { status?: number })?.status;
-        return c.json({ error: 'Upload rejected.' }, status === 400 ? 400 : 400);
+        if (err instanceof AppError && err.status === 503) return c.json({ error: 'Attachment storage is unavailable.' }, 503);
+        return c.json({ error: 'Upload rejected.' }, 400);
     }
 });
 
@@ -384,12 +358,15 @@ clientMessageRoutes.get('/inspections/:id/messages/attachments/:attachmentId', a
     const attachmentId = c.req.param('attachmentId');
     const actor = await resolveClientActor(c, inspectionId);
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
-    const att = await c.var.services.message.resolveAttachmentForInspection(inspectionId, actor.tenantId, attachmentId);
-    if (!att) return c.json({ error: 'Not found' }, 404);
-    if (!c.env.PHOTOS) return c.json({ error: 'Not found' }, 404);
-    const obj = await r2Get(c.env.PHOTOS, att.key);
-    if (!obj) return c.json({ error: 'Not found' }, 404);
-    return streamAttachment(obj, att);
+    // A client downloads the attachments of its own thread.
+    const thread = await c.var.services.message.resolveThreadContact(actor.tenantId, inspectionId, actor.ref);
+    const att = thread ? await c.var.services.message.resolveAttachmentForInspection(inspectionId, actor.tenantId, attachmentId, thread.contactId) : null;
+    try {
+        return (att ? await serveAttachment(c.env.PHOTOS, att, actor.tenantId) : null) ?? c.json({ error: 'Not found' }, 404);
+    } catch (err) {
+        if (err instanceof AppError && err.status === 503) return c.json({ error: 'Attachment storage is unavailable.' }, 503);
+        throw err;
+    }
 });
 
 export const clientMessageRouteConfigs = [clientMessageListRoute, clientMessageSendRoute] as const;

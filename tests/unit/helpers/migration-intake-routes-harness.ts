@@ -7,8 +7,8 @@
  * email provider and an R2 double. A per-file copy of that harness is how one
  * spec ends up asserting against a context the route never actually sees.
  *
- * It does NOT mock `drizzle-orm/d1`. That call has to be hoisted inside the
- * spec file that wants it, and a helper cannot do it on the spec's behalf.
+ * The database is real: a spec points `intakeD1` at its in-memory database
+ * (`intakeD1.use(db)`) and `intakeRequest` hands that binding to the routes.
  */
 import { vi } from 'vitest';
 import { Hono } from 'hono';
@@ -23,6 +23,10 @@ import { limitsFor } from '../../../server/lib/migration-intake/limits';
 import { MigrationStageService } from '../../../server/services/migration-intake/stage.service';
 import { r2Keys } from '../../../server/lib/r2-keys';
 import type { MigrationIntent } from '../../../server/lib/db/schema';
+import { d1For, lazyD1 } from './d1-binding';
+
+/** The binding the routes read; a spec calls `intakeD1.use(db)` once its database exists. */
+export const intakeD1 = lazyD1();
 
 export const TENANT = '11111111-1111-1111-1111-1111111111a1';
 export const OTHER = '33333333-3333-3333-3333-3333333333c3';
@@ -117,7 +121,7 @@ export function intakeApp(opts: IntakeAppOpts) {
 }
 
 export function intakeRequest(opts: IntakeAppOpts, path: string, init?: RequestInit) {
-    return intakeApp(opts).request(path, init, { DB: {}, PHOTOS: intakeBucket(opts.store) });
+    return intakeApp(opts).request(path, init, { DB: intakeD1.binding, PHOTOS: intakeBucket(opts.store) });
 }
 
 /** A JSON request body with the header a zod-openapi route needs to read it. */
@@ -214,7 +218,7 @@ export async function stageIntakeRun(
     const tenantId = params.tenantId ?? TENANT;
     const sourceKey = r2Keys.migrationSource(tenantId, 'seed', 'csv');
     store.set(sourceKey, new TextEncoder().encode(params.sourceText ?? CONTACTS_CSV));
-    const staged = await new MigrationStageService({} as D1Database).stage({
+    const staged = await new MigrationStageService(d1For(db)).stage({
         tenantId,
         createdBy: USER,
         intent: params.intent,

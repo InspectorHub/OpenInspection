@@ -6,7 +6,7 @@
  * sellingAgentId, or clientContactId that belongs to a different tenant
  * before inserting the inspections row.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionCoreService } from '../../../server/services/inspection/inspection-core.service';
 import { PeopleService } from '../../../server/services/people.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
@@ -17,8 +17,8 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const T1 = '00000000-0000-0000-0000-000000000001';
 const T2 = '00000000-0000-0000-0000-000000000002';
@@ -53,15 +53,14 @@ describe('InspectionCoreService.createInspection — cross-tenant contact valida
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(db);
+        testD1.use(db);
         await seedFixtures(db);
     });
 
     function makeSvc(tenantId: string) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sdb = new ScopedDB(db as any, tenantId);
-        return new InspectionCoreService({} as D1Database, undefined, sdb);
+        return new InspectionCoreService(testD1.binding, undefined, sdb);
     }
 
     // -------------------------------------------------------------------------
@@ -123,7 +122,7 @@ describe('InspectionCoreService.createInspection — cross-tenant contact valida
 
         // Task 13 dropped inspections.referredByAgentId — the buyer_agent
         // link now lives ONLY in inspection_people.
-        const buyerAgentContactId = await new PeopleService({ DB: {} as D1Database })
+        const buyerAgentContactId = await new PeopleService({ DB: testD1.binding })
             .contactIdForRole(T1, created.id, 'buyer_agent');
         expect(buyerAgentContactId).toBe(CONTACT_T1);
     });

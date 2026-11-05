@@ -1,20 +1,19 @@
 /**
  * IA-33 (boundary A) — getReportData spreads the whole inspections row into
- * data.inspection, and GET /api/public/report/:tenant/:id returns that data
- * verbatim to any holder of the link (incl. agent-kind tokens). The row
- * carries `internal_notes` (inspector's private notes) and `price_cents`
- * (commercial pricing), which the account track explicitly withholds from
- * agents at the schema layer. The public report track must not expose them
- * just because the current SSR page happens not to render them.
+ * data.inspection. The row carries `internal_notes` (inspector's private notes)
+ * and `price_cents` (commercial pricing), which the account track withholds
+ * from agents at the schema layer, so the service removes both. The response
+ * for a report link is built from field lists (see report-link-response.spec.ts);
+ * this spec pins the service-level removal, which stays as a second layer.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = 'aa000000-0000-0000-0000-000000000001';
 const INSPECTION = 'cc000000-0000-0000-0000-000000000003';
@@ -27,9 +26,8 @@ describe('getReportData — public field projection (IA-33 boundary A)', () => {
         const fix = createTestDb();
         testDb = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        svc = new InspectionService({} as D1Database);
+        testD1.use(testDb);
+        svc = new InspectionService(testD1.binding);
         await testDb.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),

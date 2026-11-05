@@ -1,13 +1,12 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { drizzle } from 'drizzle-orm/d1';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { createTestDb, setupSchema } from '../db';
-import { asD1DrizzleReturn } from '../helpers/test-db';
 import * as schema from '../../../server/lib/db/schema';
 import { AnalyticsService } from '../../../server/services/analytics.service';
 import { ALL_INSPECTIONS, type InspectionScope } from '../../../server/lib/inspection/visibility';
 import { seedVisibilityFixture, TENANT, USERS, INSP, VISIBLE_TO_A, ALL_OF_TENANT } from '../helpers/visibility-fixture';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const A: InspectionScope = { kind: 'assigned', userId: USERS.inspA };
 
@@ -15,7 +14,7 @@ describe('analytics reads honour the scope', () => {
     let svc: AnalyticsService;
     beforeEach(async () => {
         const f = createTestDb(); await setupSchema(f.sqlite); await seedVisibilityFixture(f.db);
-        vi.mocked(drizzle).mockReturnValue(asD1DrizzleReturn(f.db));
+        testD1.use(f.db);
         // One rated item on each of two inspections. The rating matches no level, so each lands in `unresolved`,
         // which makes the number of inspections whose results were read directly countable.
         for (const id of [INSP.own, INSP.other]) {
@@ -24,7 +23,7 @@ describe('analytics reads honour the scope', () => {
                 data: { 'sec1:item1': { rating: 'zz-unknown' } }, lastSyncedAt: new Date(),
             });
         }
-        svc = new AnalyticsService({} as D1Database);
+        svc = new AnalyticsService(testD1.binding);
     });
     const total = (g: { months: Array<{ count: number }> }) => g.months.reduce((s, m) => s + m.count, 0);
 

@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, gte, lt, ne } from 'drizzle-orm';
 import { users, tenantConfigs } from '../lib/db/schema';
 import { inspections, inspectionInspectors } from '../lib/db/schema';
 import { resolveTenantTimeZone, wallClockToEpochMs } from '../lib/tz';
+import { icsUid, icsWindow } from '../lib/calendar/ics-uid';
 
 /**
  * The per-inspector iCal feeds.
@@ -44,7 +45,7 @@ interface FeedRow {
 }
 
 export class IcsService {
-    constructor(private db: D1Database, private host: string = 'openinspection') {}
+    constructor(private db: D1Database, private host: string = 'openinspection', private secret?: string) {}
 
     private getDrizzle() { return drizzle(this.db); }
 
@@ -88,6 +89,7 @@ export class IcsService {
      * lead is the person who owns the appointment.
      */
     private async leadAssignments(tenantId: string, userId: string): Promise<FeedRow[]> {
+        const span = icsWindow();
         return this.getDrizzle().select({
             id: inspections.id,
             date: inspections.date,
@@ -103,6 +105,9 @@ export class IcsService {
                 eq(inspectionInspectors.userId, userId),
                 eq(inspectionInspectors.role, 'lead'),
                 ne(inspections.status, 'cancelled'),
+                // A feed covers a window, not the inspector's whole history: yesterday through 90 days ahead.
+                gte(inspections.date, span.from),
+                lt(inspections.date, span.until),
             ))
             .all() as Promise<FeedRow[]>;
     }
@@ -141,18 +146,18 @@ export class IcsService {
         const tz = await this.tenantTimeZone(tenantId);
         const rows = await this.leadAssignments(tenantId, user.id);
 
-        const events = rows.map((r) => {
+        const events = await Promise.all(rows.map(async (r) => {
             const { startMs, endMs } = this.window(r, tz);
             return [
                 'BEGIN:VEVENT',
-                `UID:${r.id}@${this.host}`,
+                `UID:${await icsUid(this.secret, r.id, this.host)}`,
                 `DTSTART:${this.stamp(startMs)}`,
                 `DTEND:${this.stamp(endMs)}`,
                 'SUMMARY:Busy',
                 'TRANSP:OPAQUE',
                 'END:VEVENT',
             ].join('\r\n');
-        });
+        }));
         return this.wrap('Inspector Busy', events);
     }
 
@@ -165,12 +170,12 @@ export class IcsService {
         const tz = await this.tenantTimeZone(tenantId);
         const rows = await this.leadAssignments(tenantId, userId);
 
-        const events = rows.map((r) => {
+        const events = await Promise.all(rows.map(async (r) => {
             const { startMs, endMs } = this.window(r, tz);
             const address = IcsService.escape(r.propertyAddress ?? '');
             return [
                 'BEGIN:VEVENT',
-                `UID:${r.id}@${this.host}`,
+                `UID:${await icsUid(this.secret, r.id, this.host)}`,
                 `DTSTART:${this.stamp(startMs)}`,
                 `DTEND:${this.stamp(endMs)}`,
                 `SUMMARY:${address || 'Inspection'}`,
@@ -178,7 +183,7 @@ export class IcsService {
                 'TRANSP:OPAQUE',
                 'END:VEVENT',
             ].join('\r\n');
-        });
+        }));
         return this.wrap('Inspector Schedule', events);
     }
 }

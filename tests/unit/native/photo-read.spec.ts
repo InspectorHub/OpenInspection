@@ -189,7 +189,7 @@ describe('GET /api/inspections/{id}/photo with a native token (real app)', () =>
       expect(t.widths).toEqual([480]);
     });
 
-    it('control: with an image service the width is clamped to 16..2000, and no width means the original', async () => {
+    it('control: with an image service the width is clamped to the smallest and largest allowed, and no width means the original', async () => {
       const t = await setup();
       await t.get(MINE, keyOf(TENANT_ID, MINE), { query: '&w=5000', images: true });
       await t.get(MINE, keyOf(TENANT_ID, MINE), { query: '&w=abc', images: true });

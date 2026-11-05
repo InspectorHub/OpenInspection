@@ -19,6 +19,7 @@ import { eq, and } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { getDrizzle } from '../../lib/route-helpers';
+import { displaySignerStatus } from '../../services/agreement/base';
 
 /**
  * POST /api/inspections/:id/agreement-requests
@@ -201,7 +202,7 @@ const agreementsRoutes = createApiRouter()
                 agreement: { id: envelope.agreementId, name: agreementRow?.name ?? 'Agreement', content: snapshot.content },
                 requestId: env.requestId,
                 completionPolicy: envelope.completionPolicy,
-                signers: signerRows.map((s) => ({ id: s.id, name: s.name, email: s.email, role: s.role, status: s.status })),
+                signers: signerRows.map((s) => ({ id: s.id, name: s.name, email: s.email, role: s.role, status: displaySignerStatus(s) })),
             },
         }, 200);
     })

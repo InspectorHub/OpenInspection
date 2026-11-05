@@ -53,6 +53,7 @@ type ChainPaths =
     | '/:id/cost-items'
     | '/:id/cost-items/:itemId'
     | '/:id/cover'
+    | '/:id/edit-again'
     | '/:id/export/:exportId'
     | '/:id/export/:exportId/download'
     | '/:id/export/word'

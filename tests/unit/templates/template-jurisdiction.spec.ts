@@ -12,13 +12,13 @@
  * whose whole job is to say a pack is not for everybody. A template a workspace
  * authored itself names no catalogue entry and is general by definition.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { TestDb } from '../helpers/test-db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import { TemplateService } from '../../../server/services/template.service';
@@ -35,8 +35,8 @@ describe('listTemplates reports the jurisdiction a template is written to', () =
         db = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(db);
-        service = new TemplateService({} as unknown as D1Database);
+        testD1.use(db);
+        service = new TemplateService(testD1.binding);
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'jurisdiction', createdAt: new Date(),
         });

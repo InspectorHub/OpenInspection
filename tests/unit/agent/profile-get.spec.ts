@@ -6,12 +6,12 @@
  * real seeded data), and `toRawD1` supplies a D1Database-shaped value for
  * the (ignored, mocked-away) `rawDb` parameter.
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createTestDb, setupSchema, toRawD1 } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import { getProfile, updateProfile } from '../../../server/services/agent/profile';
 import { eq } from 'drizzle-orm';
@@ -23,8 +23,8 @@ describe('getProfile', () => {
     beforeEach(async () => {
         f = createTestDb();
         await setupSchema(f.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(f.db);
-        rawDb = toRawD1(f.sqlite);
+        testD1.use(f.db);
+        rawDb = testD1.binding;
 
         await f.db.insert(schema.users).values({
             id: 'ag1', tenantId: null, email: 'jane@x.com', role: 'agent', name: 'Jane',

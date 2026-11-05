@@ -17,7 +17,7 @@
  * never BE it — which is why the last block here proves an `ai_content_reviews`
  * row can name it as its artifact.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
@@ -32,8 +32,8 @@ import { recordContentReview } from '../../../server/lib/ai/content-review';
 import { AiContentReviewSchema } from '../../../server/lib/validations/ai.schema';
 import { ReportVersionService } from '../../../server/services/report-version.service';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-00000000na01';
 const OTHER_TENANT = '00000000-0000-0000-0000-00000000na02';
@@ -55,8 +55,7 @@ beforeEach(async () => {
     await setupSchema(fx.sqlite);
     // Both `recordContentReview` and `ReportVersionService` reach for
     // `drizzle(d1)` themselves; point that at the in-memory database.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockDrizzle as any).mockReturnValue(db);
+    testD1.use(db);
 
     for (const [id, name] of [[TENANT, 'Narrative Co'], [OTHER_TENANT, 'Someone Else']]) {
         await db.insert(schema.tenants).values({
@@ -146,7 +145,7 @@ describe('the narrative is not report_versions.summary', () => {
     it('publishing an amendment does not overwrite the narrative', async () => {
         await setReportNarrative(asD1(), TENANT, INSPECTION, REPORT, NARRATIVE);
 
-        const svc = new ReportVersionService({} as D1Database, 'test-encryption-secret-key');
+        const svc = new ReportVersionService(testD1.binding, 'test-encryption-secret-key', []);
         await svc.snapshotOnPublish(TENANT, INSPECTION, 'user-a', undefined, REPORT);
         const amended = await svc.snapshotOnPublish(
             TENANT, INSPECTION, 'user-a', AMENDMENT_REASON, REPORT,
@@ -225,7 +224,7 @@ describe('AI review evidence can name the narrative', () => {
 
     it("an ai_content_reviews row can be written with artifact_type 'report'", async () => {
         await recordContentReview({
-            db: {} as D1Database,
+            db: testD1.binding,
             tenantId: TENANT,
             artifactType: 'report',
             artifactId: REPORT,
@@ -249,7 +248,7 @@ describe('AI review evidence can name the narrative', () => {
         // rejected `report_version` for.
         await setReportNarrative(asD1(), TENANT, INSPECTION, REPORT, NARRATIVE);
         await recordContentReview({
-            db: {} as D1Database, tenantId: TENANT, artifactType: 'report',
+            db: testD1.binding, tenantId: TENANT, artifactType: 'report',
             artifactId: REPORT, reviewedBy: 'user-a', aiCallId: AI_CALL,
         });
 
@@ -262,7 +261,7 @@ describe('AI review evidence can name the narrative', () => {
 
     it('a retried review is still a no-op, and the two artifact types do not collide', async () => {
         const args = {
-            db: {} as D1Database, tenantId: TENANT, reviewedBy: 'user-a', aiCallId: AI_CALL,
+            db: testD1.binding, tenantId: TENANT, reviewedBy: 'user-a', aiCallId: AI_CALL,
         };
         await recordContentReview({ ...args, artifactType: 'report', artifactId: REPORT });
         await recordContentReview({ ...args, artifactType: 'report', artifactId: REPORT });

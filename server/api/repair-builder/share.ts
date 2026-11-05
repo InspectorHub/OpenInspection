@@ -9,8 +9,10 @@
  * combined RepairBuilderApi type and every route path/method stay identical.
  */
 
+import { RepairShareLineSchema } from '../../lib/validations/repair-request-view.schema';
 import { createRoute, z } from '@hono/zod-openapi';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { SHARE_EMAIL_MESSAGE_MAX } from '../../lib/repair-share-limits';
 
 // Share route schemas
 
@@ -23,14 +25,14 @@ const ShareViewResponseSchema = z.object({
     data: z.object({
         propertyAddress: z.string().nullable(),
         customIntro:     z.string().nullable(),
-        items:           z.array(z.any()),
+        items:           z.array(RepairShareLineSchema),
         creditTotal:     z.number(),
     }),
 });
 
 const ShareEmailBodySchema = z.object({
     to:      z.string().email('Invalid email address').describe('Recipient email address for the share link.'),
-    message: z.string().optional().describe('Optional personal message included in the email.'),
+    message: z.string().max(SHARE_EMAIL_MESSAGE_MAX).optional().describe('Optional personal message included in the email, up to 1000 characters.'),
 });
 
 export const shareViewRoute = createRoute(withMcpMetadata({
@@ -58,9 +60,10 @@ export const sharePdfRoute = createRoute(withMcpMetadata({
         200: { description: 'PDF binary' },
         403: { description: 'Report not published' },
         404: { description: 'Unknown share token' },
+        429: { description: 'Too many renders for this share link or company' },
     },
     operationId: 'getRepairRequestSharePdf',
-    description: 'Renders a PDF of the repair request share page via Browser Rendering. Report must be published.',
+    description: 'Renders a PDF of the repair request share page via Browser Rendering. A stored copy is served while the content is unchanged; a new render is rate-limited per share link and per company. Report must be published.',
 }, { scopes: [], tier: 'extended' }));
 
 export const shareEmailRoute = createRoute(withMcpMetadata({
@@ -77,7 +80,8 @@ export const shareEmailRoute = createRoute(withMcpMetadata({
         400: { description: 'Invalid request body' },
         403: { description: 'Report not published' },
         404: { description: 'Unknown share token' },
+        429: { description: 'Too many emails for this share link, recipient or company' },
     },
     operationId: 'emailRepairRequestShare',
-    description: 'Sends the share URL to a contractor or other recipient. Rate-limited. Report must be published.',
+    description: 'Sends the share URL to a contractor or other recipient. Limited per minute and per day per share link, per recipient address and per company. Report must be published.',
 }, { scopes: [], tier: 'extended' }));

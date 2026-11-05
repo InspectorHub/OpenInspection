@@ -1,5 +1,6 @@
 import { useLoaderData, useActionData, useNavigation, Form } from "react-router";
 import type { Route } from "./+types/sms-optin";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { createApi } from "~/lib/api-client.server";
 import { SmsDisclosure } from "~/components/notifications/SmsDisclosure";
 import { pendingProps, PENDING_CLASS } from "@core/shared-ui";
@@ -40,8 +41,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 /*  Action — confirm opt-in (BFF, no client fetch)                     */
 /* ------------------------------------------------------------------ */
 
-export async function action({ params, context }: Route.ActionArgs) {
+export async function action({ params, request, context }: Route.ActionArgs) {
     const token = params.token ?? "";
+    // Consent is given on this page only: a form posted from another site does not spend the token.
+    if (isCrossSitePost(request)) return { ok: false as const, error: m.sms_optin_error_confirm_failed() };
     try {
         const api = createApi(context);
         const res = (await api.smsPublic.sms["optin-confirm"].$post({

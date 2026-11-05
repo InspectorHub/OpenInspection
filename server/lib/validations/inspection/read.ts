@@ -219,7 +219,9 @@ export const InspectionHubSchema = z.object({
     title:  z.string().describe('Report title, snapshotted from the service line that produced it'),
     status: z.string().describe('in_progress | published'),
     publishedAt: z.string().nullable().describe('ISO instant THIS deliverable went out; null while unpublished'),
+    editingAgain: z.boolean().describe('True when a published report is open for editing again ("Edit and republish"): clients still read its latest published version, and its content accepts edits. False while it is published (locked) or a draft.'),
     versionCount: z.number().describe('Signed versions this report owns — part of what deleting it would destroy'),
+    latestVersionNumber: z.number().int().nullable().describe('The highest version number this report has signed, or null. Version numbers are monotonic per inspection, so with several reports they have gaps: this, not versionCount, is the "vN" a reader means.'),
     hasContent: z.boolean().describe('Whether its document has been written into ("information you already filled out")'),
     hasNarrative: z.boolean().describe("Whether the inspector has written the report-level narrative (reports.inspector_narrative). The FLAG, not the prose — the text is unbounded free text and comes from GET /{id}/reports/{reportId}/narrative."),
     canDelete: z.boolean().describe('Decided server-side by the same function the DELETE endpoint enforces, so the UI cannot offer an action the API refuses'),
@@ -280,7 +282,7 @@ export const AgreementRequestCreatedSchema = createApiResponseSchema(
   }),
 ).openapi('AgreementRequestCreatedResponse');
 
-export { ReportDataResponseSchema } from './report-data.schema';
+export { ReportDataResponseSchema, ReportDataFullSchema } from './report-data.schema';
 
 const InspectionListItemSchema = z.object({
     id:           z.string(),
@@ -310,6 +312,8 @@ const InspectionListItemSchema = z.object({
     inspectorName: z.string().nullable().describe('Display name of the assigned inspector. Null when unassigned.'),
     requestId:     z.string().nullable().describe('Multi-inspection request this booking belongs to. Null for a standalone booking.'),
     siblingCount:  z.number().nullable().describe('How many inspections share this `requestId`, including this one. Null when there is no request.'),
+    publishedVersionNumber: z.number().int().nullable().describe('The version of the report clients read, or null while clients see none (never published, or retracted).'),
+    editingAgain: z.boolean().describe('True while a published report is open for "Edit and republish": clients still read publishedVersionNumber and the inspector has unpublished edits.'),
 }).passthrough().openapi('InspectionListItem');
 
 // Sub-spec B Task 5 (B-4) — portfolio defectStats aggregated per top card.

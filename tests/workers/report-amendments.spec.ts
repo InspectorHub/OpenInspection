@@ -57,7 +57,7 @@ const migrationSql = import.meta.glob('../../migrations/*.sql', {
 const applyMigrations = () => replayMigrations(b.DB, migrationSql);
 
 function reportVersionService(): ReportVersionService {
-    return new ReportVersionService(b.DB, KEY_SECRET);
+    return new ReportVersionService(b.DB, KEY_SECRET, []);
 }
 
 /** Public verifier app: the real route handler + real services over real D1. */

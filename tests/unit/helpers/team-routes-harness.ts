@@ -13,6 +13,7 @@ import teamRoutes from '../../../server/api/team';
 import bulkRoutes from '../../../server/api/inspections/bulk';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { asScopedDbSource } from './test-db';
+import { d1For } from './d1-binding';
 import type * as schema from '../../../server/lib/db/schema';
 import type { HonoConfig } from '../../../server/types/hono';
 
@@ -28,7 +29,9 @@ export function buildTeamApp(
     app.onError((err, c) => (err instanceof AppError
         ? c.json({ success: false, error: { code: err.code, message: err.message } }, err.status)
         : c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500)));
+    const binding = d1For(db);
     app.use('*', async (c, next) => {
+        c.env = { ...c.env, DB: binding };
         c.set('userRole', role);
         c.set('tenantId', tenantId);
         c.set('user', { sub: userId, role, tenantId } as HonoConfig['Variables']['user']);
@@ -36,8 +39,8 @@ export function buildTeamApp(
         const sdb = new ScopedDB(asScopedDbSource(db), tenantId);
         c.set('sdb', sdb as unknown as HonoConfig['Variables']['sdb']);
         c.set('services', {
-            team: new TeamService({} as D1Database),
-            inspection: new InspectionService({} as D1Database, undefined, sdb),
+            team: new TeamService(binding),
+            inspection: new InspectionService(binding, undefined, sdb),
             email: { sendInvitation: vi.fn().mockResolvedValue(undefined) },
         } as unknown as HonoConfig['Variables']['services']);
         await next();

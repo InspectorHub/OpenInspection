@@ -17,11 +17,13 @@ import { eq, and } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { resolvePortalAccess } from '../lib/public-access';
+import type { AgentViewTokenRole } from '../services/inspection/inspection-sharing.service';
 import { isReportPublished } from '../lib/status/report-status';
 import { logger } from '../lib/logger';
 import { sendSuccess } from '../lib/response';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getDrizzle } from '../lib/route-helpers';
+import { checkRateLimit } from '../lib/rate-limit';
 
 const shareTokenRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -62,10 +64,13 @@ app.openapi(shareTokenRoute, async (c) => {
     // accept — and take the AUTHORITATIVE tenantId from it. The tenant is no
     // longer trusted from the URL-derived middleware value, which provided no
     // protection (it was resolved from the inspection id itself).
-    let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
+    // The new link acts in the role of the proof it was minted from: an agent's link stays an agent link, anything else is view-only.
+    const grant = await resolvePortalAccess(c.var.services.portalAccess, token, id);
+    let tenantId = grant?.tenantId ?? null;
+    let shareRole: AgentViewTokenRole = grant && (await c.var.services.portalAccess.getRoleKind(grant.tenantId, grant.role)) === 'agent' ? 'agent' : 'client';
     if (!tenantId && token) {
         const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
-        if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
+        if (legacy && legacy.inspectionId === id) { tenantId = legacy.tenantId; shareRole = legacy.role; }
     }
     if (!tenantId) throw Errors.NotFound('Inspection not found');
 
@@ -81,12 +86,15 @@ app.openapi(shareTokenRoute, async (c) => {
         throw Errors.Forbidden('Report has not been published yet');
     }
 
-    const shareToken = await c.var.services.inspection.generateAgentViewToken(tenantId, id);
+    // Each mint is a stored token with a 30-day lifetime, so minting is limited per inspection (after the proof above, so a caller with no proof
+    // costs nothing here). A report is shared a handful of times, not hundreds.
+    await checkRateLimit(c, 'share-token', id);
+    const shareToken = await c.var.services.inspection.generateAgentViewToken(tenantId, id, shareRole);
     const baseUrl = c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`;
     const tenantSlug = c.get('requestedTenantSlug') ?? '';
     const url = `${baseUrl}/report/${tenantSlug}/${id}?view=agent&token=${shareToken}`;
     logger.info('Public share-token minted', { inspectionId: id, tenantId });
-    return sendSuccess(c, { token: shareToken, url });
+    return sendSuccess(c, { token: shareToken, url }); // projection-allow: the share token this request just minted for the caller
 });
 
 // The browser CSP report receiver is the other unauthenticated public POST; it is mounted here

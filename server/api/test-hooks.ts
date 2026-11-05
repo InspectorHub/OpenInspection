@@ -15,6 +15,13 @@ import { segmentReport } from '../lib/translation/segment-report';
  */
 const testHooks = new Hono<HonoConfig>();
 
+// One gate for the whole router, ahead of every handler: a hook added later cannot forget to check the flag. The handlers keep their own
+// check as well (belt and braces), and the routes themselves stay in the build, which is a single bundle: absent flag, every path is a 404.
+testHooks.use('*', async (c, next) => {
+  if (c.env.E2E_EMAIL_SINK !== '1') return c.json({ error: 'Not found' }, 404);
+  return next();
+});
+
 testHooks.get('/last-email', async (c) => {
   // Fail closed: the route only exists when the sink is explicitly enabled.
   if (c.env.E2E_EMAIL_SINK !== '1') return c.json({ error: 'Not found' }, 404);

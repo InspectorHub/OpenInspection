@@ -41,14 +41,18 @@ export function badgeFormat(variant: BadgeVariant): string {
     return BADGE_VARIANTS[variant].format;
 }
 
+/** A credential badge served through a report link's photo route: `/api/public/report/<tenant>/<id>/photo?key=credentials%2F...`. */
+const REPORT_BADGE_URL = /^\/api\/public\/report\/[^/?]+\/[^/?]+\/photo\?key=credentials%2F/;
+
 /**
- * Append the variant to a `/api/public/brand-asset` URL.
+ * Append the variant to a `/api/public/brand-asset` URL, or to the report photo URL of a credential badge.
  *
  * A no-op for anything that is not one of our brand-asset paths, so a caller
  * holding an absolute or already-transformed URL passes it through unchanged.
  */
 export function badgeUrl(imageUrl: string | null, variant: BadgeVariant): string | null {
-    if (!imageUrl || !imageUrl.startsWith('/api/public/brand-asset?')) return imageUrl;
+    if (!imageUrl) return imageUrl;
+    if (!imageUrl.startsWith('/api/public/brand-asset?') && !REPORT_BADGE_URL.test(imageUrl)) return imageUrl;
     return `${imageUrl}&v=${variant}`;
 }
 

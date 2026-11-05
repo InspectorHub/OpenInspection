@@ -3,7 +3,8 @@
  *
  * Photo keys are shaped `${tenantId}/${inspectionId}/<prefix>_<uuid>_<original>`
  * (item photos: prefix = itemId; pool photos: prefix = `_pool`). We take the
- * final path segment and strip the leading `<prefix>_<uuid>_` so the trailing
+ * final path segment of a stored photo key, which a report response states relative
+ * to the company, and strip the leading `<prefix>_<uuid>_` so the trailing
  * original filename remains. This is a display label only — the authoritative
  * name (used for the download Content-Disposition) comes from the object's
  * stored `customMetadata.originalName` on the serve route.

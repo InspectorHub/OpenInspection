@@ -121,7 +121,8 @@ export async function resolveBuilderAccess(
     // Path 2: legacy KV agent-view token (existing share links).
     if (token) {
         const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
-        if (legacy && legacy.inspectionId === id) {
+        // Only a link issued for an agent may take the agent's seat; a view-only share link reads the report and nothing more.
+        if (legacy && legacy.inspectionId === id && legacy.role === 'agent') {
             const accessLevel = await agentLevel(legacy.tenantId);
             if (!accessLevel) return null;
             // NEVER `ref: token` — see legacyShareLinkRef above for why this is

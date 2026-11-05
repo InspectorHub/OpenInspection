@@ -12,9 +12,8 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import publicReportRoutes from '../../../server/api/public-report';
 import type { HonoConfig } from '../../../server/types/hono';
 import { classifyPortalAccess } from '../../../server/lib/public-access';
-
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { createTestDb } from '../db';
+import { d1For } from '../helpers/d1-binding';
 
 const live = { inspectionId: 'insp1', tenantId: 't1', role: 'client', recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null };
 
@@ -42,12 +41,9 @@ describe('classifyPortalAccess', () => {
 
 describe('GET /api/public/report/:tenant/:id with a link we took offline', () => {
     function buildApp(row: unknown) {
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-            select: () => ({ from: () => ({ where: () => ({ get: async () => ({ reportStatus: 'published' }) }) }) }),
-        });
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
-            (c as unknown as { env: Record<string, unknown> }).env = { DB: {} };
+            (c as unknown as { env: Record<string, unknown> }).env = { DB: d1For(createTestDb().sqlite) };
             c.set('services', {
                 portalAccess: { resolveToken: async () => row },
                 inspection: { getReportData: async () => ({ inspectionId: 'insp1' }), resolveReleaseGate: vi.fn().mockResolvedValue(null), resolveAgentViewToken: async () => null },

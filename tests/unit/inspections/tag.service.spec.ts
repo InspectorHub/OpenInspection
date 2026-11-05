@@ -18,8 +18,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { d1For, lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const TENANT_B = '00000000-0000-0000-0000-000000000002';
@@ -43,10 +43,8 @@ describe('TagService', () => {
         const setup = createTestDb();
         testDb = setup.db;
         await setupSchema(setup.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(testDb);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        svc = new TagService({} as any);
+        testD1.use(testDb);
+        svc = new TagService(testD1.binding);
         await seedTenants(testDb);
     });
 
@@ -213,21 +211,31 @@ describe('TagService', () => {
         });
 
         it('counts only what this call inserted when a concurrent first load got there first', async () => {
-            const realSelect = testDb.select.bind(testDb);
-            let first = true;
-            vi.spyOn(testDb, 'select').mockImplementation(((...args: unknown[]) => {
-                const builder = (realSelect as unknown as (...a: unknown[]) => { from: (t: unknown) => { where: (w: unknown) => { all: () => Promise<unknown[]> } } })(...args);
-                if (!first) return builder;
-                first = false;
-                // The first read sees no tags; then another request inserts one before this call does.
-                return { from: (t: unknown) => ({ where: (w: unknown) => ({ all: async () => {
-                    const rows = await builder.from(t).where(w).all();
-                    await testDb.insert(schema.tags).values({ id: 'raced', tenantId: TENANT_A, name: 'Critical', color: 'rose', isSeed: true, createdAt: new Date() });
-                    return rows;
-                } }) }) };
-            }) as never);
+            // The first read of the tags table sees none; another request then inserts one before this call does.
+            const real = d1For(testDb);
+            let armed = true;
+            const afterRead = () => {
+                if (!armed) return;
+                armed = false;
+                testDb.insert(schema.tags).values({ id: 'raced', tenantId: TENANT_A, name: 'Critical', color: 'rose', isSeed: true, createdAt: new Date() }).run();
+            };
+            const wrap = (stmt: Record<string, unknown>): unknown => new Proxy(stmt, {
+                get(target, prop) {
+                    const value = target[prop as string] as (...a: unknown[]) => unknown;
+                    if (prop === 'bind') return (...a: unknown[]) => wrap(value.apply(target, a) as Record<string, unknown>);
+                    if (prop === 'raw' || prop === 'all' || prop === 'first' || prop === 'run') {
+                        return async (...a: unknown[]) => { const out = await value.apply(target, a); afterRead(); return out; };
+                    }
+                    return typeof value === 'function' ? value.bind(target) : value;
+                },
+            });
+            const racing = {
+                prepare: (sql: string) => (armed && /from "tags"/i.test(sql) ? wrap(real.prepare(sql) as never) : real.prepare(sql)),
+                batch: (list: never) => (real.batch as (l: never) => unknown)(list),
+            } as unknown as D1Database;
+            const racy = new TagService(racing);
             const info = vi.spyOn(logger, 'info');
-            const out = await svc.listWithDefaults(TENANT_A);
+            const out = await racy.listWithDefaults(TENANT_A);
             expect(out).toHaveLength(5);
             expect(info).toHaveBeenCalledWith('tags.seeded', { tenantId: TENANT_A, inserted: 4, skipped: 1 });
             info.mockRestore();

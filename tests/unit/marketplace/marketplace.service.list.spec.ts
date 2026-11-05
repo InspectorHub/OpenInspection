@@ -5,8 +5,8 @@ import { marketplaceLibraries } from '../../../server/lib/db/schema/marketplace'
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 describe('MarketplaceService.list', () => {
     let svc: MarketplaceService;
@@ -17,7 +17,7 @@ describe('MarketplaceService.list', () => {
         const s = createTestDb();
         testDb = s.db; sqlite = s.sqlite;
         await setupSchema(sqlite);
-        (mockDrizzle as any).mockReturnValue(testDb);
+        testD1.use(testDb);
         const now = new Date();
         for (let i = 0; i < 13; i++) {
             await testDb.insert(marketplaceLibraries).values({
@@ -37,7 +37,7 @@ describe('MarketplaceService.list', () => {
                 inspectionKind: null,
             });
         }
-        svc = new MarketplaceService({} as any, 'tenant-A');
+        svc = new MarketplaceService(testD1.binding, 'tenant-A');
     });
 
     afterEach(() => { sqlite.close(); vi.clearAllMocks(); });

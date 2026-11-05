@@ -17,14 +17,15 @@
  * These specs therefore go through `createInvoice`. A test that writes the row
  * itself cannot fail for this reason, which is precisely how the defect lived.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { InvoiceService } from '../../../server/services/invoice.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-0000000000d1';
 const OTHER_TENANT = '00000000-0000-0000-0000-0000000000d2';
@@ -40,9 +41,8 @@ describe('InvoiceService — the invoice knows which contact it bills', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        const { drizzle } = await import('drizzle-orm/d1');
-        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-        svc = new InvoiceService({} as D1Database);
+        testD1.use(db);
+        svc = new InvoiceService(testD1.binding);
 
         for (const id of [TENANT, OTHER_TENANT]) {
             await db.insert(schema.tenants).values({

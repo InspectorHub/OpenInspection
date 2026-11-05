@@ -18,7 +18,7 @@
  *     one when a deposit is applied. A count that only ever grows is a count
  *     nobody trusts.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -27,8 +27,8 @@ import { asAnyDb, asD1Db } from '../helpers/test-db';
 import { recordPayment, getHeldDepositCents } from '../../../server/services/payment-ledger.service';
 import { applyHeldDepositsToInvoice } from '../../../server/services/invoice/deposit-application';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import { InvoiceService } from '../../../server/services/invoice.service';
 
@@ -42,8 +42,8 @@ beforeEach(async () => {
     const fixture = createTestDb();
     db = fixture.db;
     await setupSchema(fixture.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
-    invoices = new InvoiceService({} as D1Database);
+    testD1.use(db);
+    invoices = new InvoiceService(testD1.binding);
 
     await db.insert(schema.tenants).values({
         id: TENANT, slug: 'acme', status: 'active',

@@ -9,9 +9,9 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 
 | | |
 |---|---|
-| Tables | 115 |
-| Columns | 1313 |
-| Indexes (excluding primary keys) | 187 |
+| Tables | 116 |
+| Columns | 1316 |
+| Indexes (excluding primary keys) | 188 |
 | Database foreign keys (all legacy, frozen) | 51 |
 | Columns carrying a source comment | 619 (47%) |
 
@@ -19,12 +19,12 @@ from the Drizzle definitions in `server/lib/db/schema/` — the two that
 `npm run lint:tenant-scope` is the gate. These are the tables that are not *about*
 a tenant, which is the only reason to be missing it:
 
-`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants`
+`agent_terms_acceptances` · `deployment_legal_versions` · `discovery_objections` · `marketplace_libraries` · `parked_cmd_events` · `processed_cmd_events` · `processed_webhook_events` · `slug_reservations` · `sms_disclosure_versions` · `statutory_form_sightings` · `statutory_form_versions` · `sync_outbox` · `tenants` · `verify_export_attempts`
 
-That is 13 of 115. If a table you just added appears here,
+That is 14 of 116. If a table you just added appears here,
 that is the bug, not the list.
 
-**Timestamps.** 218 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
+**Timestamps.** 219 column(s) use `integer(..., { mode: 'timestamp_ms' })` —
 epoch MILLISECONDS, with no legacy `mode: 'timestamp'` columns left.
 Seconds and milliseconds are one multiplication apart and the mistake reads as a
 date tens of thousands of years out, so the Schema Rules allow only the former for
@@ -149,7 +149,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `contact_id` | text |  |  |  | → contacts.id (app-layer, optional) |
 | `token_hash` | text | UQ |  |  | SHA-256 hex; NULL on backfilled rows until first link build |
 | `token_enc` | text |  |  |  | 't1:iv:cipher' sealed plaintext (config-crypto sealToken) |
-| `status` | text | NN | `'pending'` | `pending, sent, viewed, signed, declined, expired, delivery_failed` | `delivery_failed` marks a signer whose email was rejected at the provider level (transient failure or unclassified error). |
+| `status` | text | NN | `'pending'` | `pending, sent, viewed, signing, signed, declined, expired, delivery_fa…` | `delivery_failed` marks a signer whose email was rejected at the provider level (transient failure or unclassified error). **[more]** |
 | `signature_base64` | text |  |  |  | The drawn signature image. Bare base64 OR a full `data:` URL — both are accepted, and agreements-render prefixes the bare form when composing the signed PDF. |
 | `signed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
 | `viewed_at` | integer |  |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
@@ -1348,7 +1348,7 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 | `cover_crop` | text |  |  |  | Media Studio (cover crop) — the crop transform applied to the SOURCE image (cover_photo_id), in source-pixel coords. **[more]** |
 | `cover_image_key` | text |  |  |  | Media Studio (cover crop) — R2 key of the baked cropped derivative (JPEG, 2048px long edge). |
 | `unit` | text |  |  |  | Suite / unit designation of the ONE subject property ("Suite 200"). Not a link to `inspection_units` and nothing to do with per-unit mode. |
-| `property_type` | text |  |  |  | Decides what the report becomes: resolveReportTier() reads it to tell commercial from residential, section applicability filters on it, and the editor's Property Info preset resolves only when it is 'commercial'. |
+| `property_type` | text |  |  | `single_family, multi_unit, commercial` | Decides what the report becomes: resolveReportTier() reads it to tell commercial from residential, section applicability filters on it, and the editor's Property Info preset resolves only when it is 'commercial'. **[more]** |
 | `commercial_subtype` | text |  |  |  | Plain text because org-custom subtypes live alongside the platform ids. Meaningful only when property_type = 'commercial': it selects the editor's metadata preset (`commercial:<id>`) and gates template sections through applicableTo.commercialSubtypes (org ids match via their platform parent). |
 | `report_tier` | text |  |  | `light_commercial, full_pca` | Commercial PCA Phase T — report tier. Meaningful only for commercial inspections (NULL on residential/multi-unit). |
 | `county` | text |  |  |  | The county as the Property Facts strip edits it — written ONLY by updatePropertyFacts, never at intake. |
@@ -2999,6 +2999,24 @@ neither is left blank. `[more]` marks a column whose source comment runs past
 - **UNIQUE** `uq_users_tenant_email` (tenant_id, email) — partial, `WHERE deleted_at IS NULL`
 - **UNIQUE** `idx_users_slug_per_tenant` (tenant_id, slug)
 - `idx_users_email` (email)
+
+---
+
+## `verify_export_attempts`
+
+<sub>server/lib/db/schema/verify-export-attempts.ts · 3 columns · primary key `key`</sub>
+
+> Attempt counters for the signed audit export of an envelope (POST /api/public/verify/:envelopeId/export).
+
+| Column | Type | Flags | Default | Values | Description |
+|---|---|---|---|---|---|
+| `key` | text | PK NN |  |  |  |
+| `attempts` | integer | NN |  |  | *An integer value.* |
+| `window_ends_at` | integer | NN IX |  |  | *Timestamp, epoch milliseconds. NULL means it has not happened.* |
+
+**Indexes**
+
+- `idx_verify_export_attempts_ends` (window_ends_at)
 
 ---
 

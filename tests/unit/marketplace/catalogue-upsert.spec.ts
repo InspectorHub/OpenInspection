@@ -10,8 +10,8 @@ import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { TestDb } from '../helpers/test-db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { seedStarterContent } from '../../../server/services/starter-content.service';
 import { asD1DrizzleReturn } from '../helpers/test-db';
 
@@ -26,7 +26,7 @@ describe('catalogue seeding', () => {
         db = fixture.db;
         sqlite = fixture.sqlite;
         await setupSchema(sqlite);
-        vi.mocked(mockDrizzle).mockReturnValue(asD1DrizzleReturn(db));
+        testD1.use(asD1DrizzleReturn(db));
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'catalogue', createdAt: new Date(),
         });
@@ -34,7 +34,7 @@ describe('catalogue seeding', () => {
     afterEach(() => { sqlite.close(); vi.clearAllMocks(); });
 
     it('updates an existing row whose semver moved, instead of skipping it', async () => {
-        await seedStarterContent({} as unknown as D1Database, TENANT);
+        await seedStarterContent(testD1.binding, TENANT);
         const before = await db.select().from(schema.marketplaceLibraries).all();
         expect(before.length).toBeGreaterThan(0);
         const row = before[0];
@@ -45,7 +45,7 @@ describe('catalogue seeding', () => {
             .set({ semver: '0.0.1', downloadCount: 7 })
             .where(eq(schema.marketplaceLibraries.id, row.id));
 
-        const result = await seedStarterContent({} as unknown as D1Database, TENANT);
+        const result = await seedStarterContent(testD1.binding, TENANT);
 
         const after = await db.select().from(schema.marketplaceLibraries)
             .where(eq(schema.marketplaceLibraries.id, row.id)).get();
@@ -70,7 +70,7 @@ describe('catalogue seeding', () => {
         // the shelf behind it held one comment pack. The kind is the load-bearing
         // part — it is what decides which validator the import runs and what an
         // un-install undoes — so it is asserted rather than the row's presence.
-        await seedStarterContent({} as unknown as D1Database, TENANT);
+        await seedStarterContent(testD1.binding, TENANT);
         const row = await db.select().from(schema.marketplaceLibraries)
             .where(eq(schema.marketplaceLibraries.kind, 'statutory')).get();
 
@@ -93,7 +93,7 @@ describe('catalogue seeding', () => {
         // whatever the select happened to return first — it proved the seeder
         // refreshes A row, and a seeder that handled only the comments kind
         // would have passed it unchanged.
-        await seedStarterContent({} as unknown as D1Database, TENANT);
+        await seedStarterContent(testD1.binding, TENANT);
         const before = await db.select().from(schema.marketplaceLibraries)
             .where(eq(schema.marketplaceLibraries.kind, 'statutory')).get();
         const id = before!.id;
@@ -102,7 +102,7 @@ describe('catalogue seeding', () => {
             .set({ semver: '0.0.1', downloadCount: 11 })
             .where(eq(schema.marketplaceLibraries.id, id));
 
-        const result = await seedStarterContent({} as unknown as D1Database, TENANT);
+        const result = await seedStarterContent(testD1.binding, TENANT);
         const after = await db.select().from(schema.marketplaceLibraries)
             .where(eq(schema.marketplaceLibraries.id, id)).get();
 
@@ -121,8 +121,8 @@ describe('catalogue seeding', () => {
         // every run would satisfy the assertion above just as happily, and the
         // "update available" badge would then be driven by a column this seeder
         // rewrites on every deployment.
-        await seedStarterContent({} as unknown as D1Database, TENANT);
-        const second = await seedStarterContent({} as unknown as D1Database, TENANT);
+        await seedStarterContent(testD1.binding, TENANT);
+        const second = await seedStarterContent(testD1.binding, TENANT);
         expect(second.marketplaceLibrariesSeeded).toBe(0);
     });
 });

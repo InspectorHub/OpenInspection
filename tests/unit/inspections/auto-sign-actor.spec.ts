@@ -143,7 +143,7 @@ describe('publish routes', () => {
             c.set('userRole', role);
             c.set('user', { sub: role === 'owner' ? OWNER : STAFF, role, tenantId: T });
             c.set('sdb', { getById: async () => ({ permissionOverrides: overrides }) } as unknown as HonoConfig['Variables']['sdb']);
-            c.set('services', { inspection: { publishInspection: publishService } } as unknown as HonoConfig['Variables']['services']);
+            c.set('services', { inspection: { publishInspection: publishService }, reportVersion: { assertSnapshotFits: async () => undefined } } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
         app.route('/api/inspections', inspectionsRoutes);

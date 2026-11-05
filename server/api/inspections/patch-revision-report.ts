@@ -64,13 +64,3 @@ export function revisionStatusField(
     });
     return status === null ? {} : { revisionStatus: status };
 }
-
-/**
- * The inspection row with its template snapshot as an object, or null when the stored value is not a readable one.
- *
- * The editor's own saves write the snapshot as a JSON-encoded string into a JSON column, so such a row reads back
- * as a string. Normalised here, on read, so the client sees one shape; the stored value is left as it is.
- */
-export function withReadableSnapshot<T extends { templateSnapshot?: unknown }>(inspection: T): Omit<T, 'templateSnapshot'> & { templateSnapshot: { sections: unknown[] } | null } {
-    return { ...inspection, templateSnapshot: parseSnapshot(inspection.templateSnapshot) };
-}

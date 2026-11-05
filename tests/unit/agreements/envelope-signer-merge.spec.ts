@@ -8,15 +8,15 @@
  * operator had just typed were never created. That failure is invisible from
  * the response, which is what makes it worth a test rather than a comment.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { AgreementService } from '../../../server/services/agreement.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -44,7 +44,7 @@ describe('AgreementService.findOrCreate — signer merge on a live envelope (IA-
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        testD1.use(db);
 
         await db.insert(schema.tenants).values({
             id: TENANT, slug: 'acme', status: 'active',
@@ -59,7 +59,7 @@ describe('AgreementService.findOrCreate — signer merge on a live envelope (IA-
             agreementRequired: true, paymentRequired: false, createdAt: new Date(),
         });
 
-        svc = new AgreementService({} as D1Database, { jwtSecret: 'test-secret' });
+        svc = new AgreementService(testD1.binding, { jwtSecret: 'test-secret' });
     });
 
     it('adds the signers the live envelope does not have yet, and reports their ids', async () => {

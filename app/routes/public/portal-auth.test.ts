@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { loader } from "~/routes/public/portal-auth";
+import { loader, action } from "~/routes/public/portal-auth";
 import { createLoadContext } from "~/lib/load-context";
 
 /**
@@ -45,12 +45,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function makeRequest(tenant: string, link: string | null) {
+function makeRequest(tenant: string, link: string | null, method = "POST") {
   const qs = link ? `?link=${encodeURIComponent(link)}` : "";
-  return new Request(`https://app.test/portal/${tenant}/auth${qs}`);
+  return new Request(`https://app.test/portal/${tenant}/auth${qs}`, method === "POST" ? { method } : undefined);
 }
 
-describe("portal-auth loader — find-my-report redeem destination", () => {
+describe("portal-auth action — find-my-report redeem destination", () => {
   // NOTE: happy-dom's `Response` constructor unconditionally strips
   // Set-Cookie/Set-Cookie2 (simulating the browser restriction — see
   // happy-dom/lib/fetch/Response.js), and the loader's `redirect()` builds its
@@ -68,7 +68,7 @@ describe("portal-auth loader — find-my-report redeem destination", () => {
       { "set-cookie": "__Host-inspector_token=abc; Path=/; HttpOnly; Secure; SameSite=Strict" },
     ));
 
-    const result = await loader({
+    const result = await action({
       params: { tenant: "acme" },
       request: makeRequest("acme", "sometoken"),
       context: makeContext(),
@@ -87,7 +87,7 @@ describe("portal-auth loader — find-my-report redeem destination", () => {
       { "set-cookie": "__Host-portal_session=xyz; Path=/; HttpOnly; Secure; SameSite=Lax" },
     ));
 
-    const result = await loader({
+    const result = await action({
       params: { tenant: "acme" },
       request: makeRequest("acme", "sometoken"),
       context: makeContext(),
@@ -102,13 +102,13 @@ describe("portal-auth loader — find-my-report redeem destination", () => {
   it("regression: invalid/expired link (401) -> expired state, no redirect", async () => {
     stubFetch(fakeResponse(401, { error: "Invalid or expired link" }));
 
-    const result = await loader({
+    const result = await action({
       params: { tenant: "acme" },
       request: makeRequest("acme", "badtoken"),
       context: makeContext(),
     } as never);
 
-    expect(result).toEqual({ expired: true, tenant: "acme" });
+    expect(result).toEqual({ expired: true, rateLimited: false, tenant: "acme" });
   });
 
   it("missing link -> redirects to /portal/:tenant without calling the API", async () => {
@@ -116,7 +116,7 @@ describe("portal-auth loader — find-my-report redeem destination", () => {
 
     let thrown: unknown;
     try {
-      await loader({
+      await action({
         params: { tenant: "acme" },
         request: makeRequest("acme", null),
         context: makeContext(),
@@ -128,5 +128,35 @@ describe("portal-auth loader — find-my-report redeem destination", () => {
     expect(thrown).toBeInstanceOf(Response);
     expect((thrown as Response).headers.get("location")).toBe("/portal/acme");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("portal-auth GET never spends the link (mail scanners fetch it first)", () => {
+  it("a GET with a link renders the page and does not call the API", async () => {
+    const fetchMock = stubFetch(fakeResponse(200, { data: { email: "client@example.com" } }, { "set-cookie": "__Host-portal_session=xyz" }));
+    const result = await loader({
+      params: { tenant: "acme" },
+      request: makeRequest("acme", "sometoken", "GET"),
+      context: makeContext(),
+    } as never);
+    expect(result).toEqual({ tenant: "acme" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a GET without a link goes back to the portal", async () => {
+    let thrown: unknown;
+    try {
+      await loader({ params: { tenant: "acme" }, request: makeRequest("acme", null, "GET"), context: makeContext() } as never);
+    } catch (err) {
+      thrown = err;
+    }
+    expect((thrown as Response).headers.get("location")).toBe("/portal/acme");
+  });
+
+  it("the POST redeems and a 429 from the API is shown as a limit, not as an expired link", async () => {
+    const fetchMock = stubFetch(fakeResponse(429, { error: "Too many requests" }));
+    const result = await action({ params: { tenant: "acme" }, request: makeRequest("acme", "sometoken"), context: makeContext() } as never);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ expired: false, rateLimited: true, tenant: "acme" });
   });
 });

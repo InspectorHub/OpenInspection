@@ -12,8 +12,8 @@ import { AppError, ErrorCode } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 import { makeExecutionContext } from '../helpers/exec-ctx';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 
 // eslint-disable-next-line import/order
 import { assertSeatForRoleChange } from '../../../server/features/seat-quota/role-change-guard';
@@ -33,14 +33,14 @@ describe('seat check on a role change', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        vi.mocked(mockDrizzle).mockReturnValue(db as never);
+        testD1.use(db);
         // Three seats, held by owner, manager and inspector; staff hold none.
         await db.insert(schema.tenants).values({ id: TENANT, slug: 'a', status: 'active', deploymentMode: 'shared', tier: 'free', maxUsers: 3, createdAt: new Date() });
         await db.insert(schema.users).values([user('o', 'owner'), user('m', 'manager'), user('i', 'inspector'), user('s', 'staff')]);
     });
 
     const check = (userId: string, nextRole: string, seatQuota: { enforce: boolean; billingPortalUrl: string | null } = ENFORCED) =>
-        assertSeatForRoleChange({ tenantId: TENANT, userId, nextRole, db: {} as D1Database, seatQuota });
+        assertSeatForRoleChange({ tenantId: TENANT, userId, nextRole, db: testD1.binding, seatQuota });
 
     it('refuses staff -> a seat-holding role when none is free', async () => {
         for (const next of ['inspector', 'manager']) {
@@ -87,7 +87,7 @@ describe('seat check on a role change', () => {
         }
         const patch = (app: OpenAPIHono<HonoConfig>, role: string) => app.request('/api/team/members/s', {
             method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ role }),
-        }, { DB: {} }, makeExecutionContext().ctx);
+        }, { DB: testD1.binding }, makeExecutionContext().ctx);
 
         it('answers 402 and writes nothing when staff would take the last seat', async () => {
             const { app, wrote } = build(true);

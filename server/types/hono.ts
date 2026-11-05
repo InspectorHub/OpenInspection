@@ -39,8 +39,11 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv, NativeVisible
      *  remaining usages. */
     JWT_SECRET: string;
     /** Optional rotation-window fallback for JWT_SECRET (envelope secrets KEK
-     *  unwrap + legacy blob decrypt). Set during a JWT_SECRET rotation, run the
-     *  reencrypt endpoint, then delete. Never used for new writes. */
+     *  unwrap + legacy blob decrypt + tenant signing-key unwrap). Set during a JWT_SECRET
+     *  rotation and run the reencrypt endpoint, which re-wraps the tenant secrets AND every
+     *  active signing key. Delete it only when the endpoint reports zero signing keys remaining
+     *  under an earlier secret. Only ONE previous secret is supported, so a second rotation
+     *  (A to B to C) must wait until that count is zero. Never used for new writes. */
     JWT_SECRET_PREVIOUS?: string;
     /** Spec 5H — AES-GCM key for encrypting tenant Ed25519 private keys. Falls back to JWT_SECRET. */
     KEY_ENCRYPTION_SECRET: string;
@@ -124,6 +127,8 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv, NativeVisible
     APP_NAME: string;
     PRIMARY_COLOR: string;
     APP_BASE_URL?: string;
+    /** Comma-separated extra origins allowed to call /api/* with credentials (cookies). Own origin and APP_BASE_URL are always allowed. */
+    CORS_ALLOWED_ORIGINS?: string;
 
     // ISN report-link sync (services/isn). Tenant-owned; all four set = on.
     ISN_DOMAIN?: string;
@@ -185,6 +190,8 @@ export interface AppEnv extends NativeVersionEnv, NativeImportEnv, NativeVisible
     // Inbound-webhook ceilings (120/60s QuickBooks, 300/60s Stripe), per source.
     QBO_WEBHOOK_RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
     STRIPE_WEBHOOK_RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
+    // The OAuth token endpoint's ceiling (120/60s per source), apart from the 10/60s registration door because native clients behind one shared address refresh tokens.
+    OAUTH_TOKEN_RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };
 
     // PDF Generation (Cloudflare Browser Run — formerly Browser Rendering).
     // Quick Actions API: env.BROWSER.quickAction("pdf", { url }) → Response.

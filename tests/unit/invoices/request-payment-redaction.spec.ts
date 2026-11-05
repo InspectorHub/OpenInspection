@@ -4,7 +4,7 @@
  * which the answer's amount depends on. Without it the route now refuses the
  * caller outright (the amount redaction in the handler is a second line).
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
@@ -13,17 +13,17 @@ import type { HonoConfig } from '../../../server/types/hono';
 import type { UserRole } from '../../../server/types/auth';
 import { createTestDb, setupSchema } from '../db';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 // eslint-disable-next-line import/order
 import invoiceRoutes from '../../../server/api/invoices';
 
 const T = '00000000-0000-0000-0000-000000000001';
-const ENV = { DB: {} } as HonoConfig['Bindings'];
+const ENV = { DB: testD1.binding } as HonoConfig['Bindings'];
 let db: BetterSQLite3Database<typeof schema>;
 
 function buildApp(role: UserRole, overrides: Record<string, boolean> | null) {
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
     const sent = { id: 'inv1', status: 'sent', sentAt: new Date(), amountCents: 45000, currency: 'USD' };
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => (err instanceof AppError

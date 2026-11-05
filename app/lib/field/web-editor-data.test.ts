@@ -8,12 +8,20 @@ import { loaderPayload } from "./web-editor-data.fixtures";
  * `type-check:app`. The cases below pin the runtime behaviour.
  */
 describe("editorDataFromLoader", () => {
+    it("offers the publish notice choice only for a report reopened for editing", () => {
+        const reopened = editorDataFromLoader(loaderPayload({ reportState: { publishedVersionNumber: 2, editingAgain: true, readOnly: false } }));
+        expect(reopened.reopenedForEditing).toBe(true);
+        // Control: a retracted report keeps its versions but is not reopened.
+        const retracted = editorDataFromLoader(loaderPayload({ reportState: { publishedVersionNumber: null, editingAgain: false, readOnly: false } }));
+        expect(retracted.reopenedForEditing).toBe(false);
+    });
+
     it("carries every EditorData field across by name", () => {
         const data = editorDataFromLoader(loaderPayload({ resultId: null, nextPublishIsAmendment: true, unitInspectionMode: "per_unit" }));
         expect(Object.keys(data).sort()).toEqual(
             [
                 "commercialPresets", "compliance", "defectCategories", "initialLayout", "inspection", "nextPublishIsAmendment",
-                "outboundCoolingWindow", "pcaNarrative", "ratingLevels", "relianceText", "resultId", "results",
+                "outboundCoolingWindow", "pcaNarrative", "ratingLevels", "reopenedForEditing", "relianceText", "resultId", "results",
                 "revisionStatus", "schema", "statutoryCoverage", "statutoryDetails", "tagLibrary", "templateSnapshot",
                 "unitInspectionMode", "unitProgress", "units",
             ].sort(),

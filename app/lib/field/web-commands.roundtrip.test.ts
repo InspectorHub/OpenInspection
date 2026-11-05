@@ -62,14 +62,21 @@ describe("encoder agrees with the real editor action", () => {
         inspectionPatch.mockImplementation(async () => { order.push("patch"); return ok(); });
         publishPost.mockImplementation(async () => { order.push("publish"); return ok(); });
         const r = await roundTrip(SAMPLES.publish);
-        expect(r).toEqual({ ok: true });
+        expect(r).toEqual({ ok: true, data: { unchangedSinceVersion: null } });
         expect(order).toEqual(["complete", "patch", "publish"]);
         expect(inspectionPatch).toHaveBeenCalledWith({ param: { id: "insp-1" }, json: { autoSignOnPublish: false } });
         expect(publishPost).toHaveBeenCalledWith({ param: { id: "insp-1" }, json: { summary: "Rev 2" } });
     });
 
+    it("publish carries notifyClient through the form to the publish body, and omits it when absent", async () => {
+        expect(await roundTrip({ type: "publish", notifyClient: true })).toEqual({ ok: true, data: { unchangedSinceVersion: null } });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: "insp-1" }, json: { notifyClient: true } });
+        expect(await roundTrip({ type: "publish", notifyClient: false })).toEqual({ ok: true, data: { unchangedSinceVersion: null } });
+        expect(publishPost).toHaveBeenLastCalledWith({ param: { id: "insp-1" }, json: {} });
+    });
+
     it("publish without optional fields does not touch the stored flag", async () => {
-        expect(await roundTrip({ type: "publish" })).toEqual({ ok: true });
+        expect(await roundTrip({ type: "publish" })).toEqual({ ok: true, data: { unchangedSinceVersion: null } });
         expect(completePost).not.toHaveBeenCalled();
         expect(inspectionPatch).not.toHaveBeenCalled();
         expect(publishPost).toHaveBeenCalledWith({ param: { id: "insp-1" }, json: {} });

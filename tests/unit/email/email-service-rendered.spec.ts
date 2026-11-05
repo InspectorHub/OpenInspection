@@ -114,6 +114,28 @@ describe('sends converted off hand-built HTML', () => {
     expect(p.captured[0].html).toContain('Please quote items 2 and 3.<br />Thanks.');
   });
 
+  it('repair-request share escapes the note and the address wherever they are rendered', async () => {
+    const p = probe();
+    await p.sendRepairRequestShare('contractor@x.com', {
+      propertyAddress: '12 <b>Elm</b> St',
+      shareUrl: 'https://x/repair-request/tok',
+      message: '<script>alert(1)</script><img src=x onerror=alert(2)>',
+    });
+    const html = p.captured[0].html;
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('<b>Elm</b>');
+    // Control: the text is there, as text.
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    // The no-registry fallback escapes the address and the link too.
+    const bare = new Probe('re_test', 'reports@acme.com', 'Acme');
+    await bare.sendRepairRequestShare('c@x.com', { propertyAddress: '12 <b>Elm</b> St', shareUrl: 'https://x/s?a="><i>', message: '<script>' });
+    const sent = bare.captured[0]!.html;
+    expect(sent).not.toContain('<b>Elm</b>');
+    expect(sent).not.toContain('"><i>');
+    expect(sent).toContain('12 &lt;b&gt;Elm&lt;/b&gt; St');
+  });
+
   it('repair-request share with no note leaves no empty block behind', async () => {
     const p = probe();
     await p.sendRepairRequestShare('contractor@x.com', {

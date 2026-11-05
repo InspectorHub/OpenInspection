@@ -15,14 +15,14 @@
  * comment) and `body` the notice body — the same fields, doing the same job
  * they do for email.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { lazyD1 } from '../helpers/d1-binding';
+const testD1 = lazyD1();
 import { AutomationService } from '../../../server/services/automation.service';
 
 const T = '00000000-0000-0000-0000-0000000000d1';
@@ -33,7 +33,7 @@ beforeEach(async () => {
     const fx = createTestDb();
     db = fx.db;
     await setupSchema(fx.sqlite);
-    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+    testD1.use(db);
 
     await db.insert(schema.tenants).values({
         id: T, slug: 'acme-inapp-tpl', status: 'active',
@@ -76,7 +76,7 @@ describe('in-app notice wording (B3)', () => {
     it('takes the notice title from the rule\'s in-app template, interpolated', async () => {
         await seedInAppRule({ templateId: 'tpl-inapp-1' });
 
-        await new AutomationService({} as D1Database).trigger({
+        await new AutomationService(testD1.binding).trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
             companyName: 'Acme',
         });
@@ -88,7 +88,7 @@ describe('in-app notice wording (B3)', () => {
     it('takes the body from the same template', async () => {
         await seedInAppRule({ templateId: 'tpl-inapp-1' });
 
-        await new AutomationService({} as D1Database).trigger({
+        await new AutomationService(testD1.binding).trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
             companyName: 'Acme',
         });
@@ -103,7 +103,7 @@ describe('in-app notice wording (B3)', () => {
         // literal rather than nothing.
         await seedInAppRule({ templateId: null });
 
-        await new AutomationService({} as D1Database).trigger({
+        await new AutomationService(testD1.binding).trigger({
             tenantId: T, inspectionId: INSP, triggerEvent: 'report.published',
             companyName: 'Acme',
         });
@@ -158,7 +158,7 @@ async function seedBookingAlert(storedDate: string, cfg: { timezone: string; loc
         inAppTemplateId: 'tpl-booking',
         active: true, isDefault: false, createdAt: new Date(),
     } as never);
-    await new AutomationService({} as D1Database).trigger({
+    await new AutomationService(testD1.binding).trigger({
         tenantId: T, inspectionId: INSP, triggerEvent: 'booking.received',
         companyName: 'Acme',
     });

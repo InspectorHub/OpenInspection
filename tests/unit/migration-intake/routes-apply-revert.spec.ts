@@ -12,16 +12,14 @@
  * operation was never attempted, so every refusal below reads back the batch
  * status and the real table as well as the status code.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { createTestDb, setupSchema } from '../db';
 import { withBatch } from '../helpers/d1-binding';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
-vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
-import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
-import {
+import { intakeD1 as testD1,
     OTHER,
     contactsBundle,
     intakeRequest,
@@ -60,8 +58,7 @@ describe('applying and undoing an import run over HTTP', () => {
         const fix = createTestDb();
         db = fix.db;
         await setupSchema(fix.sqlite);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockDrizzle as any).mockReturnValue(withBatch(db, fix.sqlite));
+        testD1.use(withBatch(db, fix.sqlite));
         store = new Map();
         await seedIntakeTenant(db);
         await seedIntakeTenant(db, OTHER);

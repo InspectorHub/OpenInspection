@@ -1,5 +1,6 @@
 import { Form, useLoaderData, useNavigation, redirect } from "react-router";
 import type { Route } from "./+types/concierge-confirm-token";
+import { isCrossSitePost } from "~/lib/same-origin-post.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "@core/field-ui/shared/format-date";
 import { ErrorState } from "~/components/ErrorState";
@@ -56,8 +57,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 /*  Action — redeem the token, follow the server redirect              */
 /* ------------------------------------------------------------------ */
 
-export async function action({ params, context }: Route.ActionArgs) {
+export async function action({ params, request, context }: Route.ActionArgs) {
   const token = params.token ?? "";
+  // A form posted from another site does not spend the token; the page shows its normal retry state.
+  if (isCrossSitePost(request)) return { ok: false as const };
   const api = createApi(context);
   const res = await api.concierge.confirm.$post({ json: { token } });
   if (!res.ok) {

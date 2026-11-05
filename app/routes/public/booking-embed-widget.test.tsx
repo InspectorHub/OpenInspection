@@ -49,16 +49,27 @@ const DATA: EmbedData = {
 /** Fires the solved-callback so a test can hand the form a real token. */
 let solve: ((token: string) => void) | null = null;
 let renderOpts: { sitekey: string; theme?: string } | null = null;
+let expire: (() => void) | undefined;
+let failWidget: (() => void) | undefined;
+let widgetRenders = 0;
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
     solve = null;
     renderOpts = null;
+    expire = undefined;
+    failWidget = undefined;
+    widgetRenders = 0;
     (window as unknown as { turnstile: unknown }).turnstile = {
-        render: (_el: HTMLElement, opts: { sitekey: string; theme?: string; callback: (t: string) => void }) => {
+        render: (_el: HTMLElement, opts: { sitekey: string; theme?: string; callback: (t: string) => void; "expired-callback"?: () => void; "error-callback"?: () => void }) => {
             renderOpts = opts;
             solve = opts.callback;
+            expire = opts["expired-callback"];
+            failWidget = opts["error-callback"];
+            widgetRenders += 1;
+            return `widget-${widgetRenders}`;
         },
+        remove: () => {},
     };
     // The hook injects api.js when no turnstile script is present; one here
     // keeps happy-dom off the network.
@@ -227,5 +238,64 @@ describe("embedded booking form: same-frame duplicate submits", () => {
         act(() => solve!("tok"));
         submit();
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    });
+});
+
+describe("embedded booking form: the token's life", () => {
+    it("drops a token that expired unused, says to verify again, and posts nothing on the next submit", async () => {
+        renderEmbed();
+        act(() => solve!("tok_old"));
+        act(() => expire!());
+        fillRequired();
+        submit();
+        await waitFor(() => expect(screen.getByText(/complete the verification/i)).toBeTruthy());
+        expect(postedBody()).toBeNull();
+        // Control: a fresh token after the expiry ends the message and goes through.
+        act(() => solve!("tok_new"));
+        expect(screen.queryByText(/complete the verification/i)).toBeNull();
+        submit();
+        await waitFor(() => expect(postedBody()).not.toBeNull());
+        expect(postedBody()!.turnstileToken).toBe("tok_new");
+    });
+
+    it("says the check could not load when the widget reports an error", async () => {
+        renderEmbed();
+        act(() => failWidget!());
+        fillRequired();
+        submit();
+        await waitFor(() => expect(screen.getByText(/could not load/i)).toBeTruthy());
+        expect(postedBody()).toBeNull();
+        // The widget recovering by itself (a new token) ends the message.
+        act(() => solve!("tok_recovered"));
+        expect(screen.queryByText(/could not load/i)).toBeNull();
+    });
+
+    it("does not render the challenge again after a booking was made, and removes its host from the page", async () => {
+        renderEmbed();
+        expect(widgetRenders).toBe(1);
+        expect(document.querySelector("form div.flex.justify-center")).not.toBeNull();
+        act(() => solve!("tok_ok"));
+        fillRequired();
+        submit();
+        await waitFor(() => expect(screen.getByText(/request sent|thank|submitted|success/i)).toBeTruthy());
+        expect(widgetRenders).toBe(1);
+        expect(document.querySelector("form div.flex.justify-center")).toBeNull();
+    });
+
+    it("spends the token on a submit, whatever the answer, and renders the challenge again for the next one", async () => {
+        fetchMock.mockResolvedValue({ ok: false, json: async () => ({ success: false, error: { message: "Refused" } }) });
+        renderEmbed();
+        expect(widgetRenders).toBe(1);
+        act(() => solve!("tok_spent"));
+        fillRequired();
+        submit();
+        await waitFor(() => expect(postedBody()).not.toBeNull());
+        expect(postedBody()!.turnstileToken).toBe("tok_spent");
+        await waitFor(() => expect(widgetRenders).toBe(2));
+        // The spent token is not sent again: the next submit waits for the new widget's answer.
+        fetchMock.mockClear();
+        submit();
+        await waitFor(() => expect(screen.getByText(/complete the verification/i)).toBeTruthy());
+        expect(postedBody()).toBeNull();
     });
 });

@@ -45,9 +45,8 @@ import { MAX_PHOTO_BYTES, isSignedPhotoExt, sniffedPhotoExt, storePhotoAtKey } f
 import { storeVideoUpload } from '../inspections/media-video-r2';
 import { MAX_FORM_VIDEO_BYTES } from '../../lib/media/video-types';
 import { videoChunkedRoutes } from './video-chunked';
-
-/** Multipart framing adds a little to the file itself; this much headroom is allowed before the body is read. */
-const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+import { declaredLengthRefusal } from '../../lib/declared-length';
+import { relativizeSerialized } from '../../lib/report-link-keys';
 
 /** The single-request route buffers the clip, so larger ones go through the chunked route. */
 const FORM_TOO_LARGE = {
@@ -57,19 +56,6 @@ const FORM_TOO_LARGE = {
 } as const;
 
 const INVALID_TOKEN = { error: 'Invalid or expired upload token' } as const;
-
-/**
- * Refuse a body that does not declare its size, or declares too much, before it
- * is read into memory. A missing or non-numeric length is 411 rather than zero:
- * a chunked body has no declared size to check.
- */
-function checkDeclaredLength(c: Context<HonoConfig>, maxBytes: number, tooLarge: Record<string, unknown>): Response | null {
-    const header = c.req.header('content-length');
-    if (header === undefined || !/^\d+$/.test(header.trim())) {
-        return c.json({ error: 'Content-Length is required.' }, 411);
-    }
-    return Number(header) > maxBytes + MULTIPART_OVERHEAD_BYTES ? c.json(tooLarge, 413) : null;
-}
 
 /** The token's issuer is still an active member and its inspection still exists, both in the token's tenant. */
 async function checkDestination(c: Context<HonoConfig>, claims: UploadTokenClaims): Promise<Response | null> {
@@ -99,7 +85,7 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'photo');
         if (!claims || !claims.userId || !isSignedPhotoExt(claims.ext)) return c.json(INVALID_TOKEN, 401);
 
-        const refusedLength = checkDeclaredLength(c, MAX_PHOTO_BYTES, { error: 'Photo is too large.' });
+        const refusedLength = declaredLengthRefusal(c, MAX_PHOTO_BYTES, { error: 'Photo is too large.' });
         if (refusedLength) return refusedLength;
         const refusedDestination = await checkDestination(c, claims);
         if (refusedDestination) return refusedDestination;
@@ -117,13 +103,13 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         logger.info('public-upload: stored photo', {
             tenantId: claims.tenantId, inspectionId: claims.inspectionId, mediaId: claims.mediaId, key,
         });
-        return c.json({ success: true, data: { key } }, 200);
+        return c.json({ success: true, data: { key: relativizeSerialized(key, claims.tenantId) } }, 200); // projection-allow: the key of the object the holder of this signed upload URL just stored, relative to the company
     })
     .post('/uploads/video', async (c) => {
         const claims = await verifyUploadToken(c.req.query('token') ?? '', c.env.JWT_SECRET, 'video');
         if (!claims) return c.json(INVALID_TOKEN, 401);
 
-        const refusedLength = checkDeclaredLength(c, MAX_FORM_VIDEO_BYTES, FORM_TOO_LARGE);
+        const refusedLength = declaredLengthRefusal(c, MAX_FORM_VIDEO_BYTES, FORM_TOO_LARGE);
         if (refusedLength) return refusedLength;
         const refusedDestination = await checkDestination(c, claims);
         if (refusedDestination) return refusedDestination;
@@ -131,7 +117,7 @@ export const publicUploadsRoutes = new Hono<HonoConfig>()
         if (!file) return c.json({ error: 'file field required' }, 400);
 
         const stored = await storeVideoUpload(c.env, claims, file, MAX_FORM_VIDEO_BYTES);
-        if (!stored.ok) return c.json(stored.status === 413 ? FORM_TOO_LARGE : { error: stored.error }, stored.status);
+        if (!stored.ok) return c.json(stored.status === 413 ? FORM_TOO_LARGE : { error: stored.error }, stored.status); // projection-allow: a refusal body: the constant too-large answer (error code and limits) or the upload's error message
         return c.json({ success: true, data: { mediaId: stored.mediaId, r2Key: stored.r2Key } }, 200);
     })
     .route('/uploads/video/chunked', videoChunkedRoutes);
