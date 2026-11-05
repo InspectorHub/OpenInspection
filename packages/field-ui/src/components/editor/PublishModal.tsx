@@ -272,7 +272,7 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
  <Modal
  open={receiptOpen}
  onClose={() => setReceiptOpen(false)}
- title={m.report_publish_receipt_title()}
+ title={unchangedSinceVersion !== null ? m.report_publish_receipt_title_unchanged() : m.report_publish_receipt_title()}
  footer={
   <>
   <Button variant="ghost" onClick={() => setReceiptOpen(false)}>{m.common_close()}</Button>
@@ -287,11 +287,12 @@ export function PublishModal({ open, inspectionId, progress, status, publishErro
   </>
  }
  >
- <p className="text-[13px] text-ih-fg-2">{m.report_publish_receipt_nothing_sent()}</p>
+ {/* An unchanged publish published nothing, so "final, new version recorded" would contradict it; its own sentence below says all there is to say. */}
+ {unchangedSinceVersion === null && <p className="text-[13px] text-ih-fg-2">{m.report_publish_receipt_nothing_sent()}</p>}
  {/* What was sent, in the receipt's own words. A first publish repeats the SAME sentence the dialog showed before
      publishing, so promise and receipt agree word for word. A revision cannot: its dialog points at a box that is gone
      here, so the receipt states which way the submitted choice went. */}
- <p className="mt-2 text-[13px] text-ih-fg-3">
+ <p className={unchangedSinceVersion !== null ? "text-[13px] text-ih-fg-2" : "mt-2 text-[13px] text-ih-fg-3"}>
  {unchangedSinceVersion !== null ? m.report_publish_receipt_unchanged({ version: unchangedSinceVersion }) : !submitted?.choice ? m.report_publish_body_delivery() : submitted.notify ? m.report_publish_receipt_amendment_notified() : m.report_publish_receipt_amendment_not_notified()}
  </p>
  </Modal>

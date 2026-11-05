@@ -34,7 +34,7 @@ const FROZEN_INSPECTION_FIELDS = [
 ] as const;
 
 /** JSON with object keys sorted, so two objects holding the same data compare equal whatever order they were built in. */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
     if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
     if (value !== null && typeof value === 'object') {
         const entries = Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== undefined).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));

@@ -331,5 +331,6 @@
   "report_publish_body_delivery_amendment": "No envía el informe por sí mismo. Los avisos de informe actualizado (al cliente y a cualquier otra persona a quien sus automatizaciones avisen) salen solo si marca la casilla de abajo — para que el informe llegue ahora a la bandeja de alguien, envíelo desde la inspección.",
   "report_publish_receipt_amendment_notified": "Los avisos de informe actualizado quedaron en cola. Salen según sus automatizaciones en la próxima tanda de envíos.",
   "report_publish_receipt_amendment_not_notified": "No se enviaron avisos de informe actualizado por esta actualización.",
-  "report_publish_receipt_unchanged": "No hubo cambios desde la versión {version}, por lo que no se publicó nada y no se enviaron avisos."
+  "report_publish_receipt_unchanged": "No hubo cambios desde la versión {version}, por lo que no se publicó nada y no se enviaron avisos.",
+  "report_publish_receipt_title_unchanged": "Nada que publicar"
 }

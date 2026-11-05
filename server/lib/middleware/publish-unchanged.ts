@@ -7,12 +7,14 @@ import { relockUnchangedReport } from '../inspection/report-lock';
 import { setCollabDocLocks } from '../collab/doc-lock-notify';
 import { resolveTenantSlug } from '../url';
 import { REPORT_STATUS } from '../status/report-status';
+import { logger } from '../logger';
+import { compareSnapshots } from '../snapshot-compare';
 import type { HonoConfig } from '../../types/hono';
 
 /**
  * A publish with nothing changed since the latest published version answers with that version
  * instead of making a new one. "Nothing changed" is decided before the publish does anything:
- * what a publish would freeze right now is byte-identical to what the latest version froze (the
+ * what a publish would freeze right now holds the same content as what the latest version froze (see `compareSnapshots`: object key order does not count; the
  * snapshot carries the report status, so an unpublish in between breaks the match), and the
  * `summary` is the one that version carries. A translation request is never a duplicate. The
  * answer is the normal publish shape for the existing version, and none of the publish work runs:
@@ -20,27 +22,6 @@ import type { HonoConfig } from '../../types/hono';
  * is null because none was attempted), plus `unchangedSinceVersion`: the version still current, which is how a caller tells this answer from a real publish. A version frozen before its snapshot matched this shape
  * simply does not match, so the next publish is a real one.
  */
-/**
- * Whether what a publish would freeze now is what the stored version froze. Exact, with one allowance: a version written
- * before the `presentation` part existed (no such part) is compared without `presentation` and `schemaVersion`, so that
- * the step from version 3 to 4 is not by itself a change. A stored version that HAS the part compares exactly, so a
- * settings change after it still counts.
- */
-function sameSnapshot(stored: string, fresh: string): boolean {
-    if (stored === fresh) return true;
-    try {
-        const old = JSON.parse(stored) as Record<string, unknown>;
-        if ('presentation' in old) return false;
-        const now = JSON.parse(fresh) as Record<string, unknown>;
-        delete old.schemaVersion;
-        delete now.schemaVersion;
-        delete now.presentation;
-        return JSON.stringify(old) === JSON.stringify(now);
-    } catch {
-        return false;
-    }
-}
-
 /** The version number the report still stands at when nothing changed, or null when a publish would change something. */
 async function unchangedSinceVersion(c: Context<HonoConfig>, id: string, reportIdInBody: string | undefined, summary: string | undefined): Promise<number | null> {
     const tenantId = c.get('tenantId');
@@ -56,7 +37,12 @@ async function unchangedSinceVersion(c: Context<HonoConfig>, id: string, reportI
         .limit(1)
         .get();
     if (!latest || latest.summary !== (summary ?? null)) return null;
-    return sameSnapshot(latest.snapshotJson, await versions.buildSnapshotForCheck(tenantId, id, reportId)) ? latest.versionNumber : null;
+    const fresh = await versions.buildSnapshotForCheck(tenantId, id, reportId);
+    const cmp = compareSnapshots(latest.snapshotJson, fresh);
+    if (cmp.same) return latest.versionNumber;
+    // Names only, so the next time a publish that should have been "unchanged" is not, the log says which parts moved.
+    logger.info('publish is not unchanged: the frozen copy differs', { inspectionId: id, reportId, version: latest.versionNumber, differs: cmp.differs });
+    return null;
 }
 
 export async function answerUnchangedPublish(c: Context<HonoConfig>, next: Next) {

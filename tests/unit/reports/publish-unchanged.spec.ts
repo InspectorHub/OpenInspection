@@ -191,6 +191,23 @@ describe('republishing a report that was being edited again', () => {
     });
 });
 
+describe('a snapshot that differs only in object key order is unchanged', () => {
+    it('answers as unchanged when the stored copy was projected with its keys in another order', async () => {
+        await publish(A);
+        const [row] = await versions(A);
+        const stored = JSON.parse(row.snapshotJson) as Record<string, unknown>;
+        // The same report with the top-level keys reversed and the findings keys reversed: equal content, different string.
+        const reorder = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).reverse());
+        const reordered = JSON.stringify(reorder({ ...stored, data: reorder(stored.data as Record<string, unknown>) }));
+        expect(reordered).not.toBe(row.snapshotJson);
+        await db.update(schema.reportVersions).set({ snapshotJson: reordered }).where(eq(schema.reportVersions.id, row.id));
+
+        const second = await publish(A);
+        expect(second.body.data.unchangedSinceVersion).toBe(1);
+        expect(await versions(A)).toHaveLength(1);
+    });
+});
+
 describe('the step from snapshot version 3 to 4 is not by itself a change', () => {
     /** Rewrites the stored latest version as an older (version 3) snapshot: no `presentation`, schemaVersion 3. */
     async function downgradeStoredToV3(id: string) {
