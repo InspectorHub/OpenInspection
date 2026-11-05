@@ -72,20 +72,15 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       # server/generated/version.ts is git-ignored and produced by the build;
       # type-check imports it, so stamp it on a fresh checkout.
       - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
       - run: npm run i18n:compile:cached
-      # Same shape as the paraglide cache above, and for the same reason: the
+      # Same shape as the i18n cache (.github/actions/i18n-cache), and for the same reason: the
       # output is a pure function of the route TREE, so a key built from those
       # inputs can only restore what they produced. Five jobs need these types
       # and every one of them was paying the full ~60s generate — five runner
@@ -144,18 +139,13 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
       - run: npm run i18n:compile:cached
-      # Same shape as the paraglide cache above, and for the same reason: the
+      # Same shape as the i18n cache (.github/actions/i18n-cache), and for the same reason: the
       # output is a pure function of the route TREE, so a key built from those
       # inputs can only restore what they produced. Five jobs need these types
       # and every one of them was paying the full ~60s generate — five runner
@@ -201,22 +191,17 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
       - run: npm run i18n:compile:cached
       # knip resolves every `./+types/*` import a route file makes, so it needs
       # the generated route types present or it reports the whole of app/routes
       # as unresolved. In the old serial job these existed only because
       # type-check had already run; nothing declared the dependency.
-      # Same shape as the paraglide cache above, and for the same reason: the
+      # Same shape as the i18n cache (.github/actions/i18n-cache), and for the same reason: the
       # output is a pure function of the route TREE, so a key built from those
       # inputs can only restore what they produced. Five jobs need these types
       # and every one of them was paying the full ~60s generate — five runner
@@ -314,7 +299,10 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
       - run: npm run test:unit -- --shard=${{ matrix.shard }}/4
       # The specs listed as shareable in tests/unit/isolation.json run with
@@ -350,7 +338,7 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run test:contract
 
   test-workers:
@@ -362,7 +350,10 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
       - run: npm run test:workers
 
@@ -387,18 +378,13 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      # Restore the generated i18n output BEFORE install: `npm ci` runs `prepare`, which
+      # compiles it (via the stamped script), so a hit turns that into a skip.
+      - uses: ./.github/actions/i18n-cache
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
-      # Keyed on the compiler's INPUTS, so a hit can only ever restore output
-      # that those exact inputs produced — unlike a build-info cache, there is no
-      # staleness to reason about. The stamp inside app/paraglide comes back with
-      # it, so the script below sees "unchanged" and skips a ~66s compile.
-      - uses: actions/cache@v4
-        with:
-          path: app/paraglide
-          key: paraglide-${{ hashFiles('messages/**', 'project.inlang/**') }}
       - run: npm run i18n:compile:cached
-      # Same shape as the paraglide cache above, and for the same reason: the
+      # Same shape as the i18n cache (.github/actions/i18n-cache), and for the same reason: the
       # output is a pure function of the route TREE, so a key built from those
       # inputs can only restore what they produced. Five jobs need these types
       # and every one of them was paying the full ~60s generate — five runner
@@ -417,12 +403,13 @@ jobs:
     name: build + bundle size
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # No i18n-cache action here or in e2e: the vite paraglide plugin can delete the in-output stamp before a cache would be saved.
     steps:
       - uses: actions/checkout@v5
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v5
         with: { node-version: 22.22.x, cache: npm }
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit --no-fund
       - run: npm run gen-version
       - run: npm run build
       # Bundle-size gate (Workers Free 3 MiB gzipped). Reuses the build/ output
@@ -535,7 +522,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund
 
       # build (via webServer) imports server/generated/version.ts.
       - name: Generate version stamp

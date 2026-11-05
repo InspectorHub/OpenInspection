@@ -61,6 +61,34 @@ function walk(dir, acc = []) {
 
 function inputHash() {
     const h = createHash('sha256');
+    // The compiler itself is an input: a restored or stamped directory must not be
+    // trusted after paraglide-js is upgraded. (`npm ci` now runs this script from
+    // `prepare`, so the installed version is on disk by the time we get here.)
+    try {
+        h.update(`paraglide-js@${JSON.parse(readFileSync('node_modules/@inlang/paraglide-js/package.json', 'utf8')).version}`);
+    } catch {
+        h.update('paraglide-js@unknown');
+    }
+    // The compile FLAGS are inputs too: the `i18n:compile*` script strings in package.json
+    // (strategy, output structure, declarations) and the paraglideVitePlugin option block
+    // in vite.config.ts, which writes to the same outdir. Only those slices are hashed, so
+    // unrelated edits to either file do not invalidate. NOTE: the CI cache key prefix
+    // `paraglide-v2` in .github/actions/i18n-cache/action.yml must be bumped when these change.
+    try {
+        const scripts = JSON.parse(readFileSync('package.json', 'utf8')).scripts ?? {};
+        for (const k of Object.keys(scripts).filter((n) => n.startsWith('i18n:compile')).sort()) {
+            h.update(`${k}=${scripts[k]}`);
+        }
+    } catch {
+        h.update('package-scripts@unknown');
+    }
+    try {
+        const vite = readFileSync('vite.config.ts', 'utf8');
+        const m = vite.match(/paraglideVitePlugin\(\{[\s\S]*?\}\)/);
+        h.update(m ? m[0] : 'vite-paraglide@unknown');
+    } catch {
+        h.update('vite-paraglide@unknown');
+    }
     for (const f of INPUT_DIRS.flatMap((d) => walk(d))) {
         h.update(f);
         h.update(readFileSync(f));

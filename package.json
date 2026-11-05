@@ -163,7 +163,7 @@
     "restore": "node scripts/restore.js",
     "rotate:jwt": "node scripts/rotate-jwt-keys.js",
     "bootstrap": "node scripts/gen-version.js && npm run vendor:copy",
-    "prepare": "node -e \"const{execSync}=require('child_process');try{execSync('git config core.hooksPath .githooks',{stdio:'ignore'})}catch(e){};try{execSync('node scripts/gen-version.js',{stdio:'ignore'})}catch(e){};try{execSync('npm run i18n:compile',{stdio:'ignore'})}catch(e){}\"",
+    "prepare": "node -e \"const{execSync}=require('child_process');try{execSync('git config core.hooksPath .githooks',{stdio:'ignore'})}catch(e){};try{execSync('node scripts/gen-version.js',{stdio:'ignore'})}catch(e){};try{execSync('npm run i18n:compile:cached',{stdio:'ignore'})}catch(e){}\"",
     "check:bundle": "node scripts/check-bundle-size.mjs",
     "mcp:snapshot": "node scripts/snapshot-openapi.mjs",
     "native:contract": "node scripts/snapshot-native-contract.mjs",

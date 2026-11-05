@@ -388,7 +388,10 @@ without anyone deciding it should be. It costs `verify` the wait for the longest
 job, which is the price of the name meaning what it says.
 
 Every job that touches generated types runs `gen-version`, `i18n:compile:cached`
-and `react-router typegen` first. CodeQL runs separately (`codeql.yml`).
+and `react-router typegen` first. `npm ci`'s `prepare` step now runs the cached
+compile itself, and CI restores the generated i18n output through the
+`.github/actions/i18n-cache` action, so the explicit `i18n:compile:cached` step
+usually skips. CodeQL runs separately (`codeql.yml`).
 
 ### Native type-check (optional)
 
